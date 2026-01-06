@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StepIndicator, registrationSteps } from '@/components/vendor/StepIndicator';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
@@ -11,9 +11,9 @@ import { Header } from '@/components/layout/Header';
 import { VendorFormData, ValidationResult } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { Clock, CheckCircle2, Lock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
+import { supabase } from '@/integrations/supabase/client';
 const initialFormData: VendorFormData = {
   organization: {
     legalName: '',
@@ -77,7 +77,14 @@ export default function VendorRegistration() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const [validations, setValidations] = useState<ValidationResult[]>([]);
+  const [systemFetchedData, setSystemFetchedData] = useState<{
+    gstLegalName?: string;
+    gstStatus?: string;
+    panName?: string;
+    bankAccountName?: string;
+  }>({});
   const { toast } = useToast();
   
   const { 
@@ -90,6 +97,58 @@ export default function VendorRegistration() {
 
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
+
+  // Subscribe to real-time validation updates
+  useEffect(() => {
+    if (!vendorId) return;
+
+    const channel = supabase
+      .channel(`vendor-validations-${vendorId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'vendor_validations',
+          filter: `vendor_id=eq.${vendorId}`,
+        },
+        async () => {
+          // Fetch updated validations
+          const { data } = await supabase
+            .from('vendor_validations')
+            .select('*')
+            .eq('vendor_id', vendorId);
+          
+          if (data) {
+            const results: ValidationResult[] = data.map((v) => ({
+              type: v.validation_type as ValidationResult['type'],
+              status: v.status as ValidationResult['status'],
+              message: v.message || '',
+              details: v.details as Record<string, unknown> | undefined,
+              timestamp: v.validated_at,
+            }));
+            setValidations(results);
+            
+            // Extract system-fetched data from validation details
+            const gstValidation = data.find(v => v.validation_type === 'gst');
+            const panValidation = data.find(v => v.validation_type === 'pan');
+            const bankValidation = data.find(v => v.validation_type === 'bank');
+            
+            setSystemFetchedData({
+              gstLegalName: (gstValidation?.details as any)?.registeredName,
+              gstStatus: (gstValidation?.details as any)?.status,
+              panName: (panValidation?.details as any)?.registeredName,
+              bankAccountName: (bankValidation?.details as any)?.accountHolderName,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [vendorId]);
 
   const handleStepComplete = (step: number, data: unknown) => {
     const stepKeys: Record<number, keyof VendorFormData> = {
@@ -124,6 +183,7 @@ export default function VendorRegistration() {
       // Submit vendor data to database
       const vendor = await submitVendor(formData);
       setIsSubmitted(true);
+      setIsLocked(true); // Lock the form after submission
       
       toast({
         title: 'Registration Submitted',
@@ -214,6 +274,57 @@ export default function VendorRegistration() {
 
           <ValidationStatus validations={validations} isProcessing={isValidating} />
 
+          {/* System Fetched Data Display */}
+          {Object.keys(systemFetchedData).some(key => systemFetchedData[key as keyof typeof systemFetchedData]) && (
+            <div className="form-section mt-6">
+              <h3 className="form-section-title flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                System-Verified Information
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                The following fields have been auto-populated from government databases and are locked.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {systemFetchedData.gstLegalName && (
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground">GST Registered Name</p>
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      {systemFetchedData.gstLegalName}
+                      <Lock className="h-3 w-3 text-muted-foreground" />
+                    </p>
+                  </div>
+                )}
+                {systemFetchedData.gstStatus && (
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground">GST Status</p>
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      {systemFetchedData.gstStatus}
+                      <Lock className="h-3 w-3 text-muted-foreground" />
+                    </p>
+                  </div>
+                )}
+                {systemFetchedData.panName && (
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground">PAN Registered Name</p>
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      {systemFetchedData.panName}
+                      <Lock className="h-3 w-3 text-muted-foreground" />
+                    </p>
+                  </div>
+                )}
+                {systemFetchedData.bankAccountName && (
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground">Bank Account Holder Name</p>
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      {systemFetchedData.bankAccountName}
+                      <Lock className="h-3 w-3 text-muted-foreground" />
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="form-section mt-6">
             <h3 className="form-section-title">What's Next?</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
@@ -234,7 +345,15 @@ export default function VendorRegistration() {
       
       <main className="container max-w-5xl py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Vendor Registration</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-2xl font-bold text-foreground">Vendor Registration</h1>
+            {isLocked && (
+              <span className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning px-2 py-1 rounded-full">
+                <Lock className="h-3 w-3" />
+                Form Locked
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Complete all steps to submit your vendor onboarding application
           </p>

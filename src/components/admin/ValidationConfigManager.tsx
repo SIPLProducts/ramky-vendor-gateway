@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { useValidationConfigs, useUpdateValidationConfig, ValidationConfig } from '@/hooks/useValidationOrchestrator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,7 +63,8 @@ const stageColors: Record<string, string> = {
   BOTH: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
 };
 
-export function ValidationConfigManager() {
+export const ValidationConfigManager = forwardRef<HTMLDivElement, object>(
+  function ValidationConfigManager(_, ref) {
   const { data: configs, isLoading, refetch } = useValidationConfigs();
   const updateConfig = useUpdateValidationConfig();
   const [editingConfig, setEditingConfig] = useState<ValidationConfig | null>(null);
@@ -97,14 +98,14 @@ export function ValidationConfigManager() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div ref={ref} className="flex items-center justify-center h-64">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -468,4 +469,4 @@ export function ValidationConfigManager() {
       </Dialog>
     </div>
   );
-}
+});
