@@ -59,7 +59,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
     const updated = selectedCategories.includes(category)
       ? selectedCategories.filter((c) => c !== category)
       : [...selectedCategories, category];
-    setValue('productCategories', updated);
+    setValue('productCategories', updated, { shouldValidate: true });
   };
 
   return (
