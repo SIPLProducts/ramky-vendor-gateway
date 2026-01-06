@@ -10,6 +10,7 @@ import {
   Shield,
   History,
   Building2,
+  Mail,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,6 +30,12 @@ const navItems: NavItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['finance', 'purchase', 'admin'],
+  },
+  {
+    label: 'Vendor Invitations',
+    href: '/admin/invitations',
+    icon: Mail,
+    roles: ['admin'],
   },
   {
     label: 'Vendor Registration',
