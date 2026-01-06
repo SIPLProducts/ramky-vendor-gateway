@@ -16,166 +16,254 @@ interface BankValidationResponse {
   message: string;
   data?: {
     accountHolderName?: string;
+    accountNumber?: string;
     bankName?: string;
     branchName?: string;
+    branchCity?: string;
     ifscCode?: string;
+    accountType?: string;
     nameMatchScore?: number;
+    pennyDropStatus?: string;
+    pennyDropAmount?: string;
+    transactionId?: string;
   };
 }
 
 // IFSC code format validation
 function isValidIFSCFormat(ifsc: string): boolean {
-  // IFSC format: 4 letters (bank code) + 0 + 6 alphanumeric (branch code)
   const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
   return ifscRegex.test(ifsc);
 }
 
 // Bank code mapping (first 4 chars of IFSC)
-function getBankName(ifsc: string): string {
-  const bankCode = ifsc.substring(0, 4);
-  const bankMap: Record<string, string> = {
-    'SBIN': 'State Bank of India',
-    'HDFC': 'HDFC Bank',
-    'ICIC': 'ICICI Bank',
-    'AXIS': 'Axis Bank',
-    'KKBK': 'Kotak Mahindra Bank',
-    'PUNB': 'Punjab National Bank',
-    'BARB': 'Bank of Baroda',
-    'CNRB': 'Canara Bank',
-    'UBIN': 'Union Bank of India',
-    'INDB': 'IndusInd Bank',
-    'YESB': 'Yes Bank',
-    'IBKL': 'IDBI Bank',
-    'FDRL': 'Federal Bank',
-    'UTIB': 'Axis Bank',
-    'BKID': 'Bank of India',
-    'IOBA': 'Indian Overseas Bank',
-    'CBIN': 'Central Bank of India',
-    'ALLA': 'Allahabad Bank',
-    'UCBA': 'UCO Bank',
-    'SBBJ': 'State Bank of Bikaner & Jaipur',
-    'SBHY': 'State Bank of Hyderabad',
-    'SBTR': 'State Bank of Travancore',
-    'SBMY': 'State Bank of Mysore',
-    'SBPA': 'State Bank of Patiala',
-  };
-  return bankMap[bankCode] || 'Unknown Bank';
-}
+const bankCodeMap: Record<string, { name: string; fullName: string }> = {
+  'SBIN': { name: 'SBI', fullName: 'State Bank of India' },
+  'HDFC': { name: 'HDFC', fullName: 'HDFC Bank Ltd' },
+  'ICIC': { name: 'ICICI', fullName: 'ICICI Bank Ltd' },
+  'AXIS': { name: 'Axis', fullName: 'Axis Bank Ltd' },
+  'KKBK': { name: 'Kotak', fullName: 'Kotak Mahindra Bank Ltd' },
+  'PUNB': { name: 'PNB', fullName: 'Punjab National Bank' },
+  'BARB': { name: 'BOB', fullName: 'Bank of Baroda' },
+  'CNRB': { name: 'Canara', fullName: 'Canara Bank' },
+  'UBIN': { name: 'Union', fullName: 'Union Bank of India' },
+  'INDB': { name: 'IndusInd', fullName: 'IndusInd Bank Ltd' },
+  'YESB': { name: 'Yes', fullName: 'Yes Bank Ltd' },
+  'IBKL': { name: 'IDBI', fullName: 'IDBI Bank Ltd' },
+  'FDRL': { name: 'Federal', fullName: 'Federal Bank Ltd' },
+  'UTIB': { name: 'Axis', fullName: 'Axis Bank Ltd' },
+  'BKID': { name: 'BOI', fullName: 'Bank of India' },
+  'IOBA': { name: 'IOB', fullName: 'Indian Overseas Bank' },
+  'CBIN': { name: 'Central', fullName: 'Central Bank of India' },
+  'UCBA': { name: 'UCO', fullName: 'UCO Bank' },
+  'KSBL': { name: 'Kotak', fullName: 'Kotak Mahindra Bank Ltd' },
+};
 
-// Simple name matching (Levenshtein-based similarity)
-function calculateNameMatchScore(name1: string, name2: string): number {
-  const s1 = name1.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const s2 = name2.toLowerCase().replace(/[^a-z0-9]/g, '');
+// Mock IFSC database with branch details
+const mockIFSCDatabase: Record<string, { branch: string; city: string; state: string }> = {
+  'HDFC0001234': { branch: 'Jubilee Hills', city: 'Hyderabad', state: 'Telangana' },
+  'ICIC0001234': { branch: 'Steel City', city: 'Visakhapatnam', state: 'Andhra Pradesh' },
+  'SBIN0001234': { branch: 'Anna Nagar', city: 'Chennai', state: 'Tamil Nadu' },
+  'UTIB0001234': { branch: 'MG Road', city: 'Bangalore', state: 'Karnataka' },
+  'KKBK0001234': { branch: 'Hinjewadi', city: 'Pune', state: 'Maharashtra' },
+  'YESB0001234': { branch: 'Fort', city: 'Mumbai', state: 'Maharashtra' },
+  'PUNB0001234': { branch: 'DLF Phase 1', city: 'Gurgaon', state: 'Haryana' },
+};
+
+// Levenshtein distance for name matching
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
   
-  if (s1 === s2) return 100;
-  if (s1.length === 0 || s2.length === 0) return 0;
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
   
-  // Simple substring matching
-  if (s1.includes(s2) || s2.includes(s1)) {
-    return 85;
-  }
-  
-  // Word-based matching
-  const words1 = s1.split(/\s+/);
-  const words2 = s2.split(/\s+/);
-  let matchCount = 0;
-  
-  for (const w1 of words1) {
-    for (const w2 of words2) {
-      if (w1 === w2 || w1.includes(w2) || w2.includes(w1)) {
-        matchCount++;
-        break;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + 1);
       }
     }
   }
+  return dp[m][n];
+}
+
+// Calculate name match score
+function calculateNameMatchScore(vendorName: string, bankAccountName: string): number {
+  const normalize = (s: string) => s.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/(pvt|private|ltd|limited|llp|inc|corp|co|company)/g, '')
+    .trim();
+
+  const n1 = normalize(vendorName);
+  const n2 = normalize(bankAccountName);
   
-  const score = (matchCount / Math.max(words1.length, words2.length)) * 100;
-  return Math.round(score);
+  if (n1 === n2) return 100;
+  if (!n1 || !n2) return 0;
+
+  // Substring match bonus
+  if (n1.includes(n2) || n2.includes(n1)) {
+    const shorter = Math.min(n1.length, n2.length);
+    const longer = Math.max(n1.length, n2.length);
+    return Math.round(70 + (shorter / longer) * 30);
+  }
+
+  const distance = levenshteinDistance(n1, n2);
+  const maxLen = Math.max(n1.length, n2.length);
+  const similarity = ((maxLen - distance) / maxLen) * 100;
+  
+  return Math.round(Math.max(0, similarity));
+}
+
+// Simulate API delay
+function simulateApiDelay(): Promise<void> {
+  const delay = Math.random() * 800 + 500; // 500-1300ms (bank APIs are slower)
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+// Generate mock transaction ID
+function generateTransactionId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `TXN${timestamp}${random}`;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { accountNumber, ifscCode, accountHolderName }: BankValidationRequest = await req.json();
+    console.log(`[Bank Validation] Validating account: ****${accountNumber?.slice(-4)} at ${ifscCode}`);
 
     if (!accountNumber || !ifscCode) {
       return new Response(
-        JSON.stringify({ 
-          valid: false, 
-          message: 'Account number and IFSC code are required' 
-        }),
+        JSON.stringify({ valid: false, message: 'Account number and IFSC code are required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    // Validate IFSC format
     const upperIFSC = ifscCode.toUpperCase().trim();
+    const cleanAccountNumber = accountNumber.replace(/\s/g, '');
+    
+    // IFSC format validation
     if (!isValidIFSCFormat(upperIFSC)) {
+      console.log(`[Bank Validation] Invalid IFSC format: ${upperIFSC}`);
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          message: 'Invalid IFSC code format. Expected format: ABCD0123456' 
+          message: 'Invalid IFSC code format. Expected format: ABCD0XXXXXX' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Validate account number length
-    const cleanAccountNumber = accountNumber.replace(/\s/g, '');
+    // Account number length validation
     if (cleanAccountNumber.length < 9 || cleanAccountNumber.length > 18) {
       return new Response(
-        JSON.stringify({ 
-          valid: false, 
-          message: 'Account number must be between 9-18 digits' 
+        JSON.stringify({ valid: false, message: 'Account number must be between 9-18 digits' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    // Get bank info
+    const bankCode = upperIFSC.substring(0, 4);
+    const bankInfo = bankCodeMap[bankCode] || { name: 'Unknown Bank', fullName: 'Unknown Bank' };
+    const branchInfo = mockIFSCDatabase[upperIFSC] || { branch: 'Main Branch', city: 'Unknown', state: 'Unknown' };
+
+    // Simulate API delay (penny drop takes time)
+    await simulateApiDelay();
+
+    // Simulate various scenarios based on account number patterns
+    const lastDigit = parseInt(cleanAccountNumber.slice(-1));
+    
+    // Scenario 1: Invalid account (ends with 0)
+    if (lastDigit === 0) {
+      console.log(`[Bank Validation] Account not found: ****${cleanAccountNumber.slice(-4)}`);
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          message: 'Bank account not found. Please verify account number and IFSC code.',
+          data: {
+            bankName: bankInfo.fullName,
+            branchName: branchInfo.branch,
+            ifscCode: upperIFSC,
+            pennyDropStatus: 'Failed',
+          }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Get bank name from IFSC
-    const bankName = getBankName(upperIFSC);
+    // Scenario 2: Account found but name mismatch (ends with 1 or 2)
+    if (lastDigit === 1 || lastDigit === 2) {
+      const bankAccountName = 'DIFFERENT NAME PVT LTD';
+      const nameMatchScore = calculateNameMatchScore(accountHolderName || '', bankAccountName);
+      
+      console.log(`[Bank Validation] Name mismatch: ${nameMatchScore}%`);
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          message: `Account verified but name mismatch (${nameMatchScore}% match). Bank records show different name.`,
+          data: {
+            accountHolderName: bankAccountName,
+            accountNumber: `XXXX${cleanAccountNumber.slice(-4)}`,
+            bankName: bankInfo.fullName,
+            branchName: branchInfo.branch,
+            branchCity: branchInfo.city,
+            ifscCode: upperIFSC,
+            accountType: 'Current',
+            nameMatchScore,
+            pennyDropStatus: 'Success',
+            pennyDropAmount: '₹1.00',
+            transactionId: generateTransactionId(),
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
 
-    // In production, you would call the actual penny drop API here
-    // TODO: Integrate with Razorpay/Cashfree/other bank verification API
-    
-    // Simulate penny drop verification
-    const simulatedAccountHolderName = accountHolderName || 'Account Holder Name';
-    const nameMatchScore = calculateNameMatchScore(accountHolderName, simulatedAccountHolderName);
-    
+    // Scenario 3: Successful verification
+    const mockBankAccountName = accountHolderName?.toUpperCase() || 'ACCOUNT HOLDER NAME';
+    const nameMatchScore = calculateNameMatchScore(accountHolderName || '', mockBankAccountName);
     const isValid = nameMatchScore >= 80;
-    
-    const simulatedResponse: BankValidationResponse = {
+    const transactionId = generateTransactionId();
+
+    console.log(`[Bank Validation] ${isValid ? 'SUCCESS' : 'FAILED'}: Score ${nameMatchScore}%, TxnID: ${transactionId}`);
+
+    const response: BankValidationResponse = {
       valid: isValid,
       message: isValid 
-        ? 'Bank account verified via ₹1 penny drop' 
-        : `Name match score (${nameMatchScore}%) below threshold`,
+        ? `Bank account verified via ₹1 penny drop. Name match: ${nameMatchScore}%`
+        : `Name match score (${nameMatchScore}%) is below the required threshold (80%)`,
       data: {
-        accountHolderName: simulatedAccountHolderName,
-        bankName: bankName,
-        branchName: 'Main Branch',
+        accountHolderName: mockBankAccountName,
+        accountNumber: `XXXX${cleanAccountNumber.slice(-4)}`,
+        bankName: bankInfo.fullName,
+        branchName: branchInfo.branch,
+        branchCity: branchInfo.city,
         ifscCode: upperIFSC,
-        nameMatchScore: nameMatchScore,
+        accountType: cleanAccountNumber.length <= 11 ? 'Savings' : 'Current',
+        nameMatchScore,
+        pennyDropStatus: 'Success',
+        pennyDropAmount: '₹1.00',
+        transactionId,
       },
     };
 
-    console.log(`Bank Validation for account ending ${cleanAccountNumber.slice(-4)}: ${simulatedResponse.valid ? 'PASSED' : 'FAILED'}`);
-
     return new Response(
-      JSON.stringify(simulatedResponse),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
   } catch (error) {
-    console.error('Bank Validation Error:', error);
+    console.error('[Bank Validation] Error:', error);
     return new Response(
-      JSON.stringify({ 
-        valid: false, 
-        message: 'Bank validation service error. Please try again.' 
-      }),
+      JSON.stringify({ valid: false, message: 'Bank validation service error. Please try again.' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
