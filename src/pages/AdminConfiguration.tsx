@@ -8,17 +8,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ValidationConfigManager } from '@/components/admin/ValidationConfigManager';
+import { ValidationApiLogs } from '@/components/admin/ValidationApiLogs';
 import { 
   Settings, 
   Clock, 
   Shield, 
   Building2, 
-  Percent, 
   Save,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Settings2,
+  FileText,
+  Percent,
 } from 'lucide-react';
 
 interface PortalConfig {
@@ -194,7 +198,24 @@ export default function AdminConfiguration() {
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="general" className="gap-2">
+            <Settings className="h-4 w-4" />
+            General Settings
+          </TabsTrigger>
+          <TabsTrigger value="validations" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            Validation Engine
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2">
+            <FileText className="h-4 w-4" />
+            API Logs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general">
+          <div className="grid gap-6 md:grid-cols-2">
         {/* Link Expiry Settings */}
         <Card>
           <CardHeader>
@@ -400,7 +421,17 @@ export default function AdminConfiguration() {
             </p>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="validations">
+          <ValidationConfigManager />
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <ValidationApiLogs />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

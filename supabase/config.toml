@@ -1,1 +1,22 @@
 project_id = "kntaaugefxhymmrvivaj"
+
+[functions.validate-gst]
+verify_jwt = false
+
+[functions.validate-pan]
+verify_jwt = false
+
+[functions.validate-bank]
+verify_jwt = false
+
+[functions.validate-msme]
+verify_jwt = false
+
+[functions.validate-name-match]
+verify_jwt = false
+
+[functions.send-vendor-invitation]
+verify_jwt = false
+
+[functions.validation-orchestrator]
+verify_jwt = false
