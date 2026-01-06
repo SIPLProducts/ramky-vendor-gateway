@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<OrganizationDetails>({
     resolver: zodResolver(schema),
@@ -90,21 +91,24 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
 
           <div className="space-y-2">
             <Label htmlFor="industryType">Type of Industry *</Label>
-            <Select
-              value={watch('industryType')}
-              onValueChange={(value) => setValue('industryType', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select industry type" />
-              </SelectTrigger>
-              <SelectContent>
-                {INDUSTRY_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="industryType"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select industry type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDUSTRY_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.industryType && (
               <p className="text-sm text-destructive">{errors.industryType.message}</p>
             )}
@@ -142,21 +146,24 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
 
           <div className="space-y-2">
             <Label htmlFor="registeredState">State *</Label>
-            <Select
-              value={watch('registeredState')}
-              onValueChange={(value) => setValue('registeredState', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select state" />
-              </SelectTrigger>
-              <SelectContent>
-                {INDIAN_STATES.map((state) => (
-                  <SelectItem key={state} value={state}>
-                    {state}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="registeredState"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDIAN_STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.registeredState && (
               <p className="text-sm text-destructive">{errors.registeredState.message}</p>
             )}
@@ -213,21 +220,24 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
 
             <div className="space-y-2">
               <Label htmlFor="communicationState">State</Label>
-              <Select
-                value={watch('communicationState')}
-                onValueChange={(value) => setValue('communicationState', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select state" />
-                </SelectTrigger>
-                <SelectContent>
-                  {INDIAN_STATES.map((state) => (
-                    <SelectItem key={state} value={state}>
-                      {state}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                name="communicationState"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
 
             <div className="space-y-2">
