@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Index from "./pages/Index";
+
 import Auth from "./pages/Auth";
 import VendorRegistration from "./pages/VendorRegistration";
 import Dashboard from "./pages/Dashboard";
@@ -25,8 +25,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Index />} />
+            {/* Public Routes - Auth is the main entry */}
+            <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/vendor/register" element={<VendorRegistration />} />
             

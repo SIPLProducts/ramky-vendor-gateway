@@ -7,18 +7,44 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, Mail, Lock, User, Loader2, AlertCircle } from 'lucide-react';
+import { Building2, Mail, Lock, User, Loader2, AlertCircle, Shield, ClipboardCheck, ArrowRight, FileText } from 'lucide-react';
 import { z } from 'zod';
-import authHeroImage from '@/assets/auth-hero.jpg';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
+type RoleType = 'vendor' | 'finance' | 'purchase' | null;
+
+const roles = [
+  {
+    id: 'vendor' as const,
+    title: 'Vendor Portal',
+    description: 'Complete your vendor registration and track application status',
+    icon: FileText,
+    color: 'bg-primary',
+  },
+  {
+    id: 'finance' as const,
+    title: 'Finance Team',
+    description: 'Review and validate vendor financial documents',
+    icon: Shield,
+    color: 'bg-warning',
+  },
+  {
+    id: 'purchase' as const,
+    title: 'Purchase Team',
+    description: 'Final approval and SAP synchronization',
+    icon: ClipboardCheck,
+    color: 'bg-accent',
+  },
+];
+
 export default function Auth() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signIn, signUp } = useAuth();
   
+  const [selectedRole, setSelectedRole] = useState<RoleType>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -43,6 +69,11 @@ export default function Auth() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    if (!selectedRole) {
+      setError('Please select a role to continue');
+      return;
+    }
 
     try {
       emailSchema.parse(loginEmail);
@@ -73,6 +104,11 @@ export default function Auth() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    if (!selectedRole) {
+      setError('Please select a role to continue');
+      return;
+    }
 
     try {
       nameSchema.parse(signupName);
@@ -118,70 +154,80 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Hero Image Section */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
-        <img
-          src={authHeroImage}
-          alt="Infrastructure construction"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-primary/40" />
-        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="h-12 w-12 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center">
-              <Building2 className="h-7 w-7" />
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card">
+        <div className="container mx-auto px-6 py-4 flex items-center">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-lg">R</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Ramky Infrastructure</h1>
-              <p className="text-white/80 text-sm">Vendor Management Portal</p>
-            </div>
-          </div>
-          
-          <h2 className="text-4xl font-bold mb-4 leading-tight">
-            Building Tomorrow's<br />Infrastructure Today
-          </h2>
-          <p className="text-lg text-white/90 max-w-md">
-            Join our network of trusted vendors and partners. Streamline your onboarding 
-            process with our secure, efficient portal.
-          </p>
-          
-          <div className="mt-12 grid grid-cols-3 gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold">500+</p>
-              <p className="text-sm text-white/80">Active Vendors</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold">₹2000Cr+</p>
-              <p className="text-sm text-white/80">Annual Procurement</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold">15+</p>
-              <p className="text-sm text-white/80">States Covered</p>
+              <h1 className="font-semibold text-foreground">Ramky Infrastructure Limited</h1>
+              <p className="text-xs text-muted-foreground">Vendor Onboarding Portal</p>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Auth Form Section */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
-        <div className="w-full max-w-md">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Ramky Infrastructure</h1>
-              <p className="text-muted-foreground text-xs">Vendor Management Portal</p>
-            </div>
-          </div>
+      {/* Hero Section */}
+      <section className="container mx-auto px-6 py-12 text-center">
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+          Vendor Onboarding Portal
+        </h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+          Secure, compliant, and audit-ready vendor registration system for 
+          Ramky Infrastructure Limited
+        </p>
+      </section>
 
-          <Card className="border-0 shadow-xl">
+      {/* Role Selection */}
+      <section className="container mx-auto px-6 pb-8">
+        <h2 className="text-2xl font-semibold text-center mb-6">Select Your Role</h2>
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          {roles.map((role) => (
+            <Card 
+              key={role.id}
+              className={`h-full cursor-pointer transition-all ${
+                selectedRole === role.id 
+                  ? 'ring-2 ring-primary shadow-lg' 
+                  : 'hover:shadow-md'
+              }`}
+              onClick={() => setSelectedRole(role.id)}
+            >
+              <CardHeader>
+                <div className={`h-12 w-12 rounded-lg ${role.color} flex items-center justify-center mb-4 transition-transform ${selectedRole === role.id ? 'scale-110' : ''}`}>
+                  <role.icon className="h-6 w-6 text-white" />
+                </div>
+                <CardTitle className="flex items-center gap-2">
+                  {role.title}
+                  {selectedRole === role.id && (
+                    <span className="text-primary text-sm">✓</span>
+                  )}
+                </CardTitle>
+                <CardDescription>{role.description}</CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Login/Signup Form */}
+      <section className="container mx-auto px-6 pb-16">
+        <div className="max-w-md mx-auto">
+          <Card className="border shadow-xl">
             <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl">Welcome</CardTitle>
+              <CardTitle className="text-2xl">
+                {selectedRole 
+                  ? `${roles.find(r => r.id === selectedRole)?.title} Login`
+                  : 'Welcome'
+                }
+              </CardTitle>
               <CardDescription>
-                Sign in to your account or create a new one
+                {selectedRole 
+                  ? 'Sign in to your account or create a new one'
+                  : 'Please select a role above to continue'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -238,14 +284,17 @@ export default function Auth() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button type="submit" className="w-full gap-2" disabled={isLoading || !selectedRole}>
                       {isLoading ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                           Signing in...
                         </>
                       ) : (
-                        'Sign In'
+                        <>
+                          Sign In
+                          <ArrowRight className="h-4 w-4" />
+                        </>
                       )}
                     </Button>
                   </form>
@@ -321,14 +370,17 @@ export default function Auth() {
                       By signing up, you agree to our Terms of Service and Privacy Policy.
                     </p>
 
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button type="submit" className="w-full gap-2" disabled={isLoading || !selectedRole}>
                       {isLoading ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                           Creating account...
                         </>
                       ) : (
-                        'Create Account'
+                        <>
+                          Create Account
+                          <ArrowRight className="h-4 w-4" />
+                        </>
                       )}
                     </Button>
                   </form>
@@ -341,7 +393,7 @@ export default function Auth() {
             © 2024 Ramky Infrastructure Limited. All rights reserved.
           </p>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
