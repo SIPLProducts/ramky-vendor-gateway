@@ -135,8 +135,8 @@ export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
             <Controller
               name="entityType"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select entity type" />
                   </SelectTrigger>
@@ -189,8 +189,8 @@ export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
             <Controller
               name="msmeCategory"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
