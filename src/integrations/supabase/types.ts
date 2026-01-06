@@ -106,6 +106,47 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_validations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          last_status: string | null
+          next_run_at: string
+          validation_type: string
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at: string
+          validation_type: string
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string
+          validation_type?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_validations_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -121,6 +162,113 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      validation_api_logs: {
+        Row: {
+          api_provider: string | null
+          created_at: string
+          error_message: string | null
+          execution_time_ms: number | null
+          id: string
+          is_success: boolean
+          request_payload: Json | null
+          response_payload: Json | null
+          response_status: number | null
+          validation_type: string
+          vendor_id: string | null
+        }
+        Insert: {
+          api_provider?: string | null
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          is_success?: boolean
+          request_payload?: Json | null
+          response_payload?: Json | null
+          response_status?: number | null
+          validation_type: string
+          vendor_id?: string | null
+        }
+        Update: {
+          api_provider?: string | null
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          is_success?: boolean
+          request_payload?: Json | null
+          response_payload?: Json | null
+          response_status?: number | null
+          validation_type?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validation_api_logs_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      validation_configs: {
+        Row: {
+          api_endpoint: string | null
+          api_provider: string | null
+          created_at: string
+          description: string | null
+          display_name: string
+          execution_stage: string
+          id: string
+          is_enabled: boolean
+          is_mandatory: boolean
+          matching_threshold: number | null
+          priority_order: number | null
+          retry_count: number | null
+          schedule_frequency_days: number | null
+          timeout_seconds: number | null
+          updated_at: string
+          validation_type: string
+        }
+        Insert: {
+          api_endpoint?: string | null
+          api_provider?: string | null
+          created_at?: string
+          description?: string | null
+          display_name: string
+          execution_stage?: string
+          id?: string
+          is_enabled?: boolean
+          is_mandatory?: boolean
+          matching_threshold?: number | null
+          priority_order?: number | null
+          retry_count?: number | null
+          schedule_frequency_days?: number | null
+          timeout_seconds?: number | null
+          updated_at?: string
+          validation_type: string
+        }
+        Update: {
+          api_endpoint?: string | null
+          api_provider?: string | null
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          execution_stage?: string
+          id?: string
+          is_enabled?: boolean
+          is_mandatory?: boolean
+          matching_threshold?: number | null
+          priority_order?: number | null
+          retry_count?: number | null
+          schedule_frequency_days?: number | null
+          timeout_seconds?: number | null
+          updated_at?: string
+          validation_type?: string
         }
         Relationships: []
       }
