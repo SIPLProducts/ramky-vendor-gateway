@@ -16,7 +16,7 @@ const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
-type RoleType = 'vendor' | 'finance' | 'purchase' | '';
+type RoleType = 'vendor' | 'finance' | 'purchase' | 'admin' | '';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -223,6 +223,7 @@ export default function Auth() {
                     <SelectItem value="vendor">Vendor Portal</SelectItem>
                     <SelectItem value="finance">Finance Team</SelectItem>
                     <SelectItem value="purchase">Purchase Team</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
