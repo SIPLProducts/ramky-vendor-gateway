@@ -97,8 +97,8 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
             <Controller
               name="bankName"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select bank" />
                   </SelectTrigger>
@@ -122,8 +122,8 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
             <Controller
               name="accountType"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select account type" />
                   </SelectTrigger>

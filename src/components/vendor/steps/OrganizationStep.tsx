@@ -94,8 +94,8 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
             <Controller
               name="industryType"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select industry type" />
                   </SelectTrigger>
@@ -149,8 +149,8 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
             <Controller
               name="registeredState"
               control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
@@ -223,8 +223,8 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
               <Controller
                 name="communicationState"
                 control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                render={({ field: { ref, ...fieldProps } }) => (
+                  <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
