@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { StatutoryDetails } from '@/types/vendor';
-import { ChevronLeft, ChevronRight, Upload, FileText, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FileUpload } from '@/components/vendor/FileUpload';
+import { useState } from 'react';
 
 const schema = z.object({
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GSTIN format'),
@@ -30,11 +32,14 @@ interface StatutoryStepProps {
 }
 
 export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
+  const [gstCertificateFile, setGstCertificateFile] = useState<File | null>(data.gstCertificateFile);
+  const [panCardFile, setPanCardFile] = useState<File | null>(data.panCardFile);
+  const [msmeCertificateFile, setMsmeCertificateFile] = useState<File | null>(data.msmeCertificateFile);
+
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
+    control,
     formState: { errors },
   } = useForm<Omit<StatutoryDetails, 'gstCertificateFile' | 'panCardFile' | 'msmeCertificateFile'>>({
     resolver: zodResolver(schema),
@@ -61,9 +66,9 @@ export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
   const handleFormSubmit = (formData: Omit<StatutoryDetails, 'gstCertificateFile' | 'panCardFile' | 'msmeCertificateFile'>) => {
     onNext({
       ...formData,
-      gstCertificateFile: data.gstCertificateFile,
-      panCardFile: data.panCardFile,
-      msmeCertificateFile: data.msmeCertificateFile,
+      gstCertificateFile,
+      panCardFile,
+      msmeCertificateFile,
     });
   };
 
@@ -95,16 +100,14 @@ export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
             <p className="text-xs text-muted-foreground">15-character GST Identification Number</p>
           </div>
 
-          <div className="space-y-2">
-            <Label>GST Certificate Upload</Label>
-            <div className="border-2 border-dashed rounded-md p-4 text-center hover:bg-muted/50 cursor-pointer transition-colors">
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Click to upload GST Certificate (PDF/JPG)
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Max 5MB</p>
-            </div>
-          </div>
+          <FileUpload
+            label="GST Certificate"
+            accept=".pdf,.jpg,.jpeg,.png"
+            documentType="gst_certificate"
+            onFileSelect={setGstCertificateFile}
+            currentFile={gstCertificateFile}
+            required
+          />
         </div>
       </div>
 
@@ -129,36 +132,37 @@ export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
 
           <div className="space-y-2">
             <Label htmlFor="entityType">Entity Type *</Label>
-            <Select
-              value={watch('entityType')}
-              onValueChange={(value) => setValue('entityType', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select entity type" />
-              </SelectTrigger>
-              <SelectContent>
-                {entityTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="entityType"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select entity type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entityTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.entityType && (
               <p className="text-sm text-destructive">{errors.entityType.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label>PAN Card Upload</Label>
-            <div className="border-2 border-dashed rounded-md p-4 text-center hover:bg-muted/50 cursor-pointer transition-colors">
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Click to upload PAN Card (PDF/JPG)
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Max 5MB</p>
-            </div>
-          </div>
+          <FileUpload
+            label="PAN Card"
+            accept=".pdf,.jpg,.jpeg,.png"
+            documentType="pan_card"
+            onFileSelect={setPanCardFile}
+            currentFile={panCardFile}
+            required
+          />
         </div>
       </div>
 
@@ -182,31 +186,31 @@ export function StatutoryStep({ data, onNext, onBack }: StatutoryStepProps) {
 
           <div className="space-y-2">
             <Label htmlFor="msmeCategory">MSME Category</Label>
-            <Select
-              value={watch('msmeCategory')}
-              onValueChange={(value) => setValue('msmeCategory', value as 'micro' | 'small' | 'medium' | '')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="micro">Micro Enterprise</SelectItem>
-                <SelectItem value="small">Small Enterprise</SelectItem>
-                <SelectItem value="medium">Medium Enterprise</SelectItem>
-              </SelectContent>
-            </Select>
+            <Controller
+              name="msmeCategory"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="micro">Micro Enterprise</SelectItem>
+                    <SelectItem value="small">Small Enterprise</SelectItem>
+                    <SelectItem value="medium">Medium Enterprise</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
 
-          <div className="space-y-2">
-            <Label>MSME Certificate Upload</Label>
-            <div className="border-2 border-dashed rounded-md p-4 text-center hover:bg-muted/50 cursor-pointer transition-colors">
-              <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Click to upload MSME Certificate (PDF)
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Max 5MB</p>
-            </div>
-          </div>
+          <FileUpload
+            label="MSME Certificate"
+            accept=".pdf"
+            documentType="msme_certificate"
+            onFileSelect={setMsmeCertificateFile}
+            currentFile={msmeCertificateFile}
+          />
         </div>
       </div>
 

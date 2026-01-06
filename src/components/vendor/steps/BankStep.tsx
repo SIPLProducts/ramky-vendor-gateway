@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BankDetails } from '@/types/vendor';
-import { ChevronLeft, ChevronRight, Upload, AlertCircle, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FileUpload } from '@/components/vendor/FileUpload';
+import { useState } from 'react';
 
 const schema = z.object({
   bankName: z.string().min(2, 'Bank name is required'),
@@ -34,11 +36,12 @@ interface BankStepProps {
 }
 
 export function BankStep({ data, onNext, onBack }: BankStepProps) {
+  const [cancelledChequeFile, setCancelledChequeFile] = useState<File | null>(data.cancelledChequeFile);
+
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
+    control,
     formState: { errors },
   } = useForm<Omit<BankDetails, 'cancelledChequeFile'>>({
     resolver: zodResolver(schema),
@@ -72,7 +75,7 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
   const handleFormSubmit = (formData: Omit<BankDetails, 'cancelledChequeFile'>) => {
     onNext({
       ...formData,
-      cancelledChequeFile: data.cancelledChequeFile,
+      cancelledChequeFile,
     });
   };
 
@@ -91,21 +94,24 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="bankName">Bank Name *</Label>
-            <Select
-              value={watch('bankName')}
-              onValueChange={(value) => setValue('bankName', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select bank" />
-              </SelectTrigger>
-              <SelectContent>
-                {popularBanks.map((bank) => (
-                  <SelectItem key={bank} value={bank}>
-                    {bank}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="bankName"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {popularBanks.map((bank) => (
+                      <SelectItem key={bank} value={bank}>
+                        {bank}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.bankName && (
               <p className="text-sm text-destructive">{errors.bankName.message}</p>
             )}
@@ -113,18 +119,21 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
 
           <div className="space-y-2">
             <Label htmlFor="accountType">Account Type *</Label>
-            <Select
-              value={watch('accountType')}
-              onValueChange={(value) => setValue('accountType', value as 'current' | 'savings')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select account type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current">Current Account</SelectItem>
-                <SelectItem value="savings">Savings Account</SelectItem>
-              </SelectContent>
-            </Select>
+            <Controller
+              name="accountType"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current Account</SelectItem>
+                    <SelectItem value="savings">Savings Account</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.accountType && (
               <p className="text-sm text-destructive">{errors.accountType.message}</p>
             )}
@@ -187,16 +196,19 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
       </div>
 
       <div className="form-section">
-        <h3 className="form-section-title">Cancelled Cheque Upload *</h3>
+        <h3 className="form-section-title">Cancelled Cheque</h3>
         <p className="text-sm text-muted-foreground mb-4">
           Upload a clear image of cancelled cheque for bank verification
         </p>
         
-        <div className="border-2 border-dashed rounded-md p-6 text-center hover:bg-muted/50 cursor-pointer transition-colors">
-          <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm font-medium">Click to upload Cancelled Cheque</p>
-          <p className="text-xs text-muted-foreground mt-1">PDF or JPG, Max 5MB</p>
-        </div>
+        <FileUpload
+          label="Cancelled Cheque"
+          accept=".pdf,.jpg,.jpeg,.png"
+          documentType="cancelled_cheque"
+          onFileSelect={setCancelledChequeFile}
+          currentFile={cancelledChequeFile}
+          required
+        />
       </div>
 
       <Alert variant="destructive" className="bg-warning/10 border-warning text-warning-foreground">

@@ -9,12 +9,14 @@ import { AppLayout } from "@/components/layout/AppLayout";
 
 import Auth from "./pages/Auth";
 import VendorRegistration from "./pages/VendorRegistration";
+import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
 import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
 import VendorList from "./pages/VendorList";
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
+import AdminInvitations from "./pages/AdminInvitations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +33,7 @@ const App = () => (
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/vendor/register" element={<VendorRegistration />} />
+            <Route path="/vendor/invite" element={<VendorRegisterWithInvite />} />
             
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
@@ -42,6 +45,7 @@ const App = () => (
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
+                <Route path="/admin/invitations" element={<AdminInvitations />} />
               </Route>
             </Route>
             
