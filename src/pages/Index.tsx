@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Users, ClipboardCheck, Shield, ArrowRight } from 'lucide-react';
+import { Building2, Users, ClipboardCheck, Shield, ArrowRight, LogIn } from 'lucide-react';
 
 export default function Index() {
   const roles = [
@@ -16,14 +16,14 @@ export default function Index() {
       title: 'Finance Team',
       description: 'Review and validate vendor submissions',
       icon: Shield,
-      href: '/finance/dashboard',
+      href: '/dashboard',
       color: 'bg-warning',
     },
     {
       title: 'Purchase Team',
       description: 'Final approval and SAP synchronization',
       icon: ClipboardCheck,
-      href: '/purchase/dashboard',
+      href: '/dashboard',
       color: 'bg-accent',
     },
   ];
@@ -42,6 +42,12 @@ export default function Index() {
               <p className="text-xs text-muted-foreground">Vendor Onboarding Portal</p>
             </div>
           </div>
+          <Link to="/auth">
+            <Button variant="outline" className="gap-2">
+              <LogIn className="h-4 w-4" />
+              Login
+            </Button>
+          </Link>
         </div>
       </header>
 
