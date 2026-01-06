@@ -11,6 +11,7 @@ import {
   History,
   Building2,
   Mail,
+  ChevronRight,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -90,17 +91,19 @@ export function Sidebar({ userRole }: SidebarProps) {
 
   return (
     <aside className="w-64 bg-sidebar border-r flex flex-col h-[calc(100vh-3.5rem)]">
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <Building2 className="h-6 w-6 text-sidebar-primary" />
+          <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
+            <Building2 className="h-5 w-5 text-white" />
+          </div>
           <div>
             <p className="text-sm font-semibold text-sidebar-foreground">Ramky Infrastructure</p>
-            <p className="text-xs text-sidebar-foreground/70">Vendor Management</p>
+            <p className="text-xs text-sidebar-foreground/60">Vendor Management</p>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-4 space-y-1.5">
         {filteredItems.map((item) => {
           const isActive = location.pathname === item.href;
           const Icon = item.icon;
@@ -110,23 +113,28 @@ export function Sidebar({ userRole }: SidebarProps) {
               key={item.href}
               to={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
+                'flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                 isActive
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-primary/20'
+                  : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              <Icon className="h-5 w-5" />
-              {item.label}
+              <div className="flex items-center gap-3">
+                <Icon className="h-5 w-5" />
+                {item.label}
+              </div>
+              {isActive && <ChevronRight className="h-4 w-4" />}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="text-xs text-sidebar-foreground/60">
-          <p>Version 1.0.0</p>
-          <p>© 2024 Ramky Infrastructure</p>
+      <div className="p-5 border-t border-sidebar-border">
+        <div className="px-4 py-3 rounded-xl bg-sidebar-accent/50">
+          <div className="text-xs text-sidebar-foreground/60">
+            <p className="font-medium text-sidebar-foreground mb-1">Version 2.0.0</p>
+            <p>© 2024 Ramky Infrastructure</p>
+          </div>
         </div>
       </div>
     </aside>
