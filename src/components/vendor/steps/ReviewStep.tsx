@@ -2,31 +2,18 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { VendorFormData } from '@/types/vendor';
-import { ChevronLeft, Send, Building2, User, FileText, Building, IndianRupee, Edit2 } from 'lucide-react';
+import { ChevronLeft, Send, Building2, User, FileText, Building, IndianRupee, Edit2, LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 
-interface ReviewStepProps {
-  data: VendorFormData;
-  onSubmit: () => void;
-  onBack: () => void;
+interface SectionHeaderProps {
+  icon: LucideIcon;
+  title: string;
+  step: number;
   onEditStep: (step: number) => void;
 }
 
-export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepProps) {
-  const [selfDeclared, setSelfDeclared] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-
-  const canSubmit = selfDeclared && termsAccepted;
-
-  const SectionHeader = ({ 
-    icon: Icon, 
-    title, 
-    step 
-  }: { 
-    icon: React.ElementType; 
-    title: string; 
-    step: number;
-  }) => (
+function SectionHeader({ icon: Icon, title, step, onEditStep }: SectionHeaderProps) {
+  return (
     <div className="flex items-center justify-between mb-4 pb-2 border-b">
       <div className="flex items-center gap-2">
         <Icon className="h-5 w-5 text-primary" />
@@ -43,23 +30,44 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
       </Button>
     </div>
   );
+}
 
-  const DataRow = ({ label, value }: { label: string; value: string | undefined }) => (
+interface DataRowProps {
+  label: string;
+  value: string | undefined;
+}
+
+function DataRow({ label, value }: DataRowProps) {
+  return (
     <div className="py-2 grid grid-cols-2 gap-4">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-sm font-medium text-foreground">{value || '-'}</span>
     </div>
   );
+}
+
+interface ReviewStepProps {
+  data: VendorFormData;
+  onSubmit: () => void;
+  onBack: () => void;
+  onEditStep: (step: number) => void;
+}
+
+export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepProps) {
+  const [selfDeclared, setSelfDeclared] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  const canSubmit = selfDeclared && termsAccepted;
 
   return (
     <div className="space-y-6">
       <div className="form-section">
-        <SectionHeader icon={Building2} title="Organization Details" step={1} />
+        <SectionHeader icon={Building2} title="Organization Details" step={1} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="Legal Name" value={data.organization.legalName} />
           <DataRow label="Trade Name" value={data.organization.tradeName} />
           <DataRow label="Industry Type" value={data.organization.industryType} />
-          <DataRow label="Categories" value={data.organization.productCategories.join(', ')} />
+          <DataRow label="Categories" value={data.organization.productCategories?.join(', ')} />
           <DataRow 
             label="Registered Address" 
             value={`${data.organization.registeredAddress}, ${data.organization.registeredCity}, ${data.organization.registeredState} - ${data.organization.registeredPincode}`} 
@@ -68,7 +76,7 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={User} title="Contact Information" step={2} />
+        <SectionHeader icon={User} title="Contact Information" step={2} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="Primary Contact" value={data.contact.primaryContactName} />
           <DataRow label="Designation" value={data.contact.primaryDesignation} />
@@ -81,7 +89,7 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={FileText} title="Statutory Details" step={3} />
+        <SectionHeader icon={FileText} title="Statutory Details" step={3} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="GSTIN" value={data.statutory.gstin} />
           <DataRow label="PAN" value={data.statutory.pan} />
@@ -96,22 +104,22 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={Building} title="Bank Details" step={4} />
+        <SectionHeader icon={Building} title="Bank Details" step={4} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="Bank Name" value={data.bank.bankName} />
           <DataRow label="Account Type" value={data.bank.accountType === 'current' ? 'Current Account' : 'Savings Account'} />
-          <DataRow label="Account Number" value={`XXXX${data.bank.accountNumber.slice(-4)}`} />
+          <DataRow label="Account Number" value={data.bank.accountNumber ? `XXXX${data.bank.accountNumber.slice(-4)}` : '-'} />
           <DataRow label="IFSC Code" value={data.bank.ifscCode} />
           <DataRow label="Branch" value={data.bank.branchName} />
         </div>
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={IndianRupee} title="Financial Information" step={5} />
+        <SectionHeader icon={IndianRupee} title="Financial Information" step={5} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="Current Year Turnover" value={data.financial.turnoverYear1 ? `₹ ${data.financial.turnoverYear1}` : undefined} />
           <DataRow label="Previous Year Turnover" value={data.financial.turnoverYear2 ? `₹ ${data.financial.turnoverYear2}` : undefined} />
-          <DataRow label="Expected Credit Period" value={`${data.financial.creditPeriodExpected} Days`} />
+          <DataRow label="Expected Credit Period" value={data.financial.creditPeriodExpected ? `${data.financial.creditPeriodExpected} Days` : '-'} />
         </div>
       </div>
 
