@@ -45,11 +45,14 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
     formState: { errors },
   } = useForm<OrganizationDetails>({
     resolver: zodResolver(schema),
-    defaultValues: data,
+    defaultValues: {
+      ...data,
+      productCategories: data.productCategories || [],
+    },
   });
 
   const sameAsRegistered = watch('sameAsRegistered');
-  const selectedCategories = watch('productCategories') || [];
+  const selectedCategories = watch('productCategories') ?? [];
 
   const handleCategoryToggle = (category: string) => {
     const updated = selectedCategories.includes(category)
