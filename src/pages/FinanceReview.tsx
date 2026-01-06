@@ -13,8 +13,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
-import { mockVendors, getVendorsByStatus } from '@/data/mockVendors';
-import { Vendor } from '@/types/vendor';
+import { useVendors, useVendorValidations, useFinanceAction, VendorRow } from '@/hooks/useVendors';
+import { ValidationResult } from '@/types/vendor';
 import { 
   Search, 
   Eye, 
@@ -25,48 +25,48 @@ import {
   FileText,
   IndianRupee,
   User,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'clarify'>('approve');
   const [comments, setComments] = useState('');
-  const { toast } = useToast();
 
-  const pendingVendors = getVendorsByStatus(['finance_review', 'validation_failed']);
+  const { data: pendingVendors, isLoading } = useVendors(['finance_review', 'validation_failed']);
+  const { data: validations } = useVendorValidations(selectedVendor?.id);
+  const financeAction = useFinanceAction();
 
-  const filteredVendors = pendingVendors.filter((vendor) =>
-    vendor.formData.organization.legalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.formData.statutory.gstin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredVendors = pendingVendors?.filter((vendor) =>
+    (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     vendor.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) || [];
 
-  const handleAction = (vendor: Vendor, action: 'approve' | 'reject' | 'clarify') => {
+  const handleAction = (vendor: VendorRow, action: 'approve' | 'reject' | 'clarify') => {
     setSelectedVendor(vendor);
     setActionType(action);
     setComments('');
     setShowActionDialog(true);
   };
 
-  const submitAction = () => {
-    const messages = {
-      approve: 'Vendor approved and forwarded to Purchase team',
-      reject: 'Vendor registration rejected',
-      clarify: 'Clarification request sent to vendor',
-    };
+  const submitAction = async () => {
+    if (!selectedVendor) return;
     
-    toast({
-      title: actionType === 'approve' ? 'Approved' : actionType === 'reject' ? 'Rejected' : 'Clarification Requested',
-      description: messages[actionType],
+    await financeAction.mutateAsync({
+      vendorId: selectedVendor.id,
+      action: actionType,
+      comments,
     });
     
     setShowActionDialog(false);
     setShowDetails(false);
+    setSelectedVendor(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -75,6 +75,14 @@ export default function FinanceReview() {
     }
     return <Badge variant="secondary">Pending Review</Badge>;
   };
+
+  // Convert DB validations to component format
+  const mappedValidations: ValidationResult[] = validations?.map(v => ({
+    type: v.validation_type as ValidationResult['type'],
+    status: v.status as ValidationResult['status'],
+    message: v.message || '',
+    timestamp: v.validated_at,
+  })) || [];
 
   return (
     <div className="space-y-6">
@@ -100,7 +108,22 @@ export default function FinanceReview() {
       </div>
 
       <div className="grid gap-4">
-        {filteredVendors.length === 0 ? (
+        {isLoading ? (
+          [...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-64" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : filteredVendors.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
@@ -120,17 +143,17 @@ export default function FinanceReview() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-foreground">
-                          {vendor.formData.organization.legalName}
+                          {vendor.legal_name || 'Unnamed Vendor'}
                         </h3>
                         {getStatusBadge(vendor.status)}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {vendor.formData.organization.registeredCity}, {vendor.formData.organization.registeredState}
+                        {vendor.registered_city}, {vendor.registered_state}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span>ID: {vendor.id}</span>
-                        <span>GSTIN: {vendor.formData.statutory.gstin}</span>
-                        <span>Submitted: {vendor.submittedAt ? new Date(vendor.submittedAt).toLocaleDateString('en-IN') : '-'}</span>
+                        <span>ID: {vendor.id.slice(0, 8)}...</span>
+                        <span>GSTIN: {vendor.gstin || 'N/A'}</span>
+                        <span>Submitted: {vendor.submitted_at ? new Date(vendor.submitted_at).toLocaleDateString('en-IN') : '-'}</span>
                       </div>
                     </div>
                   </div>
@@ -168,14 +191,10 @@ export default function FinanceReview() {
 
                 {vendor.status === 'validation_failed' && (
                   <div className="mt-4 p-3 bg-destructive/10 rounded-md">
-                    <p className="text-sm font-medium text-destructive">Validation Issues:</p>
-                    <ul className="text-sm text-destructive/80 mt-1 list-disc list-inside">
-                      {vendor.validations
-                        .filter((v) => v.status === 'failed')
-                        .map((v, i) => (
-                          <li key={i}>{v.message}</li>
-                        ))}
-                    </ul>
+                    <p className="text-sm font-medium text-destructive">Validation Issues Detected</p>
+                    <p className="text-sm text-destructive/80 mt-1">
+                      Please review vendor details and validations before proceeding.
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -188,7 +207,7 @@ export default function FinanceReview() {
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Vendor Details - {selectedVendor?.formData.organization.legalName}</DialogTitle>
+            <DialogTitle>Vendor Details - {selectedVendor?.legal_name}</DialogTitle>
             <DialogDescription>
               Review complete vendor information before approval
             </DialogDescription>
@@ -196,7 +215,7 @@ export default function FinanceReview() {
 
           {selectedVendor && (
             <div className="space-y-6">
-              <ValidationStatus validations={selectedVendor.validations} />
+              <ValidationStatus validations={mappedValidations} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
@@ -209,15 +228,15 @@ export default function FinanceReview() {
                   <CardContent className="text-sm space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Legal Name</span>
-                      <span className="font-medium">{selectedVendor.formData.organization.legalName}</span>
+                      <span className="font-medium">{selectedVendor.legal_name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Industry</span>
-                      <span>{selectedVendor.formData.organization.industryType}</span>
+                      <span>{selectedVendor.industry_type || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Location</span>
-                      <span>{selectedVendor.formData.organization.registeredCity}, {selectedVendor.formData.organization.registeredState}</span>
+                      <span>{selectedVendor.registered_city}, {selectedVendor.registered_state}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -232,15 +251,15 @@ export default function FinanceReview() {
                   <CardContent className="text-sm space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Name</span>
-                      <span className="font-medium">{selectedVendor.formData.contact.primaryContactName}</span>
+                      <span className="font-medium">{selectedVendor.primary_contact_name || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Email</span>
-                      <span>{selectedVendor.formData.contact.primaryEmail}</span>
+                      <span>{selectedVendor.primary_email || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Phone</span>
-                      <span>{selectedVendor.formData.contact.primaryPhone}</span>
+                      <span>{selectedVendor.primary_phone || 'N/A'}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -255,20 +274,20 @@ export default function FinanceReview() {
                   <CardContent className="text-sm space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">GSTIN</span>
-                      <span className="font-mono">{selectedVendor.formData.statutory.gstin}</span>
+                      <span className="font-mono">{selectedVendor.gstin || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">PAN</span>
-                      <span className="font-mono">{selectedVendor.formData.statutory.pan}</span>
+                      <span className="font-mono">{selectedVendor.pan || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Entity Type</span>
-                      <span>{selectedVendor.formData.statutory.entityType}</span>
+                      <span>{selectedVendor.entity_type || 'N/A'}</span>
                     </div>
-                    {selectedVendor.formData.statutory.msmeNumber && (
+                    {selectedVendor.msme_number && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">MSME</span>
-                        <span>{selectedVendor.formData.statutory.msmeNumber}</span>
+                        <span>{selectedVendor.msme_number}</span>
                       </div>
                     )}
                   </CardContent>
@@ -284,19 +303,21 @@ export default function FinanceReview() {
                   <CardContent className="text-sm space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Bank</span>
-                      <span>{selectedVendor.formData.bank.bankName}</span>
+                      <span>{selectedVendor.bank_name || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Account</span>
-                      <span className="font-mono">XXXX{selectedVendor.formData.bank.accountNumber.slice(-4)}</span>
+                      <span className="font-mono">
+                        {selectedVendor.account_number ? `XXXX${selectedVendor.account_number.slice(-4)}` : 'N/A'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">IFSC</span>
-                      <span className="font-mono">{selectedVendor.formData.bank.ifscCode}</span>
+                      <span className="font-mono">{selectedVendor.ifsc_code || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Credit Period</span>
-                      <span>{selectedVendor.formData.financial.creditPeriodExpected} Days</span>
+                      <span>{selectedVendor.credit_period_expected ? `${selectedVendor.credit_period_expected} Days` : 'N/A'}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -360,11 +381,20 @@ export default function FinanceReview() {
             <Button
               variant={actionType === 'reject' ? 'destructive' : 'default'}
               onClick={submitAction}
-              disabled={actionType !== 'approve' && !comments.trim()}
+              disabled={(actionType !== 'approve' && !comments.trim()) || financeAction.isPending}
             >
-              {actionType === 'approve' && 'Confirm Approval'}
-              {actionType === 'reject' && 'Confirm Rejection'}
-              {actionType === 'clarify' && 'Send Request'}
+              {financeAction.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {actionType === 'approve' && 'Confirm Approval'}
+                  {actionType === 'reject' && 'Confirm Rejection'}
+                  {actionType === 'clarify' && 'Send Request'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

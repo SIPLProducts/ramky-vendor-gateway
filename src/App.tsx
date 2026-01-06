@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
 import VendorList from "./pages/VendorList";
+import AuditLogs from "./pages/AuditLogs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
                 <Route path="/finance/review" element={<FinanceReview />} />
                 <Route path="/purchase/approval" element={<PurchaseApproval />} />
                 <Route path="/vendors" element={<VendorList />} />
+                <Route path="/audit-logs" element={<AuditLogs />} />
               </Route>
             </Route>
             
