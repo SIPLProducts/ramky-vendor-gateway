@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { useValidationApiLogs, ValidationApiLog } from '@/hooks/useValidationOrchestrator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,19 +34,20 @@ interface ValidationApiLogsProps {
   vendorId?: string;
 }
 
-export function ValidationApiLogs({ vendorId }: ValidationApiLogsProps) {
+export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsProps>(
+  function ValidationApiLogs({ vendorId }, ref) {
   const { data: logs, isLoading, refetch } = useValidationApiLogs(vendorId);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-32">
+      <div ref={ref} className="flex items-center justify-center h-32">
         <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <Card>
+    <Card ref={ref}>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -127,7 +129,7 @@ export function ValidationApiLogs({ vendorId }: ValidationApiLogsProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 function LogDetailDialog({ log }: { log: ValidationApiLog }) {
   return (
