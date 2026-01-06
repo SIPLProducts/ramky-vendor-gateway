@@ -1,19 +1,20 @@
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { useAuth } from '@/hooks/useAuth';
 
-interface AppLayoutProps {
-  userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
-  userName: string;
-}
+export function AppLayout() {
+  const { user, userRole } = useAuth();
+  
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const role = userRole || 'vendor';
 
-export function AppLayout({ userRole, userName }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
-      <Header userRole={userRole} userName={userName} />
+      <Header userRole={role} userName={userName} />
       <div className="flex">
-        {userRole !== 'vendor' && <Sidebar userRole={userRole} />}
-        <main className={`flex-1 ${userRole !== 'vendor' ? 'p-6' : 'p-4 md:p-8'}`}>
+        {role !== 'vendor' && <Sidebar userRole={role} />}
+        <main className={`flex-1 ${role !== 'vendor' ? 'p-6' : 'p-4 md:p-8'}`}>
           <Outlet />
         </main>
       </div>

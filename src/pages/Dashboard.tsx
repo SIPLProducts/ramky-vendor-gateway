@@ -12,12 +12,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
-interface DashboardProps {
-  userRole: 'finance' | 'purchase' | 'admin';
-}
-
-export default function Dashboard({ userRole }: DashboardProps) {
+export default function Dashboard() {
+  const { userRole: authRole } = useAuth();
+  const userRole = authRole || 'vendor';
   const stats = {
     total: mockVendors.length,
     pendingFinance: mockVendors.filter(v => v.status === 'finance_review').length,

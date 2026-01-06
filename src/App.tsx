@@ -2,9 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import VendorRegistration from "./pages/VendorRegistration";
 import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
@@ -20,28 +23,28 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/vendor/register" element={<VendorRegistration />} />
-          
-          {/* Finance Routes */}
-          <Route element={<AppLayout userRole="finance" userName="Suresh Reddy" />}>
-            <Route path="/finance/dashboard" element={<Dashboard userRole="finance" />} />
-            <Route path="/dashboard" element={<Dashboard userRole="finance" />} />
-            <Route path="/finance/review" element={<FinanceReview />} />
-            <Route path="/vendors" element={<VendorList />} />
-          </Route>
-          
-          {/* Purchase Routes */}
-          <Route element={<AppLayout userRole="purchase" userName="Mahesh Kumar" />}>
-            <Route path="/purchase/dashboard" element={<Dashboard userRole="purchase" />} />
-            <Route path="/purchase/approval" element={<PurchaseApproval />} />
-          </Route>
-          
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/vendor/register" element={<VendorRegistration />} />
+            
+            {/* Protected Routes */}
+            <Route element={<ProtectedRoute />}>
+              {/* Finance Routes */}
+              <Route element={<AppLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/finance/review" element={<FinanceReview />} />
+                <Route path="/purchase/approval" element={<PurchaseApproval />} />
+                <Route path="/vendors" element={<VendorList />} />
+              </Route>
+            </Route>
+            
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
