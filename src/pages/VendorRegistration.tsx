@@ -10,6 +10,7 @@ import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { Header } from '@/components/layout/Header';
 import { VendorFormData, ValidationResult } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
+import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -76,9 +77,16 @@ export default function VendorRegistration() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
   const [validations, setValidations] = useState<ValidationResult[]>([]);
   const { toast } = useToast();
+  
+  const { 
+    submitVendor, 
+    runValidations, 
+    isSubmitting, 
+    isValidating,
+    vendorId 
+  } = useVendorRegistration();
 
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
@@ -111,33 +119,28 @@ export default function VendorRegistration() {
     setCurrentStep(step);
   };
 
-  const simulateValidations = async () => {
-    setIsValidating(true);
-    
-    const mockValidations: ValidationResult[] = [
-      { type: 'gst', status: 'passed', message: 'GST verified - Active status confirmed', timestamp: new Date().toISOString() },
-      { type: 'pan', status: 'passed', message: 'PAN verified successfully', timestamp: new Date().toISOString() },
-      { type: 'name_match', status: 'passed', message: 'Name match score: 95% (Above threshold)', timestamp: new Date().toISOString() },
-      { type: 'bank', status: 'passed', message: 'Bank account verified via ₹1 penny drop', timestamp: new Date().toISOString() },
-      { type: 'msme', status: formData.statutory.msmeNumber ? 'passed' : 'skipped', message: formData.statutory.msmeNumber ? 'MSME certificate verified' : 'MSME not provided', timestamp: new Date().toISOString() },
-    ];
-
-    for (let i = 0; i < mockValidations.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setValidations((prev) => [...prev, mockValidations[i]]);
-    }
-
-    setIsValidating(false);
-  };
-
   const handleSubmit = async () => {
-    setIsSubmitted(true);
-    toast({
-      title: 'Registration Submitted',
-      description: 'Your vendor registration has been submitted for verification.',
-    });
-    
-    await simulateValidations();
+    try {
+      // Submit vendor data to database
+      const vendor = await submitVendor(formData);
+      setIsSubmitted(true);
+      
+      toast({
+        title: 'Registration Submitted',
+        description: 'Your vendor registration has been submitted. Running validations...',
+      });
+      
+      // Run automatic validations
+      const results = await runValidations(vendor.id);
+      setValidations(results);
+      
+    } catch (error) {
+      toast({
+        title: 'Submission Failed',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    }
   };
 
   const renderStep = () => {
