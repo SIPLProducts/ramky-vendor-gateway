@@ -31,10 +31,10 @@ const navItems: NavItem[] = [
     roles: ['finance', 'purchase', 'admin'],
   },
   {
-    label: 'My Registration',
+    label: 'Vendor Registration',
     href: '/vendor/register',
     icon: FileText,
-    roles: ['vendor'],
+    roles: ['vendor', 'admin'],
   },
   {
     label: 'Finance Review',
