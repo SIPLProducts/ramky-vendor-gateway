@@ -12,8 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { getVendorsByStatus } from '@/data/mockVendors';
-import { Vendor } from '@/types/vendor';
+import { useVendors, usePurchaseAction, VendorRow } from '@/hooks/useVendors';
 import { 
   Search, 
   Eye, 
@@ -22,44 +21,47 @@ import {
   Building2,
   Filter,
   Truck,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PurchaseApproval() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [comments, setComments] = useState('');
-  const { toast } = useToast();
 
-  const pendingVendors = getVendorsByStatus(['purchase_review']);
+  const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
+  const purchaseAction = usePurchaseAction();
 
-  const filteredVendors = pendingVendors.filter((vendor) =>
-    vendor.formData.organization.legalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.formData.statutory.gstin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredVendors = pendingVendors?.filter((vendor) =>
+    (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     vendor.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) || [];
 
-  const handleAction = (vendor: Vendor, action: 'approve' | 'reject') => {
+  const handleAction = (vendor: VendorRow, action: 'approve' | 'reject') => {
     setSelectedVendor(vendor);
     setActionType(action);
     setComments('');
     setShowActionDialog(true);
   };
 
-  const submitAction = () => {
-    toast({
-      title: actionType === 'approve' ? 'Approved & Synced to SAP' : 'Rejected',
-      description: actionType === 'approve' 
-        ? 'Vendor has been approved and synced to SAP. Vendor code will be generated.' 
-        : 'Vendor registration has been rejected.',
+  const submitAction = async () => {
+    if (!selectedVendor) return;
+    
+    await purchaseAction.mutateAsync({
+      vendorId: selectedVendor.id,
+      action: actionType,
+      comments,
     });
     
     setShowActionDialog(false);
     setShowDetails(false);
+    setSelectedVendor(null);
   };
 
   return (
@@ -86,7 +88,22 @@ export default function PurchaseApproval() {
       </div>
 
       <div className="grid gap-4">
-        {filteredVendors.length === 0 ? (
+        {isLoading ? (
+          [...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-64" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : filteredVendors.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
@@ -106,20 +123,20 @@ export default function PurchaseApproval() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-foreground">
-                          {vendor.formData.organization.legalName}
+                          {vendor.legal_name || 'Unnamed Vendor'}
                         </h3>
                         <Badge className="bg-success/10 text-success hover:bg-success/20">Finance Approved</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {vendor.formData.organization.industryType} • {vendor.formData.organization.productCategories.slice(0, 2).join(', ')}
+                        {vendor.industry_type} • {vendor.product_categories?.slice(0, 2).join(', ') || 'No categories'}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span>ID: {vendor.id}</span>
-                        <span>GSTIN: {vendor.formData.statutory.gstin}</span>
+                        <span>ID: {vendor.id.slice(0, 8)}...</span>
+                        <span>GSTIN: {vendor.gstin || 'N/A'}</span>
                       </div>
-                      {vendor.financeComments && (
+                      {vendor.finance_comments && (
                         <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
-                          <span className="font-medium">Finance Notes:</span> {vendor.financeComments}
+                          <span className="font-medium">Finance Notes:</span> {vendor.finance_comments}
                         </div>
                       )}
                     </div>
@@ -220,9 +237,16 @@ export default function PurchaseApproval() {
               variant={actionType === 'reject' ? 'destructive' : 'default'}
               className={actionType === 'approve' ? 'bg-accent hover:bg-accent/90' : ''}
               onClick={submitAction}
-              disabled={actionType === 'reject' && !comments.trim()}
+              disabled={(actionType === 'reject' && !comments.trim()) || purchaseAction.isPending}
             >
-              {actionType === 'approve' ? 'Confirm & Sync SAP' : 'Confirm Rejection'}
+              {purchaseAction.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                actionType === 'approve' ? 'Confirm & Sync SAP' : 'Confirm Rejection'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
