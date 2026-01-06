@@ -9,7 +9,8 @@ import {
   TrendingUp,
   FileText,
   ArrowRight,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -52,28 +53,38 @@ export default function Dashboard() {
   const displayVendors = recentVendors?.slice(0, 5) || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of vendor onboarding activities</p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Overview of vendor onboarding activities</p>
+        </div>
+        <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+          <Sparkles className="h-4 w-4" />
+          Welcome back!
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <Card className="card-interactive border-0 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Vendors
             </CardTitle>
-            <Users className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
           </CardHeader>
           <CardContent>
             {statsLoading ? (
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-9 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold">{displayStats.total}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <TrendingUp className="inline h-3 w-3 mr-1 text-success" />
+                <div className="text-4xl font-bold">{displayStats.total}</div>
+                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-success" />
                   All registered vendors
                 </p>
               </>
@@ -82,21 +93,23 @@ export default function Dashboard() {
         </Card>
 
         {(userRole === 'finance' || userRole === 'admin') && (
-          <Card className="border-warning/50">
+          <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending Finance Review
+                Pending Finance
               </CardTitle>
-              <Clock className="h-5 w-5 text-warning" />
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                <Clock className="h-5 w-5 text-white" />
+              </div>
             </CardHeader>
             <CardContent>
               {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-9 w-20" />
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-warning">{displayStats.pendingFinance}</div>
+                  <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">{displayStats.pendingFinance}</div>
                   <Link to="/finance/review">
-                    <Button variant="link" className="p-0 h-auto text-xs mt-1">
+                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-amber-600 dark:text-amber-400">
                       View all <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </Link>
@@ -107,21 +120,23 @@ export default function Dashboard() {
         )}
 
         {(userRole === 'purchase' || userRole === 'admin') && (
-          <Card className="border-primary/50">
+          <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/20 dark:to-emerald-950/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending Purchase Approval
+                Pending Purchase
               </CardTitle>
-              <FileText className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
             </CardHeader>
             <CardContent>
               {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-9 w-20" />
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-primary">{displayStats.pendingPurchase}</div>
+                  <div className="text-4xl font-bold text-teal-600 dark:text-teal-400">{displayStats.pendingPurchase}</div>
                   <Link to="/purchase/approval">
-                    <Button variant="link" className="p-0 h-auto text-xs mt-1">
+                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-teal-600 dark:text-teal-400">
                       View all <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </Link>
@@ -131,56 +146,61 @@ export default function Dashboard() {
           </Card>
         )}
 
-        <Card>
+        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               SAP Synced
             </CardTitle>
-            <CheckCircle className="h-5 w-5 text-success" />
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
+              <CheckCircle className="h-5 w-5 text-white" />
+            </div>
           </CardHeader>
           <CardContent>
             {statsLoading ? (
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-9 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold text-success">{displayStats.approved}</div>
-                <p className="text-xs text-muted-foreground mt-1">Active vendors</p>
+                <div className="text-4xl font-bold text-green-600 dark:text-green-400">{displayStats.approved}</div>
+                <p className="text-xs text-muted-foreground mt-2">Active vendors</p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-destructive/50">
+        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Validation Failed
             </CardTitle>
-            <XCircle className="h-5 w-5 text-destructive" />
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/20">
+              <XCircle className="h-5 w-5 text-white" />
+            </div>
           </CardHeader>
           <CardContent>
             {statsLoading ? (
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-9 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold text-destructive">{displayStats.validationFailed}</div>
-                <p className="text-xs text-muted-foreground mt-1">Require attention</p>
+                <div className="text-4xl font-bold text-red-600 dark:text-red-400">{displayStats.validationFailed}</div>
+                <p className="text-xs text-muted-foreground mt-2">Require attention</p>
               </>
             )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="border-0 shadow-md">
           <CardHeader>
-            <CardTitle>Recent Submissions</CardTitle>
+            <CardTitle className="text-xl">Recent Submissions</CardTitle>
             <CardDescription>Latest vendor registration activities</CardDescription>
           </CardHeader>
           <CardContent>
             {vendorsLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
                     <div className="space-y-2">
                       <Skeleton className="h-4 w-48" />
                       <Skeleton className="h-3 w-32" />
@@ -190,19 +210,22 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : displayVendors.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No vendors registered yet</p>
+              <div className="py-12 text-center text-muted-foreground">
+                <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-8 w-8 opacity-50" />
+                </div>
+                <p className="font-medium">No vendors registered yet</p>
+                <p className="text-sm mt-1">Vendors will appear here once they register</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {displayVendors.map((vendor) => (
                   <div
                     key={vendor.id}
-                    className="flex items-center justify-between p-3 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                    className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
                   >
                     <div>
-                      <p className="font-medium text-foreground">
+                      <p className="font-semibold text-foreground">
                         {vendor.legal_name || 'Unnamed Vendor'}
                       </p>
                       <p className="text-sm text-muted-foreground">
@@ -211,7 +234,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       {getStatusBadge(vendor.status)}
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-2">
                         {new Date(vendor.updated_at).toLocaleDateString('en-IN')}
                       </p>
                     </div>
@@ -222,38 +245,46 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-md">
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle className="text-xl">Quick Actions</CardTitle>
             <CardDescription>Common tasks and shortcuts</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {(userRole === 'finance' || userRole === 'admin') && (
               <Link to="/finance/review">
-                <Button variant="outline" className="w-full justify-start gap-3">
-                  <Clock className="h-4 w-4 text-warning" />
-                  Review Pending Vendors ({displayStats.pendingFinance})
+                <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl border-amber-200 hover:bg-amber-50 hover:border-amber-300 dark:border-amber-800 dark:hover:bg-amber-950/30">
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-white" />
+                  </div>
+                  <span>Review Pending Vendors ({displayStats.pendingFinance})</span>
                 </Button>
               </Link>
             )}
             {(userRole === 'purchase' || userRole === 'admin') && (
               <Link to="/purchase/approval">
-                <Button variant="outline" className="w-full justify-start gap-3 mt-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                  Approve Vendors ({displayStats.pendingPurchase})
+                <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl border-teal-200 hover:bg-teal-50 hover:border-teal-300 dark:border-teal-800 dark:hover:bg-teal-950/30 mt-2">
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-white" />
+                  </div>
+                  <span>Approve Vendors ({displayStats.pendingPurchase})</span>
                 </Button>
               </Link>
             )}
             <Link to="/vendors">
-              <Button variant="outline" className="w-full justify-start gap-3 mt-2">
-                <Users className="h-4 w-4" />
-                View All Vendors
+              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl mt-2">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+                <span>View All Vendors</span>
               </Button>
             </Link>
             <Link to="/audit-logs">
-              <Button variant="outline" className="w-full justify-start gap-3 mt-2">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-                View Audit Logs
+              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl mt-2">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center">
+                  <AlertTriangle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                </div>
+                <span>View Audit Logs</span>
               </Button>
             </Link>
           </CardContent>
