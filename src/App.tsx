@@ -14,6 +14,7 @@ import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
 import VendorList from "./pages/VendorList";
 import AuditLogs from "./pages/AuditLogs";
+import AdminConfiguration from "./pages/AdminConfiguration";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/purchase/approval" element={<PurchaseApproval />} />
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
+                <Route path="/settings" element={<AdminConfiguration />} />
               </Route>
             </Route>
             
