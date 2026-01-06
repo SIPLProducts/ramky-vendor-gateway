@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -33,8 +33,7 @@ export function FinancialStep({ data, onNext, onBack }: FinancialStepProps) {
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
+    control,
     formState: { errors },
   } = useForm<Omit<FinancialDetails, 'financialDocsFile'>>({
     resolver: zodResolver(schema),
@@ -127,21 +126,24 @@ export function FinancialStep({ data, onNext, onBack }: FinancialStepProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period *</Label>
-            <Select
-              value={watch('creditPeriodExpected')}
-              onValueChange={(value) => setValue('creditPeriodExpected', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select credit period" />
-              </SelectTrigger>
-              <SelectContent>
-                {creditPeriods.map((period) => (
-                  <SelectItem key={period.value} value={period.value}>
-                    {period.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="creditPeriodExpected"
+              control={control}
+              render={({ field: { ref, ...fieldProps } }) => (
+                <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select credit period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {creditPeriods.map((period) => (
+                      <SelectItem key={period.value} value={period.value}>
+                        {period.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.creditPeriodExpected && (
               <p className="text-sm text-destructive">{errors.creditPeriodExpected.message}</p>
             )}
