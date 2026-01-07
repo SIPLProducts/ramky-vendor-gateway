@@ -12,6 +12,9 @@ import {
   Building2,
   Mail,
   ChevronRight,
+  FileCheck,
+  HelpCircle,
+  MessageSquare,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,6 +46,12 @@ const navItems: NavItem[] = [
     href: '/vendor/register',
     icon: FileText,
     roles: ['vendor', 'admin'],
+  },
+  {
+    label: 'Document Verification',
+    href: '/finance/verification',
+    icon: FileCheck,
+    roles: ['finance', 'admin'],
   },
   {
     label: 'Finance Review',
@@ -79,6 +88,12 @@ const navItems: NavItem[] = [
     href: '/settings',
     icon: Settings,
     roles: ['admin'],
+  },
+  {
+    label: 'Help & Support',
+    href: '/support',
+    icon: HelpCircle,
+    roles: ['vendor', 'finance', 'purchase', 'admin'],
   },
 ];
 
