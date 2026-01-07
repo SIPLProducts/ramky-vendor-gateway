@@ -9,13 +9,14 @@ import {
   Settings,
   Shield,
   History,
-  Building2,
   Mail,
   ChevronRight,
   FileCheck,
   HelpCircle,
   Play,
+  Calendar,
 } from 'lucide-react';
+import ramkyLogo from '@/assets/ramky-logo.png';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
@@ -78,6 +79,12 @@ const navItems: NavItem[] = [
     roles: ['finance', 'admin'],
   },
   {
+    label: 'Scheduled Checks',
+    href: '/compliance/scheduled',
+    icon: Calendar,
+    roles: ['admin'],
+  },
+  {
     label: 'Audit Logs',
     href: '/audit-logs',
     icon: History,
@@ -114,17 +121,15 @@ export function Sidebar({ userRole }: SidebarProps) {
     <aside className="w-64 bg-sidebar border-r flex flex-col h-[calc(100vh-3.5rem)]">
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <Building2 className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-sidebar-foreground">Ramky Infrastructure</p>
-            <p className="text-xs text-sidebar-foreground/60">Vendor Management</p>
-          </div>
+          <img 
+            src={ramkyLogo} 
+            alt="Ramky Infrastructure" 
+            className="h-12 w-auto object-contain"
+          />
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1.5">
+      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
         {filteredItems.map((item) => {
           const isActive = location.pathname === item.href;
           const Icon = item.icon;
