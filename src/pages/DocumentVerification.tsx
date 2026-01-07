@@ -23,15 +23,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileCheck, 
-  FileX, 
-  Eye, 
   Play, 
   RefreshCw,
   CheckCircle2,
@@ -39,8 +36,15 @@ import {
   Clock,
   AlertTriangle,
   Building2,
-  Download
+  Download,
+  IndianRupee,
+  Loader2,
+  ArrowRight,
+  Hash,
+  User
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type ValidationStatus = 'pending' | 'passed' | 'failed' | 'skipped';
 
@@ -62,6 +66,10 @@ interface Vendor {
   status: string;
   submitted_at: string | null;
   primary_email: string | null;
+  account_number: string | null;
+  ifsc_code: string | null;
+  bank_name: string | null;
+  msme_number: string | null;
 }
 
 interface Validation {
@@ -71,6 +79,36 @@ interface Validation {
   status: ValidationStatus;
   message: string | null;
   validated_at: string;
+  details: any;
+}
+
+interface PennyDropResult {
+  success: boolean;
+  verified: boolean;
+  message: string;
+  data?: {
+    transactionId: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+    branchName: string;
+    accountHolderName: string;
+    nameMatchScore: number;
+    nameMatchStatus: 'exact' | 'partial' | 'mismatch';
+    accountStatus: string;
+    accountType: string;
+    transferAmount: number;
+    transferStatus: string;
+    transferTimestamp: string;
+    utrNumber: string;
+    responseTime: number;
+  };
+  stages?: {
+    stage: string;
+    status: 'completed' | 'in_progress' | 'pending' | 'failed';
+    message: string;
+    timestamp: string;
+  }[];
 }
 
 const validationTypeLabels: Record<string, string> = {
@@ -79,12 +117,13 @@ const validationTypeLabels: Record<string, string> = {
   bank: 'Bank Account Verification',
   msme: 'MSME Verification',
   name_match: 'Name Match Verification',
+  penny_drop: 'Penny Drop Verification',
 };
 
 const statusConfig: Record<ValidationStatus, { icon: React.ReactNode; color: string; label: string }> = {
-  passed: { icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-success', label: 'Passed' },
+  passed: { icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-green-600', label: 'Passed' },
   failed: { icon: <XCircle className="h-4 w-4" />, color: 'text-destructive', label: 'Failed' },
-  pending: { icon: <Clock className="h-4 w-4" />, color: 'text-warning', label: 'Pending' },
+  pending: { icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600', label: 'Pending' },
   skipped: { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-muted-foreground', label: 'Skipped' },
 };
 
@@ -93,15 +132,18 @@ export default function DocumentVerification() {
   const queryClient = useQueryClient();
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [runningValidation, setRunningValidation] = useState<string | null>(null);
+  const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
+  const [pennyDropStage, setPennyDropStage] = useState(0);
+  const [showPennyDropDialog, setShowPennyDropDialog] = useState(false);
 
-  // Fetch vendors pending validation
+  // Fetch ALL vendors (not just specific statuses)
   const { data: vendors, isLoading: isLoadingVendors } = useQuery({
     queryKey: ['vendors-for-verification'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
-        .in('status', ['validation_pending', 'validation_failed', 'finance_review'])
+        .not('status', 'eq', 'draft')
         .order('submitted_at', { ascending: false });
       
       if (error) throw error;
@@ -233,6 +275,72 @@ export default function DocumentVerification() {
     },
   });
 
+  // Run Penny Drop validation
+  const runPennyDropMutation = useMutation({
+    mutationFn: async (vendor: Vendor) => {
+      setRunningValidation('penny_drop');
+      setPennyDropResult(null);
+      setPennyDropStage(0);
+      setShowPennyDropDialog(true);
+
+      // Simulate stage progression
+      const stageInterval = setInterval(() => {
+        setPennyDropStage(prev => Math.min(prev + 1, 5));
+      }, 400);
+
+      const { data, error } = await supabase.functions.invoke('validate-penny-drop', {
+        body: {
+          accountNumber: vendor.account_number || '1234567890123456',
+          ifscCode: vendor.ifsc_code || 'HDFC0001234',
+          accountHolderName: vendor.legal_name || 'Unknown',
+          vendorName: vendor.legal_name || 'Unknown',
+        },
+      });
+
+      clearInterval(stageInterval);
+      
+      if (error) throw error;
+
+      setPennyDropResult(data);
+      setPennyDropStage(data.stages?.length || 5);
+
+      // Save to vendor_validations (using 'bank' type since penny_drop is not in enum)
+      await supabase
+        .from('vendor_validations')
+        .delete()
+        .eq('vendor_id', vendor.id)
+        .eq('validation_type', 'bank');
+
+      await supabase.from('vendor_validations').insert({
+        vendor_id: vendor.id,
+        validation_type: 'bank',
+        status: data.verified ? 'passed' : 'failed',
+        message: `Penny Drop: ${data.message}`,
+        details: data,
+      });
+
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.verified ? 'Penny Drop Verified' : 'Penny Drop Warning',
+        description: data.message,
+        variant: data.verified ? 'default' : 'destructive',
+      });
+      refetchValidations();
+    },
+    onError: (error) => {
+      toast({
+        title: 'Penny Drop Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setRunningValidation(null);
+    },
+  });
+
   // Run all validations
   const runAllValidationsMutation = useMutation({
     mutationFn: async (vendorId: string) => {
@@ -256,26 +364,66 @@ export default function DocumentVerification() {
   };
 
   const downloadDocument = async (doc: VendorDocument) => {
-    const { data, error } = await supabase.storage
-      .from('vendor-documents')
-      .download(doc.file_path);
-    
-    if (error) {
+    try {
+      // First try to get a signed URL for the document
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('vendor-documents')
+        .createSignedUrl(doc.file_path, 60); // 60 seconds expiry
+      
+      if (signedError) {
+        // If signed URL fails, try public URL
+        const { data: publicData } = supabase.storage
+          .from('vendor-documents')
+          .getPublicUrl(doc.file_path);
+        
+        if (publicData?.publicUrl) {
+          window.open(publicData.publicUrl, '_blank');
+          return;
+        }
+
+        // If that also fails, try direct download
+        const { data, error } = await supabase.storage
+          .from('vendor-documents')
+          .download(doc.file_path);
+        
+        if (error) {
+          toast({
+            title: 'Download Failed',
+            description: `Could not download file: ${error.message}. The file may not exist or you may not have permission.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const url = URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.file_name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Use signed URL
+      window.open(signedData.signedUrl, '_blank');
+    } catch (error) {
       toast({
         title: 'Download Failed',
-        description: error.message,
+        description: 'An unexpected error occurred while downloading the file.',
         variant: 'destructive',
       });
-      return;
     }
-
-    const url = URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = doc.file_name;
-    a.click();
-    URL.revokeObjectURL(url);
   };
+
+  const stageLabels = [
+    "IFSC Validation",
+    "Account Lookup",
+    "IMPS Transfer",
+    "Transfer Confirmation",
+    "Name Verification",
+  ];
 
   return (
     <div className="space-y-6">
@@ -286,25 +434,25 @@ export default function DocumentVerification() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Vendors List */}
-        <Card>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Vendors Pending Verification
+              All Vendors
             </CardTitle>
             <CardDescription>
-              Select a vendor to view their documents and validations
+              {vendors?.length || 0} vendors registered
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-[500px] overflow-auto">
             {isLoadingVendors ? (
               <div className="text-center py-8">
                 <RefreshCw className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
               </div>
             ) : vendors?.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">No vendors pending verification</p>
+              <p className="text-center py-8 text-muted-foreground">No vendors registered</p>
             ) : (
               <div className="space-y-2">
                 {vendors?.map((vendor) => (
@@ -324,9 +472,11 @@ export default function DocumentVerification() {
                       </div>
                       <Badge variant={
                         vendor.status === 'validation_failed' ? 'destructive' :
-                        vendor.status === 'finance_review' ? 'default' : 'secondary'
+                        vendor.status === 'finance_review' || vendor.status === 'finance_approved' ? 'default' : 
+                        vendor.status === 'purchase_approved' || vendor.status === 'sap_synced' ? 'default' :
+                        'secondary'
                       }>
-                        {vendor.status.replace('_', ' ')}
+                        {vendor.status.replace(/_/g, ' ')}
                       </Badge>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground">
@@ -340,7 +490,7 @@ export default function DocumentVerification() {
         </Card>
 
         {/* Validation Panel */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileCheck className="h-5 w-5" />
@@ -354,62 +504,143 @@ export default function DocumentVerification() {
             {!selectedVendor ? (
               <p className="text-center py-8 text-muted-foreground">Select a vendor from the list</p>
             ) : (
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => runAllValidationsMutation.mutate(selectedVendor.id)}
-                    disabled={runAllValidationsMutation.isPending}
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    Run All Validations
-                  </Button>
-                </div>
+              <Tabs defaultValue="validations" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="validations">Standard Validations</TabsTrigger>
+                  <TabsTrigger value="penny-drop">Penny Drop</TabsTrigger>
+                </TabsList>
 
-                <div className="space-y-2">
-                  {['gst', 'pan', 'bank', 'name_match', 'msme'].map((type) => {
-                    const validation = getLatestValidation(type);
-                    const status = validation?.status || 'pending';
-                    const config = statusConfig[status];
+                <TabsContent value="validations" className="space-y-4">
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => runAllValidationsMutation.mutate(selectedVendor.id)}
+                      disabled={runAllValidationsMutation.isPending}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Run All Validations
+                    </Button>
+                  </div>
 
-                    return (
-                      <div
-                        key={type}
-                        className="flex items-center justify-between p-3 rounded-lg border"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={config.color}>{config.icon}</span>
+                  <div className="space-y-2">
+                    {['gst', 'pan', 'bank', 'name_match', 'msme'].map((type) => {
+                      const validation = getLatestValidation(type);
+                      const status = validation?.status || 'pending';
+                      const config = statusConfig[status];
+
+                      return (
+                        <div
+                          key={type}
+                          className="flex items-center justify-between p-3 rounded-lg border"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={config.color}>{config.icon}</span>
+                            <div>
+                              <p className="font-medium text-sm">{validationTypeLabels[type]}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {validation?.message || 'Not yet validated'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={status === 'passed' ? 'default' : status === 'failed' ? 'destructive' : 'secondary'}>
+                              {config.label}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => runValidationMutation.mutate({ 
+                                vendorId: selectedVendor.id, 
+                                validationType: type 
+                              })}
+                              disabled={runningValidation === type}
+                            >
+                              {runningValidation === type ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="penny-drop" className="space-y-4">
+                  <Card className="border-dashed">
+                    <CardContent className="pt-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                          <IndianRupee className="h-8 w-8 text-green-600" />
                           <div>
-                            <p className="font-medium text-sm">{validationTypeLabels[type]}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {validation?.message || 'Not yet validated'}
+                            <h4 className="font-semibold">Penny Drop Bank Verification</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Verify bank account by transferring ₹1 and matching account holder name
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={status === 'passed' ? 'default' : status === 'failed' ? 'destructive' : 'secondary'}>
-                            {config.label}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => runValidationMutation.mutate({ 
-                              vendorId: selectedVendor.id, 
-                              validationType: type 
-                            })}
-                            disabled={runningValidation === type}
-                          >
-                            {runningValidation === type ? (
-                              <RefreshCw className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-3 w-3" />
-                            )}
-                          </Button>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <Label className="text-muted-foreground">Account Number</Label>
+                            <p className="font-mono">{selectedVendor.account_number || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">IFSC Code</Label>
+                            <p className="font-mono">{selectedVendor.ifsc_code || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Bank Name</Label>
+                            <p>{selectedVendor.bank_name || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Account Holder</Label>
+                            <p>{selectedVendor.legal_name || 'Not provided'}</p>
+                          </div>
                         </div>
+
+                        <Button 
+                          onClick={() => runPennyDropMutation.mutate(selectedVendor)}
+                          disabled={runPennyDropMutation.isPending}
+                          className="w-full"
+                        >
+                          {runPennyDropMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Running Penny Drop...
+                            </>
+                          ) : (
+                            <>
+                              <IndianRupee className="mr-2 h-4 w-4" />
+                              Run Penny Drop Verification
+                            </>
+                          )}
+                        </Button>
+
+                        {/* Show last penny drop result if available */}
+                        {getLatestValidation('bank')?.message?.includes('Penny Drop') && (
+                          <div className={`p-4 rounded-lg border ${
+                            getLatestValidation('bank')?.status === 'passed' 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-yellow-50 border-yellow-200'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              {getLatestValidation('bank')?.status === 'passed' ? (
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                              ) : (
+                                <XCircle className="h-5 w-5 text-yellow-600" />
+                              )}
+                              <span className="font-medium">Last Penny Drop Result</span>
+                            </div>
+                            <p className="text-sm mt-1">{getLatestValidation('bank')?.message}</p>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             )}
           </CardContent>
         </Card>
@@ -442,7 +673,7 @@ export default function DocumentVerification() {
                   {documents?.map((doc) => (
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium capitalize">
-                        {doc.document_type.replace('_', ' ')}
+                        {doc.document_type.replace(/_/g, ' ')}
                       </TableCell>
                       <TableCell>{doc.file_name}</TableCell>
                       <TableCell>
@@ -469,6 +700,109 @@ export default function DocumentVerification() {
           </CardContent>
         </Card>
       )}
+
+      {/* Penny Drop Progress Dialog */}
+      <Dialog open={showPennyDropDialog} onOpenChange={setShowPennyDropDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IndianRupee className="h-5 w-5" />
+              Penny Drop Verification
+            </DialogTitle>
+            <DialogDescription>
+              Verifying bank account for {selectedVendor?.legal_name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Progress Stages */}
+            <div className="space-y-3">
+              {stageLabels.map((stage, index) => {
+                const resultStage = pennyDropResult?.stages?.[index];
+                const isCompleted = resultStage?.status === 'completed' || pennyDropStage > index;
+                const isFailed = resultStage?.status === 'failed';
+                const isActive = runPennyDropMutation.isPending && pennyDropStage === index;
+
+                return (
+                  <div key={stage} className="flex items-center gap-3">
+                    <div className={`
+                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                      ${isFailed ? 'bg-destructive/10 text-destructive' : 
+                        isCompleted ? 'bg-green-100 text-green-700' : 
+                        isActive ? 'bg-primary/10 text-primary' : 
+                        'bg-muted text-muted-foreground'}
+                    `}>
+                      {isFailed ? (
+                        <XCircle className="h-4 w-4" />
+                      ) : isCompleted ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : isActive ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium ${
+                          isFailed ? 'text-destructive' : 
+                          isCompleted ? 'text-green-700' : 
+                          isActive ? 'text-primary' : 
+                          'text-muted-foreground'
+                        }`}>
+                          {stage}
+                        </span>
+                      </div>
+                      {resultStage && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {resultStage.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Result Details */}
+            {pennyDropResult?.data && (
+              <Card className={`border-2 ${pennyDropResult.verified ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}`}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    {pennyDropResult.verified ? (
+                      <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <XCircle className="h-6 w-6 text-yellow-600" />
+                    )}
+                    <span className="font-semibold text-lg">
+                      {pennyDropResult.verified ? 'Account Verified' : 'Verification Warning'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Transaction ID</span>
+                      <p className="font-mono font-medium text-xs">{pennyDropResult.data.transactionId}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">UTR Number</span>
+                      <p className="font-mono font-medium text-xs">{pennyDropResult.data.utrNumber}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Bank</span>
+                      <p className="font-medium">{pennyDropResult.data.bankName}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Name Match</span>
+                      <p className="font-medium">{pennyDropResult.data.nameMatchScore}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
