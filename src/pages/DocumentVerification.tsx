@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Table, 
   TableBody, 
@@ -25,8 +26,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   FileCheck, 
   Play, 
@@ -39,12 +42,17 @@ import {
   Download,
   IndianRupee,
   Loader2,
-  ArrowRight,
-  Hash,
-  User
+  Eye,
+  Mail,
+  FileText,
+  FileImage,
+  File,
+  ExternalLink,
+  ListChecks,
+  Send
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ValidationStatus = 'pending' | 'passed' | 'failed' | 'skipped';
 
@@ -55,6 +63,7 @@ interface VendorDocument {
   file_name: string;
   file_path: string;
   file_size: number | null;
+  mime_type?: string | null;
   uploaded_at: string;
 }
 
@@ -80,6 +89,13 @@ interface Validation {
   message: string | null;
   validated_at: string;
   details: any;
+}
+
+interface Deviation {
+  type: string;
+  label: string;
+  status: 'failed' | 'pending';
+  message: string;
 }
 
 interface PennyDropResult {
@@ -120,12 +136,28 @@ const validationTypeLabels: Record<string, string> = {
   penny_drop: 'Penny Drop Verification',
 };
 
+const documentTypeLabels: Record<string, string> = {
+  gst_certificate: 'GST Certificate',
+  pan_card: 'PAN Card',
+  msme_certificate: 'MSME Certificate',
+  cancelled_cheque: 'Cancelled Cheque',
+  financial_docs: 'Financial Documents',
+  incorporation_certificate: 'Incorporation Certificate',
+  other: 'Other Document',
+};
+
 const statusConfig: Record<ValidationStatus, { icon: React.ReactNode; color: string; label: string }> = {
   passed: { icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-green-600', label: 'Passed' },
   failed: { icon: <XCircle className="h-4 w-4" />, color: 'text-destructive', label: 'Failed' },
   pending: { icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600', label: 'Pending' },
   skipped: { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-muted-foreground', label: 'Skipped' },
 };
+
+function getFileIcon(mimeType: string | null | undefined) {
+  if (!mimeType) return <File className="h-5 w-5" />;
+  if (mimeType.startsWith('image/')) return <FileImage className="h-5 w-5" />;
+  return <FileText className="h-5 w-5" />;
+}
 
 export default function DocumentVerification() {
   const { toast } = useToast();
@@ -135,15 +167,23 @@ export default function DocumentVerification() {
   const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
   const [pennyDropStage, setPennyDropStage] = useState(0);
   const [showPennyDropDialog, setShowPennyDropDialog] = useState(false);
+  const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
+  const [bulkValidationProgress, setBulkValidationProgress] = useState<{current: number; total: number} | null>(null);
+  const [showDeviationDialog, setShowDeviationDialog] = useState(false);
+  const [deviationEmail, setDeviationEmail] = useState('');
+  const [additionalComments, setAdditionalComments] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<VendorDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Fetch ALL vendors (not just specific statuses)
+  // Fetch ONLY submitted vendors
   const { data: vendors, isLoading: isLoadingVendors } = useQuery({
     queryKey: ['vendors-for-verification'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
-        .not('status', 'eq', 'draft')
+        .eq('status', 'submitted')
         .order('submitted_at', { ascending: false });
       
       if (error) throw error;
@@ -183,6 +223,35 @@ export default function DocumentVerification() {
     },
     enabled: !!selectedVendor,
   });
+
+  // Get deviations (failed or pending validations)
+  const getDeviations = (): Deviation[] => {
+    if (!validations) return [];
+    
+    const deviations: Deviation[] = [];
+    const validationTypes = ['gst', 'pan', 'bank', 'name_match', 'msme'];
+    
+    validationTypes.forEach(type => {
+      const validation = validations.find(v => v.validation_type === type);
+      if (!validation || validation.status === 'pending') {
+        deviations.push({
+          type,
+          label: validationTypeLabels[type],
+          status: 'pending',
+          message: validation?.message || 'Validation not yet run'
+        });
+      } else if (validation.status === 'failed') {
+        deviations.push({
+          type,
+          label: validationTypeLabels[type],
+          status: 'failed',
+          message: validation.message || 'Validation failed'
+        });
+      }
+    });
+    
+    return deviations;
+  };
 
   // Run single validation
   const runValidationMutation = useMutation({
@@ -283,7 +352,6 @@ export default function DocumentVerification() {
       setPennyDropStage(0);
       setShowPennyDropDialog(true);
 
-      // Simulate stage progression
       const stageInterval = setInterval(() => {
         setPennyDropStage(prev => Math.min(prev + 1, 5));
       }, 400);
@@ -304,7 +372,6 @@ export default function DocumentVerification() {
       setPennyDropResult(data);
       setPennyDropStage(data.stages?.length || 5);
 
-      // Save to vendor_validations (using 'bank' type since penny_drop is not in enum)
       await supabase
         .from('vendor_validations')
         .delete()
@@ -341,7 +408,7 @@ export default function DocumentVerification() {
     },
   });
 
-  // Run all validations
+  // Run all validations for single vendor
   const runAllValidationsMutation = useMutation({
     mutationFn: async (vendorId: string) => {
       const validationTypes = ['gst', 'pan', 'bank', 'name_match', 'msme'];
@@ -358,44 +425,124 @@ export default function DocumentVerification() {
     },
   });
 
-  // Get latest validation for each type
-  const getLatestValidation = (type: string): Validation | undefined => {
-    return validations?.find(v => v.validation_type === type);
+  // Bulk validation for multiple vendors
+  const runBulkValidationMutation = useMutation({
+    mutationFn: async (vendorIds: string[]) => {
+      const validationTypes = ['gst', 'pan', 'bank', 'name_match', 'msme'];
+      const total = vendorIds.length * validationTypes.length;
+      let current = 0;
+      
+      for (const vendorId of vendorIds) {
+        for (const type of validationTypes) {
+          try {
+            await runValidationMutation.mutateAsync({ vendorId, validationType: type });
+          } catch (e) {
+            console.error(`Validation ${type} failed for vendor ${vendorId}:`, e);
+          }
+          current++;
+          setBulkValidationProgress({ current, total });
+        }
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Bulk Validation Complete',
+        description: `Validated ${selectedVendors.length} vendors successfully.`,
+      });
+      setSelectedVendors([]);
+      queryClient.invalidateQueries({ queryKey: ['vendors-for-verification'] });
+    },
+    onSettled: () => {
+      setBulkValidationProgress(null);
+    },
+  });
+
+  // Send deviation email
+  const sendDeviationEmail = async () => {
+    if (!selectedVendor) return;
+    
+    setSendingEmail(true);
+    const deviations = getDeviations();
+    
+    try {
+      const { error } = await supabase.functions.invoke('send-status-notification', {
+        body: {
+          vendorId: selectedVendor.id,
+          vendorName: selectedVendor.legal_name,
+          vendorEmail: selectedVendor.primary_email || deviationEmail,
+          status: 'clarification_needed',
+          comments: `
+Deviations Found:
+${deviations.map(d => `- ${d.label}: ${d.message}`).join('\n')}
+
+${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
+          `.trim(),
+          simulationMode: true,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Email Sent (Simulation)',
+        description: `Deviation notice sent to ${selectedVendor.primary_email || deviationEmail}`,
+      });
+      
+      setShowDeviationDialog(false);
+      setAdditionalComments('');
+    } catch (error: any) {
+      toast({
+        title: 'Failed to Send Email',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
+  // Document preview
+  const handlePreview = async (doc: VendorDocument) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('vendor-documents')
+        .createSignedUrl(doc.file_path, 3600);
+      
+      if (error) throw error;
+      
+      setPreviewUrl(data.signedUrl);
+      setPreviewDoc(doc);
+    } catch (error) {
+      toast({
+        title: 'Preview Failed',
+        description: 'Could not load document preview.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Document download
   const downloadDocument = async (doc: VendorDocument) => {
     try {
-      // First try to get a signed URL for the document
-      const { data: signedData, error: signedError } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from('vendor-documents')
-        .createSignedUrl(doc.file_path, 60); // 60 seconds expiry
+        .createSignedUrl(doc.file_path, 60);
       
-      if (signedError) {
-        // If signed URL fails, try public URL
-        const { data: publicData } = supabase.storage
-          .from('vendor-documents')
-          .getPublicUrl(doc.file_path);
-        
-        if (publicData?.publicUrl) {
-          window.open(publicData.publicUrl, '_blank');
-          return;
-        }
-
-        // If that also fails, try direct download
-        const { data, error } = await supabase.storage
+      if (error) {
+        const { data: downloaded, error: downloadError } = await supabase.storage
           .from('vendor-documents')
           .download(doc.file_path);
         
-        if (error) {
+        if (downloadError) {
           toast({
             title: 'Download Failed',
-            description: `Could not download file: ${error.message}. The file may not exist or you may not have permission.`,
+            description: 'Could not download the file.',
             variant: 'destructive',
           });
           return;
         }
 
-        const url = URL.createObjectURL(data);
+        const url = URL.createObjectURL(downloaded);
         const a = document.createElement('a');
         a.href = url;
         a.download = doc.file_name;
@@ -406,44 +553,88 @@ export default function DocumentVerification() {
         return;
       }
 
-      // Use signed URL
-      window.open(signedData.signedUrl, '_blank');
+      window.open(data.signedUrl, '_blank');
     } catch (error) {
       toast({
         title: 'Download Failed',
-        description: 'An unexpected error occurred while downloading the file.',
+        description: 'An unexpected error occurred.',
         variant: 'destructive',
       });
     }
   };
 
-  const stageLabels = [
-    "IFSC Validation",
-    "Account Lookup",
-    "IMPS Transfer",
-    "Transfer Confirmation",
-    "Name Verification",
-  ];
+  const getLatestValidation = (type: string): Validation | undefined => {
+    return validations?.find(v => v.validation_type === type);
+  };
+
+  const toggleVendorSelection = (vendorId: string) => {
+    setSelectedVendors(prev => 
+      prev.includes(vendorId) 
+        ? prev.filter(id => id !== vendorId)
+        : [...prev, vendorId]
+    );
+  };
+
+  const selectAllVendors = () => {
+    if (selectedVendors.length === vendors?.length) {
+      setSelectedVendors([]);
+    } else {
+      setSelectedVendors(vendors?.map(v => v.id) || []);
+    }
+  };
+
+  const deviations = selectedVendor ? getDeviations() : [];
+  const stageLabels = ["IFSC Validation", "Account Lookup", "IMPS Transfer", "Transfer Confirmation", "Name Verification"];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Document Verification</h1>
-        <p className="text-muted-foreground">
-          Review and verify vendor documents and run validation checks
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Document Verification</h1>
+          <p className="text-muted-foreground">
+            Review and verify submitted vendor documents and run validation checks
+          </p>
+        </div>
+        
+        {/* Bulk Validation Button */}
+        {selectedVendors.length > 0 && (
+          <Button 
+            onClick={() => runBulkValidationMutation.mutate(selectedVendors)}
+            disabled={runBulkValidationMutation.isPending}
+          >
+            {runBulkValidationMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Validating {bulkValidationProgress?.current}/{bulkValidationProgress?.total}
+              </>
+            ) : (
+              <>
+                <ListChecks className="mr-2 h-4 w-4" />
+                Bulk Validate ({selectedVendors.length})
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Vendors List */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              All Vendors
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Submitted Vendors
+              </span>
+              {vendors && vendors.length > 0 && (
+                <Checkbox
+                  checked={selectedVendors.length === vendors.length}
+                  onCheckedChange={selectAllVendors}
+                />
+              )}
             </CardTitle>
             <CardDescription>
-              {vendors?.length || 0} vendors registered
+              {vendors?.length || 0} vendors pending verification
             </CardDescription>
           </CardHeader>
           <CardContent className="max-h-[500px] overflow-auto">
@@ -452,7 +643,7 @@ export default function DocumentVerification() {
                 <RefreshCw className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
               </div>
             ) : vendors?.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">No vendors registered</p>
+              <p className="text-center py-8 text-muted-foreground">No submitted vendors pending verification</p>
             ) : (
               <div className="space-y-2">
                 {vendors?.map((vendor) => (
@@ -463,24 +654,28 @@ export default function DocumentVerification() {
                         ? 'border-primary bg-primary/5' 
                         : 'hover:bg-muted/50'
                     }`}
-                    onClick={() => setSelectedVendor(vendor)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={selectedVendors.includes(vendor.id)}
+                        onCheckedChange={() => toggleVendorSelection(vendor.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div 
+                        className="flex-1"
+                        onClick={() => setSelectedVendor(vendor)}
+                      >
                         <p className="font-medium">{vendor.legal_name || 'Unknown Vendor'}</p>
                         <p className="text-sm text-muted-foreground">{vendor.primary_email}</p>
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          GST: {vendor.gstin || 'N/A'} | PAN: {vendor.pan || 'N/A'}
+                        </div>
+                        {vendor.submitted_at && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Submitted: {new Date(vendor.submitted_at).toLocaleDateString('en-IN')}
+                          </p>
+                        )}
                       </div>
-                      <Badge variant={
-                        vendor.status === 'validation_failed' ? 'destructive' :
-                        vendor.status === 'finance_review' || vendor.status === 'finance_approved' ? 'default' : 
-                        vendor.status === 'purchase_approved' || vendor.status === 'sap_synced' ? 'default' :
-                        'secondary'
-                      }>
-                        {vendor.status.replace(/_/g, ' ')}
-                      </Badge>
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      GST: {vendor.gstin || 'N/A'} | PAN: {vendor.pan || 'N/A'}
                     </div>
                   </div>
                 ))}
@@ -508,6 +703,14 @@ export default function DocumentVerification() {
                 <TabsList>
                   <TabsTrigger value="validations">Standard Validations</TabsTrigger>
                   <TabsTrigger value="penny-drop">Penny Drop</TabsTrigger>
+                  <TabsTrigger value="deviations" className="relative">
+                    Deviations
+                    {deviations.length > 0 && (
+                      <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                        {deviations.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="validations" className="space-y-4">
@@ -618,7 +821,6 @@ export default function DocumentVerification() {
                           )}
                         </Button>
 
-                        {/* Show last penny drop result if available */}
                         {getLatestValidation('bank')?.message?.includes('Penny Drop') && (
                           <div className={`p-4 rounded-lg border ${
                             getLatestValidation('bank')?.status === 'passed' 
@@ -640,13 +842,73 @@ export default function DocumentVerification() {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                <TabsContent value="deviations" className="space-y-4">
+                  {deviations.length === 0 ? (
+                    <div className="text-center py-8">
+                      <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                      <p className="text-lg font-medium text-green-700">No Deviations Found</p>
+                      <p className="text-muted-foreground">All validations have passed.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-destructive">
+                          <AlertTriangle className="h-5 w-5" />
+                          <span className="font-medium">{deviations.length} Deviation(s) Found</span>
+                        </div>
+                        <Button 
+                          variant="destructive" 
+                          onClick={() => {
+                            setDeviationEmail(selectedVendor.primary_email || '');
+                            setShowDeviationDialog(true);
+                          }}
+                        >
+                          <Mail className="mr-2 h-4 w-4" />
+                          Send Deviation Notice
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {deviations.map((deviation) => (
+                          <div
+                            key={deviation.type}
+                            className={`p-4 rounded-lg border ${
+                              deviation.status === 'failed' 
+                                ? 'border-destructive/50 bg-destructive/5' 
+                                : 'border-yellow-500/50 bg-yellow-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {deviation.status === 'failed' ? (
+                                <XCircle className="h-5 w-5 text-destructive" />
+                              ) : (
+                                <Clock className="h-5 w-5 text-yellow-600" />
+                              )}
+                              <div>
+                                <p className="font-medium">{deviation.label}</p>
+                                <p className="text-sm text-muted-foreground">{deviation.message}</p>
+                              </div>
+                              <Badge 
+                                variant={deviation.status === 'failed' ? 'destructive' : 'secondary'}
+                                className="ml-auto"
+                              >
+                                {deviation.status === 'failed' ? 'Failed' : 'Pending'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </TabsContent>
               </Tabs>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Documents Section */}
+      {/* Documents Section with Preview */}
       {selectedVendor && (
         <Card>
           <CardHeader>
@@ -672,25 +934,38 @@ export default function DocumentVerification() {
                 <TableBody>
                   {documents?.map((doc) => (
                     <TableRow key={doc.id}>
-                      <TableCell className="font-medium capitalize">
-                        {doc.document_type.replace(/_/g, ' ')}
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {getFileIcon(doc.mime_type)}
+                          <span className="capitalize">{documentTypeLabels[doc.document_type] || doc.document_type.replace(/_/g, ' ')}</span>
+                        </div>
                       </TableCell>
                       <TableCell>{doc.file_name}</TableCell>
                       <TableCell>
                         {doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {new Date(doc.uploaded_at).toLocaleDateString()}
+                        {new Date(doc.uploaded_at).toLocaleDateString('en-IN')}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => downloadDocument(doc)}
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          Download
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePreview(doc)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadDocument(doc)}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Download
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -715,7 +990,6 @@ export default function DocumentVerification() {
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* Progress Stages */}
             <div className="space-y-3">
               {stageLabels.map((stage, index) => {
                 const resultStage = pennyDropResult?.stages?.[index];
@@ -743,16 +1017,14 @@ export default function DocumentVerification() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium ${
-                          isFailed ? 'text-destructive' : 
-                          isCompleted ? 'text-green-700' : 
-                          isActive ? 'text-primary' : 
-                          'text-muted-foreground'
-                        }`}>
-                          {stage}
-                        </span>
-                      </div>
+                      <span className={`text-sm font-medium ${
+                        isFailed ? 'text-destructive' : 
+                        isCompleted ? 'text-green-700' : 
+                        isActive ? 'text-primary' : 
+                        'text-muted-foreground'
+                      }`}>
+                        {stage}
+                      </span>
                       {resultStage && (
                         <p className="text-xs text-muted-foreground mt-1">
                           {resultStage.message}
@@ -764,7 +1036,6 @@ export default function DocumentVerification() {
               })}
             </div>
 
-            {/* Result Details */}
             {pennyDropResult?.data && (
               <Card className={`border-2 ${pennyDropResult.verified ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}`}>
                 <CardContent className="pt-4">
@@ -799,6 +1070,115 @@ export default function DocumentVerification() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deviation Email Dialog */}
+      <Dialog open={showDeviationDialog} onOpenChange={setShowDeviationDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Send Deviation Notice
+            </DialogTitle>
+            <DialogDescription>
+              Send an email to {selectedVendor?.legal_name} with the list of deviations
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>Recipient Email</Label>
+              <p className="text-sm font-medium mt-1">{selectedVendor?.primary_email || 'No email provided'}</p>
+            </div>
+
+            <div>
+              <Label>Deviations to be communicated:</Label>
+              <ScrollArea className="h-32 mt-2 border rounded-md p-3">
+                <ul className="space-y-2">
+                  {deviations.map((d) => (
+                    <li key={d.type} className="flex items-center gap-2 text-sm">
+                      {d.status === 'failed' ? (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <Clock className="h-4 w-4 text-yellow-600" />
+                      )}
+                      <span className="font-medium">{d.label}:</span>
+                      <span className="text-muted-foreground">{d.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </div>
+
+            <div>
+              <Label htmlFor="comments">Additional Comments</Label>
+              <Textarea
+                id="comments"
+                placeholder="Add any additional instructions or comments for the vendor..."
+                value={additionalComments}
+                onChange={(e) => setAdditionalComments(e.target.value)}
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeviationDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={sendDeviationEmail} disabled={sendingEmail}>
+              {sendingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Preview Dialog */}
+      <Dialog open={!!previewDoc} onOpenChange={() => { setPreviewDoc(null); setPreviewUrl(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewDoc && getFileIcon(previewDoc.mime_type)}
+              {previewDoc?.file_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            {previewDoc?.mime_type?.startsWith('image/') ? (
+              <img
+                src={previewUrl || ''}
+                alt={previewDoc.file_name}
+                className="max-w-full max-h-[70vh] mx-auto rounded-md"
+              />
+            ) : previewDoc?.mime_type === 'application/pdf' ? (
+              <iframe
+                src={previewUrl || ''}
+                className="w-full h-[70vh] rounded-md"
+                title={previewDoc.file_name}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  Preview not available for this file type
+                </p>
+                <Button onClick={() => previewUrl && window.open(previewUrl, '_blank')}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open in New Tab
+                </Button>
+              </div>
             )}
           </div>
         </DialogContent>
