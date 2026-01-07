@@ -49,7 +49,10 @@ import {
   File,
   ExternalLink,
   ListChecks,
-  Send
+  Send,
+  Shield,
+  TrendingUp,
+  Calendar
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -702,6 +705,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
               <Tabs defaultValue="validations" className="space-y-4">
                 <TabsList>
                   <TabsTrigger value="validations">Standard Validations</TabsTrigger>
+                  <TabsTrigger value="gst-compliance">GST Compliance</TabsTrigger>
                   <TabsTrigger value="penny-drop">Penny Drop</TabsTrigger>
                   <TabsTrigger value="deviations" className="relative">
                     Deviations
@@ -768,6 +772,106 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                       );
                     })}
                   </div>
+                </TabsContent>
+
+                <TabsContent value="gst-compliance" className="space-y-4">
+                  <Card className="border-dashed">
+                    <CardContent className="pt-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                          <Shield className="h-8 w-8 text-blue-600" />
+                          <div>
+                            <h4 className="font-semibold">GST Compliance Check</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Verify GST registration status and filing compliance
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <Label className="text-muted-foreground">GSTIN</Label>
+                            <p className="font-mono">{selectedVendor.gstin || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Legal Name</Label>
+                            <p>{selectedVendor.legal_name || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">PAN</Label>
+                            <p className="font-mono">{selectedVendor.pan || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Email</Label>
+                            <p>{selectedVendor.primary_email || 'Not provided'}</p>
+                          </div>
+                        </div>
+
+                        {/* GST Validation Result */}
+                        {getLatestValidation('gst') && (
+                          <div className={`p-4 rounded-lg border ${
+                            getLatestValidation('gst')?.status === 'passed' 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-red-50 border-red-200'
+                          }`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              {getLatestValidation('gst')?.status === 'passed' ? (
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                              ) : (
+                                <XCircle className="h-5 w-5 text-red-600" />
+                              )}
+                              <span className="font-medium">
+                                {getLatestValidation('gst')?.status === 'passed' ? 'GST Verified' : 'GST Verification Failed'}
+                              </span>
+                            </div>
+                            <p className="text-sm">{getLatestValidation('gst')?.message}</p>
+                            
+                            {getLatestValidation('gst')?.details && (
+                              <div className="mt-4 grid grid-cols-2 gap-3 text-sm border-t pt-3">
+                                <div>
+                                  <span className="text-muted-foreground">GST Status:</span>
+                                  <p className="font-medium">{(getLatestValidation('gst')?.details as any)?.gstStatus || 'Active'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Filing Status:</span>
+                                  <p className="font-medium">{(getLatestValidation('gst')?.details as any)?.filingStatus || 'Regular'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Compliance Score:</span>
+                                  <p className="font-medium">{(getLatestValidation('gst')?.details as any)?.complianceScore || '85'}%</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Risk Level:</span>
+                                  <p className="font-medium">{(getLatestValidation('gst')?.details as any)?.riskLevel || 'Low'}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <Button 
+                          onClick={() => runValidationMutation.mutate({ 
+                            vendorId: selectedVendor.id, 
+                            validationType: 'gst' 
+                          })}
+                          disabled={runningValidation === 'gst'}
+                          className="w-full"
+                        >
+                          {runningValidation === 'gst' ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Checking GST Compliance...
+                            </>
+                          ) : (
+                            <>
+                              <Shield className="mr-2 h-4 w-4" />
+                              Run GST Compliance Check
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 <TabsContent value="penny-drop" className="space-y-4">

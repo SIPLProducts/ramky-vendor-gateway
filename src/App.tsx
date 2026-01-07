@@ -21,6 +21,7 @@ import DocumentVerification from "./pages/DocumentVerification";
 import SupportHelp from "./pages/SupportHelp";
 import VendorFeedback from "./pages/VendorFeedback";
 import DemoShowcase from "./pages/DemoShowcase";
+import GstCompliance from "./pages/GstCompliance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
                 <Route path="/demo" element={<DemoShowcase />} />
+                <Route path="/compliance/gst" element={<GstCompliance />} />
               </Route>
             </Route>
             
