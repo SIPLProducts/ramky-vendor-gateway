@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Mail, Lock, User, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 import authHeroImage from '@/assets/auth-hero.jpg';
+import ramkyLogo from '@/assets/ramky-logo.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -143,13 +144,11 @@ export default function Auth() {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-primary/40" />
         <div className="relative z-10 flex flex-col justify-center p-12 text-white">
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-12 w-12 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center">
-              <Building2 className="h-7 w-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">Ramky Infrastructure</h1>
-              <p className="text-white/80 text-sm">Vendor Management Portal</p>
-            </div>
+            <img 
+              src={ramkyLogo} 
+              alt="Ramky Infrastructure" 
+              className="h-16 w-auto bg-white/90 rounded-lg p-2"
+            />
           </div>
           
           <h2 className="text-4xl font-bold mb-4 leading-tight">
@@ -182,13 +181,11 @@ export default function Auth() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Ramky Infrastructure</h1>
-              <p className="text-muted-foreground text-xs">Vendor Management Portal</p>
-            </div>
+            <img 
+              src={ramkyLogo} 
+              alt="Ramky Infrastructure" 
+              className="h-14 w-auto"
+            />
           </div>
 
           <Card className="border-0 shadow-xl">
