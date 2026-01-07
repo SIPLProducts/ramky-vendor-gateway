@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { StepIndicator, registrationSteps } from '@/components/vendor/StepIndicator';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
@@ -6,14 +7,16 @@ import { StatutoryStep } from '@/components/vendor/steps/StatutoryStep';
 import { BankStep } from '@/components/vendor/steps/BankStep';
 import { FinancialStep } from '@/components/vendor/steps/FinancialStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
-import { ValidationStatus } from '@/components/vendor/ValidationStatus';
+import { RegistrationStatusTracker, RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
 import { PublicHeader } from '@/components/layout/PublicHeader';
-import { VendorFormData, ValidationResult } from '@/types/vendor';
+import { VendorFormData } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { Clock, CheckCircle2, Lock } from 'lucide-react';
+import { Clock, CheckCircle2, Save, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+
 const initialFormData: VendorFormData = {
   organization: {
     legalName: '',
@@ -77,19 +80,15 @@ export default function VendorRegistration() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
-  const [validations, setValidations] = useState<ValidationResult[]>([]);
-  const [systemFetchedData, setSystemFetchedData] = useState<{
-    gstLegalName?: string;
-    gstStatus?: string;
-    panName?: string;
-    bankAccountName?: string;
-  }>({});
+  const [vendorStatus, setVendorStatus] = useState<RegistrationStatus>('draft');
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const { 
+    saveVendor,
     submitVendor, 
     runValidations, 
+    isSaving,
     isSubmitting, 
     isValidating,
     vendorId 
@@ -98,49 +97,23 @@ export default function VendorRegistration() {
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
 
-  // Subscribe to real-time validation updates
+  // Subscribe to real-time vendor status updates
   useEffect(() => {
     if (!vendorId) return;
 
     const channel = supabase
-      .channel(`vendor-validations-${vendorId}`)
+      .channel(`vendor-status-${vendorId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'vendor_validations',
-          filter: `vendor_id=eq.${vendorId}`,
+          table: 'vendors',
+          filter: `id=eq.${vendorId}`,
         },
-        async () => {
-          // Fetch updated validations
-          const { data } = await supabase
-            .from('vendor_validations')
-            .select('*')
-            .eq('vendor_id', vendorId);
-          
-          if (data) {
-            const results: ValidationResult[] = data.map((v) => ({
-              type: v.validation_type as ValidationResult['type'],
-              status: v.status as ValidationResult['status'],
-              message: v.message || '',
-              details: v.details as Record<string, unknown> | undefined,
-              timestamp: v.validated_at,
-            }));
-            setValidations(results);
-            
-            // Extract system-fetched data from validation details
-            const gstValidation = data.find(v => v.validation_type === 'gst');
-            const panValidation = data.find(v => v.validation_type === 'pan');
-            const bankValidation = data.find(v => v.validation_type === 'bank');
-            
-            setSystemFetchedData({
-              gstLegalName: (gstValidation?.details as any)?.registeredName,
-              gstStatus: (gstValidation?.details as any)?.status,
-              panName: (panValidation?.details as any)?.registeredName,
-              bankAccountName: (bankValidation?.details as any)?.accountHolderName,
-            });
-          }
+        (payload) => {
+          const newStatus = payload.new.status as RegistrationStatus;
+          setVendorStatus(newStatus);
         }
       )
       .subscribe();
@@ -178,21 +151,41 @@ export default function VendorRegistration() {
     setCurrentStep(step);
   };
 
+  const handleSaveAsDraft = async () => {
+    try {
+      await saveVendor(formData);
+      toast({
+        title: 'Draft Saved',
+        description: 'Your registration progress has been saved. You can continue later.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Save Failed',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCancel = () => {
+    if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+      navigate('/');
+    }
+  };
+
   const handleSubmit = async () => {
     try {
-      // Submit vendor data to database
       const vendor = await submitVendor(formData);
       setIsSubmitted(true);
-      setIsLocked(true); // Lock the form after submission
+      setVendorStatus('validation_pending');
       
       toast({
         title: 'Registration Submitted',
-        description: 'Your vendor registration has been submitted. Running validations...',
+        description: 'Your vendor registration has been submitted successfully.',
       });
       
-      // Run automatic validations
-      const results = await runValidations(vendor.id);
-      setValidations(results);
+      // Run automatic validations in the background
+      await runValidations(vendor.id);
       
     } catch (error) {
       toast({
@@ -258,80 +251,62 @@ export default function VendorRegistration() {
     }
   };
 
+  // Show success page after submission
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-background">
         <PublicHeader />
         <main className="container max-w-4xl py-8">
-          <Alert className="mb-6 bg-success/10 border-success">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <AlertTitle className="text-success">Registration Submitted Successfully</AlertTitle>
-            <AlertDescription>
-              Your vendor registration has been submitted and is now being validated.
-              You will receive an email notification once the review is complete.
-            </AlertDescription>
-          </Alert>
-
-          <ValidationStatus validations={validations} isProcessing={isValidating} />
-
-          {/* System Fetched Data Display */}
-          {Object.keys(systemFetchedData).some(key => systemFetchedData[key as keyof typeof systemFetchedData]) && (
-            <div className="form-section mt-6">
-              <h3 className="form-section-title flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                System-Verified Information
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                The following fields have been auto-populated from government databases and are locked.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {systemFetchedData.gstLegalName && (
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-xs text-muted-foreground">GST Registered Name</p>
-                    <p className="font-medium text-foreground flex items-center gap-2">
-                      {systemFetchedData.gstLegalName}
-                      <Lock className="h-3 w-3 text-muted-foreground" />
-                    </p>
-                  </div>
-                )}
-                {systemFetchedData.gstStatus && (
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-xs text-muted-foreground">GST Status</p>
-                    <p className="font-medium text-foreground flex items-center gap-2">
-                      {systemFetchedData.gstStatus}
-                      <Lock className="h-3 w-3 text-muted-foreground" />
-                    </p>
-                  </div>
-                )}
-                {systemFetchedData.panName && (
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-xs text-muted-foreground">PAN Registered Name</p>
-                    <p className="font-medium text-foreground flex items-center gap-2">
-                      {systemFetchedData.panName}
-                      <Lock className="h-3 w-3 text-muted-foreground" />
-                    </p>
-                  </div>
-                )}
-                {systemFetchedData.bankAccountName && (
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-xs text-muted-foreground">Bank Account Holder Name</p>
-                    <p className="font-medium text-foreground flex items-center gap-2">
-                      {systemFetchedData.bankAccountName}
-                      <Lock className="h-3 w-3 text-muted-foreground" />
-                    </p>
-                  </div>
-                )}
-              </div>
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 mb-4">
+              <CheckCircle2 className="h-8 w-8 text-success" />
             </div>
-          )}
+            <h1 className="text-2xl font-bold text-foreground mb-2">
+              Registration Submitted Successfully
+            </h1>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Your vendor registration has been submitted. You will receive email notifications as your application progresses through the approval process.
+            </p>
+          </div>
 
-          <div className="form-section mt-6">
-            <h3 className="form-section-title">What's Next?</h3>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>All validations must pass before proceeding</li>
-              <li>Finance team will review your submission</li>
-              <li>Upon Finance approval, Purchase team will give final approval</li>
-              <li>After all approvals, your vendor code will be created in SAP</li>
+          {/* Status Tracker */}
+          <div className="bg-card rounded-lg border p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-6 text-center">Registration Progress</h2>
+            <RegistrationStatusTracker status={vendorStatus} />
+          </div>
+
+          {/* What's Next */}
+          <div className="bg-card rounded-lg border p-6">
+            <h3 className="font-semibold mb-4">What Happens Next?</h3>
+            <ol className="space-y-3">
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center font-medium">1</span>
+                <div>
+                  <p className="font-medium text-foreground">Document Verification</p>
+                  <p className="text-sm text-muted-foreground">Your submitted documents will be verified automatically.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center font-medium">2</span>
+                <div>
+                  <p className="font-medium text-foreground">Finance Team Review</p>
+                  <p className="text-sm text-muted-foreground">Our finance team will review your financial details and documents.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center font-medium">3</span>
+                <div>
+                  <p className="font-medium text-foreground">Purchase Team Approval</p>
+                  <p className="text-sm text-muted-foreground">Final approval from the purchase team to complete onboarding.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center font-medium">4</span>
+                <div>
+                  <p className="font-medium text-foreground">SAP Vendor Code</p>
+                  <p className="text-sm text-muted-foreground">Your vendor code will be created in SAP upon final approval.</p>
+                </div>
+              </li>
             </ol>
           </div>
         </main>
@@ -345,14 +320,27 @@ export default function VendorRegistration() {
       
       <main className="container max-w-5xl py-8">
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
             <h1 className="text-2xl font-bold text-foreground">Vendor Registration</h1>
-            {isLocked && (
-              <span className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning px-2 py-1 rounded-full">
-                <Lock className="h-3 w-3" />
-                Form Locked
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSaveAsDraft}
+                disabled={isSaving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? 'Saving...' : 'Save as Draft'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+            </div>
           </div>
           <p className="text-muted-foreground">
             Complete all steps to submit your vendor onboarding application
