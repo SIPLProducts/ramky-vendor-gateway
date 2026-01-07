@@ -20,6 +20,7 @@ import AdminInvitations from "./pages/AdminInvitations";
 import DocumentVerification from "./pages/DocumentVerification";
 import SupportHelp from "./pages/SupportHelp";
 import VendorFeedback from "./pages/VendorFeedback";
+import DemoShowcase from "./pages/DemoShowcase";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
+                <Route path="/demo" element={<DemoShowcase />} />
               </Route>
             </Route>
             

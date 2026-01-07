@@ -14,7 +14,7 @@ import {
   ChevronRight,
   FileCheck,
   HelpCircle,
-  MessageSquare,
+  Play,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -88,6 +88,12 @@ const navItems: NavItem[] = [
     href: '/settings',
     icon: Settings,
     roles: ['admin'],
+  },
+  {
+    label: 'Demo Showcase',
+    href: '/demo',
+    icon: Play,
+    roles: ['admin', 'finance', 'purchase'],
   },
   {
     label: 'Help & Support',
