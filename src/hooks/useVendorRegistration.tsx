@@ -1,16 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { VendorFormData, ValidationResult } from '@/types/vendor';
+import { VendorFormData, ValidationResult, VendorStatus } from '@/types/vendor';
 
 interface UseVendorRegistrationOptions {
   invitationToken?: string;
 }
 
+// Statuses that allow editing
+const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
+
 export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const { toast } = useToast();
   const [vendorId, setVendorId] = useState<string | null>(null);
+  const [vendorStatus, setVendorStatus] = useState<VendorStatus | null>(null);
 
   // Fetch portal configuration
   const { data: portalConfig } = useQuery({
@@ -46,6 +50,100 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
     enabled: !!options?.invitationToken,
   });
+
+  // Fetch existing vendor data for the current user
+  const { data: existingVendor, isLoading: isLoadingVendor, refetch: refetchVendor } = useQuery({
+    queryKey: ['existing-vendor'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Set vendorId and status from existing vendor
+  useEffect(() => {
+    if (existingVendor) {
+      setVendorId(existingVendor.id);
+      setVendorStatus(existingVendor.status as VendorStatus);
+    }
+  }, [existingVendor]);
+
+  // Check if vendor can edit their registration
+  const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
+
+  // Convert database vendor to form data
+  const convertVendorToFormData = (vendor: typeof existingVendor): VendorFormData | null => {
+    if (!vendor) return null;
+    
+    return {
+      organization: {
+        legalName: vendor.legal_name || '',
+        tradeName: vendor.trade_name || '',
+        registeredAddress: vendor.registered_address || '',
+        registeredCity: vendor.registered_city || '',
+        registeredState: vendor.registered_state || '',
+        registeredPincode: vendor.registered_pincode || '',
+        communicationAddress: vendor.communication_address || '',
+        communicationCity: vendor.communication_city || '',
+        communicationState: vendor.communication_state || '',
+        communicationPincode: vendor.communication_pincode || '',
+        sameAsRegistered: vendor.same_as_registered ?? true,
+        industryType: vendor.industry_type || '',
+        productCategories: vendor.product_categories || [],
+      },
+      contact: {
+        primaryContactName: vendor.primary_contact_name || '',
+        primaryDesignation: vendor.primary_designation || '',
+        primaryEmail: vendor.primary_email || '',
+        primaryPhone: vendor.primary_phone || '',
+        secondaryContactName: vendor.secondary_contact_name || '',
+        secondaryDesignation: vendor.secondary_designation || '',
+        secondaryEmail: vendor.secondary_email || '',
+        secondaryPhone: vendor.secondary_phone || '',
+      },
+      statutory: {
+        gstin: vendor.gstin || '',
+        pan: vendor.pan || '',
+        msmeNumber: vendor.msme_number || '',
+        msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
+        entityType: vendor.entity_type || '',
+        gstCertificateFile: null,
+        panCardFile: null,
+        msmeCertificateFile: null,
+      },
+      bank: {
+        bankName: vendor.bank_name || '',
+        accountNumber: vendor.account_number || '',
+        confirmAccountNumber: vendor.account_number || '',
+        ifscCode: vendor.ifsc_code || '',
+        branchName: vendor.branch_name || '',
+        accountType: (vendor.account_type as 'current' | 'savings') || 'current',
+        cancelledChequeFile: null,
+      },
+      financial: {
+        turnoverYear1: vendor.turnover_year1?.toString() || '',
+        turnoverYear2: vendor.turnover_year2?.toString() || '',
+        turnoverYear3: vendor.turnover_year3?.toString() || '',
+        creditPeriodExpected: vendor.credit_period_expected?.toString() || '',
+        financialDocsFile: null,
+      },
+      declaration: {
+        selfDeclared: vendor.self_declared ?? false,
+        termsAccepted: vendor.terms_accepted ?? false,
+      },
+    };
+  };
 
   // Create or update vendor
   const saveVendorMutation = useMutation({
@@ -168,6 +266,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         details: { submitted_by: vendor.user_id },
       });
 
+      setVendorStatus('validation_pending');
       return vendor;
     },
     onSuccess: () => {
@@ -179,6 +278,109 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     onError: (error) => {
       toast({
         title: 'Submission Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Resubmit vendor after editing (for validation_failed or finance_rejected)
+  const resubmitVendorMutation = useMutation({
+    mutationFn: async (formData: VendorFormData) => {
+      if (!vendorId) throw new Error('No vendor to resubmit');
+      if (!canEdit) throw new Error('Vendor cannot be edited in current status');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Update vendor data
+      const vendorData = {
+        legal_name: formData.organization.legalName,
+        trade_name: formData.organization.tradeName || null,
+        registered_address: formData.organization.registeredAddress,
+        registered_city: formData.organization.registeredCity,
+        registered_state: formData.organization.registeredState,
+        registered_pincode: formData.organization.registeredPincode,
+        communication_address: formData.organization.sameAsRegistered 
+          ? formData.organization.registeredAddress 
+          : formData.organization.communicationAddress,
+        communication_city: formData.organization.sameAsRegistered 
+          ? formData.organization.registeredCity 
+          : formData.organization.communicationCity,
+        communication_state: formData.organization.sameAsRegistered 
+          ? formData.organization.registeredState 
+          : formData.organization.communicationState,
+        communication_pincode: formData.organization.sameAsRegistered 
+          ? formData.organization.registeredPincode 
+          : formData.organization.communicationPincode,
+        same_as_registered: formData.organization.sameAsRegistered,
+        industry_type: formData.organization.industryType,
+        product_categories: formData.organization.productCategories,
+        primary_contact_name: formData.contact.primaryContactName,
+        primary_designation: formData.contact.primaryDesignation,
+        primary_email: formData.contact.primaryEmail,
+        primary_phone: formData.contact.primaryPhone,
+        secondary_contact_name: formData.contact.secondaryContactName || null,
+        secondary_designation: formData.contact.secondaryDesignation || null,
+        secondary_email: formData.contact.secondaryEmail || null,
+        secondary_phone: formData.contact.secondaryPhone || null,
+        gstin: formData.statutory.gstin,
+        pan: formData.statutory.pan,
+        entity_type: formData.statutory.entityType,
+        msme_number: formData.statutory.msmeNumber || null,
+        msme_category: formData.statutory.msmeCategory || null,
+        bank_name: formData.bank.bankName,
+        account_number: formData.bank.accountNumber,
+        ifsc_code: formData.bank.ifscCode,
+        branch_name: formData.bank.branchName,
+        account_type: formData.bank.accountType,
+        turnover_year1: formData.financial.turnoverYear1 
+          ? parseFloat(formData.financial.turnoverYear1.replace(/,/g, '')) 
+          : null,
+        turnover_year2: formData.financial.turnoverYear2 
+          ? parseFloat(formData.financial.turnoverYear2.replace(/,/g, '')) 
+          : null,
+        turnover_year3: formData.financial.turnoverYear3 
+          ? parseFloat(formData.financial.turnoverYear3.replace(/,/g, '')) 
+          : null,
+        credit_period_expected: formData.financial.creditPeriodExpected 
+          ? parseInt(formData.financial.creditPeriodExpected) 
+          : null,
+        self_declared: formData.declaration.selfDeclared,
+        terms_accepted: formData.declaration.termsAccepted,
+        status: 'validation_pending' as const,
+        submitted_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('vendors')
+        .update(vendorData)
+        .eq('id', vendorId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+
+      // Log the resubmission
+      await supabase.from('audit_logs').insert({
+        vendor_id: vendorId,
+        action: 'vendor_resubmitted',
+        details: { resubmitted_by: user.id, previous_status: vendorStatus },
+      });
+
+      setVendorStatus('validation_pending');
+      await refetchVendor();
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Registration Resubmitted',
+        description: 'Your updated registration has been submitted for verification.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Resubmission Failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -388,14 +590,21 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   return {
     vendorId,
+    vendorStatus,
+    existingVendor,
+    existingFormData: convertVendorToFormData(existingVendor),
+    isLoadingVendor,
+    canEdit,
     invitation,
     isLoadingInvitation,
     portalConfig,
     saveVendor: saveVendorMutation.mutateAsync,
     submitVendor: submitVendorMutation.mutateAsync,
+    resubmitVendor: resubmitVendorMutation.mutateAsync,
     runValidations: runValidationsMutation.mutateAsync,
     isSaving: saveVendorMutation.isPending,
     isSubmitting: submitVendorMutation.isPending,
+    isResubmitting: resubmitVendorMutation.isPending,
     isValidating: runValidationsMutation.isPending,
   };
 }

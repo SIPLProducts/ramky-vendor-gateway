@@ -3,11 +3,16 @@ import { cn } from '@/lib/utils';
 
 export type RegistrationStatus = 
   | 'draft'
+  | 'submitted'
   | 'validation_pending'
   | 'validation_failed'
   | 'finance_review'
   | 'finance_approved'
+  | 'finance_rejected'
   | 'purchase_review'
+  | 'purchase_approved'
+  | 'purchase_rejected'
+  | 'sap_synced'
   | 'approved'
   | 'rejected';
 
@@ -55,15 +60,22 @@ function getActiveStepIndex(status: RegistrationStatus): number {
   switch (status) {
     case 'draft':
       return -1;
+    case 'submitted':
     case 'validation_pending':
       return 1; // Verification in progress
     case 'validation_failed':
       return 1; // Stuck at verification
     case 'finance_review':
       return 2; // Finance review in progress
+    case 'finance_rejected':
+      return 2; // Stuck at finance
     case 'finance_approved':
     case 'purchase_review':
       return 3; // Purchase review in progress
+    case 'purchase_rejected':
+      return 3; // Stuck at purchase
+    case 'purchase_approved':
+    case 'sap_synced':
     case 'approved':
       return 4; // Completed
     case 'rejected':
@@ -75,6 +87,12 @@ function getActiveStepIndex(status: RegistrationStatus): number {
 
 function getStepStatus(stepIndex: number, activeIndex: number, vendorStatus: RegistrationStatus): 'completed' | 'active' | 'pending' | 'failed' {
   if (vendorStatus === 'validation_failed' && stepIndex === 1) {
+    return 'failed';
+  }
+  if (vendorStatus === 'finance_rejected' && stepIndex === 2) {
+    return 'failed';
+  }
+  if (vendorStatus === 'purchase_rejected' && stepIndex === 3) {
     return 'failed';
   }
   if (vendorStatus === 'rejected') {
