@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -82,68 +82,68 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Check if vendor can edit their registration
   const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
 
-  // Convert database vendor to form data
-  const convertVendorToFormData = (vendor: typeof existingVendor): VendorFormData | null => {
-    if (!vendor) return null;
+  // Convert database vendor to form data - memoized to prevent infinite loops
+  const existingFormData = useMemo<VendorFormData | null>(() => {
+    if (!existingVendor) return null;
     
     return {
       organization: {
-        legalName: vendor.legal_name || '',
-        tradeName: vendor.trade_name || '',
-        registeredAddress: vendor.registered_address || '',
-        registeredCity: vendor.registered_city || '',
-        registeredState: vendor.registered_state || '',
-        registeredPincode: vendor.registered_pincode || '',
-        communicationAddress: vendor.communication_address || '',
-        communicationCity: vendor.communication_city || '',
-        communicationState: vendor.communication_state || '',
-        communicationPincode: vendor.communication_pincode || '',
-        sameAsRegistered: vendor.same_as_registered ?? true,
-        industryType: vendor.industry_type || '',
-        productCategories: vendor.product_categories || [],
+        legalName: existingVendor.legal_name || '',
+        tradeName: existingVendor.trade_name || '',
+        registeredAddress: existingVendor.registered_address || '',
+        registeredCity: existingVendor.registered_city || '',
+        registeredState: existingVendor.registered_state || '',
+        registeredPincode: existingVendor.registered_pincode || '',
+        communicationAddress: existingVendor.communication_address || '',
+        communicationCity: existingVendor.communication_city || '',
+        communicationState: existingVendor.communication_state || '',
+        communicationPincode: existingVendor.communication_pincode || '',
+        sameAsRegistered: existingVendor.same_as_registered ?? true,
+        industryType: existingVendor.industry_type || '',
+        productCategories: existingVendor.product_categories || [],
       },
       contact: {
-        primaryContactName: vendor.primary_contact_name || '',
-        primaryDesignation: vendor.primary_designation || '',
-        primaryEmail: vendor.primary_email || '',
-        primaryPhone: vendor.primary_phone || '',
-        secondaryContactName: vendor.secondary_contact_name || '',
-        secondaryDesignation: vendor.secondary_designation || '',
-        secondaryEmail: vendor.secondary_email || '',
-        secondaryPhone: vendor.secondary_phone || '',
+        primaryContactName: existingVendor.primary_contact_name || '',
+        primaryDesignation: existingVendor.primary_designation || '',
+        primaryEmail: existingVendor.primary_email || '',
+        primaryPhone: existingVendor.primary_phone || '',
+        secondaryContactName: existingVendor.secondary_contact_name || '',
+        secondaryDesignation: existingVendor.secondary_designation || '',
+        secondaryEmail: existingVendor.secondary_email || '',
+        secondaryPhone: existingVendor.secondary_phone || '',
       },
       statutory: {
-        gstin: vendor.gstin || '',
-        pan: vendor.pan || '',
-        msmeNumber: vendor.msme_number || '',
-        msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
-        entityType: vendor.entity_type || '',
+        gstin: existingVendor.gstin || '',
+        pan: existingVendor.pan || '',
+        msmeNumber: existingVendor.msme_number || '',
+        msmeCategory: (existingVendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
+        entityType: existingVendor.entity_type || '',
         gstCertificateFile: null,
         panCardFile: null,
         msmeCertificateFile: null,
       },
       bank: {
-        bankName: vendor.bank_name || '',
-        accountNumber: vendor.account_number || '',
-        confirmAccountNumber: vendor.account_number || '',
-        ifscCode: vendor.ifsc_code || '',
-        branchName: vendor.branch_name || '',
-        accountType: (vendor.account_type as 'current' | 'savings') || 'current',
+        bankName: existingVendor.bank_name || '',
+        accountNumber: existingVendor.account_number || '',
+        confirmAccountNumber: existingVendor.account_number || '',
+        ifscCode: existingVendor.ifsc_code || '',
+        branchName: existingVendor.branch_name || '',
+        accountType: (existingVendor.account_type as 'current' | 'savings') || 'current',
         cancelledChequeFile: null,
       },
       financial: {
-        turnoverYear1: vendor.turnover_year1?.toString() || '',
-        turnoverYear2: vendor.turnover_year2?.toString() || '',
-        turnoverYear3: vendor.turnover_year3?.toString() || '',
-        creditPeriodExpected: vendor.credit_period_expected?.toString() || '',
+        turnoverYear1: existingVendor.turnover_year1?.toString() || '',
+        turnoverYear2: existingVendor.turnover_year2?.toString() || '',
+        turnoverYear3: existingVendor.turnover_year3?.toString() || '',
+        creditPeriodExpected: existingVendor.credit_period_expected?.toString() || '',
         financialDocsFile: null,
       },
       declaration: {
-        selfDeclared: vendor.self_declared ?? false,
-        termsAccepted: vendor.terms_accepted ?? false,
+        selfDeclared: existingVendor.self_declared ?? false,
+        termsAccepted: existingVendor.terms_accepted ?? false,
       },
     };
-  };
+  }, [existingVendor]);
 
   // Create or update vendor
   const saveVendorMutation = useMutation({
@@ -592,7 +592,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     vendorId,
     vendorStatus,
     existingVendor,
-    existingFormData: convertVendorToFormData(existingVendor),
+    existingFormData,
     isLoadingVendor,
     canEdit,
     invitation,

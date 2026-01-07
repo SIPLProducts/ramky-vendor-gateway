@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StepIndicator, registrationSteps } from '@/components/vendor/StepIndicator';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
@@ -82,6 +82,7 @@ export default function VendorRegistration() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
+  const formDataLoadedRef = useRef(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -105,9 +106,10 @@ export default function VendorRegistration() {
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
 
-  // Load existing form data if vendor exists and is editable
+  // Load existing form data if vendor exists and is editable (only once)
   useEffect(() => {
-    if (existingFormData && vendorStatus) {
+    if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
+      formDataLoadedRef.current = true;
       setFormData(existingFormData);
       setVendorStatusState(vendorStatus);
       
