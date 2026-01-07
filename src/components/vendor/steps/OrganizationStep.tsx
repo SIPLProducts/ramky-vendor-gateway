@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
   SelectContent,
@@ -14,6 +15,12 @@ import {
 } from '@/components/ui/select';
 import { OrganizationDetails, INDUSTRY_TYPES, PRODUCT_CATEGORIES, INDIAN_STATES } from '@/types/vendor';
 import { ChevronRight } from 'lucide-react';
+
+// Convert PRODUCT_CATEGORIES to MultiSelect options format
+const categoryOptions = PRODUCT_CATEGORIES.map((category) => ({
+  label: category,
+  value: category,
+}));
 
 const schema = z.object({
   legalName: z.string().min(3, 'Legal name must be at least 3 characters'),
@@ -54,13 +61,6 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
 
   const sameAsRegistered = watch('sameAsRegistered');
   const selectedCategories = watch('productCategories') ?? [];
-
-  const handleCategoryToggle = (category: string) => {
-    const updated = selectedCategories.includes(category)
-      ? selectedCategories.filter((c) => c !== category)
-      : [...selectedCategories, category];
-    setValue('productCategories', updated, { shouldValidate: true });
-  };
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
@@ -259,25 +259,12 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
           Select all categories that apply to your business
         </p>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {PRODUCT_CATEGORIES.map((category) => (
-            <div
-              key={category}
-              className={`flex items-center gap-2 p-3 rounded-md border cursor-pointer transition-colors ${
-                selectedCategories.includes(category)
-                  ? 'bg-primary/10 border-primary'
-                  : 'hover:bg-muted'
-              }`}
-              onClick={() => handleCategoryToggle(category)}
-            >
-              <Checkbox
-                checked={selectedCategories.includes(category)}
-                className="pointer-events-none"
-              />
-              <span className="text-sm">{category}</span>
-            </div>
-          ))}
-        </div>
+        <MultiSelect
+          options={categoryOptions}
+          selected={selectedCategories}
+          onChange={(selected) => setValue('productCategories', selected, { shouldValidate: true })}
+          placeholder="Select categories..."
+        />
         {errors.productCategories && (
           <p className="text-sm text-destructive mt-2">{errors.productCategories.message}</p>
         )}
