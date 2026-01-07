@@ -7,7 +7,7 @@ import { BankStep } from '@/components/vendor/steps/BankStep';
 import { FinancialStep } from '@/components/vendor/steps/FinancialStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
-import { Header } from '@/components/layout/Header';
+import { PublicHeader } from '@/components/layout/PublicHeader';
 import { VendorFormData, ValidationResult } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
@@ -261,7 +261,7 @@ export default function VendorRegistration() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-background">
-        <Header userRole="vendor" userName="Vendor User" />
+        <PublicHeader />
         <main className="container max-w-4xl py-8">
           <Alert className="mb-6 bg-success/10 border-success">
             <CheckCircle2 className="h-5 w-5 text-success" />
@@ -341,7 +341,7 @@ export default function VendorRegistration() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header userRole="vendor" userName="Vendor User" />
+      <PublicHeader />
       
       <main className="container max-w-5xl py-8">
         <div className="mb-8">
