@@ -22,8 +22,14 @@ export function Header({ userRole, userName }: HeaderProps) {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/auth');
+    try {
+      await signOut();
+      navigate('/auth', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force navigation even if signOut fails
+      navigate('/auth', { replace: true });
+    }
   };
 
   const roleLabels = {
