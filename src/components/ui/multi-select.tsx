@@ -2,7 +2,6 @@ import * as React from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -48,25 +47,21 @@ export function MultiSelect({
     onChange([]);
   };
 
-  const selectedLabels = selected
-    .map((value) => options.find((opt) => opt.value === value)?.label)
-    .filter(Boolean);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
+        <button
+          type="button"
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between min-h-10 h-auto py-2",
+            "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-10 h-auto",
             className
           )}
         >
           <div className="flex flex-wrap gap-1 flex-1 text-left">
             {selected.length === 0 ? (
-              <span className="text-muted-foreground font-normal">{placeholder}</span>
+              <span className="text-muted-foreground">{placeholder}</span>
             ) : selected.length <= 3 ? (
               selected.map((value) => {
                 const option = options.find((opt) => opt.value === value);
@@ -78,7 +73,7 @@ export function MultiSelect({
                   >
                     {option?.label}
                     <span
-                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer hover:bg-muted-foreground/20"
                       onClick={(e) => handleRemove(value, e)}
                     >
                       <X className="h-3 w-3" />
@@ -90,7 +85,7 @@ export function MultiSelect({
               <Badge variant="secondary" className="font-normal">
                 {selected.length} selected
                 <span
-                  className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                  className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer hover:bg-muted-foreground/20"
                   onClick={handleClearAll}
                 >
                   <X className="h-3 w-3" />
@@ -99,9 +94,9 @@ export function MultiSelect({
             )}
           </div>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
-        </Button>
+        </button>
       </PopoverTrigger>
-      <PopoverContent className="w-full min-w-[300px] p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0" align="start">
         <div className="max-h-60 overflow-y-auto p-1">
           {options.map((option) => {
             const isSelected = selected.includes(option.value);
@@ -133,14 +128,13 @@ export function MultiSelect({
         </div>
         {selected.length > 0 && (
           <div className="border-t p-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-muted-foreground"
+            <button
+              type="button"
+              className="w-full text-sm text-muted-foreground hover:text-foreground py-1.5 rounded-sm hover:bg-muted transition-colors"
               onClick={handleClearAll}
             >
               Clear all ({selected.length})
-            </Button>
+            </button>
           </div>
         )}
       </PopoverContent>
