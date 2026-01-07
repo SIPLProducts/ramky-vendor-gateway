@@ -12,7 +12,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { VendorFormData } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { Clock, CheckCircle2, Save, X } from 'lucide-react';
+import { Clock, CheckCircle2, Save, X, AlertCircle, Edit2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,22 +80,49 @@ export default function VendorRegistration() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [vendorStatus, setVendorStatus] = useState<RegistrationStatus>('draft');
+  const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
+  const [isEditMode, setIsEditMode] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
   const { 
     saveVendor,
-    submitVendor, 
+    submitVendor,
+    resubmitVendor,
     runValidations, 
     isSaving,
-    isSubmitting, 
+    isSubmitting,
+    isResubmitting,
     isValidating,
-    vendorId 
+    vendorId,
+    vendorStatus,
+    existingFormData,
+    isLoadingVendor,
+    canEdit,
+    existingVendor,
   } = useVendorRegistration();
 
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
+
+  // Load existing form data if vendor exists and is editable
+  useEffect(() => {
+    if (existingFormData && vendorStatus) {
+      setFormData(existingFormData);
+      setVendorStatusState(vendorStatus);
+      
+      // If status requires resubmission, show status page first
+      if (vendorStatus === 'validation_failed' || vendorStatus === 'finance_rejected' || vendorStatus === 'purchase_rejected') {
+        setIsSubmitted(true);
+        setIsEditMode(false);
+      } else if (vendorStatus !== 'draft') {
+        // For other non-draft statuses, show the status tracker
+        setIsSubmitted(true);
+      }
+    }
+  }, [existingFormData, vendorStatus]);
+
+  const canResubmit = vendorStatusState === 'validation_failed' || vendorStatusState === 'finance_rejected' || vendorStatusState === 'purchase_rejected';
 
   // Subscribe to real-time vendor status updates
   useEffect(() => {
@@ -113,7 +140,7 @@ export default function VendorRegistration() {
         },
         (payload) => {
           const newStatus = payload.new.status as RegistrationStatus;
-          setVendorStatus(newStatus);
+          setVendorStatusState(newStatus);
         }
       )
       .subscribe();
@@ -122,6 +149,14 @@ export default function VendorRegistration() {
       supabase.removeChannel(channel);
     };
   }, [vendorId]);
+
+  const handleStartEdit = () => {
+    setIsEditMode(true);
+    setIsSubmitted(false);
+    setCurrentStep(1);
+    // Mark all steps as completed so user can navigate freely
+    setCompletedSteps([1, 2, 3, 4, 5]);
+  };
 
   const handleStepComplete = (step: number, data: unknown) => {
     const stepKeys: Record<number, keyof VendorFormData> = {
@@ -175,12 +210,21 @@ export default function VendorRegistration() {
 
   const handleSubmit = async () => {
     try {
-      const vendor = await submitVendor(formData);
+      let vendor;
+      
+      // Use resubmit if editing after failure
+      if (isEditMode && vendorId) {
+        vendor = await resubmitVendor(formData);
+      } else {
+        vendor = await submitVendor(formData);
+      }
+      
       setIsSubmitted(true);
-      setVendorStatus('validation_pending');
+      setIsEditMode(false);
+      setVendorStatusState('validation_pending');
       
       toast({
-        title: 'Registration Submitted',
+        title: isEditMode ? 'Registration Resubmitted' : 'Registration Submitted',
         description: 'Your vendor registration has been submitted successfully.',
       });
       
@@ -251,28 +295,78 @@ export default function VendorRegistration() {
     }
   };
 
-  // Show success page after submission
-  if (isSubmitted) {
+  // Loading state
+  if (isLoadingVendor) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show success/status page after submission
+  if (isSubmitted && !isEditMode) {
+    const showEditButton = canResubmit;
+    const statusMessage = vendorStatusState === 'validation_failed' 
+      ? 'Some validations failed. Please review and correct the information below.'
+      : vendorStatusState === 'finance_rejected'
+      ? 'Your registration was returned by finance for clarification. Please update and resubmit.'
+      : vendorStatusState === 'purchase_rejected'
+      ? 'Your registration was returned by purchase team. Please update and resubmit.'
+      : 'Your vendor registration has been submitted. You will receive email notifications as your application progresses.';
+
     return (
       <div className="min-h-screen bg-background">
         <PublicHeader />
         <main className="container max-w-4xl py-8">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 mb-4">
-              <CheckCircle2 className="h-8 w-8 text-success" />
+            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
+              showEditButton ? 'bg-destructive/20' : 'bg-success/20'
+            }`}>
+              {showEditButton ? (
+                <AlertCircle className="h-8 w-8 text-destructive" />
+              ) : (
+                <CheckCircle2 className="h-8 w-8 text-success" />
+              )}
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              Registration Submitted Successfully
+              {showEditButton ? 'Action Required' : 'Registration Submitted Successfully'}
             </h1>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Your vendor registration has been submitted. You will receive email notifications as your application progresses through the approval process.
+              {statusMessage}
             </p>
           </div>
+
+          {/* Edit button for failed/rejected status */}
+          {showEditButton && (
+            <div className="flex justify-center mb-6">
+              <Button onClick={handleStartEdit} size="lg">
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit & Resubmit Registration
+              </Button>
+            </div>
+          )}
+
+          {/* Finance/Purchase comments if rejected */}
+          {(vendorStatusState === 'finance_rejected' || vendorStatusState === 'purchase_rejected') && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{vendorStatusState === 'finance_rejected' ? 'Finance Team Comments' : 'Purchase Team Comments'}</AlertTitle>
+              <AlertDescription>
+                {vendorStatusState === 'finance_rejected' 
+                  ? existingVendor?.finance_comments 
+                  : existingVendor?.purchase_comments}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Status Tracker */}
           <div className="bg-card rounded-lg border p-6 mb-6">
             <h2 className="text-lg font-semibold mb-6 text-center">Registration Progress</h2>
-            <RegistrationStatusTracker status={vendorStatus} />
+            <RegistrationStatusTracker status={vendorStatusState} />
           </div>
 
           {/* What's Next */}
