@@ -116,28 +116,31 @@ export default function AdminInvitations() {
     },
   });
 
-  // Send email mutation (placeholder - needs RESEND_API_KEY)
+  // Send email mutation (uses simulation mode if RESEND_API_KEY not configured)
   const sendEmailInvitation = useMutation({
     mutationFn: async (invitationId: string) => {
       const invitation = invitations?.find((inv) => inv.id === invitationId);
       if (!invitation) throw new Error('Invitation not found');
 
-      // Call edge function to send email
-      const { error } = await supabase.functions.invoke('send-vendor-invitation', {
+      // Call edge function to send email with simulation mode enabled for demo
+      const { data, error } = await supabase.functions.invoke('send-vendor-invitation', {
         body: {
           email: invitation.email,
           token: invitation.token,
           expiresAt: invitation.expires_at,
+          simulationMode: true, // Enable simulation mode for demo
         },
       });
 
       if (error) throw error;
-      return invitation;
+      return { invitation, simulated: data?.simulated };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast({
-        title: 'Email Sent',
-        description: 'Invitation email has been sent to the vendor.',
+        title: result?.simulated ? 'Email Simulated' : 'Email Sent',
+        description: result?.simulated 
+          ? 'Invitation email simulated (demo mode). Check console for details.'
+          : 'Invitation email has been sent to the vendor.',
       });
     },
     onError: (error: any) => {
