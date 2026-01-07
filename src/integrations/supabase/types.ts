@@ -313,6 +313,50 @@ export type Database = {
           },
         ]
       }
+      vendor_feedback: {
+        Row: {
+          comments: string | null
+          created_at: string
+          ease_of_use_rating: number | null
+          id: string
+          overall_rating: number
+          support_rating: number | null
+          user_id: string | null
+          vendor_id: string | null
+          would_recommend: boolean | null
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          ease_of_use_rating?: number | null
+          id?: string
+          overall_rating: number
+          support_rating?: number | null
+          user_id?: string | null
+          vendor_id?: string | null
+          would_recommend?: boolean | null
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          ease_of_use_rating?: number | null
+          id?: string
+          overall_rating?: number
+          support_rating?: number | null
+          user_id?: string | null
+          vendor_id?: string | null
+          would_recommend?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_feedback_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_invitations: {
         Row: {
           created_at: string
