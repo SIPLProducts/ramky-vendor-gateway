@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { EnterpriseStepIndicator, registrationSteps } from '@/components/vendor/EnterpriseStepIndicator';
-import { EnterpriseHeader } from '@/components/layout/EnterpriseHeader';
-import { StickyActionBar } from '@/components/vendor/StickyActionBar';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
@@ -14,9 +12,32 @@ import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracke
 import { VendorFormData } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { Clock, Info } from 'lucide-react';
+import { 
+  Clock, 
+  Info, 
+  HelpCircle, 
+  Phone, 
+  Mail, 
+  ChevronLeft, 
+  ChevronRight, 
+  Save, 
+  Send, 
+  X,
+  Loader2,
+  MessageSquare
+} from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import ramkyLogo from '@/assets/ramky-logo.png';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 const initialFormData: VendorFormData = {
   organization: {
@@ -105,37 +126,29 @@ export default function VendorRegistration() {
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
 
-  // Load existing form data if vendor exists and is in an editable or pending state
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
       
-      // Only load existing data for draft status or statuses that need correction
       const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
       
       if (editableStatuses.includes(vendorStatus)) {
-        // Load form data for editing
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
         
         if (vendorStatus !== 'draft') {
-          // Show status screen for failed/rejected statuses
           setIsSubmitted(true);
           setIsEditMode(false);
         }
-        // For 'draft' status, show the form directly (don't set isSubmitted)
       } else if (pendingStatuses.includes(vendorStatus)) {
-        // Show status tracker for in-progress applications
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
         setIsSubmitted(true);
       }
-      // For any other status, show fresh form (don't load existing data)
     }
   }, [existingFormData, vendorStatus]);
 
-  // Subscribe to real-time vendor status updates
   useEffect(() => {
     if (!vendorId) return;
 
@@ -313,7 +326,9 @@ export default function VendorRegistration() {
     }
   };
 
-  // Loading state
+  const isLastStep = currentStep === registrationSteps.length;
+  const isFirstStep = currentStep === 1;
+
   if (isLoadingVendor) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -325,11 +340,16 @@ export default function VendorRegistration() {
     );
   }
 
-  // Success/Status screen
   if (isSubmitted && !isEditMode) {
     return (
       <div className="min-h-screen bg-background">
-        <EnterpriseHeader />
+        {/* Header for success screen */}
+        <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+          <Link to="/" className="flex items-center gap-3">
+            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+            <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+          </Link>
+        </header>
         <SuccessScreen
           status={vendorStatusState}
           vendorId={vendorId || undefined}
@@ -342,27 +362,113 @@ export default function VendorRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <EnterpriseHeader />
-      
+    <div className="min-h-screen bg-muted/30 flex flex-col">
+      {/* Header */}
+      <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+        <Link to="/" className="flex items-center gap-3">
+          <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+          <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+        </Link>
+        
+        {/* Help & Support */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Help & Support</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Help & Support</SheetTitle>
+              <SheetDescription>
+                Need assistance with your registration? We're here to help.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6 space-y-6">
+              {/* Contact Options */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-foreground">Contact Us</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Mail className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Email Support</p>
+                      <p className="text-sm text-muted-foreground">vendor.support@ramky.com</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Phone className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Phone Support</p>
+                      <p className="text-sm text-muted-foreground">+91 40 2354 6789</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FAQs */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-foreground">Frequently Asked Questions</h4>
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg border">
+                    <p className="text-sm font-medium">How long does registration take?</p>
+                    <p className="text-xs text-muted-foreground mt-1">Typically 2-3 business days after submission.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border">
+                    <p className="text-sm font-medium">What documents do I need?</p>
+                    <p className="text-xs text-muted-foreground mt-1">GST Certificate, PAN Card, Cancelled Cheque, and MSME Certificate (if applicable).</p>
+                  </div>
+                  <div className="p-3 rounded-lg border">
+                    <p className="text-sm font-medium">Can I save and continue later?</p>
+                    <p className="text-xs text-muted-foreground mt-1">Yes, click "Save Draft" to save your progress anytime.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Links */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-foreground">Quick Links</h4>
+                <div className="space-y-2">
+                  <Link to="/support" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                    <MessageSquare className="h-4 w-4" />
+                    Visit Help Center
+                  </Link>
+                  <Link to="/feedback" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                    <HelpCircle className="h-4 w-4" />
+                    Share Feedback
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </header>
+
       {/* Main Content */}
-      <div className="flex">
+      <div className="flex flex-1">
         {/* Left Sidebar - Step Indicator */}
-        <aside className="hidden lg:block w-72 flex-shrink-0 border-r bg-card p-6 min-h-[calc(100vh-3rem)] sticky top-12">
-          <div className="mb-6">
+        <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 border-r bg-card">
+          <div className="p-6 border-b">
             <h2 className="text-lg font-semibold text-foreground">Registration Steps</h2>
             <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p>
           </div>
           
-          <EnterpriseStepIndicator
-            steps={registrationSteps}
-            currentStep={currentStep}
-            completedSteps={completedSteps}
-            onStepClick={handleStepClick}
-          />
+          <div className="flex-1 p-6 overflow-auto">
+            <EnterpriseStepIndicator
+              steps={registrationSteps}
+              currentStep={currentStep}
+              completedSteps={completedSteps}
+              onStepClick={handleStepClick}
+            />
+          </div>
 
           {/* Link Expiry Notice */}
-          <div className="mt-8 p-4 bg-muted rounded-lg">
+          <div className="p-4 border-t bg-muted/50">
             <div className="flex items-start gap-3">
               <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div>
@@ -376,16 +482,16 @@ export default function VendorRegistration() {
         </aside>
 
         {/* Main Form Area */}
-        <main className="flex-1 p-6 lg:p-8 max-w-4xl">
+        <main className="flex-1 flex flex-col">
           {/* Mobile Step Indicator */}
-          <div className="lg:hidden mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-semibold text-foreground">Vendor Registration</h1>
+          <div className="lg:hidden p-4 bg-card border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="text-lg font-semibold text-foreground">Vendor Registration</h1>
               <span className="text-sm text-muted-foreground">
                 Step {currentStep} of {registrationSteps.length}
               </span>
             </div>
-            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
               <div 
                 className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${(currentStep / registrationSteps.length) * 100}%` }}
@@ -393,45 +499,109 @@ export default function VendorRegistration() {
             </div>
           </div>
 
-          {/* Page Header */}
-          <div className="hidden lg:block mb-6">
-            <h1 className="text-xl font-semibold text-foreground">
-              {registrationSteps.find(s => s.id === currentStep)?.title}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {registrationSteps.find(s => s.id === currentStep)?.description}
-            </p>
+          {/* Form Content */}
+          <div className="flex-1 p-6 lg:p-8 overflow-auto">
+            {/* Page Header */}
+            <div className="hidden lg:block mb-6">
+              <h1 className="text-xl font-semibold text-foreground">
+                {registrationSteps.find(s => s.id === currentStep)?.title}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {registrationSteps.find(s => s.id === currentStep)?.description}
+              </p>
+            </div>
+
+            {/* Info Alert */}
+            {currentStep === 1 && (
+              <Alert className="mb-6 bg-info/5 border-info/20">
+                <Info className="h-4 w-4 text-info" />
+                <AlertDescription className="text-sm">
+                  Please ensure all information matches your official documents. Fields marked with * are mandatory.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Step Content */}
+            <div className="max-w-3xl" id="step-form">
+              {renderStep()}
+            </div>
           </div>
 
-          {/* Info Alert */}
-          {currentStep === 1 && (
-            <Alert className="mb-6 bg-info/5 border-info/20">
-              <Info className="h-4 w-4 text-info" />
-              <AlertDescription className="text-sm">
-                Please ensure all information matches your official documents. Fields marked with * are mandatory.
-              </AlertDescription>
-            </Alert>
+          {/* Action Bar */}
+          {currentStep < 6 && (
+            <div className="border-t bg-card px-6 py-4 sticky bottom-0 shadow-lg">
+              <div className="max-w-3xl mx-auto flex items-center justify-between">
+                {/* Left - Cancel */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancel}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+
+                {/* Right - Actions */}
+                <div className="flex items-center gap-3">
+                  {/* Save Draft */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveAsDraft}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Draft
+                  </Button>
+
+                  {/* Previous */}
+                  {!isFirstStep && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                  )}
+
+                  {/* Next / Submit */}
+                  {isLastStep ? (
+                    <Button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting || isResubmitting}
+                      className="min-w-[140px]"
+                    >
+                      {(isSubmitting || isResubmitting) ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Submit Application
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      form="step-form"
+                      className="min-w-[100px]"
+                    >
+                      Continue
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
-
-          {/* Step Content */}
-          <div id="step-form">
-            {renderStep()}
-          </div>
         </main>
       </div>
-
-      {/* Sticky Action Bar */}
-      {currentStep < 6 && (
-        <StickyActionBar
-          currentStep={currentStep}
-          totalSteps={registrationSteps.length}
-          onCancel={handleCancel}
-          onSaveDraft={handleSaveAsDraft}
-          onBack={currentStep > 1 ? handleBack : undefined}
-          isSaving={isSaving}
-          isSubmitting={isSubmitting || isResubmitting}
-        />
-      )}
     </div>
   );
 }
