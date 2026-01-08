@@ -622,7 +622,14 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "vendor" | "finance" | "purchase" | "admin"
+      app_role:
+        | "vendor"
+        | "finance"
+        | "purchase"
+        | "admin"
+        | "sharvi_admin"
+        | "customer_admin"
+        | "approver"
       validation_status: "pending" | "passed" | "failed" | "skipped"
       validation_type: "gst" | "pan" | "bank" | "msme" | "name_match"
       vendor_status:
@@ -764,7 +771,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["vendor", "finance", "purchase", "admin"],
+      app_role: [
+        "vendor",
+        "finance",
+        "purchase",
+        "admin",
+        "sharvi_admin",
+        "customer_admin",
+        "approver",
+      ],
       validation_status: ["pending", "passed", "failed", "skipped"],
       validation_type: ["gst", "pan", "bank", "msme", "name_match"],
       vendor_status: [
