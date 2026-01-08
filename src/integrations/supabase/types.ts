@@ -14,6 +14,227 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_credentials: {
+        Row: {
+          api_provider_id: string
+          created_at: string | null
+          credential_name: string
+          credential_value: string
+          id: string
+          is_encrypted: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_provider_id: string
+          created_at?: string | null
+          credential_name: string
+          credential_value: string
+          id?: string
+          is_encrypted?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_provider_id?: string
+          created_at?: string | null
+          credential_name?: string
+          credential_value?: string
+          id?: string
+          is_encrypted?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_credentials_api_provider_id_fkey"
+            columns: ["api_provider_id"]
+            isOneToOne: false
+            referencedRelation: "api_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_providers: {
+        Row: {
+          auth_header_name: string | null
+          auth_header_prefix: string | null
+          auth_type: string | null
+          base_url: string
+          created_at: string | null
+          display_name: string
+          endpoint_path: string
+          execution_order: number | null
+          http_method: string | null
+          id: string
+          is_enabled: boolean | null
+          is_mandatory: boolean | null
+          provider_name: string
+          request_body_template: Json | null
+          request_headers: Json | null
+          response_data_mapping: Json | null
+          response_message_path: string | null
+          response_success_path: string | null
+          response_success_value: string | null
+          retry_count: number | null
+          retry_delay_ms: number | null
+          schedule_enabled: boolean | null
+          schedule_frequency_days: number | null
+          tenant_id: string | null
+          timeout_seconds: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          auth_header_name?: string | null
+          auth_header_prefix?: string | null
+          auth_type?: string | null
+          base_url: string
+          created_at?: string | null
+          display_name: string
+          endpoint_path: string
+          execution_order?: number | null
+          http_method?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          is_mandatory?: boolean | null
+          provider_name: string
+          request_body_template?: Json | null
+          request_headers?: Json | null
+          response_data_mapping?: Json | null
+          response_message_path?: string | null
+          response_success_path?: string | null
+          response_success_value?: string | null
+          retry_count?: number | null
+          retry_delay_ms?: number | null
+          schedule_enabled?: boolean | null
+          schedule_frequency_days?: number | null
+          tenant_id?: string | null
+          timeout_seconds?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          auth_header_name?: string | null
+          auth_header_prefix?: string | null
+          auth_type?: string | null
+          base_url?: string
+          created_at?: string | null
+          display_name?: string
+          endpoint_path?: string
+          execution_order?: number | null
+          http_method?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          is_mandatory?: boolean | null
+          provider_name?: string
+          request_body_template?: Json | null
+          request_headers?: Json | null
+          response_data_mapping?: Json | null
+          response_message_path?: string | null
+          response_success_path?: string | null
+          response_success_value?: string | null
+          retry_count?: number | null
+          retry_delay_ms?: number | null
+          schedule_enabled?: boolean | null
+          schedule_frequency_days?: number | null
+          tenant_id?: string | null
+          timeout_seconds?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_providers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_workflow_steps: {
+        Row: {
+          auto_approve_after_days: number | null
+          can_reject: boolean | null
+          can_request_info: boolean | null
+          created_at: string | null
+          id: string
+          is_mandatory: boolean | null
+          notify_on_complete: boolean | null
+          notify_on_pending: boolean | null
+          required_role: Database["public"]["Enums"]["app_role"]
+          step_name: string
+          step_order: number
+          workflow_id: string
+        }
+        Insert: {
+          auto_approve_after_days?: number | null
+          can_reject?: boolean | null
+          can_request_info?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_mandatory?: boolean | null
+          notify_on_complete?: boolean | null
+          notify_on_pending?: boolean | null
+          required_role: Database["public"]["Enums"]["app_role"]
+          step_name: string
+          step_order: number
+          workflow_id: string
+        }
+        Update: {
+          auto_approve_after_days?: number | null
+          can_reject?: boolean | null
+          can_request_info?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_mandatory?: boolean | null
+          notify_on_complete?: boolean | null
+          notify_on_pending?: boolean | null
+          required_role?: Database["public"]["Enums"]["app_role"]
+          step_name?: string
+          step_order?: number
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_workflow_steps_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_workflows: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          tenant_id: string
+          updated_at: string | null
+          workflow_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+          workflow_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+          workflow_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_workflows_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -51,6 +272,77 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_field_configs: {
+        Row: {
+          created_at: string | null
+          default_value: string | null
+          display_label: string
+          display_order: number | null
+          field_name: string
+          field_type: string | null
+          help_text: string | null
+          id: string
+          is_editable: boolean | null
+          is_mandatory: boolean | null
+          is_visible: boolean | null
+          options: Json | null
+          placeholder: string | null
+          step_name: string
+          tenant_id: string | null
+          updated_at: string | null
+          validation_message: string | null
+          validation_regex: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_value?: string | null
+          display_label: string
+          display_order?: number | null
+          field_name: string
+          field_type?: string | null
+          help_text?: string | null
+          id?: string
+          is_editable?: boolean | null
+          is_mandatory?: boolean | null
+          is_visible?: boolean | null
+          options?: Json | null
+          placeholder?: string | null
+          step_name: string
+          tenant_id?: string | null
+          updated_at?: string | null
+          validation_message?: string | null
+          validation_regex?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_value?: string | null
+          display_label?: string
+          display_order?: number | null
+          field_name?: string
+          field_type?: string | null
+          help_text?: string | null
+          id?: string
+          is_editable?: boolean | null
+          is_mandatory?: boolean | null
+          is_visible?: boolean | null
+          options?: Json | null
+          placeholder?: string | null
+          step_name?: string
+          tenant_id?: string | null
+          updated_at?: string | null
+          validation_message?: string | null
+          validation_regex?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_field_configs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -147,6 +439,95 @@ export type Database = {
           },
         ]
       }
+      tenant_branding: {
+        Row: {
+          accent_color: string | null
+          company_name: string | null
+          created_at: string | null
+          footer_text: string | null
+          help_email: string | null
+          help_phone: string | null
+          id: string
+          logo_url: string | null
+          primary_color: string | null
+          privacy_url: string | null
+          secondary_color: string | null
+          tagline: string | null
+          tenant_id: string
+          terms_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          footer_text?: string | null
+          help_email?: string | null
+          help_phone?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          privacy_url?: string | null
+          secondary_color?: string | null
+          tagline?: string | null
+          tenant_id: string
+          terms_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          footer_text?: string | null
+          help_email?: string | null
+          help_phone?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          privacy_url?: string | null
+          secondary_color?: string | null
+          tagline?: string | null
+          tenant_id?: string
+          terms_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_branding_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -164,6 +545,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_tenants: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tenants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       validation_api_logs: {
         Row: {
@@ -478,6 +891,7 @@ export type Database = {
           self_declared: boolean | null
           status: Database["public"]["Enums"]["vendor_status"]
           submitted_at: string | null
+          tenant_id: string | null
           terms_accepted: boolean | null
           trade_name: string | null
           turnover_year1: number | null
@@ -532,6 +946,7 @@ export type Database = {
           self_declared?: boolean | null
           status?: Database["public"]["Enums"]["vendor_status"]
           submitted_at?: string | null
+          tenant_id?: string | null
           terms_accepted?: boolean | null
           trade_name?: string | null
           turnover_year1?: number | null
@@ -586,6 +1001,7 @@ export type Database = {
           self_declared?: boolean | null
           status?: Database["public"]["Enums"]["vendor_status"]
           submitted_at?: string | null
+          tenant_id?: string | null
           terms_accepted?: boolean | null
           trade_name?: string | null
           turnover_year1?: number | null
@@ -600,6 +1016,13 @@ export type Database = {
             columns: ["invitation_id"]
             isOneToOne: false
             referencedRelation: "vendor_invitations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
