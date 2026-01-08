@@ -9,8 +9,8 @@ import {
   TrendingUp,
   FileText,
   ArrowRight,
-  Loader2,
-  Sparkles
+  Sparkles,
+  LayoutDashboard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -18,10 +18,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Dashboard() {
-  const { userRole: authRole } = useAuth();
+  const { user, userRole: authRole } = useAuth();
   const userRole = authRole || 'vendor';
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const { data: stats, isLoading: statsLoading } = useVendorStats();
   const { data: recentVendors, isLoading: vendorsLoading } = useVendors();
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; className: string }> = {
@@ -53,17 +62,43 @@ export default function Dashboard() {
   const displayVendors = recentVendors?.slice(0, 5) || [];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-start gap-3">
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <LayoutDashboard className="h-5 w-5 text-primary" />
+        </div>
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Overview of vendor onboarding activities</p>
+          <h1 className="text-2xl font-bold text-foreground">Executive Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
         </div>
-        <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
-          <Sparkles className="h-4 w-4" />
-          Welcome back!
+      </div>
+
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-teal-500 to-emerald-400 p-6 text-white">
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Welcome Back</span>
+          </div>
+          <h2 className="text-2xl font-bold mb-1">{getGreeting()}, {userName}!</h2>
+          <p className="text-sm opacity-90">Your vendor operations are running smoothly.</p>
         </div>
+        {/* Decorative circles */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20">
+          <div className="w-32 h-32 rounded-full border-4 border-white" />
+          <div className="w-24 h-24 rounded-full border-4 border-white absolute top-4 left-4" />
+        </div>
+      </div>
+
+      {/* Section Header */}
+      <div className="flex items-center gap-6 border-b">
+        <button className="pb-3 text-sm font-semibold text-foreground border-b-2 border-primary">
+          Key Metrics
+        </button>
+        <button className="pb-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          Recent Activity
+        </button>
       </div>
 
       {/* Stats Grid */}
