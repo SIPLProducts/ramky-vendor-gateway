@@ -23,7 +23,9 @@ import {
   Settings2,
   FileText,
   Percent,
+  Bell,
 } from 'lucide-react';
+import { NotificationSettings } from '@/components/pwa/NotificationSettings';
 
 interface PortalConfig {
   link_expiry_days: number;
@@ -199,18 +201,22 @@ export default function AdminConfiguration() {
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general" className="gap-2">
             <Settings className="h-4 w-4" />
-            General Settings
+            <span className="hidden sm:inline">General</span>
           </TabsTrigger>
           <TabsTrigger value="validations" className="gap-2">
             <Settings2 className="h-4 w-4" />
-            Validation Engine
+            <span className="hidden sm:inline">Validations</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">Notifications</span>
           </TabsTrigger>
           <TabsTrigger value="logs" className="gap-2">
             <FileText className="h-4 w-4" />
-            API Logs
+            <span className="hidden sm:inline">Logs</span>
           </TabsTrigger>
         </TabsList>
 
@@ -426,6 +432,12 @@ export default function AdminConfiguration() {
 
         <TabsContent value="validations">
           <ValidationConfigManager />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <div className="max-w-xl">
+            <NotificationSettings />
+          </div>
         </TabsContent>
 
         <TabsContent value="logs">

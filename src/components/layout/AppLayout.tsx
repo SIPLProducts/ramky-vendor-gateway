@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { MobileBottomNav } from './MobileBottomNav';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
+import { MobileHeader } from './MobileHeader';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
 export function AppLayout() {
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   // Persist sidebar state in localStorage
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -49,9 +53,23 @@ export function AppLayout() {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
+  // Show mobile layout for mobile devices and vendor role
+  const showMobileLayout = isMobile && role !== 'vendor';
+  const showDesktopSidebar = !isMobile && role !== 'vendor';
+
   return (
-    <div className="min-h-screen bg-background flex w-full">
-      {role !== 'vendor' && (
+    <div className="min-h-screen bg-background flex flex-col md:flex-row w-full">
+      {/* Mobile Header - Only show on mobile for non-vendor roles */}
+      {showMobileLayout && (
+        <MobileHeader 
+          userName={userName} 
+          userRole={role} 
+          onSignOut={handleLogout}
+        />
+      )}
+
+      {/* Desktop Sidebar */}
+      {showDesktopSidebar && (
         <Sidebar 
           userRole={role} 
           userName={userName} 
@@ -61,13 +79,27 @@ export function AppLayout() {
         />
       )}
       
+      {/* Main Content */}
       <main className={cn(
-        "flex-1 overflow-auto h-screen transition-all duration-300",
-        role !== 'vendor' ? 'p-6' : 'p-4 md:p-8'
+        "flex-1 overflow-auto transition-all duration-300",
+        // Mobile: Add padding for header and bottom nav
+        showMobileLayout && "pt-14 pb-20",
+        // Desktop with sidebar
+        showDesktopSidebar && "h-screen p-6",
+        // Vendor on any device
+        role === 'vendor' && "p-4 md:p-8",
+        // Mobile without sidebar (non-vendor)
+        isMobile && role !== 'vendor' && "px-4"
       )}>
         <Outlet />
       </main>
 
+      {/* Mobile Bottom Navigation */}
+      {showMobileLayout && (
+        <MobileBottomNav userRole={role} />
+      )}
+
+      {/* Install Prompt */}
       <InstallPrompt />
     </div>
   );
