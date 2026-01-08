@@ -1,6 +1,6 @@
+import * as React from 'react';
 import { CheckCircle2, Clock, FileCheck, Building2, ShoppingCart, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
 export type RegistrationStatus = 
   | 'draft'
   | 'submitted'
@@ -112,67 +112,69 @@ interface RegistrationStatusTrackerProps {
   className?: string;
 }
 
-export function RegistrationStatusTracker({ status, className }: RegistrationStatusTrackerProps) {
-  const activeStepIndex = getActiveStepIndex(status);
+export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, RegistrationStatusTrackerProps>(
+  function RegistrationStatusTracker({ status, className }, ref) {
+    const activeStepIndex = getActiveStepIndex(status);
 
-  // Always show submitted as completed once form is submitted
-  const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
+    // Always show submitted as completed once form is submitted
+    const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
 
-  return (
-    <div className={cn("w-full", className)}>
-      <div className="relative">
-        {/* Progress line */}
-        <div className="absolute top-5 left-5 right-5 h-0.5 bg-muted" />
-        <div 
-          className="absolute top-5 left-5 h-0.5 bg-primary transition-all duration-500"
-          style={{ 
-            width: `calc(${Math.max(0, (adjustedActiveIndex / (statusSteps.length - 1)) * 100)}% - 40px)` 
-          }}
-        />
+    return (
+      <div ref={ref} className={cn("w-full", className)}>
+        <div className="relative">
+          {/* Progress line */}
+          <div className="absolute top-5 left-5 right-5 h-0.5 bg-muted" />
+          <div 
+            className="absolute top-5 left-5 h-0.5 bg-primary transition-all duration-500"
+            style={{ 
+              width: `calc(${Math.max(0, (adjustedActiveIndex / (statusSteps.length - 1)) * 100)}% - 40px)` 
+            }}
+          />
 
-        {/* Steps */}
-        <div className="relative flex justify-between">
-          {statusSteps.map((step, index) => {
-            const stepStatus = getStepStatus(index, adjustedActiveIndex, status);
-            
-            return (
-              <div key={step.id} className="flex flex-col items-center" style={{ width: '20%' }}>
-                <div
-                  className={cn(
-                    "relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
-                    stepStatus === 'completed' && "bg-primary border-primary text-primary-foreground",
-                    stepStatus === 'active' && "bg-primary/20 border-primary text-primary animate-pulse",
-                    stepStatus === 'pending' && "bg-background border-muted text-muted-foreground",
-                    stepStatus === 'failed' && "bg-destructive/20 border-destructive text-destructive"
-                  )}
-                >
-                  {stepStatus === 'completed' ? (
-                    <CheckCircle2 className="h-5 w-5" />
-                  ) : (
-                    step.icon
-                  )}
-                </div>
-                <div className="mt-3 text-center">
-                  <p
+          {/* Steps */}
+          <div className="relative flex justify-between">
+            {statusSteps.map((step, index) => {
+              const stepStatus = getStepStatus(index, adjustedActiveIndex, status);
+              
+              return (
+                <div key={step.id} className="flex flex-col items-center" style={{ width: '20%' }}>
+                  <div
                     className={cn(
-                      "text-xs font-medium",
-                      stepStatus === 'completed' && "text-primary",
-                      stepStatus === 'active' && "text-primary",
-                      stepStatus === 'pending' && "text-muted-foreground",
-                      stepStatus === 'failed' && "text-destructive"
+                      "relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
+                      stepStatus === 'completed' && "bg-primary border-primary text-primary-foreground",
+                      stepStatus === 'active' && "bg-primary/20 border-primary text-primary animate-pulse",
+                      stepStatus === 'pending' && "bg-background border-muted text-muted-foreground",
+                      stepStatus === 'failed' && "bg-destructive/20 border-destructive text-destructive"
                     )}
                   >
-                    {step.label}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5 hidden md:block">
-                    {stepStatus === 'active' ? 'In Progress' : step.description}
-                  </p>
+                    {stepStatus === 'completed' ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      step.icon
+                    )}
+                  </div>
+                  <div className="mt-3 text-center">
+                    <p
+                      className={cn(
+                        "text-xs font-medium",
+                        stepStatus === 'completed' && "text-primary",
+                        stepStatus === 'active' && "text-primary",
+                        stepStatus === 'pending' && "text-muted-foreground",
+                        stepStatus === 'failed' && "text-destructive"
+                      )}
+                    >
+                      {step.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 hidden md:block">
+                      {stepStatus === 'active' ? 'In Progress' : step.description}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+);
