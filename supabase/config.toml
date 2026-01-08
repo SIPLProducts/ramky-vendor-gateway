@@ -27,5 +27,8 @@ verify_jwt = false
 [functions.validate-penny-drop]
 verify_jwt = false
 
+[functions.dynamic-api-executor]
+verify_jwt = false
+
 [functions.scheduled-gst-compliance]
 verify_jwt = false
