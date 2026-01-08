@@ -17,6 +17,7 @@ import {
   Calendar,
   LogOut,
   Bell,
+  Wrench,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ import {
 import ramkyLogo from '@/assets/ramky-logo.png';
 
 interface SidebarProps {
-  userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
+  userRole: 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | 'customer_admin' | 'approver';
   userName: string;
   onSignOut: () => Promise<void>;
 }
@@ -48,79 +49,85 @@ const navItems: NavItem[] = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['finance', 'purchase', 'admin'],
+    roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
+  },
+  {
+    label: 'Sharvi Admin Console',
+    href: '/sharvi-admin',
+    icon: Wrench,
+    roles: ['sharvi_admin'],
   },
   {
     label: 'Vendor Invitations',
     href: '/admin/invitations',
     icon: Mail,
-    roles: ['admin'],
+    roles: ['admin', 'sharvi_admin', 'customer_admin'],
   },
   {
     label: 'Vendor Registration',
     href: '/vendor/register',
     icon: FileText,
-    roles: ['vendor', 'admin'],
+    roles: ['vendor', 'admin', 'sharvi_admin'],
   },
   {
     label: 'Document Verification',
     href: '/finance/verification',
     icon: FileCheck,
-    roles: ['finance', 'admin'],
+    roles: ['finance', 'admin', 'sharvi_admin'],
   },
   {
     label: 'Finance Review',
     href: '/finance/review',
     icon: CheckCircle,
-    roles: ['finance', 'admin'],
+    roles: ['finance', 'admin', 'sharvi_admin'],
   },
   {
     label: 'Purchase Approval',
     href: '/purchase/approval',
     icon: ClipboardCheck,
-    roles: ['purchase', 'admin'],
+    roles: ['purchase', 'admin', 'sharvi_admin', 'approver'],
   },
   {
     label: 'All Vendors',
     href: '/vendors',
     icon: Users,
-    roles: ['finance', 'purchase', 'admin'],
+    roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
   },
   {
     label: 'GST Compliance',
     href: '/compliance/gst',
     icon: Shield,
-    roles: ['finance', 'admin'],
+    roles: ['finance', 'admin', 'sharvi_admin'],
   },
   {
     label: 'Scheduled Checks',
     href: '/compliance/scheduled',
     icon: Calendar,
-    roles: ['admin'],
+    roles: ['admin', 'sharvi_admin'],
   },
   {
     label: 'Audit Logs',
     href: '/audit-logs',
     icon: History,
-    roles: ['finance', 'purchase', 'admin'],
+    roles: ['finance', 'purchase', 'admin', 'sharvi_admin'],
   },
   {
     label: 'Configuration',
     href: '/settings',
     icon: Settings,
-    roles: ['admin'],
+    roles: ['admin', 'sharvi_admin', 'customer_admin'],
   },
   {
     label: 'Demo Showcase',
     href: '/demo',
     icon: Play,
-    roles: ['admin', 'finance', 'purchase'],
+    roles: ['admin', 'finance', 'purchase', 'sharvi_admin'],
   },
   {
     label: 'Help & Support',
     href: '/support',
     icon: HelpCircle,
-    roles: ['vendor', 'finance', 'purchase', 'admin'],
+    roles: ['vendor', 'finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin', 'approver'],
   },
 ];
 
@@ -129,6 +136,9 @@ const roleLabels: Record<string, string> = {
   finance: 'Finance Team',
   purchase: 'Purchase Team',
   admin: 'Administrator',
+  sharvi_admin: 'Sharvi Admin',
+  customer_admin: 'Customer Admin',
+  approver: 'Approver',
 };
 
 export function Sidebar({ userRole, userName, onSignOut }: SidebarProps) {
