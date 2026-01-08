@@ -36,10 +36,10 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top Header Bar - Always Visible */}
-      {role !== 'vendor' && (
-        <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-2">
+      {/* Top Header Bar - Always Visible for ALL users */}
+      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-50">
+        <div className="flex items-center gap-2">
+          {role !== 'vendor' && (
             <Button
               variant="ghost"
               size="icon"
@@ -52,31 +52,31 @@ export function AppLayout() {
                 <PanelLeftClose className="h-4 w-4" />
               )}
             </Button>
-            <span className="text-sm font-medium text-muted-foreground">
-              {sidebarCollapsed ? 'Show Menu' : 'Hide Menu'}
-            </span>
-          </div>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 gap-2 px-2">
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium hidden sm:inline">{userName}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </header>
-      )}
+          )}
+          <span className="text-sm font-semibold text-foreground">
+            Vendor Portal
+          </span>
+        </div>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 gap-2 px-2">
+              <Avatar className="h-7 w-7">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium hidden sm:inline">{userName}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
       
       <div className="flex flex-1 overflow-hidden">
         {role !== 'vendor' && (
