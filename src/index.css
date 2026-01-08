@@ -2,118 +2,117 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ramky Vendor Portal - Modern Enterprise Design System */
+/* Enterprise Vendor Portal - SAP Fiori Inspired Design System */
 
 @layer base {
   :root {
-    /* Core backgrounds - warm slate tones */
-    --background: 220 20% 97%;
-    --foreground: 224 32% 12%;
+    /* Core backgrounds - Clean enterprise greys */
+    --background: 210 20% 98%;
+    --foreground: 213 27% 17%;
 
-    /* Cards and containers - crisp white */
+    /* Cards and containers - Pure white */
     --card: 0 0% 100%;
-    --card-foreground: 224 32% 12%;
+    --card-foreground: 213 27% 17%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 32% 12%;
+    --popover-foreground: 213 27% 17%;
 
-    /* Primary - Deep indigo blue */
-    --primary: 235 72% 52%;
+    /* Primary - SAP Blue (enterprise standard) */
+    --primary: 210 100% 40%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Soft lavender */
-    --secondary: 240 20% 95%;
-    --secondary-foreground: 224 32% 12%;
+    /* Secondary - Neutral grey */
+    --secondary: 210 16% 93%;
+    --secondary-foreground: 213 27% 17%;
 
-    /* Muted - Subtle gray */
-    --muted: 220 14% 94%;
-    --muted-foreground: 220 10% 46%;
+    /* Muted - Soft grey for backgrounds */
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 14% 45%;
 
-    /* Accent - Vibrant teal */
-    --accent: 172 66% 50%;
+    /* Accent - Teal for highlights */
+    --accent: 187 85% 43%;
     --accent-foreground: 0 0% 100%;
 
-    /* Status colors - vivid and accessible */
-    --destructive: 0 84% 60%;
+    /* Status colors - Clear and accessible */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     
-    --success: 152 76% 42%;
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     
-    --warning: 38 95% 54%;
-    --warning-foreground: 224 32% 12%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 213 27% 17%;
     
-    --info: 210 100% 52%;
+    --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    /* Borders and inputs */
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 235 72% 52%;
+    /* Borders and inputs - Subtle definition */
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 210 100% 40%;
 
-    --radius: 0.5rem;
+    --radius: 0.375rem;
 
-    /* Sidebar - Rich dark theme */
-    --sidebar-background: 224 32% 12%;
-    --sidebar-foreground: 220 20% 92%;
-    --sidebar-primary: 235 72% 62%;
+    /* Sidebar - Professional dark */
+    --sidebar-background: 213 27% 17%;
+    --sidebar-foreground: 210 20% 96%;
+    --sidebar-primary: 210 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 28% 18%;
-    --sidebar-accent-foreground: 220 20% 92%;
-    --sidebar-border: 224 28% 20%;
-    --sidebar-ring: 235 72% 62%;
+    --sidebar-accent: 213 27% 22%;
+    --sidebar-accent-foreground: 210 20% 96%;
+    --sidebar-border: 213 27% 25%;
+    --sidebar-ring: 210 100% 50%;
 
-    /* Custom tokens */
-    --header-height: 3.5rem;
-    --gradient-primary: linear-gradient(135deg, hsl(235 72% 52%) 0%, hsl(260 72% 58%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(172 66% 50%) 0%, hsl(152 76% 42%) 100%);
-    --shadow-soft: 0 4px 24px -4px hsl(224 32% 12% / 0.08);
-    --shadow-medium: 0 8px 32px -8px hsl(224 32% 12% / 0.12);
+    /* Enterprise tokens */
+    --header-height: 3rem;
+    --shadow-sm: 0 1px 2px 0 hsl(213 27% 17% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(213 27% 17% / 0.08), 0 2px 4px -2px hsl(213 27% 17% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(213 27% 17% / 0.08), 0 4px 6px -4px hsl(213 27% 17% / 0.06);
   }
 
   .dark {
-    --background: 224 32% 8%;
-    --foreground: 220 20% 96%;
+    --background: 213 27% 8%;
+    --foreground: 210 20% 96%;
 
-    --card: 224 32% 11%;
-    --card-foreground: 220 20% 96%;
+    --card: 213 27% 11%;
+    --card-foreground: 210 20% 96%;
 
-    --popover: 224 32% 11%;
-    --popover-foreground: 220 20% 96%;
+    --popover: 213 27% 11%;
+    --popover-foreground: 210 20% 96%;
 
-    --primary: 235 80% 66%;
+    --primary: 210 100% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 224 28% 16%;
-    --secondary-foreground: 220 20% 96%;
+    --secondary: 213 27% 16%;
+    --secondary-foreground: 210 20% 96%;
 
-    --muted: 224 28% 14%;
-    --muted-foreground: 220 14% 60%;
+    --muted: 213 27% 14%;
+    --muted-foreground: 215 14% 60%;
 
-    --accent: 172 66% 50%;
+    --accent: 187 85% 43%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     
-    --success: 152 76% 42%;
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     
-    --warning: 38 95% 54%;
-    --warning-foreground: 224 32% 12%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 213 27% 17%;
 
-    --border: 224 28% 18%;
-    --input: 224 28% 18%;
-    --ring: 235 80% 66%;
+    --border: 213 27% 20%;
+    --input: 213 27% 20%;
+    --ring: 210 100% 55%;
 
-    --sidebar-background: 224 32% 6%;
-    --sidebar-foreground: 220 20% 92%;
-    --sidebar-primary: 235 80% 66%;
+    --sidebar-background: 213 27% 6%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 210 100% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 28% 12%;
-    --sidebar-accent-foreground: 220 20% 92%;
-    --sidebar-border: 224 28% 12%;
-    --sidebar-ring: 235 80% 66%;
+    --sidebar-accent: 213 27% 12%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 213 27% 12%;
+    --sidebar-ring: 210 100% 55%;
   }
 }
 
@@ -125,58 +124,115 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv11", "ss01";
   }
 
-  /* Enterprise form styling */
+  /* Enterprise Typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight;
+  }
+
+  /* Enterprise Form Section */
   .form-section {
-    @apply bg-card rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md;
+    @apply bg-card rounded-lg border p-6;
+    box-shadow: var(--shadow-sm);
   }
 
   .form-section-title {
-    @apply text-lg font-semibold text-foreground mb-4 pb-3 border-b flex items-center gap-2;
+    @apply text-base font-semibold text-foreground mb-5 pb-3 border-b border-border flex items-center gap-2;
   }
 
-  /* Status badges - pill style */
+  /* Enterprise Input Styling */
+  input, select, textarea {
+    @apply transition-colors;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    @apply ring-2 ring-primary/20 border-primary;
+  }
+
+  /* Status badges - Enterprise pill style */
   .status-badge {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-medium;
   }
 
   .status-pending {
-    @apply bg-warning/15 text-warning border border-warning/20;
+    @apply bg-warning/10 text-warning;
   }
 
   .status-success {
-    @apply bg-success/15 text-success border border-success/20;
+    @apply bg-success/10 text-success;
   }
 
   .status-error {
-    @apply bg-destructive/15 text-destructive border border-destructive/20;
+    @apply bg-destructive/10 text-destructive;
   }
 
   .status-info {
-    @apply bg-info/15 text-info border border-info/20;
+    @apply bg-info/10 text-info;
   }
 
-  /* Gradient backgrounds */
-  .gradient-primary {
-    background: var(--gradient-primary);
+  /* Card shadow utilities */
+  .shadow-enterprise-sm {
+    box-shadow: var(--shadow-sm);
   }
 
-  .gradient-accent {
-    background: var(--gradient-accent);
+  .shadow-enterprise-md {
+    box-shadow: var(--shadow-md);
   }
 
-  /* Card hover effect */
-  .card-interactive {
-    @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
+  .shadow-enterprise-lg {
+    box-shadow: var(--shadow-lg);
   }
 
-  /* Glass effect */
-  .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/20;
+  /* Sticky footer */
+  .sticky-footer {
+    @apply fixed bottom-0 left-0 right-0 bg-card border-t px-6 py-4;
+    box-shadow: 0 -4px 6px -1px hsl(213 27% 17% / 0.05);
   }
 
-  .dark .glass {
-    @apply bg-gray-900/80 border-gray-700/20;
+  /* Step indicator styles */
+  .step-item {
+    @apply relative flex items-start gap-4 pb-8;
+  }
+
+  .step-item:last-child {
+    @apply pb-0;
+  }
+
+  .step-item::before {
+    @apply absolute left-5 top-10 w-0.5 h-full bg-border -translate-x-1/2;
+    content: '';
+  }
+
+  .step-item:last-child::before {
+    @apply hidden;
+  }
+
+  .step-item.completed::before {
+    @apply bg-success;
+  }
+
+  .step-circle {
+    @apply relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-2 text-sm font-semibold transition-all;
+  }
+
+  .step-circle.active {
+    @apply border-primary bg-primary text-primary-foreground;
+  }
+
+  .step-circle.completed {
+    @apply border-success bg-success text-success-foreground;
+  }
+
+  .step-circle.pending {
+    @apply border-border bg-card text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  /* Enterprise focus ring */
+  .focus-enterprise {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
   }
 }

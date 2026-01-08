@@ -1,7 +1,6 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { OrganizationDetails, INDUSTRY_TYPES, PRODUCT_CATEGORIES, INDIAN_STATES } from '@/types/vendor';
-import { ChevronRight } from 'lucide-react';
+import { Building2, MapPin, Mail, Package } from 'lucide-react';
 
 // Convert PRODUCT_CATEGORIES to MultiSelect options format
 const categoryOptions = PRODUCT_CATEGORIES.map((category) => ({
@@ -63,17 +62,21 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
   const selectedCategories = watch('productCategories') ?? [];
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">
       <div className="form-section">
-        <h3 className="form-section-title">Organization Details</h3>
+        <h3 className="form-section-title">
+          <Building2 className="h-5 w-5 text-primary" />
+          Organization Details
+        </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
             <Label htmlFor="legalName">Legal Name (as per GST) *</Label>
             <Input
               id="legalName"
               {...register('legalName')}
               placeholder="Enter company legal name"
+              className="focus-enterprise"
             />
             {errors.legalName && (
               <p className="text-sm text-destructive">{errors.legalName.message}</p>
@@ -86,6 +89,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
               id="tradeName"
               {...register('tradeName')}
               placeholder="Enter trade name (if different)"
+              className="focus-enterprise"
             />
           </div>
 
@@ -96,7 +100,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
               control={control}
               render={({ field: { ref, ...fieldProps } }) => (
                 <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="focus-enterprise">
                     <SelectValue placeholder="Select industry type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -117,15 +121,19 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
       </div>
 
       <div className="form-section">
-        <h3 className="form-section-title">Registered Address</h3>
+        <h3 className="form-section-title">
+          <MapPin className="h-5 w-5 text-primary" />
+          Registered Address
+        </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="md:col-span-2 space-y-2">
             <Label htmlFor="registeredAddress">Address *</Label>
             <Input
               id="registeredAddress"
               {...register('registeredAddress')}
               placeholder="Enter full registered address"
+              className="focus-enterprise"
             />
             {errors.registeredAddress && (
               <p className="text-sm text-destructive">{errors.registeredAddress.message}</p>
@@ -138,6 +146,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
               id="registeredCity"
               {...register('registeredCity')}
               placeholder="Enter city"
+              className="focus-enterprise"
             />
             {errors.registeredCity && (
               <p className="text-sm text-destructive">{errors.registeredCity.message}</p>
@@ -151,7 +160,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
               control={control}
               render={({ field: { ref, ...fieldProps } }) => (
                 <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="focus-enterprise">
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
@@ -176,6 +185,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
               {...register('registeredPincode')}
               placeholder="Enter 6-digit pincode"
               maxLength={6}
+              className="focus-enterprise"
             />
             {errors.registeredPincode && (
               <p className="text-sm text-destructive">{errors.registeredPincode.message}</p>
@@ -185,27 +195,31 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
       </div>
 
       <div className="form-section">
-        <h3 className="form-section-title">Communication Address</h3>
+        <h3 className="form-section-title">
+          <Mail className="h-5 w-5 text-primary" />
+          Communication Address
+        </h3>
         
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-5 p-3 bg-muted rounded-lg">
           <Checkbox
             id="sameAsRegistered"
             checked={sameAsRegistered}
             onCheckedChange={(checked) => setValue('sameAsRegistered', !!checked)}
           />
-          <Label htmlFor="sameAsRegistered" className="font-normal cursor-pointer">
+          <Label htmlFor="sameAsRegistered" className="font-normal cursor-pointer text-sm">
             Same as Registered Address
           </Label>
         </div>
 
         {!sameAsRegistered && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="communicationAddress">Address</Label>
               <Input
                 id="communicationAddress"
                 {...register('communicationAddress')}
                 placeholder="Enter communication address"
+                className="focus-enterprise"
               />
             </div>
 
@@ -215,6 +229,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
                 id="communicationCity"
                 {...register('communicationCity')}
                 placeholder="Enter city"
+                className="focus-enterprise"
               />
             </div>
 
@@ -225,7 +240,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
                 control={control}
                 render={({ field: { ref, ...fieldProps } }) => (
                   <Select value={fieldProps.value} onValueChange={fieldProps.onChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className="focus-enterprise">
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
                     <SelectContent>
@@ -247,6 +262,7 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
                 {...register('communicationPincode')}
                 placeholder="Enter pincode"
                 maxLength={6}
+                className="focus-enterprise"
               />
             </div>
           </div>
@@ -254,7 +270,10 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
       </div>
 
       <div className="form-section">
-        <h3 className="form-section-title">Product/Service Categories *</h3>
+        <h3 className="form-section-title">
+          <Package className="h-5 w-5 text-primary" />
+          Product/Service Categories *
+        </h3>
         <p className="text-sm text-muted-foreground mb-4">
           Select all categories that apply to your business
         </p>
@@ -268,13 +287,6 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
         {errors.productCategories && (
           <p className="text-sm text-destructive mt-2">{errors.productCategories.message}</p>
         )}
-      </div>
-
-      <div className="flex justify-end">
-        <Button type="submit" className="gap-2">
-          Next Step
-          <ChevronRight className="h-4 w-4" />
-        </Button>
       </div>
     </form>
   );
