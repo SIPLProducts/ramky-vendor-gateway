@@ -10,7 +10,8 @@ import {
   FileText,
   ArrowRight,
   Sparkles,
-  LayoutDashboard
+  LayoutDashboard,
+  FileCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -57,6 +58,9 @@ export default function Dashboard() {
     approved: 0,
     validationFailed: 0,
     draft: 0,
+    submitted: 0,
+    pendingVerification: 0,
+    activeVendors: 0,
   };
 
   const displayVendors = recentVendors?.slice(0, 5) || [];
@@ -102,7 +106,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-5">
         <Card className="card-interactive border-0 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -127,64 +131,85 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {(userRole === 'finance' || userRole === 'admin') && (
-          <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending Finance
-              </CardTitle>
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-9 w-20" />
-              ) : (
-                <>
-                  <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">{displayStats.pendingFinance}</div>
-                  <Link to="/finance/review">
-                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-amber-600 dark:text-amber-400">
-                      View all <ArrowRight className="h-3 w-3 ml-1" />
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pending Verification
+            </CardTitle>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <FileCheck className="h-5 w-5 text-white" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-20" />
+            ) : (
+              <>
+                <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">{displayStats.pendingVerification}</div>
+                <Link to="/finance/verification">
+                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-blue-600 dark:text-blue-400">
+                    Verify now <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-        {(userRole === 'purchase' || userRole === 'admin') && (
-          <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/20 dark:to-emerald-950/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending Purchase
-              </CardTitle>
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-                <FileText className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-9 w-20" />
-              ) : (
-                <>
-                  <div className="text-4xl font-bold text-teal-600 dark:text-teal-400">{displayStats.pendingPurchase}</div>
-                  <Link to="/purchase/approval">
-                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-teal-600 dark:text-teal-400">
-                      View all <ArrowRight className="h-3 w-3 ml-1" />
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pending Finance
+            </CardTitle>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Clock className="h-5 w-5 text-white" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-20" />
+            ) : (
+              <>
+                <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">{displayStats.pendingFinance}</div>
+                <Link to="/finance/review">
+                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-amber-600 dark:text-amber-400">
+                    Review <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/20 dark:to-emerald-950/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pending Purchase
+            </CardTitle>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <FileText className="h-5 w-5 text-white" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-20" />
+            ) : (
+              <>
+                <div className="text-4xl font-bold text-teal-600 dark:text-teal-400">{displayStats.pendingPurchase}</div>
+                <Link to="/purchase/approval">
+                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-teal-600 dark:text-teal-400">
+                    Approve <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              SAP Synced
+              Active Vendors
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
               <CheckCircle className="h-5 w-5 text-white" />
@@ -195,8 +220,8 @@ export default function Dashboard() {
               <Skeleton className="h-9 w-20" />
             ) : (
               <>
-                <div className="text-4xl font-bold text-green-600 dark:text-green-400">{displayStats.approved}</div>
-                <p className="text-xs text-muted-foreground mt-2">Active vendors</p>
+                <div className="text-4xl font-bold text-green-600 dark:text-green-400">{displayStats.activeVendors}</div>
+                <p className="text-xs text-muted-foreground mt-2">SAP synced vendors</p>
               </>
             )}
           </CardContent>
