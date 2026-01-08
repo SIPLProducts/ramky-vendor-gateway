@@ -492,6 +492,22 @@ export default function VendorRegistration() {
             />
           </div>
 
+          {/* Help & Support Link */}
+          <div className="p-4 border-t">
+            <Link 
+              to="/support" 
+              className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
+            >
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <HelpCircle className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Need Help?</p>
+                <p className="text-xs text-muted-foreground">Visit Help & Support</p>
+              </div>
+            </Link>
+          </div>
+
           {/* Link Expiry Notice */}
           <div className="p-4 border-t bg-muted/50">
             <div className="flex items-start gap-3">
