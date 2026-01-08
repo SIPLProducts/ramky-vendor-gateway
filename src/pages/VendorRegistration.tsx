@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { EnterpriseStepIndicator, registrationSteps } from '@/components/vendor/EnterpriseStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
+import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
 import { StatutoryStep } from '@/components/vendor/steps/StatutoryStep';
@@ -104,6 +105,7 @@ export default function VendorRegistration() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const formDataLoadedRef = useRef(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -269,6 +271,9 @@ export default function VendorRegistration() {
         description: 'Your vendor registration has been submitted successfully.',
       });
       
+      // Show feedback popup after submission
+      setShowFeedback(true);
+      
       await runValidations(vendor.id);
       
     } catch (error) {
@@ -369,6 +374,13 @@ export default function VendorRegistration() {
           financeComments={existingVendor?.finance_comments}
           purchaseComments={existingVendor?.purchase_comments}
           onEdit={handleStartEdit}
+        />
+        
+        {/* Feedback Popup */}
+        <FeedbackPopup
+          open={showFeedback}
+          onOpenChange={setShowFeedback}
+          vendorId={vendorId || undefined}
         />
       </div>
     );
