@@ -23,6 +23,7 @@ import VendorFeedback from "./pages/VendorFeedback";
 import DemoShowcase from "./pages/DemoShowcase";
 import GstCompliance from "./pages/GstCompliance";
 import ScheduledChecks from "./pages/ScheduledChecks";
+import SharviAdminConsole from "./pages/SharviAdminConsole";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
                 <Route path="/demo" element={<DemoShowcase />} />
                 <Route path="/compliance/gst" element={<GstCompliance />} />
                 <Route path="/compliance/scheduled" element={<ScheduledChecks />} />
+                <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
               </Route>
             </Route>
             
