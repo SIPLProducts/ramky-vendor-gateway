@@ -42,15 +42,12 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  Calendar,
   Play,
   Loader2,
-  FileText,
-  TrendingUp,
-  TrendingDown,
   Building2
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 interface Vendor {
   id: string;
@@ -100,6 +97,8 @@ export default function GstCompliance() {
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [currentResult, setCurrentResult] = useState<GstComplianceResult | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Fetch all approved vendors (those with GST numbers)
   const { data: vendors, isLoading } = useQuery({
@@ -330,7 +329,22 @@ export default function GstCompliance() {
     if (filterStatus === 'all') return true;
     const status = getVendorComplianceStatus(v);
     return status.status === filterStatus;
-  });
+  }) || [];
+
+  // Pagination
+  const totalItems = filteredVendors.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedVendors = filteredVendors.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleFilterChange = (value: string) => {
+    setFilterStatus(value);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const stats = {
     total: complianceStatuses.length,
@@ -443,7 +457,7 @@ export default function GstCompliance() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus} onValueChange={handleFilterChange}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
@@ -486,7 +500,7 @@ export default function GstCompliance() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVendors.map((vendor) => {
+                {paginatedVendors.map((vendor) => {
                   const compliance = getVendorComplianceStatus(vendor);
                   return (
                     <TableRow key={vendor.id}>
@@ -537,6 +551,17 @@ export default function GstCompliance() {
                 })}
               </TableBody>
             </Table>
+          )}
+          
+          {filteredVendors.length > 0 && (
+            <DataTablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={handlePageSizeChange}
+            />
           )}
         </CardContent>
       </Card>
