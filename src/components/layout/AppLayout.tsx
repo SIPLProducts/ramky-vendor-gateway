@@ -21,6 +21,8 @@ export function AppLayout() {
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const role = userRole || 'vendor';
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  
+  console.log('AppLayout - userRole:', userRole, 'role:', role, 'user:', user?.email);
 
   const handleLogout = async () => {
     try {
