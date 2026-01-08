@@ -16,10 +16,7 @@ import {
   Play,
   Calendar,
   LogOut,
-  User,
 } from 'lucide-react';
-import ramkyLogo from '@/assets/ramky-logo.png';
-import { Badge } from '@/components/ui/badge';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
@@ -142,32 +139,6 @@ export function Sidebar({ userRole, userName, onSignOut }: SidebarProps) {
 
   return (
     <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0">
-      {/* Logo Section */}
-      <div className="p-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <img 
-            src={ramkyLogo} 
-            alt="Ramky Infrastructure" 
-            className="h-10 w-auto object-contain"
-          />
-        </div>
-      </div>
-
-      {/* User Profile Section */}
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-sidebar-accent/50">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center flex-shrink-0">
-            <User className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-sidebar-foreground truncate">{userName}</p>
-            <Badge variant="outline" className="text-[10px] px-2 py-0 mt-1 border-sidebar-border text-sidebar-foreground/70 bg-transparent">
-              {roleLabels[userRole]}
-            </Badge>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {filteredItems.map((item) => {
