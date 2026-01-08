@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useOfflineCache } from '@/hooks/useOfflineCache';
+import { useEffect } from 'react';
 import type { Database } from '@/integrations/supabase/types';
 
 // Types from database
@@ -11,25 +13,50 @@ type VendorInsert = Database['public']['Tables']['vendors']['Insert'];
 type VendorUpdate = Database['public']['Tables']['vendors']['Update'];
 type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
 
-// Fetch all vendors (for admin/finance/purchase)
+// Fetch all vendors (for admin/finance/purchase) with offline support
 export function useVendors(statuses?: VendorStatus[]) {
-  return useQuery({
+  const cacheKey = statuses ? `vendors_${statuses.join('_')}` : 'vendors_all';
+  const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<VendorRow[]>({ 
+    key: cacheKey,
+    ttl: 12 * 60 * 60 * 1000 // 12 hours
+  });
+
+  const query = useQuery({
     queryKey: ['vendors', statuses],
     queryFn: async () => {
-      let query = supabase
+      let q = supabase
         .from('vendors')
         .select('*')
         .order('updated_at', { ascending: false });
 
       if (statuses && statuses.length > 0) {
-        query = query.in('status', statuses);
+        q = q.in('status', statuses);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await q;
       if (error) throw error;
       return data as VendorRow[];
     },
+    enabled: isOnline, // Only fetch when online
+    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
   });
+
+  // Cache data when successfully fetched
+  useEffect(() => {
+    if (query.data && isOnline) {
+      saveToCache(query.data);
+    }
+  }, [query.data, isOnline, saveToCache]);
+
+  // Return cached data when offline
+  const data = isOnline ? query.data : (cachedData || query.data);
+
+  return {
+    ...query,
+    data,
+    isOffline: !isOnline,
+    cacheAge: getCacheAge(),
+  };
 }
 
 // Fetch single vendor
@@ -291,9 +318,14 @@ export function usePurchaseAction() {
   });
 }
 
-// Vendor statistics
+// Vendor statistics with offline support
 export function useVendorStats() {
-  return useQuery({
+  const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<any>({ 
+    key: 'vendor_stats',
+    ttl: 6 * 60 * 60 * 1000 // 6 hours
+  });
+
+  const query = useQuery({
     queryKey: ['vendor-stats'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -316,7 +348,25 @@ export function useVendorStats() {
 
       return stats;
     },
+    enabled: isOnline,
+    staleTime: 60 * 1000, // 1 minute
   });
+
+  // Cache stats when fetched
+  useEffect(() => {
+    if (query.data && isOnline) {
+      saveToCache(query.data);
+    }
+  }, [query.data, isOnline, saveToCache]);
+
+  const data = isOnline ? query.data : (cachedData || query.data);
+
+  return {
+    ...query,
+    data,
+    isOffline: !isOnline,
+    cacheAge: getCacheAge(),
+  };
 }
 
 // Audit logs
