@@ -45,59 +45,42 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Top Header Bar - Always Visible for ALL users */}
-      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-50">
-        <div className="flex items-center gap-2">
-          {role !== 'vendor' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-8 w-8"
-            >
-              {sidebarCollapsed ? (
-                <PanelLeft className="h-4 w-4" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" />
-              )}
-            </Button>
-          )}
-          <span className="text-sm font-semibold text-foreground">
-            Vendor Portal
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleLogout}
-            className="gap-2 text-destructive border-destructive/50 hover:bg-destructive hover:text-destructive-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </header>
-      
-      <div className="flex flex-1 overflow-hidden">
-        {role !== 'vendor' && (
-          <div className={cn(
-            "transition-all duration-300 ease-in-out shrink-0",
-            sidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-64"
-          )}>
-            <Sidebar userRole={role} userName={userName} onSignOut={handleLogout} />
-          </div>
-        )}
-        <main className={cn(
-          "flex-1 overflow-auto",
-          role !== 'vendor' ? 'p-6' : 'p-4 md:p-8'
+    <div className="min-h-screen bg-background flex">
+      {role !== 'vendor' && (
+        <div className={cn(
+          "transition-all duration-300 ease-in-out shrink-0",
+          sidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-64"
         )}>
-          <Outlet />
-        </main>
-      </div>
+          <Sidebar userRole={role} userName={userName} onSignOut={handleLogout} />
+        </div>
+      )}
+      
+      {/* Sidebar Toggle Button */}
+      {role !== 'vendor' && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className={cn(
+            "fixed z-50 h-8 w-8 rounded-full shadow-md border bg-background hover:bg-muted transition-all duration-300",
+            sidebarCollapsed ? "left-4 top-4" : "left-60 top-4"
+          )}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeft className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
+        </Button>
+      )}
+      
+      <main className={cn(
+        "flex-1 overflow-auto h-screen",
+        role !== 'vendor' ? 'p-6' : 'p-4 md:p-8',
+        role !== 'vendor' && sidebarCollapsed ? 'pl-16' : ''
+      )}>
+        <Outlet />
+      </main>
     </div>
   );
 }
