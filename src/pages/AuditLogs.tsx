@@ -3,18 +3,54 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuditLogs } from '@/hooks/useVendors';
-import { Search, Activity, User, Clock, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search, Activity, User, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function AuditLogs() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [actionFilter, setActionFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { data: logs, isLoading } = useAuditLogs();
 
-  const filteredLogs = logs?.filter((log) =>
-    log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    JSON.stringify(log.details || {}).toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredLogs = logs?.filter((log) => {
+    const matchesSearch = 
+      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      JSON.stringify(log.details || {}).toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesAction = actionFilter === 'all' || log.action.includes(actionFilter);
+    
+    return matchesSearch && matchesAction;
+  }) || [];
+
+  // Pagination
+  const totalItems = filteredLogs.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Reset to page 1 when filters change
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (value: string) => {
+    setActionFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const getActionBadge = (action: string) => {
     if (action.includes('approve')) {
@@ -28,6 +64,12 @@ export default function AuditLogs() {
     }
     if (action.includes('clarify')) {
       return <Badge className="bg-warning/10 text-warning">Clarification</Badge>;
+    }
+    if (action.includes('validation')) {
+      return <Badge className="bg-blue-500/10 text-blue-600">Validation</Badge>;
+    }
+    if (action.includes('draft')) {
+      return <Badge variant="secondary">Draft</Badge>;
     }
     return <Badge variant="secondary">{action}</Badge>;
   };
@@ -51,13 +93,25 @@ export default function AuditLogs() {
             <Input
               placeholder="Search logs..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
-          </Button>
+          <Select value={actionFilter} onValueChange={handleFilterChange}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="submit">Submissions</SelectItem>
+              <SelectItem value="approve">Approvals</SelectItem>
+              <SelectItem value="reject">Rejections</SelectItem>
+              <SelectItem value="validation">Validations</SelectItem>
+              <SelectItem value="draft">Drafts</SelectItem>
+              <SelectItem value="finance">Finance</SelectItem>
+              <SelectItem value="purchase">Purchase</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -88,38 +142,51 @@ export default function AuditLogs() {
               <p className="text-muted-foreground">Activity will appear here as vendors are processed.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredLogs.map((log) => (
-                <div key={log.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-foreground">
-                        {log.user_id ? 'User' : 'System'}
-                      </span>
-                      {getActionBadge(log.action)}
+            <>
+              <div className="space-y-4">
+                {paginatedLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary" />
                     </div>
-                    <p className="text-sm text-foreground">{formatAction(log.action)}</p>
-                    {log.details && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {typeof log.details === 'object' && 'comments' in (log.details as Record<string, unknown>)
-                          ? String((log.details as Record<string, unknown>).comments)
-                          : JSON.stringify(log.details)}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {new Date(log.created_at).toLocaleString('en-IN')}
-                      {log.vendor_id && (
-                        <span className="ml-2">Vendor ID: {log.vendor_id.slice(0, 8)}...</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-foreground">
+                          {log.user_id ? 'User' : 'System'}
+                        </span>
+                        {getActionBadge(log.action)}
+                      </div>
+                      <p className="text-sm text-foreground">{formatAction(log.action)}</p>
+                      {log.details && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {typeof log.details === 'object' && 'comments' in (log.details as Record<string, unknown>)
+                            ? String((log.details as Record<string, unknown>).comments)
+                            : typeof log.details === 'object' && 'legal_name' in (log.details as Record<string, unknown>)
+                            ? `Vendor: ${String((log.details as Record<string, unknown>).legal_name)}`
+                            : JSON.stringify(log.details).slice(0, 100) + (JSON.stringify(log.details).length > 100 ? '...' : '')}
+                        </p>
                       )}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(log.created_at).toLocaleString('en-IN')}
+                        {log.vendor_id && (
+                          <span className="ml-2">Vendor ID: {log.vendor_id.slice(0, 8)}...</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              
+              <DataTablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </>
           )}
         </CardContent>
       </Card>

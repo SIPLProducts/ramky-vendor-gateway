@@ -47,9 +47,10 @@ import {
   XCircle,
   Loader2,
   Send,
-  RefreshCw,
+  Filter,
 } from 'lucide-react';
 import { z } from 'zod';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 
@@ -59,6 +60,10 @@ export default function AdminInvitations() {
   const [expiryDays, setExpiryDays] = useState('14');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -178,11 +183,46 @@ export default function AdminInvitations() {
     });
   };
 
-  const getStatusBadge = (invitation: any) => {
+  const getInvitationStatus = (invitation: any): 'used' | 'expired' | 'pending' => {
     const now = new Date();
     const expiresAt = new Date(invitation.expires_at);
+    if (invitation.used_at) return 'used';
+    if (expiresAt < now) return 'expired';
+    return 'pending';
+  };
 
-    if (invitation.used_at) {
+  // Filter invitations
+  const filteredInvitations = invitations?.filter((invitation) => {
+    const matchesSearch = invitation.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const status = getInvitationStatus(invitation);
+    const matchesStatus = statusFilter === 'all' || status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }) || [];
+
+  // Pagination
+  const totalItems = filteredInvitations.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedInvitations = filteredInvitations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  const getStatusBadge = (invitation: any) => {
+    const status = getInvitationStatus(invitation);
+
+    if (status === 'used') {
       return (
         <Badge variant="default" className="bg-success">
           <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -191,7 +231,7 @@ export default function AdminInvitations() {
       );
     }
 
-    if (expiresAt < now) {
+    if (status === 'expired') {
       return (
         <Badge variant="destructive">
           <XCircle className="h-3 w-3 mr-1" />
@@ -296,86 +336,124 @@ export default function AdminInvitations() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Invitation History</CardTitle>
-          <CardDescription>
-            All vendor invitations and their current status
-          </CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle>Invitation History</CardTitle>
+              <CardDescription>
+                All vendor invitations and their current status
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-64">
+                <Input
+                  placeholder="Search by email..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={handleFilterChange}>
+                <SelectTrigger className="w-40">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="used">Used</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : !invitations?.length ? (
+          ) : filteredInvitations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No invitations yet. Create your first invitation to get started.
+              {invitations?.length === 0 
+                ? 'No invitations yet. Create your first invitation to get started.'
+                : 'No invitations match your search criteria.'}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invitations.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell className="font-medium">{invitation.email}</TableCell>
-                    <TableCell>{getStatusBadge(invitation)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(invitation.created_at), 'dd MMM yyyy')}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyInvitationLink(invitation.token)}
-                          className="gap-1"
-                        >
-                          {copiedToken === invitation.token ? (
-                            <>
-                              <CheckCircle2 className="h-4 w-4 text-success" />
-                              Copied!
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4" />
-                              Copy Link
-                            </>
-                          )}
-                        </Button>
-                        {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedInvitations.map((invitation) => (
+                    <TableRow key={invitation.id}>
+                      <TableCell className="font-medium">{invitation.email}</TableCell>
+                      <TableCell>{getStatusBadge(invitation)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(invitation.created_at), 'dd MMM yyyy')}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => sendEmailInvitation.mutate(invitation.id)}
-                            disabled={sendEmailInvitation.isPending}
+                            onClick={() => copyInvitationLink(invitation.token)}
                             className="gap-1"
                           >
-                            {sendEmailInvitation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                            {copiedToken === invitation.token ? (
+                              <>
+                                <CheckCircle2 className="h-4 w-4 text-success" />
+                                Copied!
+                              </>
                             ) : (
                               <>
-                                <Send className="h-4 w-4" />
-                                Send Email
+                                <Copy className="h-4 w-4" />
+                                Copy Link
                               </>
                             )}
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                          {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => sendEmailInvitation.mutate(invitation.id)}
+                              disabled={sendEmailInvitation.isPending}
+                              className="gap-1"
+                            >
+                              {sendEmailInvitation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Send className="h-4 w-4" />
+                                  Send Email
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              <DataTablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </>
           )}
         </CardContent>
       </Card>
