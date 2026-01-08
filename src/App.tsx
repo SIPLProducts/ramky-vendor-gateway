@@ -25,6 +25,7 @@ import GstCompliance from "./pages/GstCompliance";
 import ScheduledChecks from "./pages/ScheduledChecks";
 import SharviAdminConsole from "./pages/SharviAdminConsole";
 import NotFound from "./pages/NotFound";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/vendor/register" element={<VendorRegistration />} />
             <Route path="/vendor/invite" element={<VendorRegisterWithInvite />} />
+            <Route path="/install" element={<Install />} />
             <Route path="/support" element={<SupportHelp />} />
             <Route path="/feedback" element={<VendorFeedback />} />
             
