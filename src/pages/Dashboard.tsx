@@ -11,19 +11,37 @@ import {
   ArrowRight,
   Sparkles,
   LayoutDashboard,
-  FileCheck
+  FileCheck,
+  WifiOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConnectionStatus } from '@/components/pwa/ConnectionStatus';
+import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
+import { useQueryClient } from '@tanstack/react-query';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Dashboard() {
   const { user, userRole: authRole } = useAuth();
   const userRole = authRole || 'vendor';
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-  const { data: stats, isLoading: statsLoading } = useVendorStats();
-  const { data: recentVendors, isLoading: vendorsLoading } = useVendors();
+  const { data: stats, isLoading: statsLoading, isOffline: statsOffline, cacheAge: statsCacheAge } = useVendorStats();
+  const { data: recentVendors, isLoading: vendorsLoading, isOffline: vendorsOffline, cacheAge: vendorsCacheAge } = useVendors();
+  const queryClient = useQueryClient();
+
+  // Subscribe to real-time updates
+  const { isConnected } = useRealtimeUpdates({
+    onVendorUpdate: () => {
+      // Refresh data when vendor updates come in
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
+    },
+    showNotifications: true,
+  });
+
+  const isOffline = statsOffline || vendorsOffline;
 
   // Get greeting based on time of day
   const getGreeting = () => {
@@ -67,15 +85,28 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Offline Alert */}
+      {isOffline && (
+        <Alert className="bg-warning/10 border-warning/30">
+          <WifiOff className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-warning-foreground">
+            You're offline. Showing cached data from {statsCacheAge || vendorsCacheAge || 'earlier'}.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Page Header */}
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <LayoutDashboard className="h-5 w-5 text-primary" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <LayoutDashboard className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Executive Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Executive Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
-        </div>
+        <ConnectionStatus showLabel />
       </div>
 
       {/* Welcome Banner */}
