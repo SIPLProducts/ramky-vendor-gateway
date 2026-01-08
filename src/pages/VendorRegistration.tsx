@@ -105,19 +105,33 @@ export default function VendorRegistration() {
   const linkExpiry = new Date();
   linkExpiry.setDate(linkExpiry.getDate() + 14);
 
-  // Load existing form data if vendor exists
+  // Load existing form data if vendor exists and is in an editable or pending state
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
-      setFormData(existingFormData);
-      setVendorStatusState(vendorStatus);
       
-      if (vendorStatus === 'validation_failed' || vendorStatus === 'finance_rejected' || vendorStatus === 'purchase_rejected') {
-        setIsSubmitted(true);
-        setIsEditMode(false);
-      } else if (vendorStatus !== 'draft') {
+      // Only load existing data for draft status or statuses that need correction
+      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
+      const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
+      
+      if (editableStatuses.includes(vendorStatus)) {
+        // Load form data for editing
+        setFormData(existingFormData);
+        setVendorStatusState(vendorStatus);
+        
+        if (vendorStatus !== 'draft') {
+          // Show status screen for failed/rejected statuses
+          setIsSubmitted(true);
+          setIsEditMode(false);
+        }
+        // For 'draft' status, show the form directly (don't set isSubmitted)
+      } else if (pendingStatuses.includes(vendorStatus)) {
+        // Show status tracker for in-progress applications
+        setFormData(existingFormData);
+        setVendorStatusState(vendorStatus);
         setIsSubmitted(true);
       }
+      // For any other status, show fresh form (don't load existing data)
     }
   }, [existingFormData, vendorStatus]);
 

@@ -46,6 +46,55 @@ export function SuccessScreen({
           title: 'Clarification Needed',
           message: 'Your application was returned by our purchase team for clarification.',
         };
+      case 'submitted':
+      case 'validation_pending':
+        return {
+          icon: Clock,
+          iconClass: 'text-info',
+          bgClass: 'bg-info/10',
+          title: 'Application Under Review',
+          message: 'Your application has been submitted and is being verified. You will receive updates via email.',
+        };
+      case 'finance_review':
+        return {
+          icon: Clock,
+          iconClass: 'text-info',
+          bgClass: 'bg-info/10',
+          title: 'Finance Review in Progress',
+          message: 'Your application is being reviewed by our finance team.',
+        };
+      case 'finance_approved':
+        return {
+          icon: CheckCircle2,
+          iconClass: 'text-success',
+          bgClass: 'bg-success/10',
+          title: 'Finance Approved',
+          message: 'Your application has been approved by finance and is pending purchase approval.',
+        };
+      case 'purchase_review':
+        return {
+          icon: Clock,
+          iconClass: 'text-info',
+          bgClass: 'bg-info/10',
+          title: 'Purchase Review in Progress',
+          message: 'Your application is being reviewed by our purchase team.',
+        };
+      case 'purchase_approved':
+        return {
+          icon: CheckCircle2,
+          iconClass: 'text-success',
+          bgClass: 'bg-success/10',
+          title: 'Approved - SAP Integration Pending',
+          message: 'Your application has been fully approved. SAP vendor code will be generated shortly.',
+        };
+      case 'sap_synced':
+        return {
+          icon: CheckCircle2,
+          iconClass: 'text-success',
+          bgClass: 'bg-success/10',
+          title: 'Registration Complete',
+          message: 'Congratulations! You are now a registered vendor. Your SAP vendor code has been generated.',
+        };
       default:
         return {
           icon: CheckCircle2,
@@ -106,7 +155,7 @@ export function SuccessScreen({
         <div className="flex justify-center mb-8">
           <Button onClick={onEdit} size="lg" className="gap-2">
             <Edit2 className="h-4 w-4" />
-            Edit & Resubmit Application
+            Continue Editing Application
           </Button>
         </div>
       )}
