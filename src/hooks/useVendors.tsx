@@ -309,6 +309,9 @@ export function useVendorStats() {
         approved: data.filter(v => v.status === 'sap_synced').length,
         validationFailed: data.filter(v => v.status === 'validation_failed').length,
         draft: data.filter(v => v.status === 'draft').length,
+        submitted: data.filter(v => v.status === 'submitted').length,
+        pendingVerification: data.filter(v => ['submitted', 'validation_pending'].includes(v.status)).length,
+        activeVendors: data.filter(v => ['sap_synced', 'purchase_approved', 'finance_approved'].includes(v.status)).length,
       };
 
       return stats;
