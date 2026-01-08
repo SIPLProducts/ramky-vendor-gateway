@@ -11,12 +11,15 @@ import {
   ArrowRight,
   Sparkles,
   LayoutDashboard,
-  FileCheck
+  FileCheck,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { user, userRole: authRole } = useAuth();
@@ -65,17 +68,38 @@ export default function Dashboard() {
 
   const displayVendors = recentVendors?.slice(0, 5) || [];
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+      toast.success('Signed out successfully');
+      window.location.href = '/auth';
+    } catch (error) {
+      console.error('Logout error:', error);
+      window.location.href = '/auth';
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <LayoutDashboard className="h-5 w-5 text-primary" />
+      {/* Page Header with Logout */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <LayoutDashboard className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Executive Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Executive Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
-        </div>
+        <Button 
+          variant="outline" 
+          onClick={handleLogout}
+          className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
       </div>
 
       {/* Welcome Banner */}
