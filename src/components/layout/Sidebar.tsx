@@ -19,12 +19,12 @@ import {
   User,
 } from 'lucide-react';
 import ramkyLogo from '@/assets/ramky-logo.png';
-import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
   userName: string;
+  onSignOut: () => Promise<void>;
 }
 
 interface NavItem {
@@ -122,10 +122,9 @@ const roleLabels = {
   admin: 'Administrator',
 };
 
-export function Sidebar({ userRole, userName }: SidebarProps) {
+export function Sidebar({ userRole, userName, onSignOut }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
 
   const filteredItems = navItems.filter((item) =>
     item.roles.includes(userRole)
@@ -133,7 +132,7 @@ export function Sidebar({ userRole, userName }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      await onSignOut();
       navigate('/auth', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
