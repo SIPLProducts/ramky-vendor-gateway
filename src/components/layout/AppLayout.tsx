@@ -33,26 +33,16 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top Header Bar - Always Visible */}
       {role !== 'vendor' && (
-        <>
-          <div className={cn(
-            "transition-all duration-300 ease-in-out",
-            sidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-64"
-          )}>
-            <Sidebar userRole={role} userName={userName} onSignOut={signOut} />
-          </div>
-          
-          {/* Collapse/Expand Button + User Menu when collapsed */}
-          <div className={cn(
-            "fixed z-50 flex items-center gap-2 transition-all duration-300",
-            sidebarCollapsed ? "left-4 top-4" : "left-60 top-4"
-          )}>
+        <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-8 w-8 rounded-full shadow-md border bg-background hover:bg-muted"
+              className="h-8 w-8"
             >
               {sidebarCollapsed ? (
                 <PanelLeft className="h-4 w-4" />
@@ -60,37 +50,48 @@ export function AppLayout() {
                 <PanelLeftClose className="h-4 w-4" />
               )}
             </Button>
-            
-            {/* Show user menu when sidebar is collapsed */}
-            {sidebarCollapsed && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <span className="text-sm font-medium text-muted-foreground">
+              {sidebarCollapsed ? 'Show Menu' : 'Hide Menu'}
+            </span>
           </div>
-        </>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 gap-2 px-2">
+                <Avatar className="h-7 w-7">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium hidden sm:inline">{userName}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
       )}
-      <main className={cn(
-        "flex-1 overflow-auto h-screen transition-all duration-300",
-        role !== 'vendor' ? 'p-6' : 'p-4 md:p-8',
-        role !== 'vendor' && sidebarCollapsed ? 'pl-16' : ''
-      )}>
-        <Outlet />
-      </main>
+      
+      <div className="flex flex-1 overflow-hidden">
+        {role !== 'vendor' && (
+          <div className={cn(
+            "transition-all duration-300 ease-in-out shrink-0",
+            sidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-64"
+          )}>
+            <Sidebar userRole={role} userName={userName} onSignOut={signOut} />
+          </div>
+        )}
+        <main className={cn(
+          "flex-1 overflow-auto",
+          role !== 'vendor' ? 'p-6' : 'p-4 md:p-8'
+        )}>
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
