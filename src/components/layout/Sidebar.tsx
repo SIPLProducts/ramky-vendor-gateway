@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -15,11 +15,16 @@ import {
   HelpCircle,
   Play,
   Calendar,
+  LogOut,
+  User,
 } from 'lucide-react';
 import ramkyLogo from '@/assets/ramky-logo.png';
+import { useAuth } from '@/hooks/useAuth';
+import { Badge } from '@/components/ui/badge';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
+  userName: string;
 }
 
 interface NavItem {
@@ -110,26 +115,62 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar({ userRole }: SidebarProps) {
+const roleLabels = {
+  vendor: 'Vendor',
+  finance: 'Finance Team',
+  purchase: 'Purchase Team',
+  admin: 'Administrator',
+};
+
+export function Sidebar({ userRole, userName }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const filteredItems = navItems.filter((item) =>
     item.roles.includes(userRole)
   );
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/auth', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+      navigate('/auth', { replace: true });
+    }
+  };
+
   return (
-    <aside className="w-64 bg-sidebar border-r flex flex-col h-[calc(100vh-3.5rem)]">
+    <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0">
+      {/* Logo Section */}
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <img 
             src={ramkyLogo} 
             alt="Ramky Infrastructure" 
-            className="h-12 w-auto object-contain"
+            className="h-10 w-auto object-contain"
           />
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+      {/* User Profile Section */}
+      <div className="p-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-sidebar-accent/50">
+          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center flex-shrink-0">
+            <User className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-sidebar-foreground truncate">{userName}</p>
+            <Badge variant="outline" className="text-[10px] px-2 py-0 mt-1 border-sidebar-border text-sidebar-foreground/70 bg-transparent">
+              {roleLabels[userRole]}
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {filteredItems.map((item) => {
           const isActive = location.pathname === item.href;
           const Icon = item.icon;
@@ -139,28 +180,35 @@ export function Sidebar({ userRole }: SidebarProps) {
               key={item.href}
               to={item.href}
               className={cn(
-                'flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
+                'flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
                 isActive
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-primary/20'
-                  : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-md'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
               <div className="flex items-center gap-3">
-                <Icon className="h-5 w-5" />
-                {item.label}
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{item.label}</span>
               </div>
-              {isActive && <ChevronRight className="h-4 w-4" />}
+              {isActive && <ChevronRight className="h-4 w-4 flex-shrink-0" />}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-5 border-t border-sidebar-border">
-        <div className="px-4 py-3 rounded-xl bg-sidebar-accent/50">
-          <div className="text-xs text-sidebar-foreground/60">
-            <p className="font-medium text-sidebar-foreground mb-1">Version 2.0.0</p>
-            <p>© 2024 Ramky Infrastructure</p>
-          </div>
+      {/* Footer with Logout */}
+      <div className="p-3 border-t border-sidebar-border space-y-2">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-all duration-200"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </button>
+        <div className="px-3 py-2 rounded-lg bg-sidebar-accent/30">
+          <p className="text-[10px] text-sidebar-foreground/50 text-center">
+            © 2025 Ramky Infrastructure • v2.0.0
+          </p>
         </div>
       </div>
     </aside>

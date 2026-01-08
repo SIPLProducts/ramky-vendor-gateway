@@ -1,5 +1,4 @@
 import { Outlet } from 'react-router-dom';
-import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -10,14 +9,11 @@ export function AppLayout() {
   const role = userRole || 'vendor';
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header userRole={role} userName={userName} />
-      <div className="flex">
-        {role !== 'vendor' && <Sidebar userRole={role} />}
-        <main className={`flex-1 ${role !== 'vendor' ? 'p-6' : 'p-4 md:p-8'}`}>
-          <Outlet />
-        </main>
-      </div>
+    <div className="min-h-screen bg-background flex">
+      {role !== 'vendor' && <Sidebar userRole={role} userName={userName} />}
+      <main className={`flex-1 ${role !== 'vendor' ? 'p-6' : 'p-4 md:p-8'} overflow-auto h-screen`}>
+        <Outlet />
+      </main>
     </div>
   );
 }
