@@ -82,6 +82,11 @@ interface Vendor {
   ifsc_code: string | null;
   bank_name: string | null;
   msme_number: string | null;
+  created_at?: string;
+}
+
+interface VendorWithDocCount extends Vendor {
+  doc_count: number;
 }
 
 interface Validation {
@@ -179,18 +184,24 @@ export default function DocumentVerification() {
   const [previewDoc, setPreviewDoc] = useState<VendorDocument | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Fetch vendors for verification (submitted, validation_failed, finance_review)
+  // Fetch vendors for verification with document counts
   const { data: vendors, isLoading: isLoadingVendors } = useQuery({
     queryKey: ['vendors-for-verification'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendors')
-        .select('*')
+        .select('*, vendor_documents(id)')
         .in('status', ['submitted', 'validation_failed', 'finance_review', 'validation_pending'])
         .order('submitted_at', { ascending: false });
       
       if (error) throw error;
-      return data as Vendor[];
+      
+      // Transform to include doc_count
+      return (data || []).map(vendor => ({
+        ...vendor,
+        doc_count: Array.isArray(vendor.vendor_documents) ? vendor.vendor_documents.length : 0,
+        vendor_documents: undefined
+      })) as VendorWithDocCount[];
     },
   });
 
@@ -678,7 +689,23 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                         className="flex-1"
                         onClick={() => setSelectedVendor(vendor)}
                       >
-                        <p className="font-medium">{vendor.legal_name || 'Unknown Vendor'}</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium">{vendor.legal_name || 'Unknown Vendor'}</p>
+                          <div className="flex items-center gap-1">
+                            {vendor.doc_count > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                <FileText className="h-3 w-3 mr-1" />
+                                {vendor.doc_count}
+                              </Badge>
+                            )}
+                            <Badge 
+                              variant={vendor.status === 'submitted' ? 'default' : vendor.status === 'validation_failed' ? 'destructive' : 'secondary'}
+                              className="text-xs capitalize"
+                            >
+                              {vendor.status.replace(/_/g, ' ')}
+                            </Badge>
+                          </div>
+                        </div>
                         <p className="text-sm text-muted-foreground">{vendor.primary_email}</p>
                         <div className="mt-2 text-xs text-muted-foreground">
                           GST: {vendor.gstin || 'N/A'} | PAN: {vendor.pan || 'N/A'}
