@@ -223,18 +223,31 @@ export default function VendorRegistration() {
         description: 'Your progress has been saved. You can continue later.',
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      // Check if it's an authentication error
+      if (errorMessage.includes('not authenticated')) {
+        toast({
+          title: 'Login Required',
+          description: 'Please log in to save your draft.',
+          variant: 'destructive',
+        });
+        navigate('/auth');
+        return;
+      }
       toast({
         title: 'Save Failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
   };
 
   const handleCancel = () => {
-    if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-      navigate('/');
-    }
+    toast({
+      title: 'Registration Cancelled',
+      description: 'Your progress was not saved.',
+    });
+    navigate('/');
   };
 
   const handleSubmit = async () => {
@@ -522,7 +535,7 @@ export default function VendorRegistration() {
             )}
 
             {/* Step Content */}
-            <div className="max-w-3xl" id="step-form">
+            <div className="max-w-3xl">
               {renderStep()}
             </div>
           </div>
