@@ -12,25 +12,35 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function AppLayout() {
-  const { user, userRole, signOut } = useAuth();
+  const { user, userRole } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const navigate = useNavigate();
   
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const role = userRole || 'vendor';
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  
-  console.log('AppLayout - userRole:', userRole, 'role:', role, 'user:', user?.email);
 
   const handleLogout = async () => {
+    console.log('Logout clicked');
     try {
-      await signOut();
-      navigate('/auth', { replace: true });
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        toast.error('Error signing out');
+      } else {
+        console.log('Signed out successfully');
+        toast.success('Signed out successfully');
+      }
+      // Always navigate to auth page
+      window.location.href = '/auth';
     } catch (error) {
       console.error('Logout error:', error);
-      navigate('/auth', { replace: true });
+      toast.error('Error signing out');
+      window.location.href = '/auth';
     }
   };
 
@@ -84,7 +94,7 @@ export function AppLayout() {
             "transition-all duration-300 ease-in-out shrink-0",
             sidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-64"
           )}>
-            <Sidebar userRole={role} userName={userName} onSignOut={signOut} />
+            <Sidebar userRole={role} userName={userName} onSignOut={handleLogout} />
           </div>
         )}
         <main className={cn(
