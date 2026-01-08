@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -66,6 +67,8 @@ export function AppLayout() {
       )}>
         <Outlet />
       </main>
+
+      <InstallPrompt />
     </div>
   );
 }
