@@ -1,7 +1,6 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BankDetails } from '@/types/vendor';
-import { ChevronLeft, ChevronRight, AlertCircle, Info } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { useState } from 'react';
@@ -80,7 +79,7 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
@@ -217,17 +216,6 @@ export function BankStep({ data, onNext, onBack }: BankStepProps) {
           <strong>Important:</strong> The account holder name must match the vendor legal name for verification to pass.
         </AlertDescription>
       </Alert>
-
-      <div className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack} className="gap-2">
-          <ChevronLeft className="h-4 w-4" />
-          Previous
-        </Button>
-        <Button type="submit" className="gap-2">
-          Next Step
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
     </form>
   );
 }
