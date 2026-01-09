@@ -1,7 +1,6 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { FinancialDetails } from '@/types/vendor';
-import { ChevronLeft, ChevronRight, Upload, IndianRupee } from 'lucide-react';
+import { Upload, IndianRupee } from 'lucide-react';
 
 const schema = z.object({
   turnoverYear1: z.string().min(1, 'Current year turnover is required'),
@@ -68,7 +67,7 @@ export function FinancialStep({ data, onNext, onBack }: FinancialStepProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">Annual Turnover (Last 3 Years)</h3>
         <p className="text-sm text-muted-foreground mb-4">
@@ -168,17 +167,6 @@ export function FinancialStep({ data, onNext, onBack }: FinancialStepProps) {
             Combine all documents into a single PDF
           </p>
         </div>
-      </div>
-
-      <div className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack} className="gap-2">
-          <ChevronLeft className="h-4 w-4" />
-          Previous
-        </Button>
-        <Button type="submit" className="gap-2">
-          Next Step
-          <ChevronRight className="h-4 w-4" />
-        </Button>
       </div>
     </form>
   );
