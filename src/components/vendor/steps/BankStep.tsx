@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Landmark, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileUpload } from '@/components/vendor/FileUpload';
+import { VerifyButton } from '@/components/vendor/VerifyButton';
+import { ValidationMessage } from '@/components/vendor/ValidationMessage';
+import { useFieldValidation } from '@/hooks/useFieldValidation';
 import { BankDetails } from '@/types/vendor';
 
 const schema = z.object({
@@ -27,24 +30,70 @@ const schema = z.object({
 
 interface BankStepProps {
   data: BankDetails;
+  legalName?: string;
   onNext: (data: BankDetails) => void;
   onBack: () => void;
+  onValidationStateChange?: (isValid: boolean) => void;
 }
 
-export function BankStep({ data, onNext }: BankStepProps) {
+export function BankStep({ data, legalName, onNext, onValidationStateChange }: BankStepProps) {
   const [cancelledChequeFile, setCancelledChequeFile] = useState<File | null>(data.cancelledChequeFile);
+  
+  const { 
+    validationStates, 
+    validateBank,
+    resetValidation 
+  } = useFieldValidation();
+
   const { register, handleSubmit, control, watch, formState: { errors } } = useForm<BankDetails>({
     resolver: zodResolver(schema),
     defaultValues: data,
   });
+  
   const accountType = watch('accountType');
+  const accountNumber = watch('accountNumber');
+  const ifscCode = watch('ifscCode');
+
+  // Reset validation state when field values change
+  useEffect(() => {
+    if (validationStates.bank.status !== 'idle') {
+      resetValidation('bank');
+    }
+  }, [accountNumber, ifscCode]);
+
+  // Notify parent of validation state
+  useEffect(() => {
+    const bankValid = validationStates.bank.status === 'passed';
+    onValidationStateChange?.(bankValid);
+  }, [validationStates.bank.status, onValidationStateChange]);
+
+  const handleVerifyBank = async () => {
+    await validateBank(accountNumber || '', ifscCode || '', legalName);
+  };
 
   const handleFormSubmit = (formData: BankDetails) => {
+    // Check if bank validation passed
+    if (validationStates.bank.status !== 'passed') {
+      return; // Don't submit, validation required
+    }
+
     onNext({ ...formData, cancelledChequeFile });
   };
 
+  const canProceed = validationStates.bank.status === 'passed';
+  const canVerify = accountNumber && accountNumber.length >= 8 && ifscCode && ifscCode.length === 11;
+
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      {/* Validation Notice */}
+      {!canProceed && (
+        <Alert className="border-warning bg-warning/10">
+          <AlertDescription className="text-warning-foreground">
+            Bank account verification via penny drop is mandatory. Please verify your bank details before proceeding.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="form-section">
         <h3 className="form-section-title"><Landmark className="h-5 w-5 text-primary" />Bank Account Details</h3>
         <div className="grid gap-5">
@@ -60,6 +109,7 @@ export function BankStep({ data, onNext }: BankStepProps) {
               {errors.branchName && <p className="text-xs text-destructive">{errors.branchName.message}</p>}
             </div>
           </div>
+          
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="accountNumber">Account Number *</Label>
@@ -72,6 +122,7 @@ export function BankStep({ data, onNext }: BankStepProps) {
               {errors.confirmAccountNumber && <p className="text-xs text-destructive">{errors.confirmAccountNumber.message}</p>}
             </div>
           </div>
+          
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label>Account Type *</Label>
@@ -94,6 +145,7 @@ export function BankStep({ data, onNext }: BankStepProps) {
               </div>
             )}
           </div>
+          
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="ifscCode">IFSC Code *</Label>
@@ -105,9 +157,28 @@ export function BankStep({ data, onNext }: BankStepProps) {
               <Input id="micrCode" {...register('micrCode')} placeholder="9-digit MICR code" maxLength={9} />
             </div>
           </div>
+          
           <div className="grid gap-1.5">
             <Label htmlFor="bankAddress">Bank Address</Label>
             <Input id="bankAddress" {...register('bankAddress')} placeholder="Branch address" />
+          </div>
+
+          {/* Bank Verification Button */}
+          <div className="p-4 bg-muted/50 rounded-lg border">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h4 className="font-medium text-sm">Bank Account Verification</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Verify your bank account via ₹1 Penny Drop verification
+                </p>
+              </div>
+              <VerifyButton
+                onClick={handleVerifyBank}
+                state={validationStates.bank}
+                disabled={!canVerify}
+              />
+            </div>
+            <ValidationMessage state={validationStates.bank} />
           </div>
         </div>
       </div>

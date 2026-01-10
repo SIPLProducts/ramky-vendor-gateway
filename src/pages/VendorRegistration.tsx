@@ -51,11 +51,36 @@ export default function VendorRegistration() {
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
   const formDataLoadedRef = useRef(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration();
+
+  // Handle validation state changes from step components
+  const handleValidationStateChange = (step: number) => (isValid: boolean) => {
+    setStepValidationState(prev => ({ ...prev, [step]: isValid }));
+  };
+
+  // Check if current step can proceed (validation passed)
+  const canProceedFromCurrentStep = () => {
+    // Steps 4 (Compliance) and 5 (Bank) require validation
+    if (currentStep === 4 || currentStep === 5) {
+      return stepValidationState[currentStep] !== false;
+    }
+    return true;
+  };
+
+  const getValidationMessage = () => {
+    if (currentStep === 4 && stepValidationState[4] === false) {
+      return 'Please verify GST, PAN, and MSME details';
+    }
+    if (currentStep === 5 && stepValidationState[5] === false) {
+      return 'Please verify bank account details';
+    }
+    return undefined;
+  };
 
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
@@ -120,12 +145,13 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
+    const legalName = formData.organization.legalName;
     switch (currentStep) {
       case 1: return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(1, data)} />;
       case 2: return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
       case 3: return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
-      case 4: return <ComplianceStep data={formData.statutory} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
-      case 5: return <BankStep data={formData.bank} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} />;
+      case 4: return <ComplianceStep data={formData.statutory} legalName={legalName} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
+      case 5: return <BankStep data={formData.bank} legalName={legalName} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
       case 6: return <FinancialStep data={formData.financial} onNext={(data) => handleStepComplete(6, data)} onBack={handleBack} />;
       case 7: return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
       default: return null;
@@ -172,7 +198,7 @@ export default function VendorRegistration() {
         <main className="flex-1 overflow-auto"><div className="max-w-3xl mx-auto p-6 lg:p-8">{renderStep()}</div></main>
       </div>
 
-      <StickyActionBar currentStep={currentStep} totalSteps={registrationSteps.length} onCancel={handleCancel} onSaveDraft={handleSaveAsDraft} onBack={currentStep > 1 ? handleBack : undefined} onSubmit={currentStep === registrationSteps.length ? handleSubmit : undefined} isSaving={isSaving} isSubmitting={isSubmitting} />
+      <StickyActionBar currentStep={currentStep} totalSteps={registrationSteps.length} onCancel={handleCancel} onSaveDraft={handleSaveAsDraft} onBack={currentStep > 1 ? handleBack : undefined} onSubmit={currentStep === registrationSteps.length ? handleSubmit : undefined} isSaving={isSaving} isSubmitting={isSubmitting} canProceed={canProceedFromCurrentStep()} validationMessage={getValidationMessage()} />
     </div>
   );
 }
