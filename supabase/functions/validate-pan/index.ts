@@ -10,19 +10,6 @@ interface PANValidationRequest {
   name?: string;
 }
 
-interface PANValidationResponse {
-  valid: boolean;
-  message: string;
-  data?: {
-    name?: string;
-    panType?: string;
-    panTypeDescription?: string;
-    status?: string;
-    lastUpdated?: string;
-    aadhaarLinked?: boolean;
-  };
-}
-
 // PAN format validation
 function isValidPANFormat(pan: string): boolean {
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
@@ -48,25 +35,33 @@ function getPANTypeInfo(pan: string): { code: string; description: string } {
   return typeMap[typeChar] || { code: 'Unknown', description: 'Unknown Entity Type' };
 }
 
-// Mock database of test PANs
-const mockPANDatabase: Record<string, { name: string; status: string; aadhaarLinked: boolean }> = {
-  'AABCU9603R': { name: 'ABC INFRASTRUCTURE PVT LTD', status: 'Active', aadhaarLinked: true },
-  'AABCT3456R': { name: 'TECHSERVE IT SOLUTIONS PVT LTD', status: 'Active', aadhaarLinked: true },
-  'AABCM9012R': { name: 'METRO CONSTRUCTIONS LIMITED', status: 'Active', aadhaarLinked: true },
-  'AABCG5678R': { name: 'GREENWAY ENVIRONMENTAL SERVICES PVT LTD', status: 'Active', aadhaarLinked: false },
-  'AABCX1234R': { name: 'XYZ STEEL CORPORATION', status: 'Active', aadhaarLinked: true },
-  'AABCP7890R': { name: 'PREMIUM ELECTRICALS PVT LTD', status: 'Active', aadhaarLinked: true },
-  'AABCQ1234R': { name: 'QUICKBUILD CONTRACTORS', status: 'Active', aadhaarLinked: false },
-  // Invalid/Fake PAN
-  'ZZZZZ9999Z': { name: '', status: 'Invalid', aadhaarLinked: false },
-  // Inactive PAN
-  'BBBBC1234D': { name: 'OLD INACTIVE COMPANY', status: 'Inactive', aadhaarLinked: false },
-};
+// Get Cashfree auth token
+async function getCashfreeToken(): Promise<string> {
+  const clientId = Deno.env.get('CASHFREE_CLIENT_ID');
+  const clientSecret = Deno.env.get('CASHFREE_CLIENT_SECRET');
+  
+  if (!clientId || !clientSecret) {
+    throw new Error('Cashfree credentials not configured');
+  }
 
-// Simulate API delay
-function simulateApiDelay(): Promise<void> {
-  const delay = Math.random() * 400 + 150; // 150-550ms
-  return new Promise(resolve => setTimeout(resolve, delay));
+  const response = await fetch('https://api.cashfree.com/verification/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      clientId,
+      clientSecret,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('Cashfree token error:', await response.text());
+    throw new Error('Failed to get Cashfree auth token');
+  }
+
+  const data = await response.json();
+  return data.token;
 }
 
 serve(async (req) => {
@@ -92,7 +87,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          message: 'Invalid PAN format. Expected format: AAAAA0000A (5 letters + 4 digits + 1 letter)' 
+          message: 'Invalid PAN format. Expected format: AAAAA0000A' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -100,65 +95,56 @@ serve(async (req) => {
 
     const panTypeInfo = getPANTypeInfo(upperPAN);
 
-    // Simulate API delay
-    await simulateApiDelay();
-
-    // Check mock database
-    const mockData = mockPANDatabase[upperPAN];
+    // Call Cashfree PAN Verification API
+    const token = await getCashfreeToken();
     
-    if (mockData) {
-      const isValid = mockData.status === 'Active';
-      console.log(`[PAN Validation] Found in mock DB: ${upperPAN} - Status: ${mockData.status}`);
-      
+    const verifyResponse = await fetch('https://api.cashfree.com/verification/pan', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pan: upperPAN,
+        name: name,
+      }),
+    });
+
+    const verifyData = await verifyResponse.json();
+    console.log(`[PAN Validation] API Response:`, JSON.stringify(verifyData));
+
+    if (!verifyResponse.ok) {
+      console.error(`[PAN Validation] API Error:`, verifyData);
       return new Response(
-        JSON.stringify({
-          valid: isValid,
-          message: isValid 
-            ? `PAN verified successfully - ${mockData.name}` 
-            : `PAN verification failed - Status: ${mockData.status}`,
-          data: {
-            name: mockData.name || 'N/A',
-            panType: panTypeInfo.code,
-            panTypeDescription: panTypeInfo.description,
-            status: mockData.status,
-            lastUpdated: new Date().toISOString().split('T')[0],
-            aadhaarLinked: mockData.aadhaarLinked,
-          },
+        JSON.stringify({ 
+          valid: false, 
+          message: verifyData.message || 'PAN verification failed',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // For unknown PANs, simulate based on last character
-    const lastChar = upperPAN.charAt(9);
-    const simulateFailure = ['Z', 'Y'].includes(lastChar); // ~7.7% failure rate
-
-    if (simulateFailure) {
-      console.log(`[PAN Validation] Simulated not found: ${upperPAN}`);
-      return new Response(
-        JSON.stringify({
-          valid: false,
-          message: 'PAN not found in Income Tax records. Please verify and re-enter.',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
-
-    // Generate mock successful response
-    const response: PANValidationResponse = {
-      valid: true,
-      message: 'PAN verified successfully',
+    // Check if PAN is valid
+    const isValid = verifyData.status === 'VALID' || verifyData.valid === true;
+    const panData = verifyData.data || verifyData;
+    
+    const response = {
+      valid: isValid,
+      message: isValid 
+        ? `PAN verified successfully - ${panData.name || panData.registeredName || 'Verified'}` 
+        : `PAN verification failed - ${verifyData.message || 'Invalid PAN'}`,
       data: {
-        name: name?.toUpperCase() || 'PAN HOLDER NAME',
+        name: panData.name || panData.registeredName,
         panType: panTypeInfo.code,
         panTypeDescription: panTypeInfo.description,
-        status: 'Active',
+        status: isValid ? 'Active' : 'Invalid',
         lastUpdated: new Date().toISOString().split('T')[0],
-        aadhaarLinked: Math.random() > 0.2, // 80% have Aadhaar linked
+        aadhaarLinked: panData.aadhaarSeeding === 'Y' || panData.aadhaarLinked,
+        nameMatchScore: panData.nameMatchScore || panData.name_match_score,
       },
     };
 
-    console.log(`[PAN Validation] SUCCESS: ${upperPAN}`);
+    console.log(`[PAN Validation] ${isValid ? 'SUCCESS' : 'FAILED'}: ${upperPAN}`);
     return new Response(
       JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

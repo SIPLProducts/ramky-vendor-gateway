@@ -11,63 +11,40 @@ interface BankValidationRequest {
   accountHolderName: string;
 }
 
-interface BankValidationResponse {
-  valid: boolean;
-  message: string;
-  data?: {
-    accountHolderName?: string;
-    accountNumber?: string;
-    bankName?: string;
-    branchName?: string;
-    branchCity?: string;
-    ifscCode?: string;
-    accountType?: string;
-    nameMatchScore?: number;
-    pennyDropStatus?: string;
-    pennyDropAmount?: string;
-    transactionId?: string;
-  };
-}
-
 // IFSC code format validation
 function isValidIFSCFormat(ifsc: string): boolean {
   const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
   return ifscRegex.test(ifsc);
 }
 
-// Bank code mapping (first 4 chars of IFSC)
-const bankCodeMap: Record<string, { name: string; fullName: string }> = {
-  'SBIN': { name: 'SBI', fullName: 'State Bank of India' },
-  'HDFC': { name: 'HDFC', fullName: 'HDFC Bank Ltd' },
-  'ICIC': { name: 'ICICI', fullName: 'ICICI Bank Ltd' },
-  'AXIS': { name: 'Axis', fullName: 'Axis Bank Ltd' },
-  'KKBK': { name: 'Kotak', fullName: 'Kotak Mahindra Bank Ltd' },
-  'PUNB': { name: 'PNB', fullName: 'Punjab National Bank' },
-  'BARB': { name: 'BOB', fullName: 'Bank of Baroda' },
-  'CNRB': { name: 'Canara', fullName: 'Canara Bank' },
-  'UBIN': { name: 'Union', fullName: 'Union Bank of India' },
-  'INDB': { name: 'IndusInd', fullName: 'IndusInd Bank Ltd' },
-  'YESB': { name: 'Yes', fullName: 'Yes Bank Ltd' },
-  'IBKL': { name: 'IDBI', fullName: 'IDBI Bank Ltd' },
-  'FDRL': { name: 'Federal', fullName: 'Federal Bank Ltd' },
-  'UTIB': { name: 'Axis', fullName: 'Axis Bank Ltd' },
-  'BKID': { name: 'BOI', fullName: 'Bank of India' },
-  'IOBA': { name: 'IOB', fullName: 'Indian Overseas Bank' },
-  'CBIN': { name: 'Central', fullName: 'Central Bank of India' },
-  'UCBA': { name: 'UCO', fullName: 'UCO Bank' },
-  'KSBL': { name: 'Kotak', fullName: 'Kotak Mahindra Bank Ltd' },
-};
+// Get Cashfree auth token
+async function getCashfreeToken(): Promise<string> {
+  const clientId = Deno.env.get('CASHFREE_CLIENT_ID');
+  const clientSecret = Deno.env.get('CASHFREE_CLIENT_SECRET');
+  
+  if (!clientId || !clientSecret) {
+    throw new Error('Cashfree credentials not configured');
+  }
 
-// Mock IFSC database with branch details
-const mockIFSCDatabase: Record<string, { branch: string; city: string; state: string }> = {
-  'HDFC0001234': { branch: 'Jubilee Hills', city: 'Hyderabad', state: 'Telangana' },
-  'ICIC0001234': { branch: 'Steel City', city: 'Visakhapatnam', state: 'Andhra Pradesh' },
-  'SBIN0001234': { branch: 'Anna Nagar', city: 'Chennai', state: 'Tamil Nadu' },
-  'UTIB0001234': { branch: 'MG Road', city: 'Bangalore', state: 'Karnataka' },
-  'KKBK0001234': { branch: 'Hinjewadi', city: 'Pune', state: 'Maharashtra' },
-  'YESB0001234': { branch: 'Fort', city: 'Mumbai', state: 'Maharashtra' },
-  'PUNB0001234': { branch: 'DLF Phase 1', city: 'Gurgaon', state: 'Haryana' },
-};
+  const response = await fetch('https://api.cashfree.com/verification/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      clientId,
+      clientSecret,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('Cashfree token error:', await response.text());
+    throw new Error('Failed to get Cashfree auth token');
+  }
+
+  const data = await response.json();
+  return data.token;
+}
 
 // Levenshtein distance for name matching
 function levenshteinDistance(str1: string, str2: string): number {
@@ -104,7 +81,6 @@ function calculateNameMatchScore(vendorName: string, bankAccountName: string): n
   if (n1 === n2) return 100;
   if (!n1 || !n2) return 0;
 
-  // Substring match bonus
   if (n1.includes(n2) || n2.includes(n1)) {
     const shorter = Math.min(n1.length, n2.length);
     const longer = Math.max(n1.length, n2.length);
@@ -116,19 +92,6 @@ function calculateNameMatchScore(vendorName: string, bankAccountName: string): n
   const similarity = ((maxLen - distance) / maxLen) * 100;
   
   return Math.round(Math.max(0, similarity));
-}
-
-// Simulate API delay
-function simulateApiDelay(): Promise<void> {
-  const delay = Math.random() * 800 + 500; // 500-1300ms (bank APIs are slower)
-  return new Promise(resolve => setTimeout(resolve, delay));
-}
-
-// Generate mock transaction ID
-function generateTransactionId(): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `TXN${timestamp}${random}`;
 }
 
 serve(async (req) => {
@@ -170,28 +133,32 @@ serve(async (req) => {
       );
     }
 
-    // Get bank info
-    const bankCode = upperIFSC.substring(0, 4);
-    const bankInfo = bankCodeMap[bankCode] || { name: 'Unknown Bank', fullName: 'Unknown Bank' };
-    const branchInfo = mockIFSCDatabase[upperIFSC] || { branch: 'Main Branch', city: 'Unknown', state: 'Unknown' };
-
-    // Simulate API delay (penny drop takes time)
-    await simulateApiDelay();
-
-    // Simulate various scenarios based on account number patterns
-    const lastDigit = parseInt(cleanAccountNumber.slice(-1));
+    // Call Cashfree Bank Account Verification API (Penny Drop)
+    const token = await getCashfreeToken();
     
-    // Scenario 1: Invalid account (ends with 0)
-    if (lastDigit === 0) {
-      console.log(`[Bank Validation] Account not found: ****${cleanAccountNumber.slice(-4)}`);
+    const verifyResponse = await fetch('https://api.cashfree.com/verification/bank-account/sync', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        bank_account: cleanAccountNumber,
+        ifsc: upperIFSC,
+        name: accountHolderName,
+      }),
+    });
+
+    const verifyData = await verifyResponse.json();
+    console.log(`[Bank Validation] API Response:`, JSON.stringify(verifyData));
+
+    if (!verifyResponse.ok) {
+      console.error(`[Bank Validation] API Error:`, verifyData);
       return new Response(
-        JSON.stringify({
-          valid: false,
-          message: 'Bank account not found. Please verify account number and IFSC code.',
+        JSON.stringify({ 
+          valid: false, 
+          message: verifyData.message || 'Bank verification failed',
           data: {
-            bankName: bankInfo.fullName,
-            branchName: branchInfo.branch,
-            ifscCode: upperIFSC,
             pennyDropStatus: 'Failed',
           }
         }),
@@ -199,62 +166,41 @@ serve(async (req) => {
       );
     }
 
-    // Scenario 2: Account found but name mismatch (ends with 1 or 2)
-    if (lastDigit === 1 || lastDigit === 2) {
-      const bankAccountName = 'DIFFERENT NAME PVT LTD';
-      const nameMatchScore = calculateNameMatchScore(accountHolderName || '', bankAccountName);
-      
-      console.log(`[Bank Validation] Name mismatch: ${nameMatchScore}%`);
-      return new Response(
-        JSON.stringify({
-          valid: false,
-          message: `Account verified but name mismatch (${nameMatchScore}% match). Bank records show different name.`,
-          data: {
-            accountHolderName: bankAccountName,
-            accountNumber: `XXXX${cleanAccountNumber.slice(-4)}`,
-            bankName: bankInfo.fullName,
-            branchName: branchInfo.branch,
-            branchCity: branchInfo.city,
-            ifscCode: upperIFSC,
-            accountType: 'Current',
-            nameMatchScore,
-            pennyDropStatus: 'Success',
-            pennyDropAmount: '₹1.00',
-            transactionId: generateTransactionId(),
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
-
-    // Scenario 3: Successful verification
-    const mockBankAccountName = accountHolderName?.toUpperCase() || 'ACCOUNT HOLDER NAME';
-    const nameMatchScore = calculateNameMatchScore(accountHolderName || '', mockBankAccountName);
-    const isValid = nameMatchScore >= 80;
-    const transactionId = generateTransactionId();
-
-    console.log(`[Bank Validation] ${isValid ? 'SUCCESS' : 'FAILED'}: Score ${nameMatchScore}%, TxnID: ${transactionId}`);
-
-    const response: BankValidationResponse = {
+    // Process response
+    const bankData = verifyData.data || verifyData;
+    const accountExists = bankData.account_status === 'VALID' || verifyData.status === 'SUCCESS';
+    const bankAccountName = bankData.name_at_bank || bankData.registered_name || '';
+    
+    // Calculate name match score
+    const nameMatchScore = bankAccountName 
+      ? calculateNameMatchScore(accountHolderName || '', bankAccountName)
+      : 0;
+    
+    const isValid = accountExists && nameMatchScore >= 80;
+    
+    const response = {
       valid: isValid,
       message: isValid 
         ? `Bank account verified via ₹1 penny drop. Name match: ${nameMatchScore}%`
-        : `Name match score (${nameMatchScore}%) is below the required threshold (80%)`,
+        : accountExists 
+          ? `Account verified but name mismatch (${nameMatchScore}% match)`
+          : 'Bank account verification failed',
       data: {
-        accountHolderName: mockBankAccountName,
+        accountHolderName: bankAccountName,
         accountNumber: `XXXX${cleanAccountNumber.slice(-4)}`,
-        bankName: bankInfo.fullName,
-        branchName: branchInfo.branch,
-        branchCity: branchInfo.city,
+        bankName: bankData.bank || 'Unknown Bank',
+        branchName: bankData.branch || 'Unknown Branch',
+        branchCity: bankData.city || '',
         ifscCode: upperIFSC,
-        accountType: cleanAccountNumber.length <= 11 ? 'Savings' : 'Current',
+        accountType: bankData.account_type || 'Unknown',
         nameMatchScore,
-        pennyDropStatus: 'Success',
+        pennyDropStatus: accountExists ? 'Success' : 'Failed',
         pennyDropAmount: '₹1.00',
-        transactionId,
+        transactionId: bankData.utr || bankData.ref_id || `TXN${Date.now()}`,
       },
     };
 
+    console.log(`[Bank Validation] ${isValid ? 'SUCCESS' : 'FAILED'}: Score ${nameMatchScore}%`);
     return new Response(
       JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
