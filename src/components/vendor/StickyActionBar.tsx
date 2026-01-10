@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, X, ChevronRight, ChevronLeft, Send } from 'lucide-react';
+import { Loader2, Save, X, ChevronRight, ChevronLeft, Send, ShieldAlert } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface StickyActionBarProps {
   currentStep: number;
@@ -12,6 +13,8 @@ interface StickyActionBarProps {
   isSaving?: boolean;
   isSubmitting?: boolean;
   canSubmit?: boolean;
+  canProceed?: boolean;
+  validationMessage?: string;
 }
 
 export function StickyActionBar({
@@ -25,6 +28,8 @@ export function StickyActionBar({
   isSaving = false,
   isSubmitting = false,
   canSubmit = true,
+  canProceed = true,
+  validationMessage,
 }: StickyActionBarProps) {
   const isLastStep = currentStep === totalSteps;
   const isFirstStep = currentStep === 1;
@@ -42,6 +47,14 @@ export function StickyActionBar({
           <X className="h-4 w-4 mr-2" />
           Cancel
         </Button>
+
+        {/* Center - Validation Message */}
+        {!canProceed && validationMessage && (
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-warning/10 text-warning-foreground rounded-md border border-warning/30">
+            <ShieldAlert className="h-4 w-4 text-warning" />
+            <span className="text-sm">{validationMessage}</span>
+          </div>
+        )}
 
         {/* Right side - Navigation and Actions */}
         <div className="flex items-center gap-3">
@@ -91,7 +104,11 @@ export function StickyActionBar({
             <Button
               type="submit"
               form="step-form"
-              className="min-w-[100px]"
+              disabled={!canProceed}
+              className={cn(
+                "min-w-[100px]",
+                !canProceed && "opacity-50 cursor-not-allowed"
+              )}
             >
               Continue
               <ChevronRight className="h-4 w-4 ml-1" />

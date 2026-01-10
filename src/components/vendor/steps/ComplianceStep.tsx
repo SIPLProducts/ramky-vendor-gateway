@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +15,9 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { FileUp, Shield, Award, Globe } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileUpload } from '@/components/vendor/FileUpload';
+import { VerifyButton } from '@/components/vendor/VerifyButton';
+import { ValidationMessage } from '@/components/vendor/ValidationMessage';
+import { useFieldValidation } from '@/hooks/useFieldValidation';
 import { 
   StatutoryDetails, 
   ENTITY_TYPES,
@@ -43,26 +46,90 @@ const schema = z.object({
 
 interface ComplianceStepProps {
   data: StatutoryDetails;
+  legalName?: string;
   onNext: (data: StatutoryDetails) => void;
   onBack: () => void;
+  onValidationStateChange?: (isValid: boolean) => void;
 }
 
-export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
+export function ComplianceStep({ data, legalName, onNext, onValidationStateChange }: ComplianceStepProps) {
   const [gstCertificateFile, setGstCertificateFile] = useState<File | null>(data.gstCertificateFile);
   const [panCardFile, setPanCardFile] = useState<File | null>(data.panCardFile);
   const [msmeCertificateFile, setMsmeCertificateFile] = useState<File | null>(data.msmeCertificateFile);
+  
+  const { 
+    validationStates, 
+    validateGST, 
+    validatePAN, 
+    validateMSME,
+    resetValidation 
+  } = useFieldValidation();
 
   const {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<StatutoryDetails>({
     resolver: zodResolver(schema),
     defaultValues: data,
   });
 
+  const gstinValue = watch('gstin');
+  const panValue = watch('pan');
+  const msmeValue = watch('msmeNumber');
+
+  // Reset validation state when field value changes
+  useEffect(() => {
+    if (validationStates.gst.status !== 'idle') {
+      resetValidation('gst');
+    }
+  }, [gstinValue]);
+
+  useEffect(() => {
+    if (validationStates.pan.status !== 'idle') {
+      resetValidation('pan');
+    }
+  }, [panValue]);
+
+  useEffect(() => {
+    if (validationStates.msme.status !== 'idle') {
+      resetValidation('msme');
+    }
+  }, [msmeValue]);
+
+  // Calculate if all required validations pass
+  useEffect(() => {
+    const gstValid = !gstinValue || validationStates.gst.status === 'passed';
+    const panValid = !panValue || validationStates.pan.status === 'passed';
+    const msmeValid = !msmeValue || validationStates.msme.status === 'passed';
+    
+    onValidationStateChange?.(gstValid && panValid && msmeValid);
+  }, [gstinValue, panValue, msmeValue, validationStates, onValidationStateChange]);
+
+  const handleVerifyGST = async () => {
+    await validateGST(gstinValue || '', legalName);
+  };
+
+  const handleVerifyPAN = async () => {
+    await validatePAN(panValue || '', legalName);
+  };
+
+  const handleVerifyMSME = async () => {
+    await validateMSME(msmeValue || '', legalName);
+  };
+
   const handleFormSubmit = (formData: StatutoryDetails) => {
+    // Check validations before submitting
+    const gstNeedsValidation = formData.gstin && validationStates.gst.status !== 'passed';
+    const panNeedsValidation = formData.pan && validationStates.pan.status !== 'passed';
+    const msmeNeedsValidation = formData.msmeNumber && validationStates.msme.status !== 'passed';
+
+    if (gstNeedsValidation || panNeedsValidation || msmeNeedsValidation) {
+      return; // Don't submit, validation required
+    }
+
     onNext({
       ...formData,
       gstCertificateFile,
@@ -71,8 +138,24 @@ export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
     });
   };
 
+  const canProceed = () => {
+    const gstValid = !gstinValue || validationStates.gst.status === 'passed';
+    const panValid = !panValue || validationStates.pan.status === 'passed';
+    const msmeValid = !msmeValue || validationStates.msme.status === 'passed';
+    return gstValid && panValid && msmeValid;
+  };
+
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      {/* Validation Notice */}
+      {!canProceed() && (
+        <Alert className="border-warning bg-warning/10">
+          <AlertDescription className="text-warning-foreground">
+            Please verify all entered compliance details (GST, PAN, MSME) before proceeding to the next step.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Registration Details */}
       <div className="form-section">
         <h3 className="form-section-title">
@@ -116,32 +199,28 @@ export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
             </div>
           </div>
 
+          {/* PAN with Verification */}
           <div className="grid md:grid-cols-3 gap-5">
-            <div className="grid gap-1.5">
+            <div className="grid gap-1.5 md:col-span-2">
               <Label htmlFor="pan">PAN Number</Label>
-              <Input
-                id="pan"
-                {...register('pan')}
-                placeholder="ABCDE1234F"
-                className={`uppercase ${errors.pan ? 'border-destructive' : ''}`}
-                maxLength={10}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="pan"
+                  {...register('pan')}
+                  placeholder="ABCDE1234F"
+                  className={`uppercase flex-1 ${errors.pan ? 'border-destructive' : ''}`}
+                  maxLength={10}
+                />
+                <VerifyButton
+                  onClick={handleVerifyPAN}
+                  state={validationStates.pan}
+                  disabled={!panValue || panValue.length !== 10}
+                />
+              </div>
               {errors.pan && (
                 <p className="text-xs text-destructive">{errors.pan.message}</p>
               )}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gstin">GSTIN</Label>
-              <Input
-                id="gstin"
-                {...register('gstin')}
-                placeholder="22AAAAA0000A1Z5"
-                className={`uppercase ${errors.gstin ? 'border-destructive' : ''}`}
-                maxLength={15}
-              />
-              {errors.gstin && (
-                <p className="text-xs text-destructive">{errors.gstin.message}</p>
-              )}
+              <ValidationMessage state={validationStates.pan} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="iecNo">IEC No. (Import/Export)</Label>
@@ -151,6 +230,29 @@ export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
                 placeholder="IEC Number"
               />
             </div>
+          </div>
+
+          {/* GST with Verification */}
+          <div className="grid gap-1.5">
+            <Label htmlFor="gstin">GSTIN</Label>
+            <div className="flex gap-2">
+              <Input
+                id="gstin"
+                {...register('gstin')}
+                placeholder="22AAAAA0000A1Z5"
+                className={`uppercase flex-1 ${errors.gstin ? 'border-destructive' : ''}`}
+                maxLength={15}
+              />
+              <VerifyButton
+                onClick={handleVerifyGST}
+                state={validationStates.gst}
+                disabled={!gstinValue || gstinValue.length !== 15}
+              />
+            </div>
+            {errors.gstin && (
+              <p className="text-xs text-destructive">{errors.gstin.message}</p>
+            )}
+            <ValidationMessage state={validationStates.gst} />
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
@@ -182,7 +284,7 @@ export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
         </div>
       </div>
 
-      {/* MSME Details */}
+      {/* MSME Details with Verification */}
       <div className="form-section">
         <h3 className="form-section-title">
           <Shield className="h-5 w-5 text-primary" />
@@ -193,11 +295,20 @@ export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="msmeNumber">MSME/Udyam Number</Label>
-              <Input
-                id="msmeNumber"
-                {...register('msmeNumber')}
-                placeholder="UDYAM-XX-00-0000000"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="msmeNumber"
+                  {...register('msmeNumber')}
+                  placeholder="UDYAM-XX-00-0000000"
+                  className="flex-1"
+                />
+                <VerifyButton
+                  onClick={handleVerifyMSME}
+                  state={validationStates.msme}
+                  disabled={!msmeValue}
+                />
+              </div>
+              <ValidationMessage state={validationStates.msme} />
             </div>
             <div className="grid gap-1.5">
               <Label>MSME Category</Label>
