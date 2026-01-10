@@ -5,8 +5,7 @@ import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
-import { StatutoryStep } from '@/components/vendor/steps/StatutoryStep';
-import { BankStep } from '@/components/vendor/steps/BankStep';
+import { DocumentsVerificationStep, DocumentsVerificationData } from '@/components/vendor/steps/DocumentsVerificationStep';
 import { FinancialStep } from '@/components/vendor/steps/FinancialStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
@@ -180,20 +179,27 @@ export default function VendorRegistration() {
     setIsEditMode(true);
     setIsSubmitted(false);
     setCurrentStep(1);
-    setCompletedSteps([1, 2, 3, 4, 5]);
+    setCompletedSteps([1, 2, 3, 4]);
   };
 
   const handleStepComplete = (step: number, data: unknown) => {
-    const stepKeys: Record<number, keyof VendorFormData> = {
+    const stepKeys: Record<number, keyof VendorFormData | 'documents'> = {
       1: 'organization',
       2: 'contact',
-      3: 'statutory',
-      4: 'bank',
-      5: 'financial',
+      3: 'documents', // Combined step
+      4: 'financial',
     };
 
     const key = stepKeys[step];
-    if (key) {
+    if (key === 'documents') {
+      // Handle combined documents step
+      const docData = data as DocumentsVerificationData;
+      setFormData((prev) => ({ 
+        ...prev, 
+        statutory: docData.statutory,
+        bank: docData.bank 
+      }));
+    } else if (key) {
       setFormData((prev) => ({ ...prev, [key]: data }));
     }
 
@@ -226,7 +232,6 @@ export default function VendorRegistration() {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      // Check if it's an authentication error
       if (errorMessage.includes('not authenticated')) {
         toast({
           title: 'Login Required',
@@ -271,7 +276,6 @@ export default function VendorRegistration() {
         description: 'Your vendor registration has been submitted successfully.',
       });
       
-      // Show feedback popup after submission
       setShowFeedback(true);
       
       await runValidations(vendor.id);
@@ -308,29 +312,26 @@ export default function VendorRegistration() {
         );
       case 3:
         return (
-          <StatutoryStep
-            data={formData.statutory}
+          <DocumentsVerificationStep
+            data={{
+              statutory: formData.statutory,
+              bank: formData.bank,
+            }}
             onNext={(data) => handleStepComplete(3, data)}
+            vendorId={vendorId || undefined}
+            legalName={formData.organization.legalName}
             {...commonProps}
           />
         );
       case 4:
         return (
-          <BankStep
-            data={formData.bank}
+          <FinancialStep
+            data={formData.financial}
             onNext={(data) => handleStepComplete(4, data)}
             {...commonProps}
           />
         );
       case 5:
-        return (
-          <FinancialStep
-            data={formData.financial}
-            onNext={(data) => handleStepComplete(5, data)}
-            {...commonProps}
-          />
-        );
-      case 6:
         return (
           <ReviewStep
             data={formData}
@@ -361,7 +362,6 @@ export default function VendorRegistration() {
   if (isSubmitted && !isEditMode) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Header for success screen */}
         <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
           <Link to="/" className="flex items-center gap-3">
             <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
@@ -376,7 +376,6 @@ export default function VendorRegistration() {
           onEdit={handleStartEdit}
         />
         
-        {/* Feedback Popup */}
         <FeedbackPopup
           open={showFeedback}
           onOpenChange={setShowFeedback}
@@ -395,7 +394,6 @@ export default function VendorRegistration() {
           <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
         </Link>
         
-        {/* Help & Support */}
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
@@ -411,7 +409,6 @@ export default function VendorRegistration() {
               </SheetDescription>
             </SheetHeader>
             <div className="mt-6 space-y-6">
-              {/* Contact Options */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-foreground">Contact Us</h4>
                 <div className="space-y-3">
@@ -436,7 +433,6 @@ export default function VendorRegistration() {
                 </div>
               </div>
 
-              {/* FAQs */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-foreground">Frequently Asked Questions</h4>
                 <div className="space-y-3">
@@ -455,7 +451,6 @@ export default function VendorRegistration() {
                 </div>
               </div>
 
-              {/* Quick Links */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-foreground">Quick Links</h4>
                 <div className="space-y-2">
@@ -492,7 +487,6 @@ export default function VendorRegistration() {
             />
           </div>
 
-          {/* Help & Support Link */}
           <div className="p-4 border-t">
             <Link 
               to="/support" 
@@ -508,7 +502,6 @@ export default function VendorRegistration() {
             </Link>
           </div>
 
-          {/* Link Expiry Notice */}
           <div className="p-4 border-t bg-muted/50">
             <div className="flex items-start gap-3">
               <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -569,7 +562,7 @@ export default function VendorRegistration() {
           </div>
 
           {/* Action Bar */}
-          {currentStep < 6 && (
+          {currentStep < 5 && (
             <div className="border-t bg-card px-6 py-4 sticky bottom-0 shadow-lg">
               <div className="max-w-3xl mx-auto flex items-center justify-between">
                 {/* Left - Cancel */}
