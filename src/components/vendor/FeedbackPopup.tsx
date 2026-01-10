@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Star, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,7 +19,7 @@ interface FeedbackPopupProps {
   vendorId?: string;
 }
 
-export const FeedbackPopup = React.forwardRef<HTMLDivElement, FeedbackPopupProps>(({ open, onOpenChange, vendorId }, ref) => {
+export function FeedbackPopup({ open, onOpenChange, vendorId }: FeedbackPopupProps) {
   const [overallRating, setOverallRating] = useState(0);
   const [easeOfUseRating, setEaseOfUseRating] = useState(0);
   const [supportRating, setSupportRating] = useState(0);
@@ -201,6 +201,4 @@ export const FeedbackPopup = React.forwardRef<HTMLDivElement, FeedbackPopupProps
       </DialogContent>
     </Dialog>
   );
-});
-
-FeedbackPopup.displayName = 'FeedbackPopup';
+}

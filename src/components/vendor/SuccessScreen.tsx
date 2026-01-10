@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -12,13 +11,13 @@ interface SuccessScreenProps {
   onEdit?: () => void;
 }
 
-export const SuccessScreen = React.forwardRef<HTMLDivElement, SuccessScreenProps>(({
+export function SuccessScreen({
   status,
   vendorId,
   financeComments,
   purchaseComments,
   onEdit,
-}, ref) => {
+}: SuccessScreenProps) {
   const canResubmit = status === 'validation_failed' || status === 'finance_rejected' || status === 'purchase_rejected';
   
   const getStatusConfig = () => {
@@ -134,7 +133,7 @@ export const SuccessScreen = React.forwardRef<HTMLDivElement, SuccessScreenProps
   ];
 
   return (
-    <div ref={ref} className="max-w-2xl mx-auto py-8 px-4">
+    <div className="max-w-2xl mx-auto py-8 px-4">
       {/* Status Header */}
       <div className="text-center mb-8">
         <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${config.bgClass} mb-4`}>
@@ -213,6 +212,4 @@ export const SuccessScreen = React.forwardRef<HTMLDivElement, SuccessScreenProps
       </div>
     </div>
   );
-});
-
-SuccessScreen.displayName = 'SuccessScreen';
+}
