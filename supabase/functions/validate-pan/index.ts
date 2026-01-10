@@ -35,36 +35,6 @@ function getPANTypeInfo(pan: string): { code: string; description: string } {
   return typeMap[typeChar] || { code: 'Unknown', description: 'Unknown Entity Type' };
 }
 
-// Get Cashfree auth token
-async function getCashfreeToken(): Promise<string> {
-  const clientId = Deno.env.get('CASHFREE_CLIENT_ID');
-  const clientSecret = Deno.env.get('CASHFREE_CLIENT_SECRET');
-  
-  if (!clientId || !clientSecret) {
-    throw new Error('Cashfree credentials not configured');
-  }
-
-  // Use sandbox URL for test credentials, production for live credentials
-  const baseUrl = 'https://sandbox.cashfree.com';
-  
-  const response = await fetch(`${baseUrl}/verification/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-client-id': clientId,
-      'x-client-secret': clientSecret,
-    },
-  });
-
-  if (!response.ok) {
-    console.error('Cashfree token error:', await response.text());
-    throw new Error('Failed to get Cashfree auth token');
-  }
-
-  const data = await response.json();
-  return data.token;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -96,19 +66,34 @@ serve(async (req) => {
 
     const panTypeInfo = getPANTypeInfo(upperPAN);
 
-    // Call Cashfree PAN Verification API
-    const token = await getCashfreeToken();
-    const baseUrl = 'https://sandbox.cashfree.com';
+    // Get Cashfree credentials
+    const clientId = Deno.env.get('CASHFREE_CLIENT_ID');
+    const clientSecret = Deno.env.get('CASHFREE_CLIENT_SECRET');
     
-    const verifyResponse = await fetch(`${baseUrl}/verification/pan`, {
+    if (!clientId || !clientSecret) {
+      console.error('[PAN Validation] Cashfree credentials not configured');
+      return new Response(
+        JSON.stringify({ valid: false, message: 'PAN validation service not configured' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    // Use sandbox for test credentials
+    const baseUrl = 'https://sandbox.cashfree.com/verification';
+    
+    console.log(`[PAN Validation] Calling Cashfree API at ${baseUrl}/pan`);
+    
+    // Call Cashfree PAN Verification API directly with credentials in headers
+    const verifyResponse = await fetch(`${baseUrl}/pan`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'x-client-id': clientId,
+        'x-client-secret': clientSecret,
       },
       body: JSON.stringify({
         pan: upperPAN,
-        name: name,
+        name: name || '',
       }),
     });
 
@@ -126,23 +111,23 @@ serve(async (req) => {
       );
     }
 
-    // Check if PAN is valid
+    // Check if PAN is valid based on Cashfree response
     const isValid = verifyData.status === 'VALID' || verifyData.valid === true;
     const panData = verifyData.data || verifyData;
     
     const response = {
       valid: isValid,
       message: isValid 
-        ? `PAN verified successfully - ${panData.name || panData.registeredName || 'Verified'}` 
+        ? `PAN verified successfully - ${panData.name || panData.registered_name || panData.registeredName || 'Verified'}` 
         : `PAN verification failed - ${verifyData.message || 'Invalid PAN'}`,
       data: {
-        name: panData.name || panData.registeredName,
+        name: panData.name || panData.registered_name || panData.registeredName,
         panType: panTypeInfo.code,
         panTypeDescription: panTypeInfo.description,
         status: isValid ? 'Active' : 'Invalid',
         lastUpdated: new Date().toISOString().split('T')[0],
-        aadhaarLinked: panData.aadhaarSeeding === 'Y' || panData.aadhaarLinked,
-        nameMatchScore: panData.nameMatchScore || panData.name_match_score,
+        aadhaarLinked: panData.aadhaar_seeding === 'Y' || panData.aadhaarSeeding === 'Y' || panData.aadhaarLinked,
+        nameMatchScore: panData.name_match_score || panData.nameMatchScore,
       },
     };
 
