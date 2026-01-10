@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { EnterpriseStepIndicator } from '@/components/vendor/EnterpriseStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
-import { StickyActionBar } from '@/components/vendor/StickyActionBar';
 import { EnterpriseOrganizationStep, EnterpriseOrganizationData } from '@/components/vendor/steps/EnterpriseOrganizationStep';
 import { AddressStep } from '@/components/vendor/steps/AddressStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
@@ -13,11 +12,13 @@ import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracke
 import { VendorFormData } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { HelpCircle, Phone, Mail, MessageSquare } from 'lucide-react';
+import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 // New consolidated 5-step flow
 const registrationSteps = [
@@ -27,23 +28,6 @@ const registrationSteps = [
   { id: 4, title: 'Financial Information', description: 'Turnover and credit terms' },
   { id: 5, title: 'Review & Submit', description: 'Verify and submit application' },
 ];
-
-// Extended form data to include verification fields in organization step
-interface ExtendedOrganizationData {
-  legalName: string;
-  tradeName: string;
-  industryType: string;
-  organizationType: string;
-  ownershipType: string;
-  productCategories: string[];
-  gstin: string;
-  pan: string;
-  msmeNumber: string;
-  bankAccountNumber: string;
-  confirmAccountNumber: string;
-  ifscCode: string;
-  accountHolderName: string;
-}
 
 const initialFormData: VendorFormData = {
   organization: { legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
@@ -57,8 +41,7 @@ const initialFormData: VendorFormData = {
   declaration: { selfDeclared: false, termsAccepted: false },
 };
 
-// Extended organization data for step 1
-const initialExtendedOrgData: ExtendedOrganizationData = {
+const initialExtendedOrgData: EnterpriseOrganizationData = {
   legalName: '',
   tradeName: '',
   industryType: '',
@@ -78,7 +61,7 @@ export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
-  const [extendedOrgData, setExtendedOrgData] = useState<ExtendedOrganizationData>(initialExtendedOrgData);
+  const [extendedOrgData, setExtendedOrgData] = useState<EnterpriseOrganizationData>(initialExtendedOrgData);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -90,14 +73,11 @@ export default function VendorRegistration() {
   
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration();
 
-  // Handle validation state changes from step components
   const handleValidationStateChange = (step: number) => (isValid: boolean) => {
     setStepValidationState(prev => ({ ...prev, [step]: isValid }));
   };
 
-  // Check if current step can proceed (validation passed)
   const canProceedFromCurrentStep = () => {
-    // Step 1 (Organization Profile) requires all verifications
     if (currentStep === 1) {
       return stepValidationState[1] === true;
     }
@@ -111,6 +91,9 @@ export default function VendorRegistration() {
     return undefined;
   };
 
+  const isFirstStep = currentStep === 1;
+  const isLastStep = currentStep === registrationSteps.length;
+
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
@@ -118,7 +101,6 @@ export default function VendorRegistration() {
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
-        // Also load extended org data from existing data
         setExtendedOrgData({
           legalName: existingFormData.organization.legalName || '',
           tradeName: existingFormData.organization.tradeName || '',
@@ -156,7 +138,6 @@ export default function VendorRegistration() {
 
   const handleOrganizationComplete = (data: EnterpriseOrganizationData) => {
     setExtendedOrgData(data);
-    // Update both organization, statutory, and bank in form data
     setFormData((prev) => ({
       ...prev,
       organization: {
@@ -251,8 +232,11 @@ export default function VendorRegistration() {
     );
   }
 
+  const canProceed = canProceedFromCurrentStep();
+  const validationMessage = getValidationMessage();
+
   return (
-    <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col pb-20">
+    <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
       {/* Header */}
       <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         <Link to="/" className="flex items-center gap-3">
@@ -340,23 +324,93 @@ export default function VendorRegistration() {
             <div className="p-6">
               {renderStep()}
             </div>
+
+            {/* Action Bar - Inside Card */}
+            <div className="px-6 py-4 border-t bg-muted/30 rounded-b-[10px]">
+              {/* Validation Warning */}
+              {!canProceed && validationMessage && (
+                <div className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-warning/10 text-warning-foreground rounded-lg border border-warning/30">
+                  <ShieldAlert className="h-4 w-4 text-warning shrink-0" />
+                  <span className="text-sm font-medium">{validationMessage}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                {/* Left side - Cancel */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancel}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+
+                {/* Right side - Navigation and Actions */}
+                <div className="flex items-center gap-3">
+                  {/* Save as Draft */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveAsDraft}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Draft
+                  </Button>
+
+                  {/* Back Button */}
+                  {!isFirstStep && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                  )}
+
+                  {/* Next / Submit Button */}
+                  {isLastStep ? (
+                    <Button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="min-w-[160px]"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Submit Application
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      form="step-form"
+                      disabled={!canProceed}
+                      className={cn(
+                        "min-w-[120px]",
+                        !canProceed && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      Continue
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
-
-      {/* Sticky Action Bar */}
-      <StickyActionBar 
-        currentStep={currentStep} 
-        totalSteps={registrationSteps.length} 
-        onCancel={handleCancel} 
-        onSaveDraft={handleSaveAsDraft} 
-        onBack={currentStep > 1 ? handleBack : undefined} 
-        onSubmit={currentStep === registrationSteps.length ? handleSubmit : undefined} 
-        isSaving={isSaving} 
-        isSubmitting={isSubmitting} 
-        canProceed={canProceedFromCurrentStep()} 
-        validationMessage={getValidationMessage()} 
-      />
     </div>
   );
 }
