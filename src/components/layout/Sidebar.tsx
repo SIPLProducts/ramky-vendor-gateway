@@ -78,12 +78,6 @@ const navItems: NavItem[] = [
     roles: ['vendor', 'admin', 'sharvi_admin'],
   },
   {
-    label: 'Document Verification',
-    href: '/finance/verification',
-    icon: FileCheck,
-    roles: ['finance', 'admin', 'sharvi_admin'],
-  },
-  {
     label: 'Finance Review',
     href: '/finance/review',
     icon: CheckCircle,
