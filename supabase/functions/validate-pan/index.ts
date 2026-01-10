@@ -44,7 +44,10 @@ async function getCashfreeToken(): Promise<string> {
     throw new Error('Cashfree credentials not configured');
   }
 
-  const response = await fetch('https://api.cashfree.com/verification/token', {
+  // Use sandbox URL for test credentials, production for live credentials
+  const baseUrl = 'https://sandbox.cashfree.com';
+  
+  const response = await fetch(`${baseUrl}/verification/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -95,8 +98,9 @@ serve(async (req) => {
 
     // Call Cashfree PAN Verification API
     const token = await getCashfreeToken();
+    const baseUrl = 'https://sandbox.cashfree.com';
     
-    const verifyResponse = await fetch('https://api.cashfree.com/verification/pan', {
+    const verifyResponse = await fetch(`${baseUrl}/verification/pan`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
