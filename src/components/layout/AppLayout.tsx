@@ -53,9 +53,13 @@ export function AppLayout() {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  // Show mobile layout for mobile devices and vendor role
-  const showMobileLayout = isMobile && role !== 'vendor';
-  const showDesktopSidebar = !isMobile && role !== 'vendor';
+  // Admin roles that should see the sidebar
+  const adminRoles = ['sharvi_admin', 'admin'];
+  const isAdminRole = adminRoles.includes(role);
+  
+  // Show mobile layout for mobile devices with admin roles
+  const showMobileLayout = isMobile && isAdminRole;
+  const showDesktopSidebar = !isMobile && isAdminRole;
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row w-full">
