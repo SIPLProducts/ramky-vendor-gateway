@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +34,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   });
 
   // Validate invitation token
-  const { data: invitation, isLoading: isLoadingInvitation } = useQuery({
+  const { data: invitation } = useQuery({
     queryKey: ['vendor-invitation', options?.invitationToken],
     queryFn: async () => {
       if (!options?.invitationToken) return null;
@@ -71,14 +71,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
   });
 
-  // Set vendorId and status from existing vendor
-  useEffect(() => {
-    if (existingVendor) {
-      setVendorId(existingVendor.id);
-      setVendorStatus(existingVendor.status as VendorStatus);
-    }
-  }, [existingVendor]);
-
   // Check if vendor can edit their registration
   const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
 
@@ -90,45 +82,90 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       organization: {
         legalName: existingVendor.legal_name || '',
         tradeName: existingVendor.trade_name || '',
+        industryType: existingVendor.industry_type || '',
+        organizationType: existingVendor.entity_type || '',
+        ownershipType: '',
+        productCategories: existingVendor.product_categories || [],
+      },
+      address: {
         registeredAddress: existingVendor.registered_address || '',
+        registeredAddressLine2: '',
+        registeredAddressLine3: '',
         registeredCity: existingVendor.registered_city || '',
         registeredState: existingVendor.registered_state || '',
         registeredPincode: existingVendor.registered_pincode || '',
-        communicationAddress: existingVendor.communication_address || '',
-        communicationCity: existingVendor.communication_city || '',
-        communicationState: existingVendor.communication_state || '',
-        communicationPincode: existingVendor.communication_pincode || '',
+        registeredPhone: '',
+        registeredFax: '',
+        registeredWebsite: '',
         sameAsRegistered: existingVendor.same_as_registered ?? true,
-        industryType: existingVendor.industry_type || '',
-        productCategories: existingVendor.product_categories || [],
+        manufacturingAddress: '',
+        manufacturingAddressLine2: '',
+        manufacturingAddressLine3: '',
+        manufacturingCity: '',
+        manufacturingState: '',
+        manufacturingPincode: '',
+        manufacturingPhone: '',
+        manufacturingFax: '',
+        branchName: '',
+        branchAddress: '',
+        branchCity: '',
+        branchState: '',
+        branchPincode: '',
+        branchCountry: 'India',
+        branchWebsite: '',
+        branchContactName: '',
+        branchContactDesignation: '',
+        branchContactEmail: '',
+        branchContactPhone: '',
+        branchContactFax: '',
       },
       contact: {
-        primaryContactName: existingVendor.primary_contact_name || '',
-        primaryDesignation: existingVendor.primary_designation || '',
-        primaryEmail: existingVendor.primary_email || '',
-        primaryPhone: existingVendor.primary_phone || '',
-        secondaryContactName: existingVendor.secondary_contact_name || '',
-        secondaryDesignation: existingVendor.secondary_designation || '',
-        secondaryEmail: existingVendor.secondary_email || '',
-        secondaryPhone: existingVendor.secondary_phone || '',
+        ceoName: existingVendor.primary_contact_name || '',
+        ceoDesignation: existingVendor.primary_designation || '',
+        ceoPhone: existingVendor.primary_phone || '',
+        ceoEmail: existingVendor.primary_email || '',
+        marketingName: existingVendor.secondary_contact_name || '',
+        marketingDesignation: existingVendor.secondary_designation || '',
+        marketingPhone: existingVendor.secondary_phone || '',
+        marketingEmail: existingVendor.secondary_email || '',
+        productionName: '',
+        productionDesignation: '',
+        productionPhone: '',
+        productionEmail: '',
+        customerServiceName: '',
+        customerServiceDesignation: '',
+        customerServicePhone: '',
+        customerServiceEmail: '',
       },
       statutory: {
-        gstin: existingVendor.gstin || '',
+        firmRegistrationNo: '',
         pan: existingVendor.pan || '',
+        pfNumber: '',
+        esiNumber: '',
         msmeNumber: existingVendor.msme_number || '',
         msmeCategory: (existingVendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
+        labourPermitNo: '',
+        gstin: existingVendor.gstin || '',
+        iecNo: '',
         entityType: existingVendor.entity_type || '',
+        memberships: [],
+        enlistments: [],
+        certifications: [],
+        operationalNetwork: '',
         gstCertificateFile: null,
         panCardFile: null,
         msmeCertificateFile: null,
       },
       bank: {
         bankName: existingVendor.bank_name || '',
+        branchName: existingVendor.branch_name || '',
         accountNumber: existingVendor.account_number || '',
         confirmAccountNumber: existingVendor.account_number || '',
+        accountType: (existingVendor.account_type as 'current' | 'savings' | 'cash_credit' | 'others') || 'current',
+        accountTypeOther: '',
         ifscCode: existingVendor.ifsc_code || '',
-        branchName: existingVendor.branch_name || '',
-        accountType: (existingVendor.account_type as 'current' | 'savings') || 'current',
+        micrCode: '',
+        bankAddress: '',
         cancelledChequeFile: null,
       },
       financial: {
@@ -136,7 +173,40 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         turnoverYear2: existingVendor.turnover_year2?.toString() || '',
         turnoverYear3: existingVendor.turnover_year3?.toString() || '',
         creditPeriodExpected: existingVendor.credit_period_expected?.toString() || '',
+        majorCustomer1: '',
+        majorCustomer2: '',
+        majorCustomer3: '',
+        authorizedDistributorName: '',
+        authorizedDistributorAddress: '',
+        dealershipCertificateFile: null,
         financialDocsFile: null,
+      },
+      infrastructure: {
+        rawMaterialsUsed: '',
+        machineryAvailability: '',
+        equipmentAvailability: '',
+        powerSupply: '',
+        waterSupply: '',
+        dgCapacity: '',
+        productionCapacity: '',
+        storeCapacity: '',
+        supplyCapacity: '',
+        manpower: '',
+        inspectionTesting: '',
+        nearestRailway: '',
+        nearestBusStation: '',
+        nearestAirport: '',
+        nearestPort: '',
+        productTypes: [],
+        productTypesOther: '',
+        productionFacilities: [],
+        leadTimeRequired: '',
+      },
+      qhse: {
+        qualityIssues: '',
+        healthIssues: '',
+        environmentalIssues: '',
+        safetyIssues: '',
       },
       declaration: {
         selfDeclared: existingVendor.self_declared ?? false,
@@ -155,33 +225,33 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         user_id: user.id,
         legal_name: formData.organization.legalName,
         trade_name: formData.organization.tradeName || null,
-        registered_address: formData.organization.registeredAddress,
-        registered_city: formData.organization.registeredCity,
-        registered_state: formData.organization.registeredState,
-        registered_pincode: formData.organization.registeredPincode,
-        communication_address: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredAddress 
-          : formData.organization.communicationAddress,
-        communication_city: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredCity 
-          : formData.organization.communicationCity,
-        communication_state: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredState 
-          : formData.organization.communicationState,
-        communication_pincode: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredPincode 
-          : formData.organization.communicationPincode,
-        same_as_registered: formData.organization.sameAsRegistered,
+        registered_address: formData.address.registeredAddress,
+        registered_city: formData.address.registeredCity,
+        registered_state: formData.address.registeredState,
+        registered_pincode: formData.address.registeredPincode,
+        communication_address: formData.address.sameAsRegistered 
+          ? formData.address.registeredAddress 
+          : formData.address.manufacturingAddress,
+        communication_city: formData.address.sameAsRegistered 
+          ? formData.address.registeredCity 
+          : formData.address.manufacturingCity,
+        communication_state: formData.address.sameAsRegistered 
+          ? formData.address.registeredState 
+          : formData.address.manufacturingState,
+        communication_pincode: formData.address.sameAsRegistered 
+          ? formData.address.registeredPincode 
+          : formData.address.manufacturingPincode,
+        same_as_registered: formData.address.sameAsRegistered,
         industry_type: formData.organization.industryType,
         product_categories: formData.organization.productCategories,
-        primary_contact_name: formData.contact.primaryContactName,
-        primary_designation: formData.contact.primaryDesignation,
-        primary_email: formData.contact.primaryEmail,
-        primary_phone: formData.contact.primaryPhone,
-        secondary_contact_name: formData.contact.secondaryContactName || null,
-        secondary_designation: formData.contact.secondaryDesignation || null,
-        secondary_email: formData.contact.secondaryEmail || null,
-        secondary_phone: formData.contact.secondaryPhone || null,
+        primary_contact_name: formData.contact.ceoName,
+        primary_designation: formData.contact.ceoDesignation,
+        primary_email: formData.contact.ceoEmail,
+        primary_phone: formData.contact.ceoPhone,
+        secondary_contact_name: formData.contact.marketingName || null,
+        secondary_designation: formData.contact.marketingDesignation || null,
+        secondary_email: formData.contact.marketingEmail || null,
+        secondary_phone: formData.contact.marketingPhone || null,
         gstin: formData.statutory.gstin,
         pan: formData.statutory.pan,
         entity_type: formData.statutory.entityType,
@@ -210,7 +280,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       };
 
       if (vendorId) {
-        // Update existing vendor
         const { data, error } = await supabase
           .from('vendors')
           .update(vendorData)
@@ -221,7 +290,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         if (error) throw error;
         return data;
       } else {
-        // Create new vendor
         const { data, error } = await supabase
           .from('vendors')
           .insert(vendorData)
@@ -245,10 +313,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Submit vendor for validation
   const submitVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
-      // First save the vendor data
       const vendor = await saveVendorMutation.mutateAsync(formData);
       
-      // Update status to validation_pending
       const { error: updateError } = await supabase
         .from('vendors')
         .update({ 
@@ -259,7 +325,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       
       if (updateError) throw updateError;
 
-      // Log the submission
       await supabase.from('audit_logs').insert({
         vendor_id: vendor.id,
         action: 'vendor_submitted',
@@ -284,7 +349,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
   });
 
-  // Resubmit vendor after editing (for validation_failed or finance_rejected)
+  // Resubmit vendor after editing
   const resubmitVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
       if (!vendorId) throw new Error('No vendor to resubmit');
@@ -293,37 +358,36 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Update vendor data
       const vendorData = {
         legal_name: formData.organization.legalName,
         trade_name: formData.organization.tradeName || null,
-        registered_address: formData.organization.registeredAddress,
-        registered_city: formData.organization.registeredCity,
-        registered_state: formData.organization.registeredState,
-        registered_pincode: formData.organization.registeredPincode,
-        communication_address: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredAddress 
-          : formData.organization.communicationAddress,
-        communication_city: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredCity 
-          : formData.organization.communicationCity,
-        communication_state: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredState 
-          : formData.organization.communicationState,
-        communication_pincode: formData.organization.sameAsRegistered 
-          ? formData.organization.registeredPincode 
-          : formData.organization.communicationPincode,
-        same_as_registered: formData.organization.sameAsRegistered,
+        registered_address: formData.address.registeredAddress,
+        registered_city: formData.address.registeredCity,
+        registered_state: formData.address.registeredState,
+        registered_pincode: formData.address.registeredPincode,
+        communication_address: formData.address.sameAsRegistered 
+          ? formData.address.registeredAddress 
+          : formData.address.manufacturingAddress,
+        communication_city: formData.address.sameAsRegistered 
+          ? formData.address.registeredCity 
+          : formData.address.manufacturingCity,
+        communication_state: formData.address.sameAsRegistered 
+          ? formData.address.registeredState 
+          : formData.address.manufacturingState,
+        communication_pincode: formData.address.sameAsRegistered 
+          ? formData.address.registeredPincode 
+          : formData.address.manufacturingPincode,
+        same_as_registered: formData.address.sameAsRegistered,
         industry_type: formData.organization.industryType,
         product_categories: formData.organization.productCategories,
-        primary_contact_name: formData.contact.primaryContactName,
-        primary_designation: formData.contact.primaryDesignation,
-        primary_email: formData.contact.primaryEmail,
-        primary_phone: formData.contact.primaryPhone,
-        secondary_contact_name: formData.contact.secondaryContactName || null,
-        secondary_designation: formData.contact.secondaryDesignation || null,
-        secondary_email: formData.contact.secondaryEmail || null,
-        secondary_phone: formData.contact.secondaryPhone || null,
+        primary_contact_name: formData.contact.ceoName,
+        primary_designation: formData.contact.ceoDesignation,
+        primary_email: formData.contact.ceoEmail,
+        primary_phone: formData.contact.ceoPhone,
+        secondary_contact_name: formData.contact.marketingName || null,
+        secondary_designation: formData.contact.marketingDesignation || null,
+        secondary_email: formData.contact.marketingEmail || null,
+        secondary_phone: formData.contact.marketingPhone || null,
         gstin: formData.statutory.gstin,
         pan: formData.statutory.pan,
         entity_type: formData.statutory.entityType,
@@ -361,7 +425,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       
       if (error) throw error;
 
-      // Log the resubmission
       await supabase.from('audit_logs').insert({
         vendor_id: vendorId,
         action: 'vendor_resubmitted',
@@ -414,7 +477,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           };
           validationResults.push(result);
 
-          // Save to database
           await supabase.from('vendor_validations').insert({
             vendor_id: vendorIdToValidate,
             validation_type: 'gst',
@@ -469,7 +531,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         try {
           const response = await supabase.functions.invoke('validate-bank', {
             body: { 
-              accountNumber: vendor.account_number, 
+              accountNumber: vendor.account_number,
               ifscCode: vendor.ifsc_code,
               accountHolderName: vendor.legal_name,
             },
@@ -478,7 +540,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           const result: ValidationResult = {
             type: 'bank',
             status: response.data?.valid ? 'passed' : 'failed',
-            message: response.data?.message || 'Bank verification completed',
+            message: response.data?.message || 'Bank validation completed',
             timestamp: new Date().toISOString(),
           };
           validationResults.push(result);
@@ -500,104 +562,33 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         }
       }
 
-      // Run Name Match validation
-      if (portalConfig?.enable_name_match_validation !== false) {
-        try {
-          const response = await supabase.functions.invoke('validate-name-match', {
-            body: { 
-              vendorName: vendor.legal_name,
-              gstLegalName: vendor.legal_name, // This would come from GST API
-              threshold: portalConfig?.name_match_threshold || 80,
-            },
-          });
-          
-          const result: ValidationResult = {
-            type: 'name_match',
-            status: response.data?.valid ? 'passed' : 'failed',
-            message: response.data?.message || 'Name match validation completed',
-            timestamp: new Date().toISOString(),
-          };
-          validationResults.push(result);
+      // Check validation results
+      const hasFailedMandatory = validationResults.some(
+        r => r.status === 'failed' && ['gst', 'pan', 'bank'].includes(r.type)
+      );
 
-          await supabase.from('vendor_validations').insert({
-            vendor_id: vendorIdToValidate,
-            validation_type: 'name_match',
-            status: result.status,
-            message: result.message,
-            details: response.data,
-          });
-        } catch {
-          validationResults.push({
-            type: 'name_match',
-            status: 'failed',
-            message: 'Name match validation failed',
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
-
-      // Run MSME validation if provided
-      if (vendor.msme_number && portalConfig?.enable_msme_validation !== false) {
-        try {
-          const response = await supabase.functions.invoke('validate-msme', {
-            body: { msmeNumber: vendor.msme_number },
-          });
-          
-          const result: ValidationResult = {
-            type: 'msme',
-            status: response.data?.valid ? 'passed' : 'failed',
-            message: response.data?.message || 'MSME validation completed',
-            timestamp: new Date().toISOString(),
-          };
-          validationResults.push(result);
-
-          await supabase.from('vendor_validations').insert({
-            vendor_id: vendorIdToValidate,
-            validation_type: 'msme',
-            status: result.status,
-            message: result.message,
-            details: response.data,
-          });
-        } catch {
-          validationResults.push({
-            type: 'msme',
-            status: 'failed',
-            message: 'MSME validation service unavailable',
-            timestamp: new Date().toISOString(),
-          });
-        }
-      } else if (!vendor.msme_number) {
-        validationResults.push({
-          type: 'msme',
-          status: 'skipped',
-          message: 'MSME not provided',
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      // Determine overall status
-      const hasFailures = validationResults.some(r => r.status === 'failed');
-      const newStatus = hasFailures ? 'validation_failed' : 'finance_review';
-
+      // Update vendor status based on validation results
+      const newStatus = hasFailedMandatory ? 'validation_failed' : 'finance_review';
+      
       await supabase
         .from('vendors')
         .update({ status: newStatus })
         .eq('id', vendorIdToValidate);
 
+      setVendorStatus(newStatus);
+
       return validationResults;
+    },
+    onError: (error) => {
+      toast({
+        title: 'Validation Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
   return {
-    vendorId,
-    vendorStatus,
-    existingVendor,
-    existingFormData,
-    isLoadingVendor,
-    canEdit,
-    invitation,
-    isLoadingInvitation,
-    portalConfig,
     saveVendor: saveVendorMutation.mutateAsync,
     submitVendor: submitVendorMutation.mutateAsync,
     resubmitVendor: resubmitVendorMutation.mutateAsync,
@@ -606,5 +597,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     isSubmitting: submitVendorMutation.isPending,
     isResubmitting: resubmitVendorMutation.isPending,
     isValidating: runValidationsMutation.isPending,
+    vendorId,
+    vendorStatus,
+    existingFormData,
+    isLoadingVendor,
+    existingVendor,
+    invitation,
+    portalConfig,
+    canEdit,
   };
 }

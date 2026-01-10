@@ -319,22 +319,25 @@ export function ComplianceStep({ data, onNext }: ComplianceStepProps) {
           <FileUpload
             label="GST Certificate"
             accept=".pdf,.jpg,.jpeg,.png"
-            file={gstCertificateFile}
-            onFileChange={setGstCertificateFile}
+            documentType="gst_certificate"
+            onFileSelect={setGstCertificateFile}
+            currentFile={gstCertificateFile}
           />
 
           <FileUpload
             label="PAN Card"
             accept=".pdf,.jpg,.jpeg,.png"
-            file={panCardFile}
-            onFileChange={setPanCardFile}
+            documentType="pan_card"
+            onFileSelect={setPanCardFile}
+            currentFile={panCardFile}
           />
 
           <FileUpload
             label="MSME Certificate"
             accept=".pdf,.jpg,.jpeg,.png"
-            file={msmeCertificateFile}
-            onFileChange={setMsmeCertificateFile}
+            documentType="msme_certificate"
+            onFileSelect={setMsmeCertificateFile}
+            currentFile={msmeCertificateFile}
           />
         </div>
       </div>
