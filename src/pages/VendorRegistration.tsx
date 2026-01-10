@@ -1,100 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { EnterpriseStepIndicator, registrationSteps } from '@/components/vendor/EnterpriseStepIndicator';
+import { EnterpriseStepIndicator } from '@/components/vendor/EnterpriseStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
+import { StickyActionBar } from '@/components/vendor/StickyActionBar';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
+import { AddressStep } from '@/components/vendor/steps/AddressStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
-import { DocumentsVerificationStep, DocumentsVerificationData } from '@/components/vendor/steps/DocumentsVerificationStep';
+import { ComplianceStep } from '@/components/vendor/steps/ComplianceStep';
+import { BankStep } from '@/components/vendor/steps/BankStep';
 import { FinancialStep } from '@/components/vendor/steps/FinancialStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
 import { VendorFormData } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { 
-  Clock, 
-  Info, 
-  HelpCircle, 
-  Phone, 
-  Mail, 
-  ChevronLeft, 
-  ChevronRight, 
-  Save, 
-  Send, 
-  X,
-  Loader2,
-  MessageSquare
-} from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { HelpCircle, Phone, Mail, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+
+const registrationSteps = [
+  { id: 1, title: 'Organization Profile', description: 'Company name and type' },
+  { id: 2, title: 'Address', description: 'Registered and manufacturing address' },
+  { id: 3, title: 'Contacts', description: 'Key contact persons' },
+  { id: 4, title: 'Compliance', description: 'Statutory and legal details' },
+  { id: 5, title: 'Bank Details', description: 'Bank account information' },
+  { id: 6, title: 'Financials', description: 'Turnover and customers' },
+  { id: 7, title: 'Review & Submit', description: 'Verify and submit' },
+];
 
 const initialFormData: VendorFormData = {
-  organization: {
-    legalName: '',
-    tradeName: '',
-    registeredAddress: '',
-    registeredCity: '',
-    registeredState: '',
-    registeredPincode: '',
-    communicationAddress: '',
-    communicationCity: '',
-    communicationState: '',
-    communicationPincode: '',
-    sameAsRegistered: true,
-    industryType: '',
-    productCategories: [],
-  },
-  contact: {
-    primaryContactName: '',
-    primaryDesignation: '',
-    primaryEmail: '',
-    primaryPhone: '',
-    secondaryContactName: '',
-    secondaryDesignation: '',
-    secondaryEmail: '',
-    secondaryPhone: '',
-  },
-  statutory: {
-    gstin: '',
-    pan: '',
-    msmeNumber: '',
-    msmeCategory: '',
-    entityType: '',
-    gstCertificateFile: null,
-    panCardFile: null,
-    msmeCertificateFile: null,
-  },
-  bank: {
-    bankName: '',
-    accountNumber: '',
-    confirmAccountNumber: '',
-    ifscCode: '',
-    branchName: '',
-    accountType: 'current',
-    cancelledChequeFile: null,
-  },
-  financial: {
-    turnoverYear1: '',
-    turnoverYear2: '',
-    turnoverYear3: '',
-    creditPeriodExpected: '',
-    financialDocsFile: null,
-  },
-  declaration: {
-    selfDeclared: false,
-    termsAccepted: false,
-  },
+  organization: { legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
+  address: { registeredAddress: '', registeredAddressLine2: '', registeredAddressLine3: '', registeredCity: '', registeredState: '', registeredPincode: '', registeredPhone: '', registeredFax: '', registeredWebsite: '', sameAsRegistered: true, manufacturingAddress: '', manufacturingAddressLine2: '', manufacturingAddressLine3: '', manufacturingCity: '', manufacturingState: '', manufacturingPincode: '', manufacturingPhone: '', manufacturingFax: '', branchName: '', branchAddress: '', branchCity: '', branchState: '', branchPincode: '', branchCountry: 'India', branchWebsite: '', branchContactName: '', branchContactDesignation: '', branchContactEmail: '', branchContactPhone: '', branchContactFax: '' },
+  contact: { ceoName: '', ceoDesignation: '', ceoPhone: '', ceoEmail: '', marketingName: '', marketingDesignation: '', marketingPhone: '', marketingEmail: '', productionName: '', productionDesignation: '', productionPhone: '', productionEmail: '', customerServiceName: '', customerServiceDesignation: '', customerServicePhone: '', customerServiceEmail: '' },
+  statutory: { firmRegistrationNo: '', pan: '', pfNumber: '', esiNumber: '', msmeNumber: '', msmeCategory: '', labourPermitNo: '', gstin: '', iecNo: '', entityType: '', memberships: [], enlistments: [], certifications: [], operationalNetwork: '', gstCertificateFile: null, panCardFile: null, msmeCertificateFile: null },
+  bank: { bankName: '', branchName: '', accountNumber: '', confirmAccountNumber: '', accountType: 'current', accountTypeOther: '', ifscCode: '', micrCode: '', bankAddress: '', cancelledChequeFile: null },
+  financial: { turnoverYear1: '', turnoverYear2: '', turnoverYear3: '', creditPeriodExpected: '', majorCustomer1: '', majorCustomer2: '', majorCustomer3: '', authorizedDistributorName: '', authorizedDistributorAddress: '', dealershipCertificateFile: null, financialDocsFile: null },
+  infrastructure: { rawMaterialsUsed: '', machineryAvailability: '', equipmentAvailability: '', powerSupply: '', waterSupply: '', dgCapacity: '', productionCapacity: '', storeCapacity: '', supplyCapacity: '', manpower: '', inspectionTesting: '', nearestRailway: '', nearestBusStation: '', nearestAirport: '', nearestPort: '', productTypes: [], productTypesOther: '', productionFacilities: [], leadTimeRequired: '' },
+  qhse: { qualityIssues: '', healthIssues: '', environmentalIssues: '', safetyIssues: '' },
+  declaration: { selfDeclared: false, termsAccepted: false },
 };
 
 export default function VendorRegistration() {
@@ -109,39 +55,17 @@ export default function VendorRegistration() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const { 
-    saveVendor,
-    submitVendor,
-    resubmitVendor,
-    runValidations, 
-    isSaving,
-    isSubmitting,
-    isResubmitting,
-    vendorId,
-    vendorStatus,
-    existingFormData,
-    isLoadingVendor,
-    existingVendor,
-  } = useVendorRegistration();
-
-  const linkExpiry = new Date();
-  linkExpiry.setDate(linkExpiry.getDate() + 14);
+  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration();
 
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
-      
       const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
-      
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
-        
-        if (vendorStatus !== 'draft') {
-          setIsSubmitted(true);
-          setIsEditMode(false);
-        }
+        if (vendorStatus !== 'draft') { setIsSubmitted(true); setIsEditMode(false); }
       } else if (pendingStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
@@ -152,490 +76,103 @@ export default function VendorRegistration() {
 
   useEffect(() => {
     if (!vendorId) return;
-
-    const channel = supabase
-      .channel(`vendor-status-${vendorId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'vendors',
-          filter: `id=eq.${vendorId}`,
-        },
-        (payload) => {
-          const newStatus = payload.new.status as RegistrationStatus;
-          setVendorStatusState(newStatus);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const channel = supabase.channel(`vendor-status-${vendorId}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vendors', filter: `id=eq.${vendorId}` }, (payload) => {
+      setVendorStatusState(payload.new.status as RegistrationStatus);
+    }).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [vendorId]);
 
-  const handleStartEdit = () => {
-    setIsEditMode(true);
-    setIsSubmitted(false);
-    setCurrentStep(1);
-    setCompletedSteps([1, 2, 3, 4]);
-  };
+  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6]); };
 
   const handleStepComplete = (step: number, data: unknown) => {
-    const stepKeys: Record<number, keyof VendorFormData | 'documents'> = {
-      1: 'organization',
-      2: 'contact',
-      3: 'documents', // Combined step
-      4: 'financial',
-    };
-
+    const stepKeys: Record<number, keyof VendorFormData> = { 1: 'organization', 2: 'address', 3: 'contact', 4: 'statutory', 5: 'bank', 6: 'financial' };
     const key = stepKeys[step];
-    if (key === 'documents') {
-      // Handle combined documents step
-      const docData = data as DocumentsVerificationData;
-      setFormData((prev) => ({ 
-        ...prev, 
-        statutory: docData.statutory,
-        bank: docData.bank 
-      }));
-    } else if (key) {
-      setFormData((prev) => ({ ...prev, [key]: data }));
-    }
-
-    if (!completedSteps.includes(step)) {
-      setCompletedSteps((prev) => [...prev, step]);
-    }
+    if (key) setFormData((prev) => ({ ...prev, [key]: data }));
+    if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
     setCurrentStep(step + 1);
   };
 
-  const handleBack = () => {
-    setCurrentStep((prev) => Math.max(1, prev - 1));
-  };
-
-  const handleStepClick = (step: number) => {
-    if (completedSteps.includes(step) || step <= currentStep) {
-      setCurrentStep(step);
-    }
-  };
-
-  const handleEditStep = (step: number) => {
-    setCurrentStep(step);
-  };
+  const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
+  const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
+  const handleEditStep = (step: number) => setCurrentStep(step);
 
   const handleSaveAsDraft = async () => {
     try {
       await saveVendor(formData);
-      toast({
-        title: 'Draft Saved',
-        description: 'Your progress has been saved. You can continue later.',
-      });
+      toast({ title: 'Draft Saved', description: 'Your progress has been saved.' });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      if (errorMessage.includes('not authenticated')) {
-        toast({
-          title: 'Login Required',
-          description: 'Please log in to save your draft.',
-          variant: 'destructive',
-        });
-        navigate('/auth');
-        return;
-      }
-      toast({
-        title: 'Save Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An error occurred', variant: 'destructive' });
     }
   };
 
-  const handleCancel = () => {
-    toast({
-      title: 'Registration Cancelled',
-      description: 'Your progress was not saved.',
-    });
-    navigate('/');
-  };
+  const handleCancel = () => { toast({ title: 'Registration Cancelled' }); navigate('/'); };
 
   const handleSubmit = async () => {
     try {
-      let vendor;
-      
-      if (isEditMode && vendorId) {
-        vendor = await resubmitVendor(formData);
-      } else {
-        vendor = await submitVendor(formData);
-      }
-      
-      setIsSubmitted(true);
-      setIsEditMode(false);
-      setVendorStatusState('validation_pending');
-      
-      toast({
-        title: isEditMode ? 'Application Resubmitted' : 'Application Submitted',
-        description: 'Your vendor registration has been submitted successfully.',
-      });
-      
+      const vendor = isEditMode && vendorId ? await resubmitVendor(formData) : await submitVendor(formData);
+      setIsSubmitted(true); setIsEditMode(false); setVendorStatusState('validation_pending');
+      toast({ title: isEditMode ? 'Application Resubmitted' : 'Application Submitted' });
       setShowFeedback(true);
-      
       await runValidations(vendor.id);
-      
     } catch (error) {
-      toast({
-        title: 'Submission Failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
+      toast({ title: 'Submission Failed', description: error instanceof Error ? error.message : 'An error occurred', variant: 'destructive' });
     }
   };
 
   const renderStep = () => {
-    const commonProps = {
-      onBack: handleBack,
-    };
-
     switch (currentStep) {
-      case 1:
-        return (
-          <OrganizationStep
-            data={formData.organization}
-            onNext={(data) => handleStepComplete(1, data)}
-          />
-        );
-      case 2:
-        return (
-          <ContactStep
-            data={formData.contact}
-            onNext={(data) => handleStepComplete(2, data)}
-            {...commonProps}
-          />
-        );
-      case 3:
-        return (
-          <DocumentsVerificationStep
-            data={{
-              statutory: formData.statutory,
-              bank: formData.bank,
-            }}
-            onNext={(data) => handleStepComplete(3, data)}
-            vendorId={vendorId || undefined}
-            legalName={formData.organization.legalName}
-            {...commonProps}
-          />
-        );
-      case 4:
-        return (
-          <FinancialStep
-            data={formData.financial}
-            onNext={(data) => handleStepComplete(4, data)}
-            {...commonProps}
-          />
-        );
-      case 5:
-        return (
-          <ReviewStep
-            data={formData}
-            onSubmit={handleSubmit}
-            onBack={handleBack}
-            onEditStep={handleEditStep}
-          />
-        );
-      default:
-        return null;
+      case 1: return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(1, data)} />;
+      case 2: return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
+      case 3: return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
+      case 4: return <ComplianceStep data={formData.statutory} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
+      case 5: return <BankStep data={formData.bank} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} />;
+      case 6: return <FinancialStep data={formData.financial} onNext={(data) => handleStepComplete(6, data)} onBack={handleBack} />;
+      case 7: return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+      default: return null;
     }
   };
 
-  const isLastStep = currentStep === registrationSteps.length;
-  const isFirstStep = currentStep === 1;
-
-  if (isLoadingVendor) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm">Loading your application...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoadingVendor) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
 
   if (isSubmitted && !isEditMode) {
     return (
       <div className="min-h-screen bg-background">
         <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-          <Link to="/" className="flex items-center gap-3">
-            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-            <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
-          </Link>
+          <Link to="/" className="flex items-center gap-3"><img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" /><span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span></Link>
         </header>
-        <SuccessScreen
-          status={vendorStatusState}
-          vendorId={vendorId || undefined}
-          financeComments={existingVendor?.finance_comments}
-          purchaseComments={existingVendor?.purchase_comments}
-          onEdit={handleStartEdit}
-        />
-        
-        <FeedbackPopup
-          open={showFeedback}
-          onOpenChange={setShowFeedback}
-          vendorId={vendorId || undefined}
-        />
+        <SuccessScreen status={vendorStatusState} vendorId={vendorId || undefined} financeComments={existingVendor?.finance_comments} purchaseComments={existingVendor?.purchase_comments} onEdit={handleStartEdit} />
+        <FeedbackPopup open={showFeedback} onOpenChange={setShowFeedback} vendorId={vendorId || undefined} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-muted/30 flex flex-col pb-20">
       <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        <Link to="/" className="flex items-center gap-3">
-          <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-          <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
-        </Link>
-        
+        <Link to="/" className="flex items-center gap-3"><img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" /><span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span></Link>
         <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Help & Support</span>
-            </Button>
-          </SheetTrigger>
+          <SheetTrigger asChild><Button variant="ghost" size="sm" className="gap-2"><HelpCircle className="h-4 w-4" /><span className="hidden sm:inline">Help</span></Button></SheetTrigger>
           <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Help & Support</SheetTitle>
-              <SheetDescription>
-                Need assistance with your registration? We're here to help.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="mt-6 space-y-6">
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-foreground">Contact Us</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Mail className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Email Support</p>
-                      <p className="text-sm text-muted-foreground">vendor.support@ramky.com</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Phone className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Phone Support</p>
-                      <p className="text-sm text-muted-foreground">+91 40 2354 6789</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-foreground">Frequently Asked Questions</h4>
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg border">
-                    <p className="text-sm font-medium">How long does registration take?</p>
-                    <p className="text-xs text-muted-foreground mt-1">Typically 2-3 business days after submission.</p>
-                  </div>
-                  <div className="p-3 rounded-lg border">
-                    <p className="text-sm font-medium">What documents do I need?</p>
-                    <p className="text-xs text-muted-foreground mt-1">GST Certificate, PAN Card, Cancelled Cheque, and MSME Certificate (if applicable).</p>
-                  </div>
-                  <div className="p-3 rounded-lg border">
-                    <p className="text-sm font-medium">Can I save and continue later?</p>
-                    <p className="text-xs text-muted-foreground mt-1">Yes, click "Save Draft" to save your progress anytime.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-foreground">Quick Links</h4>
-                <div className="space-y-2">
-                  <Link to="/support" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                    <MessageSquare className="h-4 w-4" />
-                    Visit Help Center
-                  </Link>
-                  <Link to="/feedback" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                    <HelpCircle className="h-4 w-4" />
-                    Share Feedback
-                  </Link>
-                </div>
-              </div>
+            <SheetHeader><SheetTitle>Help & Support</SheetTitle><SheetDescription>Need assistance?</SheetDescription></SheetHeader>
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"><Mail className="h-5 w-5 text-primary" /><div><p className="text-sm font-medium">Email</p><p className="text-sm text-muted-foreground">vendor.support@ramky.com</p></div></div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"><Phone className="h-5 w-5 text-primary" /><div><p className="text-sm font-medium">Phone</p><p className="text-sm text-muted-foreground">+91 40 2354 6789</p></div></div>
+              <Link to="/support" className="flex items-center gap-2 text-sm text-primary hover:underline"><MessageSquare className="h-4 w-4" />Visit Help Center</Link>
             </div>
           </SheetContent>
         </Sheet>
       </header>
 
-      {/* Main Content */}
       <div className="flex flex-1">
-        {/* Left Sidebar - Step Indicator */}
         <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 border-r bg-card">
-          <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-foreground">Registration Steps</h2>
-            <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p>
-          </div>
-          
-          <div className="flex-1 p-6 overflow-auto">
-            <EnterpriseStepIndicator
-              steps={registrationSteps}
-              currentStep={currentStep}
-              completedSteps={completedSteps}
-              onStepClick={handleStepClick}
-            />
-          </div>
-
-          <div className="p-4 border-t">
-            <Link 
-              to="/support" 
-              className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
-            >
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <HelpCircle className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Need Help?</p>
-                <p className="text-xs text-muted-foreground">Visit Help & Support</p>
-              </div>
-            </Link>
-          </div>
-
-          <div className="p-4 border-t bg-muted/50">
-            <div className="flex items-start gap-3">
-              <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-xs font-medium text-foreground">Link Expires</p>
-                <p className="text-xs text-muted-foreground">
-                  {linkExpiry.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
-              </div>
-            </div>
-          </div>
+          <div className="p-6 border-b"><h2 className="text-lg font-semibold">Registration Steps</h2><p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p></div>
+          <div className="flex-1 p-6 overflow-auto"><EnterpriseStepIndicator steps={registrationSteps} currentStep={currentStep} completedSteps={completedSteps} onStepClick={handleStepClick} /></div>
         </aside>
 
-        {/* Main Form Area */}
-        <main className="flex-1 flex flex-col">
-          {/* Mobile Step Indicator */}
-          <div className="lg:hidden p-4 bg-card border-b">
-            <div className="flex items-center justify-between mb-3">
-              <h1 className="text-lg font-semibold text-foreground">Vendor Registration</h1>
-              <span className="text-sm text-muted-foreground">
-                Step {currentStep} of {registrationSteps.length}
-              </span>
-            </div>
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${(currentStep / registrationSteps.length) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Form Content */}
-          <div className="flex-1 p-6 lg:p-8 overflow-auto">
-            {/* Page Header */}
-            <div className="hidden lg:block mb-6">
-              <h1 className="text-xl font-semibold text-foreground">
-                {registrationSteps.find(s => s.id === currentStep)?.title}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {registrationSteps.find(s => s.id === currentStep)?.description}
-              </p>
-            </div>
-
-            {/* Info Alert */}
-            {currentStep === 1 && (
-              <Alert className="mb-6 bg-info/5 border-info/20">
-                <Info className="h-4 w-4 text-info" />
-                <AlertDescription className="text-sm">
-                  Please ensure all information matches your official documents. Fields marked with * are mandatory.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Step Content */}
-            <div className="max-w-3xl">
-              {renderStep()}
-            </div>
-          </div>
-
-          {/* Action Bar */}
-          {currentStep < 5 && (
-            <div className="border-t bg-card px-6 py-4 sticky bottom-0 shadow-lg">
-              <div className="max-w-3xl mx-auto flex items-center justify-between">
-                {/* Left - Cancel */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCancel}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-
-                {/* Right - Actions */}
-                <div className="flex items-center gap-3">
-                  {/* Save Draft */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSaveAsDraft}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save Draft
-                  </Button>
-
-                  {/* Previous */}
-                  {!isFirstStep && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBack}
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
-                    </Button>
-                  )}
-
-                  {/* Next / Submit */}
-                  {isLastStep ? (
-                    <Button
-                      type="button"
-                      onClick={handleSubmit}
-                      disabled={isSubmitting || isResubmitting}
-                      className="min-w-[140px]"
-                    >
-                      {(isSubmitting || isResubmitting) ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      Submit Application
-                    </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      form="step-form"
-                      className="min-w-[100px]"
-                    >
-                      Continue
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
+        <main className="flex-1 overflow-auto"><div className="max-w-3xl mx-auto p-6 lg:p-8">{renderStep()}</div></main>
       </div>
+
+      <StickyActionBar currentStep={currentStep} totalSteps={registrationSteps.length} onCancel={handleCancel} onSaveDraft={handleSaveAsDraft} onBack={currentStep > 1 ? handleBack : undefined} onSubmit={currentStep === registrationSteps.length ? handleSubmit : undefined} isSaving={isSaving} isSubmitting={isSubmitting} />
     </div>
   );
 }
