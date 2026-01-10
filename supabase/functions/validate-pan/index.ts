@@ -48,11 +48,9 @@ async function getCashfreeToken(): Promise<string> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-client-id': clientId,
+      'x-client-secret': clientSecret,
     },
-    body: JSON.stringify({
-      clientId,
-      clientSecret,
-    }),
   });
 
   if (!response.ok) {
