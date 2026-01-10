@@ -89,7 +89,7 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={FileText} title="Statutory Details" step={3} onEditStep={onEditStep} />
+        <SectionHeader icon={FileText} title="Documents & Verification" step={3} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="GSTIN" value={data.statutory.gstin} />
           <DataRow label="PAN" value={data.statutory.pan} />
@@ -100,12 +100,6 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
               <DataRow label="MSME Category" value={data.statutory.msmeCategory?.toUpperCase()} />
             </>
           )}
-        </div>
-      </div>
-
-      <div className="form-section">
-        <SectionHeader icon={Building} title="Bank Details" step={4} onEditStep={onEditStep} />
-        <div className="divide-y">
           <DataRow label="Bank Name" value={data.bank.bankName} />
           <DataRow label="Account Type" value={data.bank.accountType === 'current' ? 'Current Account' : 'Savings Account'} />
           <DataRow label="Account Number" value={data.bank.accountNumber ? `XXXX${data.bank.accountNumber.slice(-4)}` : '-'} />
@@ -115,7 +109,7 @@ export function ReviewStep({ data, onSubmit, onBack, onEditStep }: ReviewStepPro
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={IndianRupee} title="Financial Information" step={5} onEditStep={onEditStep} />
+        <SectionHeader icon={IndianRupee} title="Financial Information" step={4} onEditStep={onEditStep} />
         <div className="divide-y">
           <DataRow label="Current Year Turnover" value={data.financial.turnoverYear1 ? `₹ ${data.financial.turnoverYear1}` : undefined} />
           <DataRow label="Previous Year Turnover" value={data.financial.turnoverYear2 ? `₹ ${data.financial.turnoverYear2}` : undefined} />
