@@ -19,6 +19,7 @@ import { useVendors, useVendorValidations, useFinanceAction, VendorRow } from '@
 import { useRunValidations } from '@/hooks/useVendorValidations';
 import { addSampleDocumentsForVendor } from '@/utils/sampleDocuments';
 import { ValidationResult } from '@/types/vendor';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, 
   Eye, 
@@ -34,10 +35,41 @@ import {
   RefreshCw,
   FolderOpen,
   Plus,
-  Sparkles
+  Sparkles,
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+
+interface PennyDropResult {
+  success: boolean;
+  verified: boolean;
+  message: string;
+  data?: {
+    transactionId: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+    branchName: string;
+    accountHolderName: string;
+    nameMatchScore: number;
+    nameMatchStatus: 'exact' | 'partial' | 'mismatch';
+    accountStatus: string;
+    accountType: string;
+    transferAmount: number;
+    transferStatus: string;
+    transferTimestamp: string;
+    utrNumber: string;
+    responseTime: number;
+  };
+  stages?: {
+    stage: string;
+    status: 'completed' | 'in_progress' | 'pending' | 'failed';
+    message: string;
+    timestamp: string;
+  }[];
+}
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,6 +79,11 @@ export default function FinanceReview() {
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'clarify'>('approve');
   const [comments, setComments] = useState('');
   const [addingSampleDocs, setAddingSampleDocs] = useState(false);
+  
+  // Penny Drop states
+  const [isVerifyingPennyDrop, setIsVerifyingPennyDrop] = useState(false);
+  const [pennyDropStage, setPennyDropStage] = useState(0);
+  const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
 
   const { data: pendingVendors, isLoading } = useVendors(['finance_review', 'validation_failed']);
   const { data: validations, refetch: refetchValidations } = useVendorValidations(selectedVendor?.id);
@@ -64,6 +101,54 @@ export default function FinanceReview() {
     setActionType(action);
     setComments('');
     setShowActionDialog(true);
+  };
+
+  const pennyDropStageLabels = [
+    "IFSC Validation",
+    "Account Lookup",
+    "IMPS Transfer",
+    "Transfer Confirmation",
+    "Name Verification",
+  ];
+
+  const handlePennyDrop = async () => {
+    if (!selectedVendor) return;
+    
+    setIsVerifyingPennyDrop(true);
+    setPennyDropStage(0);
+    setPennyDropResult(null);
+
+    try {
+      // Simulate stage progression for UI
+      const stageInterval = setInterval(() => {
+        setPennyDropStage(prev => Math.min(prev + 1, 5));
+      }, 400);
+
+      const { data, error } = await supabase.functions.invoke('validate-penny-drop', {
+        body: {
+          accountNumber: selectedVendor.account_number,
+          ifscCode: selectedVendor.ifsc_code,
+          accountHolderName: selectedVendor.legal_name,
+          vendorName: selectedVendor.legal_name,
+        },
+      });
+
+      clearInterval(stageInterval);
+
+      if (error) throw error;
+
+      setPennyDropResult(data);
+      setPennyDropStage(data.stages?.length || 5);
+
+      toast(data.verified ? 'Bank account verified successfully' : 'Bank verification completed with warnings', {
+        description: data.message,
+      });
+    } catch (error) {
+      console.error('Penny drop error:', error);
+      toast.error('Failed to perform penny drop verification');
+    } finally {
+      setIsVerifyingPennyDrop(false);
+    }
   };
 
   const handleRerunValidations = async () => {
@@ -265,11 +350,15 @@ export default function FinanceReview() {
 
           {selectedVendor && (
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
+              <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted p-1">
                 <TabsTrigger value="details" className="rounded-lg">Details</TabsTrigger>
                 <TabsTrigger value="documents" className="flex items-center gap-2 rounded-lg">
                   <FolderOpen className="h-4 w-4" />
                   Documents
+                </TabsTrigger>
+                <TabsTrigger value="bank-verify" className="flex items-center gap-2 rounded-lg">
+                  <IndianRupee className="h-4 w-4" />
+                  Penny Drop
                 </TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
               </TabsList>
@@ -440,6 +529,195 @@ export default function FinanceReview() {
                   </Button>
                 </div>
                 <VendorDocuments vendorId={selectedVendor.id} />
+              </TabsContent>
+
+              <TabsContent value="bank-verify" className="space-y-4 mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">Penny Drop Verification</h3>
+                    <p className="text-sm text-muted-foreground">Verify bank account with ₹1 transfer</p>
+                  </div>
+                  <Button
+                    onClick={handlePennyDrop}
+                    disabled={isVerifyingPennyDrop || !selectedVendor?.account_number || !selectedVendor?.ifsc_code}
+                    className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                  >
+                    {isVerifyingPennyDrop ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <IndianRupee className="h-4 w-4 mr-2" />
+                        Run Penny Drop
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Bank Details Summary */}
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center">
+                        <Building2 className="h-4 w-4 text-green-600" />
+                      </div>
+                      Bank Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm grid grid-cols-2 gap-4">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Bank Name</span>
+                      <span className="font-medium">{selectedVendor.bank_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Branch</span>
+                      <span className="font-medium">{selectedVendor.branch_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Account Number</span>
+                      <span className="font-mono">{selectedVendor.account_number || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">IFSC Code</span>
+                      <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.ifsc_code || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Account Type</span>
+                      <span className="capitalize">{selectedVendor.account_type || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Account Holder</span>
+                      <span className="font-medium">{selectedVendor.legal_name || 'N/A'}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Verification Progress */}
+                {(isVerifyingPennyDrop || pennyDropResult) && (
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Verification Progress</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {pennyDropStageLabels.map((stage, index) => {
+                        const resultStage = pennyDropResult?.stages?.[index];
+                        const isCompleted = resultStage?.status === 'completed' || pennyDropStage > index;
+                        const isFailed = resultStage?.status === 'failed';
+                        const isActive = isVerifyingPennyDrop && pennyDropStage === index;
+
+                        return (
+                          <div key={stage} className="flex items-center gap-3">
+                            <div className={`
+                              w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                              ${isFailed ? 'bg-destructive/10 text-destructive' : 
+                                isCompleted ? 'bg-green-100 text-green-700' : 
+                                isActive ? 'bg-primary/10 text-primary' : 
+                                'bg-muted text-muted-foreground'}
+                            `}>
+                              {isFailed ? (
+                                <XCircle className="h-4 w-4" />
+                              ) : isCompleted ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : isActive ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                index + 1
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-medium ${
+                                  isFailed ? 'text-destructive' : 
+                                  isCompleted ? 'text-green-700' : 
+                                  isActive ? 'text-primary' : 
+                                  'text-muted-foreground'
+                                }`}>
+                                  {stage}
+                                </span>
+                                {resultStage && (
+                                  <Badge variant={isFailed ? 'destructive' : 'secondary'} className="text-xs">
+                                    {resultStage.status}
+                                  </Badge>
+                                )}
+                              </div>
+                              {resultStage && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {resultStage.message}
+                                </p>
+                              )}
+                            </div>
+                            {index < pennyDropStageLabels.length - 1 && (
+                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Result Details */}
+                {pennyDropResult?.data && (
+                  <Card className={`border-2 ${pennyDropResult.verified ? 'border-green-200 bg-green-50 dark:bg-green-950/20' : 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20'}`}>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        {pennyDropResult.verified ? (
+                          <CheckCircle2 className="h-6 w-6 text-green-600" />
+                        ) : (
+                          <XCircle className="h-6 w-6 text-yellow-600" />
+                        )}
+                        <span className="font-semibold text-lg">
+                          {pennyDropResult.verified ? 'Account Verified' : 'Verification Warning'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Transaction ID</span>
+                          <p className="font-mono font-medium">{pennyDropResult.data.transactionId}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">UTR Number</span>
+                          <p className="font-mono font-medium">{pennyDropResult.data.utrNumber}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Bank</span>
+                          <p className="font-medium">{pennyDropResult.data.bankName}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Account Holder</span>
+                          <p className="font-medium">{pennyDropResult.data.accountHolderName}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Transfer Amount</span>
+                          <p className="font-medium">₹{pennyDropResult.data.transferAmount.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Name Match Score</span>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{pennyDropResult.data.nameMatchScore}%</p>
+                            <Badge 
+                              variant={pennyDropResult.data.nameMatchStatus === 'exact' ? 'default' : 
+                                       pennyDropResult.data.nameMatchStatus === 'partial' ? 'secondary' : 'destructive'}
+                            >
+                              {pennyDropResult.data.nameMatchStatus}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {!selectedVendor?.account_number && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      ⚠️ Bank account details not available for this vendor
+                    </p>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="validations" className="space-y-4 mt-6">

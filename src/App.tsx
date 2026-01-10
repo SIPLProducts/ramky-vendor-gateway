@@ -17,7 +17,6 @@ import VendorList from "./pages/VendorList";
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
-import DocumentVerification from "./pages/DocumentVerification";
 import SupportHelp from "./pages/SupportHelp";
 import VendorFeedback from "./pages/VendorFeedback";
 import DemoShowcase from "./pages/DemoShowcase";
@@ -52,7 +51,6 @@ const App = () => (
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/finance/review" element={<FinanceReview />} />
-                <Route path="/finance/verification" element={<DocumentVerification />} />
                 <Route path="/purchase/approval" element={<PurchaseApproval />} />
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
