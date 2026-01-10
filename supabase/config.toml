@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.scheduled-gst-compliance]
 verify_jwt = false
+
+[functions.notify-finance-approval]
+verify_jwt = false
