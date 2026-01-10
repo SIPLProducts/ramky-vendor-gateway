@@ -4,11 +4,9 @@ import { EnterpriseStepIndicator } from '@/components/vendor/EnterpriseStepIndic
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
 import { StickyActionBar } from '@/components/vendor/StickyActionBar';
-import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
+import { EnterpriseOrganizationStep, EnterpriseOrganizationData } from '@/components/vendor/steps/EnterpriseOrganizationStep';
 import { AddressStep } from '@/components/vendor/steps/AddressStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
-import { ComplianceStep } from '@/components/vendor/steps/ComplianceStep';
-import { BankStep } from '@/components/vendor/steps/BankStep';
 import { FinancialStep } from '@/components/vendor/steps/FinancialStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
@@ -21,15 +19,31 @@ import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
+// New consolidated 5-step flow
 const registrationSteps = [
-  { id: 1, title: 'Organization Profile', description: 'Company name and type' },
-  { id: 2, title: 'Address', description: 'Registered and manufacturing address' },
-  { id: 3, title: 'Contacts', description: 'Key contact persons' },
-  { id: 4, title: 'Compliance', description: 'Statutory and legal details' },
-  { id: 5, title: 'Bank Details', description: 'Bank account information' },
-  { id: 6, title: 'Financials', description: 'Turnover and customers' },
-  { id: 7, title: 'Review & Submit', description: 'Verify and submit' },
+  { id: 1, title: 'Organization Profile', description: 'Company details and verification' },
+  { id: 2, title: 'Address Information', description: 'Registered and branch addresses' },
+  { id: 3, title: 'Contact Information', description: 'Key contact persons' },
+  { id: 4, title: 'Financial Information', description: 'Turnover and credit terms' },
+  { id: 5, title: 'Review & Submit', description: 'Verify and submit application' },
 ];
+
+// Extended form data to include verification fields in organization step
+interface ExtendedOrganizationData {
+  legalName: string;
+  tradeName: string;
+  industryType: string;
+  organizationType: string;
+  ownershipType: string;
+  productCategories: string[];
+  gstin: string;
+  pan: string;
+  msmeNumber: string;
+  bankAccountNumber: string;
+  confirmAccountNumber: string;
+  ifscCode: string;
+  accountHolderName: string;
+}
 
 const initialFormData: VendorFormData = {
   organization: { legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
@@ -43,10 +57,28 @@ const initialFormData: VendorFormData = {
   declaration: { selfDeclared: false, termsAccepted: false },
 };
 
+// Extended organization data for step 1
+const initialExtendedOrgData: ExtendedOrganizationData = {
+  legalName: '',
+  tradeName: '',
+  industryType: '',
+  organizationType: '',
+  ownershipType: '',
+  productCategories: [],
+  gstin: '',
+  pan: '',
+  msmeNumber: '',
+  bankAccountNumber: '',
+  confirmAccountNumber: '',
+  ifscCode: '',
+  accountHolderName: '',
+};
+
 export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
+  const [extendedOrgData, setExtendedOrgData] = useState<ExtendedOrganizationData>(initialExtendedOrgData);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -65,19 +97,16 @@ export default function VendorRegistration() {
 
   // Check if current step can proceed (validation passed)
   const canProceedFromCurrentStep = () => {
-    // Steps 4 (Compliance) and 5 (Bank) require validation
-    if (currentStep === 4 || currentStep === 5) {
-      return stepValidationState[currentStep] !== false;
+    // Step 1 (Organization Profile) requires all verifications
+    if (currentStep === 1) {
+      return stepValidationState[1] === true;
     }
     return true;
   };
 
   const getValidationMessage = () => {
-    if (currentStep === 4 && stepValidationState[4] === false) {
-      return 'Please verify GST, PAN, and MSME details';
-    }
-    if (currentStep === 5 && stepValidationState[5] === false) {
-      return 'Please verify bank account details';
+    if (currentStep === 1 && stepValidationState[1] !== true) {
+      return 'Please complete all mandatory verifications to proceed';
     }
     return undefined;
   };
@@ -89,6 +118,22 @@ export default function VendorRegistration() {
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
+        // Also load extended org data from existing data
+        setExtendedOrgData({
+          legalName: existingFormData.organization.legalName || '',
+          tradeName: existingFormData.organization.tradeName || '',
+          industryType: existingFormData.organization.industryType || '',
+          organizationType: existingFormData.organization.organizationType || '',
+          ownershipType: existingFormData.organization.ownershipType || '',
+          productCategories: existingFormData.organization.productCategories || [],
+          gstin: existingFormData.statutory.gstin || '',
+          pan: existingFormData.statutory.pan || '',
+          msmeNumber: existingFormData.statutory.msmeNumber || '',
+          bankAccountNumber: existingFormData.bank.accountNumber || '',
+          confirmAccountNumber: existingFormData.bank.confirmAccountNumber || '',
+          ifscCode: existingFormData.bank.ifscCode || '',
+          accountHolderName: '',
+        });
         setVendorStatusState(vendorStatus);
         if (vendorStatus !== 'draft') { setIsSubmitted(true); setIsEditMode(false); }
       } else if (pendingStatuses.includes(vendorStatus)) {
@@ -107,10 +152,40 @@ export default function VendorRegistration() {
     return () => { supabase.removeChannel(channel); };
   }, [vendorId]);
 
-  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6]); };
+  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4]); };
+
+  const handleOrganizationComplete = (data: EnterpriseOrganizationData) => {
+    setExtendedOrgData(data);
+    // Update both organization, statutory, and bank in form data
+    setFormData((prev) => ({
+      ...prev,
+      organization: {
+        legalName: data.legalName,
+        tradeName: data.tradeName,
+        industryType: data.industryType,
+        organizationType: data.organizationType,
+        ownershipType: data.ownershipType,
+        productCategories: data.productCategories,
+      },
+      statutory: {
+        ...prev.statutory,
+        gstin: data.gstin,
+        pan: data.pan,
+        msmeNumber: data.msmeNumber,
+      },
+      bank: {
+        ...prev.bank,
+        accountNumber: data.bankAccountNumber,
+        confirmAccountNumber: data.confirmAccountNumber,
+        ifscCode: data.ifscCode,
+      },
+    }));
+    if (!completedSteps.includes(1)) setCompletedSteps((prev) => [...prev, 1]);
+    setCurrentStep(2);
+  };
 
   const handleStepComplete = (step: number, data: unknown) => {
-    const stepKeys: Record<number, keyof VendorFormData> = { 1: 'organization', 2: 'address', 3: 'contact', 4: 'statutory', 5: 'bank', 6: 'financial' };
+    const stepKeys: Record<number, keyof VendorFormData> = { 2: 'address', 3: 'contact', 4: 'financial' };
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
@@ -145,15 +220,19 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
-    const legalName = formData.organization.legalName;
     switch (currentStep) {
-      case 1: return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(1, data)} />;
+      case 1: 
+        return (
+          <EnterpriseOrganizationStep 
+            data={extendedOrgData} 
+            onNext={handleOrganizationComplete}
+            onValidationStateChange={handleValidationStateChange(1)}
+          />
+        );
       case 2: return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
       case 3: return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
-      case 4: return <ComplianceStep data={formData.statutory} legalName={legalName} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
-      case 5: return <BankStep data={formData.bank} legalName={legalName} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
-      case 6: return <FinancialStep data={formData.financial} onNext={(data) => handleStepComplete(6, data)} onBack={handleBack} />;
-      case 7: return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+      case 4: return <FinancialStep data={formData.financial} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
+      case 5: return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
       default: return null;
     }
   };
@@ -173,32 +252,111 @@ export default function VendorRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col pb-20">
+    <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col pb-20">
+      {/* Header */}
       <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        <Link to="/" className="flex items-center gap-3"><img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" /><span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span></Link>
+        <Link to="/" className="flex items-center gap-3">
+          <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+          <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+        </Link>
         <Sheet>
-          <SheetTrigger asChild><Button variant="ghost" size="sm" className="gap-2"><HelpCircle className="h-4 w-4" /><span className="hidden sm:inline">Help</span></Button></SheetTrigger>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Help</span>
+            </Button>
+          </SheetTrigger>
           <SheetContent>
-            <SheetHeader><SheetTitle>Help & Support</SheetTitle><SheetDescription>Need assistance?</SheetDescription></SheetHeader>
+            <SheetHeader>
+              <SheetTitle>Help & Support</SheetTitle>
+              <SheetDescription>Need assistance with registration?</SheetDescription>
+            </SheetHeader>
             <div className="mt-6 space-y-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"><Mail className="h-5 w-5 text-primary" /><div><p className="text-sm font-medium">Email</p><p className="text-sm text-muted-foreground">vendor.support@ramky.com</p></div></div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"><Phone className="h-5 w-5 text-primary" /><div><p className="text-sm font-medium">Phone</p><p className="text-sm text-muted-foreground">+91 40 2354 6789</p></div></div>
-              <Link to="/support" className="flex items-center gap-2 text-sm text-primary hover:underline"><MessageSquare className="h-4 w-4" />Visit Help Center</Link>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Mail className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Email Support</p>
+                  <p className="text-sm text-muted-foreground">vendor.support@ramky.com</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Phone className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Phone Support</p>
+                  <p className="text-sm text-muted-foreground">+91 40 2354 6789</p>
+                </div>
+              </div>
+              <Link to="/support" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                <MessageSquare className="h-4 w-4" />Visit Help Center
+              </Link>
             </div>
           </SheetContent>
         </Sheet>
       </header>
 
-      <div className="flex flex-1">
-        <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 border-r bg-card">
-          <div className="p-6 border-b"><h2 className="text-lg font-semibold">Registration Steps</h2><p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p></div>
-          <div className="flex-1 p-6 overflow-auto"><EnterpriseStepIndicator steps={registrationSteps} currentStep={currentStep} completedSteps={completedSteps} onStepClick={handleStepClick} /></div>
+      {/* Main Content */}
+      <div className="flex flex-1 max-w-[1280px] mx-auto w-full">
+        {/* Left Panel - Registration Steps */}
+        <aside className="hidden lg:flex flex-col w-[280px] flex-shrink-0 border-r bg-card">
+          <div className="p-6 border-b">
+            <h2 className="text-lg font-semibold text-foreground">Registration Steps</h2>
+            <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p>
+          </div>
+          <div className="flex-1 p-6 overflow-auto">
+            <EnterpriseStepIndicator 
+              steps={registrationSteps} 
+              currentStep={currentStep} 
+              completedSteps={completedSteps} 
+              onStepClick={handleStepClick} 
+            />
+          </div>
         </aside>
 
-        <main className="flex-1 overflow-auto"><div className="max-w-3xl mx-auto p-6 lg:p-8">{renderStep()}</div></main>
+        {/* Right Panel - Form Card */}
+        <main className="flex-1 overflow-auto p-6 lg:p-8">
+          <div className="bg-card rounded-[10px] shadow-enterprise-md border">
+            {/* Form Header */}
+            <div className="px-6 py-4 border-b">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  {currentStep === 1 && <span className="text-lg">🏢</span>}
+                  {currentStep === 2 && <span className="text-lg">📍</span>}
+                  {currentStep === 3 && <span className="text-lg">👤</span>}
+                  {currentStep === 4 && <span className="text-lg">💰</span>}
+                  {currentStep === 5 && <span className="text-lg">✓</span>}
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-foreground">
+                    {registrationSteps[currentStep - 1]?.title}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {registrationSteps[currentStep - 1]?.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Form Content */}
+            <div className="p-6">
+              {renderStep()}
+            </div>
+          </div>
+        </main>
       </div>
 
-      <StickyActionBar currentStep={currentStep} totalSteps={registrationSteps.length} onCancel={handleCancel} onSaveDraft={handleSaveAsDraft} onBack={currentStep > 1 ? handleBack : undefined} onSubmit={currentStep === registrationSteps.length ? handleSubmit : undefined} isSaving={isSaving} isSubmitting={isSubmitting} canProceed={canProceedFromCurrentStep()} validationMessage={getValidationMessage()} />
+      {/* Sticky Action Bar */}
+      <StickyActionBar 
+        currentStep={currentStep} 
+        totalSteps={registrationSteps.length} 
+        onCancel={handleCancel} 
+        onSaveDraft={handleSaveAsDraft} 
+        onBack={currentStep > 1 ? handleBack : undefined} 
+        onSubmit={currentStep === registrationSteps.length ? handleSubmit : undefined} 
+        isSaving={isSaving} 
+        isSubmitting={isSubmitting} 
+        canProceed={canProceedFromCurrentStep()} 
+        validationMessage={getValidationMessage()} 
+      />
     </div>
   );
 }

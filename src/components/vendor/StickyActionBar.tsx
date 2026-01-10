@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Loader2, Save, X, ChevronRight, ChevronLeft, Send, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface StickyActionBarProps {
   currentStep: number;
@@ -34,9 +35,24 @@ export function StickyActionBar({
   const isLastStep = currentStep === totalSteps;
   const isFirstStep = currentStep === 1;
 
+  const ContinueButton = (
+    <Button
+      type="submit"
+      form="step-form"
+      disabled={!canProceed}
+      className={cn(
+        "min-w-[120px]",
+        !canProceed && "opacity-50 cursor-not-allowed"
+      )}
+    >
+      Continue
+      <ChevronRight className="h-4 w-4 ml-1" />
+    </Button>
+  );
+
   return (
     <div className="sticky-footer">
-      <div className="max-w-5xl mx-auto flex items-center justify-between">
+      <div className="max-w-[1280px] mx-auto flex items-center justify-between">
         {/* Left side - Cancel */}
         <Button
           type="button"
@@ -50,9 +66,9 @@ export function StickyActionBar({
 
         {/* Center - Validation Message */}
         {!canProceed && validationMessage && (
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-warning/10 text-warning-foreground rounded-md border border-warning/30">
+          <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-warning/10 text-warning-foreground rounded-lg border border-warning/30">
             <ShieldAlert className="h-4 w-4 text-warning" />
-            <span className="text-sm">{validationMessage}</span>
+            <span className="text-sm font-medium">{validationMessage}</span>
           </div>
         )}
 
@@ -91,7 +107,7 @@ export function StickyActionBar({
               type="button"
               onClick={onSubmit}
               disabled={isSubmitting || !canSubmit}
-              className="min-w-[140px]"
+              className="min-w-[160px]"
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -101,18 +117,20 @@ export function StickyActionBar({
               Submit Application
             </Button>
           ) : (
-            <Button
-              type="submit"
-              form="step-form"
-              disabled={!canProceed}
-              className={cn(
-                "min-w-[100px]",
-                !canProceed && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              Continue
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={!canProceed ? 0 : undefined}>
+                    {ContinueButton}
+                  </span>
+                </TooltipTrigger>
+                {!canProceed && validationMessage && (
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{validationMessage}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>

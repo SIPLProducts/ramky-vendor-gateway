@@ -89,9 +89,9 @@ export function EnterpriseStepIndicator({
 }
 
 export const registrationSteps: Step[] = [
-  { id: 1, title: 'Organization Details', description: 'Company information and address' },
-  { id: 2, title: 'Contact Information', description: 'Primary and secondary contacts' },
-  { id: 3, title: 'Documents & Verification', description: 'Upload documents with real-time validation' },
+  { id: 1, title: 'Organization Profile', description: 'Company details and verification' },
+  { id: 2, title: 'Address Information', description: 'Registered and branch addresses' },
+  { id: 3, title: 'Contact Information', description: 'Key contact persons' },
   { id: 4, title: 'Financial Information', description: 'Turnover and credit terms' },
   { id: 5, title: 'Review & Submit', description: 'Verify and submit application' },
 ];
