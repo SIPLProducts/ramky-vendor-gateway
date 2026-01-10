@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export type FieldValidationType = 'gst' | 'pan' | 'bank' | 'msme';
 
@@ -9,18 +10,14 @@ export interface FieldValidationState {
   data?: Record<string, unknown>;
 }
 
-interface ValidationParams {
-  gstin?: string;
-  pan?: string;
-  legalName?: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  accountHolderName?: string;
-  msmeNumber?: string;
-  enterpriseName?: string;
+interface NotifyFinanceParams {
+  vendorId: string;
+  vendorName: string;
+  vendorEmail?: string;
 }
 
 export function useFieldValidation() {
+  const { toast } = useToast();
   const [validationStates, setValidationStates] = useState<Record<FieldValidationType, FieldValidationState>>({
     gst: { status: 'idle', message: null },
     pan: { status: 'idle', message: null },
@@ -42,7 +39,7 @@ export function useFieldValidation() {
 
     try {
       const { data, error } = await supabase.functions.invoke('validate-gst', {
-        body: { gstin: gstin.toUpperCase().trim(), legalName },
+        body: { gstin: gstin.toUpperCase().trim(), legalName, simulationMode: true },
       });
 
       if (error) throw error;
@@ -80,7 +77,7 @@ export function useFieldValidation() {
 
     try {
       const { data, error } = await supabase.functions.invoke('validate-pan', {
-        body: { pan: pan.toUpperCase().trim(), name },
+        body: { pan: pan.toUpperCase().trim(), name, simulationMode: true },
       });
 
       if (error) throw error;
@@ -126,6 +123,7 @@ export function useFieldValidation() {
           accountNumber, 
           ifscCode: ifscCode.toUpperCase().trim(),
           accountHolderName,
+          simulationMode: true,
         },
       });
 
@@ -192,6 +190,54 @@ export function useFieldValidation() {
     }
   }, [updateValidationState]);
 
+  // Notify Finance team for approval when all validations pass
+  const notifyFinanceForApproval = useCallback(async (params: NotifyFinanceParams): Promise<{ success: boolean; otp?: string }> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('notify-finance-approval', {
+        body: {
+          vendorId: params.vendorId,
+          vendorName: params.vendorName,
+          vendorEmail: params.vendorEmail,
+          validationResults: {
+            gst: { status: validationStates.gst.status, message: validationStates.gst.message || '' },
+            pan: { status: validationStates.pan.status, message: validationStates.pan.message || '' },
+            bank: { status: validationStates.bank.status, message: validationStates.bank.message || '' },
+            msme: { status: validationStates.msme.status, message: validationStates.msme.message || '' },
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: '🔔 Finance Team Notified',
+          description: `OTP sent for approval. Vendor status updated to Finance Review.`,
+        });
+        return { success: true, otp: data.demoOtp };
+      }
+
+      return { success: false };
+    } catch (error) {
+      console.error('Failed to notify finance:', error);
+      toast({
+        title: 'Notification Failed',
+        description: 'Could not notify finance team. Please try again.',
+        variant: 'destructive',
+      });
+      return { success: false };
+    }
+  }, [validationStates, toast]);
+
+  // Check if all required validations have passed
+  const areAllValidationsPassed = useCallback((): boolean => {
+    return (
+      validationStates.gst.status === 'passed' &&
+      validationStates.pan.status === 'passed' &&
+      validationStates.bank.status === 'passed'
+    );
+  }, [validationStates]);
+
   const resetValidation = useCallback((type: FieldValidationType) => {
     updateValidationState(type, { status: 'idle', message: null });
   }, [updateValidationState]);
@@ -213,5 +259,7 @@ export function useFieldValidation() {
     validateMSME,
     resetValidation,
     resetAllValidations,
+    notifyFinanceForApproval,
+    areAllValidationsPassed,
   };
 }
