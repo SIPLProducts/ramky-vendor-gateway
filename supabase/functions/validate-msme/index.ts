@@ -10,36 +10,10 @@ interface MSMEValidationRequest {
   enterpriseName?: string;
 }
 
-interface MSMEValidationResponse {
-  valid: boolean;
-  message: string;
-  data?: {
-    udyamNumber?: string;
-    enterpriseName?: string;
-    enterpriseType?: string;
-    category?: string;
-    classification?: string;
-    registrationDate?: string;
-    validUpto?: string;
-    state?: string;
-    district?: string;
-    address?: string;
-    nicCode?: string;
-    nicDescription?: string;
-    status?: string;
-  };
-}
-
 // Udyam format validation (new format)
 function isValidUdyamFormat(udyamNumber: string): boolean {
   const udyamRegex = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/;
   return udyamRegex.test(udyamNumber);
-}
-
-// Old UAM format (still accepted)
-function isValidUAMFormat(uamNumber: string): boolean {
-  const uamRegex = /^[A-Z]{2}\d{2}[A-Z]\d{7}$/;
-  return uamRegex.test(uamNumber);
 }
 
 // State code to state name mapping
@@ -57,69 +31,33 @@ const stateCodeMap: Record<string, string> = {
   'LA': 'Ladakh',
 };
 
-// Mock MSME database
-const mockMSMEDatabase: Record<string, {
-  enterpriseName: string;
-  category: string;
-  classification: string;
-  registrationDate: string;
-  state: string;
-  district: string;
-  nicCode: string;
-  nicDescription: string;
-  status: string;
-}> = {
-  'UDYAM-TG-01-0012345': {
-    enterpriseName: 'ABC INFRASTRUCTURE PVT LTD',
-    category: 'Small',
-    classification: 'Manufacturing',
-    registrationDate: '2021-07-15',
-    state: 'Telangana',
-    district: 'Hyderabad',
-    nicCode: '41001',
-    nicDescription: 'Construction of buildings',
-    status: 'Active',
-  },
-  'UDYAM-TN-02-0054321': {
-    enterpriseName: 'GREENWAY ENVIRONMENTAL SERVICES PVT LTD',
-    category: 'Medium',
-    classification: 'Services',
-    registrationDate: '2021-02-28',
-    state: 'Tamil Nadu',
-    district: 'Chennai',
-    nicCode: '38110',
-    nicDescription: 'Collection of non-hazardous waste',
-    status: 'Active',
-  },
-  'UDYAM-MH-03-0098765': {
-    enterpriseName: 'TECHSERVE IT SOLUTIONS PVT LTD',
-    category: 'Micro',
-    classification: 'Services',
-    registrationDate: '2022-01-10',
-    state: 'Maharashtra',
-    district: 'Pune',
-    nicCode: '62013',
-    nicDescription: 'IT consulting services',
-    status: 'Active',
-  },
-  // Expired/Cancelled registration
-  'UDYAM-DL-01-0011111': {
-    enterpriseName: 'OLD ENTERPRISE',
-    category: 'Small',
-    classification: 'Trading',
-    registrationDate: '2019-01-01',
-    state: 'Delhi',
-    district: 'New Delhi',
-    nicCode: '46100',
-    nicDescription: 'Wholesale trade',
-    status: 'Cancelled',
-  },
-};
+// Get Cashfree auth token
+async function getCashfreeToken(): Promise<string> {
+  const clientId = Deno.env.get('CASHFREE_CLIENT_ID');
+  const clientSecret = Deno.env.get('CASHFREE_CLIENT_SECRET');
+  
+  if (!clientId || !clientSecret) {
+    throw new Error('Cashfree credentials not configured');
+  }
 
-// Simulate API delay
-function simulateApiDelay(): Promise<void> {
-  const delay = Math.random() * 600 + 300; // 300-900ms
-  return new Promise(resolve => setTimeout(resolve, delay));
+  const response = await fetch('https://api.cashfree.com/verification/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      clientId,
+      clientSecret,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('Cashfree token error:', await response.text());
+    throw new Error('Failed to get Cashfree auth token');
+  }
+
+  const data = await response.json();
+  return data.token;
 }
 
 serve(async (req) => {
@@ -139,102 +77,76 @@ serve(async (req) => {
     }
 
     const cleanNumber = msmeNumber.toUpperCase().trim();
-    const isUdyam = isValidUdyamFormat(cleanNumber);
-    const isUAM = isValidUAMFormat(cleanNumber);
-
-    if (!isUdyam && !isUAM) {
+    
+    if (!isValidUdyamFormat(cleanNumber)) {
       console.log(`[MSME Validation] Invalid format: ${cleanNumber}`);
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          message: 'Invalid MSME/Udyam format. Expected: UDYAM-XX-00-0000000' 
+          message: 'Invalid Udyam format. Expected: UDYAM-XX-00-0000000' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Simulate API delay
-    await simulateApiDelay();
+    // Extract state code
+    const stateCode = cleanNumber.substring(6, 8);
 
-    // Check mock database
-    const mockData = mockMSMEDatabase[cleanNumber];
+    // Call Cashfree MSME/Udyam Verification API
+    const token = await getCashfreeToken();
     
-    if (mockData) {
-      const isActive = mockData.status === 'Active';
-      console.log(`[MSME Validation] Found: ${cleanNumber} - Status: ${mockData.status}`);
-      
+    const verifyResponse = await fetch('https://api.cashfree.com/verification/udyam', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        udyam_number: cleanNumber,
+      }),
+    });
+
+    const verifyData = await verifyResponse.json();
+    console.log(`[MSME Validation] API Response:`, JSON.stringify(verifyData));
+
+    if (!verifyResponse.ok) {
+      console.error(`[MSME Validation] API Error:`, verifyData);
       return new Response(
-        JSON.stringify({
-          valid: isActive,
-          message: isActive 
-            ? `MSME certificate verified - ${mockData.category} Enterprise` 
-            : `MSME registration ${mockData.status.toLowerCase()}`,
-          data: {
-            udyamNumber: cleanNumber,
-            enterpriseName: mockData.enterpriseName,
-            enterpriseType: mockData.classification,
-            category: mockData.category,
-            classification: mockData.classification,
-            registrationDate: mockData.registrationDate,
-            validUpto: '2026-12-31', // 5 years validity
-            state: mockData.state,
-            district: mockData.district,
-            nicCode: mockData.nicCode,
-            nicDescription: mockData.nicDescription,
-            status: mockData.status,
-          },
+        JSON.stringify({ 
+          valid: false, 
+          message: verifyData.message || 'MSME verification failed',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // For unknown numbers, simulate based on state code pattern
-    let stateCode = '';
-    if (isUdyam) {
-      stateCode = cleanNumber.substring(6, 8);
-    }
+    // Process response
+    const msmeData = verifyData.data || verifyData;
+    const isValid = verifyData.status === 'VALID' || verifyData.status === 'SUCCESS';
     
-    // 15% failure rate for unknown numbers
-    const serialNumber = isUdyam ? parseInt(cleanNumber.substring(12)) : 0;
-    const simulateFailure = serialNumber % 7 === 0;
-
-    if (simulateFailure || !stateCodeMap[stateCode]) {
-      console.log(`[MSME Validation] Not found: ${cleanNumber}`);
-      return new Response(
-        JSON.stringify({
-          valid: false,
-          message: 'MSME registration not found in Udyam portal. Please verify the registration number.',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
-
-    // Generate mock successful response
-    const categories = ['Micro', 'Small', 'Medium'];
-    const classifications = ['Manufacturing', 'Services', 'Trading'];
-    const randomCategory = categories[serialNumber % 3];
-    const randomClassification = classifications[serialNumber % 3];
-
-    const response: MSMEValidationResponse = {
-      valid: true,
-      message: `MSME certificate verified - ${randomCategory} Enterprise`,
+    const response = {
+      valid: isValid,
+      message: isValid 
+        ? `MSME certificate verified - ${msmeData.enterprise_type || msmeData.category || 'Active'} Enterprise` 
+        : `MSME registration not found or ${verifyData.message}`,
       data: {
         udyamNumber: cleanNumber,
-        enterpriseName: enterpriseName?.toUpperCase() || 'REGISTERED ENTERPRISE NAME',
-        enterpriseType: randomClassification,
-        category: randomCategory,
-        classification: randomClassification,
-        registrationDate: '2021-07-01',
-        validUpto: '2026-06-30',
-        state: stateCodeMap[stateCode] || 'Unknown State',
-        district: 'District',
-        nicCode: '41001',
-        nicDescription: 'Construction and allied activities',
-        status: 'Active',
+        enterpriseName: msmeData.enterprise_name || msmeData.name || enterpriseName,
+        enterpriseType: msmeData.enterprise_type || msmeData.type_of_enterprise,
+        category: msmeData.major_activity || msmeData.category,
+        classification: msmeData.classification,
+        registrationDate: msmeData.date_of_incorporation || msmeData.registration_date,
+        validUpto: msmeData.valid_upto || '2026-12-31',
+        state: msmeData.state || stateCodeMap[stateCode] || 'Unknown',
+        district: msmeData.district,
+        address: msmeData.address || msmeData.official_address,
+        nicCode: msmeData.nic_2_digit || msmeData.nic_code,
+        nicDescription: msmeData.nic_2_digit_desc || msmeData.nic_description,
+        status: isValid ? 'Active' : 'Invalid',
       },
     };
 
-    console.log(`[MSME Validation] SUCCESS: ${cleanNumber}`);
+    console.log(`[MSME Validation] ${isValid ? 'SUCCESS' : 'FAILED'}: ${cleanNumber}`);
     return new Response(
       JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
