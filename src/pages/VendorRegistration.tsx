@@ -3,13 +3,15 @@ import { useNavigate, Link } from 'react-router-dom';
 import { EnterpriseStepIndicator } from '@/components/vendor/EnterpriseStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
-import { EnterpriseOrganizationStep, EnterpriseOrganizationData } from '@/components/vendor/steps/EnterpriseOrganizationStep';
+import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { AddressStep } from '@/components/vendor/steps/AddressStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
-import { FinancialStep } from '@/components/vendor/steps/FinancialStep';
+import { CommercialStep } from '@/components/vendor/steps/CommercialStep';
+import { BankDetailsStep } from '@/components/vendor/steps/BankDetailsStep';
+import { FinancialInfrastructureStep } from '@/components/vendor/steps/FinancialInfrastructureStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
-import { VendorFormData } from '@/types/vendor';
+import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert } from 'lucide-react';
@@ -17,16 +19,17 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-// New consolidated 5-step flow
+// 7-step registration flow matching PDF
 const registrationSteps = [
-  { id: 1, title: 'Organization Profile', description: 'Company details and verification' },
-  { id: 2, title: 'Address Information', description: 'Registered and branch addresses' },
-  { id: 3, title: 'Contact Information', description: 'Key contact persons' },
-  { id: 4, title: 'Financial Information', description: 'Turnover and credit terms' },
-  { id: 5, title: 'Review & Submit', description: 'Verify and submit application' },
+  { id: 1, title: 'Organization Profile', description: 'Company name and type' },
+  { id: 2, title: 'Address Information', description: 'Registered, manufacturing & branch' },
+  { id: 3, title: 'Contact Details', description: 'Key contact persons' },
+  { id: 4, title: 'Commercial Details', description: 'GST, PAN, MSME verification' },
+  { id: 5, title: 'Bank Details', description: 'Bank account verification' },
+  { id: 6, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
+  { id: 7, title: 'Review & Submit', description: 'Verify and submit application' },
 ];
 
 const initialFormData: VendorFormData = {
@@ -41,27 +44,10 @@ const initialFormData: VendorFormData = {
   declaration: { selfDeclared: false, termsAccepted: false },
 };
 
-const initialExtendedOrgData: EnterpriseOrganizationData = {
-  legalName: '',
-  tradeName: '',
-  industryType: '',
-  organizationType: '',
-  ownershipType: '',
-  productCategories: [],
-  gstin: '',
-  pan: '',
-  msmeNumber: '',
-  bankAccountNumber: '',
-  confirmAccountNumber: '',
-  ifscCode: '',
-  accountHolderName: '',
-};
-
 export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
-  const [extendedOrgData, setExtendedOrgData] = useState<EnterpriseOrganizationData>(initialExtendedOrgData);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -78,15 +64,22 @@ export default function VendorRegistration() {
   };
 
   const canProceedFromCurrentStep = () => {
-    if (currentStep === 1) {
-      return stepValidationState[1] === true;
+    // Steps 4 (Commercial) and 5 (Bank) require verification
+    if (currentStep === 4) {
+      return stepValidationState[4] !== false;
+    }
+    if (currentStep === 5) {
+      return stepValidationState[5] === true;
     }
     return true;
   };
 
   const getValidationMessage = () => {
-    if (currentStep === 1 && stepValidationState[1] !== true) {
-      return 'Please complete all mandatory verifications to proceed';
+    if (currentStep === 4 && stepValidationState[4] === false) {
+      return 'Please verify GST, PAN, and MSME details';
+    }
+    if (currentStep === 5 && stepValidationState[5] !== true) {
+      return 'Please verify bank account with Penny Drop';
     }
     return undefined;
   };
@@ -101,21 +94,6 @@ export default function VendorRegistration() {
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
-        setExtendedOrgData({
-          legalName: existingFormData.organization.legalName || '',
-          tradeName: existingFormData.organization.tradeName || '',
-          industryType: existingFormData.organization.industryType || '',
-          organizationType: existingFormData.organization.organizationType || '',
-          ownershipType: existingFormData.organization.ownershipType || '',
-          productCategories: existingFormData.organization.productCategories || [],
-          gstin: existingFormData.statutory.gstin || '',
-          pan: existingFormData.statutory.pan || '',
-          msmeNumber: existingFormData.statutory.msmeNumber || '',
-          bankAccountNumber: existingFormData.bank.accountNumber || '',
-          confirmAccountNumber: existingFormData.bank.confirmAccountNumber || '',
-          ifscCode: existingFormData.bank.ifscCode || '',
-          accountHolderName: '',
-        });
         setVendorStatusState(vendorStatus);
         if (vendorStatus !== 'draft') { setIsSubmitted(true); setIsEditMode(false); }
       } else if (pendingStatuses.includes(vendorStatus)) {
@@ -134,43 +112,31 @@ export default function VendorRegistration() {
     return () => { supabase.removeChannel(channel); };
   }, [vendorId]);
 
-  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4]); };
-
-  const handleOrganizationComplete = (data: EnterpriseOrganizationData) => {
-    setExtendedOrgData(data);
-    setFormData((prev) => ({
-      ...prev,
-      organization: {
-        legalName: data.legalName,
-        tradeName: data.tradeName,
-        industryType: data.industryType,
-        organizationType: data.organizationType,
-        ownershipType: data.ownershipType,
-        productCategories: data.productCategories,
-      },
-      statutory: {
-        ...prev.statutory,
-        gstin: data.gstin,
-        pan: data.pan,
-        msmeNumber: data.msmeNumber,
-      },
-      bank: {
-        ...prev.bank,
-        accountNumber: data.bankAccountNumber,
-        confirmAccountNumber: data.confirmAccountNumber,
-        ifscCode: data.ifscCode,
-      },
-    }));
-    if (!completedSteps.includes(1)) setCompletedSteps((prev) => [...prev, 1]);
-    setCurrentStep(2);
-  };
+  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6]); };
 
   const handleStepComplete = (step: number, data: unknown) => {
-    const stepKeys: Record<number, keyof VendorFormData> = { 2: 'address', 3: 'contact', 4: 'financial' };
+    const stepKeys: Record<number, keyof VendorFormData> = {
+      1: 'organization',
+      2: 'address',
+      3: 'contact',
+      4: 'statutory',
+      5: 'bank',
+    };
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
     setCurrentStep(step + 1);
+  };
+
+  const handleFinancialInfraComplete = (data: { financial: FinancialDetails; infrastructure: InfrastructureDetails; qhse: QHSEDetails }) => {
+    setFormData((prev) => ({
+      ...prev,
+      financial: data.financial,
+      infrastructure: data.infrastructure,
+      qhse: data.qhse,
+    }));
+    if (!completedSteps.includes(6)) setCompletedSteps((prev) => [...prev, 6]);
+    setCurrentStep(7);
   };
 
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
@@ -201,20 +167,24 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
+    const legalName = formData.organization.legalName;
     switch (currentStep) {
       case 1: 
-        return (
-          <EnterpriseOrganizationStep 
-            data={extendedOrgData} 
-            onNext={handleOrganizationComplete}
-            onValidationStateChange={handleValidationStateChange(1)}
-          />
-        );
-      case 2: return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
-      case 3: return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
-      case 4: return <FinancialStep data={formData.financial} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
-      case 5: return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
-      default: return null;
+        return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(1, data)} />;
+      case 2: 
+        return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
+      case 3: 
+        return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
+      case 4: 
+        return <CommercialStep data={formData.statutory} legalName={legalName} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
+      case 5: 
+        return <BankDetailsStep data={formData.bank} legalName={legalName} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
+      case 6: 
+        return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
+      case 7: 
+        return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+      default: 
+        return null;
     }
   };
 
@@ -306,8 +276,10 @@ export default function VendorRegistration() {
                   {currentStep === 1 && <span className="text-lg">🏢</span>}
                   {currentStep === 2 && <span className="text-lg">📍</span>}
                   {currentStep === 3 && <span className="text-lg">👤</span>}
-                  {currentStep === 4 && <span className="text-lg">💰</span>}
-                  {currentStep === 5 && <span className="text-lg">✓</span>}
+                  {currentStep === 4 && <span className="text-lg">📋</span>}
+                  {currentStep === 5 && <span className="text-lg">🏦</span>}
+                  {currentStep === 6 && <span className="text-lg">💰</span>}
+                  {currentStep === 7 && <span className="text-lg">✓</span>}
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">
