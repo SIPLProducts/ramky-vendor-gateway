@@ -330,7 +330,7 @@ export function useVendorStats() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendors')
-        .select('status');
+        .select('status, tenant_id');
       
       if (error) throw error;
 
@@ -344,6 +344,23 @@ export function useVendorStats() {
         submitted: data.filter(v => v.status === 'submitted').length,
         pendingVerification: data.filter(v => ['submitted', 'validation_pending'].includes(v.status)).length,
         activeVendors: data.filter(v => ['sap_synced', 'purchase_approved', 'finance_approved'].includes(v.status)).length,
+        byCompany: data.reduce((acc, v) => {
+          const tenantId = v.tenant_id || 'unassigned';
+          if (!acc[tenantId]) {
+            acc[tenantId] = { total: 0, pending: 0, approved: 0, rejected: 0 };
+          }
+          acc[tenantId].total++;
+          if (['finance_review', 'purchase_review', 'validation_pending'].includes(v.status)) {
+            acc[tenantId].pending++;
+          }
+          if (['sap_synced', 'purchase_approved', 'finance_approved'].includes(v.status)) {
+            acc[tenantId].approved++;
+          }
+          if (['finance_rejected', 'purchase_rejected', 'validation_failed'].includes(v.status)) {
+            acc[tenantId].rejected++;
+          }
+          return acc;
+        }, {} as Record<string, { total: number; pending: number; approved: number; rejected: number }>),
       };
 
       return stats;
@@ -367,6 +384,23 @@ export function useVendorStats() {
     isOffline: !isOnline,
     cacheAge: getCacheAge(),
   };
+}
+
+// Fetch buyer companies
+export function useBuyerCompanies() {
+  return useQuery({
+    queryKey: ['buyer-companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 }
 
 // Audit logs

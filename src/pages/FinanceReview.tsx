@@ -12,10 +12,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
-import { useVendors, useVendorValidations, useFinanceAction, VendorRow } from '@/hooks/useVendors';
+import { useVendors, useVendorValidations, useFinanceAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import { useRunValidations } from '@/hooks/useVendorValidations';
 import { addSampleDocumentsForVendor } from '@/utils/sampleDocuments';
 import { ValidationResult } from '@/types/vendor';
@@ -73,6 +80,7 @@ interface PennyDropResult {
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showActionDialog, setShowActionDialog] = useState(false);
@@ -86,15 +94,25 @@ export default function FinanceReview() {
   const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
 
   const { data: pendingVendors, isLoading } = useVendors(['finance_review', 'validation_failed']);
+  const { data: buyerCompanies } = useBuyerCompanies();
   const { data: validations, refetch: refetchValidations } = useVendorValidations(selectedVendor?.id);
   const financeAction = useFinanceAction();
   const runValidations = useRunValidations();
 
-  const filteredVendors = pendingVendors?.filter((vendor) =>
-    (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.id.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredVendors = pendingVendors?.filter((vendor) => {
+    const matchesSearch = 
+      (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
+    return matchesSearch && matchesBuyerCompany;
+  }) || [];
+
+  const getBuyerCompanyName = (tenantId: string | null) => {
+    if (!tenantId || !buyerCompanies) return 'Unassigned';
+    const company = buyerCompanies.find(c => c.id === tenantId);
+    return company ? `${company.name} (${company.code})` : 'Unassigned';
+  };
 
   const handleAction = (vendor: VendorRow, action: 'approve' | 'reject' | 'clarify') => {
     setSelectedVendor(vendor);
@@ -225,7 +243,7 @@ export default function FinanceReview() {
           <p className="text-muted-foreground">Review and approve vendor registrations</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative w-72">
+          <div className="relative w-64">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, GSTIN, or ID..."
@@ -234,9 +252,20 @@ export default function FinanceReview() {
               className="pl-11 h-11 rounded-xl"
             />
           </div>
-          <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl">
-            <Filter className="h-4 w-4" />
-          </Button>
+          <Select value={buyerCompanyFilter} onValueChange={setBuyerCompanyFilter}>
+            <SelectTrigger className="w-56 h-11 rounded-xl">
+              <Building2 className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filter by buyer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Buyer Companies</SelectItem>
+              {buyerCompanies?.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name} ({company.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -284,7 +313,7 @@ export default function FinanceReview() {
                         {getStatusBadge(vendor.status)}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {vendor.registered_city}, {vendor.registered_state}
+                        {getBuyerCompanyName(vendor.tenant_id)} • {vendor.registered_city}, {vendor.registered_state}
                       </p>
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                         <span className="font-mono bg-muted px-2 py-0.5 rounded">ID: {vendor.id.slice(0, 8)}...</span>

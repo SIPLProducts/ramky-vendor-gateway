@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useVendorStats, useVendors } from '@/hooks/useVendors';
+import { useVendorStats, useVendors, useBuyerCompanies } from '@/hooks/useVendors';
 import { 
   Users, 
   Clock, 
@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   FileCheck,
   WifiOff,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -22,6 +23,7 @@ import { ConnectionStatus } from '@/components/pwa/ConnectionStatus';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 
 export default function Dashboard() {
   const { user, userRole: authRole } = useAuth();
@@ -29,6 +31,7 @@ export default function Dashboard() {
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const { data: stats, isLoading: statsLoading, isOffline: statsOffline, cacheAge: statsCacheAge } = useVendorStats();
   const { data: recentVendors, isLoading: vendorsLoading, isOffline: vendorsOffline, cacheAge: vendorsCacheAge } = useVendors();
+  const { data: buyerCompanies } = useBuyerCompanies();
   const queryClient = useQueryClient();
 
   // Subscribe to real-time updates
@@ -79,9 +82,27 @@ export default function Dashboard() {
     submitted: 0,
     pendingVerification: 0,
     activeVendors: 0,
+    byCompany: {} as Record<string, { total: number; pending: number; approved: number; rejected: number }>,
   };
 
   const displayVendors = recentVendors?.slice(0, 5) || [];
+
+  // Get company breakdown with names
+  type CompanyStats = { total: number; pending: number; approved: number; rejected: number };
+  const byCompanyData = (displayStats.byCompany || {}) as Record<string, CompanyStats>;
+  
+  const companyBreakdown = Object.entries(byCompanyData).map(([tenantId, companyData]) => {
+    const company = buyerCompanies?.find(c => c.id === tenantId);
+    return {
+      id: tenantId,
+      name: company?.name || 'Unassigned',
+      code: company?.code || '-',
+      total: companyData.total,
+      pending: companyData.pending,
+      approved: companyData.approved,
+      rejected: companyData.rejected,
+    };
+  }).sort((a, b) => b.total - a.total);
 
   return (
     <div className="space-y-6">
@@ -281,7 +302,7 @@ export default function Dashboard() {
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle className="text-xl">Recent Submissions</CardTitle>
@@ -328,6 +349,81 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground mt-2">
                         {new Date(vendor.updated_at).toLocaleDateString('en-IN')}
                       </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Vendors by Buyer Company
+            </CardTitle>
+            <CardDescription>Distribution across buyer companies</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-2 w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : companyBreakdown.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No vendor data by company yet</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {companyBreakdown.slice(0, 5).map((company) => (
+                  <div key={company.id} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">{company.name}</span>
+                        <span className="text-muted-foreground text-sm ml-2">({company.code})</span>
+                      </div>
+                      <span className="text-sm font-semibold">{company.total} vendors</span>
+                    </div>
+                    <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
+                      {company.approved > 0 && (
+                        <div 
+                          className="bg-green-500 h-full" 
+                          style={{ width: `${(company.approved / company.total) * 100}%` }}
+                        />
+                      )}
+                      {company.pending > 0 && (
+                        <div 
+                          className="bg-amber-500 h-full" 
+                          style={{ width: `${(company.pending / company.total) * 100}%` }}
+                        />
+                      )}
+                      {company.rejected > 0 && (
+                        <div 
+                          className="bg-red-500 h-full" 
+                          style={{ width: `${(company.rejected / company.total) * 100}%` }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        Approved: {company.approved}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                        Pending: {company.pending}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                        Rejected: {company.rejected}
+                      </span>
                     </div>
                   </div>
                 ))}
