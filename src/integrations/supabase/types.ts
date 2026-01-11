@@ -347,6 +347,41 @@ export type Database = {
           },
         ]
       }
+      invitation_email_events: {
+        Row: {
+          created_at: string
+          email_id: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          invitation_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email_id?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          invitation_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email_id?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          invitation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitation_email_events_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_invitations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portal_config: {
         Row: {
           config_key: string
@@ -775,8 +810,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           email: string
+          email_clicked_at: string | null
+          email_opened_at: string | null
+          email_sent_at: string | null
           expires_at: string
           id: string
+          resend_email_id: string | null
           token: string
           used_at: string | null
           vendor_id: string | null
@@ -785,8 +824,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email: string
+          email_clicked_at?: string | null
+          email_opened_at?: string | null
+          email_sent_at?: string | null
           expires_at: string
           id?: string
+          resend_email_id?: string | null
           token: string
           used_at?: string | null
           vendor_id?: string | null
@@ -795,8 +838,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string
+          email_clicked_at?: string | null
+          email_opened_at?: string | null
+          email_sent_at?: string | null
           expires_at?: string
           id?: string
+          resend_email_id?: string | null
           token?: string
           used_at?: string | null
           vendor_id?: string | null
