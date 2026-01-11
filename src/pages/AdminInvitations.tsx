@@ -127,13 +127,13 @@ export default function AdminInvitations() {
       const invitation = invitations?.find((inv) => inv.id === invitationId);
       if (!invitation) throw new Error('Invitation not found');
 
-      // Call edge function to send email with simulation mode enabled for demo
+      // Call edge function to send invitation email
       const { data, error } = await supabase.functions.invoke('send-vendor-invitation', {
         body: {
           email: invitation.email,
           token: invitation.token,
           expiresAt: invitation.expires_at,
-          simulationMode: true, // Enable simulation mode for demo
+          simulationMode: false, // Real email sending
         },
       });
 
