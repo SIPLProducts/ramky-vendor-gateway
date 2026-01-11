@@ -13,6 +13,7 @@ interface InvitationEmailRequest {
   email: string;
   token: string;
   expiresAt: string;
+  invitationId?: string;
   simulationMode?: boolean;
 }
 
@@ -22,10 +23,10 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, token, expiresAt, simulationMode = false }: InvitationEmailRequest = await req.json();
+    const { email, token, expiresAt, invitationId, simulationMode = false }: InvitationEmailRequest = await req.json();
 
     const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://lovable.app";
-    const inviteLink = `${frontendUrl}/vendor/invite?token=${token}`;
+    const inviteLink = `${frontendUrl}/vendor/register?token=${token}`;
 
     const expiryDate = new Date(expiresAt).toLocaleDateString('en-IN', {
       day: 'numeric',
@@ -138,6 +139,9 @@ const handler = async (req: Request): Promise<Response> => {
         to: [email],
         subject: "Vendor Registration Invitation - Ramky Infrastructure",
         html: emailHtml,
+        headers: {
+          "X-Entity-Ref-ID": invitationId || token, // For tracking
+        },
       }),
     });
     
@@ -151,7 +155,36 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Invitation email sent successfully:", result);
 
-    return new Response(JSON.stringify(result), {
+    // Update the invitation with the Resend email ID for tracking
+    if (invitationId && result.id) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          await supabase
+            .from("vendor_invitations")
+            .update({ 
+              resend_email_id: result.id,
+              email_sent_at: new Date().toISOString()
+            })
+            .eq("id", invitationId);
+          
+          // Log to email events
+          await supabase.from("invitation_email_events").insert({
+            invitation_id: invitationId,
+            email_id: result.id,
+            event_type: "sent",
+            event_data: { to: email, subject: "Vendor Registration Invitation" },
+          });
+        }
+      } catch (updateError) {
+        console.error("Failed to update invitation with email ID:", updateError);
+      }
+    }
+
+    return new Response(JSON.stringify({ ...result, emailId: result.id }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

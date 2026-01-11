@@ -48,7 +48,10 @@ import {
   Loader2,
   Send,
   Filter,
+  Eye,
+  MousePointerClick,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
@@ -133,14 +136,16 @@ export default function AdminInvitations() {
           email: invitation.email,
           token: invitation.token,
           expiresAt: invitation.expires_at,
+          invitationId: invitation.id,
           simulationMode: false, // Real email sending
         },
       });
 
       if (error) throw error;
-      return { invitation, simulated: data?.simulated };
+      return { invitation, simulated: data?.simulated, emailId: data?.emailId };
     },
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
       toast({
         title: result?.simulated ? 'Email Simulated' : 'Email Sent',
         description: result?.simulated 
@@ -245,6 +250,53 @@ export default function AdminInvitations() {
         <Clock className="h-3 w-3 mr-1" />
         Pending
       </Badge>
+    );
+  };
+
+  const getEmailTrackingStatus = (invitation: any) => {
+    const sentAt = invitation.email_sent_at;
+    const openedAt = invitation.email_opened_at;
+    const clickedAt = invitation.email_clicked_at;
+
+    if (!sentAt) return null;
+
+    return (
+      <TooltipProvider>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger>
+              <div className={`p-1 rounded ${sentAt ? 'text-green-600' : 'text-gray-300'}`}>
+                <Send className="h-3 w-3" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Sent: {sentAt ? format(new Date(sentAt), 'dd MMM yyyy HH:mm') : 'Not sent'}</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger>
+              <div className={`p-1 rounded ${openedAt ? 'text-blue-600' : 'text-gray-300'}`}>
+                <Eye className="h-3 w-3" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Opened: {openedAt ? format(new Date(openedAt), 'dd MMM yyyy HH:mm') : 'Not opened yet'}</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger>
+              <div className={`p-1 rounded ${clickedAt ? 'text-purple-600' : 'text-gray-300'}`}>
+                <MousePointerClick className="h-3 w-3" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Clicked: {clickedAt ? format(new Date(clickedAt), 'dd MMM yyyy HH:mm') : 'Not clicked yet'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
     );
   };
 
@@ -384,6 +436,7 @@ export default function AdminInvitations() {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Email Tracking</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -394,6 +447,11 @@ export default function AdminInvitations() {
                     <TableRow key={invitation.id}>
                       <TableCell className="font-medium">{invitation.email}</TableCell>
                       <TableCell>{getStatusBadge(invitation)}</TableCell>
+                      <TableCell>
+                        {getEmailTrackingStatus(invitation) || (
+                          <span className="text-muted-foreground text-sm">Not sent</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {format(new Date(invitation.created_at), 'dd MMM yyyy')}
                       </TableCell>
