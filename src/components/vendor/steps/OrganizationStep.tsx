@@ -1,6 +1,7 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { 
@@ -11,7 +12,8 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   OrganizationDetails, 
   INDUSTRY_TYPES, 
@@ -21,6 +23,7 @@ import {
 } from '@/types/vendor';
 
 const schema = z.object({
+  buyerCompanyId: z.string().min(1, 'Buyer company is required'),
   legalName: z.string().min(2, 'Legal name is required'),
   tradeName: z.string().optional(),
   industryType: z.string().min(1, 'Industry type is required'),
@@ -35,6 +38,21 @@ interface OrganizationStepProps {
 }
 
 export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
+  // Fetch buyer companies (tenants)
+  const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
+    queryKey: ['buyer-companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const {
     register,
     handleSubmit,
@@ -54,6 +72,39 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
         </h3>
 
         <div className="grid gap-5">
+          {/* Buyer Company - Mandatory Field */}
+          <div className="grid gap-1.5">
+            <Label>Buyer Company *</Label>
+            <Controller
+              name="buyerCompanyId"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCompanies}>
+                  <SelectTrigger className={errors.buyerCompanyId ? 'border-destructive' : ''}>
+                    {isLoadingCompanies ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Loading companies...</span>
+                      </div>
+                    ) : (
+                      <SelectValue placeholder="Select buyer company" />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {buyerCompanies?.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} ({company.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.buyerCompanyId && (
+              <p className="text-xs text-destructive">{errors.buyerCompanyId.message}</p>
+            )}
+          </div>
+
           <div className="grid gap-1.5">
             <Label htmlFor="legalName">Legal Name of Organization *</Label>
             <Input

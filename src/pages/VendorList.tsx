@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useVendors } from '@/hooks/useVendors';
+import { supabase } from '@/integrations/supabase/client';
 import { Search, Download, Eye, Filter, Building2, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
@@ -39,11 +41,27 @@ type VendorStatus =
 export default function VendorList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   // Fetch all vendors from database
   const { data: vendors, isLoading, refetch } = useVendors();
+
+  // Fetch buyer companies (tenants) for filter
+  const { data: buyerCompanies } = useQuery({
+    queryKey: ['buyer-companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const filteredVendors = vendors?.filter((vendor) => {
     const matchesSearch =
@@ -52,8 +70,9 @@ export default function VendorList() {
       vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
+    const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesBuyerCompany;
   }) || [];
 
   // Pagination
@@ -72,9 +91,20 @@ export default function VendorList() {
     setCurrentPage(1);
   };
 
+  const handleBuyerCompanyFilterChange = (value: string) => {
+    setBuyerCompanyFilter(value);
+    setCurrentPage(1);
+  };
+
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
     setCurrentPage(1);
+  };
+
+  const getBuyerCompanyName = (tenantId: string | null) => {
+    if (!tenantId || !buyerCompanies) return '-';
+    const company = buyerCompanies.find(c => c.id === tenantId);
+    return company ? `${company.name} (${company.code})` : '-';
   };
 
   const getStatusBadge = (status: VendorStatus) => {
@@ -161,6 +191,20 @@ export default function VendorList() {
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={buyerCompanyFilter} onValueChange={handleBuyerCompanyFilterChange}>
+              <SelectTrigger className="w-56">
+                <Building2 className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filter by buyer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Buyer Companies</SelectItem>
+                {buyerCompanies?.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name} ({company.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -184,9 +228,9 @@ export default function VendorList() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendor</TableHead>
+                      <TableHead>Buyer Company</TableHead>
                       <TableHead>GSTIN</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Industry</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>SAP Code</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -195,7 +239,7 @@ export default function VendorList() {
                   <TableBody>
                     {paginatedVendors.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No vendors found matching your criteria
                         </TableCell>
                       </TableRow>
@@ -213,6 +257,9 @@ export default function VendorList() {
                               </div>
                             </div>
                           </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{getBuyerCompanyName(vendor.tenant_id)}</span>
+                          </TableCell>
                           <TableCell className="font-mono text-sm">
                             {vendor.gstin || '-'}
                           </TableCell>
@@ -220,9 +267,6 @@ export default function VendorList() {
                             {vendor.registered_city && vendor.registered_state 
                               ? `${vendor.registered_city}, ${vendor.registered_state}` 
                               : '-'}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {vendor.industry_type || '-'}
                           </TableCell>
                           <TableCell>{getStatusBadge(vendor.status as VendorStatus)}</TableCell>
                           <TableCell className="font-mono">
