@@ -33,7 +33,7 @@ const registrationSteps = [
 ];
 
 const initialFormData: VendorFormData = {
-  organization: { legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
+  organization: { buyerCompanyId: '', legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
   address: { registeredAddress: '', registeredAddressLine2: '', registeredAddressLine3: '', registeredCity: '', registeredState: '', registeredPincode: '', registeredPhone: '', registeredFax: '', registeredWebsite: '', sameAsRegistered: true, manufacturingAddress: '', manufacturingAddressLine2: '', manufacturingAddressLine3: '', manufacturingCity: '', manufacturingState: '', manufacturingPincode: '', manufacturingPhone: '', manufacturingFax: '', branchName: '', branchAddress: '', branchCity: '', branchState: '', branchPincode: '', branchCountry: 'India', branchWebsite: '', branchContactName: '', branchContactDesignation: '', branchContactEmail: '', branchContactPhone: '', branchContactFax: '' },
   contact: { ceoName: '', ceoDesignation: '', ceoPhone: '', ceoEmail: '', marketingName: '', marketingDesignation: '', marketingPhone: '', marketingEmail: '', productionName: '', productionDesignation: '', productionPhone: '', productionEmail: '', customerServiceName: '', customerServiceDesignation: '', customerServicePhone: '', customerServiceEmail: '' },
   statutory: { firmRegistrationNo: '', pan: '', pfNumber: '', esiNumber: '', msmeNumber: '', msmeCategory: '', labourPermitNo: '', gstin: '', iecNo: '', entityType: '', memberships: [], enlistments: [], certifications: [], operationalNetwork: '', gstCertificateFile: null, panCardFile: null, msmeCertificateFile: null },

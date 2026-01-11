@@ -80,6 +80,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     
     return {
       organization: {
+        buyerCompanyId: existingVendor.tenant_id || '',
         legalName: existingVendor.legal_name || '',
         tradeName: existingVendor.trade_name || '',
         industryType: existingVendor.industry_type || '',
@@ -223,6 +224,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       const vendorData = {
         user_id: user.id,
+        tenant_id: formData.organization.buyerCompanyId || null,
         legal_name: formData.organization.legalName,
         trade_name: formData.organization.tradeName || null,
         registered_address: formData.address.registeredAddress,

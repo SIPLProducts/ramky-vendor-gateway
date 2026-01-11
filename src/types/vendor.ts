@@ -25,6 +25,7 @@ export interface ValidationResult {
 
 // Step 1: Organization Profile
 export interface OrganizationDetails {
+  buyerCompanyId: string;
   legalName: string;
   tradeName: string;
   industryType: string;
