@@ -126,6 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Real email sending with Resend
+    console.log("Sending invitation email to:", email);
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -139,6 +140,8 @@ const handler = async (req: Request): Promise<Response> => {
         html: emailHtml,
       }),
     });
+    
+    console.log("Resend API response status:", emailResponse.status);
 
     const result = await emailResponse.json();
 
