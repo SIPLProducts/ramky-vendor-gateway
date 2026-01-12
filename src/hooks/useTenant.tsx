@@ -159,7 +159,61 @@ export function useCreateTenant() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      toast({ title: 'Tenant Created', description: 'New customer tenant has been created.' });
+      queryClient.invalidateQueries({ queryKey: ['buyer-companies'] });
+      toast({ title: 'Tenant Created', description: 'New buyer company has been created.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// Update tenant
+export function useUpdateTenant() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Tenant> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('tenants')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['buyer-companies'] });
+      toast({ title: 'Tenant Updated', description: 'Buyer company has been updated.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// Delete tenant
+export function useDeleteTenant() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('tenants')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['buyer-companies'] });
+      toast({ title: 'Tenant Deleted', description: 'Buyer company has been removed.' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
