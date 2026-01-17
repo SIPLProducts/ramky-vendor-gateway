@@ -10,9 +10,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Auth from "./pages/Auth";
 import VendorRegistration from "./pages/VendorRegistration";
 import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
+import VendorRegistrationPreview from "./pages/VendorRegistrationPreview";
+import VendorLogin from "./pages/VendorLogin";
 import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
+import SAPSync from "./pages/SAPSync";
 import VendorList from "./pages/VendorList";
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
@@ -39,10 +42,9 @@ const App = () => (
             {/* Public Routes - Auth is the main entry */}
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/vendor/register" element={<VendorRegistration />} />
-            <Route path="/vendor/invite" element={<VendorRegisterWithInvite />} />
+            <Route path="/vendor/login" element={<VendorLogin />} />
+            <Route path="/vendor/invite" element={<VendorRegistration />} />
             <Route path="/install" element={<Install />} />
-            <Route path="/support" element={<SupportHelp />} />
             <Route path="/feedback" element={<VendorFeedback />} />
             
             {/* Protected Routes */}
@@ -50,12 +52,15 @@ const App = () => (
               {/* Finance Routes */}
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/vendor/register" element={<VendorRegistrationPreview />} />
                 <Route path="/finance/review" element={<FinanceReview />} />
                 <Route path="/purchase/approval" element={<PurchaseApproval />} />
+                <Route path="/sap/sync" element={<SAPSync />} />
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
+                <Route path="/support" element={<SupportHelp />} />
                 <Route path="/demo" element={<DemoShowcase />} />
                 <Route path="/compliance/gst" element={<GstCompliance />} />
                 <Route path="/compliance/scheduled" element={<ScheduledChecks />} />

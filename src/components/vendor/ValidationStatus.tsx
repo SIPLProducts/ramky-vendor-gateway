@@ -14,7 +14,7 @@ const validationLabels: Record<string, string> = {
   gst: 'GST Verification',
   pan: 'PAN Verification',
   name_match: 'Name Match Verification',
-  bank: 'Bank Account Verification (₹1 Penny Drop)',
+  bank: 'Bank Account Verification',
   msme: 'MSME/Udyam Verification',
 };
 
@@ -68,6 +68,7 @@ export const ValidationStatus = forwardRef<HTMLDivElement, ValidationStatusProps
 
     const passedCount = validations.filter((v) => v.status === 'passed').length;
     const failedCount = validations.filter((v) => v.status === 'failed').length;
+    const skippedCount = validations.filter((v) => v.status === 'skipped').length;
     const pendingCount = allValidations.filter((v) => v.status === 'pending').length;
 
     return (
@@ -82,7 +83,7 @@ export const ValidationStatus = forwardRef<HTMLDivElement, ValidationStatusProps
         )}
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="flex items-center gap-3 p-3 rounded-lg bg-success/5 border border-success/20">
             <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
               <CheckCircle2 className="h-5 w-5 text-success" />
@@ -99,6 +100,15 @@ export const ValidationStatus = forwardRef<HTMLDivElement, ValidationStatusProps
             <div>
               <p className="text-2xl font-bold text-destructive">{failedCount}</p>
               <p className="text-xs text-muted-foreground">Failed</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-muted-foreground/20">
+            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+              <MinusCircle className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-muted-foreground">{skippedCount}</p>
+              <p className="text-xs text-muted-foreground">Skipped</p>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg bg-warning/5 border border-warning/20">

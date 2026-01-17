@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+import nodemailer from "npm:nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,8 +24,12 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, token, expiresAt, invitationId, simulationMode = false }: InvitationEmailRequest = await req.json();
 
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://lovable.app";
-    const inviteLink = `${frontendUrl}/vendor/register?token=${token}`;
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://ramkyvms.netlify.app";
+    const inviteLink = `${frontendUrl}/vendor/invite?token=${token}`;
+    
+    console.log("Generated invite link:", inviteLink);
+    console.log("Token:", token);
+    console.log("Frontend URL:", frontendUrl);
 
     const expiryDate = new Date(expiresAt).toLocaleDateString('en-IN', {
       day: 'numeric',
@@ -55,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
           <p>You have been invited to register as a vendor with Ramky Infrastructure Limited. Please click the button below to create your account and complete your vendor registration.</p>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${inviteLink}" style="background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+            <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
               Start Registration
             </a>
           </div>
@@ -82,7 +85,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     // Simulation mode - log instead of sending
-    if (simulationMode || !RESEND_API_KEY) {
+    if (simulationMode) {
       console.log("[Invitation Email - SIMULATION MODE]");
       console.log("To:", email);
       console.log("Subject: Vendor Registration Invitation - Ramky Infrastructure");
@@ -126,37 +129,37 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Real email sending with Resend
+    // Real email sending with Gmail SMTP
     console.log("Sending invitation email to:", email);
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "Ramky Infrastructure <onboarding@resend.dev>",
-        to: [email],
-        subject: "Vendor Registration Invitation - Ramky Infrastructure",
-        html: emailHtml,
-        headers: {
-          "X-Entity-Ref-ID": invitationId || token, // For tracking
-        },
-      }),
-    });
     
-    console.log("Resend API response status:", emailResponse.status);
-
-    const result = await emailResponse.json();
-
-    if (!emailResponse.ok) {
-      throw new Error(result.message || "Failed to send email");
+    const SMTP_PASS = Deno.env.get("SMTP_PASS");
+    if (!SMTP_PASS) {
+      throw new Error("SMTP_PASS environment variable not configured");
     }
 
-    console.log("Invitation email sent successfully:", result);
+    // Create nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // Use TLS
+      auth: {
+        user: "viraatmankali@gmail.com",
+        pass: SMTP_PASS, // Gmail App Password
+      },
+    });
 
-    // Update the invitation with the Resend email ID for tracking
-    if (invitationId && result.id) {
+    // Send email
+    const emailResult = await transporter.sendMail({
+      from: '"Ramky Infrastructure" <viraatmankali@gmail.com>',
+      to: email,
+      subject: "Vendor Registration Invitation - Ramky Infrastructure",
+      html: emailHtml,
+    });
+
+    console.log("Email sent successfully:", emailResult.messageId);
+
+    // Update the invitation with email tracking
+    if (invitationId) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL");
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -166,31 +169,41 @@ const handler = async (req: Request): Promise<Response> => {
           await supabase
             .from("vendor_invitations")
             .update({ 
-              resend_email_id: result.id,
               email_sent_at: new Date().toISOString()
             })
             .eq("id", invitationId);
           
-          // Log to email events
-          await supabase.from("invitation_email_events").insert({
-            invitation_id: invitationId,
-            email_id: result.id,
-            event_type: "sent",
-            event_data: { to: email, subject: "Vendor Registration Invitation" },
+          // Log to audit_logs
+          await supabase.from("audit_logs").insert({
+            action: "invitation_email_sent",
+            details: {
+              to: email,
+              subject: "Vendor Registration Invitation",
+              message_id: emailResult.messageId,
+              invite_link: inviteLink,
+              expires_at: expiresAt,
+            },
           });
         }
       } catch (updateError) {
-        console.error("Failed to update invitation with email ID:", updateError);
+        console.error("Failed to update invitation:", updateError);
       }
     }
 
-    return new Response(JSON.stringify({ ...result, emailId: result.id }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    });
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        messageId: emailResult.messageId,
+        message: `Invitation email sent successfully to ${email}` 
+      }), 
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
   } catch (error: any) {
     console.error("Error in send-vendor-invitation function:", error);
     return new Response(

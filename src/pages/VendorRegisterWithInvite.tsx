@@ -133,9 +133,9 @@ export default function VendorRegisterWithInvite() {
         description: 'Your account has been created. Redirecting to registration form...',
       });
 
-      // Navigate to the registration form
+      // Navigate to the registration form with the token
       setTimeout(() => {
-        navigate('/vendor/register?invitation=' + invitation?.id);
+        navigate(`/vendor/register?token=${token}`);
       }, 1500);
     } catch (err: any) {
       if (err.message.includes('already registered')) {

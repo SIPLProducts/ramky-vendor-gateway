@@ -14,6 +14,7 @@ import {
   FileCheck,
   WifiOff,
   Building2,
+  Server,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -76,6 +77,7 @@ export default function Dashboard() {
     total: 0,
     pendingFinance: 0,
     pendingPurchase: 0,
+    pendingSAPSync: 0,
     approved: 0,
     validationFailed: 0,
     draft: 0,
@@ -127,7 +129,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
           </div>
         </div>
-        <ConnectionStatus showLabel />
+        <ConnectionStatus showLabel showLogout />
       </div>
 
       {/* Welcome Banner */}
@@ -151,9 +153,6 @@ export default function Dashboard() {
       <div className="flex items-center gap-6 border-b">
         <button className="pb-3 text-sm font-semibold text-foreground border-b-2 border-primary">
           Key Metrics
-        </button>
-        <button className="pb-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-          Recent Activity
         </button>
       </div>
 
@@ -186,7 +185,7 @@ export default function Dashboard() {
         <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Verification
+              Penny Drop Verification
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <FileCheck className="h-5 w-5 text-white" />
@@ -198,7 +197,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">{displayStats.pendingVerification}</div>
-                <Link to="/finance/verification">
+                <Link to="/finance/review">
                   <Button variant="link" className="p-0 h-auto text-xs mt-2 text-blue-600 dark:text-blue-400">
                     Verify now <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
@@ -258,6 +257,31 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pending SAP Sync
+            </CardTitle>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <Server className="h-5 w-5 text-white" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-20" />
+            ) : (
+              <>
+                <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">{displayStats.pendingSAPSync}</div>
+                <Link to="/sap/sync">
+                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-purple-600 dark:text-purple-400">
+                    Sync now <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -274,27 +298,6 @@ export default function Dashboard() {
               <>
                 <div className="text-4xl font-bold text-green-600 dark:text-green-400">{displayStats.activeVendors}</div>
                 <p className="text-xs text-muted-foreground mt-2">SAP synced vendors</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Validation Failed
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/20">
-              <XCircle className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold text-red-600 dark:text-red-400">{displayStats.validationFailed}</div>
-                <p className="text-xs text-muted-foreground mt-2">Require attention</p>
               </>
             )}
           </CardContent>

@@ -75,9 +75,10 @@ function getActiveStepIndex(status: RegistrationStatus): number {
     case 'purchase_rejected':
       return 3; // Stuck at purchase
     case 'purchase_approved':
+      return 4; // SAP sync in progress
     case 'sap_synced':
     case 'approved':
-      return 4; // Completed
+      return 5; // All steps completed (beyond last step)
     case 'rejected':
       return -2; // Special case for rejection
     default:

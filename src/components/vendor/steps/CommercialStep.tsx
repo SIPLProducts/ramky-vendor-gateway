@@ -29,13 +29,13 @@ import {
 
 const schema = z.object({
   firmRegistrationNo: z.string().optional(),
-  pan: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').or(z.literal('')),
+  pan: z.string().min(1).or(z.literal('')),
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
   msmeNumber: z.string().optional(),
   msmeCategory: z.enum(['micro', 'small', 'medium', '']),
   labourPermitNo: z.string().optional(),
-  gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST format').or(z.literal('')),
+  gstin: z.string().min(1).or(z.literal('')),
   iecNo: z.string().optional(),
   entityType: z.string().min(1, 'Entity type is required'),
   memberships: z.array(z.string()).optional(),
@@ -47,12 +47,13 @@ const schema = z.object({
 interface CommercialStepProps {
   data: StatutoryDetails;
   legalName?: string;
+  vendorId?: string;
   onNext: (data: StatutoryDetails) => void;
   onBack: () => void;
   onValidationStateChange?: (isValid: boolean) => void;
 }
 
-export function CommercialStep({ data, legalName, onNext, onValidationStateChange }: CommercialStepProps) {
+export function CommercialStep({ data, legalName, vendorId, onNext, onValidationStateChange }: CommercialStepProps) {
   const [gstCertificateFile, setGstCertificateFile] = useState<File | null>(data.gstCertificateFile);
   const [panCardFile, setPanCardFile] = useState<File | null>(data.panCardFile);
   const [msmeCertificateFile, setMsmeCertificateFile] = useState<File | null>(data.msmeCertificateFile);
@@ -63,7 +64,7 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
     validatePAN, 
     validateMSME,
     resetValidation 
-  } = useFieldValidation();
+  } = useFieldValidation(vendorId);
 
   const {
     register,
@@ -100,13 +101,14 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
   }, [msmeValue]);
 
   // Calculate if all required validations pass
+  // MSME is now optional - can be skipped
   useEffect(() => {
     const gstValid = !gstinValue || validationStates.gst.status === 'passed';
     const panValid = !panValue || validationStates.pan.status === 'passed';
-    const msmeValid = !msmeValue || validationStates.msme.status === 'passed';
+    // MSME is optional - always considered valid
     
-    onValidationStateChange?.(gstValid && panValid && msmeValid);
-  }, [gstinValue, panValue, msmeValue, validationStates, onValidationStateChange]);
+    onValidationStateChange?.(gstValid && panValid);
+  }, [gstinValue, panValue, validationStates, onValidationStateChange]);
 
   const handleVerifyGST = async () => {
     await validateGST(gstinValue || '', legalName);
@@ -124,9 +126,17 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
     // Check validations before submitting
     const gstNeedsValidation = formData.gstin && validationStates.gst.status !== 'passed';
     const panNeedsValidation = formData.pan && validationStates.pan.status !== 'passed';
-    const msmeNeedsValidation = formData.msmeNumber && validationStates.msme.status !== 'passed';
+    // MSME is optional - no validation required
 
-    if (gstNeedsValidation || panNeedsValidation || msmeNeedsValidation) {
+    if (gstNeedsValidation || panNeedsValidation) {
+      return;
+    }
+
+    // Check mandatory document uploads
+    if (!panCardFile) {
+      return;
+    }
+    if (!gstCertificateFile) {
       return;
     }
 
@@ -141,8 +151,10 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
   const canProceed = () => {
     const gstValid = !gstinValue || validationStates.gst.status === 'passed';
     const panValid = !panValue || validationStates.pan.status === 'passed';
-    const msmeValid = !msmeValue || validationStates.msme.status === 'passed';
-    return gstValid && panValid && msmeValid;
+    // MSME is optional - always valid
+    // Check mandatory document uploads
+    const documentsUploaded = !!panCardFile && !!gstCertificateFile;
+    return gstValid && panValid && documentsUploaded;
   };
 
   return (
@@ -151,7 +163,7 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
       {!canProceed() && (
         <Alert className="border-warning bg-warning/10">
           <AlertDescription className="text-warning-foreground">
-            Please verify all entered compliance details (GST, PAN, MSME) before proceeding.
+            Please verify all entered compliance details (GST, PAN) and upload mandatory documents (PAN Card, GST Certificate) before proceeding. MSME verification is optional.
           </AlertDescription>
         </Alert>
       )}
@@ -288,13 +300,19 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
       <div className="form-section">
         <h3 className="form-section-title">
           <Shield className="h-5 w-5 text-primary" />
-          MSME Details
+          MSME Details (Optional)
         </h3>
+
+        <Alert className="mb-5 border-blue-200 bg-blue-50">
+          <AlertDescription className="text-blue-900">
+            MSME verification is optional. You can skip this section and proceed with your registration.
+          </AlertDescription>
+        </Alert>
 
         <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="msmeNumber">MSME/Udyam Number</Label>
+              <Label htmlFor="msmeNumber">MSME/Udyam Number (Optional)</Label>
               <div className="flex gap-2">
                 <Input
                   id="msmeNumber"
@@ -428,23 +446,25 @@ export function CommercialStep({ data, legalName, onNext, onValidationStateChang
 
         <div className="grid gap-5">
           <FileUpload
-            label="GST Certificate"
+            label="GST Certificate *"
             accept=".pdf,.jpg,.jpeg,.png"
             documentType="gst_certificate"
             onFileSelect={setGstCertificateFile}
             currentFile={gstCertificateFile}
+            required
           />
 
           <FileUpload
-            label="PAN Card"
+            label="PAN Card *"
             accept=".pdf,.jpg,.jpeg,.png"
             documentType="pan_card"
             onFileSelect={setPanCardFile}
             currentFile={panCardFile}
+            required
           />
 
           <FileUpload
-            label="MSME Certificate"
+            label="MSME Certificate (Optional)"
             accept=".pdf,.jpg,.jpeg,.png"
             documentType="msme_certificate"
             onFileSelect={setMsmeCertificateFile}

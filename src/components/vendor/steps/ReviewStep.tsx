@@ -104,9 +104,6 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
             <Label htmlFor="termsAccepted" className="text-sm font-normal cursor-pointer">I accept the Terms and Conditions and Privacy Policy of Ramky Infrastructure Limited.</Label>
           </div>
         </div>
-        <div className="mt-6 pt-4 border-t">
-          <Button onClick={onSubmit} disabled={!canSubmit} className="w-full md:w-auto">Submit Application</Button>
-        </div>
       </div>
     </div>
   );

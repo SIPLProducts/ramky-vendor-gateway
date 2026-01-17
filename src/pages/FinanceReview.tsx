@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
-import { useVendors, useVendorValidations, useFinanceAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
+import { useVendors, useFinanceAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import { useRunValidations } from '@/hooks/useVendorValidations';
 import { addSampleDocumentsForVendor } from '@/utils/sampleDocuments';
 import { ValidationResult } from '@/types/vendor';
@@ -44,7 +44,8 @@ import {
   Plus,
   Sparkles,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Mail
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -92,10 +93,14 @@ export default function FinanceReview() {
   const [isVerifyingPennyDrop, setIsVerifyingPennyDrop] = useState(false);
   const [pennyDropStage, setPennyDropStage] = useState(0);
   const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
+  
+  // Reverse Penny Drop states (Surepass)
+  const [isInitializingPennyDrop, setIsInitializingPennyDrop] = useState(false);
+  const [isCheckingPennyDropStatus, setIsCheckingPennyDropStatus] = useState(false);
+  const [reversePennyDropResult, setReversePennyDropResult] = useState<any>(null);
 
   const { data: pendingVendors, isLoading } = useVendors(['finance_review', 'validation_failed']);
   const { data: buyerCompanies } = useBuyerCompanies();
-  const { data: validations, refetch: refetchValidations } = useVendorValidations(selectedVendor?.id);
   const financeAction = useFinanceAction();
   const runValidations = useRunValidations();
 
@@ -169,6 +174,81 @@ export default function FinanceReview() {
     }
   };
 
+  // Initialize Reverse Penny Drop (Surepass) - sends email to vendor
+  const handleInitReversePennyDrop = async () => {
+    if (!selectedVendor) return;
+    
+    setIsInitializingPennyDrop(true);
+    setReversePennyDropResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('init-reverse-penny-drop', {
+        body: {
+          vendorId: selectedVendor.id,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success('Penny drop verification initiated', {
+          description: `Email sent to ${data.emailSentTo}`,
+        });
+        setReversePennyDropResult(data);
+      } else {
+        throw new Error(data.error || 'Failed to initialize penny drop');
+      }
+    } catch (error: any) {
+      console.error('Init reverse penny drop error:', error);
+      toast.error('Failed to initialize penny drop', {
+        description: error.message,
+      });
+    } finally {
+      setIsInitializingPennyDrop(false);
+    }
+  };
+
+  // Verify Reverse Penny Drop status (Surepass)
+  const handleVerifyReversePennyDrop = async () => {
+    if (!selectedVendor) return;
+    
+    setIsCheckingPennyDropStatus(true);
+    setReversePennyDropResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-reverse-penny-drop', {
+        body: {
+          vendorId: selectedVendor.id,
+        },
+      });
+
+      if (error) throw error;
+
+      setReversePennyDropResult(data);
+
+      if (data.success) {
+        if (data.verified) {
+          toast.success('Bank account verified!', {
+            description: `Account holder: ${data.data?.holder_name}`,
+          });
+        } else {
+          toast.info('Verification pending', {
+            description: 'Vendor has not completed the payment yet.',
+          });
+        }
+      } else {
+        throw new Error(data.error || 'Failed to verify penny drop');
+      }
+    } catch (error: any) {
+      console.error('Verify reverse penny drop error:', error);
+      toast.error('Failed to verify penny drop', {
+        description: error.message,
+      });
+    } finally {
+      setIsCheckingPennyDropStatus(false);
+    }
+  };
+
   const handleRerunValidations = async () => {
     if (!selectedVendor) return;
     
@@ -181,8 +261,6 @@ export default function FinanceReview() {
       ifscCode: selectedVendor.ifsc_code,
       msmeNumber: selectedVendor.msme_number,
     });
-    
-    refetchValidations();
   };
 
   const handleAddSampleDocs = async () => {
@@ -221,13 +299,55 @@ export default function FinanceReview() {
     return <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">Pending Review</Badge>;
   };
 
-  // Convert DB validations to component format
-  const mappedValidations: ValidationResult[] = validations?.map(v => ({
-    type: v.validation_type as ValidationResult['type'],
-    status: v.status as ValidationResult['status'],
-    message: v.message || '',
-    timestamp: v.validated_at,
-  })) || [];
+  // Helper function to map vendor verification status columns to ValidationResult format
+  const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
+    if (!vendor) return [];
+    
+    const vendorData = vendor as VendorRow & {
+      gst_verification_status?: string;
+      pan_verification_status?: string;
+      bank_verification_status?: string;
+      msme_verification_status?: string;
+      name_match_verification_status?: string;
+    };
+    
+    return [
+      {
+        type: 'gst' as const,
+        status: (vendorData.gst_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.gst_verification_status === 'passed' ? 'GST verified' : 'GST verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'pan' as const,
+        status: (vendorData.pan_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.pan_verification_status === 'passed' ? 'PAN verified' : 'PAN verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'bank' as const,
+        status: (vendorData.bank_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.bank_verification_status === 'passed' ? 'Bank account verified' : 'Bank verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'msme' as const,
+        status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
+        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' : 
+                 vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'name_match' as const,
+        status: (vendorData.name_match_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.name_match_verification_status === 'passed' ? 'Name match verified' : 'Name match pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+    ];
+  };
+
+  // Get validations from vendor's verification status columns
+  const mappedValidations: ValidationResult[] = getValidationsFromVendor(selectedVendor);
 
   return (
     <div className="space-y-8">
@@ -318,6 +438,21 @@ export default function FinanceReview() {
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                         <span className="font-mono bg-muted px-2 py-0.5 rounded">ID: {vendor.id.slice(0, 8)}...</span>
                         <span>GSTIN: {vendor.gstin || 'N/A'}</span>
+                        {vendor.product_categories && vendor.product_categories.length > 0 && (
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-muted-foreground">Categories:</span>
+                            {vendor.product_categories.slice(0, 2).map((category, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {category}
+                              </Badge>
+                            ))}
+                            {vendor.product_categories.length > 2 && (
+                              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
+                                +{vendor.product_categories.length - 2} more
+                              </Badge>
+                            )}
+                          </span>
+                        )}
                         <span>Submitted: {vendor.submitted_at ? new Date(vendor.submitted_at).toLocaleDateString('en-IN') : '-'}</span>
                       </div>
                     </div>
@@ -566,23 +701,56 @@ export default function FinanceReview() {
                     <h3 className="text-lg font-semibold">Penny Drop Verification</h3>
                     <p className="text-sm text-muted-foreground">Verify bank account with ₹1 transfer</p>
                   </div>
-                  <Button
-                    onClick={handlePennyDrop}
-                    disabled={isVerifyingPennyDrop || !selectedVendor?.account_number || !selectedVendor?.ifsc_code}
-                    className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                  >
-                    {isVerifyingPennyDrop ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        <IndianRupee className="h-4 w-4 mr-2" />
-                        Run Penny Drop
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleInitReversePennyDrop}
+                      disabled={isInitializingPennyDrop || !selectedVendor?.primary_email}
+                      className={`rounded-xl ${
+                        selectedVendor?.pennydrop_init 
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600' 
+                          : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                      }`}
+                    >
+                      {isInitializingPennyDrop ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {selectedVendor?.pennydrop_init ? 'Updating...' : 'Sending...'}
+                        </>
+                      ) : (
+                        <>
+                          {selectedVendor?.pennydrop_init ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Update Penny Drop
+                            </>
+                          ) : (
+                            <>
+                              <IndianRupee className="h-4 w-4 mr-2" />
+                              Run Penny Drop
+                            </>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleVerifyReversePennyDrop}
+                      disabled={isCheckingPennyDropStatus || !selectedVendor?.pennydrop_init}
+                      variant="outline"
+                      className="rounded-xl"
+                    >
+                      {isCheckingPennyDropStatus ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Verify Penny Drop
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Bank Details Summary */}
@@ -747,30 +915,118 @@ export default function FinanceReview() {
                     </p>
                   </div>
                 )}
+
+                {/* Reverse Penny Drop Status */}
+                {(selectedVendor?.pennydrop_init || reversePennyDropResult) && (
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+                          (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
+                            ? 'bg-gradient-to-br from-green-500/20 to-green-500/5'
+                            : 'bg-gradient-to-br from-blue-500/20 to-blue-500/5'
+                        }`}>
+                          <CheckCircle2 className={`h-4 w-4 ${
+                            (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
+                              ? 'text-green-600'
+                              : 'text-blue-600'
+                          }`} />
+                        </div>
+                        Reverse Penny Drop Status
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-3">
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Client ID</span>
+                        <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
+                          {selectedVendor?.pennydrop_init || reversePennyDropResult?.clientId || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Verification Status</span>
+                        <Badge variant={
+                          (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
+                            ? 'default'
+                            : 'secondary'
+                        } className={
+                          (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
+                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                            : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                        }>
+                          {reversePennyDropResult?.status || selectedVendor?.pennydrop_verification_status || 'pending'}
+                        </Badge>
+                      </div>
+                      {reversePennyDropResult?.data && reversePennyDropResult.data.holder_name && (
+                        <>
+                          <div className="flex justify-between py-2 border-b">
+                            <span className="text-muted-foreground">Account Holder</span>
+                            <span className="font-medium">{reversePennyDropResult.data.holder_name}</span>
+                          </div>
+                          {reversePennyDropResult.data.account_number && (
+                            <div className="flex justify-between py-2 border-b">
+                              <span className="text-muted-foreground">Account Number</span>
+                              <span className="font-mono">{reversePennyDropResult.data.account_number}</span>
+                            </div>
+                          )}
+                          {reversePennyDropResult.data.ifsc && (
+                            <div className="flex justify-between py-2 border-b">
+                              <span className="text-muted-foreground">IFSC</span>
+                              <span className="font-mono bg-muted px-2 py-0.5 rounded">{reversePennyDropResult.data.ifsc}</span>
+                            </div>
+                          )}
+                          {reversePennyDropResult.data.upi_id && (
+                            <div className="flex justify-between py-2 border-b">
+                              <span className="text-muted-foreground">UPI ID</span>
+                              <span className="font-mono">{reversePennyDropResult.data.upi_id}</span>
+                            </div>
+                          )}
+                          {reversePennyDropResult.data.payment_mode && (
+                            <div className="flex justify-between py-2">
+                              <span className="text-muted-foreground">Payment Mode</span>
+                              <span>{reversePennyDropResult.data.payment_mode}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Pending Payment Warning */}
+                {(reversePennyDropResult?.status === 'pending' || 
+                  (selectedVendor?.pennydrop_verification_status === 'pending' && !reversePennyDropResult?.verified)) && (
+                  <Card className="border-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Loader2 className="h-5 w-5 text-amber-600" />
+                        <span className="font-semibold text-amber-700">Verification Pending</span>
+                      </div>
+                      <p className="text-sm text-amber-600">
+                        The vendor has not completed the ₹1 verification payment yet. Please ask the vendor to scan the QR code sent via email and complete the payment.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Verified Success */}
+                {(reversePennyDropResult?.verified || selectedVendor?.pennydrop_verification_status === 'verified') && (
+                  <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-950/20">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <span className="font-semibold text-green-700">Bank Account Verified</span>
+                      </div>
+                      <p className="text-sm text-green-600">
+                        The vendor has successfully completed the ₹1 verification payment. Bank account ownership confirmed.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="validations" className="space-y-4 mt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Validation Results</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRerunValidations}
-                    disabled={runValidations.isPending}
-                    className="rounded-xl"
-                  >
-                    {runValidations.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Re-run Validations
-                      </>
-                    )}
-                  </Button>
                 </div>
                 <ValidationStatus 
                   validations={mappedValidations} 

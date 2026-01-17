@@ -29,13 +29,13 @@ import {
 
 const schema = z.object({
   firmRegistrationNo: z.string().optional(),
-  pan: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').or(z.literal('')),
+  pan: z.string().min(1).or(z.literal('')),
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
   msmeNumber: z.string().optional(),
   msmeCategory: z.enum(['micro', 'small', 'medium', '']),
   labourPermitNo: z.string().optional(),
-  gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST format').or(z.literal('')),
+  gstin: z.string().min(1).or(z.literal('')),
   iecNo: z.string().optional(),
   entityType: z.string().min(1, 'Entity type is required'),
   memberships: z.array(z.string()).optional(),

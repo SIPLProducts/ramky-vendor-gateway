@@ -247,7 +247,7 @@ export function useFinanceAction() {
   });
 }
 
-// Purchase approval mutation
+// Purchase approval mutation (approve only - no SAP sync)
 export function usePurchaseAction() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -264,7 +264,7 @@ export function usePurchaseAction() {
       comments: string;
     }) => {
       const statusMap: Record<string, VendorStatus> = {
-        approve: 'sap_synced',
+        approve: 'purchase_approved',
         reject: 'purchase_rejected',
       };
 
@@ -274,11 +274,6 @@ export function usePurchaseAction() {
         purchase_reviewed_at: new Date().toISOString(),
         purchase_comments: comments,
       };
-
-      if (action === 'approve') {
-        updateData.sap_vendor_code = `SAP-VND-${Date.now().toString().slice(-8)}`;
-        updateData.sap_synced_at = new Date().toISOString();
-      }
 
       const { data, error } = await supabase
         .from('vendors')
@@ -294,23 +289,101 @@ export function usePurchaseAction() {
         vendor_id: vendorId,
         user_id: user?.id,
         action: `purchase_${action}`,
-        details: { comments, sap_vendor_code: updateData.sap_vendor_code },
+        details: { comments },
       });
 
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      
       toast({
-        title: variables.action === 'approve' ? 'Approved & Synced' : 'Rejected',
+        title: variables.action === 'approve' ? '✅ Approved' : 'Rejected',
         description: variables.action === 'approve' 
-          ? 'Vendor synced to SAP successfully'
+          ? 'Vendor approved and ready for SAP sync'
           : 'Vendor registration rejected',
       });
     },
     onError: (error: Error) => {
       toast({
         title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// SAP Sync mutation (separate from purchase approval)
+export function useSAPSync() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ vendorId }: { vendorId: string }) => {
+      console.log('Calling SAP sync edge function for vendor:', vendorId);
+
+      // Call SAP sync edge function (which calls Cloudflare Worker)
+      const { data: sapResult, error: sapError } = await supabase.functions.invoke(
+        'sync-vendor-to-sap',
+        {
+          body: { vendorId },
+        }
+      );
+
+      console.log('SAP sync response:', { sapResult, sapError });
+
+      if (sapError) {
+        console.error('SAP sync error:', sapError);
+        throw new Error(`SAP sync failed: ${sapError.message}`);
+      }
+
+      if (!sapResult) {
+        throw new Error('No response from SAP sync function');
+      }
+
+      if (!sapResult.success) {
+        console.error('SAP sync failed:', sapResult);
+        throw new Error(sapResult.message || 'SAP sync failed');
+      }
+
+      console.log('SAP sync successful:', sapResult);
+
+      // Log audit with SAP details
+      await supabase.from('audit_logs').insert({
+        vendor_id: vendorId,
+        user_id: user?.id,
+        action: 'sap_sync',
+        details: { 
+          sap_vendor_code: sapResult.sapVendorCode,
+          sap_response: sapResult.sapResponse 
+        },
+      });
+
+      // Fetch updated vendor
+      const { data: vendor, error: fetchError } = await supabase
+        .from('vendors')
+        .select()
+        .eq('id', vendorId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return { vendor, sapResponse: sapResult };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
+      
+      toast({
+        title: '✅ Synced to SAP',
+        description: `SAP Vendor Code: ${result.sapResponse?.sapVendorCode || 'N/A'}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'SAP Sync Failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -338,6 +411,7 @@ export function useVendorStats() {
         total: data.length,
         pendingFinance: data.filter(v => v.status === 'finance_review').length,
         pendingPurchase: data.filter(v => v.status === 'purchase_review').length,
+        pendingSAPSync: data.filter(v => v.status === 'purchase_approved').length,
         approved: data.filter(v => v.status === 'sap_synced').length,
         validationFailed: data.filter(v => v.status === 'validation_failed').length,
         draft: data.filter(v => v.status === 'draft').length,

@@ -7,18 +7,15 @@ import {
   ClipboardCheck,
   Users,
   Settings,
-  Shield,
   History,
   Mail,
-  FileCheck,
   HelpCircle,
-  Play,
-  Calendar,
   LogOut,
   Bell,
   Wrench,
   ChevronLeft,
   ChevronRight,
+  Server,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -90,40 +87,22 @@ const navItems: NavItem[] = [
     roles: ['purchase', 'admin', 'sharvi_admin', 'approver'],
   },
   {
+    label: 'SAP Sync',
+    href: '/sap/sync',
+    icon: Server,
+    roles: ['admin', 'sharvi_admin'],
+  },
+  {
     label: 'All Vendors',
     href: '/vendors',
     icon: Users,
     roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
   },
   {
-    label: 'GST Compliance',
-    href: '/compliance/gst',
-    icon: Shield,
-    roles: ['finance', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Scheduled Checks',
-    href: '/compliance/scheduled',
-    icon: Calendar,
-    roles: ['admin', 'sharvi_admin'],
-  },
-  {
     label: 'Audit Logs',
     href: '/audit-logs',
     icon: History,
     roles: ['finance', 'purchase', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Configuration',
-    href: '/settings',
-    icon: Settings,
-    roles: ['admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'Demo Showcase',
-    href: '/demo',
-    icon: Play,
-    roles: ['admin', 'finance', 'purchase', 'sharvi_admin'],
   },
   {
     label: 'Help & Support',
@@ -367,7 +346,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
         {!collapsed && (
           <div className="px-2 py-1.5 text-center mt-2">
             <p className="text-[10px] text-sidebar-foreground/40">
-              © 2025 Ramky Infrastructure • v2.0.0
+              © 2026 Sharvi Infotech Private Limited • v2.0.0
             </p>
           </div>
         )}

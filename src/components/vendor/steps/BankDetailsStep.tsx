@@ -26,7 +26,7 @@ const schema = z.object({
   confirmAccountNumber: z.string().min(8, 'Please confirm account number'),
   accountType: z.enum(['current', 'savings', 'cash_credit', 'others']),
   accountTypeOther: z.string().optional(),
-  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code format'),
+  ifscCode: z.string().min(11, 'IFSC code is required'),
   micrCode: z.string().optional(),
   bankAddress: z.string().optional(),
 }).refine((data) => data.accountNumber === data.confirmAccountNumber, {
@@ -37,15 +37,16 @@ const schema = z.object({
 interface BankDetailsStepProps {
   data: BankDetails;
   legalName?: string;
+  vendorId?: string;
   onNext: (data: BankDetails) => void;
   onBack: () => void;
   onValidationStateChange?: (isValid: boolean) => void;
 }
 
-export function BankDetailsStep({ data, legalName, onNext, onValidationStateChange }: BankDetailsStepProps) {
+export function BankDetailsStep({ data, legalName, vendorId, onNext, onValidationStateChange }: BankDetailsStepProps) {
   const [cancelledChequeFile, setCancelledChequeFile] = useState<File | null>(data.cancelledChequeFile);
   
-  const { validationStates, validateBank, resetValidation } = useFieldValidation();
+  const { validationStates, validateBank, resetValidation } = useFieldValidation(vendorId);
 
   const {
     register,
@@ -68,7 +69,7 @@ export function BankDetailsStep({ data, legalName, onNext, onValidationStateChan
     if (validationStates.bank.status !== 'idle') {
       resetValidation('bank');
     }
-  }, [accountNumber, ifscCode]);
+  }, [accountNumber, ifscCode, resetValidation]);
 
   // Update parent about validation state
   useEffect(() => {
@@ -77,9 +78,10 @@ export function BankDetailsStep({ data, legalName, onNext, onValidationStateChan
   }, [validationStates.bank.status, onValidationStateChange]);
 
   const canVerify = 
-    accountNumber?.length >= 8 && 
+    accountNumber?.length >= 1 && 
+    confirmAccountNumber?.length >= 1 &&
     confirmAccountNumber === accountNumber &&
-    ifscCode?.length === 11;
+    ifscCode?.length >= 1;
 
   const handleVerifyBank = async () => {
     await validateBank(accountNumber, ifscCode, legalName);
@@ -89,19 +91,53 @@ export function BankDetailsStep({ data, legalName, onNext, onValidationStateChan
     if (validationStates.bank.status !== 'passed') {
       return;
     }
+    // Check if cancelled cheque is uploaded
+    if (!cancelledChequeFile) {
+      return;
+    }
     onNext({
       ...formData,
       cancelledChequeFile,
     });
   };
 
+  // Bypass form validation if bank is already verified
+  const handleContinue = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check if cancelled cheque is uploaded - mandatory
+    if (!cancelledChequeFile) {
+      return;
+    }
+    
+    if (validationStates.bank.status === 'passed') {
+      // Bank is verified, bypass Zod validation and submit directly
+      const formData: BankDetails = {
+        bankName: watch('bankName'),
+        branchName: watch('branchName'),
+        accountNumber: watch('accountNumber'),
+        confirmAccountNumber: watch('confirmAccountNumber'),
+        accountType: watch('accountType'),
+        accountTypeOther: watch('accountTypeOther'),
+        ifscCode: watch('ifscCode'),
+        micrCode: watch('micrCode'),
+        bankAddress: watch('bankAddress'),
+        cancelledChequeFile,
+      };
+      onNext(formData);
+    } else {
+      // Bank not verified, run normal validation
+      handleSubmit(handleFormSubmit)(e);
+    }
+  };
+
   return (
-    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form id="step-form" onSubmit={handleContinue} className="space-y-6">
       {/* Validation Notice */}
       {validationStates.bank.status !== 'passed' && (
         <Alert className="border-warning bg-warning/10">
           <AlertDescription className="text-warning-foreground">
-            Bank account verification is mandatory. Please complete ₹1 Penny Drop verification.
+            Bank account verification is mandatory. Please verify your account details.
           </AlertDescription>
         </Alert>
       )}
@@ -230,9 +266,6 @@ export function BankDetailsStep({ data, legalName, onNext, onValidationStateChan
                 <p className="text-xs text-destructive">{errors.ifscCode.message}</p>
               )}
               <ValidationMessage state={validationStates.bank} />
-              <p className="text-xs text-muted-foreground">
-                ₹1 Penny Drop verification will be performed
-              </p>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="micrCode">MICR Code (9 digits)</Label>
@@ -265,19 +298,23 @@ export function BankDetailsStep({ data, legalName, onNext, onValidationStateChan
           Supporting Documents
         </h3>
 
-        <Alert className="mb-5">
-          <AlertDescription>
-            Please attach a copy of cancelled or blank cheque
+        <Alert className="mb-5 border-warning bg-warning/10">
+          <AlertDescription className="text-warning-foreground">
+            Cancelled cheque upload is mandatory. You cannot proceed without uploading this document.
           </AlertDescription>
         </Alert>
 
         <FileUpload
-          label="Cancelled Cheque / Blank Cheque"
+          label="Cancelled Cheque / Blank Cheque *"
           accept=".pdf,.jpg,.jpeg,.png"
           documentType="cancelled_cheque"
           onFileSelect={setCancelledChequeFile}
           currentFile={cancelledChequeFile}
+          required
         />
+        {!cancelledChequeFile && (
+          <p className="text-xs text-destructive mt-2">This document is required to proceed</p>
+        )}
       </div>
     </form>
   );

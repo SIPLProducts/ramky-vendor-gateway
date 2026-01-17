@@ -92,7 +92,8 @@ export default function AdminInvitations() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
-      const { data, error } = await supabase
+      // Step 1: Create invitation in database
+      const { data: invitation, error: dbError } = await supabase
         .from('vendor_invitations')
         .insert({
           email,
@@ -102,18 +103,47 @@ export default function AdminInvitations() {
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (dbError) throw dbError;
+
+      // Step 2: Send invitation email immediately
+      console.log('Sending invitation email to:', email);
+      const { data: emailData, error: emailError } = await supabase.functions.invoke('send-vendor-invitation', {
+        body: {
+          email: invitation.email,
+          token: invitation.token,
+          expiresAt: invitation.expires_at,
+          invitationId: invitation.id,
+          simulationMode: false,
+        },
+      });
+
+      if (emailError) {
+        console.error('Email sending error:', emailError);
+        // Don't throw - invitation is created, just email failed
+        return { invitation, emailSent: false, error: emailError };
+      }
+
+      console.log('Email sent successfully:', emailData);
+      return { invitation, emailSent: true, emailData };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
       setIsDialogOpen(false);
       setEmail('');
       setExpiryDays('14');
-      toast({
-        title: 'Invitation Created',
-        description: 'Vendor invitation has been created successfully.',
-      });
+      
+      if (result.emailSent) {
+        toast({
+          title: 'Invitation Sent',
+          description: `Invitation email has been sent to ${result.invitation.email}`,
+        });
+      } else {
+        toast({
+          title: 'Invitation Created',
+          description: 'Invitation created but email failed to send. You can resend it from the list.',
+          variant: 'default',
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -130,6 +160,8 @@ export default function AdminInvitations() {
       const invitation = invitations?.find((inv) => inv.id === invitationId);
       if (!invitation) throw new Error('Invitation not found');
 
+      console.log('Calling edge function for invitation:', invitationId);
+      
       // Call edge function to send invitation email
       const { data, error } = await supabase.functions.invoke('send-vendor-invitation', {
         body: {
@@ -141,7 +173,13 @@ export default function AdminInvitations() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw new Error(error.message || 'Failed to send email');
+      }
+      
+      console.log('Edge function response:', data);
       return { invitation, simulated: data?.simulated, emailId: data?.emailId };
     },
     onSuccess: (result) => {
@@ -150,10 +188,11 @@ export default function AdminInvitations() {
         title: result?.simulated ? 'Email Simulated' : 'Email Sent',
         description: result?.simulated 
           ? 'Invitation email simulated (demo mode). Check console for details.'
-          : 'Invitation email has been sent to the vendor.',
+          : `Invitation email has been sent to ${result.invitation.email}`,
       });
     },
     onError: (error: any) => {
+      console.error('Send email mutation error:', error);
       toast({
         title: 'Email Failed',
         description: error.message || 'Failed to send invitation email. You can still copy the link.',
@@ -178,7 +217,7 @@ export default function AdminInvitations() {
   };
 
   const copyInvitationLink = (token: string) => {
-    const link = `${window.location.origin}/vendor/register?token=${token}`;
+    const link = `${window.location.origin}/vendor/invite?token=${token}`;
     navigator.clipboard.writeText(link);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);

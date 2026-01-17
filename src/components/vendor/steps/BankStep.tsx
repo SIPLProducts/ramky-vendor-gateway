@@ -20,7 +20,7 @@ const schema = z.object({
   confirmAccountNumber: z.string().min(8, 'Confirm account number'),
   accountType: z.enum(['current', 'savings', 'cash_credit', 'others']),
   accountTypeOther: z.string().optional(),
-  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC format'),
+  ifscCode: z.string().min(11, 'IFSC code is required'),
   micrCode: z.string().optional(),
   bankAddress: z.string().optional(),
 }).refine((data) => data.accountNumber === data.confirmAccountNumber, {

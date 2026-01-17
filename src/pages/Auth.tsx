@@ -146,7 +146,7 @@ export default function Auth() {
           <div className="flex items-center gap-3 mb-8">
             <img 
               src={ramkyLogo} 
-              alt="Ramky Infrastructure" 
+              alt="Sharvi Infotech Private Limited" 
               className="h-16 w-auto bg-white/90 rounded-lg p-2"
             />
           </div>
@@ -183,7 +183,7 @@ export default function Auth() {
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
             <img 
               src={ramkyLogo} 
-              alt="Ramky Infrastructure" 
+              alt="Sharvi Infotech Private Limited" 
               className="h-14 w-auto"
             />
           </div>
@@ -372,7 +372,7 @@ export default function Auth() {
           </Card>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            © 2024 Ramky Infrastructure Limited. All rights reserved.
+            © 2026 Sharvi Infotech Private Limited. All rights reserved.
           </p>
         </div>
       </div>

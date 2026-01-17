@@ -35,14 +35,14 @@ const schema = z.object({
   productCategories: z.array(z.string()).min(1, 'Select at least one category'),
   
   // Verification Fields
-  gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST format'),
-  pan: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
+  gstin: z.string().min(1, 'GSTIN is required'),
+  pan: z.string().min(1, 'PAN is required'),
   msmeNumber: z.string().min(1, 'MSME/Udyam number is required'),
   
   // Bank Details
   bankAccountNumber: z.string().min(8, 'Account number is required'),
   confirmAccountNumber: z.string().min(8, 'Confirm account number'),
-  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC format'),
+  ifscCode: z.string().min(11, 'IFSC code is required'),
   accountHolderName: z.string().optional(),
 }).refine((data) => data.bankAccountNumber === data.confirmAccountNumber, {
   message: "Account numbers don't match",

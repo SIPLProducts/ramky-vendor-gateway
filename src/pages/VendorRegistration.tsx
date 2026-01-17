@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { EnterpriseStepIndicator } from '@/components/vendor/EnterpriseStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
@@ -53,11 +53,214 @@ export default function VendorRegistration() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
+  const [isValidatingToken, setIsValidatingToken] = useState(true);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [isTokenMode, setIsTokenMode] = useState(false);
+  const [invitationEmail, setInvitationEmail] = useState<string>('');
   const formDataLoadedRef = useRef(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
-  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration();
+  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
+    invitationToken: invitationToken || undefined,
+  });
+
+  // Validate token on mount and check authentication
+  useEffect(() => {
+    const validateToken = async () => {
+      const token = searchParams.get('token');
+      
+      if (!token) {
+        setTokenError('Access denied. This page requires a valid invitation link.');
+        setIsValidatingToken(false);
+        return;
+      }
+
+      // Validate the token
+      try {
+        const { data: invitation, error } = await supabase
+          .from('vendor_invitations')
+          .select('*')
+          .eq('token', token)
+          .single();
+
+        if (error || !invitation) {
+          setTokenError('Invalid invitation link. Please contact the administrator.');
+          setIsValidatingToken(false);
+          return;
+        }
+
+        const expiresAt = new Date(invitation.expires_at);
+        if (expiresAt < new Date()) {
+          setTokenError('This invitation link has expired. Please request a new one.');
+          setIsValidatingToken(false);
+          return;
+        }
+
+        // Check if user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // If invitation has user_id, require authentication
+        if (invitation.user_id && !session) {
+          // Redirect to login page
+          navigate(`/vendor/login?token=${token}`);
+          return;
+        }
+
+        // If authenticated, verify the user matches the invitation
+        if (session && invitation.user_id) {
+          if (session.user.id !== invitation.user_id && session.user.email !== invitation.email) {
+            setTokenError('This invitation is for a different user. Please log in with the correct account.');
+            setIsValidatingToken(false);
+            return;
+          }
+        }
+
+        // Check if authenticated user already has a vendor record
+        if (session) {
+          const { data: existingVendorRecord } = await supabase
+            .from('vendors')
+            .select('id, status')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingVendorRecord) {
+            // Check if it's a draft - allow editing
+            if (existingVendorRecord.status === 'draft') {
+              console.log('[Token] Draft vendor record found - allowing form editing');
+              setInvitationToken(token);
+              setInvitationEmail(invitation.email);
+              setIsTokenMode(true);
+              setIsValidatingToken(false);
+              // Don't set isSubmitted - let the form load with existing data
+              return;
+            }
+            
+            // User has already submitted the form - show status screen
+            console.log('[Token] Existing vendor record found - showing status screen');
+            setInvitationToken(token);
+            setInvitationEmail(invitation.email);
+            setIsTokenMode(true);
+            setIsSubmitted(true);
+            setVendorStatusState(existingVendorRecord.status as RegistrationStatus);
+            setIsValidatingToken(false);
+            return;
+          }
+        }
+
+        // Check if form has been submitted via invitation
+        if (invitation.used_at) {
+          // After submission, allow unlimited access to view progress
+          console.log('[Token] Form already submitted - allowing access to view progress');
+          setInvitationToken(token);
+          setInvitationEmail(invitation.email);
+          setIsTokenMode(true);
+          setIsSubmitted(true); // Show success screen instead of form
+          setIsValidatingToken(false);
+          
+          // Fetch vendor status if vendor_id exists
+          if (invitation.vendor_id) {
+            const { data: vendor } = await supabase
+              .from('vendors')
+              .select('status')
+              .eq('id', invitation.vendor_id)
+              .single();
+            
+            if (vendor) {
+              setVendorStatusState(vendor.status as RegistrationStatus);
+            }
+          }
+          return;
+        }
+
+        // Before submission, check access count (max 3 times) - only for unauthenticated access
+        if (!session) {
+          const accessCount = invitation.access_count || 0;
+          if (accessCount >= 3) {
+            setTokenError('This invitation link has reached its maximum access limit (3 times). Please contact the administrator for a new link.');
+            setIsValidatingToken(false);
+            return;
+          }
+
+          // Increment access count
+          await supabase
+            .from('vendor_invitations')
+            .update({ access_count: accessCount + 1 })
+            .eq('token', token);
+
+          console.log(`[Token] Access granted - count: ${accessCount + 1}/3`);
+        } else {
+          console.log('[Token] Authenticated access - no access count limit');
+        }
+
+        // Token is valid - enable token mode
+        setInvitationToken(token);
+        setInvitationEmail(invitation.email);
+        setIsTokenMode(true);
+        setIsValidatingToken(false);
+      } catch (err) {
+        console.error('Token validation error:', err);
+        setTokenError('Failed to validate invitation. Please try again.');
+        setIsValidatingToken(false);
+      }
+    };
+
+    validateToken();
+  }, [searchParams, navigate]);
+
+  // Block navigation when in token mode
+  useEffect(() => {
+    if (!isTokenMode) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+      toast({
+        title: 'Navigation Blocked',
+        description: 'Please complete the registration form.',
+        variant: 'default',
+      });
+    };
+
+    // Block keyboard shortcuts that might allow navigation
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block F5, Ctrl+R (refresh)
+      if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+        e.preventDefault();
+        toast({
+          title: 'Refresh Blocked',
+          description: 'Please complete the registration form. Your progress is auto-saved.',
+          variant: 'default',
+        });
+      }
+      // Block Ctrl+W (close tab)
+      if (e.ctrlKey && e.key === 'w') {
+        e.preventDefault();
+      }
+    };
+
+    // Push initial state
+    window.history.pushState(null, '', window.location.href);
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isTokenMode, toast]);
 
   const handleValidationStateChange = (step: number) => (isValid: boolean) => {
     setStepValidationState(prev => ({ ...prev, [step]: isValid }));
@@ -79,7 +282,7 @@ export default function VendorRegistration() {
       return 'Please verify GST, PAN, and MSME details';
     }
     if (currentStep === 5 && stepValidationState[5] !== true) {
-      return 'Please verify bank account with Penny Drop';
+      return 'Please verify bank account details';
     }
     return undefined;
   };
@@ -95,7 +298,24 @@ export default function VendorRegistration() {
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
-        if (vendorStatus !== 'draft') { setIsSubmitted(true); setIsEditMode(false); }
+        // For draft status, allow user to continue from where they left off
+        // Mark steps as completed based on filled data
+        if (vendorStatus === 'draft') {
+          const filledSteps: number[] = [];
+          if (existingFormData.organization?.legalName) filledSteps.push(1);
+          if (existingFormData.address?.registeredAddress) filledSteps.push(2);
+          if (existingFormData.contact?.ceoName) filledSteps.push(3);
+          if (existingFormData.statutory?.entityType) filledSteps.push(4);
+          if (existingFormData.bank?.bankName) filledSteps.push(5);
+          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(6);
+          setCompletedSteps(filledSteps);
+          // Go to the first incomplete step or step 1
+          const nextStep = filledSteps.length > 0 ? Math.min(...[1,2,3,4,5,6,7].filter(s => !filledSteps.includes(s))) : 1;
+          setCurrentStep(nextStep || 7);
+        } else {
+          setIsSubmitted(true); 
+          setIsEditMode(false);
+        }
       } else if (pendingStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
@@ -152,15 +372,38 @@ export default function VendorRegistration() {
     }
   };
 
-  const handleCancel = () => { toast({ title: 'Registration Cancelled' }); navigate('/'); };
+  const handleCancel = () => { 
+    if (isTokenMode) {
+      toast({ 
+        title: 'Cannot Cancel', 
+        description: 'Please complete the registration or close this window.',
+        variant: 'default'
+      });
+      return;
+    }
+    toast({ title: 'Registration Cancelled' }); 
+    navigate('/'); 
+  };
 
   const handleSubmit = async () => {
     try {
       const vendor = isEditMode && vendorId ? await resubmitVendor(formData) : await submitVendor(formData);
-      setIsSubmitted(true); setIsEditMode(false); setVendorStatusState('validation_pending');
+      
+      // Mark invitation as used if token exists
+      if (invitationToken) {
+        await supabase
+          .from('vendor_invitations')
+          .update({ 
+            used_at: new Date().toISOString(),
+            vendor_id: vendor.id
+          })
+          .eq('token', invitationToken);
+      }
+      
+      setIsSubmitted(true); setIsEditMode(false); setVendorStatusState('finance_review');
       toast({ title: isEditMode ? 'Application Resubmitted' : 'Application Submitted' });
       setShowFeedback(true);
-      await runValidations(vendor.id);
+      // Skip runValidations since frontend already validated
     } catch (error) {
       toast({ title: 'Submission Failed', description: error instanceof Error ? error.message : 'An error occurred', variant: 'destructive' });
     }
@@ -176,9 +419,9 @@ export default function VendorRegistration() {
       case 3: 
         return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4: 
-        return <CommercialStep data={formData.statutory} legalName={legalName} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
+        return <CommercialStep data={formData.statutory} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
       case 5: 
-        return <BankDetailsStep data={formData.bank} legalName={legalName} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
+        return <BankDetailsStep data={formData.bank} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
       case 6: 
         return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
       case 7: 
@@ -188,15 +431,49 @@ export default function VendorRegistration() {
     }
   };
 
-  if (isLoadingVendor) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
+  if (isLoadingVendor || isValidatingToken) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
+
+  // Show error if token validation failed
+  if (tokenError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-6 text-center">
+          <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+            <X className="h-6 w-6 text-destructive" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-muted-foreground mb-6">{tokenError}</p>
+          <p className="text-sm text-muted-foreground">
+            Please contact the administrator for a new invitation link.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isSubmitted && !isEditMode) {
     return (
       <div className="min-h-screen bg-background">
         <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-          <Link to="/" className="flex items-center gap-3"><img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" /><span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span></Link>
+          {isTokenMode ? (
+            <div className="flex items-center gap-3">
+              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+              <span className="text-sm font-semibold text-foreground">Vendor Portal</span>
+            </div>
+          ) : (
+            <Link to="/" className="flex items-center gap-3">
+              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+              <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+            </Link>
+          )}
         </header>
-        <SuccessScreen status={vendorStatusState} vendorId={vendorId || undefined} financeComments={existingVendor?.finance_comments} purchaseComments={existingVendor?.purchase_comments} onEdit={handleStartEdit} />
+        <SuccessScreen 
+          status={vendorStatusState} 
+          vendorId={vendorId || undefined} 
+          financeComments={existingVendor?.finance_comments} 
+          purchaseComments={existingVendor?.purchase_comments} 
+          onEdit={isTokenMode ? undefined : handleStartEdit}
+        />
         <FeedbackPopup open={showFeedback} onOpenChange={setShowFeedback} vendorId={vendorId || undefined} />
       </div>
     );
@@ -209,10 +486,17 @@ export default function VendorRegistration() {
     <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
       {/* Header */}
       <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        <Link to="/" className="flex items-center gap-3">
-          <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-          <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
-        </Link>
+        {isTokenMode ? (
+          <div className="flex items-center gap-3">
+            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+            <span className="text-sm font-semibold text-foreground">Vendor Registration</span>
+          </div>
+        ) : (
+          <Link to="/" className="flex items-center gap-3">
+            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+            <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+          </Link>
+        )}
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
@@ -271,6 +555,13 @@ export default function VendorRegistration() {
           <div className="bg-card rounded-[10px] shadow-enterprise-md border">
             {/* Form Header */}
             <div className="px-6 py-4 border-b">
+              {isTokenMode && invitationEmail && (
+                <div className="mb-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   {currentStep === 1 && <span className="text-lg">🏢</span>}
@@ -308,16 +599,19 @@ export default function VendorRegistration() {
               )}
 
               <div className="flex items-center justify-between">
-                {/* Left side - Cancel */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCancel}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
+                {/* Left side - Cancel (hidden in token mode) */}
+                {!isTokenMode && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCancel}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                )}
+                {isTokenMode && <div />} {/* Spacer */}
 
                 {/* Right side - Navigation and Actions */}
                 <div className="flex items-center gap-3">

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { PublicHeader } from '@/components/layout/PublicHeader';
 import { 
   Card, 
   CardContent, 
@@ -129,13 +128,11 @@ export default function SupportHelp() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <PublicHeader />
-      
-      <main className="container max-w-6xl py-8">
-        <div className="text-center mb-8">
+    <div className="w-full">
+      <main className="w-full">
+        <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Help & Support</h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+          <p className="text-muted-foreground">
             Find answers to common questions or reach out to our support team for assistance
           </p>
         </div>

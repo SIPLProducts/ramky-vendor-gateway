@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,9 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
-import { useVendors, useVendorValidations, usePurchaseAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
-import { useRunValidations } from '@/hooks/useVendorValidations';
-import { addSampleDocumentsForVendor } from '@/utils/sampleDocuments';
+import { useVendors, usePurchaseAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import { ValidationResult } from '@/types/vendor';
 import { 
   Search, 
@@ -32,18 +30,11 @@ import {
   CheckCircle, 
   XCircle, 
   Building2,
-  FileText,
-  IndianRupee,
-  User,
-  Filter,
   Truck,
   Loader2,
-  RefreshCw,
   FolderOpen,
-  Plus
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
 
 export default function PurchaseApproval() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,13 +44,10 @@ export default function PurchaseApproval() {
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [comments, setComments] = useState('');
-  const [addingSampleDocs, setAddingSampleDocs] = useState(false);
 
   const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
   const { data: buyerCompanies } = useBuyerCompanies();
-  const { data: validations, refetch: refetchValidations } = useVendorValidations(selectedVendor?.id);
   const purchaseAction = usePurchaseAction();
-  const runValidations = useRunValidations();
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
     const matchesSearch = 
@@ -83,50 +71,72 @@ export default function PurchaseApproval() {
     setShowActionDialog(true);
   };
 
-  const handleRerunValidations = async () => {
-    if (!selectedVendor) return;
-    await runValidations.mutateAsync({
-      vendorId: selectedVendor.id,
-      gstin: selectedVendor.gstin,
-      pan: selectedVendor.pan,
-      legalName: selectedVendor.legal_name,
-      accountNumber: selectedVendor.account_number,
-      ifscCode: selectedVendor.ifsc_code,
-      msmeNumber: selectedVendor.msme_number,
-    });
-    refetchValidations();
-  };
-
-  const handleAddSampleDocs = async () => {
-    if (!selectedVendor) return;
-    setAddingSampleDocs(true);
-    const result = await addSampleDocumentsForVendor(selectedVendor.id);
-    if (result.success) {
-      toast.success('Sample documents added successfully');
-    } else {
-      toast.error('Failed to add sample documents');
-    }
-    setAddingSampleDocs(false);
-  };
-
   const submitAction = async () => {
     if (!selectedVendor) return;
-    await purchaseAction.mutateAsync({
-      vendorId: selectedVendor.id,
-      action: actionType,
-      comments,
-    });
-    setShowActionDialog(false);
-    setShowDetails(false);
-    setSelectedVendor(null);
+    try {
+      await purchaseAction.mutateAsync({
+        vendorId: selectedVendor.id,
+        action: actionType,
+        comments,
+      });
+      
+      setShowActionDialog(false);
+      setShowDetails(false);
+      setSelectedVendor(null);
+    } catch (error) {
+      console.error('Action failed:', error);
+    }
   };
 
-  const mappedValidations: ValidationResult[] = validations?.map(v => ({
-    type: v.validation_type as ValidationResult['type'],
-    status: v.status as ValidationResult['status'],
-    message: v.message || '',
-    timestamp: v.validated_at,
-  })) || [];
+  // Helper function to map vendor verification status columns to ValidationResult format
+  const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
+    if (!vendor) return [];
+    
+    const vendorData = vendor as VendorRow & {
+      gst_verification_status?: string;
+      pan_verification_status?: string;
+      bank_verification_status?: string;
+      msme_verification_status?: string;
+      name_match_verification_status?: string;
+    };
+    
+    return [
+      {
+        type: 'gst' as const,
+        status: (vendorData.gst_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.gst_verification_status === 'passed' ? 'GST verified' : 'GST verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'pan' as const,
+        status: (vendorData.pan_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.pan_verification_status === 'passed' ? 'PAN verified' : 'PAN verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'bank' as const,
+        status: (vendorData.bank_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.bank_verification_status === 'passed' ? 'Bank account verified' : 'Bank verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'msme' as const,
+        status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
+        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' : 
+                 vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+      {
+        type: 'name_match' as const,
+        status: (vendorData.name_match_verification_status || 'pending') as ValidationResult['status'],
+        message: vendorData.name_match_verification_status === 'passed' ? 'Name match verified' : 'Name match pending',
+        timestamp: vendor.submitted_at || vendor.created_at,
+      },
+    ];
+  };
+
+  // Get validations from vendor's verification status columns
+  const mappedValidations: ValidationResult[] = getValidationsFromVendor(selectedVendor);
 
   return (
     <div className="space-y-8">
@@ -138,7 +148,7 @@ export default function PurchaseApproval() {
             </div>
             <h1 className="text-3xl font-bold text-foreground">Purchase Approval</h1>
           </div>
-          <p className="text-muted-foreground">Final approval before SAP synchronization</p>
+          <p className="text-muted-foreground">Review and approve vendors for SAP synchronization</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative w-64">
@@ -194,7 +204,7 @@ export default function PurchaseApproval() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}><Eye className="h-4 w-4 mr-2" />Details</Button>
-                    <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><Truck className="h-4 w-4 mr-2" />Approve & Sync</Button>
+                    <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
                     <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(vendor, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
                   </div>
                 </div>
@@ -214,42 +224,49 @@ export default function PurchaseApproval() {
                 <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
               </TabsList>
-              <TabsContent value="details" className="mt-6"><p className="text-muted-foreground">Organization: {selectedVendor.legal_name} | GSTIN: {selectedVendor.gstin} | PAN: {selectedVendor.pan}</p></TabsContent>
-              <TabsContent value="documents" className="mt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Vendor Documents</h3>
-                  <Button variant="outline" size="sm" onClick={handleAddSampleDocs} disabled={addingSampleDocs} className="rounded-xl">
-                    {addingSampleDocs ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding...</> : <><Plus className="h-4 w-4 mr-2" />Add Sample Docs</>}
-                  </Button>
+              <TabsContent value="details" className="mt-6">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="text-muted-foreground">Legal Name:</span> <span className="font-medium">{selectedVendor.legal_name}</span></div>
+                  <div><span className="text-muted-foreground">Trade Name:</span> <span className="font-medium">{selectedVendor.trade_name || '-'}</span></div>
+                  <div><span className="text-muted-foreground">GSTIN:</span> <span className="font-mono font-medium">{selectedVendor.gstin || '-'}</span></div>
+                  <div><span className="text-muted-foreground">PAN:</span> <span className="font-mono font-medium">{selectedVendor.pan || '-'}</span></div>
+                  <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{selectedVendor.industry_type || '-'}</span></div>
+                  <div><span className="text-muted-foreground">Entity Type:</span> <span className="font-medium">{selectedVendor.entity_type || '-'}</span></div>
+                  <div><span className="text-muted-foreground">Location:</span> <span className="font-medium">{selectedVendor.registered_city}, {selectedVendor.registered_state}</span></div>
+                  <div><span className="text-muted-foreground">Bank:</span> <span className="font-medium">{selectedVendor.bank_name || '-'}</span></div>
+                  <div><span className="text-muted-foreground">Account:</span> <span className="font-mono font-medium">{selectedVendor.account_number || '-'}</span></div>
+                  <div><span className="text-muted-foreground">IFSC:</span> <span className="font-mono font-medium">{selectedVendor.ifsc_code || '-'}</span></div>
                 </div>
+              </TabsContent>
+              <TabsContent value="documents" className="mt-6">
                 <VendorDocuments vendorId={selectedVendor.id} />
               </TabsContent>
               <TabsContent value="validations" className="mt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Validation Results</h3>
-                  <Button variant="outline" size="sm" onClick={handleRerunValidations} disabled={runValidations.isPending} className="rounded-xl">
-                    {runValidations.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running...</> : <><RefreshCw className="h-4 w-4 mr-2" />Re-run</>}
-                  </Button>
-                </div>
-                <ValidationStatus validations={mappedValidations} isProcessing={runValidations.isPending} />
+                <ValidationStatus validations={mappedValidations} />
               </TabsContent>
             </Tabs>
           )}
           <DialogFooter className="gap-2 mt-6">
             <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(selectedVendor!, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
-            <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500" onClick={() => handleAction(selectedVendor!, 'approve')}><Truck className="h-4 w-4 mr-2" />Approve & Sync</Button>
+            <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500" onClick={() => handleAction(selectedVendor!, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showActionDialog} onOpenChange={setShowActionDialog}>
         <DialogContent className="rounded-2xl">
-          <DialogHeader><DialogTitle>{actionType === 'approve' ? '🚀 Approve & Sync to SAP' : '❌ Reject Vendor'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{actionType === 'approve' ? '✅ Approve Vendor' : '❌ Reject Vendor'}</DialogTitle>
+          <DialogDescription>
+            {actionType === 'approve' 
+              ? 'Approved vendors will be available for SAP sync in the SAP Sync page.'
+              : 'Please provide a reason for rejection.'}
+          </DialogDescription>
+          </DialogHeader>
           <div className="py-4"><Textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder={actionType === 'approve' ? 'Optional comments...' : 'Reason for rejection...'} className="rounded-xl" rows={4} /></div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowActionDialog(false)} className="rounded-xl">Cancel</Button>
             <Button variant={actionType === 'reject' ? 'destructive' : 'default'} onClick={submitAction} disabled={(actionType === 'reject' && !comments.trim()) || purchaseAction.isPending} className={`rounded-xl ${actionType === 'approve' ? 'bg-gradient-to-r from-teal-500 to-emerald-500' : ''}`}>
-              {purchaseAction.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</> : actionType === 'approve' ? 'Confirm & Sync' : 'Confirm Rejection'}
+              {purchaseAction.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</> : actionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
             </Button>
           </DialogFooter>
         </DialogContent>
