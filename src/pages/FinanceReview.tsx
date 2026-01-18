@@ -79,46 +79,13 @@ interface PennyDropResult {
   }[];
 }
 
-// Fuzzy name matching function for legal name validation
-function calculateNameMatchScore(name1: string, name2: string): number {
-  if (!name1 || !name2) return 0;
-
-  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-  const n1 = normalize(name1);
-  const n2 = normalize(name2);
-
-  if (n1 === n2) return 100;
-
-  // Check if one contains the other
-  if (n1.includes(n2) || n2.includes(n1)) {
-    const similarity = Math.min(n1.length, n2.length) / Math.max(n1.length, n2.length) * 100;
-    return Math.round(Math.min(95, similarity + 20)); // Boost for containment
-  }
-
-  // Token-based matching
-  const words1 = n1.split(/\s+/).filter(w => w.length > 1);
-  const words2 = n2.split(/\s+/).filter(w => w.length > 1);
-
-  if (words1.length === 0 || words2.length === 0) return 0;
-
-  let matchCount = 0;
-  for (const w1 of words1) {
-    for (const w2 of words2) {
-      if (w1 === w2 || w1.includes(w2) || w2.includes(w1)) {
-        matchCount++;
-        break;
-      }
-    }
-  }
-
-  return Math.round((matchCount / Math.max(words1.length, words2.length)) * 100);
-}
-
+// Name validation result from edge function
 interface NameValidationResult {
   isValid: boolean;
   score: number;
   legalName: string;
   holderName: string;
+  matchMethod?: string;
   status: 'match' | 'partial' | 'mismatch';
 }
 
@@ -160,7 +127,7 @@ export default function FinanceReview() {
   }) || [];
 
   // Effect to load penny drop data when vendor is selected
-  // If already verified or rejected, load from stored pennydrop_status (no API call needed)
+  // Uses name validation from edge function only (no local computation)
   useEffect(() => {
     if (!selectedVendor) {
       setReversePennyDropResult(null);
@@ -182,31 +149,21 @@ export default function FinanceReview() {
         nameValidation: storedData.name_validation || null,
       });
 
-      // Use stored name validation if available, otherwise compute
+      // Use name validation from edge function (stored in pennydrop_status)
       if (storedData.name_validation) {
+        const nv = storedData.name_validation;
         setNameValidation({
-          isValid: storedData.name_validation.is_match,
-          score: storedData.name_validation.match_score,
-          legalName: storedData.name_validation.legal_name,
-          holderName: storedData.name_validation.holder_name,
-          status: storedData.name_validation.is_match
-            ? (storedData.name_validation.match_score >= 95 ? 'match' : 'partial')
+          isValid: nv.is_match,
+          score: nv.match_score,
+          legalName: nv.legal_name,
+          holderName: nv.holder_name,
+          matchMethod: nv.match_method,
+          status: nv.is_match
+            ? (nv.match_score >= 95 ? 'match' : 'partial')
             : 'mismatch',
         });
       } else {
-        // Fallback: compute name validation
-        const holderName = storedData.holder_name || '';
-        const legalName = selectedVendor.legal_name || '';
-        const score = calculateNameMatchScore(legalName, holderName);
-        const status = score >= 70 ? (score >= 95 ? 'match' : 'partial') : 'mismatch';
-
-        setNameValidation({
-          isValid: score >= 70,
-          score,
-          legalName,
-          holderName,
-          status,
-        });
+        setNameValidation(null);
       }
     } else {
       // Not verified yet - reset state
@@ -215,26 +172,25 @@ export default function FinanceReview() {
     }
   }, [selectedVendor]);
 
-
-  // Effect to compute name validation whenever reversePennyDropResult changes
+  // Effect to use name validation from edge function response
   useEffect(() => {
-    if (!selectedVendor || !reversePennyDropResult?.data?.holder_name) {
+    if (!reversePennyDropResult?.nameValidation) {
       return;
     }
 
-    const holderName = reversePennyDropResult.data.holder_name;
-    const legalName = selectedVendor.legal_name || '';
-    const score = calculateNameMatchScore(legalName, holderName);
-    const status = score >= 70 ? (score >= 95 ? 'match' : 'partial') : 'mismatch';
-
+    const nv = reversePennyDropResult.nameValidation;
+    // Edge function returns snake_case: is_match, match_score, legal_name, holder_name, match_method
     setNameValidation({
-      isValid: score >= 70,
-      score,
-      legalName,
-      holderName,
-      status,
+      isValid: nv.is_match ?? nv.isMatch,
+      score: nv.match_score ?? nv.score,
+      legalName: nv.legal_name ?? nv.legalName,
+      holderName: nv.holder_name ?? nv.holderName,
+      matchMethod: nv.match_method ?? nv.matchMethod,
+      status: (nv.is_match ?? nv.isMatch)
+        ? ((nv.match_score ?? nv.score) >= 95 ? 'match' : 'partial')
+        : 'mismatch',
     });
-  }, [reversePennyDropResult, selectedVendor]);
+  }, [reversePennyDropResult]);
 
   // Computed value to check if approve should be disabled due to name mismatch or rejection
   const isApproveDisabledDueToNameMismatch = useMemo(() => {
@@ -364,10 +320,29 @@ export default function FinanceReview() {
 
       setReversePennyDropResult(data);
 
+      // Also set nameValidation directly from the response
+      if (data.nameValidation) {
+        const nv = data.nameValidation;
+        setNameValidation({
+          isValid: nv.is_match ?? nv.isMatch,
+          score: nv.match_score ?? nv.score,
+          legalName: nv.legal_name ?? nv.legalName,
+          holderName: nv.holder_name ?? nv.holderName,
+          matchMethod: nv.match_method ?? nv.matchMethod,
+          status: (nv.is_match ?? nv.isMatch)
+            ? ((nv.match_score ?? nv.score) >= 95 ? 'match' : 'partial')
+            : 'mismatch',
+        });
+      }
+
       if (data.success) {
         if (data.verified) {
           toast.success('Bank account verified!', {
             description: `Account holder: ${data.data?.holder_name}`,
+          });
+        } else if (data.status === 'rejected') {
+          toast.error('Bank verification rejected', {
+            description: 'Name mismatch detected. Vendor must use correct bank account.',
           });
         } else {
           toast.info('Verification pending', {
@@ -609,8 +584,12 @@ export default function FinanceReview() {
                       View Details
                     </Button>
                     <Button
-                      className="rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/20"
+                      disabled={vendor.pennydrop_verification_status !== 'verified'}
+                      className={`rounded-xl ${vendor.pennydrop_verification_status === 'verified'
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/20'
+                        : 'bg-gray-400 cursor-not-allowed'}`}
                       onClick={() => handleAction(vendor, 'approve')}
+                      title={vendor.pennydrop_verification_status !== 'verified' ? 'Complete penny drop verification first' : ''}
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Approve
@@ -1177,7 +1156,7 @@ export default function FinanceReview() {
                 )}
 
                 {/* Name Validation Status */}
-                {nameValidation && (
+                {nameValidation && nameValidation.score > 0 && (
                   reversePennyDropResult?.verified ||
                   selectedVendor?.pennydrop_verification_status === 'verified' ||
                   reversePennyDropResult?.status === 'rejected' ||
