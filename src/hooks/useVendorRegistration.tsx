@@ -39,7 +39,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         .from('portal_config')
         .select('*');
       if (error) throw error;
-      
+
       const config: Record<string, unknown> = {};
       data?.forEach((item) => {
         config[item.config_key] = item.config_value;
@@ -53,13 +53,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     queryKey: ['vendor-invitation', options?.invitationToken],
     queryFn: async () => {
       if (!options?.invitationToken) return null;
-      
+
       const { data, error } = await supabase
         .from('vendor_invitations')
         .select('*')
         .eq('token', options.invitationToken)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -72,7 +72,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      
+
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
@@ -80,15 +80,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (error) throw error;
-      
+
       // Initialize vendorId and vendorStatus from existing vendor
       if (data) {
         setVendorId(data.id);
         setVendorStatus(data.status as VendorStatus);
       }
-      
+
       return data;
     },
   });
@@ -193,17 +193,17 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       manufacturing_phone: formData.address.manufacturingPhone || null,
       manufacturing_fax: formData.address.manufacturingFax || null,
       // Communication Address (derived)
-      communication_address: formData.address.sameAsRegistered 
-        ? formData.address.registeredAddress 
+      communication_address: formData.address.sameAsRegistered
+        ? formData.address.registeredAddress
         : formData.address.manufacturingAddress,
-      communication_city: formData.address.sameAsRegistered 
-        ? formData.address.registeredCity 
+      communication_city: formData.address.sameAsRegistered
+        ? formData.address.registeredCity
         : formData.address.manufacturingCity,
-      communication_state: formData.address.sameAsRegistered 
-        ? formData.address.registeredState 
+      communication_state: formData.address.sameAsRegistered
+        ? formData.address.registeredState
         : formData.address.manufacturingState,
-      communication_pincode: formData.address.sameAsRegistered 
-        ? formData.address.registeredPincode 
+      communication_pincode: formData.address.sameAsRegistered
+        ? formData.address.registeredPincode
         : formData.address.manufacturingPincode,
       // Branch Address
       branch_name: formData.address.branchName || null,
@@ -262,17 +262,17 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       micr_code: formData.bank.micrCode || null,
       bank_address: formData.bank.bankAddress || null,
       // Financial
-      turnover_year1: formData.financial.turnoverYear1 
-        ? parseFloat(formData.financial.turnoverYear1.replace(/,/g, '')) 
+      turnover_year1: formData.financial.turnoverYear1
+        ? parseFloat(formData.financial.turnoverYear1.replace(/,/g, ''))
         : null,
-      turnover_year2: formData.financial.turnoverYear2 
-        ? parseFloat(formData.financial.turnoverYear2.replace(/,/g, '')) 
+      turnover_year2: formData.financial.turnoverYear2
+        ? parseFloat(formData.financial.turnoverYear2.replace(/,/g, ''))
         : null,
-      turnover_year3: formData.financial.turnoverYear3 
-        ? parseFloat(formData.financial.turnoverYear3.replace(/,/g, '')) 
+      turnover_year3: formData.financial.turnoverYear3
+        ? parseFloat(formData.financial.turnoverYear3.replace(/,/g, ''))
         : null,
-      credit_period_expected: formData.financial.creditPeriodExpected 
-        ? parseInt(formData.financial.creditPeriodExpected) 
+      credit_period_expected: formData.financial.creditPeriodExpected
+        ? parseInt(formData.financial.creditPeriodExpected)
         : null,
       major_customer1: formData.financial.majorCustomer1 || null,
       major_customer2: formData.financial.majorCustomer2 || null,
@@ -314,7 +314,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const existingFormData = useMemo<VendorFormData | null>(() => {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
-    
+
     return {
       organization: {
         buyerCompanyId: vendor.tenant_id || '',
@@ -472,12 +472,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           .eq('id', vendorId)
           .select()
           .single();
-        
+
         if (error) throw error;
-        
+
         // Upload documents after vendor is saved
         await uploadAllDocuments(formData, data.id);
-        
+
         return data;
       } else {
         const { data, error } = await supabase
@@ -485,13 +485,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           .insert(vendorData)
           .select()
           .single();
-        
+
         if (error) throw error;
         setVendorId(data.id);
-        
+
         // Upload documents after vendor is created
         await uploadAllDocuments(formData, data.id);
-        
+
         return data;
       }
     },
@@ -508,7 +508,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const submitVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
       const vendor = await saveVendorMutation.mutateAsync(formData);
-      
+
       // Set verification statuses directly in the vendors table
       // Since frontend has already validated everything, we set them to 'passed'
       const verificationStatuses = {
@@ -518,24 +518,24 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         msme_verification_status: formData.statutory.msmeNumber ? 'passed' : 'skipped',
         name_match_verification_status: 'passed', // Name match is always validated in frontend
       };
-      
+
       // Update vendor with verification statuses and submit
       const { error: updateError } = await supabase
         .from('vendors')
-        .update({ 
+        .update({
           ...verificationStatuses,
           status: 'finance_review' as const, // Skip validation_pending, go directly to finance_review
           submitted_at: new Date().toISOString(),
         })
         .eq('id', vendor.id);
-      
+
       if (updateError) throw updateError;
 
       // Mark invitation as used if token exists
       if (options?.invitationToken) {
         await supabase
           .from('vendor_invitations')
-          .update({ 
+          .update({
             used_at: new Date().toISOString(),
             vendor_id: vendor.id
           })
@@ -546,12 +546,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       await supabase.from('audit_logs').insert({
         vendor_id: vendor.id,
         action: 'vendor_submitted',
-        details: { 
+        details: {
           submitted_by: vendor.user_id || 'anonymous',
           invitation_token: options?.invitationToken || null,
           verification_statuses: verificationStatuses,
         },
       });
+
+      // Send notification email to admin about new vendor submission
+      try {
+        await supabase.functions.invoke('notify-vendor-submission', {
+          body: { vendorId: vendor.id },
+        });
+        console.log('[Vendor] Submission notification email sent successfully');
+      } catch (notifyError) {
+        // Don't fail the submission if notification fails
+        console.error('[Vendor] Failed to send submission notification:', notifyError);
+      }
 
       setVendorStatus('finance_review');
       return vendor;
@@ -592,7 +603,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         .eq('id', vendorId)
         .select()
         .single();
-      
+
       if (error) throw error;
 
       // Upload any new documents
@@ -601,8 +612,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       await supabase.from('audit_logs').insert({
         vendor_id: vendorId,
         action: 'vendor_resubmitted',
-        details: { 
-          resubmitted_by: userId || 'anonymous', 
+        details: {
+          resubmitted_by: userId || 'anonymous',
           previous_status: vendorStatus,
           invitation_token: options?.invitationToken || null,
         },
@@ -667,12 +678,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else {
           try {
             const response = await supabase.functions.invoke('validate-gst', {
-              body: { 
+              body: {
                 id_number: vendor.gstin,
                 legal_name: legalName,
               },
             });
-            
+
             const result: ValidationResult = {
               type: 'gst',
               status: response.data?.success ? 'passed' : 'failed',
@@ -713,12 +724,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else {
           try {
             const response = await supabase.functions.invoke('verify-pan', {
-              body: { 
+              body: {
                 id_number: vendor.pan,
                 legal_name: legalName,
               },
             });
-            
+
             const result: ValidationResult = {
               type: 'pan',
               status: response.data?.success ? 'passed' : 'failed',
@@ -759,13 +770,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else {
           try {
             const response = await supabase.functions.invoke('validate-bank', {
-              body: { 
+              body: {
                 id_number: vendor.account_number,
                 ifsc: vendor.ifsc_code,
                 legal_name: legalName,
               },
             });
-            
+
             const result: ValidationResult = {
               type: 'bank',
               status: response.data?.success ? 'passed' : 'failed',
@@ -806,12 +817,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else {
           try {
             const response = await supabase.functions.invoke('validate-msme', {
-              body: { 
+              body: {
                 id_number: vendor.msme_number,
                 legal_name: legalName,
               },
             });
-            
+
             const result: ValidationResult = {
               type: 'msme',
               status: response.data?.success ? 'passed' : 'failed',
@@ -863,7 +874,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       // Update vendor status based on validation results
       const newStatus = hasFailedMandatory ? 'validation_failed' : 'finance_review';
-      
+
       await supabase
         .from('vendors')
         .update({ status: newStatus })

@@ -62,7 +62,7 @@ export default function VendorRegistration() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
   });
@@ -71,7 +71,7 @@ export default function VendorRegistration() {
   useEffect(() => {
     const validateToken = async () => {
       const token = searchParams.get('token');
-      
+
       if (!token) {
         setTokenError('Access denied. This page requires a valid invitation link.');
         setIsValidatingToken(false);
@@ -101,18 +101,25 @@ export default function VendorRegistration() {
 
         // Check if user is authenticated
         const { data: { session } } = await supabase.auth.getSession();
-        
-        // If invitation has user_id, require authentication
-        if (invitation.user_id && !session) {
+
+        // Always require authentication for vendor registration
+        if (!session) {
           // Redirect to login page
-          navigate(`/vendor/login?token=${token}`);
+          navigate(`/vendor/invite?token=${token}`);
           return;
         }
 
-        // If authenticated, verify the user matches the invitation
-        if (session && invitation.user_id) {
+        // If invitation has user_id, verify the logged-in user matches
+        if (invitation.user_id) {
           if (session.user.id !== invitation.user_id && session.user.email !== invitation.email) {
             setTokenError('This invitation is for a different user. Please log in with the correct account.');
+            setIsValidatingToken(false);
+            return;
+          }
+        } else {
+          // If no user_id in invitation yet, verify email matches
+          if (session.user.email !== invitation.email) {
+            setTokenError('This invitation is for a different email. Please log in with the correct account.');
             setIsValidatingToken(false);
             return;
           }
@@ -139,7 +146,7 @@ export default function VendorRegistration() {
               // Don't set isSubmitted - let the form load with existing data
               return;
             }
-            
+
             // User has already submitted the form - show status screen
             console.log('[Token] Existing vendor record found - showing status screen');
             setInvitationToken(token);
@@ -161,7 +168,7 @@ export default function VendorRegistration() {
           setIsTokenMode(true);
           setIsSubmitted(true); // Show success screen instead of form
           setIsValidatingToken(false);
-          
+
           // Fetch vendor status if vendor_id exists
           if (invitation.vendor_id) {
             const { data: vendor } = await supabase
@@ -169,7 +176,7 @@ export default function VendorRegistration() {
               .select('status')
               .eq('id', invitation.vendor_id)
               .single();
-            
+
             if (vendor) {
               setVendorStatusState(vendor.status as RegistrationStatus);
             }
@@ -250,7 +257,7 @@ export default function VendorRegistration() {
 
     // Push initial state
     window.history.pushState(null, '', window.location.href);
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('keydown', handleKeyDown);
@@ -310,10 +317,10 @@ export default function VendorRegistration() {
           if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(6);
           setCompletedSteps(filledSteps);
           // Go to the first incomplete step or step 1
-          const nextStep = filledSteps.length > 0 ? Math.min(...[1,2,3,4,5,6,7].filter(s => !filledSteps.includes(s))) : 1;
+          const nextStep = filledSteps.length > 0 ? Math.min(...[1, 2, 3, 4, 5, 6, 7].filter(s => !filledSteps.includes(s))) : 1;
           setCurrentStep(nextStep || 7);
         } else {
-          setIsSubmitted(true); 
+          setIsSubmitted(true);
           setIsEditMode(false);
         }
       } else if (pendingStatuses.includes(vendorStatus)) {
@@ -372,34 +379,34 @@ export default function VendorRegistration() {
     }
   };
 
-  const handleCancel = () => { 
+  const handleCancel = () => {
     if (isTokenMode) {
-      toast({ 
-        title: 'Cannot Cancel', 
+      toast({
+        title: 'Cannot Cancel',
         description: 'Please complete the registration or close this window.',
         variant: 'default'
       });
       return;
     }
-    toast({ title: 'Registration Cancelled' }); 
-    navigate('/'); 
+    toast({ title: 'Registration Cancelled' });
+    navigate('/');
   };
 
   const handleSubmit = async () => {
     try {
       const vendor = isEditMode && vendorId ? await resubmitVendor(formData) : await submitVendor(formData);
-      
+
       // Mark invitation as used if token exists
       if (invitationToken) {
         await supabase
           .from('vendor_invitations')
-          .update({ 
+          .update({
             used_at: new Date().toISOString(),
             vendor_id: vendor.id
           })
           .eq('token', invitationToken);
       }
-      
+
       setIsSubmitted(true); setIsEditMode(false); setVendorStatusState('finance_review');
       toast({ title: isEditMode ? 'Application Resubmitted' : 'Application Submitted' });
       setShowFeedback(true);
@@ -412,21 +419,21 @@ export default function VendorRegistration() {
   const renderStep = () => {
     const legalName = formData.organization.legalName;
     switch (currentStep) {
-      case 1: 
+      case 1:
         return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(1, data)} />;
-      case 2: 
+      case 2:
         return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
-      case 3: 
+      case 3:
         return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
-      case 4: 
+      case 4:
         return <CommercialStep data={formData.statutory} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
-      case 5: 
+      case 5:
         return <BankDetailsStep data={formData.bank} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
-      case 6: 
+      case 6:
         return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
-      case 7: 
+      case 7:
         return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
-      default: 
+      default:
         return null;
     }
   };
@@ -467,11 +474,11 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <SuccessScreen 
-          status={vendorStatusState} 
-          vendorId={vendorId || undefined} 
-          financeComments={existingVendor?.finance_comments} 
-          purchaseComments={existingVendor?.purchase_comments} 
+        <SuccessScreen
+          status={vendorStatusState}
+          vendorId={vendorId || undefined}
+          financeComments={existingVendor?.finance_comments}
+          purchaseComments={existingVendor?.purchase_comments}
           onEdit={isTokenMode ? undefined : handleStartEdit}
         />
         <FeedbackPopup open={showFeedback} onOpenChange={setShowFeedback} vendorId={vendorId || undefined} />
@@ -541,11 +548,11 @@ export default function VendorRegistration() {
             <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p>
           </div>
           <div className="flex-1 p-6 overflow-auto">
-            <EnterpriseStepIndicator 
-              steps={registrationSteps} 
-              currentStep={currentStep} 
-              completedSteps={completedSteps} 
-              onStepClick={handleStepClick} 
+            <EnterpriseStepIndicator
+              steps={registrationSteps}
+              currentStep={currentStep}
+              completedSteps={completedSteps}
+              onStepClick={handleStepClick}
             />
           </div>
         </aside>
@@ -582,7 +589,7 @@ export default function VendorRegistration() {
                 </div>
               </div>
             </div>
-            
+
             {/* Form Content */}
             <div className="p-6">
               {renderStep()}

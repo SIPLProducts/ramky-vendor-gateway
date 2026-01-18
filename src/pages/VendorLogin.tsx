@@ -28,7 +28,7 @@ export default function VendorLogin() {
   const [isValidating, setIsValidating] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -64,7 +64,7 @@ export default function VendorLogin() {
 
         // If already used, redirect to registration to show status
         if (data.used_at) {
-          navigate(`/vendor/invite?token=${token}`);
+          navigate(`/vendor/registration?token=${token}`);
           return;
         }
 
@@ -113,8 +113,8 @@ export default function VendorLogin() {
         }
       }
 
-      // Redirect to registration form
-      navigate(`/vendor/invite?token=${token}`);
+      // Redirect to registration form (protected route)
+      navigate(`/vendor/registration?token=${token}`);
     } catch (err) {
       console.error('Login error:', err);
       setError('An unexpected error occurred. Please try again.');
@@ -176,7 +176,7 @@ export default function VendorLogin() {
               Sign in to complete your vendor registration
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             {error && (
               <Alert variant="destructive" className="mb-4">

@@ -43,10 +43,11 @@ const App = () => (
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/vendor/login" element={<VendorLogin />} />
-            <Route path="/vendor/invite" element={<VendorRegistration />} />
+            <Route path="/vendor/invite" element={<VendorLogin />} />
+            <Route path="/vendor/registration" element={<VendorRegistration />} />
             <Route path="/install" element={<Install />} />
             <Route path="/feedback" element={<VendorFeedback />} />
-            
+
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
               {/* Finance Routes */}
@@ -67,7 +68,7 @@ const App = () => (
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
               </Route>
             </Route>
-            
+
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
