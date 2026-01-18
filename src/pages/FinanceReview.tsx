@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,11 +27,11 @@ import { useRunValidations } from '@/hooks/useVendorValidations';
 import { addSampleDocumentsForVendor } from '@/utils/sampleDocuments';
 import { ValidationResult } from '@/types/vendor';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Search, 
-  Eye, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Search,
+  Eye,
+  CheckCircle,
+  XCircle,
   MessageSquare,
   Building2,
   FileText,
@@ -79,6 +79,49 @@ interface PennyDropResult {
   }[];
 }
 
+// Fuzzy name matching function for legal name validation
+function calculateNameMatchScore(name1: string, name2: string): number {
+  if (!name1 || !name2) return 0;
+
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+  const n1 = normalize(name1);
+  const n2 = normalize(name2);
+
+  if (n1 === n2) return 100;
+
+  // Check if one contains the other
+  if (n1.includes(n2) || n2.includes(n1)) {
+    const similarity = Math.min(n1.length, n2.length) / Math.max(n1.length, n2.length) * 100;
+    return Math.round(Math.min(95, similarity + 20)); // Boost for containment
+  }
+
+  // Token-based matching
+  const words1 = n1.split(/\s+/).filter(w => w.length > 1);
+  const words2 = n2.split(/\s+/).filter(w => w.length > 1);
+
+  if (words1.length === 0 || words2.length === 0) return 0;
+
+  let matchCount = 0;
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      if (w1 === w2 || w1.includes(w2) || w2.includes(w1)) {
+        matchCount++;
+        break;
+      }
+    }
+  }
+
+  return Math.round((matchCount / Math.max(words1.length, words2.length)) * 100);
+}
+
+interface NameValidationResult {
+  isValid: boolean;
+  score: number;
+  legalName: string;
+  holderName: string;
+  status: 'match' | 'partial' | 'mismatch';
+}
+
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
@@ -88,16 +131,19 @@ export default function FinanceReview() {
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'clarify'>('approve');
   const [comments, setComments] = useState('');
   const [addingSampleDocs, setAddingSampleDocs] = useState(false);
-  
+
   // Penny Drop states
   const [isVerifyingPennyDrop, setIsVerifyingPennyDrop] = useState(false);
   const [pennyDropStage, setPennyDropStage] = useState(0);
   const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
-  
+
   // Reverse Penny Drop states (Surepass)
   const [isInitializingPennyDrop, setIsInitializingPennyDrop] = useState(false);
   const [isCheckingPennyDropStatus, setIsCheckingPennyDropStatus] = useState(false);
   const [reversePennyDropResult, setReversePennyDropResult] = useState<any>(null);
+
+  // Name validation state
+  const [nameValidation, setNameValidation] = useState<NameValidationResult | null>(null);
 
   const { data: pendingVendors, isLoading } = useVendors(['finance_review', 'validation_failed']);
   const { data: buyerCompanies } = useBuyerCompanies();
@@ -105,13 +151,105 @@ export default function FinanceReview() {
   const runValidations = useRunValidations();
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
-    const matchesSearch = 
+    const matchesSearch =
       (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
     return matchesSearch && matchesBuyerCompany;
   }) || [];
+
+  // Effect to load penny drop data when vendor is selected
+  // If already verified or rejected, load from stored pennydrop_status (no API call needed)
+  useEffect(() => {
+    if (!selectedVendor) {
+      setReversePennyDropResult(null);
+      setNameValidation(null);
+      return;
+    }
+
+    // If vendor has stored penny drop status data, load it directly
+    const storedData = selectedVendor.pennydrop_status as any;
+    const verificationStatus = selectedVendor.pennydrop_verification_status;
+
+    if ((verificationStatus === 'verified' || verificationStatus === 'rejected') && storedData) {
+      // Already verified or rejected - use stored data
+      setReversePennyDropResult({
+        success: true,
+        verified: verificationStatus === 'verified',
+        status: verificationStatus,
+        data: storedData,
+        nameValidation: storedData.name_validation || null,
+      });
+
+      // Use stored name validation if available, otherwise compute
+      if (storedData.name_validation) {
+        setNameValidation({
+          isValid: storedData.name_validation.is_match,
+          score: storedData.name_validation.match_score,
+          legalName: storedData.name_validation.legal_name,
+          holderName: storedData.name_validation.holder_name,
+          status: storedData.name_validation.is_match
+            ? (storedData.name_validation.match_score >= 95 ? 'match' : 'partial')
+            : 'mismatch',
+        });
+      } else {
+        // Fallback: compute name validation
+        const holderName = storedData.holder_name || '';
+        const legalName = selectedVendor.legal_name || '';
+        const score = calculateNameMatchScore(legalName, holderName);
+        const status = score >= 70 ? (score >= 95 ? 'match' : 'partial') : 'mismatch';
+
+        setNameValidation({
+          isValid: score >= 70,
+          score,
+          legalName,
+          holderName,
+          status,
+        });
+      }
+    } else {
+      // Not verified yet - reset state
+      setReversePennyDropResult(null);
+      setNameValidation(null);
+    }
+  }, [selectedVendor]);
+
+
+  // Effect to compute name validation whenever reversePennyDropResult changes
+  useEffect(() => {
+    if (!selectedVendor || !reversePennyDropResult?.data?.holder_name) {
+      return;
+    }
+
+    const holderName = reversePennyDropResult.data.holder_name;
+    const legalName = selectedVendor.legal_name || '';
+    const score = calculateNameMatchScore(legalName, holderName);
+    const status = score >= 70 ? (score >= 95 ? 'match' : 'partial') : 'mismatch';
+
+    setNameValidation({
+      isValid: score >= 70,
+      score,
+      legalName,
+      holderName,
+      status,
+    });
+  }, [reversePennyDropResult, selectedVendor]);
+
+  // Computed value to check if approve should be disabled due to name mismatch or rejection
+  const isApproveDisabledDueToNameMismatch = useMemo(() => {
+    // If penny drop verification was rejected due to name mismatch
+    if (selectedVendor?.pennydrop_verification_status === 'rejected' || reversePennyDropResult?.status === 'rejected') {
+      return true;
+    }
+    // If penny drop is verified but name validation failed (legacy check)
+    if (selectedVendor?.pennydrop_verification_status === 'verified' || reversePennyDropResult?.verified) {
+      return nameValidation !== null && !nameValidation.isValid;
+    }
+    return false;
+  }, [selectedVendor, reversePennyDropResult, nameValidation]);
+
+
 
   const getBuyerCompanyName = (tenantId: string | null) => {
     if (!tenantId || !buyerCompanies) return 'Unassigned';
@@ -136,7 +274,7 @@ export default function FinanceReview() {
 
   const handlePennyDrop = async () => {
     if (!selectedVendor) return;
-    
+
     setIsVerifyingPennyDrop(true);
     setPennyDropStage(0);
     setPennyDropResult(null);
@@ -177,7 +315,7 @@ export default function FinanceReview() {
   // Initialize Reverse Penny Drop (Surepass) - sends email to vendor
   const handleInitReversePennyDrop = async () => {
     if (!selectedVendor) return;
-    
+
     setIsInitializingPennyDrop(true);
     setReversePennyDropResult(null);
 
@@ -211,7 +349,7 @@ export default function FinanceReview() {
   // Verify Reverse Penny Drop status (Surepass)
   const handleVerifyReversePennyDrop = async () => {
     if (!selectedVendor) return;
-    
+
     setIsCheckingPennyDropStatus(true);
     setReversePennyDropResult(null);
 
@@ -251,7 +389,7 @@ export default function FinanceReview() {
 
   const handleRerunValidations = async () => {
     if (!selectedVendor) return;
-    
+
     await runValidations.mutateAsync({
       vendorId: selectedVendor.id,
       gstin: selectedVendor.gstin,
@@ -266,27 +404,27 @@ export default function FinanceReview() {
   const handleAddSampleDocs = async () => {
     if (!selectedVendor) return;
     setAddingSampleDocs(true);
-    
+
     const result = await addSampleDocumentsForVendor(selectedVendor.id);
-    
+
     if (result.success) {
       toast.success('Sample documents added successfully');
     } else {
       toast.error('Failed to add sample documents');
     }
-    
+
     setAddingSampleDocs(false);
   };
 
   const submitAction = async () => {
     if (!selectedVendor) return;
-    
+
     await financeAction.mutateAsync({
       vendorId: selectedVendor.id,
       action: actionType,
       comments,
     });
-    
+
     setShowActionDialog(false);
     setShowDetails(false);
     setSelectedVendor(null);
@@ -302,7 +440,7 @@ export default function FinanceReview() {
   // Helper function to map vendor verification status columns to ValidationResult format
   const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
     if (!vendor) return [];
-    
+
     const vendorData = vendor as VendorRow & {
       gst_verification_status?: string;
       pan_verification_status?: string;
@@ -310,7 +448,7 @@ export default function FinanceReview() {
       msme_verification_status?: string;
       name_match_verification_status?: string;
     };
-    
+
     return [
       {
         type: 'gst' as const,
@@ -333,8 +471,8 @@ export default function FinanceReview() {
       {
         type: 'msme' as const,
         status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' : 
-                 vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
+        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
+          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
         timestamp: vendor.submitted_at || vendor.created_at,
       },
       {
@@ -457,7 +595,7 @@ export default function FinanceReview() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
@@ -705,11 +843,10 @@ export default function FinanceReview() {
                     <Button
                       onClick={handleInitReversePennyDrop}
                       disabled={isInitializingPennyDrop || !selectedVendor?.primary_email}
-                      className={`rounded-xl ${
-                        selectedVendor?.pennydrop_init 
-                          ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600' 
-                          : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
-                      }`}
+                      className={`rounded-xl ${selectedVendor?.pennydrop_init
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                        }`}
                     >
                       {isInitializingPennyDrop ? (
                         <>
@@ -808,10 +945,10 @@ export default function FinanceReview() {
                           <div key={stage} className="flex items-center gap-3">
                             <div className={`
                               w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                              ${isFailed ? 'bg-destructive/10 text-destructive' : 
-                                isCompleted ? 'bg-green-100 text-green-700' : 
-                                isActive ? 'bg-primary/10 text-primary' : 
-                                'bg-muted text-muted-foreground'}
+                              ${isFailed ? 'bg-destructive/10 text-destructive' :
+                                isCompleted ? 'bg-green-100 text-green-700' :
+                                  isActive ? 'bg-primary/10 text-primary' :
+                                    'bg-muted text-muted-foreground'}
                             `}>
                               {isFailed ? (
                                 <XCircle className="h-4 w-4" />
@@ -825,12 +962,11 @@ export default function FinanceReview() {
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className={`text-sm font-medium ${
-                                  isFailed ? 'text-destructive' : 
-                                  isCompleted ? 'text-green-700' : 
-                                  isActive ? 'text-primary' : 
-                                  'text-muted-foreground'
-                                }`}>
+                                <span className={`text-sm font-medium ${isFailed ? 'text-destructive' :
+                                  isCompleted ? 'text-green-700' :
+                                    isActive ? 'text-primary' :
+                                      'text-muted-foreground'
+                                  }`}>
                                   {stage}
                                 </span>
                                 {resultStage && (
@@ -869,7 +1005,7 @@ export default function FinanceReview() {
                           {pennyDropResult.verified ? 'Account Verified' : 'Verification Warning'}
                         </span>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="text-muted-foreground">Transaction ID</span>
@@ -895,9 +1031,9 @@ export default function FinanceReview() {
                           <span className="text-muted-foreground">Name Match Score</span>
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{pennyDropResult.data.nameMatchScore}%</p>
-                            <Badge 
-                              variant={pennyDropResult.data.nameMatchStatus === 'exact' ? 'default' : 
-                                       pennyDropResult.data.nameMatchStatus === 'partial' ? 'secondary' : 'destructive'}
+                            <Badge
+                              variant={pennyDropResult.data.nameMatchStatus === 'exact' ? 'default' :
+                                pennyDropResult.data.nameMatchStatus === 'partial' ? 'secondary' : 'destructive'}
                             >
                               {pennyDropResult.data.nameMatchStatus}
                             </Badge>
@@ -921,16 +1057,14 @@ export default function FinanceReview() {
                   <Card className="border-0 shadow-sm">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                          (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
-                            ? 'bg-gradient-to-br from-green-500/20 to-green-500/5'
-                            : 'bg-gradient-to-br from-blue-500/20 to-blue-500/5'
-                        }`}>
-                          <CheckCircle2 className={`h-4 w-4 ${
-                            (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
-                              ? 'text-green-600'
-                              : 'text-blue-600'
-                          }`} />
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${(reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
+                          ? 'bg-gradient-to-br from-green-500/20 to-green-500/5'
+                          : 'bg-gradient-to-br from-blue-500/20 to-blue-500/5'
+                          }`}>
+                          <CheckCircle2 className={`h-4 w-4 ${(reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
+                            ? 'text-green-600'
+                            : 'text-blue-600'
+                            }`} />
                         </div>
                         Reverse Penny Drop Status
                       </CardTitle>
@@ -993,22 +1127,41 @@ export default function FinanceReview() {
                 )}
 
                 {/* Pending Payment Warning */}
-                {(reversePennyDropResult?.status === 'pending' || 
+                {(reversePennyDropResult?.status === 'pending' ||
                   (selectedVendor?.pennydrop_verification_status === 'pending' && !reversePennyDropResult?.verified)) && (
-                  <Card className="border-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                    <Card className="border-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Loader2 className="h-5 w-5 text-amber-600" />
+                          <span className="font-semibold text-amber-700">Verification Pending</span>
+                        </div>
+                        <p className="text-sm text-amber-600">
+                          The vendor has not completed the ₹1 verification payment yet. Please ask the vendor to scan the QR code sent via email and complete the payment.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                {/* Rejected - Name Mismatch */}
+                {(reversePennyDropResult?.status === 'rejected' || selectedVendor?.pennydrop_verification_status === 'rejected') && (
+                  <Card className="border-2 border-red-200 bg-red-50 dark:bg-red-950/20">
                     <CardContent className="pt-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <Loader2 className="h-5 w-5 text-amber-600" />
-                        <span className="font-semibold text-amber-700">Verification Pending</span>
+                        <XCircle className="h-5 w-5 text-red-600" />
+                        <span className="font-semibold text-red-700">❌ Bank Verification Rejected - Name Mismatch</span>
                       </div>
-                      <p className="text-sm text-amber-600">
-                        The vendor has not completed the ₹1 verification payment yet. Please ask the vendor to scan the QR code sent via email and complete the payment.
+                      <p className="text-sm text-red-600 mb-3">
+                        The vendor completed the ₹1 payment, but the bank account holder name does not match the company's legal name. The vendor must pay using a bank account registered under their company name.
                       </p>
+                      <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-sm">
+                        <p className="text-red-700 dark:text-red-300 mb-2">
+                          <strong>Action Required:</strong> Click "Update Penny Drop" above to send a new verification link to the vendor with instructions to use the correct bank account.
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
 
-                {/* Verified Success */}
                 {(reversePennyDropResult?.verified || selectedVendor?.pennydrop_verification_status === 'verified') && (
                   <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-950/20">
                     <CardContent className="pt-4">
@@ -1022,15 +1175,68 @@ export default function FinanceReview() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Name Validation Status */}
+                {nameValidation && (
+                  reversePennyDropResult?.verified ||
+                  selectedVendor?.pennydrop_verification_status === 'verified' ||
+                  reversePennyDropResult?.status === 'rejected' ||
+                  selectedVendor?.pennydrop_verification_status === 'rejected'
+                ) && (
+                    <Card className={`border-2 ${nameValidation.isValid
+                      ? 'border-green-200 bg-green-50 dark:bg-green-950/20'
+                      : 'border-red-200 bg-red-50 dark:bg-red-950/20'
+                      }`}>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          {nameValidation.isValid ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-red-600" />
+                          )}
+                          <span className={`font-semibold ${nameValidation.isValid ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                            {nameValidation.isValid ? 'Name Verification Passed' : '⚠️ Name Mismatch Detected'}
+                          </span>
+                          <Badge
+                            variant={nameValidation.status === 'match' ? 'default' :
+                              nameValidation.status === 'partial' ? 'secondary' : 'destructive'}
+                            className="ml-auto"
+                          >
+                            {nameValidation.score}% Match
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Vendor Legal Name:</span>
+                            <span className="font-medium">{nameValidation.legalName || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Bank Account Holder:</span>
+                            <span className="font-medium">{nameValidation.holderName || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        {!nameValidation.isValid && (
+                          <div className="mt-3 p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                            <p className="text-sm text-red-700 dark:text-red-300">
+                              <strong>Approval Blocked:</strong> The bank account holder name does not match the vendor's legal name (score below 70%). Please verify with the vendor before proceeding.
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
               </TabsContent>
 
               <TabsContent value="validations" className="space-y-4 mt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Validation Results</h3>
                 </div>
-                <ValidationStatus 
-                  validations={mappedValidations} 
-                  isProcessing={runValidations.isPending} 
+                <ValidationStatus
+                  validations={mappedValidations}
+                  isProcessing={runValidations.isPending}
                 />
               </TabsContent>
             </Tabs>
@@ -1045,9 +1251,14 @@ export default function FinanceReview() {
               <XCircle className="h-4 w-4 mr-2" />
               Reject
             </Button>
-            <Button 
-              onClick={() => handleAction(selectedVendor!, 'approve')} 
-              className="rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+            <Button
+              onClick={() => handleAction(selectedVendor!, 'approve')}
+              disabled={isApproveDisabledDueToNameMismatch}
+              className={`rounded-xl ${isApproveDisabledDueToNameMismatch
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                }`}
+              title={isApproveDisabledDueToNameMismatch ? 'Cannot approve: Bank account holder name does not match vendor legal name' : ''}
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Approve
