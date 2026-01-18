@@ -15,7 +15,9 @@ import {
   Wrench,
   ChevronLeft,
   ChevronRight,
-  Server,
+  RefreshCw,
+  IndianRupee,
+  ShoppingCart,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -77,19 +79,19 @@ const navItems: NavItem[] = [
   {
     label: 'Finance Review',
     href: '/finance/review',
-    icon: CheckCircle,
+    icon: IndianRupee,
     roles: ['finance', 'admin', 'sharvi_admin'],
   },
   {
     label: 'Purchase Approval',
     href: '/purchase/approval',
-    icon: ClipboardCheck,
+    icon: ShoppingCart,
     roles: ['purchase', 'admin', 'sharvi_admin', 'approver'],
   },
   {
     label: 'SAP Sync',
     href: '/sap/sync',
-    icon: Server,
+    icon: RefreshCw,
     roles: ['admin', 'sharvi_admin'],
   },
   {
@@ -142,7 +144,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
   };
 
   return (
-    <aside 
+    <aside
       className={cn(
         "bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out",
         collapsed ? "w-[68px]" : "w-64"
@@ -154,13 +156,13 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
         collapsed ? "p-3" : "p-4"
       )}>
         <Link to="/dashboard" className="flex items-center gap-3">
-          <img 
-            src={ramkyLogo} 
-            alt="Ramky" 
+          <img
+            src={ramkyLogo}
+            alt="Ramky"
             className={cn(
               "transition-all duration-300",
               collapsed ? "h-8 w-8 object-contain" : "h-10 w-auto"
-            )} 
+            )}
           />
           {!collapsed && (
             <div className="overflow-hidden">
@@ -199,8 +201,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               )}
             </Button>
           </TooltipTrigger>
-          <TooltipContent 
-            side="right" 
+          <TooltipContent
+            side="right"
             className="bg-slate-900 text-white border-0 px-3 py-1.5 text-xs font-medium rounded-full shadow-lg"
             sideOffset={8}
           >
@@ -254,8 +256,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                 <TooltipTrigger asChild>
                   {linkContent}
                 </TooltipTrigger>
-                <TooltipContent 
-                  side="right" 
+                <TooltipContent
+                  side="right"
                   className="bg-slate-900 text-white border-0 px-3 py-1.5 text-xs font-medium rounded-full shadow-lg"
                   sideOffset={8}
                 >
@@ -279,7 +281,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <button 
+                <button
                   className={cn(
                     "w-full flex items-center rounded-lg hover:bg-sidebar-accent transition-colors",
                     collapsed ? "justify-center p-2" : "gap-3 p-2"
@@ -306,8 +308,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               </DropdownMenuTrigger>
             </TooltipTrigger>
             {collapsed && (
-              <TooltipContent 
-                side="right" 
+              <TooltipContent
+                side="right"
                 className="bg-slate-900 text-white border-0 px-3 py-1.5 text-xs font-medium rounded-full shadow-lg"
                 sideOffset={8}
               >
@@ -315,9 +317,9 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               </TooltipContent>
             )}
           </Tooltip>
-          <DropdownMenuContent 
-            align={collapsed ? "center" : "end"} 
-            side="top" 
+          <DropdownMenuContent
+            align={collapsed ? "center" : "end"}
+            side="top"
             className="w-56 bg-popover border shadow-lg"
             sideOffset={8}
           >

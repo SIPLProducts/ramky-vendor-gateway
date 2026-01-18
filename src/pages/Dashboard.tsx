@@ -14,6 +14,9 @@ import {
   WifiOff,
   Building2,
   Server,
+  IndianRupee,
+  ShoppingCart,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -188,7 +191,7 @@ export default function Dashboard() {
               Pending Finance
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <Clock className="h-5 w-5 text-white" />
+              <IndianRupee className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
           <CardContent>
@@ -213,7 +216,7 @@ export default function Dashboard() {
               Pending Purchase
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-              <FileText className="h-5 w-5 text-white" />
+              <ShoppingCart className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
           <CardContent>
@@ -238,7 +241,7 @@ export default function Dashboard() {
               Pending SAP Sync
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <Server className="h-5 w-5 text-white" />
+              <RefreshCw className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
           <CardContent>
@@ -420,7 +423,7 @@ export default function Dashboard() {
               <Link to="/finance/review">
                 <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl border-amber-200 hover:bg-amber-50 hover:border-amber-300 dark:border-amber-800 dark:hover:bg-amber-950/30">
                   <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-white" />
+                    <IndianRupee className="h-4 w-4 text-white" />
                   </div>
                   <span>Review Pending Vendors ({displayStats.pendingFinance})</span>
                 </Button>
@@ -430,7 +433,7 @@ export default function Dashboard() {
               <Link to="/purchase/approval">
                 <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl border-teal-200 hover:bg-teal-50 hover:border-teal-300 dark:border-teal-800 dark:hover:bg-teal-950/30 mt-2">
                   <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center">
-                    <FileText className="h-4 w-4 text-white" />
+                    <ShoppingCart className="h-4 w-4 text-white" />
                   </div>
                   <span>Approve Vendors ({displayStats.pendingPurchase})</span>
                 </Button>
