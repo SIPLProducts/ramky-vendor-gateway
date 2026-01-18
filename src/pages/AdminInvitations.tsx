@@ -50,6 +50,8 @@ import {
   Send,
   Filter,
   Building2,
+  User,
+  Phone,
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
@@ -59,6 +61,8 @@ const emailSchema = z.string().email('Please enter a valid email address');
 export default function AdminInvitations() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [email, setEmail] = useState('');
+  const [vendorName, setVendorName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [expiryDays, setExpiryDays] = useState('14');
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -86,8 +90,8 @@ export default function AdminInvitations() {
   });
 
   // Create invitation mutation
-  const createInvitation = useMutation<any, Error, { email: string; expiryDays: number; tenantId: string | null }>({
-    mutationFn: async ({ email, expiryDays, tenantId }) => {
+  const createInvitation = useMutation<any, Error, { email: string; vendorName: string; phoneNumber: string; expiryDays: number; tenantId: string | null }>({
+    mutationFn: async ({ email, vendorName, phoneNumber, expiryDays, tenantId }) => {
       // Generate unique token
       const token = crypto.randomUUID();
       const expiresAt = new Date();
@@ -105,6 +109,8 @@ export default function AdminInvitations() {
           token,
           expires_at: expiresAt.toISOString(),
           tenant_id: tenantId || null,
+          vendor_name: vendorName || null,
+          phone_number: phoneNumber || null,
         })
         .select('*, tenants(id, name, code)')
         .single();
@@ -119,6 +125,9 @@ export default function AdminInvitations() {
           token: invitation.token,
           expiresAt: invitation.expires_at,
           invitationId: invitation.id,
+          vendorName: vendorName || null,
+          tenantId: tenantId || null,
+          tenantName: tenantName,
           simulationMode: false,
         },
       });
@@ -136,6 +145,8 @@ export default function AdminInvitations() {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
       setIsDialogOpen(false);
       setEmail('');
+      setVendorName('');
+      setPhoneNumber('');
       setExpiryDays('14');
       setSelectedTenantId('');
 
@@ -169,6 +180,10 @@ export default function AdminInvitations() {
 
       console.log('Calling edge function for invitation:', invitationId);
 
+      // Get tenant name for email - tenants is an array from the join
+      const tenantData = (invitation as any).tenants;
+      const tenantName = Array.isArray(tenantData) ? tenantData[0]?.name : tenantData?.name || 'Ramky Infrastructure';
+
       // Call edge function to send invitation email
       const { data, error } = await supabase.functions.invoke('send-vendor-invitation', {
         body: {
@@ -176,6 +191,9 @@ export default function AdminInvitations() {
           token: invitation.token,
           expiresAt: invitation.expires_at,
           invitationId: invitation.id,
+          vendorName: (invitation as any).vendor_name || null,
+          tenantId: (invitation as any).tenant_id || null,
+          tenantName: tenantName,
           simulationMode: false, // Real email sending
         },
       });
@@ -220,7 +238,7 @@ export default function AdminInvitations() {
       }
     }
 
-    createInvitation.mutate({ email, expiryDays: parseInt(expiryDays), tenantId: selectedTenantId || null });
+    createInvitation.mutate({ email, vendorName, phoneNumber, expiryDays: parseInt(expiryDays), tenantId: selectedTenantId || null });
   };
 
   const copyInvitationLink = (token: string) => {
@@ -327,6 +345,17 @@ export default function AdminInvitations() {
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
+                <Label htmlFor="vendor-name">Vendor Name</Label>
+                <Input
+                  id="vendor-name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={vendorName}
+                  onChange={(e) => setVendorName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="vendor-email">Vendor Email</Label>
                 <Input
                   id="vendor-email"
@@ -341,6 +370,17 @@ export default function AdminInvitations() {
                 {emailError && (
                   <p className="text-sm text-destructive">{emailError}</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vendor-phone">Phone Number</Label>
+                <Input
+                  id="vendor-phone"
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
@@ -446,82 +486,104 @@ export default function AdminInvitations() {
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedInvitations.map((invitation) => (
-                    <TableRow key={invitation.id}>
-                      <TableCell className="font-medium">{invitation.email}</TableCell>
-                      <TableCell>{getStatusBadge(invitation)}</TableCell>
-                      <TableCell>
-                        {(invitation as any).tenants ? (
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span>{(invitation as any).tenants.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {format(new Date(invitation.created_at), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyInvitationLink(invitation.token)}
-                            className="gap-1"
-                          >
-                            {copiedToken === invitation.token ? (
-                              <>
-                                <CheckCircle2 className="h-4 w-4 text-success" />
-                                Copied!
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-4 w-4" />
-                                Copy Link
-                              </>
-                            )}
-                          </Button>
-                          {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone Number</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedInvitations.map((invitation) => (
+                      <TableRow key={invitation.id}>
+                        <TableCell>
+                          {(invitation as any).vendor_name ? (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{(invitation as any).vendor_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{invitation.email}</TableCell>
+                        <TableCell>
+                          {(invitation as any).phone_number ? (
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-4 w-4 text-muted-foreground" />
+                              <span>{(invitation as any).phone_number}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {(invitation as any).tenants ? (
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-muted-foreground" />
+                              <span>{(invitation as any).tenants.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(invitation.created_at), 'dd MMM yyyy')}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => sendEmailInvitation.mutate(invitation.id)}
-                              disabled={sendEmailInvitation.isPending}
+                              onClick={() => copyInvitationLink(invitation.token)}
                               className="gap-1"
                             >
-                              {sendEmailInvitation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                              {copiedToken === invitation.token ? (
+                                <>
+                                  <CheckCircle2 className="h-4 w-4 text-success" />
+                                  Copied!
+                                </>
                               ) : (
                                 <>
-                                  <Send className="h-4 w-4" />
-                                  Send Email
+                                  <Copy className="h-4 w-4" />
+                                  Copy Link
                                 </>
                               )}
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => sendEmailInvitation.mutate(invitation.id)}
+                                disabled={sendEmailInvitation.isPending}
+                                className="gap-1"
+                              >
+                                {sendEmailInvitation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Send className="h-4 w-4" />
+                                    Send Email
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
               <DataTablePagination
                 currentPage={currentPage}
