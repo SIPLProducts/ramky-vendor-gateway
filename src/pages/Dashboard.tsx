@@ -1,17 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useVendorStats, useVendors, useBuyerCompanies } from '@/hooks/useVendors';
-import { 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Users,
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
   TrendingUp,
   FileText,
   ArrowRight,
   Sparkles,
   LayoutDashboard,
-  FileCheck,
   WifiOff,
   Building2,
   Server,
@@ -92,7 +91,7 @@ export default function Dashboard() {
   // Get company breakdown with names
   type CompanyStats = { total: number; pending: number; approved: number; rejected: number };
   const byCompanyData = (displayStats.byCompany || {}) as Record<string, CompanyStats>;
-  
+
   const companyBreakdown = Object.entries(byCompanyData).map(([tenantId, companyData]) => {
     const company = buyerCompanies?.find(c => c.id === tenantId);
     return {
@@ -157,7 +156,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-5">
         <Card className="card-interactive border-0 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -182,30 +181,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Penny Drop Verification
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <FileCheck className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">{displayStats.pendingVerification}</div>
-                <Link to="/finance/review">
-                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-blue-600 dark:text-blue-400">
-                    Verify now <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
 
         <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -396,20 +371,20 @@ export default function Dashboard() {
                     </div>
                     <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
                       {company.approved > 0 && (
-                        <div 
-                          className="bg-green-500 h-full" 
+                        <div
+                          className="bg-green-500 h-full"
                           style={{ width: `${(company.approved / company.total) * 100}%` }}
                         />
                       )}
                       {company.pending > 0 && (
-                        <div 
-                          className="bg-amber-500 h-full" 
+                        <div
+                          className="bg-amber-500 h-full"
                           style={{ width: `${(company.pending / company.total) * 100}%` }}
                         />
                       )}
                       {company.rejected > 0 && (
-                        <div 
-                          className="bg-red-500 h-full" 
+                        <div
+                          className="bg-red-500 h-full"
                           style={{ width: `${(company.rejected / company.total) * 100}%` }}
                         />
                       )}

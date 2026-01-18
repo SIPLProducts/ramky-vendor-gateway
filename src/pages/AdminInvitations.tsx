@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenants } from '@/hooks/useTenant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,10 +49,8 @@ import {
   Loader2,
   Send,
   Filter,
-  Eye,
-  MousePointerClick,
+  Building2,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
@@ -61,6 +60,7 @@ export default function AdminInvitations() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [expiryDays, setExpiryDays] = useState('14');
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,6 +69,7 @@ export default function AdminInvitations() {
   const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: tenants } = useTenants();
 
   // Fetch invitations
   const { data: invitations, isLoading } = useQuery({
@@ -76,7 +77,7 @@ export default function AdminInvitations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendor_invitations')
-        .select('*')
+        .select('*, tenants(id, name, code)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -85,12 +86,16 @@ export default function AdminInvitations() {
   });
 
   // Create invitation mutation
-  const createInvitation = useMutation({
-    mutationFn: async ({ email, expiryDays }: { email: string; expiryDays: number }) => {
+  const createInvitation = useMutation<any, Error, { email: string; expiryDays: number; tenantId: string | null }>({
+    mutationFn: async ({ email, expiryDays, tenantId }) => {
       // Generate unique token
       const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
+
+      // Get tenant name for email
+      const selectedTenant = tenants?.find(t => t.id === tenantId);
+      const tenantName = selectedTenant?.name || 'Ramky Infrastructure';
 
       // Step 1: Create invitation in database
       const { data: invitation, error: dbError } = await supabase
@@ -99,8 +104,9 @@ export default function AdminInvitations() {
           email,
           token,
           expires_at: expiresAt.toISOString(),
+          tenant_id: tenantId || null,
         })
-        .select()
+        .select('*, tenants(id, name, code)')
         .single();
 
       if (dbError) throw dbError;
@@ -131,7 +137,8 @@ export default function AdminInvitations() {
       setIsDialogOpen(false);
       setEmail('');
       setExpiryDays('14');
-      
+      setSelectedTenantId('');
+
       if (result.emailSent) {
         toast({
           title: 'Invitation Sent',
@@ -161,7 +168,7 @@ export default function AdminInvitations() {
       if (!invitation) throw new Error('Invitation not found');
 
       console.log('Calling edge function for invitation:', invitationId);
-      
+
       // Call edge function to send invitation email
       const { data, error } = await supabase.functions.invoke('send-vendor-invitation', {
         body: {
@@ -178,7 +185,7 @@ export default function AdminInvitations() {
         console.error('Error details:', JSON.stringify(error, null, 2));
         throw new Error(error.message || 'Failed to send email');
       }
-      
+
       console.log('Edge function response:', data);
       return { invitation, simulated: data?.simulated, emailId: data?.emailId };
     },
@@ -186,7 +193,7 @@ export default function AdminInvitations() {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
       toast({
         title: result?.simulated ? 'Email Simulated' : 'Email Sent',
-        description: result?.simulated 
+        description: result?.simulated
           ? 'Invitation email simulated (demo mode). Check console for details.'
           : `Invitation email has been sent to ${result.invitation.email}`,
       });
@@ -213,7 +220,7 @@ export default function AdminInvitations() {
       }
     }
 
-    createInvitation.mutate({ email, expiryDays: parseInt(expiryDays) });
+    createInvitation.mutate({ email, expiryDays: parseInt(expiryDays), tenantId: selectedTenantId || null });
   };
 
   const copyInvitationLink = (token: string) => {
@@ -292,53 +299,6 @@ export default function AdminInvitations() {
     );
   };
 
-  const getEmailTrackingStatus = (invitation: any) => {
-    const sentAt = invitation.email_sent_at;
-    const openedAt = invitation.email_opened_at;
-    const clickedAt = invitation.email_clicked_at;
-
-    if (!sentAt) return null;
-
-    return (
-      <TooltipProvider>
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger>
-              <div className={`p-1 rounded ${sentAt ? 'text-green-600' : 'text-gray-300'}`}>
-                <Send className="h-3 w-3" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Sent: {sentAt ? format(new Date(sentAt), 'dd MMM yyyy HH:mm') : 'Not sent'}</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger>
-              <div className={`p-1 rounded ${openedAt ? 'text-blue-600' : 'text-gray-300'}`}>
-                <Eye className="h-3 w-3" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Opened: {openedAt ? format(new Date(openedAt), 'dd MMM yyyy HH:mm') : 'Not opened yet'}</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger>
-              <div className={`p-1 rounded ${clickedAt ? 'text-purple-600' : 'text-gray-300'}`}>
-                <MousePointerClick className="h-3 w-3" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Clicked: {clickedAt ? format(new Date(clickedAt), 'dd MMM yyyy HH:mm') : 'Not clicked yet'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </TooltipProvider>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -394,6 +354,22 @@ export default function AdminInvitations() {
                     <SelectItem value="14">14 Days</SelectItem>
                     <SelectItem value="30">30 Days</SelectItem>
                     <SelectItem value="60">60 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="company">Company (Tenant)</Label>
+                <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                  <SelectTrigger id="company">
+                    <SelectValue placeholder="Select a company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants?.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -464,7 +440,7 @@ export default function AdminInvitations() {
             </div>
           ) : filteredInvitations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {invitations?.length === 0 
+              {invitations?.length === 0
                 ? 'No invitations yet. Create your first invitation to get started.'
                 : 'No invitations match your search criteria.'}
             </div>
@@ -475,7 +451,7 @@ export default function AdminInvitations() {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Email Tracking</TableHead>
+                    <TableHead>Company</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -487,8 +463,13 @@ export default function AdminInvitations() {
                       <TableCell className="font-medium">{invitation.email}</TableCell>
                       <TableCell>{getStatusBadge(invitation)}</TableCell>
                       <TableCell>
-                        {getEmailTrackingStatus(invitation) || (
-                          <span className="text-muted-foreground text-sm">Not sent</span>
+                        {(invitation as any).tenants ? (
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span>{(invitation as any).tenants.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -541,7 +522,7 @@ export default function AdminInvitations() {
                   ))}
                 </TableBody>
               </Table>
-              
+
               <DataTablePagination
                 currentPage={currentPage}
                 totalPages={totalPages}
