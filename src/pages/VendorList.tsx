@@ -33,12 +33,12 @@ import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { ValidationResult } from '@/types/vendor';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Search, 
-  Download, 
-  Eye, 
-  Filter, 
-  Building2, 
+import {
+  Search,
+  Download,
+  Eye,
+  Filter,
+  Building2,
   RefreshCw,
   MapPin,
   Phone,
@@ -49,11 +49,12 @@ import {
   Calendar,
   User,
   FolderOpen,
+  MessageSquare,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
-type VendorStatus = 
+type VendorStatus =
   | 'draft'
   | 'submitted'
   | 'validation_pending'
@@ -87,7 +88,7 @@ export default function VendorList() {
         .select('id, name, code')
         .eq('is_active', true)
         .order('name');
-      
+
       if (error) throw error;
       return data;
     },
@@ -166,7 +167,7 @@ export default function VendorList() {
       Status: v.status,
       SAP_Code: v.sap_vendor_code || '-',
     }));
-    
+
     console.log('Exporting:', csvData);
     alert('Export functionality - CSV data logged to console');
   };
@@ -174,7 +175,7 @@ export default function VendorList() {
   // Helper function to map vendor verification status columns to ValidationResult format
   const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
     if (!vendor) return [];
-    
+
     const vendorData = vendor as VendorRow & {
       gst_verification_status?: string;
       pan_verification_status?: string;
@@ -182,7 +183,7 @@ export default function VendorList() {
       msme_verification_status?: string;
       name_match_verification_status?: string;
     };
-    
+
     return [
       {
         type: 'gst' as const,
@@ -205,8 +206,8 @@ export default function VendorList() {
       {
         type: 'msme' as const,
         status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' : 
-                 vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
+        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
+          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
         timestamp: vendor.submitted_at || vendor.created_at,
       },
       {
@@ -344,8 +345,8 @@ export default function VendorList() {
                             {vendor.gstin || '-'}
                           </TableCell>
                           <TableCell>
-                            {vendor.registered_city && vendor.registered_state 
-                              ? `${vendor.registered_city}, ${vendor.registered_state}` 
+                            {vendor.registered_city && vendor.registered_state
+                              ? `${vendor.registered_city}, ${vendor.registered_state}`
                               : '-'}
                           </TableCell>
                           <TableCell>{getStatusBadge(vendor.status as VendorStatus)}</TableCell>
@@ -353,8 +354,8 @@ export default function VendorList() {
                             {vendor.sap_vendor_code || '-'}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => {
                                 setSelectedVendor(vendor);
@@ -370,7 +371,7 @@ export default function VendorList() {
                   </TableBody>
                 </Table>
               </div>
-              
+
               <DataTablePagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -394,7 +395,7 @@ export default function VendorList() {
               <span className="ml-2">{selectedVendor && getStatusBadge(selectedVendor.status as VendorStatus)}</span>
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedVendor && (
             <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
@@ -402,7 +403,7 @@ export default function VendorList() {
                 <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
                 <ScrollArea className="h-[50vh] pr-4">
                   <div className="space-y-6">
@@ -439,9 +440,9 @@ export default function VendorList() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Address Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -461,9 +462,9 @@ export default function VendorList() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Contact Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -483,9 +484,9 @@ export default function VendorList() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Statutory Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -511,9 +512,9 @@ export default function VendorList() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Bank Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -547,9 +548,9 @@ export default function VendorList() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Financial Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -571,9 +572,50 @@ export default function VendorList() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
+                    {/* Review Comments */}
+                    {(selectedVendor.finance_comments || selectedVendor.purchase_comments) && (
+                      <>
+                        <div className="space-y-3">
+                          <h4 className="font-semibold flex items-center gap-2 text-primary">
+                            <MessageSquare className="h-4 w-4" />
+                            Review Comments
+                          </h4>
+                          <div className="grid grid-cols-1 gap-4 text-sm">
+                            {selectedVendor.finance_comments && (
+                              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
+                                  {selectedVendor.finance_reviewed_at && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(selectedVendor.finance_reviewed_at).toLocaleDateString('en-IN')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-amber-900 dark:text-amber-100">{selectedVendor.finance_comments}</p>
+                              </div>
+                            )}
+                            {selectedVendor.purchase_comments && (
+                              <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
+                                  {selectedVendor.purchase_reviewed_at && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(selectedVendor.purchase_reviewed_at).toLocaleDateString('en-IN')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-teal-900 dark:text-teal-100">{selectedVendor.purchase_comments}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Separator />
+                      </>
+                    )}
+
                     {/* SAP Info */}
                     {selectedVendor.sap_vendor_code && (
                       <div className="space-y-3">
@@ -596,11 +638,11 @@ export default function VendorList() {
                   </div>
                 </ScrollArea>
               </TabsContent>
-              
+
               <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
                 <VendorDocuments vendorId={selectedVendor.id} />
               </TabsContent>
-              
+
               <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
                 <ValidationStatus validations={mappedValidations} />
               </TabsContent>

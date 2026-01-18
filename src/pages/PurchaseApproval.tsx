@@ -24,15 +24,16 @@ import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { useVendors, usePurchaseAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import { ValidationResult } from '@/types/vendor';
-import { 
-  Search, 
-  Eye, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Search,
+  Eye,
+  CheckCircle,
+  XCircle,
   Building2,
   Truck,
   Loader2,
   FolderOpen,
+  MessageSquare,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,13 +45,15 @@ export default function PurchaseApproval() {
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [comments, setComments] = useState('');
+  const [showFinanceCommentDialog, setShowFinanceCommentDialog] = useState(false);
+  const [selectedFinanceComment, setSelectedFinanceComment] = useState<{ vendorName: string; comment: string | null }>({ vendorName: '', comment: null });
 
   const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const purchaseAction = usePurchaseAction();
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
-    const matchesSearch = 
+    const matchesSearch =
       (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -79,7 +82,7 @@ export default function PurchaseApproval() {
         action: actionType,
         comments,
       });
-      
+
       setShowActionDialog(false);
       setShowDetails(false);
       setSelectedVendor(null);
@@ -91,7 +94,7 @@ export default function PurchaseApproval() {
   // Helper function to map vendor verification status columns to ValidationResult format
   const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
     if (!vendor) return [];
-    
+
     const vendorData = vendor as VendorRow & {
       gst_verification_status?: string;
       pan_verification_status?: string;
@@ -99,7 +102,7 @@ export default function PurchaseApproval() {
       msme_verification_status?: string;
       name_match_verification_status?: string;
     };
-    
+
     return [
       {
         type: 'gst' as const,
@@ -122,8 +125,8 @@ export default function PurchaseApproval() {
       {
         type: 'msme' as const,
         status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' : 
-                 vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
+        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
+          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
         timestamp: vendor.submitted_at || vendor.created_at,
       },
       {
@@ -203,6 +206,18 @@ export default function PurchaseApproval() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {vendor.finance_comments && (
+                      <Button
+                        variant="outline"
+                        className="rounded-xl border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
+                        onClick={() => {
+                          setSelectedFinanceComment({ vendorName: vendor.legal_name || 'Vendor', comment: vendor.finance_comments });
+                          setShowFinanceCommentDialog(true);
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />Comment
+                      </Button>
+                    )}
                     <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}><Eye className="h-4 w-4 mr-2" />Details</Button>
                     <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
                     <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(vendor, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
@@ -256,17 +271,44 @@ export default function PurchaseApproval() {
       <Dialog open={showActionDialog} onOpenChange={setShowActionDialog}>
         <DialogContent className="rounded-2xl">
           <DialogHeader><DialogTitle>{actionType === 'approve' ? '✅ Approve Vendor' : '❌ Reject Vendor'}</DialogTitle>
-          <DialogDescription>
-            {actionType === 'approve' 
-              ? 'Approved vendors will be available for SAP sync in the SAP Sync page.'
-              : 'Please provide a reason for rejection.'}
-          </DialogDescription>
+            <DialogDescription>
+              {actionType === 'approve'
+                ? 'Approved vendors will be available for SAP sync in the SAP Sync page.'
+                : 'Please provide a reason for rejection.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4"><Textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder={actionType === 'approve' ? 'Optional comments...' : 'Reason for rejection...'} className="rounded-xl" rows={4} /></div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowActionDialog(false)} className="rounded-xl">Cancel</Button>
             <Button variant={actionType === 'reject' ? 'destructive' : 'default'} onClick={submitAction} disabled={(actionType === 'reject' && !comments.trim()) || purchaseAction.isPending} className={`rounded-xl ${actionType === 'approve' ? 'bg-gradient-to-r from-teal-500 to-emerald-500' : ''}`}>
               {purchaseAction.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</> : actionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Finance Comment Popup Dialog */}
+      <Dialog open={showFinanceCommentDialog} onOpenChange={setShowFinanceCommentDialog}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-amber-600" />
+              Finance Team Comment
+            </DialogTitle>
+            <DialogDescription>
+              Comment for {selectedFinanceComment.vendorName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                {selectedFinanceComment.comment || 'No comment provided'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowFinanceCommentDialog(false)} className="rounded-xl">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

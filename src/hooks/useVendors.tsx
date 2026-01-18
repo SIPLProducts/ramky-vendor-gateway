@@ -16,7 +16,7 @@ type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
 // Fetch all vendors (for admin/finance/purchase) with offline support
 export function useVendors(statuses?: VendorStatus[]) {
   const cacheKey = statuses ? `vendors_${statuses.join('_')}` : 'vendors_all';
-  const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<VendorRow[]>({ 
+  const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<VendorRow[]>({
     key: cacheKey,
     ttl: 12 * 60 * 60 * 1000 // 12 hours
   });
@@ -194,10 +194,34 @@ export function useFinanceAction() {
       action: 'approve' | 'reject' | 'clarify';
       comments: string;
     }) => {
+      // For clarify action, use the dedicated edge function
+      if (action === 'clarify') {
+        const { data, error } = await supabase.functions.invoke('request-vendor-clarification', {
+          body: {
+            vendorId,
+            comment: comments,
+            reviewerName: user?.email || 'Finance Team',
+          },
+        });
+
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Failed to send clarification request');
+
+        // Log audit
+        await supabase.from('audit_logs').insert({
+          vendor_id: vendorId,
+          user_id: user?.id,
+          action: 'finance_clarify',
+          details: { comments, email_sent_to: data.vendorEmail },
+        });
+
+        return { id: vendorId, status: 'draft' as VendorStatus };
+      }
+
+      // For approve/reject, continue with existing logic
       const statusMap: Record<string, VendorStatus> = {
         approve: 'purchase_review',
         reject: 'finance_rejected',
-        clarify: 'finance_review',
       };
 
       const updateData: VendorUpdate = {
@@ -230,11 +254,11 @@ export function useFinanceAction() {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
         title: variables.action === 'approve' ? 'Approved' : variables.action === 'reject' ? 'Rejected' : 'Clarification Requested',
-        description: variables.action === 'approve' 
+        description: variables.action === 'approve'
           ? 'Vendor forwarded to Purchase team'
           : variables.action === 'reject'
-          ? 'Vendor registration rejected'
-          : 'Clarification request sent',
+            ? 'Vendor registration rejected'
+            : 'Clarification email sent to vendor. Status changed to draft.',
       });
     },
     onError: (error: Error) => {
@@ -296,10 +320,10 @@ export function usePurchaseAction() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      
+
       toast({
         title: variables.action === 'approve' ? '✅ Approved' : 'Rejected',
-        description: variables.action === 'approve' 
+        description: variables.action === 'approve'
           ? 'Vendor approved and ready for SAP sync'
           : 'Vendor registration rejected',
       });
@@ -355,9 +379,9 @@ export function useSAPSync() {
         vendor_id: vendorId,
         user_id: user?.id,
         action: 'sap_sync',
-        details: { 
+        details: {
           sap_vendor_code: sapResult.sapVendorCode,
-          sap_response: sapResult.sapResponse 
+          sap_response: sapResult.sapResponse
         },
       });
 
@@ -375,7 +399,7 @@ export function useSAPSync() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
-      
+
       toast({
         title: '✅ Synced to SAP',
         description: `SAP Vendor Code: ${result.sapResponse?.sapVendorCode || 'N/A'}`,
@@ -393,7 +417,7 @@ export function useSAPSync() {
 
 // Vendor statistics with offline support
 export function useVendorStats() {
-  const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<any>({ 
+  const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<any>({
     key: 'vendor_stats',
     ttl: 6 * 60 * 60 * 1000 // 6 hours
   });
@@ -404,7 +428,7 @@ export function useVendorStats() {
       const { data, error } = await supabase
         .from('vendors')
         .select('status, tenant_id');
-      
+
       if (error) throw error;
 
       const stats = {
@@ -470,7 +494,7 @@ export function useBuyerCompanies() {
         .select('id, name, code')
         .eq('is_active', true)
         .order('name');
-      
+
       if (error) throw error;
       return data;
     },

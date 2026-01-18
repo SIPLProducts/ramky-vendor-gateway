@@ -23,10 +23,10 @@ import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import { ValidationResult } from '@/types/vendor';
-import { 
-  Search, 
-  Eye, 
-  CheckCircle, 
+import {
+  Search,
+  Eye,
+  CheckCircle,
   Building2,
   User,
   Loader2,
@@ -43,6 +43,7 @@ import {
   Globe,
   Calendar,
   Hash,
+  MessageSquare,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -55,13 +56,14 @@ export default function SAPSync() {
   const [showDetails, setShowDetails] = useState(false);
   const [sapSyncResult, setSapSyncResult] = useState<any>(null);
   const [showSapResultDialog, setShowSapResultDialog] = useState(false);
+  const [syncingVendorId, setSyncingVendorId] = useState<string | null>(null);
 
   const { data: approvedVendors, isLoading, refetch } = useVendors(['purchase_approved']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const sapSync = useSAPSync();
 
   const filteredVendors = approvedVendors?.filter((vendor) => {
-    const matchesSearch = 
+    const matchesSearch =
       (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -75,21 +77,27 @@ export default function SAPSync() {
     return company ? `${company.name} (${company.code})` : 'Unassigned';
   };
 
-  const handleSyncToSAP = async () => {
-    if (!selectedVendor) return;
+  const handleSyncToSAP = async (vendorToSync?: VendorRow) => {
+    const vendor = vendorToSync || selectedVendor;
+    if (!vendor) return;
+
+    setSyncingVendorId(vendor.id);
     try {
-      const result = await sapSync.mutateAsync({ vendorId: selectedVendor.id });
+      const result = await sapSync.mutateAsync({ vendorId: vendor.id });
       setSapSyncResult(result.sapResponse);
+      setSelectedVendor(vendor);
       setShowSapResultDialog(true);
     } catch (error) {
       console.error('SAP sync failed:', error);
+    } finally {
+      setSyncingVendorId(null);
     }
   };
 
   // Helper function to map vendor verification status columns to ValidationResult format
   const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
     if (!vendor) return [];
-    
+
     const vendorData = vendor as VendorRow & {
       gst_verification_status?: string;
       pan_verification_status?: string;
@@ -97,7 +105,7 @@ export default function SAPSync() {
       msme_verification_status?: string;
       name_match_verification_status?: string;
     };
-    
+
     return [
       {
         type: 'gst' as const,
@@ -120,8 +128,8 @@ export default function SAPSync() {
       {
         type: 'msme' as const,
         status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' : 
-                 vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
+        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
+          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
         timestamp: vendor.submitted_at || vendor.created_at,
       },
       {
@@ -222,7 +230,20 @@ export default function SAPSync() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}><Eye className="h-4 w-4 mr-2" />View & Sync</Button>
+                    <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
+                      <Eye className="h-4 w-4 mr-2" />View
+                    </Button>
+                    <Button
+                      className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
+                      onClick={() => handleSyncToSAP(vendor)}
+                      disabled={syncingVendorId === vendor.id}
+                    >
+                      {syncingVendorId === vendor.id ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
+                      ) : (
+                        <><Server className="h-4 w-4 mr-2" />Sync</>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -243,7 +264,7 @@ export default function SAPSync() {
               Review vendor details before syncing to SAP
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedVendor && (
             <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
@@ -251,7 +272,7 @@ export default function SAPSync() {
                 <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
                 <ScrollArea className="h-[50vh] pr-4">
                   <div className="space-y-6">
@@ -288,9 +309,9 @@ export default function SAPSync() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Address Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -310,9 +331,9 @@ export default function SAPSync() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Contact Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -332,9 +353,9 @@ export default function SAPSync() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Statutory Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -368,9 +389,9 @@ export default function SAPSync() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Bank Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -404,9 +425,9 @@ export default function SAPSync() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Financial Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -432,14 +453,14 @@ export default function SAPSync() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <Separator />
-                    
+
                     {/* Approval Info */}
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2 text-primary">
                         <Calendar className="h-4 w-4" />
-                        Approval Information
+                        Approval Timeline
                       </h4>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div className="space-y-1">
@@ -447,40 +468,73 @@ export default function SAPSync() {
                           <p className="font-medium">{selectedVendor.finance_reviewed_at ? new Date(selectedVendor.finance_reviewed_at).toLocaleString('en-IN') : '-'}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-muted-foreground">Finance Comments</p>
-                          <p className="font-medium">{selectedVendor.finance_comments || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
                           <p className="text-muted-foreground">Purchase Reviewed At</p>
                           <p className="font-medium">{selectedVendor.purchase_reviewed_at ? new Date(selectedVendor.purchase_reviewed_at).toLocaleString('en-IN') : '-'}</p>
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Purchase Comments</p>
-                          <p className="font-medium">{selectedVendor.purchase_comments || '-'}</p>
-                        </div>
                       </div>
                     </div>
+
+                    {/* Review Comments */}
+                    {(selectedVendor.finance_comments || selectedVendor.purchase_comments) && (
+                      <>
+                        <Separator />
+                        <div className="space-y-3">
+                          <h4 className="font-semibold flex items-center gap-2 text-primary">
+                            <MessageSquare className="h-4 w-4" />
+                            Review Comments
+                          </h4>
+                          <div className="grid grid-cols-1 gap-4 text-sm">
+                            {selectedVendor.finance_comments && (
+                              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
+                                  {selectedVendor.finance_reviewed_at && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(selectedVendor.finance_reviewed_at).toLocaleDateString('en-IN')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-amber-900 dark:text-amber-100">{selectedVendor.finance_comments}</p>
+                              </div>
+                            )}
+                            {selectedVendor.purchase_comments && (
+                              <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
+                                  {selectedVendor.purchase_reviewed_at && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(selectedVendor.purchase_reviewed_at).toLocaleDateString('en-IN')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-teal-900 dark:text-teal-100">{selectedVendor.purchase_comments}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </ScrollArea>
               </TabsContent>
-              
+
               <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
                 <VendorDocuments vendorId={selectedVendor.id} />
               </TabsContent>
-              
+
               <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
                 <ValidationStatus validations={mappedValidations} />
               </TabsContent>
             </Tabs>
           )}
-          
+
           <DialogFooter className="gap-2 mt-4 pt-4 border-t">
             <Button variant="outline" onClick={() => setShowDetails(false)} className="rounded-xl">
               Close
             </Button>
-            <Button 
-              className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20" 
-              onClick={handleSyncToSAP}
+            <Button
+              className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
+              onClick={() => handleSyncToSAP()}
               disabled={sapSync.isPending}
             >
               {sapSync.isPending ? (
@@ -551,13 +605,13 @@ export default function SAPSync() {
             </div>
           )}
           <DialogFooter>
-            <Button 
+            <Button
               onClick={() => {
                 setShowSapResultDialog(false);
                 setShowDetails(false);
                 setSelectedVendor(null);
                 setSapSyncResult(null);
-              }} 
+              }}
               className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500"
             >
               Done

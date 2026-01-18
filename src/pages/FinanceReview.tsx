@@ -192,18 +192,23 @@ export default function FinanceReview() {
     });
   }, [reversePennyDropResult]);
 
-  // Computed value to check if approve should be disabled due to name mismatch or rejection
-  const isApproveDisabledDueToNameMismatch = useMemo(() => {
-    // If penny drop verification was rejected due to name mismatch
-    if (selectedVendor?.pennydrop_verification_status === 'rejected' || reversePennyDropResult?.status === 'rejected') {
+  // Computed value to check if approve should be disabled (penny drop not verified)
+  const isApproveDisabled = useMemo(() => {
+    // Approve is only enabled when penny drop verification status is 'verified'
+    const verificationStatus = selectedVendor?.pennydrop_verification_status;
+
+    // If not verified, disable approve
+    if (verificationStatus !== 'verified') {
       return true;
     }
-    // If penny drop is verified but name validation failed (legacy check)
-    if (selectedVendor?.pennydrop_verification_status === 'verified' || reversePennyDropResult?.verified) {
-      return nameValidation !== null && !nameValidation.isValid;
+
+    // If verified but name validation explicitly failed (extra safety check)
+    if (nameValidation !== null && !nameValidation.isValid) {
+      return true;
     }
+
     return false;
-  }, [selectedVendor, reversePennyDropResult, nameValidation]);
+  }, [selectedVendor, nameValidation]);
 
 
 
@@ -1232,12 +1237,12 @@ export default function FinanceReview() {
             </Button>
             <Button
               onClick={() => handleAction(selectedVendor!, 'approve')}
-              disabled={isApproveDisabledDueToNameMismatch}
-              className={`rounded-xl ${isApproveDisabledDueToNameMismatch
+              disabled={isApproveDisabled}
+              className={`rounded-xl ${isApproveDisabled
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
                 }`}
-              title={isApproveDisabledDueToNameMismatch ? 'Cannot approve: Bank account holder name does not match vendor legal name' : ''}
+              title={isApproveDisabled ? 'Complete penny drop verification first' : ''}
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Approve
