@@ -85,13 +85,13 @@ export function useFieldValidation(vendorId?: string) {
     if (!vendorId) return; // Only save if we have a vendor ID
 
     try {
-      await supabase.from('vendor_validations').insert({
+      await supabase.from('vendor_validations').insert([{
         vendor_id: vendorId,
         validation_type: type,
         status,
         message,
-        details,
-      });
+        details: details as any,
+      }]);
       console.log(`[Validation] Saved ${type} validation to database`);
     } catch (error) {
       console.error(`[Validation] Failed to save ${type} validation:`, error);
