@@ -26,8 +26,12 @@ import {
   Building2,
   CreditCard,
   Shield,
-  Send
+  Send,
+  Download,
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
 const faqs = [
@@ -101,6 +105,25 @@ const faqs = [
   },
 ];
 
+function FeatureSection({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <h3 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+        <ArrowRight className="h-4 w-4 text-primary" />
+        {title}
+      </h3>
+      <ul className="space-y-2 ml-6">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function SupportHelp() {
   const { toast } = useToast();
   const [contactForm, setContactForm] = useState({
@@ -110,6 +133,88 @@ export default function SupportHelp() {
     message: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleDownloadFeatures = () => {
+    const content = `
+RAMKY VENDOR ONBOARDING PORTAL
+Product Features & Functionalities
+===================================
+
+1. VENDOR SELF-REGISTRATION PORTAL
+- Multi-step registration form (Organization, Contact, Statutory, Bank, Financial details)
+- Save as Draft & resume later functionality
+- Invitation-based registration via secure email links
+- Multi-tenant support for multiple buyer companies (RIL, REE, REF, RPC, REEL)
+
+2. AUTOMATED DOCUMENT VERIFICATION
+- GST Number Verification – Validates GSTIN against government database
+- PAN Verification – Cross-checks PAN details with NSDL/UTIITSL
+- MSME Certificate Verification – Validates Udyam registration number
+- Bank Account Verification – Validates account number & IFSC code
+- Penny Drop Verification – Real-time bank account ownership validation via ₹1 test transaction
+- Name Match Verification – Cross-validates entity name across GST, PAN & Bank records
+
+3. GST COMPLIANCE CHECK
+- Periodic GST return filing status check
+- Scheduled compliance monitoring (configurable frequency)
+- Automated alerts for non-compliant vendors
+- Compliance history tracking and audit trail
+
+4. MULTI-LEVEL APPROVAL WORKFLOW
+- Finance Review & Approval – Finance team reviews vendor financials, bank details, and compliance
+- Purchase Review & Approval – Purchase team reviews vendor capabilities and commercial terms
+- Configurable approval steps with role-based access
+- Approval comments, rejection reasons, and request-for-info flows
+- Email notifications at each approval stage
+
+5. SAP INTEGRATION (BUSINESS PARTNER CREATION)
+- Automatic sync of approved vendor data to SAP S/4HANA
+- Business Partner (BP) creation via SAP API
+- Vendor code generation and mapping
+- Company code extension (e.g., 1710)
+- Real-time sync status tracking with SAP response logging
+
+6. ADMINISTRATION & CONFIGURATION
+- Tenant/Buyer Company Management
+- Form Field Configuration – Show/hide/reorder fields per tenant
+- Validation API Provider Management – Configure external API endpoints
+- Workflow Configuration – Define approval steps and roles
+- Branding Configuration – Custom logo, colors, and company details per tenant
+- API Logs & Monitoring – Track all validation API calls and responses
+
+7. AUDIT TRAIL & SECURITY
+- Complete audit logging of all user actions
+- Role-based access control (Vendor, Finance, Purchase, Admin, Sharvi Admin)
+- Row-level security on all database tables
+- Encrypted credential storage for API keys
+- Session management and secure authentication
+
+8. NOTIFICATIONS & COMMUNICATION
+- Email notifications for registration status changes
+- Invitation emails with secure registration links
+- Finance & Purchase approval notifications
+- Email delivery tracking (sent, opened, clicked)
+
+===================================
+© Ramky Group – Vendor Onboarding Portal
+Powered by Sharvi Technologies
+    `.trim();
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Ramky_Vendor_Portal_Features.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Download Started',
+      description: 'Product Features document is being downloaded.',
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,6 +398,123 @@ export default function SupportHelp() {
           </Card>
         </div>
 
+        {/* Product Features & Functionalities */}
+        <Card className="mt-8" id="product-features">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Product Features & Functionalities
+              </CardTitle>
+              <CardDescription>
+                Complete vendor onboarding platform capabilities
+              </CardDescription>
+            </div>
+            <Button onClick={handleDownloadFeatures} variant="outline" className="gap-2">
+              <Download className="h-4 w-4" />
+              Download PDF
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6" id="features-content">
+              {/* Vendor Registration */}
+              <FeatureSection
+                title="1. Vendor Self-Registration Portal"
+                items={[
+                  'Multi-step registration form (Organization, Contact, Statutory, Bank, Financial details)',
+                  'Save as Draft & resume later functionality',
+                  'Invitation-based registration via secure email links',
+                  'Multi-tenant support for multiple buyer companies (RIL, REE, REF, RPC, REEL)',
+                ]}
+              />
+
+              {/* Document Verification */}
+              <FeatureSection
+                title="2. Automated Document Verification"
+                items={[
+                  'GST Number Verification – Validates GSTIN against government database',
+                  'PAN Verification – Cross-checks PAN details with NSDL/UTIITSL',
+                  'MSME Certificate Verification – Validates Udyam registration number',
+                  'Bank Account Verification – Validates account number & IFSC code',
+                  'Penny Drop Verification – Real-time bank account ownership validation via ₹1 test transaction',
+                  'Name Match Verification – Cross-validates entity name across GST, PAN & Bank records',
+                ]}
+              />
+
+              {/* GST Compliance */}
+              <FeatureSection
+                title="3. GST Compliance Check"
+                items={[
+                  'Periodic GST return filing status check',
+                  'Scheduled compliance monitoring (configurable frequency)',
+                  'Automated alerts for non-compliant vendors',
+                  'Compliance history tracking and audit trail',
+                ]}
+              />
+
+              {/* Approval Workflow */}
+              <FeatureSection
+                title="4. Multi-Level Approval Workflow"
+                items={[
+                  'Finance Review & Approval – Finance team reviews vendor financials, bank details, and compliance',
+                  'Purchase Review & Approval – Purchase team reviews vendor capabilities and commercial terms',
+                  'Configurable approval steps with role-based access',
+                  'Approval comments, rejection reasons, and request-for-info flows',
+                  'Email notifications at each approval stage',
+                ]}
+              />
+
+              {/* SAP Integration */}
+              <FeatureSection
+                title="5. SAP Integration (Business Partner Creation)"
+                items={[
+                  'Automatic sync of approved vendor data to SAP S/4HANA',
+                  'Business Partner (BP) creation via SAP API',
+                  'Vendor code generation and mapping',
+                  'Company code extension (e.g., 1710)',
+                  'Real-time sync status tracking with SAP response logging',
+                ]}
+              />
+
+              {/* Admin & Configuration */}
+              <FeatureSection
+                title="6. Administration & Configuration"
+                items={[
+                  'Tenant/Buyer Company Management',
+                  'Form Field Configuration – Show/hide/reorder fields per tenant',
+                  'Validation API Provider Management – Configure external API endpoints',
+                  'Workflow Configuration – Define approval steps and roles',
+                  'Branding Configuration – Custom logo, colors, and company details per tenant',
+                  'API Logs & Monitoring – Track all validation API calls and responses',
+                ]}
+              />
+
+              {/* Audit & Security */}
+              <FeatureSection
+                title="7. Audit Trail & Security"
+                items={[
+                  'Complete audit logging of all user actions',
+                  'Role-based access control (Vendor, Finance, Purchase, Admin, Sharvi Admin)',
+                  'Row-level security on all database tables',
+                  'Encrypted credential storage for API keys',
+                  'Session management and secure authentication',
+                ]}
+              />
+
+              {/* Notifications */}
+              <FeatureSection
+                title="8. Notifications & Communication"
+                items={[
+                  'Email notifications for registration status changes',
+                  'Invitation emails with secure registration links',
+                  'Finance & Purchase approval notifications',
+                  'Email delivery tracking (sent, opened, clicked)',
+                ]}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Additional Resources */}
         <Card className="mt-8">
           <CardHeader>
@@ -300,9 +522,9 @@ export default function SupportHelp() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => document.getElementById('product-features')?.scrollIntoView({ behavior: 'smooth' })}>
                 <FileQuestion className="h-6 w-6" />
-                <span>User Guide</span>
+                <span>Product Features</span>
               </Button>
               <Button variant="outline" className="h-auto py-4 flex-col gap-2">
                 <Shield className="h-6 w-6" />

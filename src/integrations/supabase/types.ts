@@ -807,7 +807,6 @@ export type Database = {
       }
       vendor_invitations: {
         Row: {
-          access_count: number | null
           created_at: string
           created_by: string | null
           email: string
@@ -819,11 +818,9 @@ export type Database = {
           resend_email_id: string | null
           token: string
           used_at: string | null
-          user_id: string | null
           vendor_id: string | null
         }
         Insert: {
-          access_count?: number | null
           created_at?: string
           created_by?: string | null
           email: string
@@ -835,11 +832,9 @@ export type Database = {
           resend_email_id?: string | null
           token: string
           used_at?: string | null
-          user_id?: string | null
           vendor_id?: string | null
         }
         Update: {
-          access_count?: number | null
           created_at?: string
           created_by?: string | null
           email?: string
@@ -851,7 +846,6 @@ export type Database = {
           resend_email_id?: string | null
           token?: string
           used_at?: string | null
-          user_id?: string | null
           vendor_id?: string | null
         }
         Relationships: []
@@ -914,7 +908,6 @@ export type Database = {
           finance_reviewed_at: string | null
           finance_reviewed_by: string | null
           gstin: string | null
-          gst_verification_status: string | null
           id: string
           ifsc_code: string | null
           industry_type: string | null
@@ -922,14 +915,7 @@ export type Database = {
           legal_name: string | null
           msme_category: string | null
           msme_number: string | null
-          msme_verification_status: string | null
-          name_match_verification_status: string | null
           pan: string | null
-          pan_verification_status: string | null
-          bank_verification_status: string | null
-          pennydrop_init: string | null
-          pennydrop_status: Json | null
-          pennydrop_verification_status: string | null
           primary_contact_name: string | null
           primary_designation: string | null
           primary_email: string | null
@@ -977,7 +963,6 @@ export type Database = {
           finance_reviewed_at?: string | null
           finance_reviewed_by?: string | null
           gstin?: string | null
-          gst_verification_status?: string | null
           id?: string
           ifsc_code?: string | null
           industry_type?: string | null
@@ -985,13 +970,7 @@ export type Database = {
           legal_name?: string | null
           msme_category?: string | null
           msme_number?: string | null
-          msme_verification_status?: string | null
-          name_match_verification_status?: string | null
           pan?: string | null
-          pan_verification_status?: string | null
-          bank_verification_status?: string | null
-          pennydrop_init?: string | null
-          pennydrop_status?: Json | null
           primary_contact_name?: string | null
           primary_designation?: string | null
           primary_email?: string | null
@@ -1039,7 +1018,6 @@ export type Database = {
           finance_reviewed_at?: string | null
           finance_reviewed_by?: string | null
           gstin?: string | null
-          gst_verification_status?: string | null
           id?: string
           ifsc_code?: string | null
           industry_type?: string | null
@@ -1047,13 +1025,7 @@ export type Database = {
           legal_name?: string | null
           msme_category?: string | null
           msme_number?: string | null
-          msme_verification_status?: string | null
-          name_match_verification_status?: string | null
           pan?: string | null
-          pan_verification_status?: string | null
-          bank_verification_status?: string | null
-          pennydrop_init?: string | null
-          pennydrop_status?: Json | null
           primary_contact_name?: string | null
           primary_designation?: string | null
           primary_email?: string | null
