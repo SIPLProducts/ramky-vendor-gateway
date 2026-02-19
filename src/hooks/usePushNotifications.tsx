@@ -39,7 +39,7 @@ export function usePushNotifications() {
   const checkExistingSubscription = async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const subscription = await (registration as any).pushManager.getSubscription();
       setState(prev => ({ ...prev, isSubscribed: !!subscription }));
     } catch (error) {
       console.error('Error checking subscription:', error);
@@ -87,7 +87,7 @@ export function usePushNotifications() {
       
       // Create a subscription (using a placeholder VAPID key for demo)
       // In production, you'd get this from your server
-      const subscription = await registration.pushManager.subscribe({
+      const subscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
           'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U'
@@ -116,7 +116,7 @@ export function usePushNotifications() {
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const subscription = await (registration as any).pushManager.getSubscription();
       
       if (subscription) {
         await subscription.unsubscribe();
