@@ -41,9 +41,9 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [role, setRole] = useState<AppRole>('vendor');
+  // selectedRole = built-in AppRole OR "custom:<custom_role_id>"
+  const [selectedRole, setSelectedRole] = useState<string>('vendor');
   const [tenantIds, setTenantIds] = useState<string[]>(defaultTenantId ? [defaultTenantId] : []);
-  const [customRoleIds, setCustomRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -54,19 +54,22 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
   }, [open, defaultTenantId]);
 
   const reset = () => {
-    setFullName(''); setEmail(''); setPassword(''); setRole('vendor');
-    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setCustomRoleIds([]); setShowPw(false);
+    setFullName(''); setEmail(''); setPassword(''); setSelectedRole('vendor');
+    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setShowPw(false);
   };
 
   const toggleTenant = (id: string) => {
     setTenantIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
   };
-  const toggleCustom = (id: string) => {
-    setCustomRoleIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
-  };
+
+  const isCustom = selectedRole.startsWith('custom:');
+  const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
+  // Built-in role to actually persist in user_roles. For custom selection, default to 'vendor'
+  // (the custom role drives screen permissions; user_roles still requires an enum value).
+  const builtInRole: AppRole = isCustom ? 'vendor' : (selectedRole as AppRole);
 
   const handleSubmit = async () => {
-    if (!email || !password || !role) {
+    if (!email || !password || !selectedRole) {
       toast({ title: 'Missing fields', description: 'Email, password and role are required', variant: 'destructive' });
       return;
     }
@@ -79,13 +82,18 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email: email.trim(), password, full_name: fullName.trim() || null,
-          role, tenant_ids: tenantIds, custom_role_ids: customRoleIds,
+          role: builtInRole,
+          tenant_ids: tenantIds,
+          custom_role_ids: customRoleId ? [customRoleId] : [],
         },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
 
-      toast({ title: 'User created', description: `${email} added as ${role}` });
+      const roleLabel = isCustom
+        ? (customRoles.find((c) => c.id === customRoleId)?.name ?? 'custom role')
+        : builtInRole;
+      toast({ title: 'User created', description: `${email} added as ${roleLabel}` });
       reset();
       onOpenChange(false);
       onCreated();
@@ -137,10 +145,21 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
           </div>
           <div className="space-y-2">
             <Label>Role *</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
               <SelectContent>
+                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Built-in Roles</div>
                 {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                {customRoles.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 mt-1 text-xs font-medium text-muted-foreground border-t">Custom Roles</div>
+                    {customRoles.map((c) => (
+                      <SelectItem key={c.id} value={`custom:${c.id}`} disabled={!c.is_active}>
+                        {c.name}{!c.is_active && ' (inactive)'}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -153,21 +172,6 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
                 <label key={t.id} className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={tenantIds.includes(t.id)} onCheckedChange={() => toggleTenant(t.id)} />
                   <span className="text-sm">{t.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Custom Roles (optional)</Label>
-            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-              {customRoles.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No custom roles available. Create one in the Custom Roles tab first.
-                </p>
-              ) : customRoles.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={customRoleIds.includes(c.id)} onCheckedChange={() => toggleCustom(c.id)} />
-                  <span className="text-sm">{c.name}{!c.is_active && <span className="text-muted-foreground ml-1">(inactive)</span>}</span>
                 </label>
               ))}
             </div>
