@@ -42,7 +42,7 @@ function simulateGSTVerification(gstin: string, legalName?: string) {
   const stateCode = gstin.substring(0, 2);
   const stateName = getStateName(stateCode);
   const registeredName = legalName || 'ABC ENTERPRISES PVT LTD';
-  
+
   return {
     valid: true,
     message: `GST verified successfully - Active`,
@@ -51,11 +51,15 @@ function simulateGSTVerification(gstin: string, legalName?: string) {
       tradeName: registeredName,
       status: 'Active',
       registrationDate: '2020-07-15',
-      stateCode: stateCode,
-      stateName: stateName,
+      stateCode,
+      stateName,
       taxpayerType: 'Regular',
-      businessNature: 'Supplier of Services, Supplier of Goods',
+      businessNature: ['Supplier of Services', 'Supplier of Goods'],
       principalPlaceOfBusiness: `${stateName}, India`,
+      additionalPlaces: [],
+      constitutionOfBusiness: 'Private Limited Company',
+      jurisdictionCentre: `Range-1, Division-1, ${stateName} Commissionerate`,
+      jurisdictionState: `${stateName} State Tax`,
       lastFiledReturn: 'GSTR-3B - December 2025',
       complianceRating: 'Good',
     },
