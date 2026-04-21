@@ -25,6 +25,7 @@ export const SCREENS: { key: string; label: string }[] = [
   { key: 'admin_configuration', label: 'Admin Configuration' },
   { key: 'sharvi_admin_console', label: 'Sharvi Admin Console' },
   { key: 'vendor_invitations', label: 'Vendor Invitations' },
+  { key: 'custom_roles', label: 'Custom Roles' },
   { key: 'support', label: 'Help & Support' },
 ];
 
