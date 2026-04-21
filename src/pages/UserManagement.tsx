@@ -22,9 +22,11 @@ interface UserRow {
   created_at: string;
   role: AppRole | null;
   tenants: { id: string; name: string }[];
+  customRoles: { id: string; name: string }[];
 }
 
 interface Tenant { id: string; name: string; }
+interface CustomRoleOpt { id: string; name: string; is_active: boolean; }
 
 const ALL_ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
 
@@ -34,6 +36,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRoleOpt[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
@@ -44,19 +47,24 @@ export default function UserManagement() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, userTenantsRes, tenantsRes] = await Promise.all([
+      const [profilesRes, rolesRes, userTenantsRes, tenantsRes, customRolesRes, userCustomRes] = await Promise.all([
         supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
         supabase.from('user_tenants').select('user_id, tenant_id'),
         supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('custom_roles').select('id, name, is_active').order('name'),
+        supabase.from('user_custom_roles').select('user_id, custom_role_id'),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
       if (rolesRes.error) throw rolesRes.error;
       if (userTenantsRes.error) throw userTenantsRes.error;
       if (tenantsRes.error) throw tenantsRes.error;
+      if (customRolesRes.error) throw customRolesRes.error;
+      if (userCustomRes.error) throw userCustomRes.error;
 
       const tenantMap = new Map<string, Tenant>((tenantsRes.data ?? []).map((t) => [t.id, t]));
+      const customRoleMap = new Map<string, CustomRoleOpt>((customRolesRes.data ?? []).map((c) => [c.id, c]));
       const roleMap = new Map<string, AppRole>((rolesRes.data ?? []).map((r) => [r.user_id, r.role as AppRole]));
       const utByUser = new Map<string, string[]>();
       (userTenantsRes.data ?? []).forEach((ut) => {
@@ -64,8 +72,15 @@ export default function UserManagement() {
         arr.push(ut.tenant_id);
         utByUser.set(ut.user_id, arr);
       });
+      const cuByUser = new Map<string, string[]>();
+      (userCustomRes.data ?? []).forEach((uc) => {
+        const arr = cuByUser.get(uc.user_id) ?? [];
+        arr.push(uc.custom_role_id);
+        cuByUser.set(uc.user_id, arr);
+      });
 
       setTenants(tenantsRes.data ?? []);
+      setCustomRoles(customRolesRes.data ?? []);
       setUsers(
         (profilesRes.data ?? []).map((p) => ({
           id: p.id,
@@ -76,6 +91,10 @@ export default function UserManagement() {
           tenants: (utByUser.get(p.id) ?? [])
             .map((tid) => tenantMap.get(tid))
             .filter((t): t is Tenant => !!t),
+          customRoles: (cuByUser.get(p.id) ?? [])
+            .map((cid) => customRoleMap.get(cid))
+            .filter((c): c is CustomRoleOpt => !!c)
+            .map((c) => ({ id: c.id, name: c.name })),
         }))
       );
     } catch (err: any) {
