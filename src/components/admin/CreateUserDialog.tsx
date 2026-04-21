@@ -168,7 +168,7 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Tenants (optional)</Label>
+            <Label>Tenants *</Label>
             <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
               {tenants.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No tenants available</p>
