@@ -135,7 +135,7 @@ export default function AdminInvitations() {
           vendor_name: vendorName || null,
           phone_number: phoneNumber || null,
         })
-        .select('*, tenants(id, name, code)')
+        .select('*')
         .single();
 
       if (dbError) throw dbError;
