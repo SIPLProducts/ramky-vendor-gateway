@@ -103,18 +103,34 @@ export interface StatutoryDetails {
   pan: string;
   pfNumber: string;
   esiNumber: string;
+  // GST registration flag + conditional fields
+  isGstRegistered: boolean;
+  gstin: string;
+  gstDeclarationReason: string;
+  gstSelfDeclarationFile: File | null;
+  // Extended GST certificate fields (auto-populated from OCR/API)
+  gstConstitutionOfBusiness: string;
+  gstPrincipalPlaceOfBusiness: string;
+  gstAdditionalPlaces: string[];
+  gstRegistrationDate: string;
+  gstStatus: string;
+  gstTaxpayerType: string;
+  gstBusinessNature: string[];
+  gstJurisdictionCentre: string;
+  gstJurisdictionState: string;
+  // MSME registration flag + conditional fields
+  isMsmeRegistered: boolean;
   msmeNumber: string;
   msmeCategory: 'micro' | 'small' | 'medium' | '';
   labourPermitNo: string;
-  gstin: string;
   iecNo: string;
   entityType: string;
-  
+
   memberships: string[];
   enlistments: string[];
   certifications: string[];
   operationalNetwork: string;
-  
+
   gstCertificateFile: File | null;
   panCardFile: File | null;
   msmeCertificateFile: File | null;
