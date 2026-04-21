@@ -1,71 +1,49 @@
 
 
-## Polish Document Verification into an enterprise-grade inline form
+## Fix: Custom-role users routed correctly without altering custom role behavior
 
 ### Goal
-Transform Step 1 (Document Verification) from the current stacked "upload tile + status block" layout into a compact, inline, enterprise-grade form — same tabbed shell, but each stage reads like a professional data-entry section instead of a demo widget.
+When a Customer Admin creates a user with a **Custom Role** (e.g. "SCM Head"), the custom role itself must remain the source of truth for screen access — no built-in role should override or shadow it. Today, such users are silently stamped as `vendor` in `user_roles`, which sends them into the vendor portal on login.
 
-### Visual + layout changes (per tab)
+### Root cause (recap)
+- `user_roles.role` is a NOT-NULL enum, so every user must carry one built-in role.
+- `CreateUserDialog.tsx` falls back to `'vendor'` for custom-role selections → routing layer reads `vendor` and pushes them to the vendor portal.
+- `useAuth` only reads `user_roles`, so it never knows the user actually has a custom role.
 
-Each of the 4 tabs (GST, PAN, MSME, Bank) gets the same consistent inline structure:
+### Fix (no built-in role used for custom-role users)
 
-```text
-┌─ Stage header ──────────────────────────────────────────────┐
-│ [icon] GST Verification        [status pill: Verified ✓]    │
-│ Short helper line in muted text                             │
-├─────────────────────────────────────────────────────────────┤
-│ Row 1 (gates, where applicable):                            │
-│   [ Are you GST registered? ]   ( ) Yes  ( ) No             │
-│                                                             │
-│ Row 2 — Document + extracted fields, side-by-side:          │
-│ ┌──────────────┐  ┌────────────────────────────────────┐    │
-│ │  Upload box  │  │ Legal Name        [readonly input] │    │
-│ │  (compact,   │  │ Trade Name        [readonly input] │    │
-│ │   80px tall, │  │ GSTIN             [readonly input] │    │
-│ │   filename + │  │ Constitution      [readonly input] │    │
-│ │   re-upload) │  │ Principal Place   [editable text]  │    │
-│ └──────────────┘  └────────────────────────────────────┘    │
-│                                                             │
-│ Row 3 — Inline action bar (right-aligned):                  │
-│   [ Re-upload ]  [ Verify ▸ ]   • last verified 2s ago      │
-└─────────────────────────────────────────────────────────────┘
-```
+**1. `CreateUserDialog.tsx` — neutral placeholder, not a functional built-in role**
+- When a Custom Role is picked, store `'approver'` in `user_roles` purely as a non-vendor placeholder. **No built-in permissions are granted** because:
+  - `approver` has no rows in `role_screen_permissions` (verified — screen access today comes entirely from `custom_role_screen_permissions` for these users).
+  - Routing/sidebar will be updated (step 3) to ignore the built-in role for custom-role users.
+- The UI continues to show the user's *custom* role label everywhere — the enum value is internal plumbing only.
 
-Key principles:
-- **Two-column grid (`md:grid-cols-2`)** for label/value pairs — no more single long stack.
-- **Compact upload control** (single row with filename, size, replace link) instead of the large dropzone tile once a file is chosen.
-- **Read-only verified fields** rendered as proper `Input` controls with a lock icon + "Verified" hint, not as plain text rows — keeps the form-grade look.
-- **Status pill** in the stage header (Pending / Uploading / Extracting / Verifying / Verified / Failed) using the existing `status-badge` tokens from `index.css`.
-- **Inline cross-check messages** (e.g. "PAN matches GSTIN ✓", "Name match 96%") shown as a slim alert strip under the grid, not as a separate card.
-- **Sticky stage footer** inside each tab with the action buttons aligned to the right (`Re-upload`, `Verify`, `Continue` once done) — matches the enterprise pattern used elsewhere.
+**2. `useAuth.tsx` — make custom roles first-class**
+- After fetching `user_roles`, also fetch active `user_custom_roles` joined with `custom_roles` (id, name, is_active).
+- Expose:
+  - `customRoles: { id, name }[]` — only active ones.
+  - `hasCustomRole: boolean`.
+  - `isVendor: boolean` = `userRole === 'vendor' && !hasCustomRole`.
+- Existing `userRole` field is preserved for backward-compat, but routing should prefer `isVendor` / `hasCustomRole`.
 
-### Stage-specific tweaks
+**3. Routing & layout — defer to custom role when present**
+- `Auth.tsx` post-login redirect: if `hasCustomRole` → go to `/dashboard`; else if `isVendor` → vendor portal; else → `/dashboard`.
+- `AppLayout.tsx`: treat `hasCustomRole` users as portal users (sidebar shown, vendor-only padding skipped). `useScreenPermissions` already merges custom-role screens, so the sidebar will list exactly what the custom role grants — nothing from any built-in role.
+- `ProtectedRoute.tsx` stays as-is (auth gate only).
 
-- **GST – No path**: when "No" is selected, the upload box collapses to a single-line "Download declaration → Upload signed copy" strip, and the manual fields (Legal Name, Address, City, State, Pincode) appear in the same 2-column grid below.
-- **PAN**: 2 fields only (PAN, Holder Name) → use a tighter `md:grid-cols-3` so the row fills nicely; cross-check chip ("Matches GSTIN PAN") sits inline next to the PAN field.
-- **MSME – No path**: shows a single muted info strip "Skipped — not MSME registered" and auto-marks the stage done.
-- **Bank**: Account No, IFSC, Bank, Branch, Holder Name in `md:grid-cols-2`; penny-drop result chip ("Account active ✓") in the header status pill.
+**4. One-time data backfill (existing mis-classified users like Brijesh)**
+- Update existing rows: any user that has at least one active `user_custom_roles` link but `user_roles.role = 'vendor'` → set `user_roles.role = 'approver'`. This rescues already-created users without changing their custom role assignments.
 
-### Shell polish (applies to the whole step)
-
-- Card padding tightened to `p-5`, section dividers use `border-border/60`.
-- Tab triggers get fixed min-width and an inline status dot (existing chip logic kept).
-- Footer summary above the global Continue button: `4 of 4 stages verified` with a thin progress bar — replaces the current ad-hoc text.
-- Subtle `shadow-enterprise-sm` on each stage panel; consistent `rounded-lg`.
+### Explicitly out of scope
+- No change to vendor invitation flow — invited vendors keep `role = 'vendor'` via the `handle_new_user` trigger and the existing email-domain logic.
+- No change to `custom_roles`, `custom_role_screen_permissions`, or `user_custom_roles` schema.
+- No new built-in role and no edits to `role_screen_permissions` — built-in roles get **zero** added permissions because of this fix.
+- No changes to other registration / OCR work.
 
 ### Files
-
-- **Edited** `src/components/vendor/steps/DocumentVerificationStep.tsx`
-  - Rewrite the body of each `TabsContent` to use the 2-column inline grid described above.
-  - Introduce a small local `StageShell` helper inside the file (header + body + footer) so the 4 stages stay visually identical.
-  - Replace the large upload tile with a compact `FilePill` (filename, size, replace) once a file is uploaded; keep the original dropzone only when no file yet.
-  - Render verified values inside `<Input readOnly />` with a lock icon adornment instead of plain `<p>` tags.
-  - Move action buttons (Verify / Re-upload) into a right-aligned inline footer per stage.
-
-- **Edited** `src/components/vendor/steps/DocumentVerificationStep.tsx` only — no other components need changes; `OcrComparisonCard` is reused inline as the cross-check strip.
-
-### Out of scope
-- No changes to OCR logic, the dummy verifyApi, gating math, or auto-advance behaviour.
-- No new design tokens — reuses existing `--primary`, `--success`, `--warning`, `--destructive`, and the `.status-badge` / `.shadow-enterprise-sm` utilities already in `src/index.css`.
-- No changes to other registration steps (2–8) or the horizontal stepper.
+- Edit `src/components/admin/CreateUserDialog.tsx` — change custom-role fallback from `'vendor'` → `'approver'` (placeholder only).
+- Edit `src/hooks/useAuth.tsx` — load custom roles, expose `customRoles`, `hasCustomRole`, `isVendor`.
+- Edit `src/pages/Auth.tsx` — use `isVendor` / `hasCustomRole` for post-login redirect.
+- Edit `src/components/layout/AppLayout.tsx` — treat `hasCustomRole` users as portal users.
+- Data fix via insert/update tool: `UPDATE user_roles SET role='approver' WHERE role='vendor' AND user_id IN (SELECT user_id FROM user_custom_roles uc JOIN custom_roles cr ON cr.id=uc.custom_role_id WHERE cr.is_active);`
 
