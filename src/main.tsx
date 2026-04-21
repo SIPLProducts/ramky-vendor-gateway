@@ -25,19 +25,48 @@ async function clearPreviewPwaCache() {
   }
 }
 
+function notifyNewVersion() {
+  // Lazy import sonner so it doesn't affect initial bundle critical path
+  import("sonner").then(({ toast }) => {
+    toast.info("A new version is available", {
+      description: "Refreshing in 3 seconds to load the latest update…",
+      duration: 3000,
+    });
+  });
+}
+
 clearPreviewPwaCache().finally(() => {
   createRoot(document.getElementById("root")!).render(<App />);
 
-  // Always check for SW updates on every page load and reload when a new one activates
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((reg) => reg.update());
+  if (!("serviceWorker" in navigator)) return;
+
+  // Periodically check for updates so long-lived sessions also pick up new versions
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => {
+      reg.update();
+      reg.addEventListener("updatefound", () => {
+        const installing = reg.installing;
+        if (!installing) return;
+        installing.addEventListener("statechange", () => {
+          if (installing.state === "installed" && navigator.serviceWorker.controller) {
+            // A newer SW is waiting — let the user know; controllerchange will reload.
+            notifyNewVersion();
+          }
+        });
+      });
     });
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-  }
+  });
+
+  // Re-check whenever the tab regains focus
+  window.addEventListener("focus", () => {
+    navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.update()));
+  });
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    // Small delay so the toast is visible before reload
+    setTimeout(() => window.location.reload(), 800);
+  });
 });
