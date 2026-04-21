@@ -155,8 +155,8 @@ const handler = async (req: Request): Promise<Response> => {
       html: body.html,
       mimeContent: body.html
         ? [
-            { mimeType: "text/plain; charset=utf-8", content: plainText, transferEncoding: "quoted-printable" },
-            { mimeType: "text/html; charset=utf-8", content: body.html, transferEncoding: "quoted-printable" },
+            { mimeType: "text/plain; charset=utf-8", content: plainText, transferEncoding: "base64" },
+            { mimeType: "text/html; charset=utf-8", content: body.html, transferEncoding: "base64" },
           ]
         : undefined,
     } as any);
