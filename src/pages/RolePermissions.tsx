@@ -4,13 +4,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Shield } from 'lucide-react';
+import { Shield, Building2 } from 'lucide-react';
 import { AppRole } from '@/components/admin/ChangeRoleDialog';
 
 const BUILTIN_ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
 
-interface CustomRoleCol { id: string; name: string; }
+interface CustomRoleCol { id: string; name: string; tenant_id?: string | null; }
 
 export const SCREENS: { key: string; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -31,9 +32,14 @@ export const SCREENS: { key: string; label: string }[] = [
   { key: 'support', label: 'Help & Support' },
 ];
 
-type Matrix = Record<string, Record<string, boolean>>; // role -> screen -> can_access
+type Matrix = Record<string, Record<string, boolean>>;
 
-export default function RolePermissions() {
+interface Props {
+  tenantId?: string | null;
+  tenantLabel?: string;
+}
+
+export default function RolePermissions({ tenantId = null, tenantLabel = 'All Tenants (Global)' }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -42,11 +48,21 @@ export default function RolePermissions() {
 
   const load = async () => {
     setLoading(true);
-    const [permsRes, customRolesRes, customPermsRes] = await Promise.all([
-      supabase.from('role_screen_permissions').select('role, screen_key, can_access'),
-      supabase.from('custom_roles').select('id, name').order('name'),
-      supabase.from('custom_role_screen_permissions').select('custom_role_id, screen_key, can_access'),
-    ]);
+
+    // Built-in role perms: filter to current tenant scope (or global if tenantId === null)
+    const permsQuery = supabase.from('role_screen_permissions').select('role, screen_key, can_access, tenant_id');
+    const permsRes = tenantId
+      ? await permsQuery.eq('tenant_id', tenantId)
+      : await permsQuery.is('tenant_id', null);
+
+    // Custom roles: only those in the current tenant (or global if no tenant selected)
+    const crQuery = supabase.from('custom_roles').select('id, name, tenant_id').order('name');
+    const customRolesRes = tenantId
+      ? await crQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      : await crQuery;
+
+    const customPermsRes = await supabase.from('custom_role_screen_permissions').select('custom_role_id, screen_key, can_access');
+
     if (permsRes.error) {
       toast({ title: 'Failed to load', description: permsRes.error.message, variant: 'destructive' });
       setLoading(false); return;
@@ -54,6 +70,7 @@ export default function RolePermissions() {
     if (customRolesRes.error) {
       toast({ title: 'Failed to load custom roles', description: customRolesRes.error.message, variant: 'destructive' });
     }
+
     const m: Matrix = {};
     BUILTIN_ROLES.forEach((r) => { m[r] = {}; SCREENS.forEach((s) => { m[r][s.key] = false; }); });
     (customRolesRes.data ?? []).forEach((cr) => {
@@ -75,7 +92,7 @@ export default function RolePermissions() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [tenantId]);
 
   const toggle = async (roleKey: string, screenKey: string, next: boolean) => {
     const isCustom = roleKey.startsWith('custom:');
@@ -91,9 +108,18 @@ export default function RolePermissions() {
         .upsert({ custom_role_id: customRoleId, screen_key: screenKey, can_access: next }, { onConflict: 'custom_role_id,screen_key' });
       error = res.error;
     } else {
-      const res = await supabase.from('role_screen_permissions')
-        .upsert({ role: roleKey as AppRole, screen_key: screenKey, can_access: next }, { onConflict: 'role,screen_key' });
-      error = res.error;
+      // For built-in roles, scope by tenant_id (null = global default)
+      // First delete any existing matching row for this scope, then insert (composite uniqueness via expression index can't use upsert onConflict)
+      const delQuery = supabase.from('role_screen_permissions').delete()
+        .eq('role', roleKey as AppRole).eq('screen_key', screenKey);
+      const delRes = tenantId ? await delQuery.eq('tenant_id', tenantId) : await delQuery.is('tenant_id', null);
+      if (delRes.error) error = delRes.error;
+      else {
+        const insRes = await supabase.from('role_screen_permissions').insert({
+          role: roleKey as AppRole, screen_key: screenKey, can_access: next, tenant_id: tenantId,
+        } as any);
+        error = insRes.error;
+      }
     }
     if (error) {
       toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
@@ -103,7 +129,7 @@ export default function RolePermissions() {
     await supabase.from('audit_logs').insert({
       action: isCustom ? 'custom_role_screen_permission_changed' : 'role_screen_permission_changed',
       user_id: user?.id,
-      details: { role: roleKey, screen_key: screenKey, can_access: next },
+      details: { role: roleKey, screen_key: screenKey, can_access: next, tenant_id: tenantId },
     });
   };
 
@@ -113,14 +139,19 @@ export default function RolePermissions() {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Shield className="h-6 w-6" /> Role &amp; Screen Permissions
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Control which screens each role (built-in and custom) can access. Changes apply immediately.
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Shield className="h-5 w-5" /> Role &amp; Screen Permissions
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure which screens each role can access for the selected tenant. Changes apply immediately.
+          </p>
+        </div>
+        <Badge variant="outline" className="text-xs">
+          <Building2 className="h-3 w-3 mr-1" /> {tenantLabel}
+        </Badge>
       </div>
 
       <Card>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -22,6 +22,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   tenants: Tenant[];
   customRoles?: CustomRoleOpt[];
+  defaultTenantId?: string | null;
   onCreated: () => void;
 }
 
@@ -34,20 +35,27 @@ function generatePassword() {
   return pw;
 }
 
-export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = [], onCreated }: Props) {
+export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = [], defaultTenantId = null, onCreated }: Props) {
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [role, setRole] = useState<AppRole>('vendor');
-  const [tenantIds, setTenantIds] = useState<string[]>([]);
+  const [tenantIds, setTenantIds] = useState<string[]>(defaultTenantId ? [defaultTenantId] : []);
   const [customRoleIds, setCustomRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (open && defaultTenantId && tenantIds.length === 0) {
+      setTenantIds([defaultTenantId]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultTenantId]);
+
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setRole('vendor');
-    setTenantIds([]); setCustomRoleIds([]); setShowPw(false);
+    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setCustomRoleIds([]); setShowPw(false);
   };
 
   const toggleTenant = (id: string) => {
