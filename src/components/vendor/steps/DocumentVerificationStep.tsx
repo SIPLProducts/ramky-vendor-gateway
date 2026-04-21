@@ -85,6 +85,26 @@ function timeAgo(ts?: number) {
   return `${h}h ago`;
 }
 
+function friendlyModelName(model?: string): string | undefined {
+  if (!model) return undefined;
+  const map: Record<string, string> = {
+    "google/gemini-2.5-pro": "Gemini 2.5 Pro",
+    "google/gemini-2.5-flash": "Gemini 2.5 Flash",
+    "google/gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite",
+    "google/gemini-3-flash-preview": "Gemini 3 Flash",
+    "google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
+    "openai/gpt-5": "GPT-5",
+    "openai/gpt-5-mini": "GPT-5 Mini",
+    "openai/gpt-5-nano": "GPT-5 Nano",
+  };
+  if (map[model]) return map[model];
+  // Fallback: take part after "/" and prettify
+  const tail = model.includes("/") ? model.split("/")[1] : model;
+  return tail
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function DocumentVerificationStep({
   vendorId,
   initialData,
