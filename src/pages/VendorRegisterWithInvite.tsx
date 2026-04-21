@@ -54,29 +54,34 @@ export default function VendorRegisterWithInvite() {
   const validateInvitation = async () => {
     try {
       const { data, error } = await supabase
-        .from('vendor_invitations')
-        .select('*')
-        .eq('token', token)
-        .single();
+        .rpc('get_invitation_by_token', { _token: token as string });
 
-      if (error || !data) {
+      const row = Array.isArray(data) ? data[0] : data;
+
+      if (error || !row) {
         setError('Invalid invitation link. Please contact the administrator.');
         return;
       }
 
-      const expiresAt = new Date(data.expires_at);
+      const expiresAt = new Date(row.expires_at);
       if (expiresAt < new Date()) {
         setError('This invitation link has expired. Please request a new one.');
         return;
       }
 
-      if (data.used_at) {
+      if (row.used_at) {
         setError('This invitation has already been used. Please log in instead.');
         return;
       }
 
-      setInvitation(data);
-      setEmail(data.email);
+      setInvitation({
+        id: row.id,
+        email: row.email,
+        token: token as string,
+        expires_at: row.expires_at,
+        used_at: row.used_at,
+      });
+      setEmail(row.email);
     } catch (err) {
       setError('Failed to validate invitation. Please try again.');
     } finally {
