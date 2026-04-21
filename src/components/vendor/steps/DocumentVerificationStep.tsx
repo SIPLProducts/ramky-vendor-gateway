@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock } from "lucide-react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,15 +8,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useOcrExtraction, OcrDocumentType } from "@/hooks/useOcrExtraction";
-import { OcrComparisonCard } from "@/components/vendor/OcrComparisonCard";
 
 export interface VerifiedDocumentData {
-  // Stage 1 — GST gate
   isGstRegistered?: boolean;
   gstDeclarationReason?: string;
-  // Yes path
   gst?: {
     gstin: string;
     legalName: string;
@@ -27,24 +23,12 @@ export interface VerifiedDocumentData {
     apiName?: string;
     nameMatchScore?: number;
   };
-  // No path
   manualLegalName?: string;
-  manualAddress?: {
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
+  manualAddress?: { address: string; city: string; state: string; pincode: string };
   gstSelfDeclarationFile?: File | null;
-
-  // Stage 2 — PAN
   pan?: { number: string; holderName: string; apiName?: string; nameMatchScore?: number };
-
-  // Stage 3 — MSME gate
   isMsmeRegistered?: boolean;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; apiName?: string; nameMatchScore?: number };
-
-  // Stage 4 — Bank
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string };
 }
 
@@ -55,14 +39,17 @@ interface DocumentVerificationStepProps {
 }
 
 type DocStatus = "idle" | "uploading" | "ocr" | "verifying" | "verified" | "failed";
+type StageStatus = "pending" | "in-progress" | "verified" | "failed";
 
 interface DocState {
   status: DocStatus;
   fileName?: string;
+  fileSize?: number;
   ocrData?: Record<string, any>;
   apiData?: Record<string, any>;
   nameMatchScore?: number;
   errorMessage?: string;
+  verifiedAt?: number;
 }
 
 const idleDoc: DocState = { status: "idle" };
@@ -78,6 +65,23 @@ function nameMatchScore(a?: string, b?: string): number | undefined {
   let common = 0;
   A.forEach((t) => { if (B.has(t)) common += 1; });
   return Math.round((common / Math.max(A.size, B.size)) * 100);
+}
+
+function formatBytes(bytes?: number) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function timeAgo(ts?: number) {
+  if (!ts) return "";
+  const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
 }
 
 export function DocumentVerificationStep({
@@ -112,13 +116,8 @@ export function DocumentVerificationStep({
     initialData?.gst?.principalPlaceOfBusiness || initialData?.gst?.address || "",
   );
 
-  // No-GST path
-  const [gstDeclarationFile, setGstDeclarationFile] = useState<File | null>(
-    initialData?.gstSelfDeclarationFile ?? null,
-  );
-  const [gstDeclarationReason, setGstDeclarationReason] = useState<string>(
-    initialData?.gstDeclarationReason ?? "",
-  );
+  const [gstDeclarationFile, setGstDeclarationFile] = useState<File | null>(initialData?.gstSelfDeclarationFile ?? null);
+  const [gstDeclarationReason, setGstDeclarationReason] = useState<string>(initialData?.gstDeclarationReason ?? "");
   const [manualLegalName, setManualLegalName] = useState<string>(initialData?.manualLegalName ?? "");
   const [manualAddress, setManualAddress] = useState({
     address: initialData?.manualAddress?.address ?? "",
@@ -176,56 +175,29 @@ export function DocumentVerificationStep({
       : idleDoc,
   );
 
-  // ---------- Verification helpers ----------
-  // NOTE: Real-time API validation is temporarily disabled.
-  // We return a dummy "success" response that echoes the OCR-extracted name,
-  // so name-match scoring still works. Wire real APIs back in verifyApi() later.
+  // ---------- Verification (dummy / simulated) ----------
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
-    // Small artificial delay so the "verifying" state is visible
     await new Promise((r) => setTimeout(r, 400));
-
     if (kind === "gst") {
       return {
         ok: true as const,
-        apiData: {
-          legalName: ocr.legal_name,
-          tradeName: ocr.trade_name,
-          gstin: ocr.gstin,
-          status: "Active",
-          simulated: true,
-        },
+        apiData: { legalName: ocr.legal_name, tradeName: ocr.trade_name, gstin: ocr.gstin, status: "Active", simulated: true },
         registeredName: ocr.legal_name,
       };
     }
     if (kind === "pan") {
-      return {
-        ok: true as const,
-        apiData: { name: ocr.holder_name, pan: ocr.pan_number, simulated: true },
-        registeredName: ocr.holder_name,
-      };
+      return { ok: true as const, apiData: { name: ocr.holder_name, pan: ocr.pan_number, simulated: true }, registeredName: ocr.holder_name };
     }
     if (kind === "msme") {
       return {
         ok: true as const,
-        apiData: {
-          name: ocr.enterprise_name,
-          enterpriseName: ocr.enterprise_name,
-          udyamNumber: ocr.udyam_number,
-          simulated: true,
-        },
+        apiData: { name: ocr.enterprise_name, enterpriseName: ocr.enterprise_name, udyamNumber: ocr.udyam_number, simulated: true },
         registeredName: ocr.enterprise_name,
       };
     }
-    // cheque -> penny drop
     return {
       ok: true as const,
-      apiData: {
-        accountHolderName: ocr.account_holder_name,
-        bankName: ocr.bank_name,
-        ifsc: ocr.ifsc_code,
-        accountNumber: ocr.account_number,
-        simulated: true,
-      },
+      apiData: { accountHolderName: ocr.account_holder_name, bankName: ocr.bank_name, ifsc: ocr.ifsc_code, accountNumber: ocr.account_number, simulated: true },
       registeredName: ocr.account_holder_name,
     };
   };
@@ -238,53 +210,52 @@ export function DocumentVerificationStep({
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
   ) => {
     if (file.size > 5 * 1024 * 1024) {
-      setDoc({ status: "failed", fileName: file.name, errorMessage: "File must be under 5 MB" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: "File must be under 5 MB" });
       return;
     }
-    setDoc({ status: "uploading", fileName: file.name });
-    setDoc({ status: "ocr", fileName: file.name });
+    setDoc({ status: "uploading", fileName: file.name, fileSize: file.size });
+    setDoc({ status: "ocr", fileName: file.name, fileSize: file.size });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
-      setDoc({ status: "failed", fileName: file.name, errorMessage: ocrRes.error || "Could not read document" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: ocrRes.error || "Could not read document" });
       return;
     }
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
-      setDoc({ status: "failed", fileName: file.name, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
       return;
     }
-    setDoc({ status: "verifying", fileName: file.name, ocrData: ocrRes.extracted });
+    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, ocrData: ocrRes.extracted, errorMessage: "Verification failed" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Verification failed" });
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
     if (extraErr) {
-      setDoc({ status: "failed", fileName: file.name, ocrData: ocrRes.extracted, apiData: v.apiData, errorMessage: extraErr });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, errorMessage: extraErr });
       return;
     }
     const score = nameMatchScore(afterVerifiedOcrName(), v.registeredName);
     setDoc({
       status: "verified",
       fileName: file.name,
+      fileSize: file.size,
       ocrData: ocrRes.extracted,
       apiData: v.apiData,
       nameMatchScore: score,
+      verifiedAt: Date.now(),
     });
   };
 
-  // Effective legal name (used as the cross-check anchor for PAN/MSME/Bank holder)
   const effectiveLegalName = useMemo(() => {
     if (isGstRegistered === true) return gstDoc.ocrData?.legal_name || gstDoc.apiData?.legalName;
     if (isGstRegistered === false) return manualLegalName;
     return undefined;
   }, [isGstRegistered, gstDoc, manualLegalName]);
 
-  // ---------- Stage handlers ----------
   const handleGstUpload = (file: File) =>
     runDocFlow("gst", file, setGstDoc, () => gstDoc.ocrData?.legal_name).then(() => {
-      // Pre-fill the editable principal place from latest OCR
       setGstDoc((prev) => {
         const principal = prev.ocrData?.principal_place_of_business || prev.ocrData?.address;
         if (principal && !editablePrincipalPlace) setEditablePrincipalPlace(principal);
@@ -293,33 +264,23 @@ export function DocumentVerificationStep({
     });
 
   const handlePanUpload = (file: File) =>
-    runDocFlow(
-      "pan",
-      file,
-      setPanDoc,
-      () => effectiveLegalName,
-      (ocr) => {
-        // PAN-from-GST cross-check (only when GST path)
-        if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
-          const panFromGst = String(gstDoc.ocrData.gstin).slice(2, 12).toUpperCase();
-          const panOcr = String(ocr.pan_number || "").toUpperCase();
-          if (panFromGst.length === 10 && panOcr && panFromGst !== panOcr) {
-            setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`);
-            return `PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`;
-          }
+    runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
+      if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
+        const panFromGst = String(gstDoc.ocrData.gstin).slice(2, 12).toUpperCase();
+        const panOcr = String(ocr.pan_number || "").toUpperCase();
+        if (panFromGst.length === 10 && panOcr && panFromGst !== panOcr) {
+          setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`);
+          return `PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`;
         }
-        setPanCrossCheckError(null);
-        return null;
-      },
-    );
+      }
+      setPanCrossCheckError(null);
+      return null;
+    });
 
-  const handleMsmeUpload = (file: File) =>
-    runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+  const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+  const handleBankUpload = (file: File) => runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName);
 
-  const handleBankUpload = (file: File) =>
-    runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName);
-
-  // ---------- Stage gating ----------
+  // ---------- Gating ----------
   const stage1Done =
     isGstRegistered === true
       ? gstDoc.status === "verified"
@@ -334,15 +295,11 @@ export function DocumentVerificationStep({
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
   const stage3Done = isMsmeRegistered === false || (isMsmeRegistered === true && msmeDoc.status === "verified");
   const stage4Done = bankDoc.status === "verified";
-
   const allDone = stage1Done && stage2Done && stage3Done && stage4Done;
   const completedCount = [stage1Done, stage2Done, stage3Done, stage4Done].filter(Boolean).length;
 
   const handleContinue = () => {
-    const out: VerifiedDocumentData = {
-      isGstRegistered: isGstRegistered ?? undefined,
-    };
-
+    const out: VerifiedDocumentData = { isGstRegistered: isGstRegistered ?? undefined };
     if (isGstRegistered === true && gstDoc.status === "verified" && gstDoc.ocrData) {
       out.gst = {
         gstin: gstDoc.ocrData.gstin,
@@ -360,7 +317,6 @@ export function DocumentVerificationStep({
       out.manualLegalName = manualLegalName;
       out.manualAddress = manualAddress;
     }
-
     if (panDoc.status === "verified" && panDoc.ocrData) {
       out.pan = {
         number: panDoc.ocrData.pan_number,
@@ -369,7 +325,6 @@ export function DocumentVerificationStep({
         nameMatchScore: panDoc.nameMatchScore,
       };
     }
-
     out.isMsmeRegistered = isMsmeRegistered ?? false;
     if (isMsmeRegistered && msmeDoc.status === "verified" && msmeDoc.ocrData) {
       out.msme = {
@@ -380,7 +335,6 @@ export function DocumentVerificationStep({
         nameMatchScore: msmeDoc.nameMatchScore,
       };
     }
-
     if (bankDoc.status === "verified" && bankDoc.ocrData) {
       out.bank = {
         accountNumber: bankDoc.ocrData.account_number,
@@ -391,15 +345,13 @@ export function DocumentVerificationStep({
         apiName: bankDoc.apiData?.accountHolderName || bankDoc.apiData?.name,
       };
     }
-
     onComplete(out);
   };
 
-  // ---------- Tabs (active tab + auto-advance) ----------
+  // ---------- Tabs ----------
   type TabKey = "gst" | "pan" | "msme" | "bank";
   const [activeTab, setActiveTab] = useState<TabKey>("gst");
 
-  // Auto-advance to next pending tab when a stage completes
   const prevDoneRef = useRef({ s1: false, s2: false, s3: false });
   useEffect(() => {
     const prev = prevDoneRef.current;
@@ -415,56 +367,43 @@ export function DocumentVerificationStep({
     msme: stage2Done,
     bank: stage3Done,
   };
-  const tabStatus: Record<TabKey, "pending" | "in-progress" | "verified" | "failed"> = {
-    gst: gstDoc.status === "failed"
-      ? "failed"
-      : stage1Done
-        ? "verified"
-        : isGstRegistered !== null
-          ? "in-progress"
-          : "pending",
-    pan: panDoc.status === "failed" || !!panCrossCheckError
-      ? "failed"
-      : stage2Done
-        ? "verified"
-        : panDoc.status !== "idle"
-          ? "in-progress"
-          : "pending",
-    msme: msmeDoc.status === "failed"
-      ? "failed"
-      : stage3Done
-        ? "verified"
-        : isMsmeRegistered !== null
-          ? "in-progress"
-          : "pending",
-    bank: bankDoc.status === "failed"
-      ? "failed"
-      : stage4Done
-        ? "verified"
-        : bankDoc.status !== "idle"
-          ? "in-progress"
-          : "pending",
+  const tabStatus: Record<TabKey, StageStatus> = {
+    gst: gstDoc.status === "failed" ? "failed" : stage1Done ? "verified" : isGstRegistered !== null ? "in-progress" : "pending",
+    pan: panDoc.status === "failed" || !!panCrossCheckError ? "failed" : stage2Done ? "verified" : panDoc.status !== "idle" ? "in-progress" : "pending",
+    msme: msmeDoc.status === "failed" ? "failed" : stage3Done ? "verified" : isMsmeRegistered !== null ? "in-progress" : "pending",
+    bank: bankDoc.status === "failed" ? "failed" : stage4Done ? "verified" : bankDoc.status !== "idle" ? "in-progress" : "pending",
   };
 
   return (
     <form
       id="step-form"
       onSubmit={(e) => { e.preventDefault(); if (allDone) handleContinue(); }}
-      className="space-y-6"
+      className="space-y-5"
     >
-      {/* Banner */}
-      <Alert className={cn("border", allDone ? "border-success bg-success/10" : "border-warning bg-warning/10")}>
-        <ShieldCheck className={cn("h-4 w-4", allDone ? "text-success" : "text-warning")} />
-        <AlertDescription className="font-medium">
-          {allDone
-            ? "All required checks passed. You can continue to the next step."
-            : `${completedCount} of 4 stages complete. Finish each stage in order to continue.`}
-        </AlertDescription>
-      </Alert>
+      {/* Summary banner */}
+      <div className="rounded-lg border border-border/60 bg-card shadow-enterprise-sm px-4 py-3 flex items-center gap-3">
+        <ShieldCheck className={cn("h-5 w-5", allDone ? "text-success" : "text-primary")} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">
+            {allDone ? "All required checks passed" : "Document verification"}
+          </p>
+          <div className="mt-1.5 flex items-center gap-3">
+            <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden max-w-[260px]">
+              <div
+                className={cn("h-full transition-all", allDone ? "bg-success" : "bg-primary")}
+                style={{ width: `${(completedCount / 4) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {completedCount} of 4 stages verified
+            </span>
+          </div>
+        </div>
+      </div>
 
       <TooltipProvider delayDuration={150}>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="w-full">
-          <TabsList className="grid grid-cols-4 w-full h-auto p-1">
+          <TabsList className="grid grid-cols-4 w-full h-auto p-1 bg-muted/60">
             {([
               { key: "gst", label: "GST", num: 1 },
               { key: "pan", label: "PAN", num: 2 },
@@ -478,7 +417,7 @@ export function DocumentVerificationStep({
                   key={t.key}
                   value={t.key}
                   disabled={!unlocked}
-                  className="flex items-center justify-center gap-2 py-2.5 data-[state=active]:bg-background"
+                  className="flex items-center justify-center gap-2 py-2.5 min-w-0 data-[state=active]:bg-background data-[state=active]:shadow-enterprise-sm"
                 >
                   <span className="text-xs sm:text-sm font-medium">
                     {t.num}. {t.label}
@@ -497,194 +436,270 @@ export function DocumentVerificationStep({
             })}
           </TabsList>
 
-          {/* GST */}
-          <TabsContent value="gst" className="mt-4 space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Are you GST registered?</Label>
-              <RadioGroup
-                value={isGstRegistered === null ? "" : isGstRegistered ? "yes" : "no"}
-                onValueChange={(v) => setIsGstRegistered(v === "yes")}
-                className="flex gap-6 mt-2"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="yes" id="gst-yes" />
-                  <Label htmlFor="gst-yes" className="cursor-pointer">Yes</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="no" id="gst-no" />
-                  <Label htmlFor="gst-no" className="cursor-pointer">No</Label>
-                </div>
-              </RadioGroup>
-            </div>
+          {/* ============================== GST ============================== */}
+          <TabsContent value="gst" className="mt-4">
+            <StageShell
+              icon={<Building2 className="h-4 w-4" />}
+              title="GST Verification"
+              subtitle="Upload your GST certificate or declare non-registration"
+              status={tabStatus.gst}
+              verifiedAt={gstDoc.verifiedAt}
+            >
+              <div className="space-y-5">
+                {/* Gate row */}
+                <GateRow
+                  label="Are you GST registered?"
+                  value={isGstRegistered}
+                  onChange={setIsGstRegistered}
+                  yesLabel="Yes"
+                  noLabel="No"
+                />
 
-            {isGstRegistered === true && (
-              <UploadBox
-                label="GST Certificate"
-                accept=".pdf,.jpg,.jpeg,.png"
-                state={gstDoc}
-                onUpload={handleGstUpload}
-                onReset={() => setGstDoc(idleDoc)}
-                statusText={{ uploading: "Uploading…", ocr: "Reading GST certificate…", verifying: "Verifying with GST API…" }}
-                successContent={
-                  <div className="space-y-3">
-                    <OcrComparisonCard
-                      rows={[
-                        { label: "GSTIN", ocrValue: gstDoc.ocrData?.gstin, apiValue: gstDoc.apiData?.gstin ?? gstDoc.ocrData?.gstin },
-                        { label: "Legal Name", ocrValue: gstDoc.ocrData?.legal_name, apiValue: gstDoc.apiData?.legalName ?? gstDoc.apiData?.name },
-                        { label: "Trade Name", ocrValue: gstDoc.ocrData?.trade_name, apiValue: gstDoc.apiData?.tradeName },
-                        { label: "Constitution", ocrValue: gstDoc.ocrData?.constitution_of_business, apiValue: gstDoc.apiData?.constitutionOfBusiness },
-                      ]}
-                      nameMatchScore={gstDoc.nameMatchScore}
+                {/* YES path */}
+                {isGstRegistered === true && (
+                  <>
+                    <DocSplitRow
+                      uploadLabel="GST Certificate"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      doc={gstDoc}
+                      onUpload={handleGstUpload}
+                      onReset={() => setGstDoc(idleDoc)}
+                      busyLabel={
+                        gstDoc.status === "uploading" ? "Uploading…" :
+                        gstDoc.status === "ocr" ? "Reading certificate…" :
+                        gstDoc.status === "verifying" ? "Verifying…" : ""
+                      }
+                      verifiedFields={
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <ReadOnlyField label="Legal Name" value={gstDoc.ocrData?.legal_name} />
+                          <ReadOnlyField label="Trade Name" value={gstDoc.ocrData?.trade_name} />
+                          <ReadOnlyField label="GSTIN" value={gstDoc.ocrData?.gstin} mono />
+                          <ReadOnlyField label="Constitution" value={gstDoc.ocrData?.constitution_of_business} />
+                          <div className="md:col-span-2">
+                            <Label htmlFor="principal-place" className="text-xs font-medium text-muted-foreground">
+                              Principal Place of Business
+                            </Label>
+                            <Input
+                              id="principal-place"
+                              value={editablePrincipalPlace}
+                              onChange={(e) => setEditablePrincipalPlace(e.target.value)}
+                              placeholder="As per GST certificate"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                      }
                     />
-                    <div>
-                      <Label htmlFor="principal-place" className="text-xs font-medium">
-                        Principal Place of Business <span className="text-muted-foreground">(editable)</span>
-                      </Label>
-                      <Input
-                        id="principal-place"
-                        value={editablePrincipalPlace}
-                        onChange={(e) => setEditablePrincipalPlace(e.target.value)}
-                        placeholder="As per GST certificate"
-                        className="mt-1"
+                    {gstDoc.status === "verified" && typeof gstDoc.nameMatchScore === "number" && (
+                      <CrossCheckStrip
+                        ok={gstDoc.nameMatchScore >= 80}
+                        text={`Name match score: ${gstDoc.nameMatchScore}%`}
                       />
+                    )}
+                  </>
+                )}
+
+                {/* NO path */}
+                {isGstRegistered === false && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">GST Self-Declaration</p>
+                        <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
+                      </div>
+                      <a
+                        href="/templates/gst-self-declaration.html"
+                        download
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Template
+                      </a>
+                      <InlineFilePicker
+                        file={gstDeclarationFile}
+                        onPick={setGstDeclarationFile}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <FormField
+                        label="Reason for non-registration"
+                        value={gstDeclarationReason}
+                        onChange={setGstDeclarationReason}
+                        placeholder="e.g. Turnover below threshold"
+                      />
+                      <FormField
+                        label="Legal Name *"
+                        value={manualLegalName}
+                        onChange={setManualLegalName}
+                        placeholder="Registered name of the entity"
+                      />
+                      <FormField
+                        label="Address *"
+                        value={manualAddress.address}
+                        onChange={(v) => setManualAddress((p) => ({ ...p, address: v }))}
+                        placeholder="Street, area"
+                      />
+                      <FormField
+                        label="City *"
+                        value={manualAddress.city}
+                        onChange={(v) => setManualAddress((p) => ({ ...p, city: v }))}
+                      />
+                      <FormField
+                        label="State *"
+                        value={manualAddress.state}
+                        onChange={(v) => setManualAddress((p) => ({ ...p, state: v }))}
+                      />
+                      <FormField
+                        label="Pincode *"
+                        value={manualAddress.pincode}
+                        onChange={(v) => setManualAddress((p) => ({ ...p, pincode: v }))}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </StageShell>
+          </TabsContent>
+
+          {/* ============================== PAN ============================== */}
+          <TabsContent value="pan" className="mt-4">
+            <StageShell
+              icon={<BadgeCheck className="h-4 w-4" />}
+              title="PAN Verification"
+              subtitle="Upload PAN card to extract and verify holder details"
+              status={tabStatus.pan}
+              verifiedAt={panDoc.verifiedAt}
+            >
+              <DocSplitRow
+                uploadLabel="PAN Card"
+                accept=".pdf,.jpg,.jpeg,.png"
+                doc={panDoc}
+                onUpload={handlePanUpload}
+                onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
+                busyLabel={
+                  panDoc.status === "uploading" ? "Uploading…" :
+                  panDoc.status === "ocr" ? "Reading PAN…" :
+                  panDoc.status === "verifying" ? "Verifying…" : ""
+                }
+                verifiedFields={
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <ReadOnlyField label="PAN Number" value={panDoc.ocrData?.pan_number} mono />
+                    <ReadOnlyField label="Holder Name" value={panDoc.ocrData?.holder_name} />
+                  </div>
+                }
+              />
+              {panCrossCheckError && (
+                <CrossCheckStrip ok={false} text={panCrossCheckError} className="mt-3" />
+              )}
+              {panDoc.status === "verified" && !panCrossCheckError && isGstRegistered === true && (
+                <CrossCheckStrip ok={true} text="PAN matches PAN derived from GSTIN" className="mt-3" />
+              )}
+              {panDoc.status === "verified" && typeof panDoc.nameMatchScore === "number" && (
+                <CrossCheckStrip
+                  ok={panDoc.nameMatchScore >= 80}
+                  text={`Name match vs Legal Name: ${panDoc.nameMatchScore}%`}
+                  className="mt-2"
+                />
+              )}
+            </StageShell>
+          </TabsContent>
+
+          {/* ============================== MSME ============================== */}
+          <TabsContent value="msme" className="mt-4">
+            <StageShell
+              icon={<ShieldCheck className="h-4 w-4" />}
+              title="MSME / Udyam"
+              subtitle="Optional — upload Udyam certificate or skip"
+              status={tabStatus.msme}
+              verifiedAt={msmeDoc.verifiedAt}
+            >
+              <div className="space-y-5">
+                <GateRow
+                  label="Are you MSME / Udyam registered?"
+                  value={isMsmeRegistered}
+                  onChange={setIsMsmeRegistered}
+                  yesLabel="Yes"
+                  noLabel="No, skip"
+                />
+
+                {isMsmeRegistered === false && (
+                  <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Skipped — not MSME registered
+                  </div>
+                )}
+
+                {isMsmeRegistered === true && (
+                  <DocSplitRow
+                    uploadLabel="Udyam Certificate"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    doc={msmeDoc}
+                    onUpload={handleMsmeUpload}
+                    onReset={() => setMsmeDoc(idleDoc)}
+                    busyLabel={
+                      msmeDoc.status === "uploading" ? "Uploading…" :
+                      msmeDoc.status === "ocr" ? "Reading Udyam…" :
+                      msmeDoc.status === "verifying" ? "Verifying…" : ""
+                    }
+                    verifiedFields={
+                      <div className="grid md:grid-cols-2 gap-3">
+                        <ReadOnlyField label="Udyam Number" value={msmeDoc.ocrData?.udyam_number} mono />
+                        <ReadOnlyField label="Enterprise Name" value={msmeDoc.ocrData?.enterprise_name} />
+                        <ReadOnlyField label="Enterprise Type" value={msmeDoc.ocrData?.enterprise_type} />
+                      </div>
+                    }
+                  />
+                )}
+
+                {isMsmeRegistered === true && msmeDoc.status === "verified" && typeof msmeDoc.nameMatchScore === "number" && (
+                  <CrossCheckStrip
+                    ok={msmeDoc.nameMatchScore >= 80}
+                    text={`Name match vs Legal Name: ${msmeDoc.nameMatchScore}%`}
+                  />
+                )}
+              </div>
+            </StageShell>
+          </TabsContent>
+
+          {/* ============================== BANK ============================== */}
+          <TabsContent value="bank" className="mt-4">
+            <StageShell
+              icon={<Landmark className="h-4 w-4" />}
+              title="Bank Account"
+              subtitle="Upload cancelled cheque — penny-drop verifies the account"
+              status={tabStatus.bank}
+              verifiedAt={bankDoc.verifiedAt}
+            >
+              <DocSplitRow
+                uploadLabel="Cancelled Cheque"
+                accept=".pdf,.jpg,.jpeg,.png"
+                doc={bankDoc}
+                onUpload={handleBankUpload}
+                onReset={() => setBankDoc(idleDoc)}
+                busyLabel={
+                  bankDoc.status === "uploading" ? "Uploading…" :
+                  bankDoc.status === "ocr" ? "Reading cheque…" :
+                  bankDoc.status === "verifying" ? "Penny-drop verification…" : ""
+                }
+                verifiedFields={
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <ReadOnlyField label="Account Number" value={bankDoc.ocrData?.account_number} mono />
+                    <ReadOnlyField label="IFSC Code" value={bankDoc.ocrData?.ifsc_code} mono />
+                    <ReadOnlyField label="Bank Name" value={bankDoc.ocrData?.bank_name} />
+                    <ReadOnlyField label="Branch" value={bankDoc.ocrData?.branch_name} />
+                    <div className="md:col-span-2">
+                      <ReadOnlyField label="Account Holder Name" value={bankDoc.ocrData?.account_holder_name} />
                     </div>
                   </div>
                 }
               />
-            )}
-
-            {isGstRegistered === false && (
-              <div className="space-y-3 rounded-md border bg-muted/20 p-4">
-                <div className="flex items-start gap-3">
-                  <FileText className="h-4 w-4 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">GST Self-Declaration</p>
-                    <p className="text-xs text-muted-foreground">Download the template, sign it, and upload the signed copy.</p>
-                  </div>
-                  <a
-                    href="/templates/gst-self-declaration.html"
-                    download
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download
-                  </a>
-                </div>
-
-                <div>
-                  <Label className="text-xs font-medium">Reason for non-registration</Label>
-                  <Input
-                    value={gstDeclarationReason}
-                    onChange={(e) => setGstDeclarationReason(e.target.value)}
-                    placeholder="e.g. Turnover below threshold"
-                    className="mt-1"
-                  />
-                </div>
-
-                <FilePicker
-                  label="Signed declaration"
-                  file={gstDeclarationFile}
-                  onPick={setGstDeclarationFile}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                />
-
-                <div className="grid sm:grid-cols-2 gap-3 pt-2">
-                  <Field label="Legal Name *" value={manualLegalName} onChange={setManualLegalName} placeholder="Registered name of the entity" />
-                  <Field label="Address *" value={manualAddress.address} onChange={(v) => setManualAddress((p) => ({ ...p, address: v }))} placeholder="Street, area" />
-                  <Field label="City *" value={manualAddress.city} onChange={(v) => setManualAddress((p) => ({ ...p, city: v }))} />
-                  <Field label="State *" value={manualAddress.state} onChange={(v) => setManualAddress((p) => ({ ...p, state: v }))} />
-                  <Field label="Pincode *" value={manualAddress.pincode} onChange={(v) => setManualAddress((p) => ({ ...p, pincode: v }))} />
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* PAN */}
-          <TabsContent value="pan" className="mt-4">
-            <UploadBox
-              label="PAN Card"
-              accept=".pdf,.jpg,.jpeg,.png"
-              state={panDoc}
-              onUpload={handlePanUpload}
-              onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
-              statusText={{ uploading: "Uploading…", ocr: "Reading PAN card…", verifying: "Verifying with PAN API…" }}
-              extraError={panCrossCheckError}
-              successContent={
-                <OcrComparisonCard
-                  rows={[
-                    { label: "PAN Number", ocrValue: panDoc.ocrData?.pan_number, apiValue: panDoc.apiData?.pan ?? panDoc.ocrData?.pan_number },
-                    { label: "Holder Name", ocrValue: panDoc.ocrData?.holder_name, apiValue: panDoc.apiData?.name },
-                    ...(effectiveLegalName ? [{ label: "Cross-check vs Legal Name", ocrValue: panDoc.ocrData?.holder_name, apiValue: effectiveLegalName }] : []),
-                  ]}
-                  nameMatchScore={panDoc.nameMatchScore}
-                />
-              }
-            />
-          </TabsContent>
-
-          {/* MSME */}
-          <TabsContent value="msme" className="mt-4 space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Are you MSME / Udyam registered?</Label>
-              <RadioGroup
-                value={isMsmeRegistered === null ? "" : isMsmeRegistered ? "yes" : "no"}
-                onValueChange={(v) => setIsMsmeRegistered(v === "yes")}
-                className="flex gap-6 mt-2"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="yes" id="msme-yes" />
-                  <Label htmlFor="msme-yes" className="cursor-pointer">Yes</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="no" id="msme-no" />
-                  <Label htmlFor="msme-no" className="cursor-pointer">No, skip</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {isMsmeRegistered === true && (
-              <UploadBox
-                label="Udyam Certificate"
-                accept=".pdf,.jpg,.jpeg,.png"
-                state={msmeDoc}
-                onUpload={handleMsmeUpload}
-                onReset={() => setMsmeDoc(idleDoc)}
-                statusText={{ uploading: "Uploading…", ocr: "Reading Udyam certificate…", verifying: "Verifying with MSME API…" }}
-                successContent={
-                  <OcrComparisonCard
-                    rows={[
-                      { label: "Udyam No.", ocrValue: msmeDoc.ocrData?.udyam_number, apiValue: msmeDoc.apiData?.udyamNumber ?? msmeDoc.ocrData?.udyam_number },
-                      { label: "Enterprise", ocrValue: msmeDoc.ocrData?.enterprise_name, apiValue: msmeDoc.apiData?.enterpriseName ?? msmeDoc.apiData?.name },
-                      { label: "Type", ocrValue: msmeDoc.ocrData?.enterprise_type, apiValue: msmeDoc.apiData?.enterpriseType },
-                    ]}
-                    nameMatchScore={msmeDoc.nameMatchScore}
-                  />
-                }
-              />
-            )}
-          </TabsContent>
-
-          {/* BANK */}
-          <TabsContent value="bank" className="mt-4">
-            <UploadBox
-              label="Cancelled Cheque"
-              accept=".pdf,.jpg,.jpeg,.png"
-              state={bankDoc}
-              onUpload={handleBankUpload}
-              onReset={() => setBankDoc(idleDoc)}
-              statusText={{ uploading: "Uploading…", ocr: "Reading cheque…", verifying: "Running penny-drop verification…" }}
-              successContent={
-                <OcrComparisonCard
-                  rows={[
-                    { label: "Account No.", ocrValue: bankDoc.ocrData?.account_number, apiValue: bankDoc.apiData?.accountNumber ?? bankDoc.ocrData?.account_number },
-                    { label: "IFSC", ocrValue: bankDoc.ocrData?.ifsc_code, apiValue: bankDoc.apiData?.ifsc ?? bankDoc.apiData?.ifscCode ?? bankDoc.ocrData?.ifsc_code },
-                    { label: "Bank", ocrValue: bankDoc.ocrData?.bank_name, apiValue: bankDoc.apiData?.bankName ?? bankDoc.ocrData?.bank_name },
-                    { label: "Holder", ocrValue: bankDoc.ocrData?.account_holder_name, apiValue: bankDoc.apiData?.accountHolderName ?? bankDoc.apiData?.name },
-                    ...(effectiveLegalName ? [{ label: "Cross-check vs Legal Name", ocrValue: bankDoc.ocrData?.account_holder_name, apiValue: effectiveLegalName }] : []),
-                  ]}
-                />
-              }
-            />
+              {bankDoc.status === "verified" && (
+                <CrossCheckStrip ok={true} text="Account active · Penny-drop successful" className="mt-3" />
+              )}
+            </StageShell>
           </TabsContent>
         </Tabs>
       </TooltipProvider>
@@ -692,89 +707,116 @@ export function DocumentVerificationStep({
   );
 }
 
-// ---------- Status chip ----------
-function StatusChip({ status, locked }: { status: "pending" | "in-progress" | "verified" | "failed"; locked: boolean }) {
-  if (locked) {
-    return <Lock className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Locked" />;
-  }
-  if (status === "verified") {
-    return <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" aria-label="Verified" />;
-  }
-  if (status === "failed") {
-    return <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="Failed" />;
-  }
-  if (status === "in-progress") {
-    return <Loader2 className="h-3.5 w-3.5 text-primary shrink-0 animate-spin" aria-label="In progress" />;
-  }
+/* =================================================================
+   Helper components — kept local for visual consistency across stages
+   ================================================================= */
+
+function StatusChip({ status, locked }: { status: StageStatus; locked: boolean }) {
+  if (locked) return <Lock className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Locked" />;
+  if (status === "verified") return <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" aria-label="Verified" />;
+  if (status === "failed") return <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="Failed" />;
+  if (status === "in-progress") return <Loader2 className="h-3.5 w-3.5 text-primary shrink-0 animate-spin" aria-label="In progress" />;
   return <Clock className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Pending" />;
 }
 
+function StatusPill({ status }: { status: StageStatus }) {
+  const map: Record<StageStatus, { label: string; cls: string; icon: React.ReactNode }> = {
+    pending: { label: "Pending", cls: "bg-muted text-muted-foreground", icon: <Clock className="h-3 w-3" /> },
+    "in-progress": { label: "In progress", cls: "bg-primary/10 text-primary", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
+    verified: { label: "Verified", cls: "bg-success/10 text-success", icon: <CheckCircle2 className="h-3 w-3" /> },
+    failed: { label: "Failed", cls: "bg-destructive/10 text-destructive", icon: <AlertCircle className="h-3 w-3" /> },
+  };
+  const { label, cls, icon } = map[status];
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium", cls)}>
+      {icon}
+      {label}
+    </span>
+  );
+}
 
-// ---------- Sub-components ----------
-
-interface StageCardProps {
-  index: number;
+interface StageShellProps {
+  icon: React.ReactNode;
   title: string;
   subtitle: string;
-  done: boolean;
-  unlocked: boolean;
+  status: StageStatus;
+  verifiedAt?: number;
   children: React.ReactNode;
 }
-function StageCard({ index, title, subtitle, done, unlocked, children }: StageCardProps) {
+function StageShell({ icon, title, subtitle, status, verifiedAt, children }: StageShellProps) {
   return (
-    <div
-      className={cn(
-        "rounded-lg border bg-card overflow-hidden transition-colors",
-        done && "border-success",
-        !unlocked && "opacity-70",
-      )}
-    >
-      <div className="px-4 py-3 border-b flex items-center justify-between gap-2 bg-muted/20">
-        <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold",
-              done ? "bg-success text-success-foreground" : unlocked ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-            )}
-          >
-            {done ? <CheckCircle2 className="h-4 w-4" /> : index}
+    <div className="rounded-lg border border-border/60 bg-card shadow-enterprise-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            {icon}
           </div>
-          <div>
-            <h3 className="font-medium text-sm">{title}</h3>
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-foreground leading-tight">{title}</h3>
+            <p className="text-xs text-muted-foreground leading-tight mt-0.5">{subtitle}</p>
           </div>
         </div>
-        {!unlocked && <Lock className="h-4 w-4 text-muted-foreground" />}
+        <div className="flex items-center gap-2 shrink-0">
+          {verifiedAt && status === "verified" && (
+            <span className="hidden sm:inline text-xs text-muted-foreground">
+              · {timeAgo(verifiedAt)}
+            </span>
+          )}
+          <StatusPill status={status} />
+        </div>
       </div>
-      <div className="p-4">{children}</div>
+
+      {/* Body */}
+      <div className="p-5">{children}</div>
     </div>
   );
 }
 
-function LockedHint({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground p-3 bg-muted/30 rounded-md">
-      <Lock className="h-3.5 w-3.5" />
-      {children}
-    </div>
-  );
-}
-
-interface UploadBoxProps {
+function GateRow({
+  label, value, onChange, yesLabel = "Yes", noLabel = "No",
+}: {
   label: string;
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+  yesLabel?: string;
+  noLabel?: string;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 rounded-md border border-border/60 bg-muted/20 px-4 py-3">
+      <Label className="text-sm font-medium text-foreground sm:flex-1">{label}</Label>
+      <RadioGroup
+        value={value === null ? "" : value ? "yes" : "no"}
+        onValueChange={(v) => onChange(v === "yes")}
+        className="flex gap-6"
+      >
+        <div className="flex items-center gap-2">
+          <RadioGroupItem value="yes" id={`${label}-yes`} />
+          <Label htmlFor={`${label}-yes`} className="cursor-pointer text-sm">{yesLabel}</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <RadioGroupItem value="no" id={`${label}-no`} />
+          <Label htmlFor={`${label}-no`} className="cursor-pointer text-sm">{noLabel}</Label>
+        </div>
+      </RadioGroup>
+    </div>
+  );
+}
+
+interface DocSplitRowProps {
+  uploadLabel: string;
   accept: string;
-  state: DocState;
+  doc: DocState;
   onUpload: (f: File) => void;
   onReset: () => void;
-  statusText: Record<"uploading" | "ocr" | "verifying", string>;
-  successContent: React.ReactNode;
-  extraError?: string | null;
+  busyLabel: string;
+  verifiedFields: React.ReactNode;
 }
-function UploadBox({ label, accept, state, onUpload, onReset, statusText, successContent, extraError }: UploadBoxProps) {
+function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, verifiedFields }: DocSplitRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const isBusy = state.status === "uploading" || state.status === "ocr" || state.status === "verifying";
-  const isVerified = state.status === "verified";
-  const isFailed = state.status === "failed";
+  const isBusy = doc.status === "uploading" || doc.status === "ocr" || doc.status === "verifying";
+  const isVerified = doc.status === "verified";
+  const isFailed = doc.status === "failed";
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -783,70 +825,43 @@ function UploadBox({ label, accept, state, onUpload, onReset, statusText, succes
   }, [onUpload]);
 
   return (
-    <div className="space-y-3">
-      {state.status === "idle" && (
+    <div className="space-y-4">
+      {/* Upload control */}
+      {doc.status === "idle" && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          className="w-full border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30 rounded-md p-6 flex flex-col items-center justify-center gap-2 transition-colors"
+          className="w-full border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 rounded-md px-4 py-5 flex items-center justify-center gap-3 transition-colors"
         >
-          <Upload className="h-6 w-6 text-muted-foreground" />
-          <span className="text-sm font-medium">Drop {label.toLowerCase()} or click to browse</span>
-          <span className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5 MB</span>
+          <Upload className="h-5 w-5 text-muted-foreground" />
+          <div className="text-left">
+            <p className="text-sm font-medium text-foreground">Drop {uploadLabel.toLowerCase()} or click to browse</p>
+            <p className="text-xs text-muted-foreground">PDF, JPG, PNG · up to 5 MB</p>
+          </div>
         </button>
       )}
 
-      {isBusy && (
-        <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-md">
-          <Loader2 className="h-5 w-5 text-primary animate-spin" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">
-              {state.status === "uploading" && statusText.uploading}
-              {state.status === "ocr" && statusText.ocr}
-              {state.status === "verifying" && statusText.verifying}
-            </p>
-            {state.fileName && <p className="text-xs text-muted-foreground truncate">{state.fileName}</p>}
-          </div>
+      {(isBusy || isVerified || isFailed) && (
+        <FilePill
+          fileName={doc.fileName}
+          fileSize={doc.fileSize}
+          state={isBusy ? "busy" : isVerified ? "verified" : "failed"}
+          busyLabel={busyLabel}
+          onReplace={() => inputRef.current?.click()}
+          onReset={onReset}
+        />
+      )}
+
+      {isFailed && doc.errorMessage && (
+        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{doc.errorMessage}</span>
         </div>
       )}
 
-      {isFailed && (
-        <div className="space-y-3">
-          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>{state.errorMessage}</span>
-          </div>
-          <Button type="button" size="sm" variant="outline" onClick={onReset}>
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Re-upload
-          </Button>
-        </div>
-      )}
-
-      {isVerified && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2 p-2 bg-success/10 border border-success/30 rounded-md text-success text-sm">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="font-medium">Verified</span>
-              {state.fileName && <span className="text-xs text-muted-foreground truncate">· {state.fileName}</span>}
-            </div>
-            <Button type="button" size="sm" variant="ghost" onClick={onReset} className="h-7 px-2 text-xs">
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Re-upload
-            </Button>
-          </div>
-          {extraError && (
-            <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{extraError}</span>
-            </div>
-          )}
-          {successContent}
-        </div>
-      )}
+      {isVerified && verifiedFields}
 
       <input
         ref={inputRef}
@@ -863,40 +878,138 @@ function UploadBox({ label, accept, state, onUpload, onReset, statusText, succes
   );
 }
 
-function FilePicker({ label, file, onPick, accept }: { label: string; file: File | null; onPick: (f: File | null) => void; accept: string }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+function FilePill({
+  fileName, fileSize, state, busyLabel, onReplace, onReset,
+}: {
+  fileName?: string;
+  fileSize?: number;
+  state: "busy" | "verified" | "failed";
+  busyLabel?: string;
+  onReplace: () => void;
+  onReset: () => void;
+}) {
+  const accent =
+    state === "verified" ? "border-success/40 bg-success/5" :
+    state === "failed" ? "border-destructive/40 bg-destructive/5" :
+    "border-border bg-muted/30";
+
+  return (
+    <div className={cn("flex items-center gap-3 rounded-md border px-3 py-2.5", accent)}>
+      <div className="h-8 w-8 rounded-md bg-background border border-border/60 flex items-center justify-center shrink-0">
+        {state === "busy" ? (
+          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+        ) : state === "verified" ? (
+          <CheckCircle2 className="h-4 w-4 text-success" />
+        ) : (
+          <AlertCircle className="h-4 w-4 text-destructive" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{fileName || "Document"}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {state === "busy" ? busyLabel : (
+            <>
+              {fileSize ? formatBytes(fileSize) : ""}
+              {state === "verified" && <span className="text-success"> · Verified</span>}
+              {state === "failed" && <span className="text-destructive"> · Failed</span>}
+            </>
+          )}
+        </p>
+      </div>
+      {state !== "busy" && (
+        <div className="flex items-center gap-1 shrink-0">
+          <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onReplace}>
+            <Upload className="h-3.5 w-3.5 mr-1" />
+            Replace
+          </Button>
+          <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onReset}>
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReadOnlyField({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
   return (
     <div>
-      <Label className="text-xs font-medium">{label} *</Label>
-      <div className="mt-1 flex items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-          <Upload className="h-3.5 w-3.5 mr-1" />
-          {file ? "Replace file" : "Choose file"}
-        </Button>
-        {file && (
-          <span className="text-xs text-muted-foreground truncate flex-1">{file.name}</span>
-        )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            onPick(f);
-            if (inputRef.current) inputRef.current.value = "";
-          }}
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <div className="relative mt-1">
+        <Input
+          readOnly
+          value={value || ""}
+          placeholder="—"
+          className={cn(
+            "pr-8 bg-muted/40 border-border/60 cursor-default focus-visible:ring-0",
+            mono && "font-mono text-sm tracking-wide",
+          )}
         />
+        <Lock className="h-3.5 w-3.5 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       </div>
     </div>
   );
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function FormField({
+  label, value, onChange, placeholder,
+}: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      <Label className="text-xs font-medium">{label}</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1" />
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1"
+      />
     </div>
+  );
+}
+
+function CrossCheckStrip({ ok, text, className }: { ok: boolean; text: string; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium",
+        ok ? "border-success/30 bg-success/5 text-success" : "border-destructive/30 bg-destructive/5 text-destructive",
+        className,
+      )}
+    >
+      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function InlineFilePicker({
+  file, onPick, accept,
+}: { file: File | null; onPick: (f: File | null) => void; accept: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <Button
+        type="button"
+        variant={file ? "outline" : "default"}
+        size="sm"
+        className="h-8"
+        onClick={() => inputRef.current?.click()}
+      >
+        <Upload className="h-3.5 w-3.5 mr-1" />
+        {file ? "Replace" : "Upload signed"}
+      </Button>
+      {file && <span className="text-xs text-muted-foreground truncate max-w-[120px]">{file.name}</span>}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          onPick(f);
+          if (inputRef.current) inputRef.current.value = "";
+        }}
+      />
+    </>
   );
 }
