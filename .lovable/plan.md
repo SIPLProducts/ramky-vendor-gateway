@@ -1,146 +1,72 @@
 
 
-## Conditional GST/MSME Registration + Expanded GST Certificate Capture
+## Add explicit Save button to Custom Role Screen Permissions dialog
 
-### Part A — Conditional GST & MSME flow
+### Problem
+In **Custom Roles → Screens** dialog, each checkbox toggle currently auto-saves immediately via per-row upsert. Users expect to tick several screens and then click **Save** once. There's no visible Save action, so users don't know if/when changes were persisted, and accidental clicks instantly mutate permissions.
 
-#### GST block
+### Change
+Convert `CustomRolePermissionsMatrix` from auto-save-on-toggle to **stage-then-save** with an explicit Save button.
 
-```text
-Are you GST registered?  ( ) Yes   ( ) No
-
-If YES:
-  - GSTIN (mandatory, OCR + API verification — current behaviour)
-  - GST certificate upload
-  - Auto-capture extended fields (see Part B)
-
-If NO:
-  - Notice: "Download the GST Self-Declaration form, sign it, and upload"
-  - [Download GST Self-Declaration Template] button (PDF in /public/templates/)
-  - Signed declaration upload (mandatory)
-  - Reason for non-registration (optional text)
-  - GST + name-match validations skipped in orchestrator
-```
-
-#### MSME block
+### Behaviour
 
 ```text
-Are you MSME registered?  ( ) Yes   ( ) No
-
-If YES:
-  - MSME category (Micro / Small / Medium)
-  - Udyam / MSME number (mandatory, API verification)
-  - MSME certificate upload
-
-If NO:
-  - No further fields
-  - MSME validation skipped
+Open dialog → load existing perms from DB into `perms` (saved baseline)
+            → also keep `draft` copy for in-dialog edits
+User ticks/unticks → only `draft` changes; "Unsaved changes" badge appears
+[Cancel]            → revert draft = perms, close dialog
+[Save changes]      → diff draft vs perms → upsert changed rows in one batch
+                    → write one audit_log entry summarising changes
+                    → toast "Permissions saved", close dialog
+Close (X) with unsaved changes → confirm "Discard unsaved changes?"
 ```
-
-### Part B — Expanded GST certificate data capture
-
-When a vendor uploads a GST certificate, OCR + the form must capture and persist these additional fields from the certificate:
-
-- Legal Name
-- Trade Name
-- Constitution of Business (Private Limited, LLP, Partnership, Proprietorship, etc.)
-- Principal Place of Business — full address
-- Additional Place(s) of Business (multi-line / array)
-- Date of Registration
-- GSTIN Status (Active / Cancelled / Suspended)
-- Taxpayer Type (Regular / Composition / SEZ / Casual)
-- Nature of Business Activities (multi-select from certificate)
-- Jurisdiction — Centre
-- Jurisdiction — State
-
-These will be:
-- auto-filled from OCR (`ocr-extract` GST schema extended)
-- auto-verified against the GST API response where overlap exists
-- shown read-only with an "Edit" toggle for vendor correction
-- displayed in `ReviewStep` and `FinanceReview`
-
-### Backend work
-
-1. **Schema migration — `vendors` table additions**
-   - `is_gst_registered boolean default true`
-   - `gst_declaration_reason text`
-   - `is_msme_registered boolean default false`
-   - `gst_constitution_of_business text`
-   - `gst_principal_place_of_business text`
-   - `gst_additional_places jsonb`
-   - `gst_registration_date date`
-   - `gst_status text`
-   - `gst_taxpayer_type text`
-   - `gst_business_nature text[]`
-   - `gst_jurisdiction_centre text`
-   - `gst_jurisdiction_state text`
-
-   (Existing `gstin`, `msme_number`, `msme_category` stay; nullable when flags false.)
-
-2. **Storage**
-   - Reuse `vendor-documents` bucket
-   - New `document_type = 'gst_self_declaration'` row in `vendor_documents`
-
-3. **Edge function updates**
-   - `supabase/functions/ocr-extract/index.ts` — extend GST schema to return all Part B fields
-   - `supabase/functions/validate-gst/index.ts` — return the same fields in `data`
-   - `supabase/functions/validation-orchestrator/index.ts` — skip GST + name-match if `is_gst_registered=false`; skip MSME if `is_msme_registered=false` (mark as `skipped`, not `failed`)
-
-4. **Static asset**
-   - `public/templates/gst-self-declaration.pdf` — generated once with Sharvi/tenant branding placeholders
-
-### Frontend work
-
-1. **`src/components/vendor/steps/ComplianceStep.tsx`** (or `CommercialStep.tsx` — wherever GST/MSME live)
-   - Add `RadioGroup` "Are you GST registered?"
-   - Conditional render: GSTIN + verification + extended GST fields  **OR**  declaration download + upload + reason
-   - Add `RadioGroup` "Are you MSME registered?"
-   - Conditional render: MSME number + category + cert  **OR**  nothing
-   - Update Zod schema for conditional requireds
-
-2. **GST extended-fields panel** (new sub-component inside the step)
-   - Renders Legal Name, Trade Name, Constitution, Principal Address, Additional Places, Reg Date, Status, Taxpayer Type, Business Nature, Jurisdictions
-   - Auto-populated from OCR + API
-   - Each field has read-only by default, "Edit" toggle for manual correction
-
-3. **`src/components/vendor/steps/ReviewStep.tsx`**
-   - GST section shows either "Registered — GSTIN + extended fields" or "Not registered — declaration on file ✓"
-   - MSME section shows "Registered — Micro/Small/Medium + Udyam #" or "Not registered"
-
-4. **`src/types/vendor.ts`** — extend `ComplianceDetails` with new flags and GST extended fields
-
-5. **`src/hooks/useVendorRegistration.tsx`** — persist new flags, declaration reason, and extended GST fields
-
-6. **`src/pages/FinanceReview.tsx`** — surface the new GST fields and registration-status flags for reviewers
-
-7. **`src/components/admin/ValidationConfigManager.tsx`** — small note that GST/MSME validations auto-skip when vendor declares "No"
 
 ### Files touched
 
-- new migration: vendor columns above
-- new asset: `public/templates/gst-self-declaration.pdf`
-- edit: `supabase/functions/ocr-extract/index.ts`
-- edit: `supabase/functions/validate-gst/index.ts`
-- edit: `supabase/functions/validation-orchestrator/index.ts`
-- edit: `src/types/vendor.ts`
-- edit: `src/components/vendor/steps/ComplianceStep.tsx` (or current GST/MSME step)
-- edit: `src/components/vendor/steps/ReviewStep.tsx`
-- edit: `src/hooks/useVendorRegistration.tsx`
-- edit: `src/pages/FinanceReview.tsx`
-- edit: `src/components/admin/ValidationConfigManager.tsx`
+1. **`src/components/admin/CustomRolePermissionsMatrix.tsx`** — main rewrite
+   - Track `saved: Record<string,boolean>` and `draft: Record<string,boolean>`
+   - `toggle()` only mutates `draft` (no DB call)
+   - New `dirty` derived flag = any key where `draft[k] !== saved[k]`
+   - New `handleSave()`:
+     - Compute changed keys
+     - Single `upsert([...rows])` to `custom_role_screen_permissions` with `onConflict: 'custom_role_id,screen_key'`
+     - On success: update `saved`, write one `audit_logs` row `{action:'custom_role_permissions_bulk_updated', details:{custom_role_id, changes:[{screen_key,can_access}...]}}`, toast, call optional `onSaved` callback
+   - New `handleCancel()` resets draft
+   - Add footer with `Cancel` + `Save changes` buttons (Save disabled when `!dirty` or `saving`)
+   - Show small "Unsaved changes" badge in header area when `dirty`
+   - Accept new optional props: `onDirtyChange?(dirty)`, `onSaved?()`
+
+2. **`src/pages/CustomRoles.tsx`** — small updates
+   - Move dialog Save/Cancel out of matrix or keep matrix-owned (chosen: matrix-owned for reuse)
+   - Intercept `onOpenChange(false)` → if matrix is dirty, `confirm('Discard unsaved changes?')` before closing
+   - Track `permsDirty` via `onDirtyChange` from the matrix
+   - On `onSaved`, close the dialog and refresh role list (no count change needed but keeps UX consistent)
+
+### UI
+
+```text
+┌─ Screen Permissions — Finance Reviewer ─────────────[X]┐
+│ Check the screens users with this role can access.    │
+│ [• Unsaved changes]                                    │
+│                                                        │
+│ ☐ Dashboard          ☑ All Vendors                     │
+│ ☑ Finance Review     ☐ SCM Approval                    │
+│ ...                                                    │
+│                                                        │
+│                              [Cancel] [Save changes]   │
+└────────────────────────────────────────────────────────┘
+```
 
 ### Expected result
-
-- Non-GST vendors complete onboarding via signed self-declaration; no fake GSTIN
-- Non-MSME vendors answer "No" and move on; no MSME number required
-- GST-registered vendors get richer auto-captured data (Legal/Trade name, Constitution, Address, Status, Jurisdictions, etc.) from one certificate upload
-- Reviewers see complete GST profile in Finance Review
-- Orchestrator no longer fails skip-by-choice cases
+- Toggling checkboxes is free and reversible inside the dialog
+- One explicit Save persists all changes atomically
+- Clear visual signal when there are unsaved edits
+- Closing the dialog with unsaved edits prompts the user
+- One audit log entry per Save (not per checkbox), easier to read in Audit Logs
 
 ### Technical notes
-
-- Self-declaration template is a static PDF; per-vendor pre-fill is a follow-up
-- Existing `validation_configs` rows unchanged — they only fire when vendor declares Yes
-- Skipped validations recorded in `vendor_validations` with `status='skipped'` for audit
-- OCR confidence per extended field still respected; low-confidence fields are flagged for manual review
+- Bulk upsert is a single round-trip — faster than current per-toggle behaviour
+- Existing RLS policies on `custom_role_screen_permissions` already allow admin upsert; no DB changes needed
+- `useScreenPermissions` consumers pick up the change on next refetch (already triggered by `is_active` join + role-key invalidation flow)
+- Behaviour of the **built-in** role matrix in `RolePermissions.tsx` is left unchanged in this task; if desired we can apply the same pattern there in a follow-up
 
