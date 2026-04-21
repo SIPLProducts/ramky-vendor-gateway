@@ -488,6 +488,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
+      // Ensure tenant_id is populated from the invitation when the form didn't carry one
+      if (!vendorData.tenant_id && invitation?.tenant_id) {
+        vendorData.tenant_id = invitation.tenant_id;
+      }
 
       if (vendorId) {
         const { data, error } = await supabase
