@@ -477,6 +477,10 @@ export default function AdminConfiguration() {
           <ValidationConfigManager />
         </TabsContent>
 
+        <TabsContent value="email">
+          <SmtpSettings config={config} updateConfig={updateConfig} />
+        </TabsContent>
+
         <TabsContent value="notifications">
           <div className="max-w-xl">
             <NotificationSettings />
