@@ -1,86 +1,146 @@
 
 
-## Auto-create vendor account from invite email (no password prompt)
+## Conditional GST/MSME Registration + Expanded GST Certificate Capture
 
-### What changes
+### Part A — Conditional GST & MSME flow
 
-Today the invite link drops the vendor on a login screen that asks for a password they were never given. Instead, the invite link should **automatically provision the vendor's account** and sign them straight into the registration form — zero password entry on first visit.
-
-### New flow
+#### GST block
 
 ```text
-Email link
-  -> /vendor/invite?token=...
-  -> validate token (RPC)
-  -> auto-create auth user for invited email (server-side, random password)
-  -> generate a magic link / one-time session
-  -> sign vendor in silently
-  -> redirect to /vendor/registration?token=...
+Are you GST registered?  ( ) Yes   ( ) No
+
+If YES:
+  - GSTIN (mandatory, OCR + API verification — current behaviour)
+  - GST certificate upload
+  - Auto-capture extended fields (see Part B)
+
+If NO:
+  - Notice: "Download the GST Self-Declaration form, sign it, and upload"
+  - [Download GST Self-Declaration Template] button (PDF in /public/templates/)
+  - Signed declaration upload (mandatory)
+  - Reason for non-registration (optional text)
+  - GST + name-match validations skipped in orchestrator
 ```
 
-The vendor never sees a password field on first visit. On any future visit, they can request a magic link from `/vendor/login` using their invited email.
+#### MSME block
+
+```text
+Are you MSME registered?  ( ) Yes   ( ) No
+
+If YES:
+  - MSME category (Micro / Small / Medium)
+  - Udyam / MSME number (mandatory, API verification)
+  - MSME certificate upload
+
+If NO:
+  - No further fields
+  - MSME validation skipped
+```
+
+### Part B — Expanded GST certificate data capture
+
+When a vendor uploads a GST certificate, OCR + the form must capture and persist these additional fields from the certificate:
+
+- Legal Name
+- Trade Name
+- Constitution of Business (Private Limited, LLP, Partnership, Proprietorship, etc.)
+- Principal Place of Business — full address
+- Additional Place(s) of Business (multi-line / array)
+- Date of Registration
+- GSTIN Status (Active / Cancelled / Suspended)
+- Taxpayer Type (Regular / Composition / SEZ / Casual)
+- Nature of Business Activities (multi-select from certificate)
+- Jurisdiction — Centre
+- Jurisdiction — State
+
+These will be:
+- auto-filled from OCR (`ocr-extract` GST schema extended)
+- auto-verified against the GST API response where overlap exists
+- shown read-only with an "Edit" toggle for vendor correction
+- displayed in `ReviewStep` and `FinanceReview`
 
 ### Backend work
 
-1. **New edge function `accept-vendor-invite`** (public, `verify_jwt = false`)
-   - Input: `{ token }`
-   - Uses service-role key to:
-     - Call `get_invitation_by_token` to validate token (exists, not expired, not used)
-     - Check if auth user exists for invited email; if not, create one via `auth.admin.createUser` with a random password and `email_confirm: true`
-     - Generate a magic link via `auth.admin.generateLink({ type: 'magiclink', email })`
-     - Return `{ action_link, email, invitation_id }`
-   - Tracks access via `record_invitation_access`
+1. **Schema migration — `vendors` table additions**
+   - `is_gst_registered boolean default true`
+   - `gst_declaration_reason text`
+   - `is_msme_registered boolean default false`
+   - `gst_constitution_of_business text`
+   - `gst_principal_place_of_business text`
+   - `gst_additional_places jsonb`
+   - `gst_registration_date date`
+   - `gst_status text`
+   - `gst_taxpayer_type text`
+   - `gst_business_nature text[]`
+   - `gst_jurisdiction_centre text`
+   - `gst_jurisdiction_state text`
 
-2. **New RPC `claim_invitation(_token, _vendor_id)`** (`SECURITY DEFINER`)
-   - Validates token + matches `auth.jwt() ->> 'email'`
-   - Sets `used_at`, links `vendor_id`
-   - Replaces the remaining direct `vendor_invitations.update` calls
+   (Existing `gstin`, `msme_number`, `msme_category` stay; nullable when flags false.)
+
+2. **Storage**
+   - Reuse `vendor-documents` bucket
+   - New `document_type = 'gst_self_declaration'` row in `vendor_documents`
+
+3. **Edge function updates**
+   - `supabase/functions/ocr-extract/index.ts` — extend GST schema to return all Part B fields
+   - `supabase/functions/validate-gst/index.ts` — return the same fields in `data`
+   - `supabase/functions/validation-orchestrator/index.ts` — skip GST + name-match if `is_gst_registered=false`; skip MSME if `is_msme_registered=false` (mark as `skipped`, not `failed`)
+
+4. **Static asset**
+   - `public/templates/gst-self-declaration.pdf` — generated once with Sharvi/tenant branding placeholders
 
 ### Frontend work
 
-1. **`/vendor/invite` route** (`src/App.tsx`)
-   - Point to a new lightweight `VendorInviteAccept` page (or reuse `VendorRegisterWithInvite` rewritten)
-   - Page logic:
-     - Read `token` from URL
-     - Call `accept-vendor-invite` edge function
-     - On success: `window.location.href = action_link` (Supabase magic link auto-signs the user in and redirects)
-     - Configure the magic link `redirectTo` = `${origin}/vendor/registration?token=...`
-   - Show clear states: validating → signing you in → error (invalid/expired/used)
+1. **`src/components/vendor/steps/ComplianceStep.tsx`** (or `CommercialStep.tsx` — wherever GST/MSME live)
+   - Add `RadioGroup` "Are you GST registered?"
+   - Conditional render: GSTIN + verification + extended GST fields  **OR**  declaration download + upload + reason
+   - Add `RadioGroup` "Are you MSME registered?"
+   - Conditional render: MSME number + category + cert  **OR**  nothing
+   - Update Zod schema for conditional requireds
 
-2. **`/vendor/registration`**
-   - Already uses `get_invitation_by_token` ✓
-   - Replace direct `vendor_invitations.update(...)` with `claim_invitation` RPC after submit
+2. **GST extended-fields panel** (new sub-component inside the step)
+   - Renders Legal Name, Trade Name, Constitution, Principal Address, Additional Places, Reg Date, Status, Taxpayer Type, Business Nature, Jurisdictions
+   - Auto-populated from OCR + API
+   - Each field has read-only by default, "Edit" toggle for manual correction
 
-3. **`/vendor/login`** — repurpose as fallback
-   - Remove "temporary password from invitation email" copy
-   - Offer **"Email me a sign-in link"** (magic link) using the invited email
-   - Keep password login only for vendors who set one later
+3. **`src/components/vendor/steps/ReviewStep.tsx`**
+   - GST section shows either "Registered — GSTIN + extended fields" or "Not registered — declaration on file ✓"
+   - MSME section shows "Registered — Micro/Small/Medium + Udyam #" or "Not registered"
 
-4. **Admin invitation UI** (`AdminInvitations.tsx`)
-   - Update help text: "Vendor will be signed in automatically from the email link — no password required"
+4. **`src/types/vendor.ts`** — extend `ComplianceDetails` with new flags and GST extended fields
+
+5. **`src/hooks/useVendorRegistration.tsx`** — persist new flags, declaration reason, and extended GST fields
+
+6. **`src/pages/FinanceReview.tsx`** — surface the new GST fields and registration-status flags for reviewers
+
+7. **`src/components/admin/ValidationConfigManager.tsx`** — small note that GST/MSME validations auto-skip when vendor declares "No"
 
 ### Files touched
 
-- new: `supabase/functions/accept-vendor-invite/index.ts`
-- new migration: `claim_invitation(_token text, _vendor_id uuid)` RPC
-- new: `src/pages/VendorInviteAccept.tsx` (or rewrite `VendorRegisterWithInvite.tsx`)
-- edit: `src/App.tsx` (route `/vendor/invite` → `VendorInviteAccept`)
-- edit: `src/pages/VendorLogin.tsx` (magic-link fallback, remove password copy)
-- edit: `src/pages/VendorRegistration.tsx` (use `claim_invitation` RPC on submit)
-- edit: `src/hooks/useVendorRegistration.tsx` (use `claim_invitation` RPC on submit)
-- edit: `src/pages/AdminInvitations.tsx` (copy update)
+- new migration: vendor columns above
+- new asset: `public/templates/gst-self-declaration.pdf`
+- edit: `supabase/functions/ocr-extract/index.ts`
+- edit: `supabase/functions/validate-gst/index.ts`
+- edit: `supabase/functions/validation-orchestrator/index.ts`
+- edit: `src/types/vendor.ts`
+- edit: `src/components/vendor/steps/ComplianceStep.tsx` (or current GST/MSME step)
+- edit: `src/components/vendor/steps/ReviewStep.tsx`
+- edit: `src/hooks/useVendorRegistration.tsx`
+- edit: `src/pages/FinanceReview.tsx`
+- edit: `src/components/admin/ValidationConfigManager.tsx`
 
 ### Expected result
 
-- Vendor clicks the email link → lands on `/vendor/invite?token=...` → sees a brief "Signing you in…" → arrives signed-in on the registration form
-- No password prompt, no manual signup
-- Returning vendors can request a magic link from `/vendor/login` if their session expires
-- All invitation reads/writes go through `SECURITY DEFINER` RPCs or a service-role edge function — no direct browser access to `vendor_invitations`
+- Non-GST vendors complete onboarding via signed self-declaration; no fake GSTIN
+- Non-MSME vendors answer "No" and move on; no MSME number required
+- GST-registered vendors get richer auto-captured data (Legal/Trade name, Constitution, Address, Status, Jurisdictions, etc.) from one certificate upload
+- Reviewers see complete GST profile in Finance Review
+- Orchestrator no longer fails skip-by-choice cases
 
 ### Technical notes
 
-- `auth.admin.createUser` + magic-link generation requires `SUPABASE_SERVICE_ROLE_KEY` (already configured)
-- Magic link `redirectTo` carries the `token` query param so registration can resume
-- If the auth user already exists (returning vendor on a fresh device), skip create and just generate the magic link
-- `vendor_invitations` RLS stays locked; only edge function (service role) and RPCs touch it
+- Self-declaration template is a static PDF; per-vendor pre-fill is a follow-up
+- Existing `validation_configs` rows unchanged — they only fire when vendor declares Yes
+- Skipped validations recorded in `vendor_validations` with `status='skipped'` for audit
+- OCR confidence per extended field still respected; low-confidence fields are flagged for manual review
 
