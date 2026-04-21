@@ -30,30 +30,36 @@ export function ChangeRoleDialog({
   tenants = [], currentTenantIds = [],
   customRoles = [], currentCustomRoleIds = [],
 }: Props) {
-  const [role, setRole] = useState<AppRole>(currentRole ?? 'vendor');
+  // Single value: built-in AppRole OR "custom:<id>"
+  const initialSelected = currentCustomRoleIds[0]
+    ? `custom:${currentCustomRoleIds[0]}`
+    : (currentRole ?? 'vendor');
+  const [selectedRole, setSelectedRole] = useState<string>(initialSelected);
   const [tenantIds, setTenantIds] = useState<string[]>(currentTenantIds);
-  const [customIds, setCustomIds] = useState<string[]>(currentCustomRoleIds);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setRole(currentRole ?? 'vendor');
+      setSelectedRole(
+        currentCustomRoleIds[0]
+          ? `custom:${currentCustomRoleIds[0]}`
+          : (currentRole ?? 'vendor')
+      );
       setTenantIds(currentTenantIds);
-      setCustomIds(currentCustomRoleIds);
     }
   }, [open, currentRole, currentTenantIds.join(','), currentCustomRoleIds.join(',')]);
 
   const toggleTenant = (id: string) => {
     setTenantIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
   };
-  const toggleCustom = (id: string) => {
-    setCustomIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
-  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onConfirm(role, tenantIds, customIds);
+      const isCustom = selectedRole.startsWith('custom:');
+      const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
+      const builtInRole: AppRole = isCustom ? 'vendor' : (selectedRole as AppRole);
+      await onConfirm(builtInRole, tenantIds, customRoleId ? [customRoleId] : []);
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -65,32 +71,29 @@ export function ChangeRoleDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Change Role &amp; Access</DialogTitle>
-          <DialogDescription>Update role, tenants, and custom roles for {userName}</DialogDescription>
+          <DialogDescription>Update role and tenant access for {userName}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Built-in Role</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Label>Role</Label>
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
               <SelectContent>
+                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Built-in Roles</div>
                 {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                {customRoles.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 mt-1 text-xs font-medium text-muted-foreground border-t">Custom Roles</div>
+                    {customRoles.map((c) => (
+                      <SelectItem key={c.id} value={`custom:${c.id}`} disabled={!c.is_active}>
+                        {c.name}{!c.is_active && ' (inactive)'}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
-
-          {customRoles.length > 0 && (
-            <div className="space-y-2">
-              <Label>Custom Roles</Label>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-                {customRoles.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox checked={customIds.includes(c.id)} onCheckedChange={() => toggleCustom(c.id)} />
-                    <span className="text-sm">{c.name}{!c.is_active && <span className="text-muted-foreground ml-1">(inactive)</span>}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
           {tenants.length > 0 && (
             <div className="space-y-2">
