@@ -27,4 +27,17 @@ async function clearPreviewPwaCache() {
 
 clearPreviewPwaCache().finally(() => {
   createRoot(document.getElementById("root")!).render(<App />);
+
+  // Always check for SW updates on every page load and reload when a new one activates
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => reg.update());
+    });
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  }
 });
