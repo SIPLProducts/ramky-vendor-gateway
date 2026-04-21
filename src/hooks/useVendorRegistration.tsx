@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'financial_docs' | 'dealership_certificate';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
@@ -141,6 +141,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
     const documentsToUpload: { file: File | null; type: DocumentType }[] = [
       { file: formData.statutory.gstCertificateFile, type: 'gst_certificate' },
+      { file: formData.statutory.gstSelfDeclarationFile, type: 'gst_self_declaration' },
       { file: formData.statutory.panCardFile, type: 'pan_card' },
       { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
       { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
