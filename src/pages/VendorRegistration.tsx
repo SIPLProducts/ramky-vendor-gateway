@@ -464,9 +464,14 @@ export default function VendorRegistration() {
 
   const handleSaveAsDraft = async () => {
     try {
+      setAutoSaveState('saving');
       await saveVendor(formData);
+      lastSavedHashRef.current = JSON.stringify(formData);
+      setLastSavedAt(new Date());
+      setAutoSaveState('saved');
       toast({ title: 'Draft Saved', description: 'Your progress has been saved.' });
     } catch (error) {
+      setAutoSaveState('error');
       toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An error occurred', variant: 'destructive' });
     }
   };
