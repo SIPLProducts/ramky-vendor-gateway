@@ -267,9 +267,22 @@ export default function VendorRegistration() {
   };
 
   const canProceedFromCurrentStep = () => {
-    // Step 1 (Document Verification) requires all required docs verified
+    // Step 1 (Document Verification) requires all required stages resolved
     if (currentStep === 1) {
-      return !!verifiedData?.pan && !!verifiedData?.gst && !!verifiedData?.bank;
+      if (!verifiedData) return false;
+      const gstOk =
+        verifiedData.isGstRegistered === true
+          ? !!verifiedData.gst
+          : verifiedData.isGstRegistered === false
+            ? !!verifiedData.gstSelfDeclarationFile &&
+              !!verifiedData.manualLegalName &&
+              !!verifiedData.manualAddress?.address &&
+              !!verifiedData.manualAddress?.city &&
+              !!verifiedData.manualAddress?.state &&
+              !!verifiedData.manualAddress?.pincode
+            : false;
+      const msmeOk = verifiedData.isMsmeRegistered === false || !!verifiedData.msme;
+      return gstOk && !!verifiedData.pan && msmeOk && !!verifiedData.bank;
     }
     // Steps 5 (Commercial) and 6 (Bank) still allow inline verification
     if (currentStep === 5) {
@@ -282,8 +295,8 @@ export default function VendorRegistration() {
   };
 
   const getValidationMessage = () => {
-    if (currentStep === 1 && !(verifiedData?.pan && verifiedData?.gst && verifiedData?.bank)) {
-      return 'Upload and verify PAN, GST, and Cancelled Cheque to continue';
+    if (currentStep === 1 && !canProceedFromCurrentStep()) {
+      return 'Complete each stage in order: GST → PAN → MSME → Bank';
     }
     if (currentStep === 5 && stepValidationState[5] === false) {
       return 'Please verify GST, PAN, and MSME details';
