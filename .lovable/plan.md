@@ -1,131 +1,73 @@
 
 
-## Email Body Preview
+## Improve Vendor Invitation Email Body
 
-Here is the exact HTML email body that the `send-vendor-invitation` Edge Function sends. After the fix (removing `mimeContent` and letting `denomailer` handle encoding natively), this will render correctly in all email clients.
+### Clarifying the Issue
 
-### Visual Layout
+The SMTP function is now correctly encoding emails (`quoted-printable`, no base64 garbling). So "not generating good" likely means the **visual design / content** of the email body needs improvement, not the encoding.
 
+### Proposed Redesign
+
+Rebuild the `send-vendor-invitation` HTML template with a cleaner, more professional Sharvi-branded layout:
+
+**Visual Improvements**
+- Replace the flat blue gradient header with a clean white card + Sharvi logo wordmark and a thin colored top border (SAP Fiori inspired, matching the app's visual identity).
+- Use the project's grey page background (`#F7F9FC`) outside the card and pure white (`#FFFFFF`) inside.
+- Rounded card (10px radius) with subtle shadow.
+- Use system font stack matching the app.
+
+**Content Improvements**
+- Personalized greeting line ("Hello, You've been invited by Sharvi Vendor Portal to register as a supplier.")
+- Three-step "What happens next" mini-checklist (Click the button → Complete 7-step form → Get verified & approved).
+- Estimated time to complete: ~10–15 minutes.
+- Clear primary CTA button ("Start Registration") with hover-friendly styling.
+- Expiry warning in an amber info box with calendar icon.
+- Plain-text fallback link in a monospace box.
+- Footer with support email, company name, and "automated message" disclaimer.
+
+**Layout sketch**
 ```text
-┌─────────────────────────────────────────────────────┐
-│         BLUE GRADIENT HEADER (#2563eb)              │
-│                                                     │
-│           Sharvi Vendor Portal                      │
-│          Vendor Management System                   │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  You're Invited to Register                         │
-│                                                     │
-│  Hello,                                             │
-│                                                     │
-│  You have been invited to register as a vendor      │
-│  on the Sharvi Vendor Portal. Please click the      │
-│  button below to create your account and            │
-│  complete your vendor registration.                 │
-│                                                     │
-│          ┌────────────────────┐                      │
-│          │ Start Registration │  (blue button)       │
-│          └────────────────────┘                      │
-│                                                     │
-│  ┌─────────────────────────────────────────────┐    │
-│  │ ⚠️ Important: This invitation link expires   │    │
-│  │ on 5 May 2026. Please complete your          │    │
-│  │ registration before this date.               │    │
-│  └─────────────────────────────────────────────┘    │
-│                                                     │
-│  If the button doesn't work, copy this link:        │
-│  https://ramkyvms.netlify.app/vendor/invite?token=… │
-│                                                     │
-│  ─────────────────────────────────────────────      │
-│  This is an automated message from Sharvi Vendor    │
-│  Portal. If you did not expect this invitation,     │
-│  please ignore this email or contact                │
-│  support@sharviinfotech.com.                        │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│ [grey #F7F9FC background]            │
+│  ┌────────────────────────────────┐  │
+│  │ ▔▔▔▔▔ blue accent bar ▔▔▔▔▔   │  │
+│  │   SHARVI Vendor Portal         │  │
+│  │                                │  │
+│  │   You're Invited to Register   │  │
+│  │                                │  │
+│  │   Hello,                       │  │
+│  │   You've been invited to       │  │
+│  │   register as a supplier...    │  │
+│  │                                │  │
+│  │   What happens next:           │  │
+│  │   ① Click "Start Registration" │  │
+│  │   ② Complete the 7-step form   │  │
+│  │   ③ Get verified & approved    │  │
+│  │                                │  │
+│  │   ⏱ Takes about 10–15 minutes  │  │
+│  │                                │  │
+│  │   [  Start Registration  ]     │  │
+│  │                                │  │
+│  │   ⚠ Expires on 5 May 2026      │  │
+│  │                                │  │
+│  │   Fallback link: https://...   │  │
+│  │                                │  │
+│  │   ─────────────────────────    │  │
+│  │   Need help? support@...       │  │
+│  │   © Sharvi Infotech             │  │
+│  └────────────────────────────────┘  │
+└──────────────────────────────────────┘
 ```
 
-### Raw HTML Email Body (what the function sends)
+### Files Changed
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
-  Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px;
-  margin: 0 auto; padding: 20px;">
+- `supabase/functions/send-vendor-invitation/index.ts` — replace the inline `emailHtml` template with the redesigned layout above. No logic changes (token, link, expiry, simulation mode, audit logging all stay the same).
 
-  <!-- Blue gradient header -->
-  <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">
-      Sharvi Vendor Portal
-    </h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0;
-      font-size: 14px;">Vendor Management System</p>
-  </div>
+### Deployment
 
-  <!-- Body content -->
-  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb;
-    border-top: none; border-radius: 0 0 12px 12px;">
+After editing, redeploy `send-vendor-invitation`. No DB changes, no other functions touched.
 
-    <h2 style="color: #1f2937; margin-top: 0;">
-      You're Invited to Register
-    </h2>
-    <p>Hello,</p>
-    <p>You have been invited to register as a vendor on the Sharvi Vendor
-       Portal. Please click the button below to create your account and
-       complete your vendor registration.</p>
+### Open Question
 
-    <!-- CTA Button -->
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="https://ramkyvms.netlify.app/vendor/invite?token=TOKEN"
-         style="background: #2563eb; color: white; padding: 14px 28px;
-         text-decoration: none; border-radius: 8px; font-weight: 600;
-         display: inline-block;">
-        Start Registration
-      </a>
-    </div>
-
-    <!-- Expiry warning -->
-    <div style="background: #fef3c7; border: 1px solid #f59e0b;
-      border-radius: 8px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0; color: #92400e; font-size: 14px;">
-        <strong>⚠️ Important:</strong> This invitation link expires on
-        <strong>5 May 2026</strong>. Please complete your registration
-        before this date.
-      </p>
-    </div>
-
-    <!-- Fallback link -->
-    <p style="color: #6b7280; font-size: 14px;">
-      If the button above doesn't work, copy and paste this link:
-    </p>
-    <p style="background: #f3f4f6; padding: 12px; border-radius: 6px;
-      word-break: break-all; font-size: 12px; color: #4b5563;">
-      https://ramkyvms.netlify.app/vendor/invite?token=TOKEN
-    </p>
-
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-    <!-- Footer -->
-    <p style="color: #6b7280; font-size: 12px; margin-bottom: 0;">
-      This is an automated message from Sharvi Vendor Portal. If you did
-      not expect this invitation, please ignore this email or contact
-      support@sharviinfotech.com.
-    </p>
-  </div>
-</body>
-</html>
-```
-
-### What was fixed
-
-The `send-smtp-email` Edge Function previously set `transferEncoding: "base64"` in a manual `mimeContent` block but passed raw (unencoded) HTML. Email clients tried to decode the raw text as base64, producing garbled characters.
-
-The fix removes `mimeContent` entirely and passes `content` (plain text) and `html` directly to `denomailer`, which handles encoding automatically. This is already deployed.
-
-No further code changes are needed -- the fix was applied in the previous approved plan.
+If by "not generating good" you actually meant something different (e.g., garbled characters still appearing, missing subject, broken link, plain-text-only rendering in your client), reply with a screenshot of what you're seeing and I'll adjust the plan.
 
