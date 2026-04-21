@@ -37,6 +37,42 @@ const handler = async (req: Request): Promise<Response> => {
       year: 'numeric',
     });
 
+    // Resolve tenant company name dynamically
+    let companyName = "Sharvi Vendor Portal";
+    let supportEmail = "support@sharviinfotech.com";
+    try {
+      const sbUrl = Deno.env.get("SUPABASE_URL");
+      const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (sbUrl && sbKey && invitationId) {
+        const sb = createClient(sbUrl, sbKey);
+        const { data: inv } = await sb
+          .from("vendor_invitations")
+          .select("tenant_id")
+          .eq("id", invitationId)
+          .maybeSingle();
+        if (inv?.tenant_id) {
+          const { data: branding } = await sb
+            .from("tenant_branding")
+            .select("company_name, help_email")
+            .eq("tenant_id", inv.tenant_id)
+            .maybeSingle();
+          if (branding?.company_name) companyName = branding.company_name;
+          if (branding?.help_email) supportEmail = branding.help_email;
+          if (!branding?.company_name) {
+            const { data: tenant } = await sb
+              .from("tenants")
+              .select("name")
+              .eq("id", inv.tenant_id)
+              .maybeSingle();
+            if (tenant?.name) companyName = tenant.name;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to resolve tenant company name:", e);
+    }
+    const brandShort = (companyName.split(/\s+/)[0] || "VENDOR").toUpperCase();
+
     const emailHtml = `
       <!DOCTYPE html>
       <html lang="en">
