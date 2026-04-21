@@ -14,7 +14,7 @@ import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
 export function AppLayout() {
-  const { user, userRole } = useAuth();
+  const { user, userRole, hasCustomRole, isVendor } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
