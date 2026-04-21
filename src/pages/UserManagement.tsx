@@ -102,26 +102,43 @@ export default function UserManagement() {
     return { total: users.length, counts };
   }, [users]);
 
-  const handleChangeRole = async (newRole: AppRole) => {
+  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[]) => {
     if (!roleDialog) return;
-    if (roleDialog.id === user?.id) {
+    if (roleDialog.id === user?.id && newRole !== roleDialog.role) {
       toast({ title: 'Action blocked', description: 'You cannot change your own role.', variant: 'destructive' });
       return;
     }
     try {
-      // Delete existing then insert (table allows one role per user via app convention)
-      const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', roleDialog.id);
-      if (delErr) throw delErr;
-      const { error: insErr } = await supabase.from('user_roles').insert({ user_id: roleDialog.id, role: newRole });
-      if (insErr) throw insErr;
+      // Role update (only if changed)
+      if (newRole !== roleDialog.role) {
+        const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', roleDialog.id);
+        if (delErr) throw delErr;
+        const { error: insErr } = await supabase.from('user_roles').insert({ user_id: roleDialog.id, role: newRole });
+        if (insErr) throw insErr;
 
-      await supabase.from('audit_logs').insert({
-        action: 'role_changed',
-        user_id: user?.id,
-        details: { target_user_id: roleDialog.id, target_email: roleDialog.email, old_role: roleDialog.role, new_role: newRole },
-      });
+        await supabase.from('audit_logs').insert({
+          action: 'role_changed',
+          user_id: user?.id,
+          details: { target_user_id: roleDialog.id, target_email: roleDialog.email, old_role: roleDialog.role, new_role: newRole },
+        });
+      }
 
-      toast({ title: 'Role updated', description: `${roleDialog.email} → ${newRole}` });
+      // Tenant sync — diff and apply
+      const currentIds = roleDialog.tenants.map((t) => t.id);
+      const toAdd = newTenantIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !newTenantIds.includes(id));
+      if (toRemove.length > 0) {
+        const { error } = await supabase.from('user_tenants')
+          .delete().eq('user_id', roleDialog.id).in('tenant_id', toRemove);
+        if (error) throw error;
+      }
+      if (toAdd.length > 0) {
+        const rows = toAdd.map((tid) => ({ user_id: roleDialog.id, tenant_id: tid }));
+        const { error } = await supabase.from('user_tenants').insert(rows);
+        if (error) throw error;
+      }
+
+      toast({ title: 'User updated', description: `${roleDialog.email} → ${newRole}` });
       await loadData();
     } catch (err: any) {
       toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
@@ -301,6 +318,8 @@ export default function UserManagement() {
           onOpenChange={(o) => !o && setRoleDialog(null)}
           currentRole={roleDialog.role}
           userName={roleDialog.full_name ?? roleDialog.email}
+          tenants={tenants}
+          currentTenantIds={roleDialog.tenants.map((t) => t.id)}
           onConfirm={handleChangeRole}
         />
       )}
