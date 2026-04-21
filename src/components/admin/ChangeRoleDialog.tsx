@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 
-const ROLES = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'] as const;
-export type AppRole = typeof ROLES[number];
+const ALL_ROLES = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'] as const;
+export type AppRole = typeof ALL_ROLES[number];
+const ROLES: AppRole[] = ['vendor', 'sharvi_admin'];
 
 interface Tenant { id: string; name: string; }
 interface CustomRoleOpt { id: string; name: string; is_active: boolean; }

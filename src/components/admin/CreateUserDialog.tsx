@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { AppRole } from './ChangeRoleDialog';
 
-const ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
+const ROLES: AppRole[] = ['vendor', 'sharvi_admin'];
 
 interface Tenant { id: string; name: string; }
 interface CustomRoleOpt { id: string; name: string; is_active: boolean; }
