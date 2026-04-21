@@ -31,7 +31,20 @@ import {
 } from 'lucide-react';
 import { NotificationSettings } from '@/components/pwa/NotificationSettings';
 
-interface PortalConfig {
+interface SmtpConfig {
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password: string;
+  smtp_encryption: 'none' | 'ssl' | 'tls' | 'starttls';
+  smtp_from_email: string;
+  smtp_from_name: string;
+  smtp_reply_to: string;
+  smtp_use_app_password: boolean;
+  smtp_enabled: boolean;
+}
+
+interface PortalConfig extends SmtpConfig {
   link_expiry_days: number;
   name_match_threshold: number;
   enable_gst_validation: boolean;
@@ -53,6 +66,16 @@ const defaultConfig: PortalConfig = {
   enable_name_match_validation: true,
   auto_reject_failed_validations: false,
   gst_revalidation_days: 90,
+  smtp_host: '',
+  smtp_port: 587,
+  smtp_username: '',
+  smtp_password: '',
+  smtp_encryption: 'tls',
+  smtp_from_email: '',
+  smtp_from_name: 'Sharvi Vendor Portal',
+  smtp_reply_to: '',
+  smtp_use_app_password: true,
+  smtp_enabled: false,
 };
 
 export default function AdminConfiguration() {
