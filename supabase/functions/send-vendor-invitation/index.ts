@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.7";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -129,33 +129,31 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Real email sending with Gmail SMTP
+    // Real email sending - delegate to send-smtp-email which has the working SMTP logic
     console.log("Sending invitation email to:", email);
-    
-    const SMTP_PASS = Deno.env.get("SMTP_PASS");
-    if (!SMTP_PASS) {
-      throw new Error("SMTP_PASS environment variable not configured");
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const smtpResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        to: email,
+        subject: "Vendor Registration Invitation - Ramky Infrastructure",
+        html: emailHtml,
+      }),
+    });
+
+    const smtpData = await smtpResp.json();
+    if (!smtpResp.ok || !smtpData.success) {
+      throw new Error(smtpData.error || `SMTP send failed (${smtpResp.status})`);
     }
 
-    // Create nodemailer transporter
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false, // Use TLS
-      auth: {
-        user: "viraatmankali@gmail.com",
-        pass: SMTP_PASS, // Gmail App Password
-      },
-    });
-
-    // Send email
-    const emailResult = await transporter.sendMail({
-      from: '"Ramky Infrastructure" <viraatmankali@gmail.com>',
-      to: email,
-      subject: "Vendor Registration Invitation - Ramky Infrastructure",
-      html: emailHtml,
-    });
-
+    const emailResult = { messageId: smtpData.messageId || `inv-${Date.now()}` };
     console.log("Email sent successfully:", emailResult.messageId);
 
     // Update the invitation with email tracking
