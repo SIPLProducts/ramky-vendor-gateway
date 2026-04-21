@@ -104,7 +104,7 @@ export default function AdminInvitations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendor_invitations')
-        .select('*, tenants(id, name, code)')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
