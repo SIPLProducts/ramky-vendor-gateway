@@ -29,6 +29,8 @@ interface VendorData {
   ifsc_code: string | null;
   bank_name: string | null;
   msme_number: string | null;
+  is_gst_registered: boolean | null;
+  is_msme_registered: boolean | null;
 }
 
 interface ValidationResult {
