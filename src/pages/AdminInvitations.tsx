@@ -534,10 +534,9 @@ export default function AdminInvitations() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
+                      <TableHead>Vendor Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone Number</TableHead>
-                      <TableHead>Company</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Expires</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
