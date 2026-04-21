@@ -603,13 +603,15 @@ export default function VendorRegistration() {
             <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
           </Link>
         )}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Help</span>
-            </Button>
-          </SheetTrigger>
+        <div className="flex items-center gap-4">
+          <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} className="hidden sm:flex" />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <HelpCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Help</span>
+              </Button>
+            </SheetTrigger>
           <SheetContent>
             <SheetHeader>
               <SheetTitle>Help & Support</SheetTitle>
