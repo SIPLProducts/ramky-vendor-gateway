@@ -1425,6 +1425,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_invitation: {
+        Args: { _token: string; _vendor_id?: string }
+        Returns: {
+          email: string
+          id: string
+          used_at: string
+          vendor_id: string
+        }[]
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {

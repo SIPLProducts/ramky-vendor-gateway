@@ -12,6 +12,7 @@ import VendorRegistration from "./pages/VendorRegistration";
 import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
 import VendorRegistrationPreview from "./pages/VendorRegistrationPreview";
 import VendorLogin from "./pages/VendorLogin";
+import VendorInviteAccept from "./pages/VendorInviteAccept";
 import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
@@ -45,7 +46,7 @@ const App = () => (
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/vendor/login" element={<VendorLogin />} />
-            <Route path="/vendor/invite" element={<VendorLogin />} />
+            <Route path="/vendor/invite" element={<VendorInviteAccept />} />
             <Route path="/vendor/registration" element={<VendorRegistration />} />
             <Route path="/install" element={<Install />} />
             <Route path="/feedback" element={<VendorFeedback />} />

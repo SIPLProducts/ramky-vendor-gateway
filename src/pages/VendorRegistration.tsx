@@ -439,15 +439,15 @@ export default function VendorRegistration() {
     try {
       const vendor = isEditMode && vendorId ? await resubmitVendor(formData) : await submitVendor(formData);
 
-      // Mark invitation as used if token exists
+      // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
       if (invitationToken) {
-        await supabase
-          .from('vendor_invitations')
-          .update({
-            used_at: new Date().toISOString(),
-            vendor_id: vendor.id
-          })
-          .eq('token', invitationToken);
+        const { error: claimErr } = await supabase.rpc('claim_invitation', {
+          _token: invitationToken,
+          _vendor_id: vendor.id,
+        });
+        if (claimErr) {
+          console.warn('claim_invitation failed (non-blocking):', claimErr);
+        }
       }
 
       setIsSubmitted(true); setIsEditMode(false); setVendorStatusState('finance_review');

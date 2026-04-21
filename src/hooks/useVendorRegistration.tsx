@@ -536,15 +536,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         console.warn('route-vendor-approval failed (non-blocking):', e);
       }
 
-      // Mark invitation as used if token exists
+      // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
       if (options?.invitationToken) {
-        await supabase
-          .from('vendor_invitations')
-          .update({
-            used_at: new Date().toISOString(),
-            vendor_id: vendor.id
-          })
-          .eq('token', options.invitationToken);
+        const { error: claimErr } = await supabase.rpc('claim_invitation', {
+          _token: options.invitationToken,
+          _vendor_id: vendor.id,
+        });
+        if (claimErr) {
+          console.warn('claim_invitation failed (non-blocking):', claimErr);
+        }
       }
 
       // Log submission
