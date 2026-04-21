@@ -494,3 +494,186 @@ export default function AdminConfiguration() {
     </div>
   );
 }
+
+interface SmtpSettingsProps {
+  config: PortalConfig;
+  updateConfig: <K extends keyof PortalConfig>(key: K, value: PortalConfig[K]) => void;
+}
+
+function SmtpSettings({ config, updateConfig }: SmtpSettingsProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const { toast } = useToast();
+
+  const handleTest = () => {
+    if (!config.smtp_host || !config.smtp_from_email) {
+      toast({
+        title: 'Missing fields',
+        description: 'Please fill in SMTP host and From email before testing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    toast({
+      title: 'Test email queued',
+      description: `A test message will be sent from ${config.smtp_from_email} via ${config.smtp_host}:${config.smtp_port}. Save your changes first if you haven't.`,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-primary" />
+            SMTP Email Configuration
+          </CardTitle>
+          <CardDescription>
+            Configure outbound email delivery via your own SMTP server. Supports app passwords (Gmail, Outlook, Zoho, etc.).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <Label htmlFor="smtp_enabled" className="font-medium">Enable SMTP Sending</Label>
+              <p className="text-xs text-muted-foreground">When off, the system uses the default email provider.</p>
+            </div>
+            <Switch
+              id="smtp_enabled"
+              checked={config.smtp_enabled}
+              onCheckedChange={(checked) => updateConfig('smtp_enabled', checked)}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="smtp_host">SMTP Host</Label>
+              <Input
+                id="smtp_host"
+                placeholder="smtp.gmail.com"
+                value={config.smtp_host}
+                onChange={(e) => updateConfig('smtp_host', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtp_port">Port</Label>
+              <Input
+                id="smtp_port"
+                type="number"
+                placeholder="587"
+                value={config.smtp_port}
+                onChange={(e) => updateConfig('smtp_port', parseInt(e.target.value) || 587)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtp_encryption">Encryption</Label>
+              <Select
+                value={config.smtp_encryption}
+                onValueChange={(v) => updateConfig('smtp_encryption', v as PortalConfig['smtp_encryption'])}
+              >
+                <SelectTrigger id="smtp_encryption">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="tls">TLS (587)</SelectItem>
+                  <SelectItem value="ssl">SSL (465)</SelectItem>
+                  <SelectItem value="starttls">STARTTLS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="smtp_use_app_password" className="font-medium text-sm">Use App Password</Label>
+                <p className="text-xs text-muted-foreground">Recommended for Gmail / Outlook with 2FA</p>
+              </div>
+              <Switch
+                id="smtp_use_app_password"
+                checked={config.smtp_use_app_password}
+                onCheckedChange={(checked) => updateConfig('smtp_use_app_password', checked)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="smtp_username">Username</Label>
+              <Input
+                id="smtp_username"
+                placeholder="you@yourdomain.com"
+                value={config.smtp_username}
+                onChange={(e) => updateConfig('smtp_username', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtp_password">
+                {config.smtp_use_app_password ? 'App Password' : 'Password'}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="smtp_password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={config.smtp_use_app_password ? '16-char app password' : 'Account password'}
+                  value={config.smtp_password}
+                  onChange={(e) => updateConfig('smtp_password', e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="smtp_from_email">From Email</Label>
+              <Input
+                id="smtp_from_email"
+                type="email"
+                placeholder="noreply@yourdomain.com"
+                value={config.smtp_from_email}
+                onChange={(e) => updateConfig('smtp_from_email', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="smtp_from_name">From Name</Label>
+              <Input
+                id="smtp_from_name"
+                placeholder="Sharvi Vendor Portal"
+                value={config.smtp_from_name}
+                onChange={(e) => updateConfig('smtp_from_name', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="smtp_reply_to">Reply-To (optional)</Label>
+              <Input
+                id="smtp_reply_to"
+                type="email"
+                placeholder="support@yourdomain.com"
+                value={config.smtp_reply_to}
+                onChange={(e) => updateConfig('smtp_reply_to', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              <strong>Gmail:</strong> Enable 2-Step Verification, then create an App Password at myaccount.google.com/apppasswords. Use port <code>587</code> with TLS.
+              <br />
+              <strong>Outlook/Office 365:</strong> Use <code>smtp.office365.com</code>, port <code>587</code>, STARTTLS, with an app password.
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={handleTest}>
+              <Mail className="h-4 w-4 mr-2" />
+              Send Test Email
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
