@@ -317,6 +317,9 @@ export default function UserManagement() {
                               ))}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {u.tenants.length === 0 ? (
                             <span className="text-muted-foreground text-xs">None</span>
                           ) : (
                             u.tenants.map((t) => (
