@@ -534,6 +534,47 @@ export type Database = {
           },
         ]
       }
+      ocr_extractions: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          document_type: string
+          extracted_data: Json
+          id: string
+          raw_text: string | null
+          user_id: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          document_type: string
+          extracted_data?: Json
+          id?: string
+          raw_text?: string | null
+          user_id?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          document_type?: string
+          extracted_data?: Json
+          id?: string
+          raw_text?: string | null
+          user_id?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocr_extractions_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portal_config: {
         Row: {
           config_key: string
