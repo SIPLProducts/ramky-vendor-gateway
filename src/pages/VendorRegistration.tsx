@@ -629,13 +629,14 @@ export default function VendorRegistration() {
               )}
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  {currentStep === 1 && <span className="text-lg">🏢</span>}
-                  {currentStep === 2 && <span className="text-lg">📍</span>}
-                  {currentStep === 3 && <span className="text-lg">👤</span>}
-                  {currentStep === 4 && <span className="text-lg">📋</span>}
-                  {currentStep === 5 && <span className="text-lg">🏦</span>}
-                  {currentStep === 6 && <span className="text-lg">💰</span>}
-                  {currentStep === 7 && <span className="text-lg">✓</span>}
+                  {currentStep === 1 && <span className="text-lg">🛡️</span>}
+                  {currentStep === 2 && <span className="text-lg">🏢</span>}
+                  {currentStep === 3 && <span className="text-lg">📍</span>}
+                  {currentStep === 4 && <span className="text-lg">👤</span>}
+                  {currentStep === 5 && <span className="text-lg">📋</span>}
+                  {currentStep === 6 && <span className="text-lg">🏦</span>}
+                  {currentStep === 7 && <span className="text-lg">💰</span>}
+                  {currentStep === 8 && <span className="text-lg">✓</span>}
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">
