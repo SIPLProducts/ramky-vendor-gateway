@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Mail, Lock, User, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 import authHeroImage from '@/assets/auth-hero.jpg';
@@ -16,8 +16,6 @@ import ramkyLogo from '@/assets/ramky-logo.png';
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
-
-type RoleType = 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | '';
 
 export default function Auth() {
   const navigate = useNavigate();
