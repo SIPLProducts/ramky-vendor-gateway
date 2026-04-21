@@ -261,7 +261,18 @@ export default function AdminInvitations() {
       }
     }
 
-    createInvitation.mutate({ email, vendorName, phoneNumber, expiryDays: parseInt(expiryDays), tenantId: selectedTenantId || null });
+    if (!effectiveTenantId) {
+      toast({
+        title: 'No Company Assigned',
+        description: isSharviAdmin
+          ? 'Please select a company.'
+          : 'Your account is not assigned to any company. Contact your administrator.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    createInvitation.mutate({ email, vendorName, phoneNumber, expiryDays: parseInt(expiryDays), tenantId: effectiveTenantId });
   };
 
   const copyInvitationLink = (token: string) => {
