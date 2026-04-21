@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useTenantFilter, useTenantContext } from '@/hooks/useTenantContext';
 import { useToast } from '@/hooks/use-toast';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { useEffect } from 'react';
@@ -15,6 +16,7 @@ type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
 
 // Fetch all vendors (for admin/finance/purchase) with offline support
 export function useVendors(statuses?: VendorStatus[]) {
+  const { tenantIds, activeTenantId } = useTenantFilter();
   const cacheKey = statuses ? `vendors_${statuses.join('_')}` : 'vendors_all';
   const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<VendorRow[]>({
     key: cacheKey,
@@ -22,7 +24,7 @@ export function useVendors(statuses?: VendorStatus[]) {
   });
 
   const query = useQuery({
-    queryKey: ['vendors', statuses],
+    queryKey: ['vendors', statuses, activeTenantId, tenantIds],
     queryFn: async () => {
       let q = supabase
         .from('vendors')
@@ -33,22 +35,29 @@ export function useVendors(statuses?: VendorStatus[]) {
         q = q.in('status', statuses);
       }
 
+      if (activeTenantId) {
+        q = q.eq('tenant_id', activeTenantId);
+      } else if (tenantIds !== null) {
+        // Restricted user: filter to their tenants. Empty list -> no results.
+        if (tenantIds.length === 0) return [] as VendorRow[];
+        q = q.in('tenant_id', tenantIds);
+      }
+      // tenantIds === null && !activeTenantId -> super admin viewing all tenants
+
       const { data, error } = await q;
       if (error) throw error;
       return data as VendorRow[];
     },
-    enabled: isOnline, // Only fetch when online
-    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
+    enabled: isOnline,
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Cache data when successfully fetched
   useEffect(() => {
     if (query.data && isOnline) {
       saveToCache(query.data);
     }
   }, [query.data, isOnline, saveToCache]);
 
-  // Return cached data when offline
   const data = isOnline ? query.data : (cachedData || query.data);
 
   return {
@@ -118,15 +127,18 @@ export function useVendorValidations(vendorId: string | undefined) {
 export function useCreateVendor() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { activeTenantId, myTenantIds } = useTenantContext();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (vendorData: Omit<VendorInsert, 'user_id'>) => {
+      const fallbackTenant = activeTenantId ?? myTenantIds[0] ?? null;
       const { data, error } = await supabase
         .from('vendors')
         .insert({
           ...vendorData,
           user_id: user?.id,
+          tenant_id: vendorData.tenant_id ?? fallbackTenant,
         } as VendorInsert)
         .select()
         .single();
@@ -417,18 +429,31 @@ export function useSAPSync() {
 
 // Vendor statistics with offline support
 export function useVendorStats() {
+  const { tenantIds, activeTenantId } = useTenantFilter();
   const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<any>({
     key: 'vendor_stats',
     ttl: 6 * 60 * 60 * 1000 // 6 hours
   });
 
   const query = useQuery({
-    queryKey: ['vendor-stats'],
+    queryKey: ['vendor-stats', activeTenantId, tenantIds],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('status, tenant_id');
+      let q = supabase.from('vendors').select('status, tenant_id');
 
+      if (activeTenantId) {
+        q = q.eq('tenant_id', activeTenantId);
+      } else if (tenantIds !== null) {
+        if (tenantIds.length === 0) {
+          return {
+            total: 0, pendingFinance: 0, pendingPurchase: 0, pendingSAPSync: 0,
+            approved: 0, validationFailed: 0, draft: 0, submitted: 0,
+            pendingVerification: 0, activeVendors: 0, byCompany: {},
+          };
+        }
+        q = q.in('tenant_id', tenantIds);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
 
       const stats = {
