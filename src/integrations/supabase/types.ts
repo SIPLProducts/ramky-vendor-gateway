@@ -395,6 +395,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -404,6 +405,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -413,9 +415,18 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "custom_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       form_field_configs: {
         Row: {
@@ -581,6 +592,7 @@ export type Database = {
           id: string
           role: Database["public"]["Enums"]["app_role"]
           screen_key: string
+          tenant_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -589,6 +601,7 @@ export type Database = {
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           screen_key: string
+          tenant_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -597,9 +610,18 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           screen_key?: string
+          tenant_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "role_screen_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scheduled_validations: {
         Row: {
