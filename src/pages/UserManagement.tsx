@@ -8,12 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Search, UserCog, Building2, Users, Plus, Shield } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings } from 'lucide-react';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 import { AssignTenantDialog } from '@/components/admin/AssignTenantDialog';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
+import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
+import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import RolePermissions from '@/pages/RolePermissions';
 
 interface UserRow {
   id: string;
@@ -27,6 +31,7 @@ interface UserRow {
 
 interface Tenant { id: string; name: string; }
 interface CustomRoleOpt { id: string; name: string; is_active: boolean; }
+interface CustomRoleRow extends CustomRoleData { id: string; user_count: number; created_at: string; }
 
 const ALL_ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
 
@@ -37,12 +42,15 @@ export default function UserManagement() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleOpt[]>([]);
+  const [customRoleRows, setCustomRoleRows] = useState<CustomRoleRow[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
   const [tenantDialog, setTenantDialog] = useState<UserRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const navigate = useNavigate();
+  const [editingCustomRole, setEditingCustomRole] = useState<CustomRoleData | null>(null);
+  const [customRoleDialogOpen, setCustomRoleDialogOpen] = useState(false);
+  const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -52,7 +60,7 @@ export default function UserManagement() {
         supabase.from('user_roles').select('user_id, role'),
         supabase.from('user_tenants').select('user_id, tenant_id'),
         supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
-        supabase.from('custom_roles').select('id, name, is_active').order('name'),
+        supabase.from('custom_roles').select('*').order('created_at', { ascending: false }),
         supabase.from('user_custom_roles').select('user_id, custom_role_id'),
       ]);
 
@@ -73,14 +81,17 @@ export default function UserManagement() {
         utByUser.set(ut.user_id, arr);
       });
       const cuByUser = new Map<string, string[]>();
+      const countsByRole = new Map<string, number>();
       (userCustomRes.data ?? []).forEach((uc) => {
         const arr = cuByUser.get(uc.user_id) ?? [];
         arr.push(uc.custom_role_id);
         cuByUser.set(uc.user_id, arr);
+        countsByRole.set(uc.custom_role_id, (countsByRole.get(uc.custom_role_id) ?? 0) + 1);
       });
 
       setTenants(tenantsRes.data ?? []);
       setCustomRoles(customRolesRes.data ?? []);
+      setCustomRoleRows((customRolesRes.data ?? []).map((r) => ({ ...r, user_count: countsByRole.get(r.id) ?? 0 })));
       setUsers(
         (profilesRes.data ?? []).map((p) => ({
           id: p.id,
@@ -128,27 +139,22 @@ export default function UserManagement() {
       return;
     }
     try {
-      // Role update (only if changed)
       if (newRole !== roleDialog.role) {
         const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', roleDialog.id);
         if (delErr) throw delErr;
         const { error: insErr } = await supabase.from('user_roles').insert({ user_id: roleDialog.id, role: newRole });
         if (insErr) throw insErr;
-
         await supabase.from('audit_logs').insert({
-          action: 'role_changed',
-          user_id: user?.id,
+          action: 'role_changed', user_id: user?.id,
           details: { target_user_id: roleDialog.id, target_email: roleDialog.email, old_role: roleDialog.role, new_role: newRole },
         });
       }
 
-      // Tenant sync — diff and apply
       const currentIds = roleDialog.tenants.map((t) => t.id);
       const toAdd = newTenantIds.filter((id) => !currentIds.includes(id));
       const toRemove = currentIds.filter((id) => !newTenantIds.includes(id));
       if (toRemove.length > 0) {
-        const { error } = await supabase.from('user_tenants')
-          .delete().eq('user_id', roleDialog.id).in('tenant_id', toRemove);
+        const { error } = await supabase.from('user_tenants').delete().eq('user_id', roleDialog.id).in('tenant_id', toRemove);
         if (error) throw error;
       }
       if (toAdd.length > 0) {
@@ -157,13 +163,11 @@ export default function UserManagement() {
         if (error) throw error;
       }
 
-      // Custom role sync
       const currentCustom = roleDialog.customRoles.map((c) => c.id);
       const cToAdd = newCustomRoleIds.filter((id) => !currentCustom.includes(id));
       const cToRemove = currentCustom.filter((id) => !newCustomRoleIds.includes(id));
       if (cToRemove.length > 0) {
-        const { error } = await supabase.from('user_custom_roles')
-          .delete().eq('user_id', roleDialog.id).in('custom_role_id', cToRemove);
+        const { error } = await supabase.from('user_custom_roles').delete().eq('user_id', roleDialog.id).in('custom_role_id', cToRemove);
         if (error) throw error;
         await supabase.from('audit_logs').insert({
           action: 'custom_roles_unassigned', user_id: user?.id,
@@ -212,158 +216,257 @@ export default function UserManagement() {
     }
   };
 
+  const handleSaveCustomRole = async (data: CustomRoleData) => {
+    try {
+      if (data.id) {
+        const { error } = await supabase.from('custom_roles')
+          .update({ name: data.name, description: data.description, is_active: data.is_active })
+          .eq('id', data.id);
+        if (error) throw error;
+        await supabase.from('audit_logs').insert({
+          action: 'custom_role_updated', user_id: user?.id, details: { id: data.id, name: data.name },
+        });
+        toast({ title: 'Role updated' });
+      } else {
+        const { data: created, error } = await supabase.from('custom_roles')
+          .insert({ name: data.name, description: data.description, is_active: data.is_active, created_by: user?.id })
+          .select().single();
+        if (error) throw error;
+        await supabase.from('audit_logs').insert({
+          action: 'custom_role_created', user_id: user?.id, details: { id: created.id, name: data.name },
+        });
+        toast({ title: 'Role created' });
+      }
+      await loadData();
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+      throw err;
+    }
+  };
+
+  const handleDeleteCustomRole = async (role: CustomRoleRow) => {
+    if (role.user_count > 0) {
+      toast({ title: 'Cannot delete', description: `Unassign ${role.user_count} user(s) first`, variant: 'destructive' });
+      return;
+    }
+    if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from('custom_roles').delete().eq('id', role.id);
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    await supabase.from('audit_logs').insert({
+      action: 'custom_role_deleted', user_id: user?.id, details: { id: role.id, name: role.name },
+    });
+    toast({ title: 'Role deleted' });
+    await loadData();
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Users className="h-6 w-6" /> User Management
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage application users, roles, and tenant assignments.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/admin/role-permissions')}>
-            <Shield className="h-4 w-4 mr-2" /> Role Permissions
-          </Button>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Create User
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <Users className="h-6 w-6" /> User Management
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">Manage users, custom roles, and screen-level permissions.</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Total Users</p>
-            <p className="text-2xl font-semibold">{stats.total}</p>
-          </CardContent>
-        </Card>
-        {ALL_ROLES.map((r) => (
-          <Card key={r}>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground capitalize">{r.replace('_', ' ')}</p>
-              <p className="text-2xl font-semibold">{stats.counts[r] ?? 0}</p>
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
+          <TabsTrigger value="custom-roles"><ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles</TabsTrigger>
+          <TabsTrigger value="role-permissions"><Settings className="h-4 w-4 mr-2" /> Role Permissions</TabsTrigger>
+        </TabsList>
+
+        {/* USERS TAB */}
+        <TabsContent value="users" className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Create User
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Total Users</p>
+                <p className="text-2xl font-semibold">{stats.total}</p>
+              </CardContent>
+            </Card>
+            {ALL_ROLES.map((r) => (
+              <Card key={r}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground capitalize">{r.replace('_', ' ')}</p>
+                  <p className="text-2xl font-semibold">{stats.counts[r] ?? 0}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Users</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                </div>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All roles</SelectItem>
+                    {ALL_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Custom Roles</TableHead>
+                      <TableHead>Tenants</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                      ))
+                    ) : filtered.length === 0 ? (
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                    ) : (
+                      filtered.map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
+                          <TableCell>{u.email}</TableCell>
+                          <TableCell>
+                            {u.role ? <Badge variant="secondary">{u.role}</Badge> : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {u.customRoles.length === 0
+                                ? <span className="text-muted-foreground text-xs">—</span>
+                                : u.customRoles.map((c) => (
+                                    <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
+                                  ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {u.tenants.length === 0 ? (
+                                <span className="text-muted-foreground text-xs">None</span>
+                              ) : (
+                                u.tenants.map((t) => (
+                                  <Badge key={t.id} variant="outline" className="cursor-pointer hover:bg-destructive/10"
+                                    onClick={() => handleRemoveTenant(u.id, t.id)} title="Click to remove">
+                                    {t.name} ×
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {new Date(u.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => setRoleDialog(u)}
+                                disabled={u.id === user?.id}
+                                title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
+                                <UserCog className="h-4 w-4 mr-1" /> Role
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => setTenantDialog(u)}>
+                                <Building2 className="h-4 w-4 mr-1" /> Tenant
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Users</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All roles</SelectItem>
-                {ALL_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-              </SelectContent>
-            </Select>
+        {/* CUSTOM ROLES TAB */}
+        <TabsContent value="custom-roles" className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => { setEditingCustomRole(null); setCustomRoleDialogOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" /> Create Role
+            </Button>
           </div>
-
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Custom Roles</TableHead>
-                  <TableHead>Tenants</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+          <Card>
+            <CardHeader><CardTitle className="text-base">All Custom Roles</CardTitle></CardHeader>
+            <CardContent>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Users</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No users found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
-                      <TableCell>{u.email}</TableCell>
-                      <TableCell>
-                        {u.role ? <Badge variant="secondary">{u.role}</Badge> : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {u.customRoles.length === 0
-                            ? <span className="text-muted-foreground text-xs">—</span>
-                            : u.customRoles.map((c) => (
-                                <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
-                              ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {u.tenants.length === 0 ? (
-                            <span className="text-muted-foreground text-xs">None</span>
-                          ) : (
-                            u.tenants.map((t) => (
-                              <Badge
-                                key={t.id}
-                                variant="outline"
-                                className="cursor-pointer hover:bg-destructive/10"
-                                onClick={() => handleRemoveTenant(u.id, t.id)}
-                                title="Click to remove"
-                              >
-                                {t.name} ×
-                              </Badge>
-                            ))
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setRoleDialog(u)}
-                            disabled={u.id === user?.id}
-                            title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}
-                          >
-                            <UserCog className="h-4 w-4 mr-1" /> Role
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setTenantDialog(u)}>
-                            <Building2 className="h-4 w-4 mr-1" /> Tenant
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                      ))
+                    ) : customRoleRows.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No custom roles yet. Click "Create Role" to add one.
+                      </TableCell></TableRow>
+                    ) : (
+                      customRoleRows.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">{r.name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{r.description ?? '—'}</TableCell>
+                          <TableCell>{r.user_count}</TableCell>
+                          <TableCell>
+                            {r.is_active
+                              ? <Badge variant="secondary">Active</Badge>
+                              : <Badge variant="outline">Inactive</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => setPermsRole(r)}>
+                                <Settings className="h-4 w-4 mr-1" /> Screens
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingCustomRole(r); setCustomRoleDialogOpen(true); }}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteCustomRole(r)} className="text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
+        {/* ROLE PERMISSIONS TAB */}
+        <TabsContent value="role-permissions">
+          <RolePermissions />
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
       {roleDialog && (
         <ChangeRoleDialog
           open={!!roleDialog}
@@ -394,6 +497,23 @@ export default function UserManagement() {
         customRoles={customRoles}
         onCreated={loadData}
       />
+      <CustomRoleDialog
+        open={customRoleDialogOpen}
+        onOpenChange={setCustomRoleDialogOpen}
+        initial={editingCustomRole}
+        onSave={handleSaveCustomRole}
+      />
+      <Dialog open={!!permsRole} onOpenChange={(o) => !o && setPermsRole(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Screen Permissions — {permsRole?.name}</DialogTitle>
+            <DialogDescription>
+              Check the screens users with this role should access. Changes save automatically.
+            </DialogDescription>
+          </DialogHeader>
+          {permsRole && <CustomRolePermissionsMatrix customRoleId={permsRole.id} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
