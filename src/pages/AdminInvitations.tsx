@@ -218,6 +218,7 @@ export default function AdminInvitations() {
           tenantId: (invitation as any).tenant_id || null,
           tenantName: tenantName,
           simulationMode: false, // Real email sending
+          frontendUrl: window.location.origin,
         },
       });
 
