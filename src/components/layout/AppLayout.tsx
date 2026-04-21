@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { MobileHeader } from './MobileHeader';
+import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -53,13 +54,19 @@ export function AppLayout() {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  // Admin roles that should see the sidebar
-  const adminRoles = ['sharvi_admin', 'admin'];
-  const isAdminRole = adminRoles.includes(role);
-  
-  // Show mobile layout for mobile devices with admin roles
-  const showMobileLayout = isMobile && isAdminRole;
-  const showDesktopSidebar = !isMobile && isAdminRole;
+  // Built-in roles that should see the portal sidebar
+  const portalBuiltInRoles = ['sharvi_admin', 'admin', 'customer_admin', 'finance', 'purchase', 'approver'];
+  const isBuiltInPortalRole = portalBuiltInRoles.includes(role);
+
+  // Also treat as portal user if they have any granted custom/approver permission
+  const { allowed, loading: permsLoading } = useScreenPermissions();
+  const hasAnyPermission = allowed.size > 0;
+
+  const isPortalUser = isBuiltInPortalRole || (role !== 'vendor') || hasAnyPermission;
+
+  // Show mobile layout for mobile devices with portal access
+  const showMobileLayout = isMobile && isPortalUser && !permsLoading;
+  const showDesktopSidebar = !isMobile && isPortalUser && !permsLoading;
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row w-full">
