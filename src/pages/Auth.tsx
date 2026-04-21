@@ -23,7 +23,6 @@ export default function Auth() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signIn, signUp } = useAuth();
   
-  const [selectedRole, setSelectedRole] = useState<RoleType>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
