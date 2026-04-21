@@ -10,6 +10,7 @@ import { CommercialStep } from '@/components/vendor/steps/CommercialStep';
 import { BankDetailsStep } from '@/components/vendor/steps/BankDetailsStep';
 import { FinancialInfrastructureStep } from '@/components/vendor/steps/FinancialInfrastructureStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
+import { DocumentVerificationStep, VerifiedDocumentData } from '@/components/vendor/steps/DocumentVerificationStep';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
 import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
@@ -21,15 +22,16 @@ import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
-// 7-step registration flow matching PDF
+// 8-step registration flow — Step 1 is the OCR + verification gate
 const registrationSteps = [
-  { id: 1, title: 'Organization Profile', description: 'Company name and type' },
-  { id: 2, title: 'Address Information', description: 'Registered, manufacturing & branch' },
-  { id: 3, title: 'Contact Details', description: 'Key contact persons' },
-  { id: 4, title: 'Commercial Details', description: 'GST, PAN, MSME verification' },
-  { id: 5, title: 'Bank Details', description: 'Bank account verification' },
-  { id: 6, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
-  { id: 7, title: 'Review & Submit', description: 'Verify and submit application' },
+  { id: 1, title: 'Document Verification', description: 'Upload & auto-verify PAN, GST, MSME, Bank' },
+  { id: 2, title: 'Organization Profile', description: 'Company name and type' },
+  { id: 3, title: 'Address Information', description: 'Registered, manufacturing & branch' },
+  { id: 4, title: 'Contact Details', description: 'Key contact persons' },
+  { id: 5, title: 'Commercial Details', description: 'GST, PAN, MSME verification' },
+  { id: 6, title: 'Bank Details', description: 'Bank account verification' },
+  { id: 7, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
+  { id: 8, title: 'Review & Submit', description: 'Verify and submit application' },
 ];
 
 const initialFormData: VendorFormData = {
