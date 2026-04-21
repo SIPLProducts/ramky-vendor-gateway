@@ -21,7 +21,12 @@ export default function AuditLogs() {
   const [pageSize, setPageSize] = useState(10);
   const { data: logs, isLoading } = useAuditLogs();
 
+  // Hide noisy legacy per-checkbox permission events; the bulk save event is shown instead.
+  const HIDDEN_ACTIONS = new Set(['custom_role_screen_permission_changed']);
+
   const filteredLogs = logs?.filter((log) => {
+    if (HIDDEN_ACTIONS.has(log.action)) return false;
+
     const matchesSearch = 
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       JSON.stringify(log.details || {}).toLowerCase().includes(searchTerm.toLowerCase());
