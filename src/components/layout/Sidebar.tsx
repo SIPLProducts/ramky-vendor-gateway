@@ -36,6 +36,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import ramkyLogo from '@/assets/ramky-logo.png';
+import { Shield } from 'lucide-react';
+import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | 'customer_admin' | 'approver';
@@ -49,76 +51,25 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  roles: string[];
+  screenKey: string;
 }
 
 const navItems: NavItem[] = [
-  {
-    label: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'Sharvi Admin Console',
-    href: '/sharvi-admin',
-    icon: Wrench,
-    roles: ['sharvi_admin'],
-  },
-  {
-    label: 'Vendor Invitations',
-    href: '/admin/invitations',
-    icon: Mail,
-    roles: ['admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'User Management',
-    href: '/admin/users',
-    icon: UserCog,
-    roles: ['admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Vendor Registration',
-    href: '/vendor/register',
-    icon: FileText,
-    roles: ['vendor', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Finance Review',
-    href: '/finance/review',
-    icon: IndianRupee,
-    roles: ['finance', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Purchase Approval',
-    href: '/purchase/approval',
-    icon: ShoppingCart,
-    roles: ['purchase', 'admin', 'sharvi_admin', 'approver'],
-  },
-  {
-    label: 'SAP Sync',
-    href: '/sap/sync',
-    icon: RefreshCw,
-    roles: ['admin', 'sharvi_admin'],
-  },
-  {
-    label: 'All Vendors',
-    href: '/vendors',
-    icon: Users,
-    roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'Audit Logs',
-    href: '/audit-logs',
-    icon: History,
-    roles: ['finance', 'purchase', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Help & Support',
-    href: '/support',
-    icon: HelpCircle,
-    roles: ['vendor', 'finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin', 'approver'],
-  },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, screenKey: 'dashboard' },
+  { label: 'Sharvi Admin Console', href: '/sharvi-admin', icon: Wrench, screenKey: 'sharvi_admin_console' },
+  { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
+  { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
+  { label: 'Role Permissions', href: '/admin/role-permissions', icon: Shield, screenKey: 'role_permissions' },
+  { label: 'Vendor Registration', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
+  { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
+  { label: 'Purchase Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },
+  { label: 'SAP Sync', href: '/sap/sync', icon: RefreshCw, screenKey: 'sap_sync' },
+  { label: 'All Vendors', href: '/vendors', icon: Users, screenKey: 'vendors' },
+  { label: 'GST Compliance', href: '/compliance/gst', icon: CheckCircle, screenKey: 'gst_compliance' },
+  { label: 'Scheduled Checks', href: '/compliance/scheduled', icon: ClipboardCheck, screenKey: 'scheduled_checks' },
+  { label: 'Audit Logs', href: '/audit-logs', icon: History, screenKey: 'audit_logs' },
+  { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
+  { label: 'Help & Support', href: '/support', icon: HelpCircle, screenKey: 'support' },
 ];
 
 const roleLabels: Record<string, string> = {
