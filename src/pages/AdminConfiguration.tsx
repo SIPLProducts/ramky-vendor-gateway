@@ -10,13 +10,14 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ValidationConfigManager } from '@/components/admin/ValidationConfigManager';
 import { ValidationApiLogs } from '@/components/admin/ValidationApiLogs';
-import { 
-  Settings, 
-  Clock, 
-  Shield, 
-  Building2, 
+import {
+  Settings,
+  Clock,
+  Shield,
+  Building2,
   Save,
   RefreshCw,
   AlertCircle,
@@ -24,6 +25,9 @@ import {
   FileText,
   Percent,
   Bell,
+  Mail,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { NotificationSettings } from '@/components/pwa/NotificationSettings';
 
