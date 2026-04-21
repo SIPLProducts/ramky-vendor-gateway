@@ -531,6 +531,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       if (updateError) throw updateError;
 
+      // Initialise approval matrix progress (best-effort)
+      try {
+        await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendor.id } });
+      } catch (e) {
+        console.warn('route-vendor-approval failed (non-blocking):', e);
+      }
+
       // Mark invitation as used if token exists
       if (options?.invitationToken) {
         await supabase
