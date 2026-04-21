@@ -21,6 +21,9 @@ import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
+import { CompletenessRing } from '@/components/vendor/CompletenessRing';
+import { useFormCompleteness } from '@/hooks/useFormCompleteness';
 
 // 8-step registration flow — Step 1 is the OCR + verification gate
 const registrationSteps = [
@@ -348,6 +351,52 @@ export default function VendorRegistration() {
     return () => { supabase.removeChannel(channel); };
   }, [vendorId]);
 
+  // -------- Auto-save (debounced) --------
+  const [autoSaveState, setAutoSaveState] = useState<AutoSaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedHashRef = useRef<string>('');
+  const isFirstAutoSaveRef = useRef(true);
+
+  useEffect(() => {
+    // Skip while loading / submitted / token still validating
+    if (isLoadingVendor || isValidatingToken || isSubmitted) return;
+    // Need at least an invitation token (vendor will be created on first save) or an existing vendorId
+    if (!invitationToken && !vendorId) return;
+
+    // Skip the very first run after mount so we don't save unchanged loaded data
+    if (isFirstAutoSaveRef.current) {
+      isFirstAutoSaveRef.current = false;
+      lastSavedHashRef.current = JSON.stringify(formData);
+      return;
+    }
+
+    const hash = JSON.stringify(formData);
+    if (hash === lastSavedHashRef.current) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSaveState('saving');
+        await saveVendor(formData);
+        lastSavedHashRef.current = hash;
+        setLastSavedAt(new Date());
+        setAutoSaveState('saved');
+      } catch (err) {
+        console.warn('Auto-save failed:', err);
+        setAutoSaveState('error');
+      }
+    }, 2500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor]);
+
+  // Per-step + overall completeness
+  const completeness = useFormCompleteness(formData, verifiedData);
+
+
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6, 7]); };
 
   const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
@@ -415,9 +464,14 @@ export default function VendorRegistration() {
 
   const handleSaveAsDraft = async () => {
     try {
+      setAutoSaveState('saving');
       await saveVendor(formData);
+      lastSavedHashRef.current = JSON.stringify(formData);
+      setLastSavedAt(new Date());
+      setAutoSaveState('saved');
       toast({ title: 'Draft Saved', description: 'Your progress has been saved.' });
     } catch (error) {
+      setAutoSaveState('error');
       toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An error occurred', variant: 'destructive' });
     }
   };
@@ -549,13 +603,15 @@ export default function VendorRegistration() {
             <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
           </Link>
         )}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Help</span>
-            </Button>
-          </SheetTrigger>
+        <div className="flex items-center gap-4">
+          <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} className="hidden sm:flex" />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <HelpCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Help</span>
+              </Button>
+            </SheetTrigger>
           <SheetContent>
             <SheetHeader>
               <SheetTitle>Help & Support</SheetTitle>
@@ -581,7 +637,8 @@ export default function VendorRegistration() {
               </Link>
             </div>
           </SheetContent>
-        </Sheet>
+          </Sheet>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -589,8 +646,18 @@ export default function VendorRegistration() {
         {/* Left Panel - Registration Steps */}
         <aside className="hidden lg:flex flex-col w-[280px] flex-shrink-0 border-r bg-card">
           <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-foreground">Registration Steps</h2>
-            <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p>
+            <div className="flex items-center gap-4">
+              <CompletenessRing value={completeness.overall} size={64} label="done" />
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-foreground leading-tight">Registration Progress</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {completeness.overall < 100
+                    ? `${100 - completeness.overall}% to go — keep going!`
+                    : 'All set — review &amp; submit'}
+                </p>
+              </div>
+            </div>
+            <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} className="mt-3" />
           </div>
           <div className="flex-1 p-6 overflow-auto">
             <EnterpriseStepIndicator
