@@ -1,74 +1,91 @@
 
 
-## Scope data by user + tenant across the application
-
-### Problem
-
-- All vendors in the database currently have `tenant_id = NULL`, so even after we add tenant filters there is nothing to filter on.
-- Frontend list/stats queries (`useVendors`, `useVendorStats`, `DocumentVerification`, `GstCompliance`, `AdminInvitations`, `AuditLogs`) fetch every row.
-- Database RLS on `vendors`, `vendor_invitations`, `vendor_documents`, `vendor_validations`, `validation_api_logs`, `audit_logs`, `ocr_extractions` lets `finance` / `purchase` / `sharvi_admin` / `customer_admin` users see ALL rows regardless of which tenant(s) they belong to. The only role currently scoped properly is the per-level approver via `approval_matrix_approvers`.
-- `UserManagement` already lists every profile globally — customer admins should only see users from their own tenant(s).
+## Sequential Document OCR Flow (Step 1 redesign)
 
 ### Goal
 
-Each signed-in user sees only data that belongs to a tenant they are mapped to in `user_tenants`, with these role exceptions:
+Replace the current "4-tile parallel grid" on Step 1 with a guided, sequential, conditional flow that mirrors how a vendor naturally fills the form. Each stage unlocks the next only after OCR + realtime API verification succeeds.
 
-| Role | Visibility |
-|---|---|
-| `vendor` | Only their own vendor record (unchanged — already by `user_id`) |
-| `customer_admin`, `finance`, `purchase`, `approver`, custom-role users | Only data where `vendors.tenant_id` ∈ their `user_tenants.tenant_id` set |
-| `sharvi_admin`, `admin` | All tenants (super-admin) — with an optional **Active Tenant** switcher in the header to filter the view |
+### New flow on Step 1
 
-### Plan
+```text
+Stage 1 — GST gate
+  Q: "Are you GST registered?"  [Yes] / [No]
+  ├─ Yes → Upload GST certificate
+  │        OCR extracts → Legal Name, Trade Name,
+  │        Constitution of Business, Principal Place of Business
+  │        Realtime GST API verification (validate-gst)
+  │        Show extracted fields; Address is editable, others read-only
+  │        Carry Legal Name + GSTIN forward
+  └─ No  → Download "GST Self-Declaration" template (existing public/templates/gst-self-declaration.html)
+           Upload signed copy
+           Manual entry: Legal Name, Address, City, State, Pincode (mandatory)
+           No GST API call
 
-#### 1. Backfill + enforce tenant on vendor data (DB migration)
+Stage 2 — PAN gate (always required)
+  Upload PAN card
+  OCR extracts → PAN number, Holder Name
+  Realtime PAN API verification (validate-pan)
+  Cross-check PAN against the PAN derived from GSTIN (chars 3–12)
+    - If GST path: must match → block Continue if mismatch with clear message
+    - If No-GST path: skip cross-check
+  Cross-check holder name vs Legal Name (fuzzy, threshold from validation_configs)
 
-- Backfill `vendors.tenant_id` for the 13 existing rows: assign them to the only existing tenant `Ramky Infrastructure Limited` (so admins/devs can see data immediately). Sample/seed vendors get the same default.
-- Add a SECURITY DEFINER helper `public.user_tenant_ids(_user_id uuid) returns setof uuid` that returns the caller's tenant ids — used in RLS to avoid recursion.
-- Replace permissive RLS on these tables with tenant-scoped versions (super admins keep full access):
-  - `vendors` — finance/purchase/customer_admin SELECT/UPDATE only when `tenant_id` is in caller's tenant set
-  - `vendor_invitations` — same scope (already has `tenant_id` column)
-  - `vendor_documents`, `vendor_validations`, `validation_api_logs`, `ocr_extractions`, `audit_logs` — scope via the parent vendor's `tenant_id`
-  - `profiles` — customer_admin can see profiles of users that share at least one tenant; otherwise only own profile
+Stage 3 — MSME gate
+  Q: "Are you MSME / Udyam registered?"  [Yes] / [No]
+  ├─ Yes → Upload Udyam certificate
+  │        OCR extracts → Udyam number, Enterprise name, Type
+  │        Realtime MSME API verification (validate-msme)
+  │        Cross-check Enterprise name vs Legal Name
+  └─ No  → Skip, move on (no document needed)
 
-#### 2. Add a tenant context to the app
+Stage 4 — Bank verification (always required)
+  Upload Cancelled Cheque
+  OCR extracts → Account number, IFSC, Bank, Branch, Holder name
+  Realtime Penny-drop verification (validate-penny-drop)
+  Cross-check holder name vs Legal Name
+```
 
-New file `src/hooks/useTenantContext.tsx` exposed via `<TenantProvider>` (mounted in `App.tsx` inside `AuthProvider`):
+Continue button on Step 1 stays disabled until: GST stage resolved (Yes-verified OR No-with-declaration uploaded) **AND** PAN verified **AND** MSME stage resolved **AND** Bank verified.
 
-- Fetches `user_tenants` for the current user once.
-- Exposes `{ myTenantIds, activeTenantId, setActiveTenantId, isSuperAdmin }`.
-- Persists `activeTenantId` in `localStorage`.
-- For super admins: `activeTenantId = null` means "all tenants"; otherwise filter to selected.
-- For everyone else: defaults to their `is_default` tenant or first; cannot be cleared.
+### Carry-forward into later steps
 
-#### 3. Add an Active Tenant switcher in the header
+Once Step 1 is complete, the form auto-fills and locks where appropriate:
 
-- `EnterpriseHeader.tsx` — show a `Select` listing the user's tenants (super admins also get an "All tenants" option). Hidden when the user has only one tenant.
+| Field on later step | Source | Editable? |
+|---|---|---|
+| Organization → Legal Name | GST OCR (or manual if No-GST) | No |
+| Organization → Trade Name | GST OCR | Yes |
+| Statutory → GSTIN, Constitution, Registration date, Status, Taxpayer type | GST API | No |
+| Statutory → Principal Place of Business | GST OCR | **Yes** |
+| Address → Registered Address (prefilled from Principal Place) | GST OCR | Yes |
+| Statutory → PAN | PAN OCR | No |
+| Statutory → MSME number, Category | MSME OCR | No |
+| Bank → Account No, IFSC, Bank, Branch | Cheque OCR | No (re-upload to change) |
+| Statutory → `is_gst_registered`, `gst_declaration_reason` | Stage 1 answer | — |
+| Statutory → `is_msme_registered` | Stage 3 answer | — |
 
-#### 4. Apply the tenant filter on the client
+### Files to change
 
-Update list queries to add `.in('tenant_id', myTenantIds)` (or `.eq('tenant_id', activeTenantId)` when one is selected). RLS is the security boundary; the client filter just keeps the UI tidy and supports the super-admin switcher:
+- **Rewrite** `src/components/vendor/steps/DocumentVerificationStep.tsx`
+  - Replace parallel grid with a vertical stepper of 4 stages.
+  - Add Yes/No radio gates for GST and MSME.
+  - Add download-link + upload widget for the GST self-declaration path with manual Legal Name + Address fields.
+  - Implement PAN-from-GST cross-check (`gstin.slice(2,12) === pan`).
+  - Show cross-name-match warnings inline (reusing existing `OcrComparisonCard`).
+  - Expand `VerifiedDocumentData` to include: `isGstRegistered`, `gstDeclarationReason`, `manualLegalName`, `manualAddress` (city/state/pincode), `isMsmeRegistered`, GST `constitutionOfBusiness` and `principalPlaceOfBusiness`.
 
-- `src/hooks/useVendors.tsx` — `useVendors`, `useVendorStats`, `useBuyerCompanies`
-- `src/pages/DocumentVerification.tsx`, `src/pages/GstCompliance.tsx`, `src/pages/FinanceReview.tsx`, `src/pages/PurchaseApproval.tsx`, `src/pages/SAPSync.tsx`, `src/pages/VendorList.tsx`, `src/pages/Dashboard.tsx`
-- `src/pages/AdminInvitations.tsx` — filter `vendor_invitations`
-- `src/pages/AuditLogs.tsx` — join via vendor's tenant
-- `src/pages/UserManagement.tsx` — load only profiles whose `user_tenants` overlap caller's tenant set (super admins see all)
-- `useCreateVendor` / vendor invitation creation — set `tenant_id = activeTenantId ?? defaultTenantId` so new records are scoped from creation
+- **Update** `src/pages/VendorRegistration.tsx`
+  - `handleStep1Complete` (the existing handler that receives `VerifiedDocumentData`) — populate `formData.statutory.isGstRegistered`, `gstDeclarationReason`, `gstConstitutionOfBusiness`, `gstPrincipalPlaceOfBusiness`, `isMsmeRegistered`, `pan`, `gstin`, `msmeNumber`, `organization.legalName`, `organization.tradeName`, `bank.accountNumber/ifsc/bankName/branchName`, and seed `address.registeredAddress` from the GST principal place.
+  - Tighten `canProceedFromCurrentStep()` for step 1 to also accept the No-GST path (declaration file + manual legal name + address present).
+  - Keep step 5 (Commercial) and step 6 (Bank) read-only for fields already verified upstream.
 
-#### 5. Wire the existing `tenant_id` on creation paths
-
-- `useVendorRegistration.tsx` insert path — populate `tenant_id` from the invitation (`vendor_invitations.tenant_id`) or the active tenant.
-- `send-vendor-invitation` flow — already accepts a tenant; ensure UI passes the active tenant when no explicit choice is made.
-
-### Files touched
-
-- New: `supabase/migrations/<timestamp>_tenant_scoped_rls.sql`, `src/hooks/useTenantContext.tsx`
-- Edited: `src/App.tsx`, `src/components/layout/EnterpriseHeader.tsx`, `src/hooks/useVendors.tsx`, `src/hooks/useVendorRegistration.tsx`, `src/pages/Dashboard.tsx`, `src/pages/VendorList.tsx`, `src/pages/FinanceReview.tsx`, `src/pages/PurchaseApproval.tsx`, `src/pages/SAPSync.tsx`, `src/pages/DocumentVerification.tsx`, `src/pages/GstCompliance.tsx`, `src/pages/AdminInvitations.tsx`, `src/pages/AuditLogs.tsx`, `src/pages/UserManagement.tsx`
+- **Update** `src/components/vendor/steps/CommercialStep.tsx` and `src/components/vendor/steps/BankDetailsStep.tsx`
+  - Mark fields populated from Step 1 as read-only (with a small "Verified in Step 1" hint), except Principal Place of Business which stays editable.
 
 ### Out of scope
 
-- Changing the existing approver-matrix scoping (already correct).
-- Changing vendor self-service screens (already user-scoped by `user_id`).
-- Migrating historical audit log rows that have no `vendor_id` — they remain visible only to super admins.
+- No DB migration — all needed columns already exist on `vendors` (`is_gst_registered`, `gst_declaration_reason`, `gst_constitution_of_business`, `gst_principal_place_of_business`, `is_msme_registered`, etc.).
+- No edge function changes — existing `ocr-extract`, `validate-gst`, `validate-pan`, `validate-msme`, `validate-penny-drop` already handle each call.
+- GST self-declaration template at `public/templates/gst-self-declaration.html` is reused as-is.
 
