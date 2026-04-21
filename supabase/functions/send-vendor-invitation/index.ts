@@ -55,7 +55,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <p>Hello,</p>
           
-          <p>You have been invited to register as a vendor with Ramky Infrastructure Limited. Please click the button below to create your account and complete your vendor registration.</p>
+          <p>You have been invited to register as a vendor on the Sharvi Vendor Portal. Please click the button below to create your account and complete your vendor registration.</p>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
