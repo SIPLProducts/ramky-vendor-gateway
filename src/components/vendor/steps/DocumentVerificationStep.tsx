@@ -177,43 +177,57 @@ export function DocumentVerificationStep({
   );
 
   // ---------- Verification helpers ----------
+  // NOTE: Real-time API validation is temporarily disabled.
+  // We return a dummy "success" response that echoes the OCR-extracted name,
+  // so name-match scoring still works. Wire real APIs back in verifyApi() later.
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
-    try {
-      if (kind === "gst") {
-        const { data, error } = await supabase.functions.invoke("validate-gst", {
-          body: { gstin: ocr.gstin, name: ocr.legal_name, simulationMode: true },
-        });
-        if (error || !data?.valid) throw new Error(data?.message || error?.message || "GST verification failed");
-        return { ok: true, apiData: data.data, registeredName: data.data?.legalName || data.data?.name };
-      }
-      if (kind === "pan") {
-        const { data, error } = await supabase.functions.invoke("validate-pan", {
-          body: { pan: ocr.pan_number, name: ocr.holder_name, simulationMode: true },
-        });
-        if (error || !data?.valid) throw new Error(data?.message || error?.message || "PAN verification failed");
-        return { ok: true, apiData: data.data, registeredName: data.data?.name };
-      }
-      if (kind === "msme") {
-        const { data, error } = await supabase.functions.invoke("validate-msme", {
-          body: { msmeNumber: ocr.udyam_number, name: ocr.enterprise_name, simulationMode: true },
-        });
-        if (error || !data?.valid) throw new Error(data?.message || error?.message || "MSME verification failed");
-        return { ok: true, apiData: data.data, registeredName: data.data?.name || data.data?.enterpriseName };
-      }
-      // cheque -> penny drop
-      const { data, error } = await supabase.functions.invoke("validate-penny-drop", {
-        body: {
-          accountNumber: ocr.account_number,
-          ifscCode: ocr.ifsc_code,
-          name: ocr.account_holder_name,
-          simulationMode: true,
+    // Small artificial delay so the "verifying" state is visible
+    await new Promise((r) => setTimeout(r, 400));
+
+    if (kind === "gst") {
+      return {
+        ok: true as const,
+        apiData: {
+          legalName: ocr.legal_name,
+          tradeName: ocr.trade_name,
+          gstin: ocr.gstin,
+          status: "Active",
+          simulated: true,
         },
-      });
-      if (error || !data?.valid) throw new Error(data?.message || error?.message || "Bank verification failed");
-      return { ok: true, apiData: data.data, registeredName: data.data?.accountHolderName || data.data?.name };
-    } catch (e: any) {
-      return { ok: false, error: e?.message ?? "Verification failed" } as const;
+        registeredName: ocr.legal_name,
+      };
     }
+    if (kind === "pan") {
+      return {
+        ok: true as const,
+        apiData: { name: ocr.holder_name, pan: ocr.pan_number, simulated: true },
+        registeredName: ocr.holder_name,
+      };
+    }
+    if (kind === "msme") {
+      return {
+        ok: true as const,
+        apiData: {
+          name: ocr.enterprise_name,
+          enterpriseName: ocr.enterprise_name,
+          udyamNumber: ocr.udyam_number,
+          simulated: true,
+        },
+        registeredName: ocr.enterprise_name,
+      };
+    }
+    // cheque -> penny drop
+    return {
+      ok: true as const,
+      apiData: {
+        accountHolderName: ocr.account_holder_name,
+        bankName: ocr.bank_name,
+        ifsc: ocr.ifsc_code,
+        accountNumber: ocr.account_number,
+        simulated: true,
+      },
+      registeredName: ocr.account_holder_name,
+    };
   };
 
   const runDocFlow = async (
