@@ -692,10 +692,20 @@ function SmtpSettings({ config, updateConfig }: SmtpSettingsProps) {
             </AlertDescription>
           </Alert>
 
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={handleTest}>
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end justify-end">
+            <div className="space-y-2 flex-1 sm:max-w-xs">
+              <Label htmlFor="smtp_test_to">Send test to</Label>
+              <Input
+                id="smtp_test_to"
+                type="email"
+                placeholder="you@example.com"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" onClick={handleTest} disabled={testing}>
               <Mail className="h-4 w-4 mr-2" />
-              Send Test Email
+              {testing ? 'Sending...' : 'Send Test Email'}
             </Button>
           </div>
         </CardContent>
