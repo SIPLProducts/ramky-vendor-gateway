@@ -157,19 +157,21 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
               ))}
             </div>
           </div>
-          {customRoles.length > 0 && (
-            <div className="space-y-2">
-              <Label>Custom Roles (optional)</Label>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-                {customRoles.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox checked={customRoleIds.includes(c.id)} onCheckedChange={() => toggleCustom(c.id)} />
-                    <span className="text-sm">{c.name}{!c.is_active && <span className="text-muted-foreground ml-1">(inactive)</span>}</span>
-                  </label>
-                ))}
-              </div>
+          <div className="space-y-2">
+            <Label>Custom Roles (optional)</Label>
+            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+              {customRoles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No custom roles available. Create one in the Custom Roles tab first.
+                </p>
+              ) : customRoles.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={customRoleIds.includes(c.id)} onCheckedChange={() => toggleCustom(c.id)} />
+                  <span className="text-sm">{c.name}{!c.is_active && <span className="text-muted-foreground ml-1">(inactive)</span>}</span>
+                </label>
+              ))}
             </div>
-          )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
