@@ -7,6 +7,7 @@ export interface OcrResult {
   success: boolean;
   extracted?: Record<string, any>;
   confidence?: number;
+  model?: string;
   error?: string;
 }
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard } from "lucide-react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,7 @@ interface DocState {
   nameMatchScore?: number;
   errorMessage?: string;
   verifiedAt?: number;
+  ocrModel?: string;
 }
 
 const idleDoc: DocState = { status: "idle" };
@@ -82,6 +83,26 @@ function timeAgo(ts?: number) {
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   return `${h}h ago`;
+}
+
+function friendlyModelName(model?: string): string | undefined {
+  if (!model) return undefined;
+  const map: Record<string, string> = {
+    "google/gemini-2.5-pro": "Gemini 2.5 Pro",
+    "google/gemini-2.5-flash": "Gemini 2.5 Flash",
+    "google/gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite",
+    "google/gemini-3-flash-preview": "Gemini 3 Flash",
+    "google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
+    "openai/gpt-5": "GPT-5",
+    "openai/gpt-5-mini": "GPT-5 Mini",
+    "openai/gpt-5-nano": "GPT-5 Nano",
+  };
+  if (map[model]) return map[model];
+  // Fallback: take part after "/" and prettify
+  const tail = model.includes("/") ? model.split("/")[1] : model;
+  return tail
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function DocumentVerificationStep({
@@ -225,15 +246,15 @@ export function DocumentVerificationStep({
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
       return;
     }
-    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted });
+    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Verification failed" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: "Verification failed" });
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
     if (extraErr) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, errorMessage: extraErr });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, ocrModel: ocrRes.model, errorMessage: extraErr });
       return;
     }
     const score = nameMatchScore(afterVerifiedOcrName(), v.registeredName);
@@ -245,6 +266,7 @@ export function DocumentVerificationStep({
       apiData: v.apiData,
       nameMatchScore: score,
       verifiedAt: Date.now(),
+      ocrModel: ocrRes.model,
     });
   };
 
@@ -849,6 +871,7 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
           fileSize={doc.fileSize}
           state={isBusy ? "busy" : isVerified ? "verified" : "failed"}
           busyLabel={busyLabel}
+          ocrModel={doc.ocrModel}
           onReplace={() => inputRef.current?.click()}
           onReset={onReset}
         />
@@ -879,12 +902,13 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
 }
 
 function FilePill({
-  fileName, fileSize, state, busyLabel, onReplace, onReset,
+  fileName, fileSize, state, busyLabel, ocrModel, onReplace, onReset,
 }: {
   fileName?: string;
   fileSize?: number;
   state: "busy" | "verified" | "failed";
   busyLabel?: string;
+  ocrModel?: string;
   onReplace: () => void;
   onReset: () => void;
 }) {
@@ -892,6 +916,8 @@ function FilePill({
     state === "verified" ? "border-success/40 bg-success/5" :
     state === "failed" ? "border-destructive/40 bg-destructive/5" :
     "border-border bg-muted/30";
+
+  const modelLabel = friendlyModelName(ocrModel);
 
   return (
     <div className={cn("flex items-center gap-3 rounded-md border px-3 py-2.5", accent)}>
@@ -905,7 +931,18 @@ function FilePill({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{fileName || "Document"}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{fileName || "Document"}</p>
+          {modelLabel && state !== "busy" && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary shrink-0"
+              title={`Extracted by ${modelLabel}`}
+            >
+              <Sparkles className="h-2.5 w-2.5" />
+              {modelLabel}
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground truncate">
           {state === "busy" ? busyLabel : (
             <>

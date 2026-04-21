@@ -124,7 +124,8 @@ serve(async (req) => {
 
     const dataUrl = `data:${mimeType};base64,${fileBase64}`;
 
-    console.log(`[ocr-extract] Calling AI gateway for ${documentType}`);
+    const OCR_MODEL = "google/gemini-2.5-flash";
+    console.log(`[ocr-extract] Calling AI gateway for ${documentType} with ${OCR_MODEL}`);
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -133,7 +134,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: OCR_MODEL,
         messages: [
           {
             role: "system",
@@ -228,7 +229,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, extracted, confidence }),
+      JSON.stringify({ success: true, extracted, confidence, model: OCR_MODEL }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
