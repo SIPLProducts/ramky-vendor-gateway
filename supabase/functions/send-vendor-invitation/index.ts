@@ -88,7 +88,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (simulationMode) {
       console.log("[Invitation Email - SIMULATION MODE]");
       console.log("To:", email);
-      console.log("Subject: Vendor Registration Invitation - Ramky Infrastructure");
+      console.log("Subject: Vendor Registration Invitation - Sharvi");
       console.log("Invite Link:", inviteLink);
       console.log("Expires:", expiryDate);
 
@@ -143,7 +143,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         to: email,
-        subject: "Vendor Registration Invitation - Ramky Infrastructure",
+        subject: "Vendor Registration Invitation - Sharvi",
         html: emailHtml,
       }),
     });
