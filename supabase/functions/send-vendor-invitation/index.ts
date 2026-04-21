@@ -24,7 +24,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, token, expiresAt, invitationId, simulationMode = false }: InvitationEmailRequest = await req.json();
 
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://ramkyvms.netlify.app";
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://ramky-flow.lovable.app";
     const inviteLink = `${frontendUrl}/vendor/invite?token=${token}`;
     
     console.log("Generated invite link:", inviteLink);
