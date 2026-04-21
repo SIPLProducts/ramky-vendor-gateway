@@ -1510,6 +1510,7 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      user_tenant_ids: { Args: { _user_id: string }; Returns: string[] }
     }
     Enums: {
       app_role:
