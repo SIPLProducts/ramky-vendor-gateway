@@ -127,6 +127,23 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`[send-smtp-email] from="${from}" to=${JSON.stringify(toArr)}`);
 
+    // Build plain-text fallback from HTML if not explicitly provided
+    const plainText = body.text ?? (body.html
+      ? body.html
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<\/(p|div|h[1-6]|li|tr|br)>/gi, "\n")
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/gi, " ")
+          .replace(/&amp;/gi, "&")
+          .replace(/&lt;/gi, "<")
+          .replace(/&gt;/gi, ">")
+          .replace(/&quot;/gi, '"')
+          .replace(/\n\s*\n\s*\n/g, "\n\n")
+          .trim()
+      : "");
+
     await client.send({
       from,
       to: toArr,
@@ -134,9 +151,15 @@ const handler = async (req: Request): Promise<Response> => {
       bcc: bccArr,
       replyTo: replyTo || undefined,
       subject: body.subject,
-      content: body.text ?? "text/html content",
+      content: plainText,
       html: body.html,
-    });
+      mimeContent: body.html
+        ? [
+            { mimeType: "text/plain; charset=utf-8", content: plainText, transferEncoding: "quoted-printable" },
+            { mimeType: "text/html; charset=utf-8", content: body.html, transferEncoding: "quoted-printable" },
+          ]
+        : undefined,
+    } as any);
 
     await client.close();
 
