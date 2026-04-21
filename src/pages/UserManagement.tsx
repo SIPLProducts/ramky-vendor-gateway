@@ -10,12 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings } from 'lucide-react';
+import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch } from 'lucide-react';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 import { AssignTenantDialog } from '@/components/admin/AssignTenantDialog';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
+import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import RolePermissions from '@/pages/RolePermissions';
 
@@ -276,6 +277,7 @@ export default function UserManagement() {
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
           <TabsTrigger value="custom-roles"><ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles</TabsTrigger>
           <TabsTrigger value="role-permissions"><Settings className="h-4 w-4 mr-2" /> Role Permissions</TabsTrigger>
+          <TabsTrigger value="approval-matrix"><GitBranch className="h-4 w-4 mr-2" /> Approval Matrix</TabsTrigger>
         </TabsList>
 
         {/* USERS TAB */}
@@ -463,6 +465,11 @@ export default function UserManagement() {
         {/* ROLE PERMISSIONS TAB */}
         <TabsContent value="role-permissions">
           <RolePermissions />
+        </TabsContent>
+
+        {/* APPROVAL MATRIX TAB */}
+        <TabsContent value="approval-matrix">
+          <ApprovalMatrixConfig />
         </TabsContent>
       </Tabs>
 
