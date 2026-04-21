@@ -177,7 +177,6 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
             </div>
           </div>
         </div>
-        </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={saving}>
