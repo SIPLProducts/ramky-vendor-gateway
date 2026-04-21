@@ -11,6 +11,7 @@ import {
   Shield,
   UserCog,
 } from 'lucide-react';
+import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 
 interface MobileBottomNavProps {
   userRole: string;
@@ -20,73 +21,26 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  roles: string[];
+  screenKey: string;
 }
 
 const mobileNavItems: NavItem[] = [
-  {
-    label: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'Vendors',
-    href: '/vendors',
-    icon: Users,
-    roles: ['finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'Review',
-    href: '/finance/review',
-    icon: CheckCircle,
-    roles: ['finance', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Approval',
-    href: '/purchase/approval',
-    icon: ClipboardCheck,
-    roles: ['purchase', 'admin', 'sharvi_admin', 'approver'],
-  },
-  {
-    label: 'GST',
-    href: '/compliance/gst',
-    icon: Shield,
-    roles: ['finance', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Register',
-    href: '/vendor/register',
-    icon: FileText,
-    roles: ['vendor', 'admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Users',
-    href: '/admin/users',
-    icon: UserCog,
-    roles: ['admin', 'sharvi_admin'],
-  },
-  {
-    label: 'Settings',
-    href: '/settings',
-    icon: Settings,
-    roles: ['admin', 'sharvi_admin', 'customer_admin'],
-  },
-  {
-    label: 'Help',
-    href: '/support',
-    icon: HelpCircle,
-    roles: ['vendor', 'finance', 'purchase', 'admin', 'sharvi_admin', 'customer_admin', 'approver'],
-  },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, screenKey: 'dashboard' },
+  { label: 'Vendors', href: '/vendors', icon: Users, screenKey: 'vendors' },
+  { label: 'Review', href: '/finance/review', icon: CheckCircle, screenKey: 'finance_review' },
+  { label: 'Approval', href: '/purchase/approval', icon: ClipboardCheck, screenKey: 'purchase_approval' },
+  { label: 'GST', href: '/compliance/gst', icon: Shield, screenKey: 'gst_compliance' },
+  { label: 'Register', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
+  { label: 'Users', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
+  { label: 'Settings', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
+  { label: 'Help', href: '/support', icon: HelpCircle, screenKey: 'support' },
 ];
 
 export function MobileBottomNav({ userRole }: MobileBottomNavProps) {
   const location = useLocation();
+  const { can, loading } = useScreenPermissions();
 
-  // Filter items based on role and limit to 5 items max
-  const filteredItems = mobileNavItems
-    .filter((item) => item.roles.includes(userRole))
-    .slice(0, 5);
+  const filteredItems = (loading ? [] : mobileNavItems.filter((i) => can(i.screenKey))).slice(0, 5);
 
   if (filteredItems.length === 0) return null;
 
@@ -104,9 +58,7 @@ export function MobileBottomNav({ userRole }: MobileBottomNavProps) {
               className={cn(
                 'flex flex-col items-center justify-center flex-1 h-full py-1 px-1 transition-colors',
                 'tap-highlight-transparent active:scale-95 transition-transform',
-                isActive
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
+                isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
               <div

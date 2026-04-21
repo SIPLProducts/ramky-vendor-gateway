@@ -85,11 +85,10 @@ const roleLabels: Record<string, string> = {
 export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { can, loading: permsLoading } = useScreenPermissions();
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-  const filteredItems = navItems.filter((item) =>
-    item.roles.includes(userRole)
-  );
+  const filteredItems = permsLoading ? [] : navItems.filter((item) => can(item.screenKey));
 
   const handleLogout = async () => {
     try {
