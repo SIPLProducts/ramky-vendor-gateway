@@ -46,12 +46,12 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
   const [customRoleIds, setCustomRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // When dialog opens or default tenant changes, prefill
-  useState(() => {});
-  // sync default
-  if (defaultTenantId && tenantIds.length === 0 && open) {
-    // noop - initial state covers it; below useEffect-like via separate effect not needed (handled in reset)
-  }
+  useEffect(() => {
+    if (open && defaultTenantId && tenantIds.length === 0) {
+      setTenantIds([defaultTenantId]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultTenantId]);
 
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setRole('vendor');
