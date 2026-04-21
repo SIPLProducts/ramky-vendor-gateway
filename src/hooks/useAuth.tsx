@@ -4,10 +4,18 @@ import { supabase } from '@/integrations/supabase/client';
 
 type AppRole = 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | 'customer_admin' | 'approver';
 
+interface CustomRoleRef {
+  id: string;
+  name: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   userRole: AppRole | null;
+  customRoles: CustomRoleRef[];
+  hasCustomRole: boolean;
+  isVendor: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
@@ -20,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
+  const [customRoles, setCustomRoles] = useState<CustomRoleRef[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,10 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Defer role fetching with setTimeout to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
-            fetchUserRole(session.user.id);
+            loadRoles(session.user.id);
           }, 0);
         } else {
           setUserRole(null);
+          setCustomRoles([]);
           setLoading(false);
         }
       }
@@ -47,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        loadRoles(session.user.id);
       } else {
         setLoading(false);
       }
@@ -56,23 +66,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserRole = async (userId: string) => {
+  const loadRoles = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
+      const [roleRes, customRes] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', userId).single(),
+        supabase
+          .from('user_custom_roles')
+          .select('custom_role_id, custom_roles!inner(id, name, is_active)')
+          .eq('user_id', userId),
+      ]);
 
-      if (error) {
-        console.error('Error fetching user role:', error);
-        setUserRole('vendor'); // Default role
+      if (roleRes.error) {
+        console.error('Error fetching user role:', roleRes.error);
+        setUserRole('vendor');
       } else {
-        setUserRole(data?.role as AppRole || 'vendor');
+        setUserRole((roleRes.data?.role as AppRole) || 'vendor');
+      }
+
+      if (customRes.error) {
+        console.error('Error fetching custom roles:', customRes.error);
+        setCustomRoles([]);
+      } else {
+        const active: CustomRoleRef[] = (customRes.data ?? [])
+          .map((r: any) => r.custom_roles)
+          .filter((cr: any) => cr && cr.is_active)
+          .map((cr: any) => ({ id: cr.id, name: cr.name }));
+        setCustomRoles(active);
       }
     } catch (err) {
-      console.error('Error fetching user role:', err);
+      console.error('Error loading roles:', err);
       setUserRole('vendor');
+      setCustomRoles([]);
     } finally {
       setLoading(false);
     }
@@ -107,10 +131,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     setUserRole(null);
+    setCustomRoles([]);
   };
 
+  const hasCustomRole = customRoles.length > 0;
+  const isVendor = userRole === 'vendor' && !hasCustomRole;
+
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        userRole,
+        customRoles,
+        hasCustomRole,
+        isVendor,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
