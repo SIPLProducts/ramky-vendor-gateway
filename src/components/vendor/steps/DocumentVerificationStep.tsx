@@ -246,15 +246,15 @@ export function DocumentVerificationStep({
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
       return;
     }
-    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted });
+    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Verification failed" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: "Verification failed" });
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
     if (extraErr) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, errorMessage: extraErr });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, ocrModel: ocrRes.model, errorMessage: extraErr });
       return;
     }
     const score = nameMatchScore(afterVerifiedOcrName(), v.registeredName);
@@ -266,6 +266,7 @@ export function DocumentVerificationStep({
       apiData: v.apiData,
       nameMatchScore: score,
       verifiedAt: Date.now(),
+      ocrModel: ocrRes.model,
     });
   };
 
