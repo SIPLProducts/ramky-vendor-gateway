@@ -240,7 +240,7 @@ export default function AdminConfiguration() {
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general" className="gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">General</span>
@@ -248,6 +248,10 @@ export default function AdminConfiguration() {
           <TabsTrigger value="validations" className="gap-2">
             <Settings2 className="h-4 w-4" />
             <span className="hidden sm:inline">Validations</span>
+          </TabsTrigger>
+          <TabsTrigger value="email" className="gap-2">
+            <Mail className="h-4 w-4" />
+            <span className="hidden sm:inline">Email (SMTP)</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
