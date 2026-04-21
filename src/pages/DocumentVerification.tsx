@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenantFilter } from '@/hooks/useTenantContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Card, 
@@ -184,18 +185,29 @@ export default function DocumentVerification() {
   const [previewDoc, setPreviewDoc] = useState<VendorDocument | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  const { tenantIds, activeTenantId } = useTenantFilter();
+
   // Fetch vendors for verification with document counts
   const { data: vendors, isLoading: isLoadingVendors } = useQuery({
-    queryKey: ['vendors-for-verification'],
+    queryKey: ['vendors-for-verification', activeTenantId, tenantIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('vendors')
         .select('*, vendor_documents(id)')
         .in('status', ['submitted', 'validation_failed', 'finance_review', 'validation_pending'])
         .order('submitted_at', { ascending: false });
-      
+
+      if (activeTenantId) {
+        q = q.eq('tenant_id', activeTenantId);
+      } else if (tenantIds !== null) {
+        if (tenantIds.length === 0) return [] as VendorWithDocCount[];
+        q = q.in('tenant_id', tenantIds);
+      }
+
+      const { data, error } = await q;
+
       if (error) throw error;
-      
+
       // Transform to include doc_count
       return (data || []).map(vendor => ({
         ...vendor,

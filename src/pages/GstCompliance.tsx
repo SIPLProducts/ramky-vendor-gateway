@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenantFilter } from '@/hooks/useTenantContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Card, 
@@ -100,17 +101,27 @@ export default function GstCompliance() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const { tenantIds, activeTenantId } = useTenantFilter();
+
   // Fetch all approved vendors (those with GST numbers)
   const { data: vendors, isLoading } = useQuery({
-    queryKey: ['vendors-gst-compliance'],
+    queryKey: ['vendors-gst-compliance', activeTenantId, tenantIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('vendors')
         .select('*')
         .not('gstin', 'is', null)
         .not('status', 'eq', 'draft')
         .order('legal_name');
-      
+
+      if (activeTenantId) {
+        q = q.eq('tenant_id', activeTenantId);
+      } else if (tenantIds !== null) {
+        if (tenantIds.length === 0) return [] as Vendor[];
+        q = q.in('tenant_id', tenantIds);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return data as Vendor[];
     },
