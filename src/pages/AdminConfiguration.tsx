@@ -106,6 +106,8 @@ export default function AdminConfiguration() {
             (loadedConfig as Record<string, unknown>)[key] = Boolean(value);
           } else if (typeof loadedConfig[key] === 'number') {
             (loadedConfig as Record<string, unknown>)[key] = Number(value);
+          } else if (typeof loadedConfig[key] === 'string') {
+            (loadedConfig as Record<string, unknown>)[key] = value == null ? '' : String(value);
           }
         }
       });
