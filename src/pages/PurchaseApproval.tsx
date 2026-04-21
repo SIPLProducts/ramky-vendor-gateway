@@ -149,7 +149,7 @@ export default function PurchaseApproval() {
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
               <Truck className="h-5 w-5 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground">Purchase Approval</h1>
+            <h1 className="text-3xl font-bold text-foreground">SCM Approval</h1>
           </div>
           <p className="text-muted-foreground">Review and approve vendors for SAP synchronization</p>
         </div>

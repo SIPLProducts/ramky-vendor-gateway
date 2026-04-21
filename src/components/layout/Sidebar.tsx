@@ -64,7 +64,7 @@ const navItems: NavItem[] = [
   { label: 'My Approvals', href: '/admin/my-approvals', icon: Inbox, screenKey: 'my_approvals' },
   { label: 'Vendor Registration', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
   { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
-  { label: 'Purchase Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },
+  { label: 'SCM Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },
   { label: 'SAP Sync', href: '/sap/sync', icon: RefreshCw, screenKey: 'sap_sync' },
   { label: 'All Vendors', href: '/vendors', icon: Users, screenKey: 'vendors' },
   { label: 'GST Compliance', href: '/compliance/gst', icon: CheckCircle, screenKey: 'gst_compliance' },
