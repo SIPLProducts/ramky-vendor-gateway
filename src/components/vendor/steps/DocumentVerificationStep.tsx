@@ -871,6 +871,7 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
           fileSize={doc.fileSize}
           state={isBusy ? "busy" : isVerified ? "verified" : "failed"}
           busyLabel={busyLabel}
+          ocrModel={doc.ocrModel}
           onReplace={() => inputRef.current?.click()}
           onReset={onReset}
         />
