@@ -281,6 +281,7 @@ export default function UserManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Custom Roles</TableHead>
                   <TableHead>Tenants</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -290,12 +291,12 @@ export default function UserManagement() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+                      <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -309,7 +310,13 @@ export default function UserManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {u.tenants.length === 0 ? (
+                          {u.customRoles.length === 0
+                            ? <span className="text-muted-foreground text-xs">—</span>
+                            : u.customRoles.map((c) => (
+                                <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
+                              ))}
+                        </div>
+                      </TableCell>
                             <span className="text-muted-foreground text-xs">None</span>
                           ) : (
                             u.tenants.map((t) => (
