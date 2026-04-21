@@ -161,6 +161,16 @@ export default function AdminConfiguration() {
       enable_name_match_validation: 'Enable vendor name vs GST legal name matching',
       auto_reject_failed_validations: 'Automatically reject vendors with failed validations',
       gst_revalidation_days: 'Days between periodic GST re-validations',
+      smtp_host: 'SMTP server hostname (e.g. smtp.gmail.com)',
+      smtp_port: 'SMTP server port (587 for TLS, 465 for SSL, 25 for none)',
+      smtp_username: 'SMTP authentication username',
+      smtp_password: 'SMTP authentication password or app password',
+      smtp_encryption: 'Connection encryption: none, ssl, tls, starttls',
+      smtp_from_email: 'Default From email address used to send notifications',
+      smtp_from_name: 'Display name shown in the From field',
+      smtp_reply_to: 'Reply-To email address',
+      smtp_use_app_password: 'Use an app-specific password instead of the account password',
+      smtp_enabled: 'Enable outbound emails through this SMTP configuration',
     };
     return descriptions[key] || '';
   };
