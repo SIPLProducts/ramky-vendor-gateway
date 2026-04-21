@@ -229,7 +229,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, extracted, confidence }),
+      JSON.stringify({ success: true, extracted, confidence, model: OCR_MODEL }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
