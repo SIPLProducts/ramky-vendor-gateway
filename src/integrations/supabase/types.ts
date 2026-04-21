@@ -147,6 +147,82 @@ export type Database = {
           },
         ]
       }
+      approval_matrix_approvers: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          id: string
+          level_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          level_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          level_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_matrix_approvers_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "approval_matrix_levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_matrix_levels: {
+        Row: {
+          approval_mode: string
+          created_at: string
+          designation: string | null
+          id: string
+          is_active: boolean
+          level_name: string
+          level_number: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          approval_mode?: string
+          created_at?: string
+          designation?: string | null
+          id?: string
+          is_active?: boolean
+          level_name: string
+          level_number: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          approval_mode?: string
+          created_at?: string
+          designation?: string | null
+          id?: string
+          is_active?: boolean
+          level_name?: string
+          level_number?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_matrix_levels_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_workflow_steps: {
         Row: {
           auto_approve_after_days: number | null
@@ -843,6 +919,57 @@ export type Database = {
           validation_type?: string
         }
         Relationships: []
+      }
+      vendor_approval_progress: {
+        Row: {
+          acted_at: string | null
+          acted_by: string | null
+          comments: string | null
+          created_at: string
+          id: string
+          level_id: string
+          level_number: number
+          status: string
+          vendor_id: string
+        }
+        Insert: {
+          acted_at?: string | null
+          acted_by?: string | null
+          comments?: string | null
+          created_at?: string
+          id?: string
+          level_id: string
+          level_number: number
+          status?: string
+          vendor_id: string
+        }
+        Update: {
+          acted_at?: string | null
+          acted_by?: string | null
+          comments?: string | null
+          created_at?: string
+          id?: string
+          level_id?: string
+          level_number?: number
+          status?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_approval_progress_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "approval_matrix_levels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_approval_progress_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_documents: {
         Row: {
