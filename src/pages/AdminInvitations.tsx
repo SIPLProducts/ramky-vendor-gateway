@@ -579,10 +579,10 @@ export default function AdminInvitations() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => sendEmailInvitation.mutate(invitation.id)}
-                                disabled={sendEmailInvitation.isPending}
+                                disabled={sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id}
                                 className="gap-1"
                               >
-                                {sendEmailInvitation.isPending ? (
+                                {sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <>
