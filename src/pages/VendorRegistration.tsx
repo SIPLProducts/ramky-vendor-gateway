@@ -351,6 +351,52 @@ export default function VendorRegistration() {
     return () => { supabase.removeChannel(channel); };
   }, [vendorId]);
 
+  // -------- Auto-save (debounced) --------
+  const [autoSaveState, setAutoSaveState] = useState<AutoSaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedHashRef = useRef<string>('');
+  const isFirstAutoSaveRef = useRef(true);
+
+  useEffect(() => {
+    // Skip while loading / submitted / token still validating
+    if (isLoadingVendor || isValidatingToken || isSubmitted) return;
+    // Need at least an invitation token (vendor will be created on first save) or an existing vendorId
+    if (!invitationToken && !vendorId) return;
+
+    // Skip the very first run after mount so we don't save unchanged loaded data
+    if (isFirstAutoSaveRef.current) {
+      isFirstAutoSaveRef.current = false;
+      lastSavedHashRef.current = JSON.stringify(formData);
+      return;
+    }
+
+    const hash = JSON.stringify(formData);
+    if (hash === lastSavedHashRef.current) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSaveState('saving');
+        await saveVendor(formData);
+        lastSavedHashRef.current = hash;
+        setLastSavedAt(new Date());
+        setAutoSaveState('saved');
+      } catch (err) {
+        console.warn('Auto-save failed:', err);
+        setAutoSaveState('error');
+      }
+    }, 2500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor]);
+
+  // Per-step + overall completeness
+  const completeness = useFormCompleteness(formData, verifiedData);
+
+
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6, 7]); };
 
   const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
