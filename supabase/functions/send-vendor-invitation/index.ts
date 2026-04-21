@@ -14,6 +14,7 @@ interface InvitationEmailRequest {
   expiresAt: string;
   invitationId?: string;
   simulationMode?: boolean;
+  frontendUrl?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -22,11 +23,32 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, token, expiresAt, invitationId, simulationMode = false }: InvitationEmailRequest = await req.json();
+    const body: InvitationEmailRequest = await req.json();
+    const { email, token, expiresAt, invitationId, simulationMode = false } = body;
 
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://ramky-flow.lovable.app";
+    // Resolve frontend URL dynamically — no hardcoded fallback.
+    // Priority: explicit body param > Origin header > Referer header > FRONTEND_URL env.
+    const originHeader = req.headers.get("origin") || "";
+    const refererHeader = req.headers.get("referer") || "";
+    let refererOrigin = "";
+    try { if (refererHeader) refererOrigin = new URL(refererHeader).origin; } catch { /* ignore */ }
+
+    const frontendUrl =
+      body.frontendUrl?.replace(/\/+$/, "") ||
+      originHeader ||
+      refererOrigin ||
+      Deno.env.get("FRONTEND_URL") ||
+      "";
+
+    if (!frontendUrl) {
+      return new Response(
+        JSON.stringify({ error: "Unable to determine frontend URL. Pass `frontendUrl` in the request body or set FRONTEND_URL env var." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const inviteLink = `${frontendUrl}/vendor/invite?token=${token}`;
-    
+
     console.log("Generated invite link:", inviteLink);
     console.log("Token:", token);
     console.log("Frontend URL:", frontendUrl);

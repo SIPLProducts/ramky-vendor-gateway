@@ -152,11 +152,11 @@ export default function AdminInvitations() {
           tenantId: tenantId || null,
           tenantName: tenantName,
           simulationMode: false,
+          frontendUrl: window.location.origin,
         },
       });
 
       if (emailError) {
-        console.error('Email sending error:', emailError);
         // Don't throw - invitation is created, just email failed
         return { invitation, emailSent: false, error: emailError };
       }
@@ -218,6 +218,7 @@ export default function AdminInvitations() {
           tenantId: (invitation as any).tenant_id || null,
           tenantName: tenantName,
           simulationMode: false, // Real email sending
+          frontendUrl: window.location.origin,
         },
       });
 
