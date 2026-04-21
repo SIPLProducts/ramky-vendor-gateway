@@ -48,20 +48,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
   });
 
-  // Validate invitation token
+  // Validate invitation token via SECURITY DEFINER RPC (RLS-safe for vendors)
   const { data: invitation } = useQuery({
     queryKey: ['vendor-invitation', options?.invitationToken],
     queryFn: async () => {
       if (!options?.invitationToken) return null;
 
       const { data, error } = await supabase
-        .from('vendor_invitations')
-        .select('*')
-        .eq('token', options.invitationToken)
-        .single();
+        .rpc('get_invitation_by_token', { _token: options.invitationToken });
 
       if (error) throw error;
-      return data;
+      const row = Array.isArray(data) ? data[0] : data;
+      return row ?? null;
     },
     enabled: !!options?.invitationToken,
   });
