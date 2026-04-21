@@ -1,193 +1,69 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Mail, Lock, Loader2, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Mail, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
-interface InvitationData {
-  id: string;
-  email: string;
-  token: string;
-  expires_at: string;
-  used_at: string | null;
-  user_id: string | null;
-  access_count: number | null;
-}
-
 export default function VendorLogin() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const prefillEmail = searchParams.get('email') || '';
 
+  const [email, setEmail] = useState(prefillEmail);
   const [isLoading, setIsLoading] = useState(false);
-  const [isValidating, setIsValidating] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [invitation, setInvitation] = useState<InvitationData | null>(null);
+  const [sent, setSent] = useState(false);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  // Validate token on mount
-  useEffect(() => {
-    const validateToken = async () => {
-      if (!token) {
-        setError('No invitation token provided. Please use the link from your email.');
-        setIsValidating(false);
-        return;
-      }
-
-      try {
-        // Use SECURITY DEFINER RPC — anon-safe lookup that also bumps access count
-        const { data: rows, error: fetchError } = await supabase
-          .rpc('record_invitation_access', { _token: token });
-
-        if (fetchError) {
-          console.error('Token lookup failed:', fetchError);
-          setError('We could not verify your invitation right now. Please try again in a moment.');
-          setIsValidating(false);
-          return;
-        }
-
-        const data = Array.isArray(rows) ? rows[0] : rows;
-        if (!data) {
-          setError('Invalid invitation link. Please contact the administrator.');
-          setIsValidating(false);
-          return;
-        }
-
-        // Check expiry
-        const expiresAt = new Date(data.expires_at);
-        if (expiresAt < new Date()) {
-          setError('This invitation link has expired. Please request a new one.');
-          setIsValidating(false);
-          return;
-        }
-
-        // If already used, redirect to registration to show status
-        if (data.used_at) {
-          navigate(`/vendor/registration?token=${token}`);
-          return;
-        }
-
-        setInvitation({
-          id: data.id,
-          email: data.email,
-          token,
-          expires_at: data.expires_at,
-          used_at: data.used_at,
-          user_id: null,
-          access_count: data.access_count ?? null,
-        });
-        setEmail(data.email);
-        setIsValidating(false);
-      } catch (err) {
-        console.error('Token validation error:', err);
-        setError('Failed to validate invitation. Please try again.');
-        setIsValidating(false);
-      }
-    };
-
-    validateToken();
-  }, [token, navigate]);
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
     try {
-      // Sign in with Supabase
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithOtp({
         email,
-        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/vendor/registration`,
+        },
       });
 
       if (signInError) {
-        if (signInError.message.includes('Invalid login credentials')) {
-          setError('Invalid email or password. Please check your credentials from the invitation email.');
-        } else {
-          setError(signInError.message);
-        }
+        setError(signInError.message);
         setIsLoading(false);
         return;
       }
 
-      // Verify the logged-in user matches the invitation
-      if (invitation && data.user) {
-        if (data.user.email !== invitation.email) {
-          await supabase.auth.signOut();
-          setError('This invitation is for a different email address.');
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // Redirect to registration form (protected route)
-      navigate(`/vendor/registration?token=${token}`);
+      setSent(true);
+      setIsLoading(false);
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('Magic link error:', err);
       setError('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };
 
-  if (isValidating) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Validating invitation...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !invitation) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 text-destructive" />
-            </div>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Please contact the administrator for assistance.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
       <header className="h-14 border-b bg-white/80 backdrop-blur-sm px-6 flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+          <img src={ramkyLogo} alt="Vendor Portal" className="h-8 w-auto" />
           <span className="text-sm font-semibold text-foreground">Vendor Portal</span>
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="w-full max-w-md shadow-xl border-0">
           <CardHeader className="text-center pb-2">
             <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
               <ShieldCheck className="h-7 w-7 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Vendor Login</CardTitle>
+            <CardTitle className="text-2xl">Vendor Sign-In</CardTitle>
             <CardDescription>
-              Sign in to complete your vendor registration
+              We'll email you a secure sign-in link — no password required.
             </CardDescription>
           </CardHeader>
 
@@ -199,74 +75,59 @@ export default function VendorLogin() {
               </Alert>
             )}
 
-            {invitation && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Invitation for:</strong> {invitation.email}
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Use the password from your invitation email to log in.
-                </p>
-              </div>
+            {sent ? (
+              <Alert className="mb-4">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>
+                  Check your inbox for a sign-in link sent to <strong>{email}</strong>.
+                  The link expires shortly, so use it soon.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <form onSubmit={handleSendLink} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use the email address your invitation was sent to.
+                  </p>
+                </div>
+
+                <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending sign-in link…
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4" />
+                      Email me a sign-in link
+                    </>
+                  )}
+                </Button>
+              </form>
             )}
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    disabled={!!invitation}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your temporary password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Your temporary password was sent in the invitation email.
-                </p>
-              </div>
-
-              <Button type="submit" className="w-full gap-2" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  <>
-                    Continue to Registration
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </form>
 
             <div className="mt-6 pt-4 border-t">
               <p className="text-xs text-center text-muted-foreground">
                 Having trouble? Contact{' '}
-                <a href="mailto:vendor.support@ramky.com" className="text-primary hover:underline">
-                  vendor.support@ramky.com
+                <a
+                  href="mailto:support@sharviinfotech.com"
+                  className="text-primary hover:underline"
+                >
+                  support@sharviinfotech.com
                 </a>
               </p>
             </div>
@@ -274,7 +135,6 @@ export default function VendorLogin() {
         </Card>
       </div>
 
-      {/* Footer */}
       <footer className="py-4 text-center text-sm text-muted-foreground">
         © 2026 Sharvi Infotech Private Limited. All rights reserved.
       </footer>
