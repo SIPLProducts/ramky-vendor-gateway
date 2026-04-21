@@ -62,7 +62,7 @@ const navItems: NavItem[] = [
   { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
   { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
   { label: 'My Approvals', href: '/admin/my-approvals', icon: Inbox, screenKey: 'my_approvals' },
-  { label: 'Vendor Registration', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
+  
   { label: 'SCM Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },
   { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
   { label: 'SAP Sync', href: '/sap/sync', icon: RefreshCw, screenKey: 'sap_sync' },

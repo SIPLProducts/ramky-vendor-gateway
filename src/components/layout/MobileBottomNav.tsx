@@ -30,7 +30,7 @@ const mobileNavItems: NavItem[] = [
   { label: 'Review', href: '/finance/review', icon: CheckCircle, screenKey: 'finance_review' },
   { label: 'Approval', href: '/purchase/approval', icon: ClipboardCheck, screenKey: 'purchase_approval' },
   { label: 'GST', href: '/compliance/gst', icon: Shield, screenKey: 'gst_compliance' },
-  { label: 'Register', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
+  
   { label: 'Users', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
   { label: 'Settings', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
   { label: 'Help', href: '/support', icon: HelpCircle, screenKey: 'support' },
