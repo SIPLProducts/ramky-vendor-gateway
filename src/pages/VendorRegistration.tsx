@@ -50,6 +50,7 @@ export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
+  const [verifiedData, setVerifiedData] = useState<VerifiedDocumentData | undefined>(undefined);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
