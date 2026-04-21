@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Service role can insert ocr extractions" ON public.ocr_extractions;
