@@ -361,15 +361,49 @@ export default function VendorRegistration() {
     return () => { supabase.removeChannel(channel); };
   }, [vendorId]);
 
-  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6]); };
+  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6, 7]); };
+
+  const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
+    setVerifiedData(data);
+    // Pre-fill statutory + bank + organization (legal name) from verified docs
+    setFormData((prev) => ({
+      ...prev,
+      organization: {
+        ...prev.organization,
+        legalName: data.gst?.legalName || data.pan?.holderName || prev.organization.legalName,
+        tradeName: data.gst?.tradeName || prev.organization.tradeName,
+      },
+      address: {
+        ...prev.address,
+        registeredAddress: data.gst?.address || prev.address.registeredAddress,
+      },
+      statutory: {
+        ...prev.statutory,
+        pan: data.pan?.number || prev.statutory.pan,
+        gstin: data.gst?.gstin || prev.statutory.gstin,
+        msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
+      },
+      bank: {
+        ...prev.bank,
+        accountNumber: data.bank?.accountNumber || prev.bank.accountNumber,
+        confirmAccountNumber: data.bank?.accountNumber || prev.bank.confirmAccountNumber,
+        ifscCode: data.bank?.ifsc || prev.bank.ifscCode,
+        bankName: data.bank?.bankName || prev.bank.bankName,
+        branchName: data.bank?.branchName || prev.bank.branchName,
+      },
+    }));
+    if (!completedSteps.includes(1)) setCompletedSteps((prev) => [...prev, 1]);
+    setCurrentStep(2);
+  };
 
   const handleStepComplete = (step: number, data: unknown) => {
+    // step is the new step number (2..6); map to form key
     const stepKeys: Record<number, keyof VendorFormData> = {
-      1: 'organization',
-      2: 'address',
-      3: 'contact',
-      4: 'statutory',
-      5: 'bank',
+      2: 'organization',
+      3: 'address',
+      4: 'contact',
+      5: 'statutory',
+      6: 'bank',
     };
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
@@ -384,8 +418,8 @@ export default function VendorRegistration() {
       infrastructure: data.infrastructure,
       qhse: data.qhse,
     }));
-    if (!completedSteps.includes(6)) setCompletedSteps((prev) => [...prev, 6]);
-    setCurrentStep(7);
+    if (!completedSteps.includes(7)) setCompletedSteps((prev) => [...prev, 7]);
+    setCurrentStep(8);
   };
 
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
@@ -442,18 +476,20 @@ export default function VendorRegistration() {
     const legalName = formData.organization.legalName;
     switch (currentStep) {
       case 1:
-        return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(1, data)} />;
+        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} />;
       case 2:
-        return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(2, data)} onBack={handleBack} />;
+        return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(2, data)} />;
       case 3:
-        return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
+        return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
-        return <CommercialStep data={formData.statutory} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(4)} />;
+        return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
       case 5:
-        return <BankDetailsStep data={formData.bank} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
+        return <CommercialStep data={formData.statutory} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
       case 6:
-        return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
+        return <BankDetailsStep data={formData.bank} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(6, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(6)} />;
       case 7:
+        return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
+      case 8:
         return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
       default:
         return null;
