@@ -319,16 +319,28 @@ export default function VendorRegistration() {
         // Mark steps as completed based on filled data
         if (vendorStatus === 'draft') {
           const filledSteps: number[] = [];
-          if (existingFormData.organization?.legalName) filledSteps.push(1);
-          if (existingFormData.address?.registeredAddress) filledSteps.push(2);
-          if (existingFormData.contact?.ceoName) filledSteps.push(3);
-          if (existingFormData.statutory?.entityType) filledSteps.push(4);
-          if (existingFormData.bank?.bankName) filledSteps.push(5);
-          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(6);
+          // Step 1 = doc verification — assume completed if we already have key fields
+          if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
+            filledSteps.push(1);
+            // Pre-seed verifiedData so Step 1 shows green tiles when revisited
+            setVerifiedData({
+              pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
+              gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
+              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '' } : undefined,
+              bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
+            });
+          }
+          if (existingFormData.organization?.legalName) filledSteps.push(2);
+          if (existingFormData.address?.registeredAddress) filledSteps.push(3);
+          if (existingFormData.contact?.ceoName) filledSteps.push(4);
+          if (existingFormData.statutory?.entityType) filledSteps.push(5);
+          if (existingFormData.bank?.bankName) filledSteps.push(6);
+          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(7);
           setCompletedSteps(filledSteps);
           // Go to the first incomplete step or step 1
-          const nextStep = filledSteps.length > 0 ? Math.min(...[1, 2, 3, 4, 5, 6, 7].filter(s => !filledSteps.includes(s))) : 1;
-          setCurrentStep(nextStep || 7);
+          const allSteps = [1, 2, 3, 4, 5, 6, 7, 8];
+          const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
+          setCurrentStep(nextStep || 8);
         } else {
           setIsSubmitted(true);
           setIsEditMode(false);
