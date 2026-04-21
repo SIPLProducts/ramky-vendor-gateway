@@ -432,21 +432,30 @@ export default function AdminInvitations() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="company">Company (Tenant)</Label>
-                <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
-                  <SelectTrigger id="company">
-                    <SelectValue placeholder="Select a company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenants?.map((tenant) => (
-                      <SelectItem key={tenant.id} value={tenant.id}>
-                        {tenant.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isSharviAdmin ? (
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company (Tenant)</Label>
+                  <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                    <SelectTrigger id="company">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenants?.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
+                    {tenants?.find(t => t.id === currentUserTenantId)?.name || (currentUserTenantId ? 'Loading…' : 'No company assigned to your account')}
+                  </div>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
