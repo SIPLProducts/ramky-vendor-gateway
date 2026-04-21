@@ -48,11 +48,6 @@ export default function Auth() {
     setError(null);
     setSuccess(null);
 
-    if (!selectedRole) {
-      setError('Please select a role to continue');
-      return;
-    }
-
     try {
       emailSchema.parse(loginEmail);
       passwordSchema.parse(loginPassword);
@@ -82,11 +77,6 @@ export default function Auth() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-
-    if (!selectedRole) {
-      setError('Please select a role to continue');
-      return;
-    }
 
     try {
       nameSchema.parse(signupName);
@@ -207,23 +197,6 @@ export default function Auth() {
                   <AlertDescription>{success}</AlertDescription>
                 </Alert>
               )}
-
-              {/* Role Selection Dropdown */}
-              <div className="mb-6">
-                <Label htmlFor="role-select" className="mb-2 block">Select Your Role</Label>
-                <Select value={selectedRole} onValueChange={(value: RoleType) => setSelectedRole(value)}>
-                  <SelectTrigger id="role-select" className="w-full">
-                    <SelectValue placeholder="Choose your role..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vendor">Vendor Portal</SelectItem>
-                    <SelectItem value="finance">Finance Team</SelectItem>
-                    <SelectItem value="purchase">Purchase Team</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="sharvi_admin">Sharvi Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
               <Tabs defaultValue="login" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
