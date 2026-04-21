@@ -276,6 +276,71 @@ export type Database = {
           },
         ]
       }
+      custom_role_screen_permissions: {
+        Row: {
+          can_access: boolean
+          created_at: string
+          custom_role_id: string
+          id: string
+          screen_key: string
+          updated_at: string
+        }
+        Insert: {
+          can_access?: boolean
+          created_at?: string
+          custom_role_id: string
+          id?: string
+          screen_key: string
+          updated_at?: string
+        }
+        Update: {
+          can_access?: boolean
+          created_at?: string
+          custom_role_id?: string
+          id?: string
+          screen_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_role_screen_permissions_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       form_field_configs: {
         Row: {
           created_at: string | null
@@ -589,6 +654,38 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      user_custom_roles: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          custom_role_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          custom_role_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          custom_role_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_custom_roles_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
