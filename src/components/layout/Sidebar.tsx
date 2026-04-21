@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   UserCog,
   ShieldCheck,
+  Inbox,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ const navItems: NavItem[] = [
   { label: 'Sharvi Admin Console', href: '/sharvi-admin', icon: Wrench, screenKey: 'sharvi_admin_console' },
   { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
   { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
+  { label: 'My Approvals', href: '/admin/my-approvals', icon: Inbox, screenKey: 'my_approvals' },
   { label: 'Vendor Registration', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
   { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
   { label: 'Purchase Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },
