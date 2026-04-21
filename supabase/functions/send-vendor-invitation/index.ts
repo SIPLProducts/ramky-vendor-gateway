@@ -73,6 +73,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
     const brandShort = (companyName.split(/\s+/)[0] || "VENDOR").toUpperCase();
 
+    const currentYear = new Date().getFullYear();
+
     const emailHtml = `
       <!DOCTYPE html>
       <html lang="en">
@@ -81,122 +83,117 @@ const handler = async (req: Request): Promise<Response> => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Vendor Registration Invitation</title>
       </head>
-      <body style="margin:0; padding:0; background-color:#F7F9FC; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#1f2937;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F7F9FC; padding:32px 16px;">
+      <body style="margin:0; padding:0; background-color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#2d3748;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc; padding:40px 16px;">
           <tr>
             <td align="center">
-              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); overflow:hidden;">
-                
-                <!-- Top accent bar -->
+              <table role="presentation" width="620" cellpadding="0" cellspacing="0" border="0" style="max-width:620px; width:100%;">
+
+                <!-- Navy header -->
                 <tr>
-                  <td style="height:4px; background:linear-gradient(90deg,#2563eb 0%,#1d4ed8 100%); line-height:4px; font-size:0;">&nbsp;</td>
-                </tr>
-                
-                <!-- Brand header -->
-                <tr>
-                  <td style="padding:28px 36px 8px 36px;">
-                    <div style="font-size:18px; font-weight:700; color:#0b3a8c; letter-spacing:0.5px;">${brandShort}</div>
-                    <div style="font-size:12px; color:#6b7280; margin-top:2px; letter-spacing:0.3px; text-transform:uppercase;">Vendor Portal</div>
+                  <td style="background-color:#1e3a5f; border-radius:12px 12px 0 0; padding:36px 44px; text-align:center;">
+                    <div style="font-family:Georgia,'Times New Roman',serif; font-size:24px; font-weight:600; color:#ffffff; letter-spacing:2px;">${brandShort}</div>
+                    <div style="font-size:11px; color:#d4a574; margin-top:6px; letter-spacing:3px; text-transform:uppercase; font-weight:500;">Vendor Portal</div>
                   </td>
                 </tr>
 
-                <!-- Title -->
+                <!-- White card body -->
                 <tr>
-                  <td style="padding:8px 36px 0 36px;">
-                    <h1 style="margin:0; font-size:22px; line-height:1.3; color:#111827; font-weight:600;">You're Invited to Register</h1>
-                  </td>
-                </tr>
+                  <td style="background-color:#ffffff; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; padding:48px 44px;">
 
-                <!-- Body copy -->
-                <tr>
-                  <td style="padding:16px 36px 0 36px; font-size:14px; line-height:1.6; color:#374151;">
-                    <p style="margin:0 0 12px 0;">Hello,</p>
-                    <p style="margin:0 0 16px 0;">You've been invited by <strong>${companyName}</strong> to register as a supplier. Please complete your registration to begin doing business with us.</p>
-                  </td>
-                </tr>
+                    <h1 style="margin:0 0 8px 0; font-family:Georgia,'Times New Roman',serif; font-size:26px; line-height:1.3; color:#1e3a5f; font-weight:600; letter-spacing:0.3px;">
+                      Vendor Registration Invitation
+                    </h1>
+                    <div style="height:2px; width:48px; background-color:#d4a574; margin:0 0 28px 0; line-height:2px; font-size:0;">&nbsp;</div>
 
-                <!-- What happens next -->
-                <tr>
-                  <td style="padding:8px 36px 0 36px;">
-                    <div style="background-color:#F7F9FC; border:1px solid #e5e7eb; border-radius:8px; padding:18px 20px;">
-                      <div style="font-size:13px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:12px;">What happens next</div>
-                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                        <tr>
-                          <td style="padding:6px 0; font-size:14px; color:#374151;">
-                            <span style="display:inline-block; width:22px; height:22px; line-height:22px; border-radius:50%; background-color:#2563eb; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:10px;">1</span>
-                            Click the <strong>Start Registration</strong> button below
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:6px 0; font-size:14px; color:#374151;">
-                            <span style="display:inline-block; width:22px; height:22px; line-height:22px; border-radius:50%; background-color:#2563eb; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:10px;">2</span>
-                            Complete the 7-step vendor registration form
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:6px 0; font-size:14px; color:#374151;">
-                            <span style="display:inline-block; width:22px; height:22px; line-height:22px; border-radius:50%; background-color:#2563eb; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:10px;">3</span>
-                            Get verified &amp; approved by our team
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Time estimate -->
-                <tr>
-                  <td style="padding:14px 36px 0 36px;">
-                    <p style="margin:0; font-size:13px; color:#6b7280;">⏱ Takes about <strong style="color:#374151;">10–15 minutes</strong> to complete.</p>
-                  </td>
-                </tr>
-
-                <!-- CTA -->
-                <tr>
-                  <td align="center" style="padding:24px 36px 8px 36px;">
-                    <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#2563eb; color:#ffffff; text-decoration:none; padding:14px 32px; border-radius:6px; font-size:15px; font-weight:600; letter-spacing:0.2px;">
-                      Start Registration
-                    </a>
-                  </td>
-                </tr>
-
-                <!-- Expiry notice -->
-                <tr>
-                  <td style="padding:16px 36px 0 36px;">
-                    <div style="background-color:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px;">
-                      <p style="margin:0; font-size:13px; color:#92400e;">
-                        ⚠ <strong>Important:</strong> This invitation expires on <strong>${expiryDate}</strong>.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Fallback link -->
-                <tr>
-                  <td style="padding:20px 36px 0 36px;">
-                    <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p>
-                    <div style="background-color:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:10px 12px; font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace; font-size:11px; color:#374151; word-break:break-all;">
-                      ${inviteLink}
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Divider -->
-                <tr>
-                  <td style="padding:24px 36px 0 36px;">
-                    <div style="height:1px; background-color:#e5e7eb; line-height:1px; font-size:0;">&nbsp;</div>
-                  </td>
-                </tr>
-
-                <!-- Footer -->
-                <tr>
-                  <td style="padding:16px 36px 28px 36px;">
-                    <p style="margin:0 0 6px 0; font-size:12px; color:#6b7280;">
-                      Need help? Contact us at <a href="mailto:${supportEmail}" style="color:#2563eb; text-decoration:none;">${supportEmail}</a>
+                    <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#2d3748;">
+                      Dear Valued Business Partner,
                     </p>
-                    <p style="margin:0; font-size:11px; color:#9ca3af;">
-                      This is an automated message from ${companyName}. © ${companyName}.
+
+                    <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#2d3748;">
+                      <strong style="color:#1e3a5f;">${companyName}</strong> cordially invites you to register as an approved supplier in our Vendor Management Portal.
                     </p>
+
+                    <p style="margin:0 0 32px 0; font-size:15px; line-height:1.7; color:#4a5568;">
+                      This secure registration process enables streamlined collaboration and ensures compliance with our procurement standards.
+                    </p>
+
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin:0 0 32px 0;">
+                      <tr>
+                        <td style="padding:24px 28px;">
+                          <div style="font-size:11px; font-weight:600; color:#1e3a5f; text-transform:uppercase; letter-spacing:2px; margin-bottom:18px;">Registration Process</div>
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="padding:8px 0; font-size:14px; color:#2d3748; line-height:1.6;">
+                                <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background-color:#1e3a5f; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:14px; font-family:Georgia,serif;">I</span>
+                                Access Registration Portal
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding:8px 0; font-size:14px; color:#2d3748; line-height:1.6;">
+                                <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background-color:#1e3a5f; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:14px; font-family:Georgia,serif;">II</span>
+                                Complete Supplier Profile
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding:8px 0; font-size:14px; color:#2d3748; line-height:1.6;">
+                                <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background-color:#1e3a5f; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:14px; font-family:Georgia,serif;">III</span>
+                                Verification &amp; Approval
+                              </td>
+                            </tr>
+                          </table>
+                          <div style="border-top:1px solid #e2e8f0; margin-top:18px; padding-top:14px; font-size:12px; color:#718096; letter-spacing:0.3px;">
+                            Estimated Time: <strong style="color:#2d3748;">10&ndash;15 minutes</strong>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 32px 0;">
+                      <tr>
+                        <td align="center">
+                          <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d4a574; color:#1e3a5f; text-decoration:none; padding:15px 44px; border-radius:4px; font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase;">
+                            Begin Registration
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px 0;">
+                      <tr>
+                        <td style="border-left:3px solid #d4a574; background-color:#fdfaf5; padding:14px 18px; font-size:13px; color:#2d3748;">
+                          <span style="font-weight:600; color:#1e3a5f; letter-spacing:0.5px;">Invitation Expires:</span>
+                          <span style="color:#4a5568;"> ${expiryDate}</span>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="margin:0 0 28px 0; font-size:13px; line-height:1.7; color:#4a5568;">
+                      Should you encounter any difficulties, please contact our support team at
+                      <a href="mailto:${supportEmail}" style="color:#1e3a5f; text-decoration:none; font-weight:600;">${supportEmail}</a>.
+                    </p>
+
+                    <div style="margin:0 0 32px 0;">
+                      <p style="margin:0 0 8px 0; font-size:11px; color:#718096; letter-spacing:0.3px; text-transform:uppercase; font-weight:600;">Direct Link</p>
+                      <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:10px 14px; font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace; font-size:11px; color:#4a5568; word-break:break-all;">
+                        ${inviteLink}
+                      </div>
+                    </div>
+
+                    <div style="height:1px; background-color:#e2e8f0; margin:0 0 24px 0; line-height:1px; font-size:0;">&nbsp;</div>
+
+                    <p style="margin:0; font-size:14px; line-height:1.7; color:#2d3748;">
+                      Respectfully,<br>
+                      <span style="font-family:Georgia,'Times New Roman',serif; font-style:italic; color:#1e3a5f;">Procurement Team</span><br>
+                      <span style="color:#718096; font-size:13px;">${companyName}</span>
+                    </p>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding:24px 16px; text-align:center; font-size:11px; color:#a0aec0; letter-spacing:0.3px;">
+                    &copy; ${currentYear} ${companyName}. All rights reserved.<br>
+                    <span style="color:#cbd5e0;">This is an automated message. Please do not reply directly to this email.</span>
                   </td>
                 </tr>
 
