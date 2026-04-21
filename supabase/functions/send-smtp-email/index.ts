@@ -117,18 +117,24 @@ const handler = async (req: Request): Promise<Response> => {
       debug: { log: true },
     });
 
-    const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+    const from = fromName
+      ? `${fromName.replace(/[<>"]/g, "")} <${fromEmail}>`
+      : fromEmail;
 
-    console.log(`[send-smtp-email] Sending to=${JSON.stringify(body.to)} via ${host}:${port} (${encryption})`);
+    const toArr = Array.isArray(body.to) ? body.to : [body.to];
+    const ccArr = body.cc ? (Array.isArray(body.cc) ? body.cc : [body.cc]) : undefined;
+    const bccArr = body.bcc ? (Array.isArray(body.bcc) ? body.bcc : [body.bcc]) : undefined;
+
+    console.log(`[send-smtp-email] from="${from}" to=${JSON.stringify(toArr)}`);
 
     await client.send({
       from,
-      to: body.to,
-      cc: body.cc,
-      bcc: body.bcc,
+      to: toArr,
+      cc: ccArr,
+      bcc: bccArr,
       replyTo: replyTo || undefined,
       subject: body.subject,
-      content: body.text ?? "",
+      content: body.text ?? "text/html content",
       html: body.html,
     });
 
