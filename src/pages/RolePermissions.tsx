@@ -18,7 +18,7 @@ export const SCREENS: { key: string; label: string }[] = [
   { key: 'vendors', label: 'All Vendors' },
   { key: 'vendor_registration', label: 'Vendor Registration' },
   { key: 'finance_review', label: 'Finance Review' },
-  { key: 'purchase_approval', label: 'Purchase Approval' },
+  { key: 'purchase_approval', label: 'SCM Approval' },
   { key: 'sap_sync', label: 'SAP Sync' },
   { key: 'gst_compliance', label: 'GST Compliance' },
   { key: 'scheduled_checks', label: 'Scheduled Checks' },
