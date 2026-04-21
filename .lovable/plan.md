@@ -1,84 +1,68 @@
 
-## Plan: Remove All Mock/Simulation APIs — Switch to Live Verification
+## Plan: User Management Screen
 
-Goal: eliminate all simulated/mock validation responses and route every check through real third-party APIs. Real API failures will return real errors (no silent fallback to fake "success").
+Add an admin screen to manage application users — view all users, their roles, tenant assignments, and change roles.
 
-### Scope of Mocks to Remove
+### What gets built
 
-| Validation | Current Mock | Replacement |
-|---|---|---|
-| GST | `simulateGSTVerification()` + `simulationMode=true` default | Live Cashfree GST API only |
-| PAN | `simulatePANVerification()` + `simulationMode=true` default | Live Cashfree PAN API only |
-| MSME / Udyam | `simulateMSMEValidation()` + `USE_SIMULATION_MODE` env | Live Cashfree Udyam API only |
-| Bank | Any simulation fallback in `validate-bank` | Live Cashfree Bank API only |
-| Penny Drop | Fully mocked `validate-penny-drop` | New real **Surepass Reverse Penny Drop** function |
-| Name Match | Internal Levenshtein (not a mock — keep) | Unchanged |
+**New page: `/admin/users`**
+- Table of all users: name, email, current role, assigned tenant(s), created date
+- Search by name/email
+- Filter by role
+- Per-row "Change Role" action → dropdown to reassign role (vendor / finance / purchase / approver / customer_admin / admin / sharvi_admin)
+- Per-row "Assign Tenant" action → select tenant from dropdown
+- Stats header: total users, count per role
 
-### Phase 1 — Strip Simulation from Cashfree Functions
+**Sidebar entry**
+- Add "User Management" item (Users icon) in `Sidebar.tsx` and `MobileBottomNav.tsx`
+- Visible only to `admin` and `sharvi_admin` roles
+- Placed between "Vendor Invitations" and "Vendor Registration"
 
-For `validate-gst`, `validate-pan`, `validate-msme`, `validate-bank`:
-- Delete all `simulate*()` helper functions
-- Delete `simulationMode` request param and `USE_SIMULATION_MODE` env checks
-- Delete fallback-to-simulation branches when API fails or credentials missing
-- If `CASHFREE_CLIENT_ID` / `CASHFREE_CLIENT_SECRET` missing → return `{ valid: false, message: "Verification service not configured" }` with 500
-- If Cashfree API returns non-OK → return real error message + status, log to `validation_api_logs`
-- Keep format validation (regex) — that's not a mock, it's input validation
+### Backend changes
 
-### Phase 2 — Implement Real Surepass Reverse Penny Drop
+The `user_roles` and `user_tenants` tables currently block INSERT / UPDATE / DELETE — no policies exist for those operations. Need to add admin-only mutation policies:
 
-Replace `supabase/functions/validate-penny-drop/index.ts` with real Surepass integration per `pennydrop.md`:
+**Migration**
+```sql
+-- Allow admins to insert/update/delete user_roles
+CREATE POLICY "Admins can insert user roles" ON public.user_roles
+  FOR INSERT TO authenticated
+  WITH CHECK (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'));
 
-- **Action `initialize`**: POST `https://kyc-api.surepass.io/api/v1/bank-verification/reverse-penny-drop/initialize` → returns `client_id`, `payment_link`, app deep links (gpay/phonepe/paytm/bhim/whatsapp)
-- **Action `status`**: POST `https://kyc-api.surepass.io/api/v1/bank-verification/reverse-penny-drop/status` with `{client_id}` → returns `account_number`, `ifsc`, `holder_name`, `upi_id`, `status`
-- Routes via `?action=initialize` or `?action=status` query param (single function)
-- On success: persist into `vendors.pennydrop_status` (jsonb), `vendors.pennydrop_init`, `vendors.pennydrop_verification_status`
-- Auth header: `Bearer ${SUREPASS_TOKEN}` (user adds secret manually)
+CREATE POLICY "Admins can update user roles" ON public.user_roles
+  FOR UPDATE TO authenticated
+  USING (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'));
 
-### Phase 3 — Frontend UPI Verification UI
+CREATE POLICY "Admins can delete user roles" ON public.user_roles
+  FOR DELETE TO authenticated
+  USING (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'));
+```
 
-Update `BankStep.tsx` + `useVendorValidations.tsx`:
-- Add **"Verify Bank via UPI Penny Drop"** button → calls `initialize`
-- Render QR code (use `qrcode` lib) of `payment_link` + buttons for GPay / PhonePe / Paytm / BHIM / WhatsApp using returned deep links
-- Poll `status` every 5s for up to 5 min
-- On `status=success`: auto-fill account_number, ifsc_code, account_holder_name; lock fields; mark validation passed
-- Stages shown: Awaiting Payment → Payment Received → Account Verified
-
-### Phase 4 — Remove Mock Data from UI Demo Components
-
-- `src/components/vendor/PennyDropDemo.tsx` — replace simulated flow with real `initialize`/`status` calls (or remove if no longer needed)
-- `src/components/vendor/EmailNotificationDemo.tsx` — leave (not a validation mock)
-- `src/data/mockVendors.ts` — keep only if used for admin seeding; flag for user
-
-### Phase 5 — Audit Logging
-
-Every real API call (Cashfree + Surepass) writes a row to `validation_api_logs` with `is_success`, `response_status`, `execution_time_ms`, `request_payload`, `response_payload`. The existing `ValidationApiLogs` admin page already displays these.
+(`user_tenants` already has admin INSERT/UPDATE/DELETE via existing ALL policies.)
 
 ### Technical Details
 
+**Files to create**
+- `src/pages/UserManagement.tsx` — main screen with table, search, filters, role/tenant change dialogs
+- `src/components/admin/ChangeRoleDialog.tsx` — dropdown + confirm
+- `src/components/admin/AssignTenantDialog.tsx` — tenant select + confirm
+
 **Files to modify**
-- `supabase/functions/validate-gst/index.ts` — strip simulation
-- `supabase/functions/validate-pan/index.ts` — strip simulation
-- `supabase/functions/validate-msme/index.ts` — strip simulation
-- `supabase/functions/validate-bank/index.ts` — strip simulation (verify current state)
-- `supabase/functions/validate-penny-drop/index.ts` — replace with Surepass impl
-- `supabase/config.toml` — already has all functions registered; no change
-- `src/components/vendor/steps/BankStep.tsx` — UPI QR + polling UI
-- `src/hooks/useVendorValidations.tsx` — add `initiatePennyDrop()` + `pollPennyDropStatus()`
-- `src/components/vendor/PennyDropDemo.tsx` — wire to real function or remove
+- `src/App.tsx` — add `/admin/users` route inside `AppLayout`
+- `src/components/layout/Sidebar.tsx` — add nav item with `UserCog` icon (roles: admin, sharvi_admin)
+- `src/components/layout/MobileBottomNav.tsx` — add same item
 
-**New dependency**
-- `qrcode` (and `@types/qrcode`) for rendering UPI QR
+**Data fetching**
+- Join `profiles` + `user_roles` + `user_tenants` + `tenants` via Supabase queries
+- Use existing RLS: admins can SELECT all profiles & user_roles already
 
-**Secrets needed**
-- `SUREPASS_TOKEN` — user will add manually in Lovable Cloud secrets
-- `CASHFREE_CLIENT_ID` + `CASHFREE_CLIENT_SECRET` — already configured ✓
+**Safeguards**
+- Prevent users from changing their own role (avoid self-lockout)
+- Confirmation dialog before role change
+- Toast notification on success/failure
+- Audit log entry written to `audit_logs` for every role change
 
-**Cashfree IP whitelisting note**
-Cashfree production typically requires whitelisting caller IPs. Supabase Edge Function egress IPs are not static. After this change, if Cashfree returns auth/IP errors, the user must either (a) request Cashfree to disable IP whitelisting on the account, or (b) we proxy through a fixed-IP service. This is operational, not a code issue — flagged here so the user knows.
-
-**No DB migrations required** — all required columns already exist.
-
-### Out of Scope
-- Replacing Cashfree with another provider
-- Building a fallback "test mode" toggle (explicitly removed by this request)
-- Cashfree IP-whitelisting setup
+### Out of scope
+- Creating new users (handled via Auth signup / Vendor Invitations)
+- Deleting users from auth.users (requires service-role; can add later if needed)
+- Bulk role assignment
