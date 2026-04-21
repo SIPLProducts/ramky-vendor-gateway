@@ -152,10 +152,7 @@ export default function AdminInvitations() {
           tenantId: tenantId || null,
           tenantName: tenantName,
           simulationMode: false,
-        },
-      });
-
-      if (emailError) {
+          frontendUrl: window.location.origin,
         console.error('Email sending error:', emailError);
         // Don't throw - invitation is created, just email failed
         return { invitation, emailSent: false, error: emailError };
