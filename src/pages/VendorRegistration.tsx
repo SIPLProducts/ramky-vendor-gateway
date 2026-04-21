@@ -414,22 +414,42 @@ export default function VendorRegistration() {
 
   const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
     setVerifiedData(data);
-    // Pre-fill statutory + bank + organization (legal name) from verified docs
+
+    // Resolve legal + address depending on GST path
+    const gstYes = data.isGstRegistered === true;
+    const legalName =
+      (gstYes ? data.gst?.legalName : data.manualLegalName) ||
+      data.pan?.holderName ||
+      '';
+    const tradeName = data.gst?.tradeName || '';
+    const principalPlace = data.gst?.principalPlaceOfBusiness || data.gst?.address || '';
+
     setFormData((prev) => ({
       ...prev,
       organization: {
         ...prev.organization,
-        legalName: data.gst?.legalName || data.pan?.holderName || prev.organization.legalName,
-        tradeName: data.gst?.tradeName || prev.organization.tradeName,
+        legalName: legalName || prev.organization.legalName,
+        tradeName: tradeName || prev.organization.tradeName,
       },
       address: {
         ...prev.address,
-        registeredAddress: data.gst?.address || prev.address.registeredAddress,
+        registeredAddress: gstYes
+          ? (principalPlace || prev.address.registeredAddress)
+          : (data.manualAddress?.address || prev.address.registeredAddress),
+        registeredCity: gstYes ? prev.address.registeredCity : (data.manualAddress?.city || prev.address.registeredCity),
+        registeredState: gstYes ? prev.address.registeredState : (data.manualAddress?.state || prev.address.registeredState),
+        registeredPincode: gstYes ? prev.address.registeredPincode : (data.manualAddress?.pincode || prev.address.registeredPincode),
       },
       statutory: {
         ...prev.statutory,
-        pan: data.pan?.number || prev.statutory.pan,
+        isGstRegistered: data.isGstRegistered ?? prev.statutory.isGstRegistered,
+        gstDeclarationReason: data.gstDeclarationReason || prev.statutory.gstDeclarationReason,
+        gstSelfDeclarationFile: data.gstSelfDeclarationFile ?? prev.statutory.gstSelfDeclarationFile,
         gstin: data.gst?.gstin || prev.statutory.gstin,
+        gstConstitutionOfBusiness: data.gst?.constitutionOfBusiness || prev.statutory.gstConstitutionOfBusiness,
+        gstPrincipalPlaceOfBusiness: principalPlace || prev.statutory.gstPrincipalPlaceOfBusiness,
+        pan: data.pan?.number || prev.statutory.pan,
+        isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
         msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
       },
       bank: {
