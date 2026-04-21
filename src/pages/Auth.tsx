@@ -238,7 +238,7 @@ export default function Auth() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full gap-2" disabled={isLoading || !selectedRole}>
+                    <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -324,7 +324,7 @@ export default function Auth() {
                       By signing up, you agree to our Terms of Service and Privacy Policy.
                     </p>
 
-                    <Button type="submit" className="w-full gap-2" disabled={isLoading || !selectedRole}>
+                    <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
