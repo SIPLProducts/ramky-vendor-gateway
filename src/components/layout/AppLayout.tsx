@@ -98,10 +98,10 @@ export function AppLayout() {
         showMobileLayout && "pt-14 pb-20",
         // Desktop with sidebar
         showDesktopSidebar && "h-screen p-6",
-        // Vendor on any device
-        role === 'vendor' && "p-4 md:p-8",
-        // Mobile without sidebar (non-vendor)
-        isMobile && role !== 'vendor' && "px-4"
+        // Vendor on any device (true vendor only — not custom-role users)
+        isVendor && "p-4 md:p-8",
+        // Mobile without sidebar (true vendor only)
+        isMobile && isVendor && "px-4"
       )}>
         <Outlet />
       </main>
