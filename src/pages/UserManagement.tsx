@@ -372,6 +372,8 @@ export default function UserManagement() {
           userName={roleDialog.full_name ?? roleDialog.email}
           tenants={tenants}
           currentTenantIds={roleDialog.tenants.map((t) => t.id)}
+          customRoles={customRoles}
+          currentCustomRoleIds={roleDialog.customRoles.map((c) => c.id)}
           onConfirm={handleChangeRole}
         />
       )}
@@ -389,6 +391,7 @@ export default function UserManagement() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         tenants={tenants}
+        customRoles={customRoles}
         onCreated={loadData}
       />
     </div>

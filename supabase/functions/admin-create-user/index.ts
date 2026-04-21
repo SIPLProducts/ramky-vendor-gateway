@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, password, full_name, role, tenant_ids } = body ?? {};
+    const { email, password, full_name, role, tenant_ids, custom_role_ids } = body ?? {};
     if (!email || !password || !role) {
       return new Response(JSON.stringify({ error: 'email, password and role are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -71,11 +71,20 @@ Deno.serve(async (req) => {
       if (tErr) throw tErr;
     }
 
+    // Custom roles
+    if (Array.isArray(custom_role_ids) && custom_role_ids.length > 0) {
+      const rows = custom_role_ids.map((cid: string) => ({
+        user_id: newUserId, custom_role_id: cid, assigned_by: callerId,
+      }));
+      const { error: cErr } = await admin.from('user_custom_roles').insert(rows);
+      if (cErr) throw cErr;
+    }
+
     // Audit log
     await admin.from('audit_logs').insert({
       action: 'user_created',
       user_id: callerId,
-      details: { new_user_id: newUserId, email, role, tenant_ids: tenant_ids ?? [] },
+      details: { new_user_id: newUserId, email, role, tenant_ids: tenant_ids ?? [], custom_role_ids: custom_role_ids ?? [] },
     });
 
     return new Response(JSON.stringify({ user_id: newUserId, email }), {
