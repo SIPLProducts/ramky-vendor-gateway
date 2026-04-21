@@ -23,7 +23,6 @@ export default function Auth() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signIn, signUp } = useAuth();
   
-  const [selectedRole, setSelectedRole] = useState<RoleType>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -48,11 +47,6 @@ export default function Auth() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-
-    if (!selectedRole) {
-      setError('Please select a role to continue');
-      return;
-    }
 
     try {
       emailSchema.parse(loginEmail);
@@ -83,11 +77,6 @@ export default function Auth() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-
-    if (!selectedRole) {
-      setError('Please select a role to continue');
-      return;
-    }
 
     try {
       nameSchema.parse(signupName);
@@ -209,23 +198,6 @@ export default function Auth() {
                 </Alert>
               )}
 
-              {/* Role Selection Dropdown */}
-              <div className="mb-6">
-                <Label htmlFor="role-select" className="mb-2 block">Select Your Role</Label>
-                <Select value={selectedRole} onValueChange={(value: RoleType) => setSelectedRole(value)}>
-                  <SelectTrigger id="role-select" className="w-full">
-                    <SelectValue placeholder="Choose your role..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vendor">Vendor Portal</SelectItem>
-                    <SelectItem value="finance">Finance Team</SelectItem>
-                    <SelectItem value="purchase">Purchase Team</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="sharvi_admin">Sharvi Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               <Tabs defaultValue="login" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="login">Login</TabsTrigger>
@@ -266,7 +238,7 @@ export default function Auth() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full gap-2" disabled={isLoading || !selectedRole}>
+                    <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -352,7 +324,7 @@ export default function Auth() {
                       By signing up, you agree to our Terms of Service and Privacy Policy.
                     </p>
 
-                    <Button type="submit" className="w-full gap-2" disabled={isLoading || !selectedRole}>
+                    <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
