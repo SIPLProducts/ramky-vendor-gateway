@@ -256,7 +256,7 @@ export function DocumentVerificationStep({
     setDoc({ status: "verifying", fileName: file.name, ocrData: ocrRes.extracted });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, ocrData: ocrRes.extracted, errorMessage: v.error });
+      setDoc({ status: "failed", fileName: file.name, ocrData: ocrRes.extracted, errorMessage: "Verification failed" });
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
