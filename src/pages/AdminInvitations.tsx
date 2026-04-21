@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenants } from '@/hooks/useTenant';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,6 +75,28 @@ export default function AdminInvitations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: tenants } = useTenants();
+  const { user, userRole } = useAuth();
+  const isSharviAdmin = userRole === 'sharvi_admin';
+
+  // Auto-derive tenant for current (non-sharvi) admin from user_tenants
+  const { data: currentUserTenantId } = useQuery({
+    queryKey: ['current-user-tenant', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('user_tenants')
+        .select('tenant_id, is_default')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) { console.error(error); return null; }
+      return data?.tenant_id ?? null;
+    },
+    enabled: !!user?.id,
+  });
+
+  const effectiveTenantId = isSharviAdmin ? (selectedTenantId || null) : (currentUserTenantId || null);
 
   // Fetch invitations
   const { data: invitations, isLoading } = useQuery({
@@ -238,7 +261,18 @@ export default function AdminInvitations() {
       }
     }
 
-    createInvitation.mutate({ email, vendorName, phoneNumber, expiryDays: parseInt(expiryDays), tenantId: selectedTenantId || null });
+    if (!effectiveTenantId) {
+      toast({
+        title: 'No Company Assigned',
+        description: isSharviAdmin
+          ? 'Please select a company.'
+          : 'Your account is not assigned to any company. Contact your administrator.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    createInvitation.mutate({ email, vendorName, phoneNumber, expiryDays: parseInt(expiryDays), tenantId: effectiveTenantId });
   };
 
   const copyInvitationLink = (token: string) => {
@@ -398,21 +432,30 @@ export default function AdminInvitations() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="company">Company (Tenant)</Label>
-                <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
-                  <SelectTrigger id="company">
-                    <SelectValue placeholder="Select a company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenants?.map((tenant) => (
-                      <SelectItem key={tenant.id} value={tenant.id}>
-                        {tenant.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isSharviAdmin ? (
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company (Tenant)</Label>
+                  <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                    <SelectTrigger id="company">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenants?.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
+                    {tenants?.find(t => t.id === currentUserTenantId)?.name || (currentUserTenantId ? 'Loading…' : 'No company assigned to your account')}
+                  </div>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
