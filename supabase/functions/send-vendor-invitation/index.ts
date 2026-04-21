@@ -39,47 +39,135 @@ const handler = async (req: Request): Promise<Response> => {
 
     const emailHtml = `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vendor Registration Invitation</title>
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Sharvi Vendor Portal</h1>
-          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Vendor Management System</p>
-        </div>
-        
-        <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-          <h2 style="color: #1f2937; margin-top: 0;">You're Invited to Register</h2>
-          
-          <p>Hello,</p>
-          
-          <p>You have been invited to register as a vendor on the Sharvi Vendor Portal. Please click the button below to create your account and complete your vendor registration.</p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-              Start Registration
-            </a>
-          </div>
-          
-          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0; color: #92400e; font-size: 14px;">
-              <strong>⚠️ Important:</strong> This invitation link expires on <strong>${expiryDate}</strong>. Please complete your registration before this date.
-            </p>
-          </div>
-          
-          <p style="color: #6b7280; font-size: 14px;">If the button above doesn't work, copy and paste this link into your browser:</p>
-          <p style="background: #f3f4f6; padding: 12px; border-radius: 6px; word-break: break-all; font-size: 12px; color: #4b5563;">
-            ${inviteLink}
-          </p>
-          
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-          
-          <p style="color: #6b7280; font-size: 12px; margin-bottom: 0;">
-            This is an automated message from Sharvi Vendor Portal. If you did not expect this invitation, please ignore this email or contact support@sharviinfotech.com.
-          </p>
-        </div>
+      <body style="margin:0; padding:0; background-color:#F7F9FC; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#1f2937;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F7F9FC; padding:32px 16px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); overflow:hidden;">
+                
+                <!-- Top accent bar -->
+                <tr>
+                  <td style="height:4px; background:linear-gradient(90deg,#2563eb 0%,#1d4ed8 100%); line-height:4px; font-size:0;">&nbsp;</td>
+                </tr>
+                
+                <!-- Brand header -->
+                <tr>
+                  <td style="padding:28px 36px 8px 36px;">
+                    <div style="font-size:18px; font-weight:700; color:#0b3a8c; letter-spacing:0.5px;">SHARVI</div>
+                    <div style="font-size:12px; color:#6b7280; margin-top:2px; letter-spacing:0.3px; text-transform:uppercase;">Vendor Portal</div>
+                  </td>
+                </tr>
+
+                <!-- Title -->
+                <tr>
+                  <td style="padding:8px 36px 0 36px;">
+                    <h1 style="margin:0; font-size:22px; line-height:1.3; color:#111827; font-weight:600;">You're Invited to Register</h1>
+                  </td>
+                </tr>
+
+                <!-- Body copy -->
+                <tr>
+                  <td style="padding:16px 36px 0 36px; font-size:14px; line-height:1.6; color:#374151;">
+                    <p style="margin:0 0 12px 0;">Hello,</p>
+                    <p style="margin:0 0 16px 0;">You've been invited by <strong>Sharvi Vendor Portal</strong> to register as a supplier. Please complete your registration to begin doing business with us.</p>
+                  </td>
+                </tr>
+
+                <!-- What happens next -->
+                <tr>
+                  <td style="padding:8px 36px 0 36px;">
+                    <div style="background-color:#F7F9FC; border:1px solid #e5e7eb; border-radius:8px; padding:18px 20px;">
+                      <div style="font-size:13px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:12px;">What happens next</div>
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="padding:6px 0; font-size:14px; color:#374151;">
+                            <span style="display:inline-block; width:22px; height:22px; line-height:22px; border-radius:50%; background-color:#2563eb; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:10px;">1</span>
+                            Click the <strong>Start Registration</strong> button below
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:6px 0; font-size:14px; color:#374151;">
+                            <span style="display:inline-block; width:22px; height:22px; line-height:22px; border-radius:50%; background-color:#2563eb; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:10px;">2</span>
+                            Complete the 7-step vendor registration form
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:6px 0; font-size:14px; color:#374151;">
+                            <span style="display:inline-block; width:22px; height:22px; line-height:22px; border-radius:50%; background-color:#2563eb; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:10px;">3</span>
+                            Get verified &amp; approved by our team
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Time estimate -->
+                <tr>
+                  <td style="padding:14px 36px 0 36px;">
+                    <p style="margin:0; font-size:13px; color:#6b7280;">⏱ Takes about <strong style="color:#374151;">10–15 minutes</strong> to complete.</p>
+                  </td>
+                </tr>
+
+                <!-- CTA -->
+                <tr>
+                  <td align="center" style="padding:24px 36px 8px 36px;">
+                    <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#2563eb; color:#ffffff; text-decoration:none; padding:14px 32px; border-radius:6px; font-size:15px; font-weight:600; letter-spacing:0.2px;">
+                      Start Registration
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- Expiry notice -->
+                <tr>
+                  <td style="padding:16px 36px 0 36px;">
+                    <div style="background-color:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px;">
+                      <p style="margin:0; font-size:13px; color:#92400e;">
+                        ⚠ <strong>Important:</strong> This invitation expires on <strong>${expiryDate}</strong>.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Fallback link -->
+                <tr>
+                  <td style="padding:20px 36px 0 36px;">
+                    <p style="margin:0 0 8px 0; font-size:12px; color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p>
+                    <div style="background-color:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:10px 12px; font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace; font-size:11px; color:#374151; word-break:break-all;">
+                      ${inviteLink}
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Divider -->
+                <tr>
+                  <td style="padding:24px 36px 0 36px;">
+                    <div style="height:1px; background-color:#e5e7eb; line-height:1px; font-size:0;">&nbsp;</div>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding:16px 36px 28px 36px;">
+                    <p style="margin:0 0 6px 0; font-size:12px; color:#6b7280;">
+                      Need help? Contact us at <a href="mailto:support@sharviinfotech.com" style="color:#2563eb; text-decoration:none;">support@sharviinfotech.com</a>
+                    </p>
+                    <p style="margin:0; font-size:11px; color:#9ca3af;">
+                      This is an automated message from Sharvi Vendor Portal. © Sharvi Infotech.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
       </html>
     `;
