@@ -121,7 +121,7 @@ export default function UserManagement() {
     return { total: users.length, counts };
   }, [users]);
 
-  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[]) => {
+  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
     if (!roleDialog) return;
     if (roleDialog.id === user?.id && newRole !== roleDialog.role) {
       toast({ title: 'Action blocked', description: 'You cannot change your own role.', variant: 'destructive' });
@@ -155,6 +155,29 @@ export default function UserManagement() {
         const rows = toAdd.map((tid) => ({ user_id: roleDialog.id, tenant_id: tid }));
         const { error } = await supabase.from('user_tenants').insert(rows);
         if (error) throw error;
+      }
+
+      // Custom role sync
+      const currentCustom = roleDialog.customRoles.map((c) => c.id);
+      const cToAdd = newCustomRoleIds.filter((id) => !currentCustom.includes(id));
+      const cToRemove = currentCustom.filter((id) => !newCustomRoleIds.includes(id));
+      if (cToRemove.length > 0) {
+        const { error } = await supabase.from('user_custom_roles')
+          .delete().eq('user_id', roleDialog.id).in('custom_role_id', cToRemove);
+        if (error) throw error;
+        await supabase.from('audit_logs').insert({
+          action: 'custom_roles_unassigned', user_id: user?.id,
+          details: { target_user_id: roleDialog.id, custom_role_ids: cToRemove },
+        });
+      }
+      if (cToAdd.length > 0) {
+        const rows = cToAdd.map((cid) => ({ user_id: roleDialog.id, custom_role_id: cid, assigned_by: user?.id }));
+        const { error } = await supabase.from('user_custom_roles').insert(rows);
+        if (error) throw error;
+        await supabase.from('audit_logs').insert({
+          action: 'custom_roles_assigned', user_id: user?.id,
+          details: { target_user_id: roleDialog.id, custom_role_ids: cToAdd },
+        });
       }
 
       toast({ title: 'User updated', description: `${roleDialog.email} → ${newRole}` });
