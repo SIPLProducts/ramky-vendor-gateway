@@ -637,7 +637,8 @@ export default function VendorRegistration() {
               </Link>
             </div>
           </SheetContent>
-        </Sheet>
+          </Sheet>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -645,8 +646,18 @@ export default function VendorRegistration() {
         {/* Left Panel - Registration Steps */}
         <aside className="hidden lg:flex flex-col w-[280px] flex-shrink-0 border-r bg-card">
           <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-foreground">Registration Steps</h2>
-            <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit</p>
+            <div className="flex items-center gap-4">
+              <CompletenessRing value={completeness.overall} size={64} label="done" />
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-foreground leading-tight">Registration Progress</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {completeness.overall < 100
+                    ? `${100 - completeness.overall}% to go — keep going!`
+                    : 'All set — review &amp; submit'}
+                </p>
+              </div>
+            </div>
+            <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} className="mt-3" />
           </div>
           <div className="flex-1 p-6 overflow-auto">
             <EnterpriseStepIndicator
