@@ -64,9 +64,10 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
 
   const isCustom = selectedRole.startsWith('custom:');
   const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
-  // Built-in role to actually persist in user_roles. For custom selection, default to 'vendor'
-  // (the custom role drives screen permissions; user_roles still requires an enum value).
-  const builtInRole: AppRole = isCustom ? 'vendor' : (selectedRole as AppRole);
+  // Built-in role to actually persist in user_roles. For custom selection we use 'approver'
+  // purely as a non-vendor placeholder — it grants no built-in screen permissions; the
+  // assigned custom role remains the sole source of truth for what the user can access.
+  const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
 
   const handleSubmit = async () => {
     if (!email || !password || !selectedRole) {

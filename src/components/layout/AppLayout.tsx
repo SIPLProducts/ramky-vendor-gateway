@@ -14,7 +14,7 @@ import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
 export function AppLayout() {
-  const { user, userRole } = useAuth();
+  const { user, userRole, hasCustomRole, isVendor } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
@@ -62,7 +62,8 @@ export function AppLayout() {
   const { allowed, loading: permsLoading } = useScreenPermissions();
   const hasAnyPermission = allowed.size > 0;
 
-  const isPortalUser = isBuiltInPortalRole || (role !== 'vendor') || hasAnyPermission;
+  // Anyone with a custom role is a portal user — the custom role drives access, not the built-in enum.
+  const isPortalUser = hasCustomRole || isBuiltInPortalRole || (!isVendor) || hasAnyPermission;
 
   // Show mobile layout for mobile devices with portal access
   const showMobileLayout = isMobile && isPortalUser && !permsLoading;
@@ -97,10 +98,10 @@ export function AppLayout() {
         showMobileLayout && "pt-14 pb-20",
         // Desktop with sidebar
         showDesktopSidebar && "h-screen p-6",
-        // Vendor on any device
-        role === 'vendor' && "p-4 md:p-8",
-        // Mobile without sidebar (non-vendor)
-        isMobile && role !== 'vendor' && "px-4"
+        // Vendor on any device (true vendor only — not custom-role users)
+        isVendor && "p-4 md:p-8",
+        // Mobile without sidebar (true vendor only)
+        isMobile && isVendor && "px-4"
       )}>
         <Outlet />
       </main>
