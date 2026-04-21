@@ -1,101 +1,84 @@
 
 
-## Formal & Elegant Vendor Invitation Email Redesign
+## Fix "Access Denied" on Vendor Invitation Link
 
-### Current Email Body Issues
-The current email is functional but lacks the sophistication expected for enterprise B2B communications. It needs:
-- More formal, professional tone
-- Elegant typography and spacing
-- Refined color palette (less bright, more corporate)
-- Better visual hierarchy
-- Professional signature block
+### Root Cause
 
-### Proposed Elegant Design
+When a vendor clicks **Begin Registration** in the invitation email, they land on `/vendor/invite?token=...` **without being logged in**. The page queries `vendor_invitations` directly from the browser to validate the token. However, the table's RLS policies only allow `sharvi_admin`, `admin`, `customer_admin`, `finance`, and `purchase` roles to SELECT rows — there is **no policy for anonymous users**. So the query returns no row, and the UI shows "Invalid invitation link".
 
-**Visual Style:**
-- **Color Palette**: Deep navy (#1e3a5f) for headers, soft gold/amber (#d4a574) for accents, charcoal (#2d3748) for text
-- **Typography**: Elegant serif for headings (Georgia), clean sans-serif for body (system fonts)
-- **Layout**: Generous whitespace, refined borders, subtle shadows
-- **Card**: Pure white with 1px subtle border (#e2e8f0), 12px border radius
+The token itself is valid in the database (verified — not expired, not used).
 
-**Email Body Structure:**
+### Fix Approach
 
-```html
-┌─────────────────────────────────────────────────────────┐
-│  [Soft grey #f8fafc background]                         │
-│    ┌──────────────────────────────────────────────┐    │
-│    │  ▓▓▓ Deep Navy Header Bar (#1e3a5f) ▓▓▓      │    │
-│    │                                                │    │
-│    │      [Company Logo Wordmark - White]           │    │
-│    │      Vendor Portal                             │    │
-│    │                                                │    │
-│    └──────────────────────────────────────────────┘    │
-│                                                        │
-│    ┌──────────────────────────────────────────────┐    │
-│    │                                                │    │
-│    │   Vendor Registration Invitation               │    │
-│    │                                                │    │
-│    │   ─────────────────────────────────────        │    │
-│    │                                                │    │
-│    │   Dear Valued Business Partner,                │    │
-│    │                                                │    │
-│    │   [Company Name] cordially invites you to      │    │
-│    │   register as an approved supplier in our      │    │
-│    │   Vendor Management Portal.                    │    │
-│    │                                                │    │
-│    │   This secure registration process enables     │    │
-│    │   streamlined collaboration and ensures          │    │
-│    │   compliance with our procurement standards.     │    │
-│    │                                                │    │
-│    │   ┌─────────────────────────────────────┐       │    │
-│    │   │  REGISTRATION PROCESS               │       │    │
-│    │   │                                     │       │    │
-│    │   │  ①  Access Registration Portal      │       │    │
-│    │   │  ②  Complete Supplier Profile       │       │    │
-│    │   │  ③  Verification & Approval         │       │    │
-│    │   │                                     │       │    │
-│    │   │  Estimated Time: 10–15 minutes      │       │    │
-│    │   └─────────────────────────────────────┘       │    │
-│    │                                                │    │
-│    │   [    BEGIN REGISTRATION    ]                 │    │
-│    │   (Gold/Amber button #d4a574)                  │    │
-│    │                                                │    │
-│    │   ┌─────────────────────────────────────┐       │    │
-│    │   │  ⚠  INVITATION EXPIRES: [Date]    │       │    │
-│    │   └─────────────────────────────────────┘       │    │
-│    │                                                │    │
-│    │   Should you encounter any difficulties,       │    │
-│    │   please contact our support team at           │    │
-│    │   [support email].                             │    │
-│    │                                                │    │
-│    │   ─────────────────────────────────────        │    │
-│    │                                                │    │
-│    │   Respectfully,                                │    │
-│    │   Procurement Team                             │    │
-│    │   [Company Name]                               │    │
-│    │                                                │    │
-│    └──────────────────────────────────────────────┘    │
-│                                                        │
-│    [Footer: © 2025 Company Name. All rights reserved.] │
-│                                                        │
-└─────────────────────────────────────────────────────────┘
+We cannot blindly open SELECT to anonymous users (that would expose every invitation, email, and token to the public). Instead, we'll create a **secure database function** that validates one specific token at a time, returning only the minimum data needed (id, email, expires_at, used_at, tenant_id) for that single token.
+
+### Changes
+
+**1. New SECURITY DEFINER database function** (migration)
+
+```sql
+create or replace function public.get_invitation_by_token(_token text)
+returns table (
+  id uuid,
+  email text,
+  expires_at timestamptz,
+  used_at timestamptz,
+  tenant_id uuid,
+  vendor_name text,
+  phone_number text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id, email, expires_at, used_at, tenant_id, vendor_name, phone_number
+  from public.vendor_invitations
+  where token = _token
+  limit 1;
+$$;
+
+grant execute on function public.get_invitation_by_token(text) to anon, authenticated;
 ```
 
-### Key Improvements
+This function:
+- Accepts only one specific token at a time (no enumeration possible)
+- Returns only the fields the registration page needs
+- Bypasses RLS safely because it's scoped to a single token lookup
 
-1. **Tone**: "Dear Valued Business Partner" instead of casual "Hello"
-2. **Language**: Formal business English ("cordially invites", "streamlined collaboration")
-3. **Visual Hierarchy**: Clear sections with elegant dividers
-4. **Color Scheme**: Deep navy, soft gold, charcoal - corporate and refined
-5. **Button**: "BEGIN REGISTRATION" in elegant gold/amber instead of bright blue
-6. **Signature**: Professional sign-off with "Respectfully, Procurement Team"
-7. **Expiry Notice**: Styled as important but not alarming
+**2. Update `src/pages/VendorRegisterWithInvite.tsx`**
 
-### Files to Change
+Replace the direct table query:
+```ts
+supabase.from('vendor_invitations').select('*').eq('token', token).single()
+```
+with the RPC call:
+```ts
+supabase.rpc('get_invitation_by_token', { _token: token })
+```
+and read the first row from the returned array.
 
-- `supabase/functions/send-vendor-invitation/index.ts` — Replace the `emailHtml` template (lines 76-209) with the new elegant design
+The "mark as used" UPDATE after signup stays as-is (runs after `auth.signUp`, so the user is now authenticated; we'll also add an UPDATE policy allowing the just-signed-up user to mark their own invitation used by token match).
 
-### Deployment
+**3. Add a narrow UPDATE policy on `vendor_invitations`**
 
-After editing, redeploy `send-vendor-invitation` Edge Function.
+```sql
+create policy "Authenticated users can mark own invitation used"
+on public.vendor_invitations
+for update
+to authenticated
+using (used_at is null and email = (auth.jwt() ->> 'email'))
+with check (email = (auth.jwt() ->> 'email'));
+```
+
+This ensures the freshly-created vendor user can flip `used_at` for their own invitation, without giving them write access to anyone else's record.
+
+### Files Touched
+
+- New migration: `get_invitation_by_token` function + UPDATE policy
+- `src/pages/VendorRegisterWithInvite.tsx` — swap direct query for RPC call
+
+### Verification
+
+After deploy, opening `https://ramkyvms.netlify.app/vendor/invite?token=9995bc44-9d6c-4f0a-b3a4-4196bbff8ccc` should show the "Create Your Account" form with `bala@sharviinfotech.com` pre-filled, instead of "Access Denied".
 
