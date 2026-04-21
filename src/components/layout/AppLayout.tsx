@@ -62,7 +62,8 @@ export function AppLayout() {
   const { allowed, loading: permsLoading } = useScreenPermissions();
   const hasAnyPermission = allowed.size > 0;
 
-  const isPortalUser = isBuiltInPortalRole || (role !== 'vendor') || hasAnyPermission;
+  // Anyone with a custom role is a portal user — the custom role drives access, not the built-in enum.
+  const isPortalUser = hasCustomRole || isBuiltInPortalRole || (!isVendor) || hasAnyPermission;
 
   // Show mobile layout for mobile devices with portal access
   const showMobileLayout = isMobile && isPortalUser && !permsLoading;
