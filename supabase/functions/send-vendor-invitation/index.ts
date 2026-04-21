@@ -95,7 +95,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <!-- Brand header -->
                 <tr>
                   <td style="padding:28px 36px 8px 36px;">
-                    <div style="font-size:18px; font-weight:700; color:#0b3a8c; letter-spacing:0.5px;">SHARVI</div>
+                    <div style="font-size:18px; font-weight:700; color:#0b3a8c; letter-spacing:0.5px;">${brandShort}</div>
                     <div style="font-size:12px; color:#6b7280; margin-top:2px; letter-spacing:0.3px; text-transform:uppercase;">Vendor Portal</div>
                   </td>
                 </tr>
@@ -111,7 +111,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                   <td style="padding:16px 36px 0 36px; font-size:14px; line-height:1.6; color:#374151;">
                     <p style="margin:0 0 12px 0;">Hello,</p>
-                    <p style="margin:0 0 16px 0;">You've been invited by <strong>Sharvi Vendor Portal</strong> to register as a supplier. Please complete your registration to begin doing business with us.</p>
+                    <p style="margin:0 0 16px 0;">You've been invited by <strong>${companyName}</strong> to register as a supplier. Please complete your registration to begin doing business with us.</p>
                   </td>
                 </tr>
 
@@ -192,10 +192,10 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                   <td style="padding:16px 36px 28px 36px;">
                     <p style="margin:0 0 6px 0; font-size:12px; color:#6b7280;">
-                      Need help? Contact us at <a href="mailto:support@sharviinfotech.com" style="color:#2563eb; text-decoration:none;">support@sharviinfotech.com</a>
+                      Need help? Contact us at <a href="mailto:${supportEmail}" style="color:#2563eb; text-decoration:none;">${supportEmail}</a>
                     </p>
                     <p style="margin:0; font-size:11px; color:#9ca3af;">
-                      This is an automated message from Sharvi Vendor Portal. © Sharvi Infotech.
+                      This is an automated message from ${companyName}. © ${companyName}.
                     </p>
                   </td>
                 </tr>
@@ -267,7 +267,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         to: email,
-        subject: "Vendor Registration Invitation - Sharvi",
+        subject: `Vendor Registration Invitation - ${companyName}`,
         html: emailHtml,
       }),
     });
