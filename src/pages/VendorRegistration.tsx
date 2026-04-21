@@ -21,6 +21,9 @@ import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
+import { CompletenessRing } from '@/components/vendor/CompletenessRing';
+import { useFormCompleteness } from '@/hooks/useFormCompleteness';
 
 // 8-step registration flow — Step 1 is the OCR + verification gate
 const registrationSteps = [
