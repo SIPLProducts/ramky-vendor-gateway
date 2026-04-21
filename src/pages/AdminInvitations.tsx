@@ -75,6 +75,28 @@ export default function AdminInvitations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: tenants } = useTenants();
+  const { user, userRole } = useAuth();
+  const isSharviAdmin = userRole === 'sharvi_admin';
+
+  // Auto-derive tenant for current (non-sharvi) admin from user_tenants
+  const { data: currentUserTenantId } = useQuery({
+    queryKey: ['current-user-tenant', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('user_tenants')
+        .select('tenant_id, is_default')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) { console.error(error); return null; }
+      return data?.tenant_id ?? null;
+    },
+    enabled: !!user?.id,
+  });
+
+  const effectiveTenantId = isSharviAdmin ? (selectedTenantId || null) : (currentUserTenantId || null);
 
   // Fetch invitations
   const { data: invitations, isLoading } = useQuery({
