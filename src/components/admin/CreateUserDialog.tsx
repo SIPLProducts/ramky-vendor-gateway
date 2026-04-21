@@ -41,9 +41,9 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [role, setRole] = useState<AppRole>('vendor');
+  // selectedRole = built-in AppRole OR "custom:<custom_role_id>"
+  const [selectedRole, setSelectedRole] = useState<string>('vendor');
   const [tenantIds, setTenantIds] = useState<string[]>(defaultTenantId ? [defaultTenantId] : []);
-  const [customRoleIds, setCustomRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -54,15 +54,12 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
   }, [open, defaultTenantId]);
 
   const reset = () => {
-    setFullName(''); setEmail(''); setPassword(''); setRole('vendor');
-    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setCustomRoleIds([]); setShowPw(false);
+    setFullName(''); setEmail(''); setPassword(''); setSelectedRole('vendor');
+    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setShowPw(false);
   };
 
   const toggleTenant = (id: string) => {
     setTenantIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
-  };
-  const toggleCustom = (id: string) => {
-    setCustomRoleIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
   };
 
   const handleSubmit = async () => {
