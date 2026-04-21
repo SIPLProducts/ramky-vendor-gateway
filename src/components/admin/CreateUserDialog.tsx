@@ -22,6 +22,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   tenants: Tenant[];
   customRoles?: CustomRoleOpt[];
+  defaultTenantId?: string | null;
   onCreated: () => void;
 }
 
@@ -34,20 +35,27 @@ function generatePassword() {
   return pw;
 }
 
-export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = [], onCreated }: Props) {
+export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = [], defaultTenantId = null, onCreated }: Props) {
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [role, setRole] = useState<AppRole>('vendor');
-  const [tenantIds, setTenantIds] = useState<string[]>([]);
+  const [tenantIds, setTenantIds] = useState<string[]>(defaultTenantId ? [defaultTenantId] : []);
   const [customRoleIds, setCustomRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // When dialog opens or default tenant changes, prefill
+  useState(() => {});
+  // sync default
+  if (defaultTenantId && tenantIds.length === 0 && open) {
+    // noop - initial state covers it; below useEffect-like via separate effect not needed (handled in reset)
+  }
+
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setRole('vendor');
-    setTenantIds([]); setCustomRoleIds([]); setShowPw(false);
+    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setCustomRoleIds([]); setShowPw(false);
   };
 
   const toggleTenant = (id: string) => {

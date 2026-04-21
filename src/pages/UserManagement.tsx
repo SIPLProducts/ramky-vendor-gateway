@@ -31,10 +31,11 @@ interface UserRow {
 }
 
 interface Tenant { id: string; name: string; }
-interface CustomRoleOpt { id: string; name: string; is_active: boolean; }
-interface CustomRoleRow extends CustomRoleData { id: string; user_count: number; created_at: string; }
+interface CustomRoleOpt { id: string; name: string; is_active: boolean; tenant_id?: string | null; }
+interface CustomRoleRow extends CustomRoleData { id: string; user_count: number; created_at: string; tenant_id?: string | null; }
 
 const ALL_ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
+const ALL_TENANTS = '__all__';
 
 export default function UserManagement() {
   const { user } = useAuth();
@@ -46,6 +47,7 @@ export default function UserManagement() {
   const [customRoleRows, setCustomRoleRows] = useState<CustomRoleRow[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [scopeTenantId, setScopeTenantId] = useState<string>(ALL_TENANTS);
   const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
   const [tenantDialog, setTenantDialog] = useState<UserRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -73,7 +75,7 @@ export default function UserManagement() {
       if (userCustomRes.error) throw userCustomRes.error;
 
       const tenantMap = new Map<string, Tenant>((tenantsRes.data ?? []).map((t) => [t.id, t]));
-      const customRoleMap = new Map<string, CustomRoleOpt>((customRolesRes.data ?? []).map((c) => [c.id, c]));
+      const customRoleMap = new Map<string, CustomRoleOpt>((customRolesRes.data ?? []).map((c: any) => [c.id, c]));
       const roleMap = new Map<string, AppRole>((rolesRes.data ?? []).map((r) => [r.user_id, r.role as AppRole]));
       const utByUser = new Map<string, string[]>();
       (userTenantsRes.data ?? []).forEach((ut) => {
@@ -91,8 +93,8 @@ export default function UserManagement() {
       });
 
       setTenants(tenantsRes.data ?? []);
-      setCustomRoles(customRolesRes.data ?? []);
-      setCustomRoleRows((customRolesRes.data ?? []).map((r) => ({ ...r, user_count: countsByRole.get(r.id) ?? 0 })));
+      setCustomRoles((customRolesRes.data ?? []) as any);
+      setCustomRoleRows((customRolesRes.data ?? []).map((r: any) => ({ ...r, user_count: countsByRole.get(r.id) ?? 0 })));
       setUsers(
         (profilesRes.data ?? []).map((p) => ({
           id: p.id,
@@ -118,20 +120,37 @@ export default function UserManagement() {
 
   useEffect(() => { loadData(); }, []);
 
+  // Custom roles scoped to selected tenant (or global if "All")
+  const scopedCustomRoles = useMemo(() => {
+    if (scopeTenantId === ALL_TENANTS) return customRoles;
+    return customRoles.filter((c) => c.tenant_id === scopeTenantId || !c.tenant_id);
+  }, [customRoles, scopeTenantId]);
+
+  const scopedCustomRoleRows = useMemo(() => {
+    if (scopeTenantId === ALL_TENANTS) return customRoleRows;
+    return customRoleRows.filter((c) => c.tenant_id === scopeTenantId || !c.tenant_id);
+  }, [customRoleRows, scopeTenantId]);
+
+  // Users scoped to selected tenant
+  const scopedUsers = useMemo(() => {
+    if (scopeTenantId === ALL_TENANTS) return users;
+    return users.filter((u) => u.tenants.some((t) => t.id === scopeTenantId));
+  }, [users, scopeTenantId]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return users.filter((u) => {
+    return scopedUsers.filter((u) => {
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (!q) return true;
       return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
     });
-  }, [users, search, roleFilter]);
+  }, [scopedUsers, search, roleFilter]);
 
   const stats = useMemo(() => {
     const counts: Record<string, number> = {};
-    users.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
-    return { total: users.length, counts };
-  }, [users]);
+    scopedUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
+    return { total: scopedUsers.length, counts };
+  }, [scopedUsers]);
 
   const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
     if (!roleDialog) return;
@@ -219,6 +238,8 @@ export default function UserManagement() {
 
   const handleSaveCustomRole = async (data: CustomRoleData) => {
     try {
+      // Bind to selected tenant if one is chosen (else global)
+      const tenantBinding = scopeTenantId === ALL_TENANTS ? null : scopeTenantId;
       if (data.id) {
         const { error } = await supabase.from('custom_roles')
           .update({ name: data.name, description: data.description, is_active: data.is_active })
@@ -230,13 +251,13 @@ export default function UserManagement() {
         toast({ title: 'Role updated' });
       } else {
         const { data: created, error } = await supabase.from('custom_roles')
-          .insert({ name: data.name, description: data.description, is_active: data.is_active, created_by: user?.id })
+          .insert({ name: data.name, description: data.description, is_active: data.is_active, created_by: user?.id, tenant_id: tenantBinding } as any)
           .select().single();
         if (error) throw error;
         await supabase.from('audit_logs').insert({
-          action: 'custom_role_created', user_id: user?.id, details: { id: created.id, name: data.name },
+          action: 'custom_role_created', user_id: user?.id, details: { id: created.id, name: data.name, tenant_id: tenantBinding },
         });
-        toast({ title: 'Role created' });
+        toast({ title: 'Role created', description: tenantBinding ? `Scoped to selected tenant` : 'Global role' });
       }
       await loadData();
     } catch (err: any) {
@@ -263,13 +284,36 @@ export default function UserManagement() {
     await loadData();
   };
 
+  const tenantLabel = scopeTenantId === ALL_TENANTS
+    ? 'All Tenants (Global)'
+    : tenants.find((t) => t.id === scopeTenantId)?.name ?? '';
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Users className="h-6 w-6" /> User Management
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage users, custom roles, and screen-level permissions.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <Users className="h-6 w-6" /> User Management
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage users, custom roles, screen permissions and approval matrix — scoped per tenant.
+          </p>
+        </div>
+        <Card className="min-w-[280px]">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-primary" />
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground">Tenant Scope</p>
+              <Select value={scopeTenantId} onValueChange={setScopeTenantId}>
+                <SelectTrigger className="h-8 mt-0.5"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_TENANTS}>All Tenants (Global)</SelectItem>
+                  {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
@@ -282,7 +326,10 @@ export default function UserManagement() {
 
         {/* USERS TAB */}
         <TabsContent value="users" className="space-y-6">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <Badge variant="outline" className="text-xs">
+              <Building2 className="h-3 w-3 mr-1" /> {tenantLabel}
+            </Badge>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" /> Create User
             </Button>
@@ -341,7 +388,9 @@ export default function UserManagement() {
                         <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
                     ) : filtered.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        {scopeTenantId === ALL_TENANTS ? 'No users found' : 'No users in this tenant'}
+                      </TableCell></TableRow>
                     ) : (
                       filtered.map((u) => (
                         <TableRow key={u.id}>
@@ -400,19 +449,27 @@ export default function UserManagement() {
 
         {/* CUSTOM ROLES TAB */}
         <TabsContent value="custom-roles" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <Badge variant="outline" className="text-xs">
+              <Building2 className="h-3 w-3 mr-1" /> {tenantLabel}
+            </Badge>
             <Button onClick={() => { setEditingCustomRole(null); setCustomRoleDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Create Role
             </Button>
           </div>
           <Card>
-            <CardHeader><CardTitle className="text-base">All Custom Roles</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Custom Roles {scopeTenantId !== ALL_TENANTS && <span className="text-sm text-muted-foreground font-normal">— scoped to {tenantLabel}</span>}
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="border rounded-md">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Scope</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Users</TableHead>
                       <TableHead>Status</TableHead>
@@ -422,38 +479,46 @@ export default function UserManagement() {
                   <TableBody>
                     {loading ? (
                       Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
-                    ) : customRoleRows.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No custom roles yet. Click "Create Role" to add one.
+                    ) : scopedCustomRoleRows.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No custom roles {scopeTenantId !== ALL_TENANTS ? 'in this tenant' : 'yet'}. Click "Create Role" to add one.
                       </TableCell></TableRow>
                     ) : (
-                      customRoleRows.map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell className="font-medium">{r.name}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{r.description ?? '—'}</TableCell>
-                          <TableCell>{r.user_count}</TableCell>
-                          <TableCell>
-                            {r.is_active
-                              ? <Badge variant="secondary">Active</Badge>
-                              : <Badge variant="outline">Inactive</Badge>}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => setPermsRole(r)}>
-                                <Settings className="h-4 w-4 mr-1" /> Screens
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => { setEditingCustomRole(r); setCustomRoleDialogOpen(true); }}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteCustomRole(r)} className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      scopedCustomRoleRows.map((r) => {
+                        const tName = r.tenant_id ? tenants.find((t) => t.id === r.tenant_id)?.name : null;
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell className="font-medium">{r.name}</TableCell>
+                            <TableCell>
+                              {tName
+                                ? <Badge variant="outline" className="bg-primary/5">{tName}</Badge>
+                                : <Badge variant="secondary">Global</Badge>}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{r.description ?? '—'}</TableCell>
+                            <TableCell>{r.user_count}</TableCell>
+                            <TableCell>
+                              {r.is_active
+                                ? <Badge variant="secondary">Active</Badge>
+                                : <Badge variant="outline">Inactive</Badge>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => setPermsRole(r)}>
+                                  <Settings className="h-4 w-4 mr-1" /> Screens
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setEditingCustomRole(r); setCustomRoleDialogOpen(true); }}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDeleteCustomRole(r)} className="text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -464,7 +529,7 @@ export default function UserManagement() {
 
         {/* ROLE PERMISSIONS TAB */}
         <TabsContent value="role-permissions">
-          <RolePermissions />
+          <RolePermissions tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId} tenantLabel={tenantLabel} />
         </TabsContent>
 
         {/* APPROVAL MATRIX TAB */}
@@ -482,7 +547,7 @@ export default function UserManagement() {
           userName={roleDialog.full_name ?? roleDialog.email}
           tenants={tenants}
           currentTenantIds={roleDialog.tenants.map((t) => t.id)}
-          customRoles={customRoles}
+          customRoles={scopedCustomRoles}
           currentCustomRoleIds={roleDialog.customRoles.map((c) => c.id)}
           onConfirm={handleChangeRole}
         />
@@ -501,7 +566,8 @@ export default function UserManagement() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         tenants={tenants}
-        customRoles={customRoles}
+        customRoles={scopedCustomRoles}
+        defaultTenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId}
         onCreated={loadData}
       />
       <CustomRoleDialog
