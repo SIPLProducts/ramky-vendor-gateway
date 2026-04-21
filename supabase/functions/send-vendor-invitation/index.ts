@@ -46,8 +46,8 @@ const handler = async (req: Request): Promise<Response> => {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Ramky Infrastructure Limited</h1>
-          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Vendor Management Portal</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Sharvi Vendor Portal</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Vendor Management System</p>
         </div>
         
         <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
@@ -55,7 +55,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <p>Hello,</p>
           
-          <p>You have been invited to register as a vendor with Ramky Infrastructure Limited. Please click the button below to create your account and complete your vendor registration.</p>
+          <p>You have been invited to register as a vendor on the Sharvi Vendor Portal. Please click the button below to create your account and complete your vendor registration.</p>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
@@ -77,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
           
           <p style="color: #6b7280; font-size: 12px; margin-bottom: 0;">
-            This is an automated message from Ramky Infrastructure Limited. If you did not expect this invitation, please ignore this email or contact our support team.
+            This is an automated message from Sharvi Vendor Portal. If you did not expect this invitation, please ignore this email or contact support@sharviinfotech.com.
           </p>
         </div>
       </body>
@@ -88,7 +88,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (simulationMode) {
       console.log("[Invitation Email - SIMULATION MODE]");
       console.log("To:", email);
-      console.log("Subject: Vendor Registration Invitation - Ramky Infrastructure");
+      console.log("Subject: Vendor Registration Invitation - Sharvi");
       console.log("Invite Link:", inviteLink);
       console.log("Expires:", expiryDate);
 
@@ -143,7 +143,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         to: email,
-        subject: "Vendor Registration Invitation - Ramky Infrastructure",
+        subject: "Vendor Registration Invitation - Sharvi",
         html: emailHtml,
       }),
     });
