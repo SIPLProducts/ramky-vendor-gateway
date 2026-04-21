@@ -181,7 +181,9 @@ serve(async (req) => {
       
       switch (config.validation_type) {
         case 'gst':
-          if (!vendor.gstin) {
+          if (vendor.is_gst_registered === false) {
+            result = { type: 'gst', status: 'skipped', message: 'Vendor declared not GST registered — self-declaration on file' };
+          } else if (!vendor.gstin) {
             result = {
               type: 'gst',
               status: config.is_mandatory ? 'failed' : 'skipped',
@@ -217,7 +219,9 @@ serve(async (req) => {
           break;
           
         case 'name_match':
-          if (!vendor.legal_name || !vendor.gstin) {
+          if (vendor.is_gst_registered === false) {
+            result = { type: 'name_match', status: 'skipped', message: 'Vendor not GST registered — name match not applicable' };
+          } else if (!vendor.legal_name || !vendor.gstin) {
             result = {
               type: 'name_match',
               status: config.is_mandatory ? 'failed' : 'skipped',
@@ -229,7 +233,7 @@ serve(async (req) => {
               config,
               vendor,
               'validate-name-match',
-              { 
+              {
                 vendorName: vendor.legal_name,
                 gstLegalName: vendor.legal_name,
                 threshold: config.matching_threshold || 80,
@@ -261,7 +265,9 @@ serve(async (req) => {
           break;
           
         case 'msme':
-          if (!vendor.msme_number) {
+          if (vendor.is_msme_registered === false) {
+            result = { type: 'msme', status: 'skipped', message: 'Vendor declared not MSME registered' };
+          } else if (!vendor.msme_number) {
             result = {
               type: 'msme',
               status: config.is_mandatory ? 'failed' : 'skipped',
