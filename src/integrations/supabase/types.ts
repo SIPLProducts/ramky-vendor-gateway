@@ -433,6 +433,33 @@ export type Database = {
         }
         Relationships: []
       }
+      role_screen_permissions: {
+        Row: {
+          can_access: boolean
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          screen_key: string
+          updated_at: string | null
+        }
+        Insert: {
+          can_access?: boolean
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          screen_key: string
+          updated_at?: string | null
+        }
+        Update: {
+          can_access?: boolean
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          screen_key?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       scheduled_validations: {
         Row: {
           created_at: string

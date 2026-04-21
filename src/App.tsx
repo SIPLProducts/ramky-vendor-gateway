@@ -21,6 +21,7 @@ import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
 import UserManagement from "./pages/UserManagement";
+import RolePermissions from "./pages/RolePermissions";
 import SupportHelp from "./pages/SupportHelp";
 import VendorFeedback from "./pages/VendorFeedback";
 import DemoShowcase from "./pages/DemoShowcase";
@@ -63,6 +64,7 @@ const App = () => (
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
                 <Route path="/admin/users" element={<UserManagement />} />
+                <Route path="/admin/role-permissions" element={<RolePermissions />} />
                 <Route path="/support" element={<SupportHelp />} />
                 <Route path="/demo" element={<DemoShowcase />} />
                 <Route path="/compliance/gst" element={<GstCompliance />} />
