@@ -1089,11 +1089,14 @@ export type Database = {
           email_sent_at: string | null
           expires_at: string
           id: string
+          phone_number: string | null
           resend_email_id: string | null
+          tenant_id: string | null
           token: string
           used_at: string | null
           user_id: string | null
           vendor_id: string | null
+          vendor_name: string | null
         }
         Insert: {
           access_count?: number | null
@@ -1105,11 +1108,14 @@ export type Database = {
           email_sent_at?: string | null
           expires_at: string
           id?: string
+          phone_number?: string | null
           resend_email_id?: string | null
+          tenant_id?: string | null
           token: string
           used_at?: string | null
           user_id?: string | null
           vendor_id?: string | null
+          vendor_name?: string | null
         }
         Update: {
           access_count?: number | null
@@ -1121,13 +1127,24 @@ export type Database = {
           email_sent_at?: string | null
           expires_at?: string
           id?: string
+          phone_number?: string | null
           resend_email_id?: string | null
+          tenant_id?: string | null
           token?: string
           used_at?: string | null
           user_id?: string | null
           vendor_id?: string | null
+          vendor_name?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendor_invitations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_validations: {
         Row: {
