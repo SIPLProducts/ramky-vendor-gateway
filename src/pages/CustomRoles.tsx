@@ -28,6 +28,15 @@ export default function CustomRoles() {
   const [editing, setEditing] = useState<CustomRoleData | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
+  const [permsDirty, setPermsDirty] = useState(false);
+
+  const handlePermsOpenChange = (open: boolean) => {
+    if (!open) {
+      if (permsDirty && !confirm('Discard unsaved changes?')) return;
+      setPermsDirty(false);
+      setPermsRole(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -177,15 +186,22 @@ export default function CustomRoles() {
         onSave={handleSave}
       />
 
-      <Dialog open={!!permsRole} onOpenChange={(o) => !o && setPermsRole(null)}>
+      <Dialog open={!!permsRole} onOpenChange={handlePermsOpenChange}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Screen Permissions — {permsRole?.name}</DialogTitle>
             <DialogDescription>
-              Check the screens users with this role should be able to access. Changes save automatically.
+              Check the screens users with this role should be able to access. Click Save to apply changes.
             </DialogDescription>
           </DialogHeader>
-          {permsRole && <CustomRolePermissionsMatrix customRoleId={permsRole.id} />}
+          {permsRole && (
+            <CustomRolePermissionsMatrix
+              customRoleId={permsRole.id}
+              onDirtyChange={setPermsDirty}
+              onSaved={() => { setPermsDirty(false); setPermsRole(null); }}
+              onCancel={() => { setPermsDirty(false); setPermsRole(null); }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
