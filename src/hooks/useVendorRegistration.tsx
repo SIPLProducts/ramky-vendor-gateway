@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'financial_docs' | 'dealership_certificate';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
@@ -141,6 +141,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
     const documentsToUpload: { file: File | null; type: DocumentType }[] = [
       { file: formData.statutory.gstCertificateFile, type: 'gst_certificate' },
+      { file: formData.statutory.gstSelfDeclarationFile, type: 'gst_self_declaration' },
       { file: formData.statutory.panCardFile, type: 'pan_card' },
       { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
       { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
@@ -238,12 +239,24 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       customer_service_email: formData.contact.customerServiceEmail || null,
       // Statutory/Compliance
       firm_registration_no: formData.statutory.firmRegistrationNo || null,
-      gstin: formData.statutory.gstin || null,
+      is_gst_registered: formData.statutory.isGstRegistered,
+      gstin: formData.statutory.isGstRegistered ? (formData.statutory.gstin || null) : null,
+      gst_declaration_reason: !formData.statutory.isGstRegistered ? (formData.statutory.gstDeclarationReason || null) : null,
+      gst_constitution_of_business: formData.statutory.gstConstitutionOfBusiness || null,
+      gst_principal_place_of_business: formData.statutory.gstPrincipalPlaceOfBusiness || null,
+      gst_additional_places: formData.statutory.gstAdditionalPlaces?.length ? formData.statutory.gstAdditionalPlaces : null,
+      gst_registration_date: formData.statutory.gstRegistrationDate || null,
+      gst_status: formData.statutory.gstStatus || null,
+      gst_taxpayer_type: formData.statutory.gstTaxpayerType || null,
+      gst_business_nature: formData.statutory.gstBusinessNature?.length ? formData.statutory.gstBusinessNature : null,
+      gst_jurisdiction_centre: formData.statutory.gstJurisdictionCentre || null,
+      gst_jurisdiction_state: formData.statutory.gstJurisdictionState || null,
       pan: formData.statutory.pan || null,
       pf_number: formData.statutory.pfNumber || null,
       esi_number: formData.statutory.esiNumber || null,
-      msme_number: formData.statutory.msmeNumber || null,
-      msme_category: formData.statutory.msmeCategory || null,
+      is_msme_registered: formData.statutory.isMsmeRegistered,
+      msme_number: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeNumber || null) : null,
+      msme_category: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeCategory || null) : null,
       labour_permit_no: formData.statutory.labourPermitNo || null,
       iec_no: formData.statutory.iecNo || null,
       entity_type: formData.statutory.entityType || null,
@@ -378,10 +391,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         pan: vendor.pan || '',
         pfNumber: vendor.pf_number || '',
         esiNumber: vendor.esi_number || '',
+        isGstRegistered: vendor.is_gst_registered ?? true,
+        gstin: vendor.gstin || '',
+        gstDeclarationReason: vendor.gst_declaration_reason || '',
+        gstSelfDeclarationFile: null,
+        gstConstitutionOfBusiness: vendor.gst_constitution_of_business || '',
+        gstPrincipalPlaceOfBusiness: vendor.gst_principal_place_of_business || '',
+        gstAdditionalPlaces: vendor.gst_additional_places || [],
+        gstRegistrationDate: vendor.gst_registration_date || '',
+        gstStatus: vendor.gst_status || '',
+        gstTaxpayerType: vendor.gst_taxpayer_type || '',
+        gstBusinessNature: vendor.gst_business_nature || [],
+        gstJurisdictionCentre: vendor.gst_jurisdiction_centre || '',
+        gstJurisdictionState: vendor.gst_jurisdiction_state || '',
+        isMsmeRegistered: vendor.is_msme_registered ?? false,
         msmeNumber: vendor.msme_number || '',
         msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
         labourPermitNo: vendor.labour_permit_no || '',
-        gstin: vendor.gstin || '',
         iecNo: vendor.iec_no || '',
         entityType: vendor.entity_type || '',
         memberships: vendor.memberships || [],

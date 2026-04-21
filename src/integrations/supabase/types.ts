@@ -1244,11 +1244,23 @@ export type Database = {
           finance_comments: string | null
           finance_reviewed_at: string | null
           finance_reviewed_by: string | null
+          gst_additional_places: Json | null
+          gst_business_nature: string[] | null
+          gst_constitution_of_business: string | null
+          gst_declaration_reason: string | null
+          gst_jurisdiction_centre: string | null
+          gst_jurisdiction_state: string | null
+          gst_principal_place_of_business: string | null
+          gst_registration_date: string | null
+          gst_status: string | null
+          gst_taxpayer_type: string | null
           gstin: string | null
           id: string
           ifsc_code: string | null
           industry_type: string | null
           invitation_id: string | null
+          is_gst_registered: boolean | null
+          is_msme_registered: boolean | null
           legal_name: string | null
           msme_category: string | null
           msme_number: string | null
@@ -1302,11 +1314,23 @@ export type Database = {
           finance_comments?: string | null
           finance_reviewed_at?: string | null
           finance_reviewed_by?: string | null
+          gst_additional_places?: Json | null
+          gst_business_nature?: string[] | null
+          gst_constitution_of_business?: string | null
+          gst_declaration_reason?: string | null
+          gst_jurisdiction_centre?: string | null
+          gst_jurisdiction_state?: string | null
+          gst_principal_place_of_business?: string | null
+          gst_registration_date?: string | null
+          gst_status?: string | null
+          gst_taxpayer_type?: string | null
           gstin?: string | null
           id?: string
           ifsc_code?: string | null
           industry_type?: string | null
           invitation_id?: string | null
+          is_gst_registered?: boolean | null
+          is_msme_registered?: boolean | null
           legal_name?: string | null
           msme_category?: string | null
           msme_number?: string | null
@@ -1360,11 +1384,23 @@ export type Database = {
           finance_comments?: string | null
           finance_reviewed_at?: string | null
           finance_reviewed_by?: string | null
+          gst_additional_places?: Json | null
+          gst_business_nature?: string[] | null
+          gst_constitution_of_business?: string | null
+          gst_declaration_reason?: string | null
+          gst_jurisdiction_centre?: string | null
+          gst_jurisdiction_state?: string | null
+          gst_principal_place_of_business?: string | null
+          gst_registration_date?: string | null
+          gst_status?: string | null
+          gst_taxpayer_type?: string | null
           gstin?: string | null
           id?: string
           ifsc_code?: string | null
           industry_type?: string | null
           invitation_id?: string | null
+          is_gst_registered?: boolean | null
+          is_msme_registered?: boolean | null
           legal_name?: string | null
           msme_category?: string | null
           msme_number?: string | null
