@@ -77,6 +77,10 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
       toast({ title: 'Weak password', description: 'Password must be at least 8 characters', variant: 'destructive' });
       return;
     }
+    if (tenantIds.length === 0) {
+      toast({ title: 'Tenant required', description: 'Please assign at least one tenant to the user', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
