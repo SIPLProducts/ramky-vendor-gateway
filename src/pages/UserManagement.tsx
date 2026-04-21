@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Search, UserCog, Building2, Users } from 'lucide-react';
+import { Search, UserCog, Building2, Users, Plus, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 import { AssignTenantDialog } from '@/components/admin/AssignTenantDialog';
+import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 
 interface UserRow {
   id: string;
@@ -36,6 +38,8 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
   const [tenantDialog, setTenantDialog] = useState<UserRow | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const navigate = useNavigate();
 
   const loadData = async () => {
     setLoading(true);
@@ -151,11 +155,21 @@ export default function UserManagement() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Users className="h-6 w-6" /> User Management
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage application users, roles, and tenant assignments.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <Users className="h-6 w-6" /> User Management
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage application users, roles, and tenant assignments.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/admin/role-permissions')}>
+            <Shield className="h-4 w-4 mr-2" /> Role Permissions
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Create User
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -300,6 +314,12 @@ export default function UserManagement() {
           onConfirm={handleAssignTenant}
         />
       )}
+      <CreateUserDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        tenants={tenants}
+        onCreated={loadData}
+      />
     </div>
   );
 }
