@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { MobileHeader } from './MobileHeader';
+import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
