@@ -9,6 +9,7 @@ import {
   FileText,
   ClipboardCheck,
   Shield,
+  UserCog,
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -58,6 +59,12 @@ const mobileNavItems: NavItem[] = [
     href: '/vendor/register',
     icon: FileText,
     roles: ['vendor', 'admin', 'sharvi_admin'],
+  },
+  {
+    label: 'Users',
+    href: '/admin/users',
+    icon: UserCog,
+    roles: ['admin', 'sharvi_admin'],
   },
   {
     label: 'Settings',

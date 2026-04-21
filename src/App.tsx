@@ -20,6 +20,7 @@ import VendorList from "./pages/VendorList";
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
+import UserManagement from "./pages/UserManagement";
 import SupportHelp from "./pages/SupportHelp";
 import VendorFeedback from "./pages/VendorFeedback";
 import DemoShowcase from "./pages/DemoShowcase";
@@ -61,6 +62,7 @@ const App = () => (
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
+                <Route path="/admin/users" element={<UserManagement />} />
                 <Route path="/support" element={<SupportHelp />} />
                 <Route path="/demo" element={<DemoShowcase />} />
                 <Route path="/compliance/gst" element={<GstCompliance />} />

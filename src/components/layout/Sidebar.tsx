@@ -18,6 +18,7 @@ import {
   RefreshCw,
   IndianRupee,
   ShoppingCart,
+  UserCog,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,12 @@ const navItems: NavItem[] = [
     href: '/admin/invitations',
     icon: Mail,
     roles: ['admin', 'sharvi_admin', 'customer_admin'],
+  },
+  {
+    label: 'User Management',
+    href: '/admin/users',
+    icon: UserCog,
+    roles: ['admin', 'sharvi_admin'],
   },
   {
     label: 'Vendor Registration',
