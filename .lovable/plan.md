@@ -1,138 +1,86 @@
 
-## Fix "Access Denied" in Vendor Invitation Flow
 
-### What is actually broken
+## Auto-create vendor account from invite email (no password prompt)
 
-The invitation flow is still reading `vendor_invitations` directly from the browser in multiple places:
+### What changes
 
-- `src/pages/VendorLogin.tsx`
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
+Today the invite link drops the vendor on a login screen that asks for a password they were never given. Instead, the invite link should **automatically provision the vendor's account** and sign them straight into the registration form — zero password entry on first visit.
 
-That table is protected by row-level access rules and does **not** allow vendors/anonymous users to `SELECT` invitation rows directly. So the token is valid in the database, but the browser request is denied.
-
-There is already a safer server-side function available:
-
-- `public.get_invitation_by_token(_token text)` with `SECURITY DEFINER`
-
-But the main invite flow is not using it consistently.
-
-### Implementation plan
-
-#### 1. Replace direct invitation table reads with server-side token lookups
-Update all vendor-facing invite pages/hooks to use the existing RPC instead of:
-
-```ts
-.from('vendor_invitations').select('*').eq('token', token)
-```
-
-Use:
-
-```ts
-.rpc('get_invitation_by_token', { _token: token })
-```
-
-Apply this in:
-- `src/pages/VendorLogin.tsx`
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-
-This removes the client-side RLS failure causing the current error.
-
-#### 2. Add a dedicated server-side function for access tracking
-The current code also tries to increment `access_count` from the browser before login, which anonymous users cannot update.
-
-Create a new database function such as:
-- `public.record_invitation_access(_token text)`
-
-It should:
-- validate the token exists
-- check expiry / used state
-- increment `access_count` safely
-- return the same safe invitation payload needed by the UI
-
-Then use this function in `VendorLogin.tsx` instead of client-side `.update()`.
-
-#### 3. Keep authenticated updates, but only after lookup succeeds
-For authenticated vendor actions like marking an invitation used after submission, keep the authenticated update path only where policy already supports it.
-
-Review these update calls:
-- `src/pages/VendorRegistration.tsx`
-- `src/pages/VendorRegisterWithInvite.tsx`
-
-Make sure they only run after the invite was resolved through RPC and the logged-in email matches the invited email.
-
-#### 4. Normalize the invite route flow
-The project currently has mixed/legacy invite flows:
-
-- `/vendor/invite` → `VendorLogin`
-- `/vendor/registration` → `VendorRegistration`
-- `VendorRegisterWithInvite.tsx` exists but is not wired into routing
-- `/vendor/register` is a protected internal preview route
-
-Clean this up so the invite journey is unambiguous:
+### New flow
 
 ```text
 Email link
   -> /vendor/invite?token=...
-  -> validate token via RPC
-  -> login
-  -> /vendor/registration?token=...
-  -> continue registration
+  -> validate token (RPC)
+  -> auto-create auth user for invited email (server-side, random password)
+  -> generate a magic link / one-time session
+  -> sign vendor in silently
+  -> redirect to /vendor/registration?token=...
 ```
 
-Also remove or rewire the unused `VendorRegisterWithInvite` flow so it does not create confusion.
+The vendor never sees a password field on first visit. On any future visit, they can request a magic link from `/vendor/login` using their invited email.
 
-#### 5. Improve error messaging
-Right now the UI collapses multiple backend failures into generic “Access Denied” / “Invalid invitation”.
+### Backend work
 
-Update the vendor invite screens to distinguish:
-- invalid token
-- expired token
-- invitation already used
-- signed in with wrong email
-- temporary backend lookup failure
+1. **New edge function `accept-vendor-invite`** (public, `verify_jwt = false`)
+   - Input: `{ token }`
+   - Uses service-role key to:
+     - Call `get_invitation_by_token` to validate token (exists, not expired, not used)
+     - Check if auth user exists for invited email; if not, create one via `auth.admin.createUser` with a random password and `email_confirm: true`
+     - Generate a magic link via `auth.admin.generateLink({ type: 'magiclink', email })`
+     - Return `{ action_link, email, invitation_id }`
+   - Tracks access via `record_invitation_access`
 
-This makes support easier and avoids false “Access Denied” messages when the real issue is a lookup failure.
+2. **New RPC `claim_invitation(_token, _vendor_id)`** (`SECURITY DEFINER`)
+   - Validates token + matches `auth.jwt() ->> 'email'`
+   - Sets `used_at`, links `vendor_id`
+   - Replaces the remaining direct `vendor_invitations.update` calls
 
-#### 6. Verify invitation link generation still points to the correct path
-The email function already generates:
+### Frontend work
 
-```text
-{frontendUrl}/vendor/invite?token=...
-```
+1. **`/vendor/invite` route** (`src/App.tsx`)
+   - Point to a new lightweight `VendorInviteAccept` page (or reuse `VendorRegisterWithInvite` rewritten)
+   - Page logic:
+     - Read `token` from URL
+     - Call `accept-vendor-invite` edge function
+     - On success: `window.location.href = action_link` (Supabase magic link auto-signs the user in and redirects)
+     - Configure the magic link `redirectTo` = `${origin}/vendor/registration?token=...`
+   - Show clear states: validating → signing you in → error (invalid/expired/used)
 
-Keep that path, but verify the frontend only expects this one route and does not link vendors to `/vendor/register`.
+2. **`/vendor/registration`**
+   - Already uses `get_invitation_by_token` ✓
+   - Replace direct `vendor_invitations.update(...)` with `claim_invitation` RPC after submit
 
-### Files to update
+3. **`/vendor/login`** — repurpose as fallback
+   - Remove "temporary password from invitation email" copy
+   - Offer **"Email me a sign-in link"** (magic link) using the invited email
+   - Keep password login only for vendors who set one later
 
-- `src/pages/VendorLogin.tsx`
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-- `src/App.tsx`
-- `src/pages/VendorRegisterWithInvite.tsx` (cleanup or proper routing)
-- new migration for invitation access RPC(s)
+4. **Admin invitation UI** (`AdminInvitations.tsx`)
+   - Update help text: "Vendor will be signed in automatically from the email link — no password required"
 
-### Backend changes needed
+### Files touched
 
-Create one migration to add a secure invitation-access function, for example:
-
-- `get_invitation_by_token` stays as the read function
-- add `record_invitation_access(_token text)` for anonymous-safe access counting
-
-This is safer than loosening table policies on `vendor_invitations`, because invitation tokens and email data should not become directly queryable from the browser.
+- new: `supabase/functions/accept-vendor-invite/index.ts`
+- new migration: `claim_invitation(_token text, _vendor_id uuid)` RPC
+- new: `src/pages/VendorInviteAccept.tsx` (or rewrite `VendorRegisterWithInvite.tsx`)
+- edit: `src/App.tsx` (route `/vendor/invite` → `VendorInviteAccept`)
+- edit: `src/pages/VendorLogin.tsx` (magic-link fallback, remove password copy)
+- edit: `src/pages/VendorRegistration.tsx` (use `claim_invitation` RPC on submit)
+- edit: `src/hooks/useVendorRegistration.tsx` (use `claim_invitation` RPC on submit)
+- edit: `src/pages/AdminInvitations.tsx` (copy update)
 
 ### Expected result
 
-After this fix:
-- clicking the email invite link will no longer fail with RLS “Access Denied”
-- vendors can open `/vendor/invite?token=...` before logging in
-- after login, the registration screen can still resolve the same token safely
-- the invite flow will consistently use secure server-side token validation instead of direct table reads
+- Vendor clicks the email link → lands on `/vendor/invite?token=...` → sees a brief "Signing you in…" → arrives signed-in on the registration form
+- No password prompt, no manual signup
+- Returning vendors can request a magic link from `/vendor/login` if their session expires
+- All invitation reads/writes go through `SECURITY DEFINER` RPCs or a service-role edge function — no direct browser access to `vendor_invitations`
 
 ### Technical notes
 
-- Do **not** make `vendor_invitations` publicly selectable
-- Prefer `SECURITY DEFINER` RPCs for all pre-auth invitation lookups
-- Keep sensitive invite data behind server-side functions
-- Preserve existing authenticated update policy for marking invites used, unless testing shows it also needs a dedicated RPC
+- `auth.admin.createUser` + magic-link generation requires `SUPABASE_SERVICE_ROLE_KEY` (already configured)
+- Magic link `redirectTo` carries the `token` query param so registration can resume
+- If the auth user already exists (returning vendor on a fresh device), skip create and just generate the magic link
+- `vendor_invitations` RLS stays locked; only edge function (service role) and RPCs touch it
+
