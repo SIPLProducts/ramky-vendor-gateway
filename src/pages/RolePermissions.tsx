@@ -8,7 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Shield } from 'lucide-react';
 import { AppRole } from '@/components/admin/ChangeRoleDialog';
 
-const ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
+const BUILTIN_ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
+
+interface CustomRoleCol { id: string; name: string; }
 
 export const SCREENS: { key: string; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
