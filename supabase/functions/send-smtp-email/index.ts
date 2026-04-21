@@ -94,14 +94,23 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Implicit TLS only for SSL (typically port 465).
-    // For "tls"/"starttls"/"none" use a plain connection; denomailer will
-    // auto-upgrade via STARTTLS when the server advertises it (Gmail 587).
-    const useImplicitTls = encryption === "ssl" || port === 465;
+    // Deno's edge runtime has issues with STARTTLS upgrade on port 587.
+    // Force implicit TLS on port 465 for Gmail/most providers for reliability.
+    const isGmail = host.toLowerCase().includes("gmail");
+    const effectivePort = isGmail && port === 587 ? 465 : port;
+    const useImplicitTls =
+      encryption === "ssl" ||
+      effectivePort === 465 ||
+      (isGmail && port === 587);
+
+    console.log(
+      `[send-smtp-email] Connecting host=${host} port=${effectivePort} implicitTLS=${useImplicitTls}`
+    );
+
     const client = new SMTPClient({
       connection: {
         hostname: host,
-        port,
+        port: effectivePort,
         tls: useImplicitTls,
         auth: { username, password },
       },
