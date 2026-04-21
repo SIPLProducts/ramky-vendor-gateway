@@ -566,16 +566,6 @@ export default function AdminInvitations() {
                             <span className="text-muted-foreground text-sm">—</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          {(invitation as any).tenants ? (
-                            <div className="flex items-center gap-2">
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              <span>{(invitation as any).tenants.name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(invitation.created_at), 'dd MMM yyyy')}
                         </TableCell>
