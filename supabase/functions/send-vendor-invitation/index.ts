@@ -77,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
           
           <p style="color: #6b7280; font-size: 12px; margin-bottom: 0;">
-            This is an automated message from Ramky Infrastructure Limited. If you did not expect this invitation, please ignore this email or contact our support team.
+            This is an automated message from Sharvi Vendor Portal. If you did not expect this invitation, please ignore this email or contact support@sharviinfotech.com.
           </p>
         </div>
       </body>
