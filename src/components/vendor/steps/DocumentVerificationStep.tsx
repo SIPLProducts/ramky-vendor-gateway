@@ -902,12 +902,13 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
 }
 
 function FilePill({
-  fileName, fileSize, state, busyLabel, onReplace, onReset,
+  fileName, fileSize, state, busyLabel, ocrModel, onReplace, onReset,
 }: {
   fileName?: string;
   fileSize?: number;
   state: "busy" | "verified" | "failed";
   busyLabel?: string;
+  ocrModel?: string;
   onReplace: () => void;
   onReset: () => void;
 }) {
@@ -915,6 +916,8 @@ function FilePill({
     state === "verified" ? "border-success/40 bg-success/5" :
     state === "failed" ? "border-destructive/40 bg-destructive/5" :
     "border-border bg-muted/30";
+
+  const modelLabel = friendlyModelName(ocrModel);
 
   return (
     <div className={cn("flex items-center gap-3 rounded-md border px-3 py-2.5", accent)}>
@@ -928,7 +931,18 @@ function FilePill({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{fileName || "Document"}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{fileName || "Document"}</p>
+          {modelLabel && state !== "busy" && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary shrink-0"
+              title={`Extracted by ${modelLabel}`}
+            >
+              <Sparkles className="h-2.5 w-2.5" />
+              {modelLabel}
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground truncate">
           {state === "busy" ? busyLabel : (
             <>
