@@ -94,14 +94,18 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const useTls = encryption === "ssl" || encryption === "tls";
+    // Implicit TLS only for SSL (typically port 465).
+    // For "tls"/"starttls"/"none" use a plain connection; denomailer will
+    // auto-upgrade via STARTTLS when the server advertises it (Gmail 587).
+    const useImplicitTls = encryption === "ssl" || port === 465;
     const client = new SMTPClient({
       connection: {
         hostname: host,
         port,
-        tls: useTls,
+        tls: useImplicitTls,
         auth: { username, password },
       },
+      debug: { log: true },
     });
 
     const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
