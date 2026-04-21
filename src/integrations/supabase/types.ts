@@ -1448,6 +1448,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_invitation_access: {
+        Args: { _token: string }
+        Returns: {
+          access_count: number
+          email: string
+          expires_at: string
+          id: string
+          phone_number: string
+          tenant_id: string
+          used_at: string
+          vendor_name: string
+        }[]
+      }
       user_belongs_to_tenant: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
