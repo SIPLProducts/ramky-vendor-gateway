@@ -114,7 +114,9 @@ serve(async (req) => {
     const clientId = Deno.env.get('CASHFREE_CLIENT_ID')!;
     const clientSecret = Deno.env.get('CASHFREE_CLIENT_SECRET')!;
     
-    const verifyResponse = await fetch('https://api.cashfree.com/verification/udyam', {
+    const baseUrl = 'https://sandbox.cashfree.com/verification';
+    console.log(`[MSME Validation] Calling Cashfree API at ${baseUrl}/udyam`);
+    const verifyResponse = await fetch(`${baseUrl}/udyam`, {
       method: 'POST',
       headers: {
         'x-client-id': clientId,
