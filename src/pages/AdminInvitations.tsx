@@ -98,18 +98,25 @@ export default function AdminInvitations() {
 
   const effectiveTenantId = isSharviAdmin ? (selectedTenantId || null) : (currentUserTenantId || null);
 
-  // Fetch invitations
+  // Fetch invitations (RLS scopes by tenant for non-super-admins)
   const { data: invitations, isLoading } = useQuery({
-    queryKey: ['vendor-invitations'],
+    queryKey: ['vendor-invitations', isSharviAdmin ? 'all' : currentUserTenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('vendor_invitations')
         .select('*')
         .order('created_at', { ascending: false });
 
+      // Non-super-admins: client filter by their tenant for tidy UX (RLS already enforces)
+      if (!isSharviAdmin && currentUserTenantId) {
+        q = q.eq('tenant_id', currentUserTenantId);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
+    enabled: isSharviAdmin || !!currentUserTenantId,
   });
 
   // Create invitation mutation
