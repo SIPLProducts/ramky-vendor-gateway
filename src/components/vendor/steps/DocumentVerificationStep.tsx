@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback, useMemo } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock } from "lucide-react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useOcrExtraction, OcrDocumentType } from "@/hooks/useOcrExtraction";
