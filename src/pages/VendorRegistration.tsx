@@ -166,42 +166,33 @@ export default function VendorRegistration() {
           setInvitationEmail(invitation.email);
           setIsTokenMode(true);
           setIsSubmitted(true); // Show success screen instead of form
-          setIsValidatingToken(false);
 
-          // Fetch vendor status if vendor_id exists
-          if (invitation.vendor_id) {
-            const { data: vendor } = await supabase
-              .from('vendors')
-              .select('status')
-              .eq('id', invitation.vendor_id)
-              .single();
+          // Fetch vendor status for the authenticated user (RLS-safe)
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('status')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-            if (vendor) {
-              setVendorStatusState(vendor.status as RegistrationStatus);
-            }
+          if (vendor) {
+            setVendorStatusState(vendor.status as RegistrationStatus);
           }
+
+          setIsValidatingToken(false);
           return;
         }
 
-        // Before submission, check access count (max 3 times) - only for unauthenticated access
-        if (!session) {
-          const accessCount = invitation.access_count || 0;
-          if (accessCount >= 3) {
-            setTokenError('This invitation link has reached its maximum access limit (3 times). Please contact the administrator for a new link.');
-            setIsValidatingToken(false);
-            return;
-          }
+        // Authenticated user — proceed. Access counting is handled server-side
+        // by the dedicated RPC on the public login screen, so no client-side update.
+        console.log('[Token] Authenticated access granted');
 
-          // Increment access count
-          await supabase
-            .from('vendor_invitations')
-            .update({ access_count: accessCount + 1 })
-            .eq('token', token);
-
-          console.log(`[Token] Access granted - count: ${accessCount + 1}/3`);
-        } else {
-          console.log('[Token] Authenticated access - no access count limit');
-        }
+        // Token is valid - enable token mode
+        setInvitationToken(token);
+        setInvitationEmail(invitation.email);
+        setIsTokenMode(true);
+        setIsValidatingToken(false);
 
         // Token is valid - enable token mode
         setInvitationToken(token);
