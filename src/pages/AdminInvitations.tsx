@@ -585,24 +585,6 @@ export default function AdminInvitations() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyInvitationLink(invitation.token)}
-                              className="gap-1"
-                            >
-                              {copiedToken === invitation.token ? (
-                                <>
-                                  <CheckCircle2 className="h-4 w-4 text-success" />
-                                  Copied!
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="h-4 w-4" />
-                                  Copy Link
-                                </>
-                              )}
-                            </Button>
                             {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
                               <Button
                                 variant="ghost"
