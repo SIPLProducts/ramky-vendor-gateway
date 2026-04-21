@@ -1,68 +1,91 @@
 
-## Plan: User Management Screen
+## Plan: Create Users + Role/Screen/Tenant Assignment in User Management
 
-Add an admin screen to manage application users — view all users, their roles, tenant assignments, and change roles.
+Add full user lifecycle management to the existing `/admin/users` screen.
 
 ### What gets built
 
-**New page: `/admin/users`**
-- Table of all users: name, email, current role, assigned tenant(s), created date
-- Search by name/email
-- Filter by role
-- Per-row "Change Role" action → dropdown to reassign role (vendor / finance / purchase / approver / customer_admin / admin / sharvi_admin)
-- Per-row "Assign Tenant" action → select tenant from dropdown
-- Stats header: total users, count per role
+**1. "Create User" button (top-right of User Management page)**
+- Opens dialog with: Full Name, Email, Password (auto-generate option), Role (dropdown), Tenant (multi-select, optional)
+- Calls a new edge function `admin-create-user` (uses service-role key to bypass signup confirmation and create user instantly)
+- On success: profile + role + tenant assignments are written, toast shown, table refreshed
 
-**Sidebar entry**
-- Add "User Management" item (Users icon) in `Sidebar.tsx` and `MobileBottomNav.tsx`
-- Visible only to `admin` and `sharvi_admin` roles
-- Placed between "Vendor Invitations" and "Vendor Registration"
+**2. Role → Screen access mapping (new screen)**
+- New page: `/admin/role-permissions`
+- Shows a matrix: rows = roles (vendor, finance, purchase, approver, customer_admin, admin, sharvi_admin), columns = screens (Dashboard, Vendor List, Finance Review, Purchase Approval, SAP Sync, GST Compliance, Document Verification, Audit Logs, User Management, Admin Configuration, Sharvi Admin Console, Vendor Invitations, Scheduled Checks)
+- Checkbox per cell — toggling persists to a new `role_screen_permissions` table
+- Sidebar dynamically reads these permissions to decide which links to show (replaces current hard-coded role arrays)
+
+**3. Enhanced Role Assignment (existing dialog upgrade)**
+- `ChangeRoleDialog` already exists — extend it to also show & manage tenant assignments inline (instead of separate `AssignTenantDialog`)
+- Single dialog: pick role + check/uncheck tenants in one place
+- Keep `AssignTenantDialog` for the standalone "Tenants" column action as well
 
 ### Backend changes
 
-The `user_roles` and `user_tenants` tables currently block INSERT / UPDATE / DELETE — no policies exist for those operations. Need to add admin-only mutation policies:
-
 **Migration**
 ```sql
--- Allow admins to insert/update/delete user_roles
-CREATE POLICY "Admins can insert user roles" ON public.user_roles
-  FOR INSERT TO authenticated
+-- New table for role-based screen permissions
+CREATE TABLE public.role_screen_permissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  role app_role NOT NULL,
+  screen_key text NOT NULL,
+  can_access boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(role, screen_key)
+);
+
+ALTER TABLE public.role_screen_permissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Everyone can read role permissions"
+  ON public.role_screen_permissions FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Admins manage role permissions"
+  ON public.role_screen_permissions FOR ALL TO authenticated
+  USING (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'))
   WITH CHECK (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Admins can update user roles" ON public.user_roles
-  FOR UPDATE TO authenticated
-  USING (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Admins can delete user roles" ON public.user_roles
-  FOR DELETE TO authenticated
-  USING (has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin'));
+-- Seed sensible defaults (admin/sharvi_admin = all screens; others = role-appropriate)
+INSERT INTO public.role_screen_permissions (role, screen_key, can_access) VALUES
+  ('sharvi_admin','dashboard',true),('sharvi_admin','vendors',true), ... (full matrix)
+  ('admin','dashboard',true), ...
+  ('finance','dashboard',true),('finance','vendors',true),('finance','finance_review',true),('finance','audit_logs',true),
+  ('purchase','dashboard',true),('purchase','vendors',true),('purchase','purchase_approval',true),
+  ('vendor','vendor_registration',true),('vendor','vendor_feedback',true)
+  ON CONFLICT (role, screen_key) DO NOTHING;
 ```
 
-(`user_tenants` already has admin INSERT/UPDATE/DELETE via existing ALL policies.)
+**New edge function: `admin-create-user`**
+- Verifies caller is admin/sharvi_admin
+- Uses service-role client → `supabase.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name } })`
+- Inserts into `user_roles` (role) and `user_tenants` (selected tenants)
+- Returns the new user id
 
-### Technical Details
+`supabase/config.toml` will get a block for the new function with `verify_jwt = true` (we need the caller's JWT to verify they're an admin).
 
-**Files to create**
-- `src/pages/UserManagement.tsx` — main screen with table, search, filters, role/tenant change dialogs
-- `src/components/admin/ChangeRoleDialog.tsx` — dropdown + confirm
-- `src/components/admin/AssignTenantDialog.tsx` — tenant select + confirm
+### Files
 
-**Files to modify**
-- `src/App.tsx` — add `/admin/users` route inside `AppLayout`
-- `src/components/layout/Sidebar.tsx` — add nav item with `UserCog` icon (roles: admin, sharvi_admin)
-- `src/components/layout/MobileBottomNav.tsx` — add same item
+**New**
+- `src/pages/RolePermissions.tsx` — matrix UI
+- `src/components/admin/CreateUserDialog.tsx` — create user form
+- `supabase/functions/admin-create-user/index.ts` — edge function
 
-**Data fetching**
-- Join `profiles` + `user_roles` + `user_tenants` + `tenants` via Supabase queries
-- Use existing RLS: admins can SELECT all profiles & user_roles already
+**Modified**
+- `src/pages/UserManagement.tsx` — add "Create User" button + dialog
+- `src/components/admin/ChangeRoleDialog.tsx` — add tenant multi-select section
+- `src/components/layout/Sidebar.tsx` — replace hard-coded role arrays with dynamic lookup against `role_screen_permissions`
+- `src/components/layout/MobileBottomNav.tsx` — same dynamic lookup
+- `src/App.tsx` — register `/admin/role-permissions` route
+- `supabase/config.toml` — register `admin-create-user` function
 
-**Safeguards**
-- Prevent users from changing their own role (avoid self-lockout)
-- Confirmation dialog before role change
-- Toast notification on success/failure
-- Audit log entry written to `audit_logs` for every role change
+### Safeguards
+- Caller-side: only `admin` / `sharvi_admin` see the Create User button and Role Permissions page
+- Server-side: edge function double-checks caller role before using service-role
+- Cannot delete `sharvi_admin` access to `role_permissions` screen (prevents lockout)
+- Audit log entry written for: user created, role changed, screen permission toggled
 
 ### Out of scope
-- Creating new users (handled via Auth signup / Vendor Invitations)
-- Deleting users from auth.users (requires service-role; can add later if needed)
-- Bulk role assignment
+- Deleting users (can add later)
+- Custom screens beyond the existing app pages
+- Per-tenant screen permissions (this is global per role)
