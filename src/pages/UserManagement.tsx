@@ -22,9 +22,11 @@ interface UserRow {
   created_at: string;
   role: AppRole | null;
   tenants: { id: string; name: string }[];
+  customRoles: { id: string; name: string }[];
 }
 
 interface Tenant { id: string; name: string; }
+interface CustomRoleOpt { id: string; name: string; is_active: boolean; }
 
 const ALL_ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
 
@@ -34,6 +36,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRoleOpt[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
@@ -44,19 +47,24 @@ export default function UserManagement() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, userTenantsRes, tenantsRes] = await Promise.all([
+      const [profilesRes, rolesRes, userTenantsRes, tenantsRes, customRolesRes, userCustomRes] = await Promise.all([
         supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
         supabase.from('user_tenants').select('user_id, tenant_id'),
         supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('custom_roles').select('id, name, is_active').order('name'),
+        supabase.from('user_custom_roles').select('user_id, custom_role_id'),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
       if (rolesRes.error) throw rolesRes.error;
       if (userTenantsRes.error) throw userTenantsRes.error;
       if (tenantsRes.error) throw tenantsRes.error;
+      if (customRolesRes.error) throw customRolesRes.error;
+      if (userCustomRes.error) throw userCustomRes.error;
 
       const tenantMap = new Map<string, Tenant>((tenantsRes.data ?? []).map((t) => [t.id, t]));
+      const customRoleMap = new Map<string, CustomRoleOpt>((customRolesRes.data ?? []).map((c) => [c.id, c]));
       const roleMap = new Map<string, AppRole>((rolesRes.data ?? []).map((r) => [r.user_id, r.role as AppRole]));
       const utByUser = new Map<string, string[]>();
       (userTenantsRes.data ?? []).forEach((ut) => {
@@ -64,8 +72,15 @@ export default function UserManagement() {
         arr.push(ut.tenant_id);
         utByUser.set(ut.user_id, arr);
       });
+      const cuByUser = new Map<string, string[]>();
+      (userCustomRes.data ?? []).forEach((uc) => {
+        const arr = cuByUser.get(uc.user_id) ?? [];
+        arr.push(uc.custom_role_id);
+        cuByUser.set(uc.user_id, arr);
+      });
 
       setTenants(tenantsRes.data ?? []);
+      setCustomRoles(customRolesRes.data ?? []);
       setUsers(
         (profilesRes.data ?? []).map((p) => ({
           id: p.id,
@@ -76,6 +91,10 @@ export default function UserManagement() {
           tenants: (utByUser.get(p.id) ?? [])
             .map((tid) => tenantMap.get(tid))
             .filter((t): t is Tenant => !!t),
+          customRoles: (cuByUser.get(p.id) ?? [])
+            .map((cid) => customRoleMap.get(cid))
+            .filter((c): c is CustomRoleOpt => !!c)
+            .map((c) => ({ id: c.id, name: c.name })),
         }))
       );
     } catch (err: any) {
@@ -102,7 +121,7 @@ export default function UserManagement() {
     return { total: users.length, counts };
   }, [users]);
 
-  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[]) => {
+  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
     if (!roleDialog) return;
     if (roleDialog.id === user?.id && newRole !== roleDialog.role) {
       toast({ title: 'Action blocked', description: 'You cannot change your own role.', variant: 'destructive' });
@@ -136,6 +155,29 @@ export default function UserManagement() {
         const rows = toAdd.map((tid) => ({ user_id: roleDialog.id, tenant_id: tid }));
         const { error } = await supabase.from('user_tenants').insert(rows);
         if (error) throw error;
+      }
+
+      // Custom role sync
+      const currentCustom = roleDialog.customRoles.map((c) => c.id);
+      const cToAdd = newCustomRoleIds.filter((id) => !currentCustom.includes(id));
+      const cToRemove = currentCustom.filter((id) => !newCustomRoleIds.includes(id));
+      if (cToRemove.length > 0) {
+        const { error } = await supabase.from('user_custom_roles')
+          .delete().eq('user_id', roleDialog.id).in('custom_role_id', cToRemove);
+        if (error) throw error;
+        await supabase.from('audit_logs').insert({
+          action: 'custom_roles_unassigned', user_id: user?.id,
+          details: { target_user_id: roleDialog.id, custom_role_ids: cToRemove },
+        });
+      }
+      if (cToAdd.length > 0) {
+        const rows = cToAdd.map((cid) => ({ user_id: roleDialog.id, custom_role_id: cid, assigned_by: user?.id }));
+        const { error } = await supabase.from('user_custom_roles').insert(rows);
+        if (error) throw error;
+        await supabase.from('audit_logs').insert({
+          action: 'custom_roles_assigned', user_id: user?.id,
+          details: { target_user_id: roleDialog.id, custom_role_ids: cToAdd },
+        });
       }
 
       toast({ title: 'User updated', description: `${roleDialog.email} → ${newRole}` });
@@ -239,6 +281,7 @@ export default function UserManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Custom Roles</TableHead>
                   <TableHead>Tenants</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -248,12 +291,12 @@ export default function UserManagement() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+                      <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -264,6 +307,15 @@ export default function UserManagement() {
                       <TableCell>{u.email}</TableCell>
                       <TableCell>
                         {u.role ? <Badge variant="secondary">{u.role}</Badge> : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {u.customRoles.length === 0
+                            ? <span className="text-muted-foreground text-xs">—</span>
+                            : u.customRoles.map((c) => (
+                                <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
+                              ))}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -320,6 +372,8 @@ export default function UserManagement() {
           userName={roleDialog.full_name ?? roleDialog.email}
           tenants={tenants}
           currentTenantIds={roleDialog.tenants.map((t) => t.id)}
+          customRoles={customRoles}
+          currentCustomRoleIds={roleDialog.customRoles.map((c) => c.id)}
           onConfirm={handleChangeRole}
         />
       )}
@@ -337,6 +391,7 @@ export default function UserManagement() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         tenants={tenants}
+        customRoles={customRoles}
         onCreated={loadData}
       />
     </div>

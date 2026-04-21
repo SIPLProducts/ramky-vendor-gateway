@@ -19,6 +19,7 @@ import {
   IndianRupee,
   ShoppingCart,
   UserCog,
+  ShieldCheck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ const navItems: NavItem[] = [
   { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
   { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
   { label: 'Role Permissions', href: '/admin/role-permissions', icon: Shield, screenKey: 'role_permissions' },
+  { label: 'Custom Roles', href: '/admin/custom-roles', icon: ShieldCheck, screenKey: 'custom_roles' },
   { label: 'Vendor Registration', href: '/vendor/register', icon: FileText, screenKey: 'vendor_registration' },
   { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
   { label: 'Purchase Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },

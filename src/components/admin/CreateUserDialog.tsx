@@ -15,11 +15,13 @@ import { AppRole } from './ChangeRoleDialog';
 const ROLES: AppRole[] = ['vendor', 'finance', 'purchase', 'approver', 'customer_admin', 'admin', 'sharvi_admin'];
 
 interface Tenant { id: string; name: string; }
+interface CustomRoleOpt { id: string; name: string; is_active: boolean; }
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   tenants: Tenant[];
+  customRoles?: CustomRoleOpt[];
   onCreated: () => void;
 }
 
@@ -32,7 +34,7 @@ function generatePassword() {
   return pw;
 }
 
-export function CreateUserDialog({ open, onOpenChange, tenants, onCreated }: Props) {
+export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = [], onCreated }: Props) {
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,14 +42,19 @@ export function CreateUserDialog({ open, onOpenChange, tenants, onCreated }: Pro
   const [showPw, setShowPw] = useState(false);
   const [role, setRole] = useState<AppRole>('vendor');
   const [tenantIds, setTenantIds] = useState<string[]>([]);
+  const [customRoleIds, setCustomRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
-    setFullName(''); setEmail(''); setPassword(''); setRole('vendor'); setTenantIds([]); setShowPw(false);
+    setFullName(''); setEmail(''); setPassword(''); setRole('vendor');
+    setTenantIds([]); setCustomRoleIds([]); setShowPw(false);
   };
 
   const toggleTenant = (id: string) => {
     setTenantIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
+  };
+  const toggleCustom = (id: string) => {
+    setCustomRoleIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
   };
 
   const handleSubmit = async () => {
@@ -62,7 +69,10 @@ export function CreateUserDialog({ open, onOpenChange, tenants, onCreated }: Pro
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
-        body: { email: email.trim(), password, full_name: fullName.trim() || null, role, tenant_ids: tenantIds },
+        body: {
+          email: email.trim(), password, full_name: fullName.trim() || null,
+          role, tenant_ids: tenantIds, custom_role_ids: customRoleIds,
+        },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -139,6 +149,19 @@ export function CreateUserDialog({ open, onOpenChange, tenants, onCreated }: Pro
               ))}
             </div>
           </div>
+          {customRoles.length > 0 && (
+            <div className="space-y-2">
+              <Label>Custom Roles (optional)</Label>
+              <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                {customRoles.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={customRoleIds.includes(c.id)} onCheckedChange={() => toggleCustom(c.id)} />
+                    <span className="text-sm">{c.name}{!c.is_active && <span className="text-muted-foreground ml-1">(inactive)</span>}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
