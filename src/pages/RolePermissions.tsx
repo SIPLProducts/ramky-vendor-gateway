@@ -16,7 +16,7 @@ interface CustomRoleCol { id: string; name: string; tenant_id?: string | null; }
 export const SCREENS: { key: string; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'vendors', label: 'All Vendors' },
-  { key: 'vendor_registration', label: 'Vendor Registration' },
+  
   { key: 'finance_review', label: 'Finance Review' },
   { key: 'purchase_approval', label: 'SCM Approval' },
   { key: 'sap_sync', label: 'SAP Sync' },

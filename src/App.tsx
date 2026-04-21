@@ -10,7 +10,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Auth from "./pages/Auth";
 import VendorRegistration from "./pages/VendorRegistration";
 import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
-import VendorRegistrationPreview from "./pages/VendorRegistrationPreview";
+
 import VendorLogin from "./pages/VendorLogin";
 import VendorInviteAccept from "./pages/VendorInviteAccept";
 import Dashboard from "./pages/Dashboard";
@@ -56,7 +56,7 @@ const App = () => (
               {/* Finance Routes */}
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/vendor/register" element={<VendorRegistrationPreview />} />
+                
                 <Route path="/finance/review" element={<FinanceReview />} />
                 <Route path="/purchase/approval" element={<PurchaseApproval />} />
                 <Route path="/sap/sync" element={<SAPSync />} />
