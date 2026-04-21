@@ -502,21 +502,47 @@ interface SmtpSettingsProps {
 
 function SmtpSettings({ config, updateConfig }: SmtpSettingsProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
   const { toast } = useToast();
 
-  const handleTest = () => {
-    if (!config.smtp_host || !config.smtp_from_email) {
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setTestEmail(data.user.email);
+    });
+  }, []);
+
+  const handleTest = async () => {
+    if (!config.smtp_host || !config.smtp_username || !config.smtp_password || !config.smtp_from_email) {
       toast({
         title: 'Missing fields',
-        description: 'Please fill in SMTP host and From email before testing.',
+        description: 'Please fill in SMTP host, username, password and From email, then save before testing.',
         variant: 'destructive',
       });
       return;
     }
-    toast({
-      title: 'Test email queued',
-      description: `A test message will be sent from ${config.smtp_from_email} via ${config.smtp_host}:${config.smtp_port}. Save your changes first if you haven't.`,
-    });
+    if (!testEmail) {
+      toast({ title: 'Recipient required', description: 'Enter a recipient email.', variant: 'destructive' });
+      return;
+    }
+    setTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-smtp-email', {
+        body: {
+          to: testEmail,
+          subject: 'Sharvi Vendor Portal — SMTP test email',
+          html: `<p>Hello,</p><p>This is a test email sent from <strong>${config.smtp_from_name || 'Sharvi Vendor Portal'}</strong> using your configured SMTP server (<code>${config.smtp_host}:${config.smtp_port}</code>).</p><p>If you received this, your SMTP configuration is working ✅</p>`,
+          text: `SMTP test from ${config.smtp_from_name || 'Sharvi Vendor Portal'} via ${config.smtp_host}:${config.smtp_port}`,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.success === false) throw new Error((data as any).error || 'Send failed');
+      toast({ title: 'Test email sent', description: `Sent to ${testEmail}. Check the inbox (and spam folder).` });
+    } catch (e: any) {
+      toast({ title: 'Test failed', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
@@ -666,10 +692,20 @@ function SmtpSettings({ config, updateConfig }: SmtpSettingsProps) {
             </AlertDescription>
           </Alert>
 
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={handleTest}>
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end justify-end">
+            <div className="space-y-2 flex-1 sm:max-w-xs">
+              <Label htmlFor="smtp_test_to">Send test to</Label>
+              <Input
+                id="smtp_test_to"
+                type="email"
+                placeholder="you@example.com"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" onClick={handleTest} disabled={testing}>
               <Mail className="h-4 w-4 mr-2" />
-              Send Test Email
+              {testing ? 'Sending...' : 'Send Test Email'}
             </Button>
           </div>
         </CardContent>
