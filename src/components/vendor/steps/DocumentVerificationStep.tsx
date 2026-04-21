@@ -50,6 +50,7 @@ interface DocState {
   nameMatchScore?: number;
   errorMessage?: string;
   verifiedAt?: number;
+  ocrModel?: string;
 }
 
 const idleDoc: DocState = { status: "idle" };
