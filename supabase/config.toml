@@ -44,3 +44,6 @@ verify_jwt = true
 
 [functions.send-smtp-email]
 verify_jwt = false
+
+[functions.ocr-extract]
+verify_jwt = false
