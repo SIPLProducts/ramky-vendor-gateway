@@ -28,6 +28,15 @@ export default function CustomRoles() {
   const [editing, setEditing] = useState<CustomRoleData | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
+  const [permsDirty, setPermsDirty] = useState(false);
+
+  const handlePermsOpenChange = (open: boolean) => {
+    if (!open) {
+      if (permsDirty && !confirm('Discard unsaved changes?')) return;
+      setPermsDirty(false);
+      setPermsRole(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
