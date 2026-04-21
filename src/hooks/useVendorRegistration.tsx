@@ -483,14 +483,14 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
-      const vendorData = {
+      const vendorData: VendorRecord = {
         ...formDataToVendorRecord(formData, userId),
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
       // Ensure tenant_id is populated from the invitation when the form didn't carry one
-      if (!vendorData.tenant_id && invitation?.tenant_id) {
-        vendorData.tenant_id = invitation.tenant_id;
+      if (!vendorData.tenant_id && (invitation as any)?.tenant_id) {
+        vendorData.tenant_id = (invitation as any).tenant_id;
       }
 
       if (vendorId) {
