@@ -16,11 +16,6 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["ramky-logo.png", "favicon.ico"],
-      workbox: {
-        clientsClaim: true,
-        skipWaiting: true,
-        cleanupOutdatedCaches: true,
-      } as any,
       manifest: {
         name: "Ramky Vendor Portal",
         short_name: "Ramky VMS",
