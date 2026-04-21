@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { EnterpriseStepIndicator } from '@/components/vendor/EnterpriseStepIndicator';
+import { HorizontalStepIndicator } from '@/components/vendor/HorizontalStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
@@ -675,35 +675,53 @@ export default function VendorRegistration() {
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 max-w-[1280px] mx-auto w-full">
-        {/* Left Panel - Registration Steps */}
-        <aside className="hidden lg:flex flex-col w-[280px] flex-shrink-0 border-r bg-card">
-          <div className="p-6 border-b">
-            <div className="flex items-center gap-4">
-              <CompletenessRing value={completeness.overall} size={64} label="done" />
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground leading-tight">Registration Progress</h2>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {completeness.overall < 100
-                    ? `${100 - completeness.overall}% to go — keep going!`
-                    : 'All set — review &amp; submit'}
-                </p>
-              </div>
+      <div className="flex flex-col flex-1 max-w-[1280px] mx-auto w-full">
+        {/* Horizontal Step Indicator (sticky bar above the form card) */}
+        <div className="sticky top-14 z-40 bg-card border-b shadow-sm px-4 sm:px-6 py-3">
+          {/* Desktop / tablet: full horizontal stepper */}
+          <div className="hidden md:flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <HorizontalStepIndicator
+                steps={registrationSteps}
+                currentStep={currentStep}
+                completedSteps={completedSteps}
+                onStepClick={handleStepClick}
+              />
             </div>
-            <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} className="mt-3" />
+            <div className="flex flex-col items-end gap-1 shrink-0 pl-4 border-l min-w-[120px]">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-foreground leading-none">{completeness.overall}%</span>
+                <span className="text-[11px] text-muted-foreground">complete</span>
+              </div>
+              <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} />
+            </div>
           </div>
-          <div className="flex-1 p-6 overflow-auto">
-            <EnterpriseStepIndicator
-              steps={registrationSteps}
-              currentStep={currentStep}
-              completedSteps={completedSteps}
-              onStepClick={handleStepClick}
-            />
-          </div>
-        </aside>
 
-        {/* Right Panel - Form Card */}
-        <main className="flex-1 overflow-auto p-6 lg:p-8">
+          {/* Mobile: compact pill + thin progress bar */}
+          <div className="md:hidden space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="inline-flex items-center justify-center h-6 px-2 rounded-full bg-primary/10 text-primary text-[11px] font-semibold shrink-0">
+                  Step {currentStep} of {registrationSteps.length}
+                </span>
+                <span className="text-xs font-medium text-foreground truncate">
+                  {registrationSteps[currentStep - 1]?.title}
+                </span>
+              </div>
+              <span className="text-xs font-semibold text-foreground shrink-0">{completeness.overall}%</span>
+            </div>
+            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${completeness.overall}%` }}
+              />
+            </div>
+            <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} />
+          </div>
+        </div>
+
+        {/* Form Card */}
+        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <div className="bg-card rounded-[10px] shadow-enterprise-md border">
             {/* Form Header */}
             <div className="px-6 py-4 border-b">
