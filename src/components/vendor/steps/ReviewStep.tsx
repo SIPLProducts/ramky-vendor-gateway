@@ -67,10 +67,33 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
       <div className="form-section">
         <SectionHeader icon={FileCheck} title="Compliance & Statutory" step={4} onEdit={onEditStep} />
         <div className="space-y-1">
-          <DataRow label="GSTIN" value={data.statutory?.gstin} />
           <DataRow label="PAN" value={data.statutory?.pan} />
           <DataRow label="Entity Type" value={data.statutory?.entityType} />
-          <DataRow label="MSME Number" value={data.statutory?.msmeNumber} />
+          <DataRow label="GST Registered" value={data.statutory?.isGstRegistered ? 'Yes' : 'No'} />
+          {data.statutory?.isGstRegistered ? (
+            <>
+              <DataRow label="GSTIN" value={data.statutory?.gstin} />
+              <DataRow label="Constitution of Business" value={data.statutory?.gstConstitutionOfBusiness} />
+              <DataRow label="Principal Place of Business" value={data.statutory?.gstPrincipalPlaceOfBusiness} />
+              <DataRow label="GSTIN Status" value={data.statutory?.gstStatus} />
+              <DataRow label="Taxpayer Type" value={data.statutory?.gstTaxpayerType} />
+              <DataRow label="Registration Date" value={data.statutory?.gstRegistrationDate} />
+              <DataRow label="Jurisdiction (Centre)" value={data.statutory?.gstJurisdictionCentre} />
+              <DataRow label="Jurisdiction (State)" value={data.statutory?.gstJurisdictionState} />
+            </>
+          ) : (
+            <>
+              <DataRow label="Self-Declaration" value={data.statutory?.gstSelfDeclarationFile ? 'Uploaded ✓' : 'Pending upload'} />
+              <DataRow label="Reason" value={data.statutory?.gstDeclarationReason} />
+            </>
+          )}
+          <DataRow label="MSME Registered" value={data.statutory?.isMsmeRegistered ? 'Yes' : 'No'} />
+          {data.statutory?.isMsmeRegistered && (
+            <>
+              <DataRow label="MSME Category" value={data.statutory?.msmeCategory} />
+              <DataRow label="MSME Number" value={data.statutory?.msmeNumber} />
+            </>
+          )}
         </div>
       </div>
 
