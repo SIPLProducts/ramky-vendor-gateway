@@ -42,13 +42,19 @@ export default function VendorLogin() {
       }
 
       try {
-        const { data, error: fetchError } = await supabase
-          .from('vendor_invitations')
-          .select('*')
-          .eq('token', token)
-          .single();
+        // Use SECURITY DEFINER RPC — anon-safe lookup that also bumps access count
+        const { data: rows, error: fetchError } = await supabase
+          .rpc('record_invitation_access', { _token: token });
 
-        if (fetchError || !data) {
+        if (fetchError) {
+          console.error('Token lookup failed:', fetchError);
+          setError('We could not verify your invitation right now. Please try again in a moment.');
+          setIsValidating(false);
+          return;
+        }
+
+        const data = Array.isArray(rows) ? rows[0] : rows;
+        if (!data) {
           setError('Invalid invitation link. Please contact the administrator.');
           setIsValidating(false);
           return;
@@ -68,7 +74,15 @@ export default function VendorLogin() {
           return;
         }
 
-        setInvitation(data as InvitationData);
+        setInvitation({
+          id: data.id,
+          email: data.email,
+          token,
+          expires_at: data.expires_at,
+          used_at: data.used_at,
+          user_id: null,
+          access_count: data.access_count ?? null,
+        });
         setEmail(data.email);
         setIsValidating(false);
       } catch (err) {

@@ -81,15 +81,20 @@ export default function VendorRegistration() {
         return;
       }
 
-      // Validate the token
+      // Validate the token via SECURITY DEFINER RPC (avoids RLS denial)
       try {
-        const { data: invitation, error } = await supabase
-          .from('vendor_invitations')
-          .select('*')
-          .eq('token', token)
-          .single();
+        const { data: rows, error } = await supabase
+          .rpc('get_invitation_by_token', { _token: token });
 
-        if (error || !invitation) {
+        if (error) {
+          console.error('Token lookup failed:', error);
+          setTokenError('We could not verify your invitation right now. Please try again in a moment.');
+          setIsValidatingToken(false);
+          return;
+        }
+
+        const invitation = Array.isArray(rows) ? rows[0] : rows;
+        if (!invitation) {
           setTokenError('Invalid invitation link. Please contact the administrator.');
           setIsValidatingToken(false);
           return;
@@ -112,20 +117,11 @@ export default function VendorRegistration() {
           return;
         }
 
-        // If invitation has user_id, verify the logged-in user matches
-        if (invitation.user_id) {
-          if (session.user.id !== invitation.user_id && session.user.email !== invitation.email) {
-            setTokenError('This invitation is for a different user. Please log in with the correct account.');
-            setIsValidatingToken(false);
-            return;
-          }
-        } else {
-          // If no user_id in invitation yet, verify email matches
-          if (session.user.email !== invitation.email) {
-            setTokenError('This invitation is for a different email. Please log in with the correct account.');
-            setIsValidatingToken(false);
-            return;
-          }
+        // Verify the logged-in email matches the invitation email
+        if (session.user.email !== invitation.email) {
+          setTokenError('This invitation is for a different email. Please log in with the correct account.');
+          setIsValidatingToken(false);
+          return;
         }
 
         // Check if authenticated user already has a vendor record
