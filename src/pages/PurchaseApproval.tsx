@@ -59,6 +59,27 @@ export default function PurchaseApproval() {
   const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const purchaseAction = usePurchaseAction();
+  const reRoute = useReRouteApproval();
+  const { userRole } = useAuth();
+  const canReRoute = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
+
+  // Detect vendors stuck in purchase_review with NO approval progress rows (missing matrix)
+  const vendorIds = (pendingVendors ?? []).map(v => v.id);
+  const { data: stuckIds } = useQuery({
+    queryKey: ['stuck-progress-ids', vendorIds.sort().join(',')],
+    queryFn: async (): Promise<Set<string>> => {
+      if (vendorIds.length === 0) return new Set();
+      const { data, error } = await supabase
+        .from('vendor_approval_progress')
+        .select('vendor_id')
+        .in('vendor_id', vendorIds);
+      if (error) throw error;
+      const withProgress = new Set((data ?? []).map(d => d.vendor_id));
+      return new Set(vendorIds.filter(id => !withProgress.has(id)));
+    },
+    enabled: vendorIds.length > 0,
+    staleTime: 30 * 1000,
+  });
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
     const matchesSearch =
