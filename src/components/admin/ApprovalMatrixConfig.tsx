@@ -399,7 +399,7 @@ export function ApprovalMatrixConfig() {
 
           {tenantId && !usersLoading && tenantUsers.length === 0 && (
             <div className="mt-3 flex items-start gap-2 text-xs text-muted-foreground p-3 rounded-md border border-dashed">
-              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
               <div>
                 No users are assigned to this tenant yet. Assign users via <strong>User Management</strong> before configuring approvers.
               </div>
