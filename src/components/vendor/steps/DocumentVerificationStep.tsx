@@ -54,6 +54,8 @@ interface DocState {
   fileName?: string;
   fileSize?: number;
   ocrData?: Record<string, any>;
+  /** Original OCR snapshot — used to power the "Edited" badge and "Reset to OCR" link */
+  originalOcrData?: Record<string, any>;
   apiData?: Record<string, any>;
   nameMatchScore?: number;
   errorMessage?: string;
@@ -125,30 +127,31 @@ export function DocumentVerificationStep({
   const [isGstRegistered, setIsGstRegistered] = useState<boolean | null>(
     initialData?.isGstRegistered ?? (initialData?.gst ? true : null),
   );
-  const [gstDoc, setGstDoc] = useState<DocState>(
-    initialData?.gst
-      ? {
-          status: "verified",
-          ocrData: {
-            gstin: initialData.gst.gstin,
-            legal_name: initialData.gst.legalName,
-            trade_name: initialData.gst.tradeName,
-            constitution_of_business: initialData.gst.constitutionOfBusiness,
-            principal_place_of_business: initialData.gst.principalPlaceOfBusiness,
-            address: initialData.gst.address,
-            gst_status: initialData.gst.status,
-            registration_date: initialData.gst.registrationDate,
-            taxpayer_type: initialData.gst.taxpayerType,
-            business_nature: initialData.gst.businessNature,
-            additional_places: initialData.gst.additionalPlaces,
-            jurisdiction_centre: initialData.gst.jurisdictionCentre,
-            jurisdiction_state: initialData.gst.jurisdictionState,
-          },
-          apiData: { legalName: initialData.gst.apiName },
-          nameMatchScore: initialData.gst.nameMatchScore,
-        }
-      : idleDoc,
-  );
+  const [gstDoc, setGstDoc] = useState<DocState>(() => {
+    if (!initialData?.gst) return idleDoc;
+    const data = {
+      gstin: initialData.gst.gstin,
+      legal_name: initialData.gst.legalName,
+      trade_name: initialData.gst.tradeName,
+      constitution_of_business: initialData.gst.constitutionOfBusiness,
+      principal_place_of_business: initialData.gst.principalPlaceOfBusiness,
+      address: initialData.gst.address,
+      gst_status: initialData.gst.status,
+      registration_date: initialData.gst.registrationDate,
+      taxpayer_type: initialData.gst.taxpayerType,
+      business_nature: initialData.gst.businessNature,
+      additional_places: initialData.gst.additionalPlaces,
+      jurisdiction_centre: initialData.gst.jurisdictionCentre,
+      jurisdiction_state: initialData.gst.jurisdictionState,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { legalName: initialData.gst.apiName },
+      nameMatchScore: initialData.gst.nameMatchScore,
+    };
+  });
   const [editablePrincipalPlace, setEditablePrincipalPlace] = useState<string>(
     initialData?.gst?.principalPlaceOfBusiness || initialData?.gst?.address || "",
   );
@@ -164,53 +167,56 @@ export function DocumentVerificationStep({
   });
 
   // Stage 2: PAN
-  const [panDoc, setPanDoc] = useState<DocState>(
-    initialData?.pan
-      ? {
-          status: "verified",
-          ocrData: { pan_number: initialData.pan.number, holder_name: initialData.pan.holderName },
-          apiData: { name: initialData.pan.apiName },
-          nameMatchScore: initialData.pan.nameMatchScore,
-        }
-      : idleDoc,
-  );
+  const [panDoc, setPanDoc] = useState<DocState>(() => {
+    if (!initialData?.pan) return idleDoc;
+    const data = { pan_number: initialData.pan.number, holder_name: initialData.pan.holderName };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.pan.apiName },
+      nameMatchScore: initialData.pan.nameMatchScore,
+    };
+  });
   const [panCrossCheckError, setPanCrossCheckError] = useState<string | null>(null);
 
   // Stage 3: MSME
   const [isMsmeRegistered, setIsMsmeRegistered] = useState<boolean | null>(
     initialData?.isMsmeRegistered ?? (initialData?.msme ? true : null),
   );
-  const [msmeDoc, setMsmeDoc] = useState<DocState>(
-    initialData?.msme
-      ? {
-          status: "verified",
-          ocrData: {
-            udyam_number: initialData.msme.udyamNumber,
-            enterprise_name: initialData.msme.enterpriseName,
-            enterprise_type: initialData.msme.enterpriseType,
-          },
-          apiData: { name: initialData.msme.apiName },
-          nameMatchScore: initialData.msme.nameMatchScore,
-        }
-      : idleDoc,
-  );
+  const [msmeDoc, setMsmeDoc] = useState<DocState>(() => {
+    if (!initialData?.msme) return idleDoc;
+    const data = {
+      udyam_number: initialData.msme.udyamNumber,
+      enterprise_name: initialData.msme.enterpriseName,
+      enterprise_type: initialData.msme.enterpriseType,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.msme.apiName },
+      nameMatchScore: initialData.msme.nameMatchScore,
+    };
+  });
 
   // Stage 4: Bank
-  const [bankDoc, setBankDoc] = useState<DocState>(
-    initialData?.bank
-      ? {
-          status: "verified",
-          ocrData: {
-            account_number: initialData.bank.accountNumber,
-            ifsc_code: initialData.bank.ifsc,
-            bank_name: initialData.bank.bankName,
-            branch_name: initialData.bank.branchName,
-            account_holder_name: initialData.bank.accountHolderName,
-          },
-          apiData: { name: initialData.bank.apiName },
-        }
-      : idleDoc,
-  );
+  const [bankDoc, setBankDoc] = useState<DocState>(() => {
+    if (!initialData?.bank) return idleDoc;
+    const data = {
+      account_number: initialData.bank.accountNumber,
+      ifsc_code: initialData.bank.ifsc,
+      bank_name: initialData.bank.bankName,
+      branch_name: initialData.bank.branchName,
+      account_holder_name: initialData.bank.accountHolderName,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.bank.apiName },
+    };
+  });
 
   // ---------- Verification (dummy / simulated) ----------
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
@@ -279,12 +285,24 @@ export function DocumentVerificationStep({
       fileName: file.name,
       fileSize: file.size,
       ocrData: ocrRes.extracted,
+      originalOcrData: ocrRes.extracted,
       apiData: v.apiData,
       nameMatchScore: score,
       verifiedAt: Date.now(),
       ocrModel: ocrRes.model,
     });
   };
+
+  // Mutate a single OCR field on a verified doc — used by EditableOcrField for manual corrections.
+  const setOcrField = useCallback(
+    (setDoc: React.Dispatch<React.SetStateAction<DocState>>, key: string, value: any) => {
+      setDoc((prev) => ({
+        ...prev,
+        ocrData: { ...(prev.ocrData || {}), [key]: value },
+      }));
+    },
+    [],
+  );
 
   const effectiveLegalName = useMemo(() => {
     if (isGstRegistered === true) return gstDoc.ocrData?.legal_name || gstDoc.apiData?.legalName;
@@ -317,6 +335,45 @@ export function DocumentVerificationStep({
 
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
   const handleBankUpload = (file: File) => runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName);
+
+  // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
+  useEffect(() => {
+    if (panDoc.status !== "verified" || isGstRegistered !== true) {
+      setPanCrossCheckError(null);
+      return;
+    }
+    const gstin = gstDoc.ocrData?.gstin;
+    const panOcr = String(panDoc.ocrData?.pan_number || "").toUpperCase();
+    if (!gstin || !panOcr) {
+      setPanCrossCheckError(null);
+      return;
+    }
+    const panFromGst = String(gstin).slice(2, 12).toUpperCase();
+    if (panFromGst.length === 10 && panFromGst !== panOcr) {
+      setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`);
+    } else {
+      setPanCrossCheckError(null);
+    }
+  }, [panDoc.status, panDoc.ocrData?.pan_number, gstDoc.ocrData?.gstin, isGstRegistered]);
+
+  // Re-compute name-match scores live as user corrects names.
+  useEffect(() => {
+    if (panDoc.status !== "verified") return;
+    const score = nameMatchScore(effectiveLegalName, panDoc.ocrData?.holder_name);
+    setPanDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
+  }, [panDoc.status, panDoc.ocrData?.holder_name, effectiveLegalName]);
+
+  useEffect(() => {
+    if (msmeDoc.status !== "verified") return;
+    const score = nameMatchScore(effectiveLegalName, msmeDoc.ocrData?.enterprise_name);
+    setMsmeDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
+  }, [msmeDoc.status, msmeDoc.ocrData?.enterprise_name, effectiveLegalName]);
+
+  useEffect(() => {
+    if (gstDoc.status !== "verified") return;
+    const score = nameMatchScore(gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName);
+    setGstDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
+  }, [gstDoc.status, gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName]);
 
   // ---------- Gating ----------
   const stage1Done =
@@ -529,6 +586,8 @@ export function DocumentVerificationStep({
                       verifiedFields={
                         <GstVerifiedDetails
                           ocr={gstDoc.ocrData}
+                          original={gstDoc.originalOcrData}
+                          onChangeField={(k, v) => setOcrField(setGstDoc, k, v)}
                           editablePrincipalPlace={editablePrincipalPlace}
                           onChangePrincipalPlace={setEditablePrincipalPlace}
                         />
@@ -629,9 +688,23 @@ export function DocumentVerificationStep({
                   panDoc.status === "verifying" ? "Verifying…" : ""
                 }
                 verifiedFields={
-                  <div className="grid md:grid-cols-2 gap-3">
-                    <ReadOnlyField label="PAN Number" value={panDoc.ocrData?.pan_number} mono />
-                    <ReadOnlyField label="Holder Name" value={panDoc.ocrData?.holder_name} />
+                  <div className="space-y-3">
+                    <ReviewBanner />
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <EditableOcrField
+                        label="PAN Number"
+                        value={panDoc.ocrData?.pan_number}
+                        originalValue={panDoc.originalOcrData?.pan_number}
+                        onChange={(v) => setOcrField(setPanDoc, "pan_number", v.toUpperCase())}
+                        mono
+                      />
+                      <EditableOcrField
+                        label="Holder Name"
+                        value={panDoc.ocrData?.holder_name}
+                        originalValue={panDoc.originalOcrData?.holder_name}
+                        onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
+                      />
+                    </div>
                   </div>
                 }
               />
@@ -689,10 +762,29 @@ export function DocumentVerificationStep({
                       msmeDoc.status === "verifying" ? "Verifying…" : ""
                     }
                     verifiedFields={
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <ReadOnlyField label="Udyam Number" value={msmeDoc.ocrData?.udyam_number} mono />
-                        <ReadOnlyField label="Enterprise Name" value={msmeDoc.ocrData?.enterprise_name} />
-                        <ReadOnlyField label="Enterprise Type" value={msmeDoc.ocrData?.enterprise_type} />
+                      <div className="space-y-3">
+                        <ReviewBanner />
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <EditableOcrField
+                            label="Udyam Number"
+                            value={msmeDoc.ocrData?.udyam_number}
+                            originalValue={msmeDoc.originalOcrData?.udyam_number}
+                            onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
+                            mono
+                          />
+                          <EditableOcrField
+                            label="Enterprise Name"
+                            value={msmeDoc.ocrData?.enterprise_name}
+                            originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                            onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                          />
+                          <EditableOcrField
+                            label="Enterprise Type"
+                            value={msmeDoc.ocrData?.enterprise_type}
+                            originalValue={msmeDoc.originalOcrData?.enterprise_type}
+                            onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
+                          />
+                        </div>
                       </div>
                     }
                   />
@@ -729,13 +821,43 @@ export function DocumentVerificationStep({
                   bankDoc.status === "verifying" ? "Penny-drop verification…" : ""
                 }
                 verifiedFields={
-                  <div className="grid md:grid-cols-2 gap-3">
-                    <ReadOnlyField label="Account Number" value={bankDoc.ocrData?.account_number} mono />
-                    <ReadOnlyField label="IFSC Code" value={bankDoc.ocrData?.ifsc_code} mono />
-                    <ReadOnlyField label="Bank Name" value={bankDoc.ocrData?.bank_name} />
-                    <ReadOnlyField label="Branch" value={bankDoc.ocrData?.branch_name} />
-                    <div className="md:col-span-2">
-                      <ReadOnlyField label="Account Holder Name" value={bankDoc.ocrData?.account_holder_name} />
+                  <div className="space-y-3">
+                    <ReviewBanner />
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <EditableOcrField
+                        label="Account Number"
+                        value={bankDoc.ocrData?.account_number}
+                        originalValue={bankDoc.originalOcrData?.account_number}
+                        onChange={(v) => setOcrField(setBankDoc, "account_number", v)}
+                        mono
+                      />
+                      <EditableOcrField
+                        label="IFSC Code"
+                        value={bankDoc.ocrData?.ifsc_code}
+                        originalValue={bankDoc.originalOcrData?.ifsc_code}
+                        onChange={(v) => setOcrField(setBankDoc, "ifsc_code", v.toUpperCase())}
+                        mono
+                      />
+                      <EditableOcrField
+                        label="Bank Name"
+                        value={bankDoc.ocrData?.bank_name}
+                        originalValue={bankDoc.originalOcrData?.bank_name}
+                        onChange={(v) => setOcrField(setBankDoc, "bank_name", v)}
+                      />
+                      <EditableOcrField
+                        label="Branch"
+                        value={bankDoc.ocrData?.branch_name}
+                        originalValue={bankDoc.originalOcrData?.branch_name}
+                        onChange={(v) => setOcrField(setBankDoc, "branch_name", v)}
+                      />
+                      <div className="md:col-span-2">
+                        <EditableOcrField
+                          label="Account Holder Name"
+                          value={bankDoc.ocrData?.account_holder_name}
+                          originalValue={bankDoc.originalOcrData?.account_holder_name}
+                          onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
+                        />
+                      </div>
                     </div>
                   </div>
                 }
@@ -1052,10 +1174,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function GstVerifiedDetails({
   ocr,
+  original,
+  onChangeField,
   editablePrincipalPlace,
   onChangePrincipalPlace,
 }: {
   ocr?: Record<string, any>;
+  original?: Record<string, any>;
+  onChangeField: (key: string, value: any) => void;
   editablePrincipalPlace: string;
   onChangePrincipalPlace: (v: string) => void;
 }) {
@@ -1067,14 +1193,37 @@ function GstVerifiedDetails({
   const hasRegistrationSection = !!(ocr.gst_status || ocr.registration_date || ocr.taxpayer_type || businessNature.length);
   return (
     <div className="space-y-5">
+      <ReviewBanner />
+
       {/* Identity */}
       <div className="space-y-2">
         <SectionHeading>Identity</SectionHeading>
         <div className="grid md:grid-cols-2 gap-3">
-          <ReadOnlyField label="Legal Name" value={ocr.legal_name} />
-          <ReadOnlyField label="Trade Name" value={ocr.trade_name} />
-          <ReadOnlyField label="GSTIN" value={ocr.gstin} mono />
-          <ReadOnlyField label="Constitution" value={ocr.constitution_of_business} />
+          <EditableOcrField
+            label="Legal Name"
+            value={ocr.legal_name}
+            originalValue={original?.legal_name}
+            onChange={(v) => onChangeField("legal_name", v)}
+          />
+          <EditableOcrField
+            label="Trade Name"
+            value={ocr.trade_name}
+            originalValue={original?.trade_name}
+            onChange={(v) => onChangeField("trade_name", v)}
+          />
+          <EditableOcrField
+            label="GSTIN"
+            value={ocr.gstin}
+            originalValue={original?.gstin}
+            onChange={(v) => onChangeField("gstin", v.toUpperCase())}
+            mono
+          />
+          <EditableOcrField
+            label="Constitution"
+            value={ocr.constitution_of_business}
+            originalValue={original?.constitution_of_business}
+            onChange={(v) => onChangeField("constitution_of_business", v)}
+          />
         </div>
       </div>
 
@@ -1092,10 +1241,20 @@ function GstVerifiedDetails({
               </div>
             )}
             {ocr.registration_date && (
-              <ReadOnlyField label="Registration Date" value={ocr.registration_date} />
+              <EditableOcrField
+                label="Registration Date"
+                value={ocr.registration_date}
+                originalValue={original?.registration_date}
+                onChange={(v) => onChangeField("registration_date", v)}
+              />
             )}
             {ocr.taxpayer_type && (
-              <ReadOnlyField label="Taxpayer Type" value={ocr.taxpayer_type} />
+              <EditableOcrField
+                label="Taxpayer Type"
+                value={ocr.taxpayer_type}
+                originalValue={original?.taxpayer_type}
+                onChange={(v) => onChangeField("taxpayer_type", v)}
+              />
             )}
             {businessNature.length > 0 && (
               <div className="md:col-span-2">
@@ -1142,10 +1301,20 @@ function GstVerifiedDetails({
           <SectionHeading>Jurisdiction</SectionHeading>
           <div className="grid md:grid-cols-2 gap-3">
             {ocr.jurisdiction_centre && (
-              <ReadOnlyField label="Centre Jurisdiction" value={ocr.jurisdiction_centre} />
+              <EditableOcrField
+                label="Centre Jurisdiction"
+                value={ocr.jurisdiction_centre}
+                originalValue={original?.jurisdiction_centre}
+                onChange={(v) => onChangeField("jurisdiction_centre", v)}
+              />
             )}
             {ocr.jurisdiction_state && (
-              <ReadOnlyField label="State Jurisdiction" value={ocr.jurisdiction_state} />
+              <EditableOcrField
+                label="State Jurisdiction"
+                value={ocr.jurisdiction_state}
+                originalValue={original?.jurisdiction_state}
+                onChange={(v) => onChangeField("jurisdiction_state", v)}
+              />
             )}
           </div>
         </div>
@@ -1214,5 +1383,76 @@ function InlineFilePicker({
         }}
       />
     </>
+  );
+}
+
+/**
+ * EditableOcrField — used inside verified panels so users can correct
+ * OCR mis-reads inline. Shows an "Edited" pill when the value differs from
+ * the OCR'd original, plus a "Reset to OCR" link to revert.
+ */
+function EditableOcrField({
+  label,
+  value,
+  originalValue,
+  onChange,
+  mono,
+  placeholder,
+}: {
+  label: string;
+  value?: string;
+  originalValue?: string;
+  onChange: (v: string) => void;
+  mono?: boolean;
+  placeholder?: string;
+}) {
+  const current = value ?? "";
+  const original = originalValue ?? "";
+  const isEdited = current.trim() !== original.trim() && original.length > 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+        <div className="flex items-center gap-2">
+          {isEdited && (
+            <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-1.5 py-0.5 text-[10px] font-medium">
+              Edited
+            </span>
+          )}
+          {isEdited && (
+            <button
+              type="button"
+              onClick={() => onChange(original)}
+              className="text-[10px] text-primary hover:underline"
+            >
+              Reset to OCR
+            </button>
+          )}
+        </div>
+      </div>
+      <Input
+        value={current}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? "—"}
+        className={cn(
+          "mt-1 bg-muted/40 border-border/60",
+          mono && "font-mono text-sm tracking-wide",
+          isEdited && "border-warning/40 bg-warning/5",
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * One-line helper inside each verified panel telling the user they can
+ * correct any field if the OCR mis-read the document.
+ */
+function ReviewBanner() {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      <Sparkles className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+      <span>Review the extracted details. Click any field to correct it if the document was misread.</span>
+    </div>
   );
 }
