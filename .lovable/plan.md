@@ -1,49 +1,42 @@
 
 
-## Fix: Custom-role users routed correctly without altering custom role behavior
+## Fix: Step 1 "Continue" + "Save Draft" deadlock after all docs uploaded
 
-### Goal
-When a Customer Admin creates a user with a **Custom Role** (e.g. "SCM Head"), the custom role itself must remain the source of truth for screen access — no built-in role should override or shadow it. Today, such users are silently stamped as `vendor` in `user_roles`, which sends them into the vendor portal on login.
+### Root cause
 
-### Root cause (recap)
-- `user_roles.role` is a NOT-NULL enum, so every user must carry one built-in role.
-- `CreateUserDialog.tsx` falls back to `'vendor'` for custom-role selections → routing layer reads `vendor` and pushes them to the vendor portal.
-- `useAuth` only reads `user_roles`, so it never knows the user actually has a custom role.
+Step 1 (`DocumentVerificationStep`) only reports its data to the parent via `onComplete(out)` — and `onComplete` only fires when the inner `step-form` is **submitted**. The parent's outer "Continue" button is the only thing that submits that form, but it is `disabled={!canProceed}`, and `canProceed` reads from `verifiedData` in the parent, which is only set inside `onComplete`. So:
 
-### Fix (no built-in role used for custom-role users)
+- All four stages turn green inside Step 1.
+- Parent never receives the data → `verifiedData` stays `undefined` → `canProceedFromCurrentStep()` returns `false` → Continue stays disabled forever.
+- "Save Draft" calls `saveVendor(formData)` — but because `verifiedData` was never lifted, `formData.statutory` (PAN/GSTIN), `formData.bank` etc. are still empty, so the save either fails validation in the hook or saves an empty draft (looks like "not working").
 
-**1. `CreateUserDialog.tsx` — neutral placeholder, not a functional built-in role**
-- When a Custom Role is picked, store `'approver'` in `user_roles` purely as a non-vendor placeholder. **No built-in permissions are granted** because:
-  - `approver` has no rows in `role_screen_permissions` (verified — screen access today comes entirely from `custom_role_screen_permissions` for these users).
-  - Routing/sidebar will be updated (step 3) to ignore the built-in role for custom-role users.
-- The UI continues to show the user's *custom* role label everywhere — the enum value is internal plumbing only.
+### The fix
 
-**2. `useAuth.tsx` — make custom roles first-class**
-- After fetching `user_roles`, also fetch active `user_custom_roles` joined with `custom_roles` (id, name, is_active).
-- Expose:
-  - `customRoles: { id, name }[]` — only active ones.
-  - `hasCustomRole: boolean`.
-  - `isVendor: boolean` = `userRole === 'vendor' && !hasCustomRole`.
-- Existing `userRole` field is preserved for backward-compat, but routing should prefer `isVendor` / `hasCustomRole`.
+**1. Lift Step-1 progress to the parent in real time, not on submit.**
+- Add a new optional `onStageChange` prop to `DocumentVerificationStep` that fires whenever the 4 internal stage flags (`stage1Done…stage4Done`) change, sending the same payload that `onComplete` builds today.
+- Inside `DocumentVerificationStep`, call `onStageChange(buildOutput())` from a `useEffect` keyed on the stage flags + relevant doc state. `onComplete` continues to work for the explicit submit.
 
-**3. Routing & layout — defer to custom role when present**
-- `Auth.tsx` post-login redirect: if `hasCustomRole` → go to `/dashboard`; else if `isVendor` → vendor portal; else → `/dashboard`.
-- `AppLayout.tsx`: treat `hasCustomRole` users as portal users (sidebar shown, vendor-only padding skipped). `useScreenPermissions` already merges custom-role screens, so the sidebar will list exactly what the custom role grants — nothing from any built-in role.
-- `ProtectedRoute.tsx` stays as-is (auth gate only).
+**2. Parent updates `verifiedData` + `formData` continuously.**
+- Wire `onStageChange` to a new `handleDocStageChange(data)` in `VendorRegistration.tsx` that does the same `setVerifiedData` + `setFormData` mapping currently inside `handleDocVerificationComplete`, **without** advancing `currentStep`.
+- `handleDocVerificationComplete` keeps the navigation behavior (mark step 1 complete, go to step 2). The Continue button now just submits the form, which calls `onComplete`, which advances.
 
-**4. One-time data backfill (existing mis-classified users like Brijesh)**
-- Update existing rows: any user that has at least one active `user_custom_roles` link but `user_roles.role = 'vendor'` → set `user_roles.role = 'approver'`. This rescues already-created users without changing their custom role assignments.
-
-### Explicitly out of scope
-- No change to vendor invitation flow — invited vendors keep `role = 'vendor'` via the `handle_new_user` trigger and the existing email-domain logic.
-- No change to `custom_roles`, `custom_role_screen_permissions`, or `user_custom_roles` schema.
-- No new built-in role and no edits to `role_screen_permissions` — built-in roles get **zero** added permissions because of this fix.
-- No changes to other registration / OCR work.
+**3. Result**
+- "Continue" enables the moment all four stages show green, because `verifiedData` is now populated live.
+- Clicking Continue submits the inner form → `onComplete` fires → step advances to 2 (existing behavior).
+- "Save Draft" works at any time on Step 1 because `formData.statutory` / `formData.bank` are kept in sync as docs verify, so the saved draft actually contains PAN / GSTIN / account details and the auto-save also picks them up.
 
 ### Files
-- Edit `src/components/admin/CreateUserDialog.tsx` — change custom-role fallback from `'vendor'` → `'approver'` (placeholder only).
-- Edit `src/hooks/useAuth.tsx` — load custom roles, expose `customRoles`, `hasCustomRole`, `isVendor`.
-- Edit `src/pages/Auth.tsx` — use `isVendor` / `hasCustomRole` for post-login redirect.
-- Edit `src/components/layout/AppLayout.tsx` — treat `hasCustomRole` users as portal users.
-- Data fix via insert/update tool: `UPDATE user_roles SET role='approver' WHERE role='vendor' AND user_id IN (SELECT user_id FROM user_custom_roles uc JOIN custom_roles cr ON cr.id=uc.custom_role_id WHERE cr.is_active);`
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+  - Add optional `onStageChange?: (data: VerifiedDocumentData) => void` prop.
+  - Extract the existing `out` builder from `handleContinue` into a `buildOutput()` helper.
+  - Add a `useEffect` that calls `onStageChange?.(buildOutput())` when stage states change (debounced via dependency list — no extra timers needed).
+
+- `src/pages/VendorRegistration.tsx`
+  - Add `handleDocStageChange(data)` that mirrors the data-mapping block from `handleDocVerificationComplete` but does **not** touch `completedSteps` or `currentStep`.
+  - Pass `onStageChange={handleDocStageChange}` to `<DocumentVerificationStep />` in `renderStep()`.
+
+### Out of scope
+- No change to OCR, dummy verifyApi, gating math, tab auto-advance, or any other step.
+- No DB / edge function / RLS changes.
 
