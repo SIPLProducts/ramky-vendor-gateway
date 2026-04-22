@@ -412,7 +412,7 @@ export default function VendorRegistration() {
 
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6, 7]); };
 
-  const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
+  const applyVerifiedDataToForm = (data: VerifiedDocumentData) => {
     setVerifiedData(data);
 
     // Resolve legal + address depending on GST path
@@ -461,6 +461,14 @@ export default function VendorRegistration() {
         branchName: data.bank?.branchName || prev.bank.branchName,
       },
     }));
+  };
+
+  const handleDocStageChange = (data: VerifiedDocumentData) => {
+    applyVerifiedDataToForm(data);
+  };
+
+  const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
+    applyVerifiedDataToForm(data);
     if (!completedSteps.includes(1)) setCompletedSteps((prev) => [...prev, 1]);
     setCurrentStep(2);
   };
@@ -550,7 +558,7 @@ export default function VendorRegistration() {
     const legalName = formData.organization.legalName;
     switch (currentStep) {
       case 1:
-        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} />;
+        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
       case 2:
         return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(2, data)} />;
       case 3:
