@@ -320,6 +320,9 @@ export default function PurchaseApproval() {
               <TabsContent value="validations" className="mt-6">
                 <ValidationStatus validations={mappedValidations} />
               </TabsContent>
+              <TabsContent value="workflow" className="mt-6">
+                <ApprovalTimeline vendorId={selectedVendor.id} />
+              </TabsContent>
             </Tabs>
           )}
           <DialogFooter className="gap-2 mt-6">
