@@ -89,7 +89,7 @@ export function ApprovalMatrixConfig() {
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useAllProfilesWithRoles();
   const { data: tenantUserCounts = {} } = useTenantUserCounts();
-  const userById = useMemo(() => new Map(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
+  const userById = useMemo(() => new Map<string, TenantUserWithRole>(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const currentTenant = activeTenants.find((t) => t.id === tenantId);
 
