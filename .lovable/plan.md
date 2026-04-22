@@ -1,68 +1,51 @@
 
 
-## Form Builder: Drag-and-drop reordering + inline field editor
+## Fix: Vendor feedback submission (Yes/No + Submit not working)
 
-Make the Form Builder feel like a real builder: reorder tabs by dragging them, see all existing fields per tab, and add new fields inline (no drawer pop-out).
+### Root cause
+The feedback form silently fails because of a Row-Level Security (RLS) mismatch on the `vendor_feedback` table:
 
-### What changes
+- The current INSERT policy requires `auth.uid() = user_id`.
+- The form (`/feedback` page and the `FeedbackPopup`) inserts `user_id: user?.id || null`.
+- On the public `/feedback` route, users are usually **not signed in**, so `auth.uid()` is null → policy denies the insert.
+- Even when signed in, if `user_id` is set to null (fallback), the check fails.
+- The "Yes / No (would recommend)" buttons themselves work as local state — they only appear "broken" because the entire submit is rejected with no clear message.
 
-**1. Drag-and-drop tab reordering (left rail)**
+### What will change
 
-- Tabs in the left rail become draggable using `@dnd-kit/core` + `@dnd-kit/sortable` (already common in the React stack; will be added).
-- Drag handle = the existing `GripVertical` icon. Cursor changes to grab on hover.
-- Built-in tabs (Doc Verify, Org, Address, Contact, Fin/Infra, Review) are **locked** — they show the lock icon and can't be dragged or reordered. Only custom tabs are reorderable, and only **between** the last built-in step (Fin/Infra, order 5) and Review (order 99).
-- On drop: recompute `step_order` for all custom tabs (e.g. 6, 7, 8, …) and persist in one batched update via a new `useReorderFormSteps` mutation in `useFormBuilder.tsx`. Optimistic UI update + react-query invalidation.
+**1. Database — allow public feedback submissions safely**
+- Drop the restrictive INSERT policy.
+- Add a new INSERT policy that allows:
+  - Authenticated users to insert their own feedback (`user_id = auth.uid()`), OR
+  - Anonymous submissions where `user_id IS NULL` (public feedback page).
+- Keep all existing SELECT policies unchanged so only admins/finance/purchase and the owner can read feedback.
 
-**2. Drag-and-drop field reordering (right pane)**
+```sql
+DROP POLICY "Vendors can submit feedback" ON public.vendor_feedback;
 
-- Same `@dnd-kit/sortable` treatment for the field rows inside the selected tab.
-- Works for both built-in steps (overrides) and custom steps.
-- On drop: recompute `display_order` for all fields in that step and persist via a new `useReorderFormFields` mutation. Optimistic + invalidate.
+CREATE POLICY "Anyone can submit feedback"
+ON public.vendor_feedback FOR INSERT TO public
+WITH CHECK (
+  (auth.uid() IS NOT NULL AND user_id = auth.uid())
+  OR (auth.uid() IS NULL AND user_id IS NULL)
+);
+```
 
-**3. Inline "Add Field" + inline edit (replaces the drawer for the common case)**
+**2. Frontend — `src/pages/VendorFeedback.tsx`**
+- Surface the real error message in the toast (currently it shows a generic "Submission Failed").
+- Ensure `would_recommend` is always sent (already wired; confirm RadioGroup value flows correctly).
+- After insert, log to console on failure for easier debugging.
 
-- Replace the slide-in `FieldEditorDrawer` with an **inline expandable row** at the top of the field list:
-  - "+ Add Field" button expands a compact inline form (Field Key, Display Label, Type, Mandatory, Visible, Placeholder) with `[Save] [Cancel]`.
-  - Advanced options (Help Text, Default Value, Validation Regex, Validation Message, Options for selects) live inside a `[Show advanced]` collapsible inside the same inline form.
-- **Editing** an existing field also opens inline: clicking the row expands it in place into the same compact form. Other rows collapse.
-- Only one row is in edit/add mode at a time.
-- The drawer file (`FieldEditorDrawer.tsx`) is removed since everything happens inline.
-
-**4. Existing fields list — always visible**
-
-- Even when no tab is selected on first load, default to the first tab and render its fields.
-- Each field row shows: drag handle, label, type badge, Required/Hidden badges, field key, and Edit / Delete buttons. Clicking the row (or Edit) toggles inline edit.
-- Empty state stays the same but now sits below the inline "Add Field" button so the path forward is obvious.
-
-### Files
-
-**Edited:**
-- `src/pages/FormBuilder.tsx`
-  - Wrap the tabs list in `<DndContext><SortableContext>` and the fields list in another. Use `arrayMove` on drag end.
-  - Replace the field editor drawer trigger with an inline `FieldRowEditor` component (defined in the same file or extracted to `src/components/admin/InlineFieldEditor.tsx`).
-  - Pre-select the first available tab on mount.
-- `src/hooks/useFormBuilder.tsx`
-  - Add `useReorderFormSteps(tenantId)` — accepts ordered list of `{id, step_order}` and runs a Supabase upsert in a single round-trip.
-  - Add `useReorderFormFields(tenantId, stepKey)` — same shape for `form_field_configs`.
-
-**Created:**
-- `src/components/admin/InlineFieldEditor.tsx` — compact inline form (label, key auto-slugged from label, type select, mandatory/visible switches, placeholder, advanced collapsible). Reuses the same upsert mutation already in `useFormBuilder`.
-
-**Deleted:**
-- `src/components/admin/FieldEditorDrawer.tsx` (replaced by inline editor; also removes the `SheetFooter` ref warning).
-
-**Dependencies:**
-- Add `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (small, headless, Tailwind-friendly).
-
-### Behaviour notes
-
-- Built-in tabs cannot be reordered; the dnd sensor ignores them. Custom tabs can only be dragged within the custom range.
-- Field reorder works on any tab (built-in or custom) since field overrides are per-tenant.
-- All persistence is batched per drop to avoid N round-trips.
-- Optimistic updates so the UI feels instant; a failed save reverts and shows a toast.
+**3. Frontend — `src/components/vendor/FeedbackPopup.tsx`**
+- Same error surfacing improvement.
+- Confirm Yes/No buttons toggle `wouldRecommend` (they do — local state works; failure was upstream).
 
 ### Out of scope
-- Drag-and-drop across tabs (moving a field from one tab to another).
-- Multi-select / bulk delete of fields.
-- Undo for reorders.
+- No changes to the feedback UI design or fields.
+- No changes to who can read feedback.
+
+### Files touched
+- New migration: `supabase/migrations/<timestamp>_fix_vendor_feedback_insert.sql`
+- `src/pages/VendorFeedback.tsx` (better error messaging)
+- `src/components/vendor/FeedbackPopup.tsx` (better error messaging)
 
