@@ -260,15 +260,26 @@ export function ApprovalMatrixConfig() {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {isDirty && !loading && (
+            <Badge variant="destructive" className="animate-pulse">Unsaved changes</Badge>
+          )}
           <Button variant="outline" onClick={addRow} disabled={!tenantId}>
             <Plus className="h-4 w-4 mr-1" /> Add Row
           </Button>
-          <Button onClick={saveAll} disabled={saving || !tenantId}>
+          <Button onClick={saveAll} disabled={saving || !tenantId} variant={isDirty ? 'default' : 'secondary'}>
             <Save className="h-4 w-4 mr-1" /> {saving ? 'Saving...' : 'Save All'}
           </Button>
         </div>
       </div>
+
+      {/* Save reminder banner */}
+      {isDirty && !loading && rows.length > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-md border border-amber-500/50 bg-amber-500/10 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <span><strong>You have unsaved changes.</strong> Click <strong>Save All</strong> to persist this matrix to the database.</span>
+        </div>
+      )}
 
       {/* Chain preview */}
       {grouped.length > 0 && (
