@@ -24,7 +24,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ApprovalTimeline } from '@/components/vendor/ApprovalTimeline';
-import { useVendors, usePurchaseAction, useBuyerCompanies, useReRouteApproval, VendorRow } from '@/hooks/useVendors';
+import { useVendors, useScmMatrixAction, useBuyerCompanies, useReRouteApproval, VendorRow } from '@/hooks/useVendors';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,26 +59,28 @@ export default function PurchaseApproval() {
 
   const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
   const { data: buyerCompanies } = useBuyerCompanies();
-  const purchaseAction = usePurchaseAction();
+  const purchaseAction = useScmMatrixAction();
   const reRoute = useReRouteApproval();
-  const { userRole } = useAuth();
+  const { userRole, user } = useAuth();
   const canReRoute = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
+
+  const userEmail = (user?.email ?? '').toLowerCase();
 
   // Fetch approval progress rows for all visible vendors (for stuck detection + status badge)
   const vendorIds = (pendingVendors ?? []).map(v => v.id);
   const { data: progressByVendor } = useQuery({
     queryKey: ['purchase-progress', vendorIds.sort().join(',')],
-    queryFn: async (): Promise<Record<string, Array<{ level_number: number; status: string }>>> => {
+    queryFn: async (): Promise<Record<string, Array<{ id: string; level_id: string; level_number: number; status: string }>>> => {
       if (vendorIds.length === 0) return {};
       const { data, error } = await supabase
         .from('vendor_approval_progress')
-        .select('vendor_id, level_number, status')
+        .select('id, vendor_id, level_id, level_number, status')
         .in('vendor_id', vendorIds);
       if (error) throw error;
-      const map: Record<string, Array<{ level_number: number; status: string }>> = {};
+      const map: Record<string, Array<{ id: string; level_id: string; level_number: number; status: string }>> = {};
       (data ?? []).forEach(row => {
         if (!map[row.vendor_id]) map[row.vendor_id] = [];
-        map[row.vendor_id].push({ level_number: row.level_number, status: row.status });
+        map[row.vendor_id].push({ id: row.id, level_id: row.level_id, level_number: row.level_number, status: row.status });
       });
       return map;
     },
@@ -85,7 +88,52 @@ export default function PurchaseApproval() {
     staleTime: 30 * 1000,
   });
 
+  // Resolve approvers for all active (lowest pending) levels currently on screen
+  const activeLevelIds = Array.from(new Set(
+    Object.values(progressByVendor ?? {}).map(rows => {
+      const pending = rows.filter(r => r.status === 'pending').sort((a, b) => a.level_number - b.level_number);
+      return pending[0]?.level_id;
+    }).filter(Boolean) as string[]
+  ));
+
+  const { data: approversByLevel } = useQuery({
+    queryKey: ['scm-approvers-by-level', activeLevelIds.sort().join(',')],
+    queryFn: async (): Promise<Record<string, Array<{ user_id: string | null; approver_email: string | null; approver_name: string | null }>>> => {
+      if (activeLevelIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from('approval_matrix_approvers')
+        .select('level_id, user_id, approver_email, approver_name')
+        .in('level_id', activeLevelIds);
+      if (error) throw error;
+      const map: Record<string, Array<{ user_id: string | null; approver_email: string | null; approver_name: string | null }>> = {};
+      (data ?? []).forEach(row => {
+        if (!map[row.level_id]) map[row.level_id] = [];
+        map[row.level_id].push({ user_id: row.user_id, approver_email: row.approver_email, approver_name: row.approver_name });
+      });
+      return map;
+    },
+    enabled: activeLevelIds.length > 0,
+    staleTime: 60 * 1000,
+  });
+
   const stuckIds = new Set(vendorIds.filter(id => !progressByVendor?.[id]?.length));
+
+  // Returns info about the active level for a vendor: the pending row, its approvers, and whether the current user is one
+  const getActiveLevelInfo = (vendorId: string) => {
+    const rows = progressByVendor?.[vendorId] ?? [];
+    const pending = rows.filter(r => r.status === 'pending').sort((a, b) => a.level_number - b.level_number);
+    const active = pending[0];
+    if (!active) return { active: null, approvers: [], isActiveApprover: false, approverNames: '' };
+    const approvers = approversByLevel?.[active.level_id] ?? [];
+    const isActiveApprover = approvers.some(
+      a => a.user_id === user?.id || (a.approver_email && a.approver_email.toLowerCase() === userEmail)
+    );
+    const approverNames = approvers
+      .map(a => a.approver_name || a.approver_email)
+      .filter(Boolean)
+      .join(', ');
+    return { active, approvers, isActiveApprover, approverNames };
+  };
 
   const getScmStatusBadge = (vendorId: string) => {
     const rows = progressByVendor?.[vendorId] ?? [];
@@ -93,12 +141,17 @@ export default function PurchaseApproval() {
       return { label: 'Awaiting SCM Approval', className: 'bg-amber-100 text-amber-700 border-amber-200' };
     }
     const approved = rows.filter(r => r.status === 'approved').sort((a, b) => b.level_number - a.level_number);
-    const pending = rows.filter(r => r.status === 'pending').sort((a, b) => b.level_number - a.level_number);
-    if (approved.length > 0 && pending.length > 0) {
-      return {
-        label: `SCM L${approved[0].level_number} Approved · Pending L${pending[0].level_number}`,
-        className: 'bg-blue-100 text-blue-700 border-blue-200',
-      };
+    const pending = rows.filter(r => r.status === 'pending').sort((a, b) => a.level_number - b.level_number);
+    const { approverNames } = getActiveLevelInfo(vendorId);
+    if (pending.length > 0) {
+      const activeLabel = `Pending L${pending[0].level_number}${approverNames ? ` — ${approverNames}` : ''}`;
+      if (approved.length > 0) {
+        return {
+          label: `L${approved[0].level_number} Approved · ${activeLabel}`,
+          className: 'bg-blue-100 text-blue-700 border-blue-200',
+        };
+      }
+      return { label: activeLabel, className: 'bg-amber-100 text-amber-700 border-amber-200' };
     }
     return { label: 'Awaiting SCM Approval', className: 'bg-amber-100 text-amber-700 border-amber-200' };
   };
@@ -241,6 +294,13 @@ export default function PurchaseApproval() {
           filteredVendors.map((vendor) => {
             const isStuck = stuckIds.has(vendor.id);
             const scmBadge = getScmStatusBadge(vendor.id);
+            const { isActiveApprover, active } = getActiveLevelInfo(vendor.id);
+            const canAct = !isStuck && !!active && isActiveApprover;
+            const disabledReason = isStuck
+              ? 'No SCM matrix configured for this vendor.'
+              : !active
+                ? 'No pending SCM level for this vendor.'
+                : 'Only the active SCM approver can act. Use the My Approvals page.';
             return (
             <Card key={vendor.id} className="border-0 shadow-md card-interactive">
               <CardContent className="p-6">
@@ -284,8 +344,37 @@ export default function PurchaseApproval() {
                         Re-route
                       </Button>
                     )}
-                    <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
-                    <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(vendor, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20 disabled:opacity-50"
+                              onClick={() => handleAction(vendor, 'approve')}
+                              disabled={!canAct}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />Approve
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canAct && <TooltipContent>{disabledReason}</TooltipContent>}
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="destructive"
+                              className="rounded-xl disabled:opacity-50"
+                              onClick={() => handleAction(vendor, 'reject')}
+                              disabled={!canAct}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />Reject
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canAct && <TooltipContent>{disabledReason}</TooltipContent>}
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
                 {isStuck && (
