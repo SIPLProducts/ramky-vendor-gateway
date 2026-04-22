@@ -294,6 +294,13 @@ export default function PurchaseApproval() {
           filteredVendors.map((vendor) => {
             const isStuck = stuckIds.has(vendor.id);
             const scmBadge = getScmStatusBadge(vendor.id);
+            const { isActiveApprover, active } = getActiveLevelInfo(vendor.id);
+            const canAct = !isStuck && !!active && isActiveApprover;
+            const disabledReason = isStuck
+              ? 'No SCM matrix configured for this vendor.'
+              : !active
+                ? 'No pending SCM level for this vendor.'
+                : 'Only the active SCM approver can act. Use the My Approvals page.';
             return (
             <Card key={vendor.id} className="border-0 shadow-md card-interactive">
               <CardContent className="p-6">
