@@ -216,7 +216,9 @@ export default function PurchaseApproval() {
             <p className="text-muted-foreground mt-2">No vendors pending purchase approval.</p>
           </CardContent></Card>
         ) : (
-          filteredVendors.map((vendor) => (
+          filteredVendors.map((vendor) => {
+            const isStuck = stuckIds?.has(vendor.id) ?? false;
+            return (
             <Card key={vendor.id} className="border-0 shadow-md card-interactive">
               <CardContent className="p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -234,7 +236,7 @@ export default function PurchaseApproval() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {vendor.finance_comments && (
                       <Button
                         variant="outline"
@@ -248,13 +250,42 @@ export default function PurchaseApproval() {
                       </Button>
                     )}
                     <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}><Eye className="h-4 w-4 mr-2" />Details</Button>
+                    {canReRoute && isStuck && (
+                      <Button
+                        variant="outline"
+                        className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10"
+                        onClick={() => reRoute.mutate(vendor.id)}
+                        disabled={reRoute.isPending}
+                      >
+                        {reRoute.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                        Re-route
+                      </Button>
+                    )}
                     <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
                     <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(vendor, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
                   </div>
                 </div>
+                {isStuck && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>No SCM approval matrix configured</AlertTitle>
+                    <AlertDescription className="flex items-center justify-between gap-3 flex-wrap">
+                      <span>
+                        This vendor has no approval levels seeded. An admin must configure the matrix for{' '}
+                        <strong>{getBuyerCompanyName(vendor.tenant_id)}</strong>, then click <em>Re-route</em>.
+                      </span>
+                      {canReRoute && (
+                        <Link to="/admin/configuration" className="underline font-medium whitespace-nowrap">
+                          Open Approval Matrix →
+                        </Link>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
 
