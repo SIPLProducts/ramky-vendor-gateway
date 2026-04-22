@@ -110,6 +110,7 @@ export function DocumentVerificationStep({
   vendorId,
   initialData,
   onComplete,
+  onStageChange,
 }: DocumentVerificationStepProps) {
   const { extractFromFile } = useOcrExtraction();
 
