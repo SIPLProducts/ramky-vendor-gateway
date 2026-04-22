@@ -22,6 +22,13 @@ export interface VerifiedDocumentData {
     address?: string;
     apiName?: string;
     nameMatchScore?: number;
+    status?: string;
+    registrationDate?: string;
+    taxpayerType?: string;
+    businessNature?: string[];
+    additionalPlaces?: string[];
+    jurisdictionCentre?: string;
+    jurisdictionState?: string;
   };
   manualLegalName?: string;
   manualAddress?: { address: string; city: string; state: string; pincode: string };
