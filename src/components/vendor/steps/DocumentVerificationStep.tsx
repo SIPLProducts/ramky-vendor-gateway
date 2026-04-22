@@ -37,6 +37,19 @@ export interface VerifiedDocumentData {
   isMsmeRegistered?: boolean;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string };
+  // Step-1 uploaded files — lifted so parent draft saves include them
+  gstCertificateFile?: File | null;
+  panCardFile?: File | null;
+  msmeCertificateFile?: File | null;
+  cancelledChequeFile?: File | null;
+  // Authoritative completion status from the child
+  step1Status?: {
+    stage1Done: boolean;
+    stage2Done: boolean;
+    stage3Done: boolean;
+    stage4Done: boolean;
+    allDone: boolean;
+  };
 }
 
 interface DocumentVerificationStepProps {
@@ -53,6 +66,8 @@ interface DocState {
   status: DocStatus;
   fileName?: string;
   fileSize?: number;
+  /** The actual uploaded File — lifted to parent so draft save includes it */
+  file?: File;
   ocrData?: Record<string, any>;
   /** Original OCR snapshot — used to power the "Edited" badge and "Reset to OCR" link */
   originalOcrData?: Record<string, any>;
@@ -284,6 +299,7 @@ export function DocumentVerificationStep({
       status: "verified",
       fileName: file.name,
       fileSize: file.size,
+      file,
       ocrData: ocrRes.extracted,
       originalOcrData: ocrRes.extracted,
       apiData: v.apiData,
@@ -447,8 +463,15 @@ export function DocumentVerificationStep({
         apiName: bankDoc.apiData?.accountHolderName || bankDoc.apiData?.name,
       };
     }
+    // Lift uploaded files so the parent can persist them in the draft
+    out.gstCertificateFile = gstDoc.file ?? null;
+    out.panCardFile = panDoc.file ?? null;
+    out.msmeCertificateFile = msmeDoc.file ?? null;
+    out.cancelledChequeFile = bankDoc.file ?? null;
+    // Authoritative completion status (mirrors what the UI shows green)
+    out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
