@@ -274,8 +274,8 @@ export function ApprovalMatrixConfig() {
         const levelPayload = {
           tenant_id: tenantId,
           level_number: levelNumber,
-          level_name: first.level_name,
-          designation: first.designation || null,
+          level_name: `Level ${levelNumber}`,
+          designation: null,
           approval_mode: first.approval_mode,
         };
         console.log('[ApprovalMatrix] upserting level', levelNumber, levelPayload);
