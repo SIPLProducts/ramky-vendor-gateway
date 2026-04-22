@@ -750,12 +750,15 @@ interface ComboProps {
   excludeIds: string[];
   onSelect: (userId: string) => void;
   onAssignUsers?: () => void;
+  mode?: 'name' | 'email';
 }
 
-function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect, onAssignUsers }: ComboProps) {
+function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect, onAssignUsers, mode = 'name' }: ComboProps) {
   const [open, setOpen] = useState(false);
   const selected = users.find((u) => u.user_id === value) ?? null;
   const exclude = new Set(excludeIds);
+  const placeholder = mode === 'email' ? 'Select email…' : 'Select approver…';
+  const display = selected ? (mode === 'email' ? selected.email : (selected.full_name ?? selected.email)) : placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -773,11 +776,7 @@ function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect
         >
           <span className="truncate flex items-center gap-1.5">
             {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-            {loading
-              ? 'Loading users…'
-              : selected
-              ? (selected.full_name ?? selected.email)
-              : 'Select approver…'}
+            {loading ? 'Loading users…' : display}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 ml-2 shrink-0" />
         </Button>
