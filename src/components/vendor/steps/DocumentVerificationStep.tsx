@@ -348,6 +348,13 @@ export function DocumentVerificationStep({
         address: editablePrincipalPlace || gstDoc.ocrData.address || gstDoc.ocrData.principal_place_of_business,
         apiName: gstDoc.apiData?.legalName || gstDoc.apiData?.name,
         nameMatchScore: gstDoc.nameMatchScore,
+        status: gstDoc.ocrData.gst_status,
+        registrationDate: gstDoc.ocrData.registration_date,
+        taxpayerType: gstDoc.ocrData.taxpayer_type,
+        businessNature: Array.isArray(gstDoc.ocrData.business_nature) ? gstDoc.ocrData.business_nature : undefined,
+        additionalPlaces: Array.isArray(gstDoc.ocrData.additional_places) ? gstDoc.ocrData.additional_places : undefined,
+        jurisdictionCentre: gstDoc.ocrData.jurisdiction_centre,
+        jurisdictionState: gstDoc.ocrData.jurisdiction_state,
       };
     } else if (isGstRegistered === false) {
       out.gstDeclarationReason = gstDeclarationReason;
