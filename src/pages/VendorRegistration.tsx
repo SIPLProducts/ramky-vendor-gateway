@@ -613,6 +613,7 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
+    // Built-in steps 1..5
     switch (currentStep) {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
@@ -624,11 +625,26 @@ export default function VendorRegistration() {
         return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
       case 5:
         return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
-      case 6:
-        return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
-      default:
-        return null;
     }
+    // Last step is always Review
+    if (currentStep === registrationSteps.length) {
+      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+    }
+    // Anything in between is an admin-defined custom tab (ids 6..N-1)
+    const customIdx = currentStep - 6;
+    const customStep = customSteps[customIdx];
+    if (customStep) {
+      const fields = fieldsByStep[customStep.step_key] || [];
+      return (
+        <DynamicStep
+          stepKey={customStep.step_key}
+          fields={fields}
+          values={customFieldValues[customStep.step_key] || {}}
+          onChange={(next) => setCustomFieldValues((prev) => ({ ...prev, [customStep.step_key]: next }))}
+        />
+      );
+    }
+    return null;
   };
 
   if (isLoadingVendor || isValidatingToken) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
