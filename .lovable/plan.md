@@ -1,133 +1,79 @@
 
-## Fix Step-1 deadlock so green verification always enables Continue and Save Draft
 
-### Root cause
-Step 1 currently has two different sources of truth:
+## Remove both Commercial Details AND Bank Details steps (consolidate to 6 steps)
 
-- `DocumentVerificationStep` shows the green/verified state from its **local doc state**
-- The outer action bar (`Continue`, `Save Draft`) depends on **parent state** (`verifiedData` + `formData`)
+### Why
+Step 1 (Document Verification) already does OCR + real-time API verification for **PAN, GST, MSME, and Bank (cancelled cheque + penny drop)**. Re-asking the vendor for the same data in later steps is pure duplication.
 
-Those two can drift. In the current code:
+### What changes
 
-1. The child only lifts extracted values, not the actual uploaded files.
-2. The parent re-derives “can proceed” from partial data instead of using the child’s real completion state.
-3. `Save Draft` uses the parent `formData` snapshot, which can be one render behind the latest Step-1 OCR/edit state.
+**Registration flow goes from 8 steps to 6 steps:**
 
-So the UI can show all green in Step 1 while the parent still thinks Step 1 is incomplete, and draft save can run with stale/incomplete data.
+```text
+Before:  1 Doc Verify → 2 Org → 3 Address → 4 Contact → 5 Commercial → 6 Bank → 7 Fin/Infra → 8 Review
+After:   1 Doc Verify → 2 Org → 3 Address → 4 Contact → 5 Fin/Infra → 6 Review
+```
 
-### What to change
+- **Step 5 (Commercial Details) removed** — GST/PAN/MSME already captured in Step 1.
+- **Step 6 (Bank Details) removed** — Bank Name, Branch, Account Number, IFSC, MICR, Account Holder Name and the cancelled cheque file are all captured in Step 1's Bank tile (OCR + penny-drop verification).
+- **Fin/Infra becomes Step 5**, **Review becomes Step 6**.
 
-#### 1. Make Step 1 emit one authoritative snapshot
-File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
+### Fields that need to survive
 
-Extend the Step-1 payload so the child sends everything the parent actually needs:
+**From Commercial Details (not on PAN/GST/MSME docs):**
+Entity Type, Firm Reg No, PF Number, ESI Number, IEC No, Labour Permit, Memberships, Enlistments, Certifications, Operational Network → moved into **Step 2 Organization Profile** as a "Statutory & Memberships" sub-section.
 
-- extracted/corrected OCR values
-- uploaded file objects for GST / PAN / MSME / cancelled cheque
-- explicit stage-completion metadata:
-  - `stage1Done`
-  - `stage2Done`
-  - `stage3Done`
-  - `stage4Done`
-  - `allDone`
+**From Bank Details (not captured by cheque OCR):**
+- Account Type (current / savings / cash credit / others) — not on a cheque
+- Bank Address — usually not on a cheque
+- Confirm Account Number — pure UI re-entry guard, no longer needed since the OCR'd value is shown for review/correction in Step 1
 
-Implementation changes:
-- Add `file?: File` to `DocState`
-- Save the uploaded `File` in `runDocFlow(...)`
-- Extend `VerifiedDocumentData` with:
-  - `gstCertificateFile?: File | null`
-  - `panCardFile?: File | null`
-  - `msmeCertificateFile?: File | null`
-  - `cancelledChequeFile?: File | null`
-  - `step1Status?: { stage1Done: boolean; stage2Done: boolean; stage3Done: boolean; stage4Done: boolean; allDone: boolean }`
-- Include those fields in `buildOutput()`
-
-This makes the Step-1 payload the real source of truth instead of forcing the parent to guess from fragments.
-
-#### 2. Parent should merge the Step-1 snapshot into a draft-safe form object
-File: `src/pages/VendorRegistration.tsx`
-
-Refactor the current mapping logic into a pure helper:
-
-- `mergeVerifiedDataIntoForm(prevFormData, verifiedData): VendorFormData`
-
-That helper should map:
-- organization legal/trade names
-- statutory GST/PAN/MSME values
-- bank values
-- Step-1 uploaded files:
-  - `gstCertificateFile`
-  - `panCardFile`
-  - `msmeCertificateFile`
-  - `cancelledChequeFile`
-
-Then:
-- `handleDocStageChange` updates a `latestStep1DataRef`
-- `handleDocStageChange` only calls `setVerifiedData` / `setFormData` when the merged values actually changed
-- `handleDocVerificationComplete` reuses the same merge helper, then advances to Step 2
-
-This removes duplication and keeps draft save + continue aligned.
-
-#### 3. Stop re-deriving completion in the parent
-File: `src/pages/VendorRegistration.tsx`
-
-Update `canProceedFromCurrentStep()` for Step 1 to use the child’s explicit completion result:
-
-- Prefer `verifiedData?.step1Status?.allDone`
-- Keep the old field-based fallback only as a defensive backup
-
-This ensures:
-- if the child shows all 4 tiles green, the parent action bar also enables
-- no mismatch between local child state and outer footer state
-
-#### 4. Save Draft should save the freshest Step-1 data, not a stale render snapshot
-File: `src/pages/VendorRegistration.tsx`
-
-Change `handleSaveAsDraft()` so when `currentStep === 1` it builds the payload from the latest lifted Step-1 snapshot before calling `saveVendor(...)`.
-
-Pattern:
-- read `latestStep1DataRef.current`
-- build `draftPayload = mergeVerifiedDataIntoForm(formData, latestStep1DataRef.current)`
-- pass `draftPayload` to `saveVendor(draftPayload)`
-
-Also update `lastSavedHashRef` using that same final payload.
-
-This fixes the case where the user clicks Save Draft immediately after the last verification/edit and the parent state has not fully flushed yet.
-
-#### 5. Prevent autosave/button churn from no-op state writes
-Files:
-- `src/pages/VendorRegistration.tsx`
-- optionally `src/components/vendor/steps/DocumentVerificationStep.tsx`
-
-Guard against repeated identical updates:
-- do not call `setVerifiedData` if the new Step-1 snapshot is materially unchanged
-- do not call `setFormData` if the merged result is the same as the previous form state
-
-That reduces unnecessary autosaves and avoids keeping the footer in a “saving/pending” loop.
+→ Account Type + Bank Address get added as two small fields inside Step 1's Bank verified panel (after penny-drop succeeds), so the vendor sets them once, in context, alongside the OCR'd bank values they can already edit. Account Type defaults to `current`. Bank Address is optional.
 
 ### Files to edit
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-  - store uploaded `File` objects in doc state
-  - extend `VerifiedDocumentData`
-  - emit `step1Status` + file objects from `buildOutput()`
 
-- `src/pages/VendorRegistration.tsx`
-  - add `mergeVerifiedDataIntoForm(...)`
-  - add `latestStep1DataRef`
-  - update `handleDocStageChange`
-  - update `handleDocVerificationComplete`
-  - update `canProceedFromCurrentStep()`
-  - update `handleSaveAsDraft()` to save the merged latest Step-1 payload
+1. **`src/pages/VendorRegistration.tsx`**
+   - Drop `CommercialStep` and `BankDetailsStep` imports.
+   - Update `registrationSteps` to the 6-step list (Doc Verify, Org, Address, Contact, Fin/Infra, Review).
+   - In `renderStep()`: remove `case 5` (Commercial) and `case 6` (Bank); shift Fin/Infra → `case 5`, Review → `case 6`.
+   - Update `handleStepComplete` `stepKeys` map (drop `statutory` and `bank` entries).
+   - Update `handleFinancialInfraComplete` to advance to step 6 and mark step 5 complete.
+   - Update `canProceedFromCurrentStep()` and `getValidationMessage()` — remove the Commercial and Bank branches.
+   - Update the draft-resume "filled steps" detector: drop `entityType` and `bankName` mappings; fallback target becomes step 6.
+   - Update `handleStartEdit` seed `completedSteps` to `[1,2,3,4,5]`.
 
-### Result after the fix
-- When all four Step-1 checks are green, `Continue` enables reliably
-- Clicking `Continue` advances to Step 2 reliably
-- `Save Draft` saves the latest OCR/manual-correction values reliably
-- Uploaded Step-1 files are carried into the form state, so draft saves include the actual documents too
-- The green state in Step 1 and the footer button state stay in sync
+2. **`src/components/vendor/steps/DocumentVerificationStep.tsx`**
+   - In the Bank verified panel (rendered after penny-drop passes), add two `EditableOcrField`s: **Account Type** (Select: Current / Savings / Cash Credit / Others) and **Bank Address** (text). Default Account Type to `current`.
+   - Extend `VerifiedDocumentData.bank` to include `accountType` and `bankAddress`.
+   - Include both in `buildOutput()`.
 
-### Out of scope
-- No OCR extraction logic changes
-- No backend schema changes
-- No workflow or approval changes
-- No changes to steps 2–8 except consuming the corrected Step-1 data
+3. **`src/pages/VendorRegistration.tsx` → `mergeVerifiedDataIntoForm`**
+   - Map `verifiedData.bank.accountType` → `formData.bank.accountType` (default `current`).
+   - Map `verifiedData.bank.bankAddress` → `formData.bank.bankAddress`.
+
+4. **`src/components/vendor/steps/OrganizationStep.tsx`**
+   - Add "Statutory & Memberships" sub-section: Entity Type, Firm Reg No, PF, ESI, IEC, Labour Permit, Memberships, Enlistments, Certifications, Operational Network. Reuse constants from `src/types/vendor.ts` and the existing `MultiSelect` component. These write into `formData.statutory` (no type changes needed).
+
+5. **`src/components/vendor/steps/ReviewStep.tsx`**
+   - Keep the read-only Commercial and Bank summary cards (vendors still see the verified values).
+   - Update edit-button targets: statutory → Step 1 or Step 2, bank → Step 1.
+
+6. **`src/hooks/useFormCompleteness.tsx`**
+   - If it weights step 5 (Commercial) or step 6 (Bank) separately, fold those weights into Step 1 / Step 2 so 100% remains achievable.
+
+7. **Delete files**
+   - `src/components/vendor/steps/CommercialStep.tsx`
+   - `src/components/vendor/steps/BankDetailsStep.tsx` (and `BankStep.tsx` if unreferenced after this change)
+
+### Not changing
+- OCR pipeline, real-time APIs (PAN, GST, MSME, penny drop), gating, autosave, draft save — unchanged.
+- Database schema — `vendors` already has `bank_name`, `bank_branch_name`, `account_number`, `ifsc_code`, `micr_code`, `account_type`, `bank_address`, plus all statutory/membership columns.
+- `formData.statutory` and `formData.bank` shapes — unchanged.
+- Approval workflow, edge functions, SAP sync — unchanged.
+- Existing drafts — values remain in `formData.statutory` / `formData.bank` and resurface in their new locations.
+
+### Result
+- Vendor enters PAN, GST, MSME and Bank details exactly **once**, in Step 1, via OCR + real-time verification, with inline manual correction.
+- Form drops from 8 to 6 steps.
+- Zero data loss; all non-OCR fields (entity type, memberships, account type, bank address, etc.) preserved in their most logical home.
+
