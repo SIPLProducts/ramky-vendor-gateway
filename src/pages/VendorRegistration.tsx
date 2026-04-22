@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HorizontalStepIndicator } from '@/components/vendor/HorizontalStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
@@ -9,6 +9,8 @@ import { ContactStep } from '@/components/vendor/steps/ContactStep';
 import { FinancialInfrastructureStep } from '@/components/vendor/steps/FinancialInfrastructureStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { DocumentVerificationStep, VerifiedDocumentData } from '@/components/vendor/steps/DocumentVerificationStep';
+import { DynamicStep } from '@/components/vendor/DynamicStep';
+import { useDynamicFormSchema } from '@/hooks/useDynamicFormSchema';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
 import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
@@ -23,17 +25,20 @@ import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoS
 import { CompletenessRing } from '@/components/vendor/CompletenessRing';
 import { useFormCompleteness } from '@/hooks/useFormCompleteness';
 
-// 6-step registration flow — Step 1 is the OCR + verification gate.
-// Commercial Details and Bank Details have been folded into Step 1 (OCR + APIs)
-// and Step 2 (statutory & memberships) — vendors enter PAN/GST/MSME/Bank only once.
-const registrationSteps = [
+// 6-step built-in registration flow — Step 1 is the OCR + verification gate.
+// Custom admin-defined tabs are inserted between step 5 (Fin/Infra) and the
+// final Review step at runtime.
+const builtInSteps = [
   { id: 1, title: 'Document Verification', description: 'Upload & auto-verify PAN, GST, MSME, Bank' },
   { id: 2, title: 'Organization Profile', description: 'Company, statutory & memberships' },
   { id: 3, title: 'Address Information', description: 'Registered, manufacturing & branch' },
   { id: 4, title: 'Contact Details', description: 'Key contact persons' },
   { id: 5, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
-  { id: 6, title: 'Review & Submit', description: 'Verify and submit application' },
+  // Custom tabs slot in here at runtime (ids 6..N)
+  // Review is always the last step
 ];
+const REVIEW_TITLE = 'Review & Submit';
+const REVIEW_DESCRIPTION = 'Verify and submit application';
 
 const initialFormData: VendorFormData = {
   organization: { buyerCompanyId: '', legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
