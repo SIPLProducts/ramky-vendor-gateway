@@ -57,6 +57,7 @@ const newRowKey = () => Math.random().toString(36).slice(2, 10);
 export function ApprovalMatrixConfig() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: tenants = [] } = useTenants();
   const activeTenants = useMemo(() => tenants.filter((t) => t.is_active), [tenants]);
 
@@ -69,10 +70,21 @@ export function ApprovalMatrixConfig() {
   const [savedSnapshot, setSavedSnapshot] = useState<string>('[]');
   const [dbState, setDbState] = useState<DbState>({ levels: 0, approvers: 0, lastUpdated: null });
   const [lastSaveResult, setLastSaveResult] = useState<{ levels: number; approvers: number; at: number } | null>(null);
+  const [pendingRoleChanges, setPendingRoleChanges] = useState<Record<string, AppRole>>({});
+  const [canEditRoles, setCanEditRoles] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+      const roles = (data ?? []).map((r) => r.role);
+      setCanEditRoles(roles.includes('sharvi_admin') || roles.includes('admin'));
+    })();
+  }, [user?.id]);
 
   const isDirty = useMemo(
-    () => JSON.stringify(rows.map(({ rowKey, ...r }) => r)) !== savedSnapshot,
-    [rows, savedSnapshot]
+    () => JSON.stringify(rows.map(({ rowKey, ...r }) => r)) !== savedSnapshot || Object.keys(pendingRoleChanges).length > 0,
+    [rows, savedSnapshot, pendingRoleChanges]
   );
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
