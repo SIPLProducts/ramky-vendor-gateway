@@ -435,7 +435,7 @@ export function usePurchaseAction() {
         .update(updateData)
         .eq('id', vendorId)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
