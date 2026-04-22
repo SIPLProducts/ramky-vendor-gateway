@@ -21,12 +21,17 @@ export function useMyApprovals() {
     if (!user) return;
     setLoading(true);
 
-    // 1. Levels where I am an approver
+    // 1. Levels where I am an approver — by user_id OR by email (case-insensitive)
+    const email = (user.email ?? '').toLowerCase();
     const { data: myLevels } = await supabase
       .from('approval_matrix_approvers')
-      .select('level_id')
-      .eq('user_id', user.id);
-    const levelIds = (myLevels ?? []).map((l) => l.level_id);
+      .select('level_id, user_id, approver_email')
+      .or(
+        email
+          ? `user_id.eq.${user.id},approver_email.ilike.${email}`
+          : `user_id.eq.${user.id}`
+      );
+    const levelIds = [...new Set((myLevels ?? []).map((l) => l.level_id))];
     if (levelIds.length === 0) { setItems([]); setLoading(false); return; }
 
     // 2. Pending progress at those levels
