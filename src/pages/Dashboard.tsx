@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTenantContext } from '@/hooks/useTenantContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConnectionStatus } from '@/components/pwa/ConnectionStatus';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
@@ -37,6 +38,10 @@ export default function Dashboard() {
   const { data: buyerCompanies } = useBuyerCompanies();
   const { data: stuckCount } = useStuckApprovalVendors();
   const isAdmin = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
+  const { activeTenantId, myTenants, setActiveTenantId, isSuperAdmin } = useTenantContext();
+  const activeTenantName = activeTenantId
+    ? myTenants.find((t) => t.id === activeTenantId)?.name ?? 'selected tenant'
+    : null;
   const queryClient = useQueryClient();
 
   // Subscribe to real-time updates
@@ -336,8 +341,22 @@ export default function Dashboard() {
                 <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
                   <Users className="h-8 w-8 opacity-50" />
                 </div>
-                <p className="font-medium">No vendors registered yet</p>
-                <p className="text-sm mt-1">Vendors will appear here once they register</p>
+                {activeTenantName ? (
+                  <>
+                    <p className="font-medium">No vendors found for {activeTenantName}</p>
+                    <p className="text-sm mt-1">Try switching the tenant in the header above{isSuperAdmin ? ' or view All Tenants' : ''}.</p>
+                    {isSuperAdmin && (
+                      <Button variant="link" size="sm" className="mt-2" onClick={() => setActiveTenantId(null)}>
+                        View All Tenants
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">No vendors registered yet</p>
+                    <p className="text-sm mt-1">Vendors will appear here once they register</p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
