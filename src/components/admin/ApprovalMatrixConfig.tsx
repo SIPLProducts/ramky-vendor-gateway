@@ -290,10 +290,31 @@ export function ApprovalMatrixConfig() {
         </Card>
       )}
 
+      {/* Missing-users banner (promoted to top of card) */}
+      {tenantId && !usersLoading && tenantUsers.length === 0 && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-md border border-dashed border-destructive/50 bg-destructive/5">
+          <div className="flex items-start gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <div>
+              <strong>No users assigned to this tenant.</strong>{' '}
+              <span className="text-muted-foreground">Approver dropdowns will be empty until you assign at least one user.</span>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => setAssignDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-1" /> Assign Users
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Approvers (one row per person · group rows by Level # for co-approvers)</CardTitle>
+          {tenantId && tenantUsers.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1" /> Manage Users
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="border rounded-md overflow-x-auto">
