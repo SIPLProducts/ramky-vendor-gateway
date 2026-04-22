@@ -131,6 +131,43 @@ export function useUpsertFormField() {
   });
 }
 
+export function useReorderFormSteps() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (items: Array<{ id: string; step_order: number }>) => {
+      // Update each in parallel; small N so this is fine
+      const results = await Promise.all(
+        items.map((it) =>
+          supabase.from('form_step_configs').update({ step_order: it.step_order }).eq('id', it.id),
+        ),
+      );
+      const firstErr = results.find((r) => r.error);
+      if (firstErr?.error) throw firstErr.error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['form-step-configs'] }),
+    onError: (e: Error) => toast({ title: 'Reorder failed', description: e.message, variant: 'destructive' }),
+  });
+}
+
+export function useReorderFormFields() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (items: Array<{ id: string; display_order: number }>) => {
+      const results = await Promise.all(
+        items.map((it) =>
+          supabase.from('form_field_configs').update({ display_order: it.display_order }).eq('id', it.id),
+        ),
+      );
+      const firstErr = results.find((r) => r.error);
+      if (firstErr?.error) throw firstErr.error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['form-field-configs'] }),
+    onError: (e: Error) => toast({ title: 'Reorder failed', description: e.message, variant: 'destructive' }),
+  });
+}
+
 export function useDeleteFormField() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

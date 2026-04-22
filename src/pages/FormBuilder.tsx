@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTenants, useFormFieldConfigs } from '@/hooks/useTenant';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import {
@@ -6,6 +6,8 @@ import {
   useUpsertFormStep,
   useDeleteFormStep,
   useDeleteFormField,
+  useReorderFormSteps,
+  useReorderFormFields,
   BUILT_IN_STEPS,
   type FormStepConfig,
 } from '@/hooks/useFormBuilder';
@@ -18,19 +20,117 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
-import { FieldEditorDrawer } from '@/components/admin/FieldEditorDrawer';
+import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
 import type { FormFieldConfig } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+// ---------- Sortable Tab Row ----------
+function SortableTab({
+  step, idx, isSelected, onSelect,
+}: { step: FormStepConfig; idx: number; isSelected: boolean; onSelect: () => void }) {
+  const disabled = step.is_built_in;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: step.id, disabled,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'w-full px-3 py-2 rounded-md text-sm flex items-center justify-between gap-2 transition-colors',
+        isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted',
+      )}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer" onClick={onSelect}>
+        <span
+          {...attributes}
+          {...listeners}
+          className={cn('shrink-0', disabled ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing')}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className={cn('h-3.5 w-3.5', disabled ? 'text-muted-foreground/30' : 'text-muted-foreground/70')} />
+        </span>
+        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}</span>
+        <span className="truncate font-medium text-left">{step.step_label}</span>
+      </div>
+      {step.is_built_in ? (
+        <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+      ) : (
+        !step.is_visible && <EyeOff className="h-3 w-3 text-muted-foreground shrink-0" />
+      )}
+    </div>
+  );
+}
+
+// ---------- Sortable Field Row ----------
+function SortableField({
+  field, isEditing, onEdit, onDelete,
+}: {
+  field: FormFieldConfig; isEditing: boolean;
+  onEdit: () => void; onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center justify-between gap-3 px-3 py-2.5 bg-background',
+        isEditing && 'bg-primary/5',
+      )}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/70" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium truncate">{field.display_label}</span>
+            <Badge variant="outline" className="text-[10px]">{field.field_type}</Badge>
+            {field.is_mandatory && <Badge className="text-[10px]">Required</Badge>}
+            {!field.is_visible && (
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <EyeOff className="h-2.5 w-2.5" />Hidden
+              </Badge>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">{field.field_name}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button variant="ghost" size="icon" onClick={onEdit}>
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onDelete}>
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function FormBuilder() {
   const { data: tenants } = useTenants();
@@ -46,24 +146,32 @@ export default function FormBuilder() {
   const upsertStep = useUpsertFormStep();
   const deleteStep = useDeleteFormStep();
   const deleteField = useDeleteFormField();
+  const reorderSteps = useReorderFormSteps();
+  const reorderFields = useReorderFormFields();
 
   // Combine built-in (display only) with custom steps
   const allSteps = useMemo(() => {
     const customSorted = [...customSteps].sort((a, b) => a.step_order - b.step_order);
-    const synthetic: FormStepConfig[] = BUILT_IN_STEPS.map((s, i) => ({
+    const synthetic: FormStepConfig[] = BUILT_IN_STEPS.map((s) => ({
       id: `builtin-${s.step_key}`,
       tenant_id: effectiveTenantId,
       created_at: '',
       updated_at: '',
       ...s,
     }));
-    // Place built-in 1-5, then custom, then built-in review
     const review = synthetic.find((s) => s.step_key === 'review')!;
     const headBuiltins = synthetic.filter((s) => s.step_key !== 'review');
     return [...headBuiltins, ...customSorted, review];
   }, [customSteps, effectiveTenantId]);
 
   const [selectedStepKey, setSelectedStepKey] = useState<string>('document_verification');
+  // Default to first available tab if current selection vanishes
+  useEffect(() => {
+    if (!allSteps.find((s) => s.step_key === selectedStepKey) && allSteps.length) {
+      setSelectedStepKey(allSteps[0].step_key);
+    }
+  }, [allSteps, selectedStepKey]);
+
   const selectedStep = allSteps.find((s) => s.step_key === selectedStepKey);
   const fieldsForStep = useMemo(
     () => allFields.filter((f) => f.step_name === selectedStepKey).sort((a, b) => a.display_order - b.display_order),
@@ -76,9 +184,42 @@ export default function FormBuilder() {
     step_label: '', step_description: '', step_order: (customSteps.length || 0) + 6, is_visible: true,
   });
 
-  // Field drawer state
-  const [fieldDrawerOpen, setFieldDrawerOpen] = useState(false);
-  const [editingField, setEditingField] = useState<FormFieldConfig | null>(null);
+  // Inline field editor state: 'new' | field id | null
+  const [editingFieldId, setEditingFieldId] = useState<string | 'new' | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // ---- Tab DnD ----
+  const handleTabDragEnd = async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const customIds = customSteps
+      .slice()
+      .sort((a, b) => a.step_order - b.step_order)
+      .map((s) => s.id);
+    const oldIdx = customIds.indexOf(active.id as string);
+    const newIdx = customIds.indexOf(over.id as string);
+    if (oldIdx === -1 || newIdx === -1) return; // Non-custom (built-in) — ignore
+    const reordered = arrayMove(customIds, oldIdx, newIdx);
+    const updates = reordered.map((id, i) => ({ id, step_order: 6 + i }));
+    await reorderSteps.mutateAsync(updates);
+  };
+
+  // ---- Field DnD ----
+  const handleFieldDragEnd = async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = fieldsForStep.map((f) => f.id);
+    const oldIdx = ids.indexOf(active.id as string);
+    const newIdx = ids.indexOf(over.id as string);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const reordered = arrayMove(ids, oldIdx, newIdx);
+    const updates = reordered.map((id, i) => ({ id, display_order: i + 1 }));
+    await reorderFields.mutateAsync(updates);
+  };
 
   const openNewTab = () => {
     setTabDraft({ step_label: '', step_description: '', step_order: (customSteps.length || 0) + 6, is_visible: true });
@@ -88,11 +229,8 @@ export default function FormBuilder() {
   const openEditTab = (s: FormStepConfig) => {
     if (s.is_built_in) return;
     setTabDraft({
-      id: s.id,
-      step_label: s.step_label,
-      step_description: s.step_description || '',
-      step_order: s.step_order,
-      is_visible: s.is_visible,
+      id: s.id, step_label: s.step_label, step_description: s.step_description || '',
+      step_order: s.step_order, is_visible: s.is_visible,
     });
     setTabDialogOpen(true);
   };
@@ -109,16 +247,6 @@ export default function FormBuilder() {
       is_visible: tabDraft.is_visible,
     });
     setTabDialogOpen(false);
-  };
-
-  const handleAddField = () => {
-    setEditingField(null);
-    setFieldDrawerOpen(true);
-  };
-
-  const handleEditField = (f: FormFieldConfig) => {
-    setEditingField(f);
-    setFieldDrawerOpen(true);
   };
 
   if (!effectiveTenantId) {
@@ -149,6 +277,11 @@ export default function FormBuilder() {
     );
   }
 
+  const customStepIds = customSteps
+    .slice()
+    .sort((a, b) => a.step_order - b.step_order)
+    .map((s) => s.id);
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
@@ -156,7 +289,8 @@ export default function FormBuilder() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Form Builder</h1>
           <p className="text-muted-foreground mt-1">
-            Add tabs and fields to the vendor registration form for <span className="font-medium text-foreground">{tenantName}</span>.
+            Add tabs and fields to the vendor registration form for{' '}
+            <span className="font-medium text-foreground">{tenantName}</span>.
           </p>
         </div>
         {isSuperAdmin && (
@@ -174,7 +308,8 @@ export default function FormBuilder() {
 
       <Alert>
         <AlertDescription>
-          Built-in steps (locked) drive verification and gating and can't be removed. Add custom tabs to collect any extra information your vendors need to submit.
+          Built-in steps (locked 🔒) drive verification and gating and can't be reordered or removed.
+          Drag custom tabs to reorder. Drag fields inside any tab to reorder them.
         </AlertDescription>
       </Alert>
 
@@ -188,30 +323,19 @@ export default function FormBuilder() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-1 pb-4">
-            {allSteps.map((s, idx) => {
-              const isSelected = s.step_key === selectedStepKey;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedStepKey(s.step_key)}
-                  className={cn(
-                    'w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between gap-2 transition-colors',
-                    isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                    <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}</span>
-                    <span className="truncate font-medium">{s.step_label}</span>
-                  </div>
-                  {s.is_built_in ? (
-                    <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-                  ) : (
-                    !s.is_visible && <EyeOff className="h-3 w-3 text-muted-foreground shrink-0" />
-                  )}
-                </button>
-              );
-            })}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTabDragEnd}>
+              <SortableContext items={customStepIds} strategy={verticalListSortingStrategy}>
+                {allSteps.map((s, idx) => (
+                  <SortableTab
+                    key={s.id}
+                    step={s}
+                    idx={idx}
+                    isSelected={s.step_key === selectedStepKey}
+                    onSelect={() => setSelectedStepKey(s.step_key)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </CardContent>
         </Card>
 
@@ -248,52 +372,65 @@ export default function FormBuilder() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Fields</h3>
-              <Button size="sm" onClick={handleAddField}>
+              <h3 className="text-sm font-semibold">
+                Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
+              </h3>
+              <Button size="sm" onClick={() => setEditingFieldId('new')} disabled={editingFieldId === 'new'}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add Field
               </Button>
             </div>
 
-            {fieldsForStep.length === 0 ? (
+            {/* Inline new-field editor */}
+            {editingFieldId === 'new' && (
+              <div className="mb-3">
+                <InlineFieldEditor
+                  tenantId={effectiveTenantId}
+                  stepKey={selectedStepKey}
+                  defaultOrder={fieldsForStep.length + 1}
+                  onClose={() => setEditingFieldId(null)}
+                />
+              </div>
+            )}
+
+            {fieldsForStep.length === 0 && editingFieldId !== 'new' ? (
               <div className="border border-dashed rounded-lg p-10 text-center">
                 <p className="text-sm text-muted-foreground">No custom fields configured for this tab yet.</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {selectedStep?.is_built_in
                     ? 'Built-in fields are managed in code; add tenant overrides here.'
-                    : 'Add fields to start collecting data.'}
+                    : 'Click "Add Field" above to start collecting data.'}
                 </p>
               </div>
-            ) : (
-              <div className="border rounded-lg divide-y">
-                {fieldsForStep.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium truncate">{f.display_label}</span>
-                          <Badge variant="outline" className="text-[10px]">{f.field_type}</Badge>
-                          {f.is_mandatory && <Badge className="text-[10px]">Required</Badge>}
-                          {!f.is_visible && <Badge variant="secondary" className="text-[10px] gap-1"><EyeOff className="h-2.5 w-2.5" />Hidden</Badge>}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">{f.field_name}</div>
+            ) : fieldsForStep.length > 0 ? (
+              <div className="border rounded-lg divide-y overflow-hidden">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFieldDragEnd}>
+                  <SortableContext items={fieldsForStep.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+                    {fieldsForStep.map((f) => (
+                      <div key={f.id}>
+                        <SortableField
+                          field={f}
+                          isEditing={editingFieldId === f.id}
+                          onEdit={() => setEditingFieldId(editingFieldId === f.id ? null : f.id)}
+                          onDelete={async () => {
+                            if (confirm(`Delete field "${f.display_label}"?`)) await deleteField.mutateAsync(f.id);
+                          }}
+                        />
+                        {editingFieldId === f.id && (
+                          <div className="p-3 bg-muted/20 border-t">
+                            <InlineFieldEditor
+                              tenantId={effectiveTenantId}
+                              stepKey={selectedStepKey}
+                              field={f}
+                              onClose={() => setEditingFieldId(null)}
+                            />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => handleEditField(f)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon"
-                        onClick={async () => {
-                          if (confirm(`Delete field "${f.display_label}"?`)) await deleteField.mutateAsync(f.id);
-                        }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -342,16 +479,6 @@ export default function FormBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Field drawer */}
-      <FieldEditorDrawer
-        open={fieldDrawerOpen}
-        onOpenChange={setFieldDrawerOpen}
-        tenantId={effectiveTenantId}
-        stepKey={selectedStepKey}
-        field={editingField}
-        defaultOrder={fieldsForStep.length + 1}
-      />
     </div>
   );
 }
