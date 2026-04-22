@@ -70,9 +70,9 @@ Deno.serve(async (req) => {
       await admin.from('vendor_approval_progress').update({
         status: 'rejected', acted_by: userId, acted_at: new Date().toISOString(), comments,
       }).eq('id', progress_id);
-      // Mark vendor rejected
-      await admin.from('vendors').update({ status: 'finance_rejected' }).eq('id', progress.vendor_id);
-      return new Response(JSON.stringify({ ok: true, vendor_status: 'rejected' }), {
+      // Reject at any Purchase/SCM matrix level -> purchase_rejected
+      await admin.from('vendors').update({ status: 'purchase_rejected' }).eq('id', progress.vendor_id);
+      return new Response(JSON.stringify({ ok: true, vendor_status: 'purchase_rejected' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -83,16 +83,16 @@ Deno.serve(async (req) => {
     }).eq('id', progress_id);
 
     // For ALL mode we'd need to check sibling approvers — current schema has one row per level so single approval = level done.
-    // (Multi-row-per-level can be added later; for now ANY/ALL behave the same on this row.)
 
-    // Check if this was the last (level 1)
+    // Final Purchase/SCM matrix level (level_number = 1) approved -> hand off to Finance review.
+    // Intermediate levels: just advance, no vendor status change.
     if (level && level.level_number === 1) {
       await admin.from('vendors').update({
-        status: 'purchase_approved',
+        status: 'finance_review',
         purchase_reviewed_by: userId,
         purchase_reviewed_at: new Date().toISOString(),
       }).eq('id', progress.vendor_id);
-      return new Response(JSON.stringify({ ok: true, vendor_status: 'fully_approved' }), {
+      return new Response(JSON.stringify({ ok: true, vendor_status: 'finance_review' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

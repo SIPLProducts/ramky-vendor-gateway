@@ -550,11 +550,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       };
 
       // Update vendor with verification statuses and submit
+      // New flow: submission goes to Purchase/SCM matrix first, then Finance
       const { error: updateError } = await supabase
         .from('vendors')
         .update({
           ...verificationStatuses,
-          status: 'finance_review' as const, // Skip validation_pending, go directly to finance_review
+          status: 'purchase_review' as const, // Goes to Purchase/SCM approval matrix first
           submitted_at: new Date().toISOString(),
         })
         .eq('id', vendor.id);
@@ -601,13 +602,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         console.error('[Vendor] Failed to send submission notification:', notifyError);
       }
 
-      setVendorStatus('finance_review');
+      setVendorStatus('purchase_review');
       return vendor;
     },
     onSuccess: () => {
       toast({
         title: 'Registration Submitted',
-        description: 'Your vendor registration has been submitted for verification.',
+        description: 'Your vendor registration is now in Purchase/SCM approval.',
       });
     },
     onError: (error) => {
@@ -910,7 +911,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       );
 
       // Update vendor status based on validation results
-      const newStatus = hasFailedMandatory ? 'validation_failed' : 'finance_review';
+      // New flow: validation success -> goes to Purchase/SCM matrix first
+      const newStatus = hasFailedMandatory ? 'validation_failed' : 'purchase_review';
 
       await supabase
         .from('vendors')

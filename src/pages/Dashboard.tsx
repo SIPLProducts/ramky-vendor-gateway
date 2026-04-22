@@ -188,10 +188,10 @@ export default function Dashboard() {
         <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Finance
+              Pending Purchase / SCM
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <IndianRupee className="h-5 w-5 text-white" />
+              <ShoppingCart className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
           <CardContent>
@@ -199,10 +199,10 @@ export default function Dashboard() {
               <Skeleton className="h-9 w-20" />
             ) : (
               <>
-                <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">{displayStats.pendingFinance}</div>
-                <Link to="/finance/review">
+                <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">{displayStats.pendingPurchase}</div>
+                <Link to="/purchase/approval">
                   <Button variant="link" className="p-0 h-auto text-xs mt-2 text-amber-600 dark:text-amber-400">
-                    Review <ArrowRight className="h-3 w-3 ml-1" />
+                    Approve <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
                 </Link>
               </>
@@ -213,10 +213,10 @@ export default function Dashboard() {
         <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/20 dark:to-emerald-950/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Purchase
+              Pending Finance
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-              <ShoppingCart className="h-5 w-5 text-white" />
+              <IndianRupee className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
           <CardContent>
@@ -224,10 +224,10 @@ export default function Dashboard() {
               <Skeleton className="h-9 w-20" />
             ) : (
               <>
-                <div className="text-4xl font-bold text-teal-600 dark:text-teal-400">{displayStats.pendingPurchase}</div>
-                <Link to="/purchase/approval">
+                <div className="text-4xl font-bold text-teal-600 dark:text-teal-400">{displayStats.pendingFinance}</div>
+                <Link to="/finance/review">
                   <Button variant="link" className="p-0 h-auto text-xs mt-2 text-teal-600 dark:text-teal-400">
-                    Approve <ArrowRight className="h-3 w-3 ml-1" />
+                    Review <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
                 </Link>
               </>
