@@ -499,6 +499,53 @@ export type Database = {
           },
         ]
       }
+      form_step_configs: {
+        Row: {
+          created_at: string
+          id: string
+          is_built_in: boolean
+          is_visible: boolean
+          step_description: string | null
+          step_key: string
+          step_label: string
+          step_order: number
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_built_in?: boolean
+          is_visible?: boolean
+          step_description?: string | null
+          step_key: string
+          step_label: string
+          step_order?: number
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_built_in?: boolean
+          is_visible?: boolean
+          step_description?: string | null
+          step_key?: string
+          step_label?: string
+          step_order?: number
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_step_configs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitation_email_events: {
         Row: {
           created_at: string
@@ -1257,6 +1304,7 @@ export type Database = {
           communication_state: string | null
           created_at: string
           credit_period_expected: number | null
+          custom_field_values: Json
           customer_service_designation: string | null
           customer_service_email: string | null
           customer_service_name: string | null
@@ -1406,6 +1454,7 @@ export type Database = {
           communication_state?: string | null
           created_at?: string
           credit_period_expected?: number | null
+          custom_field_values?: Json
           customer_service_designation?: string | null
           customer_service_email?: string | null
           customer_service_name?: string | null
@@ -1555,6 +1604,7 @@ export type Database = {
           communication_state?: string | null
           created_at?: string
           credit_period_expected?: number | null
+          custom_field_values?: Json
           customer_service_designation?: string | null
           customer_service_email?: string | null
           customer_service_name?: string | null

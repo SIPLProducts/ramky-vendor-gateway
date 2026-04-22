@@ -21,6 +21,7 @@ import {
   UserCog,
   ShieldCheck,
   Inbox,
+  Layers,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, screenKey: 'dashboard' },
   { label: 'Sharvi Admin Console', href: '/sharvi-admin', icon: Wrench, screenKey: 'sharvi_admin_console' },
+  { label: 'Form Builder', href: '/admin/form-builder', icon: Layers, screenKey: 'form_builder' },
   { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
   { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
   { label: 'My Approvals', href: '/admin/my-approvals', icon: Inbox, screenKey: 'my_approvals' },

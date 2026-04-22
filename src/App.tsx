@@ -29,6 +29,7 @@ import DemoShowcase from "./pages/DemoShowcase";
 import GstCompliance from "./pages/GstCompliance";
 import ScheduledChecks from "./pages/ScheduledChecks";
 import SharviAdminConsole from "./pages/SharviAdminConsole";
+import FormBuilder from "./pages/FormBuilder";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import MyApprovals from "./pages/MyApprovals";
@@ -74,6 +75,7 @@ const App = () => (
                 <Route path="/compliance/gst" element={<GstCompliance />} />
                 <Route path="/compliance/scheduled" element={<ScheduledChecks />} />
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
+                <Route path="/admin/form-builder" element={<FormBuilder />} />
                 <Route path="/admin/my-approvals" element={<MyApprovals />} />
               </Route>
             </Route>

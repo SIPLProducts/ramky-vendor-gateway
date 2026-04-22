@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HorizontalStepIndicator } from '@/components/vendor/HorizontalStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
@@ -9,6 +9,8 @@ import { ContactStep } from '@/components/vendor/steps/ContactStep';
 import { FinancialInfrastructureStep } from '@/components/vendor/steps/FinancialInfrastructureStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { DocumentVerificationStep, VerifiedDocumentData } from '@/components/vendor/steps/DocumentVerificationStep';
+import { DynamicStep } from '@/components/vendor/DynamicStep';
+import { useDynamicFormSchema } from '@/hooks/useDynamicFormSchema';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
 import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails } from '@/types/vendor';
 import { useToast } from '@/hooks/use-toast';
@@ -23,17 +25,20 @@ import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoS
 import { CompletenessRing } from '@/components/vendor/CompletenessRing';
 import { useFormCompleteness } from '@/hooks/useFormCompleteness';
 
-// 6-step registration flow — Step 1 is the OCR + verification gate.
-// Commercial Details and Bank Details have been folded into Step 1 (OCR + APIs)
-// and Step 2 (statutory & memberships) — vendors enter PAN/GST/MSME/Bank only once.
-const registrationSteps = [
+// 6-step built-in registration flow — Step 1 is the OCR + verification gate.
+// Custom admin-defined tabs are inserted between step 5 (Fin/Infra) and the
+// final Review step at runtime.
+const builtInSteps = [
   { id: 1, title: 'Document Verification', description: 'Upload & auto-verify PAN, GST, MSME, Bank' },
   { id: 2, title: 'Organization Profile', description: 'Company, statutory & memberships' },
   { id: 3, title: 'Address Information', description: 'Registered, manufacturing & branch' },
   { id: 4, title: 'Contact Details', description: 'Key contact persons' },
   { id: 5, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
-  { id: 6, title: 'Review & Submit', description: 'Verify and submit application' },
+  // Custom tabs slot in here at runtime (ids 6..N)
+  // Review is always the last step
 ];
+const REVIEW_TITLE = 'Review & Submit';
+const REVIEW_DESCRIPTION = 'Verify and submit application';
 
 const initialFormData: VendorFormData = {
   organization: { buyerCompanyId: '', legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [] },
@@ -70,6 +75,33 @@ export default function VendorRegistration() {
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
   });
+
+  // Custom field values keyed by step_key -> field_name -> value
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, Record<string, unknown>>>({});
+
+  // Pull dynamic schema for this vendor's tenant (admin-defined extra tabs)
+  const tenantId = (existingVendor as { tenant_id?: string } | null)?.tenant_id || formData.organization.buyerCompanyId || null;
+  const { data: dynamicSchema } = useDynamicFormSchema(tenantId);
+  const customSteps = dynamicSchema?.steps || [];
+  const fieldsByStep = dynamicSchema?.fieldsByStep || {};
+
+  // Build the runtime step list: built-in 1..5 + custom tabs + Review (last)
+  const registrationSteps = useMemo(() => {
+    const list: Array<{ id: number; title: string; description: string; stepKey?: string }> = builtInSteps.map((s) => ({ ...s }));
+    customSteps.forEach((cs, i) => {
+      list.push({ id: 6 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
+    });
+    list.push({ id: 6 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
+    return list;
+  }, [customSteps]);
+
+  // Hydrate custom values from existing vendor on load
+  useEffect(() => {
+    const v = existingVendor as { custom_field_values?: Record<string, Record<string, unknown>> } | null;
+    if (v?.custom_field_values && Object.keys(v.custom_field_values).length > 0) {
+      setCustomFieldValues(v.custom_field_values);
+    }
+  }, [existingVendor]);
 
   // Validate token on mount and check authentication
   useEffect(() => {
@@ -581,6 +613,7 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
+    // Built-in steps 1..5
     switch (currentStep) {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
@@ -592,11 +625,26 @@ export default function VendorRegistration() {
         return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
       case 5:
         return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
-      case 6:
-        return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
-      default:
-        return null;
     }
+    // Last step is always Review
+    if (currentStep === registrationSteps.length) {
+      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+    }
+    // Anything in between is an admin-defined custom tab (ids 6..N-1)
+    const customIdx = currentStep - 6;
+    const customStep = customSteps[customIdx];
+    if (customStep) {
+      const fields = fieldsByStep[customStep.step_key] || [];
+      return (
+        <DynamicStep
+          stepKey={customStep.step_key}
+          fields={fields}
+          values={customFieldValues[customStep.step_key] || {}}
+          onChange={(next) => setCustomFieldValues((prev) => ({ ...prev, [customStep.step_key]: next }))}
+        />
+      );
+    }
+    return null;
   };
 
   if (isLoadingVendor || isValidatingToken) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
