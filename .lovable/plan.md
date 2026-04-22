@@ -1,120 +1,68 @@
 
 
-## Configurable Vendor Registration Form (Admin-driven)
+## Form Builder: Drag-and-drop reordering + inline field editor
 
-Let customer admins add/edit tabs (steps), fields, field types, mandatory/visible flags, and option lists from a new admin screen — and have the vendor registration form render those changes automatically on save, without code changes.
+Make the Form Builder feel like a real builder: reorder tabs by dragging them, see all existing fields per tab, and add new fields inline (no drawer pop-out).
 
-### What you'll get
+### What changes
 
-A new admin screen **"Form Builder"** (under Sharvi Admin Console → Form Builder tab, also exposed to `customer_admin` for their own tenant) where admins can:
+**1. Drag-and-drop tab reordering (left rail)**
 
-- Add / rename / reorder / disable **tabs (steps)** beyond the 6 built-in ones (e.g. "QHSE", "Sustainability", "Insurance Details").
-- For each tab, add / edit / reorder / delete **fields**.
-- Per field, configure: label, field key, type (text, number, email, phone, date, select, multi-select, textarea, file, checkbox), placeholder, help text, default value, mandatory, visible, editable, validation regex, validation message, and options list (for selects).
-- **Save** — the vendor registration form picks up the changes immediately on next load, no deploy.
+- Tabs in the left rail become draggable using `@dnd-kit/core` + `@dnd-kit/sortable` (already common in the React stack; will be added).
+- Drag handle = the existing `GripVertical` icon. Cursor changes to grab on hover.
+- Built-in tabs (Doc Verify, Org, Address, Contact, Fin/Infra, Review) are **locked** — they show the lock icon and can't be dragged or reordered. Only custom tabs are reorderable, and only **between** the last built-in step (Fin/Infra, order 5) and Review (order 99).
+- On drop: recompute `step_order` for all custom tabs (e.g. 6, 7, 8, …) and persist in one batched update via a new `useReorderFormSteps` mutation in `useFormBuilder.tsx`. Optimistic UI update + react-query invalidation.
 
-Vendor side:
-- The 6 core steps (Doc Verify, Org, Address, Contact, Fin/Infra, Review) stay as-is and continue to drive verification/gating.
-- Any **custom tabs** added by admin appear as additional steps between Step 5 (Fin/Infra) and Step 6 (Review).
-- Custom field values are saved as a JSON blob on the vendor record, surfaced in Review, and visible to finance/purchase reviewers.
+**2. Drag-and-drop field reordering (right pane)**
 
-### Screens
+- Same `@dnd-kit/sortable` treatment for the field rows inside the selected tab.
+- Works for both built-in steps (overrides) and custom steps.
+- On drop: recompute `display_order` for all fields in that step and persist via a new `useReorderFormFields` mutation. Optimistic + invalidate.
 
-**1. Form Builder (admin)** — `/admin/form-builder`
+**3. Inline "Add Field" + inline edit (replaces the drawer for the common case)**
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Form Builder                          Tenant: Ramky ▼ [Save]│
-├──────────────┬──────────────────────────────────────────────┤
-│ TABS         │  Tab: QHSE Compliance                        │
-│ ─────────────│  ─────────────────────────────────────────── │
-│ 1 Doc Verify │  Tab Label  [QHSE Compliance        ]        │
-│ 2 Org        │  Visible    [✓]   Order [7]                  │
-│ 3 Address    │                                              │
-│ 4 Contact    │  FIELDS                          [+ Add Field]│
-│ 5 Fin/Infra  │  ┌──────────────────────────────────────┐    │
-│ 6 QHSE  ✎    │  │ ⋮ ISO 9001 Cert No  text  Req  ✎ ⌫ │    │
-│ 7 Review     │  │ ⋮ Last Audit Date   date  Opt  ✎ ⌫ │    │
-│ [+ Add Tab]  │  │ ⋮ Safety Policy     file  Req  ✎ ⌫ │    │
-│              │  │ ⋮ Industry Sector   select Req ✎ ⌫ │    │
-│              │  └──────────────────────────────────────┘    │
-└──────────────┴──────────────────────────────────────────────┘
-```
+- Replace the slide-in `FieldEditorDrawer` with an **inline expandable row** at the top of the field list:
+  - "+ Add Field" button expands a compact inline form (Field Key, Display Label, Type, Mandatory, Visible, Placeholder) with `[Save] [Cancel]`.
+  - Advanced options (Help Text, Default Value, Validation Regex, Validation Message, Options for selects) live inside a `[Show advanced]` collapsible inside the same inline form.
+- **Editing** an existing field also opens inline: clicking the row expands it in place into the same compact form. Other rows collapse.
+- Only one row is in edit/add mode at a time.
+- The drawer file (`FieldEditorDrawer.tsx`) is removed since everything happens inline.
 
-**2. Field Editor (drawer)** — opens on field row click
+**4. Existing fields list — always visible**
 
-```text
-Field Key:       iso_9001_cert_no   (lowercase, underscores)
-Display Label:   ISO 9001 Cert No
-Field Type:      [ Text ▼ ]
-Placeholder:     e.g. ISO-2024-1234
-Help Text:       Enter your ISO 9001 certificate number
-Default Value:   
-Mandatory:       [✓]   Visible: [✓]   Editable: [✓]
-Validation Regex: ^ISO-\d{4}-\d+$
-Validation Msg:  Format: ISO-YYYY-NNNN
-Options (select only):
-  + Add option
-                                              [Cancel] [Save]
-```
+- Even when no tab is selected on first load, default to the first tab and render its fields.
+- Each field row shows: drag handle, label, type badge, Required/Hidden badges, field key, and Edit / Delete buttons. Clicking the row (or Edit) toggles inline edit.
+- Empty state stays the same but now sits below the inline "Add Field" button so the path forward is obvious.
 
-**3. Vendor Registration form (auto-updated)**
+### Files
 
-The renderer reads the tab + field config at mount; any custom tab shows up as an extra step. Validation, mandatory checks, and Continue gating use the same rules as built-in steps.
+**Edited:**
+- `src/pages/FormBuilder.tsx`
+  - Wrap the tabs list in `<DndContext><SortableContext>` and the fields list in another. Use `arrayMove` on drag end.
+  - Replace the field editor drawer trigger with an inline `FieldRowEditor` component (defined in the same file or extracted to `src/components/admin/InlineFieldEditor.tsx`).
+  - Pre-select the first available tab on mount.
+- `src/hooks/useFormBuilder.tsx`
+  - Add `useReorderFormSteps(tenantId)` — accepts ordered list of `{id, step_order}` and runs a Supabase upsert in a single round-trip.
+  - Add `useReorderFormFields(tenantId, stepKey)` — same shape for `form_field_configs`.
 
-### Data model (uses existing tables, adds one)
+**Created:**
+- `src/components/admin/InlineFieldEditor.tsx` — compact inline form (label, key auto-slugged from label, type select, mandatory/visible switches, placeholder, advanced collapsible). Reuses the same upsert mutation already in `useFormBuilder`.
 
-- `form_field_configs` already exists — reuse for **field-level** config (already supports `tenant_id`, `step_name`, `field_name`, `display_label`, `field_type`, `is_visible`, `is_mandatory`, `is_editable`, `display_order`, `placeholder`, `help_text`, `validation_regex`, `validation_message`, `options`, `default_value`).
-- New table `form_step_configs` — for **tab/step** definitions:
-  - `id`, `tenant_id`, `step_key` (e.g. `qhse_compliance`), `step_label`, `step_order`, `is_visible`, `is_built_in` (true for the 6 core steps so they can't be deleted), `created_at`, `updated_at`.
-  - RLS: `sharvi_admin` manages all; `customer_admin` manages own tenant rows; everyone authenticated can read their tenant's rows.
-- New column on `vendors`: `custom_field_values jsonb default '{}'::jsonb` — stores values for admin-defined fields keyed by `step_key.field_name`.
+**Deleted:**
+- `src/components/admin/FieldEditorDrawer.tsx` (replaced by inline editor; also removes the `SheetFooter` ref warning).
 
-### Implementation outline
+**Dependencies:**
+- Add `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (small, headless, Tailwind-friendly).
 
-**Backend (migration only, no edge fns):**
-1. Create `form_step_configs` + RLS policies.
-2. Add `vendors.custom_field_values jsonb`.
-3. Seed `form_step_configs` for the 6 built-in steps per tenant on first read (or lazy-seed in the hook).
+### Behaviour notes
 
-**Hook layer:**
-4. `src/hooks/useFormBuilder.tsx` — CRUD for steps and fields (admin side).
-5. `src/hooks/useDynamicFormSchema.tsx` — vendor side: returns `{ steps: StepConfig[], fieldsByStep: Record<string, FieldConfig[]> }` for the active tenant, merged with built-in step metadata.
+- Built-in tabs cannot be reordered; the dnd sensor ignores them. Custom tabs can only be dragged within the custom range.
+- Field reorder works on any tab (built-in or custom) since field overrides are per-tenant.
+- All persistence is batched per drop to avoid N round-trips.
+- Optimistic updates so the UI feels instant; a failed save reverts and shows a toast.
 
-**Admin UI:**
-6. `src/pages/FormBuilder.tsx` — the screen above (left rail = tabs list with drag-reorder; right pane = field grid with drag-reorder + add/edit drawer).
-7. `src/components/admin/FieldEditorDrawer.tsx` — field config form.
-8. Add a route `/admin/form-builder` and a Form Builder tab inside `SharviAdminConsole.tsx`.
-9. Sidebar entry under "Administration" gated to `sharvi_admin` and `customer_admin`.
-
-**Vendor renderer:**
-10. `src/components/vendor/DynamicStep.tsx` — generic renderer that takes a list of `FieldConfig` and renders the right input per type, writes into `formData.customFieldValues[stepKey]`.
-11. `src/pages/VendorRegistration.tsx`:
-    - Load dynamic schema on mount via `useDynamicFormSchema`.
-    - Build `registrationSteps` = built-in 6 + dynamic custom steps inserted before Review.
-    - In `renderStep()`, route any custom step id to `<DynamicStep stepKey=... />`.
-    - Extend `canProceedFromCurrentStep()` to validate custom-step fields (mandatory + regex) using the same rules engine.
-    - Persist `custom_field_values` in `saveVendor` and load it back on draft resume.
-
-**Review + reviewers:**
-12. `ReviewStep.tsx` — render a section per custom step listing its fields/values.
-13. `FinanceReview.tsx` / `PurchaseApproval.tsx` — show `custom_field_values` read-only.
-
-### Permissions
-
-- `sharvi_admin`: full access, all tenants.
-- `customer_admin`: full access, own tenant only.
-- Other roles: read-only via the vendor form rendering.
-
-### Out of scope (for this pass)
-
-- Conditional show/hide rules (e.g. "show field B if A == 'Yes'") — can be added later via a `visibility_condition` JSON column on `form_field_configs`.
-- Per-field role-based visibility.
-- Cross-step dependencies / lookups.
-- Migrating already-saved drafts to a renamed field key (we keep the old key's value in `custom_field_values`).
-- OCR auto-fill for custom fields.
-
-### Result
-
-Customer admins can extend the vendor registration form with new tabs and fields from the UI, save once, and vendors immediately see and fill them — with mandatory/regex validation, draft save, review summary and reviewer visibility all working out of the box.
+### Out of scope
+- Drag-and-drop across tabs (moving a field from one tab to another).
+- Multi-select / bulk delete of fields.
+- Undo for reorders.
 
