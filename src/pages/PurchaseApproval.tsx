@@ -59,7 +59,7 @@ export default function PurchaseApproval() {
 
   const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
   const { data: buyerCompanies } = useBuyerCompanies();
-  const purchaseAction = usePurchaseAction();
+  const purchaseAction = useScmMatrixAction();
   const reRoute = useReRouteApproval();
   const { userRole } = useAuth();
   const canReRoute = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
