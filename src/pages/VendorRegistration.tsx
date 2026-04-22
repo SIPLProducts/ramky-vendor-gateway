@@ -558,7 +558,7 @@ export default function VendorRegistration() {
     const legalName = formData.organization.legalName;
     switch (currentStep) {
       case 1:
-        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} />;
+        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
       case 2:
         return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(2, data)} />;
       case 3:
