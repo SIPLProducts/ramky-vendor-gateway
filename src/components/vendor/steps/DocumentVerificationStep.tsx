@@ -167,16 +167,17 @@ export function DocumentVerificationStep({
   });
 
   // Stage 2: PAN
-  const [panDoc, setPanDoc] = useState<DocState>(
-    initialData?.pan
-      ? {
-          status: "verified",
-          ocrData: { pan_number: initialData.pan.number, holder_name: initialData.pan.holderName },
-          apiData: { name: initialData.pan.apiName },
-          nameMatchScore: initialData.pan.nameMatchScore,
-        }
-      : idleDoc,
-  );
+  const [panDoc, setPanDoc] = useState<DocState>(() => {
+    if (!initialData?.pan) return idleDoc;
+    const data = { pan_number: initialData.pan.number, holder_name: initialData.pan.holderName };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.pan.apiName },
+      nameMatchScore: initialData.pan.nameMatchScore,
+    };
+  });
   const [panCrossCheckError, setPanCrossCheckError] = useState<string | null>(null);
 
   // Stage 3: MSME
