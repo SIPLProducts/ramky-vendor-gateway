@@ -891,6 +891,28 @@ export function DocumentVerificationStep({
                           onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
                         />
                       </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
+                        <select
+                          value={bankAccountType}
+                          onChange={(e) => setBankAccountType(e.target.value)}
+                          className="mt-1 w-full h-10 rounded-md border border-border/60 bg-muted/40 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="current">Current Account</option>
+                          <option value="savings">Savings Account</option>
+                          <option value="cash_credit">Cash Credit</option>
+                          <option value="others">Others</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Bank Address</Label>
+                        <Input
+                          value={bankBranchAddress}
+                          onChange={(e) => setBankBranchAddress(e.target.value)}
+                          placeholder="Branch address (optional)"
+                          className="mt-1 bg-muted/40 border-border/60"
+                        />
+                      </div>
                     </div>
                   </div>
                 }
