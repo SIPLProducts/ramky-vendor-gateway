@@ -386,6 +386,7 @@ export function ApprovalMatrixConfig() {
                               .filter((x) => x.rowKey !== r.rowKey && x.level_number === r.level_number && x.user_id)
                               .map((x) => x.user_id!) }
                             onSelect={(uid) => updateRow(r.rowKey, { user_id: uid })}
+                            onAssignUsers={() => setAssignDialogOpen(true)}
                           />
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground truncate max-w-[14rem]">
