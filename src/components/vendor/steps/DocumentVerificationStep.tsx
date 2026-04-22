@@ -525,24 +525,11 @@ export function DocumentVerificationStep({
                         gstDoc.status === "verifying" ? "Verifying…" : ""
                       }
                       verifiedFields={
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <ReadOnlyField label="Legal Name" value={gstDoc.ocrData?.legal_name} />
-                          <ReadOnlyField label="Trade Name" value={gstDoc.ocrData?.trade_name} />
-                          <ReadOnlyField label="GSTIN" value={gstDoc.ocrData?.gstin} mono />
-                          <ReadOnlyField label="Constitution" value={gstDoc.ocrData?.constitution_of_business} />
-                          <div className="md:col-span-2">
-                            <Label htmlFor="principal-place" className="text-xs font-medium text-muted-foreground">
-                              Principal Place of Business
-                            </Label>
-                            <Input
-                              id="principal-place"
-                              value={editablePrincipalPlace}
-                              onChange={(e) => setEditablePrincipalPlace(e.target.value)}
-                              placeholder="As per GST certificate"
-                              className="mt-1"
-                            />
-                          </div>
-                        </div>
+                        <GstVerifiedDetails
+                          ocr={gstDoc.ocrData}
+                          editablePrincipalPlace={editablePrincipalPlace}
+                          onChangePrincipalPlace={setEditablePrincipalPlace}
+                        />
                       }
                     />
                     {gstDoc.status === "verified" && typeof gstDoc.nameMatchScore === "number" && (
