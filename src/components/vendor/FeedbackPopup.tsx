@@ -59,10 +59,11 @@ export function FeedbackPopup({ open, onOpenChange, vendorId }: FeedbackPopupPro
         description: 'Your feedback has been submitted successfully.',
       });
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Feedback submission error:', error);
       toast({
         title: 'Submission Failed',
-        description: 'Could not submit feedback. Please try again.',
+        description: error?.message || 'Could not submit feedback. Please try again.',
         variant: 'destructive',
       });
     } finally {
