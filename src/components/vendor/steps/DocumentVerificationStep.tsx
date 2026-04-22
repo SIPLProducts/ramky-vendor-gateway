@@ -299,6 +299,7 @@ export function DocumentVerificationStep({
       status: "verified",
       fileName: file.name,
       fileSize: file.size,
+      file,
       ocrData: ocrRes.extracted,
       originalOcrData: ocrRes.extracted,
       apiData: v.apiData,
