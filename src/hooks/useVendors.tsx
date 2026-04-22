@@ -161,6 +161,67 @@ export function useVendorApprovalTrail(vendorId: string | undefined) {
   });
 }
 
+// Re-invoke route-vendor-approval to (re)seed approval progress for a vendor
+export function useReRouteApproval() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (vendorId: string) => {
+      const { data, error } = await supabase.functions.invoke('route-vendor-approval', {
+        body: { vendor_id: vendorId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, vendorId) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-approval-trail', vendorId] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['stuck-approval-vendors'] });
+      toast({
+        title: 'Approval re-routed',
+        description: 'Approval progress refreshed from the configured matrix.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Re-route failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Count of vendors stuck in purchase_review with NO approval progress rows.
+// Used by the admin dashboard widget to surface missing matrix configuration.
+export function useStuckApprovalVendors() {
+  const { tenantIds, activeTenantId } = useTenantFilter();
+  return useQuery({
+    queryKey: ['stuck-approval-vendors', activeTenantId, tenantIds],
+    queryFn: async () => {
+      let q = supabase.from('vendors').select('id, tenant_id').eq('status', 'purchase_review');
+      if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
+      else if (tenantIds !== null) {
+        if (tenantIds.length === 0) return 0;
+        q = q.in('tenant_id', tenantIds);
+      }
+      const { data: vendors, error } = await q;
+      if (error) throw error;
+      if (!vendors || vendors.length === 0) return 0;
+
+      const ids = vendors.map(v => v.id);
+      const { data: progress, error: pErr } = await supabase
+        .from('vendor_approval_progress')
+        .select('vendor_id')
+        .in('vendor_id', ids);
+      if (pErr) throw pErr;
+      const withProgress = new Set((progress ?? []).map(p => p.vendor_id));
+      return vendors.filter(v => !withProgress.has(v.id)).length;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
 // Fetch vendor validations
 export function useVendorValidations(vendorId: string | undefined) {
   return useQuery({
