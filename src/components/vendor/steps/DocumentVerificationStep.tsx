@@ -36,7 +36,7 @@ export interface VerifiedDocumentData {
   pan?: { number: string; holderName: string; apiName?: string; nameMatchScore?: number };
   isMsmeRegistered?: boolean;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; apiName?: string; nameMatchScore?: number };
-  bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string };
+  bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
   panCardFile?: File | null;
@@ -232,6 +232,14 @@ export function DocumentVerificationStep({
       apiData: { name: initialData.bank.apiName },
     };
   });
+  // Account Type + Bank Address — captured here (not on a cheque) so vendor
+  // sets them once, in context, alongside the OCR'd bank values.
+  const [bankAccountType, setBankAccountType] = useState<string>(
+    initialData?.bank?.accountType || "current",
+  );
+  const [bankBranchAddress, setBankBranchAddress] = useState<string>(
+    initialData?.bank?.bankAddress || "",
+  );
 
   // ---------- Verification (dummy / simulated) ----------
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
@@ -461,6 +469,8 @@ export function DocumentVerificationStep({
         branchName: bankDoc.ocrData.branch_name,
         accountHolderName: bankDoc.ocrData.account_holder_name,
         apiName: bankDoc.apiData?.accountHolderName || bankDoc.apiData?.name,
+        accountType: bankAccountType,
+        bankAddress: bankBranchAddress,
       };
     }
     // Lift uploaded files so the parent can persist them in the draft
@@ -471,7 +481,7 @@ export function DocumentVerificationStep({
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, bankAccountType, bankBranchAddress, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
