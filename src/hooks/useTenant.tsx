@@ -150,6 +150,49 @@ export function useTenantUsersWithRoles(tenantId: string | null | undefined) {
   });
 }
 
+// Fetch all profiles with their primary role (admin-only via RLS)
+export function useAllProfilesWithRoles() {
+  return useQuery({
+    queryKey: ['all-profiles-with-roles'],
+    queryFn: async (): Promise<TenantUserWithRole[]> => {
+      const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email').order('full_name'),
+        supabase.from('user_roles').select('user_id, role'),
+      ]);
+      if (pErr) throw pErr;
+      if (rErr) throw rErr;
+
+      const roleByUser = new Map<string, AppRole>();
+      (roles ?? []).forEach((r) => {
+        if (!roleByUser.has(r.user_id)) roleByUser.set(r.user_id, r.role as AppRole);
+      });
+
+      return (profiles ?? []).map((p) => ({
+        user_id: p.id,
+        full_name: p.full_name,
+        email: p.email,
+        role: roleByUser.get(p.id) ?? null,
+      }));
+    },
+  });
+}
+
+// Fetch user counts per tenant (for tenant dropdown annotation)
+export function useTenantUserCounts() {
+  return useQuery({
+    queryKey: ['tenant-user-counts'],
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase.from('user_tenants').select('tenant_id');
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((r) => {
+        counts[r.tenant_id] = (counts[r.tenant_id] ?? 0) + 1;
+      });
+      return counts;
+    },
+  });
+}
+
 // Fetch all tenants
 export function useTenants() {
   return useQuery({
