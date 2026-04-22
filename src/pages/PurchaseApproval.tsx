@@ -20,9 +20,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
-import { useVendors, usePurchaseAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
+import { ApprovalTimeline } from '@/components/vendor/ApprovalTimeline';
+import { useVendors, usePurchaseAction, useBuyerCompanies, useReRouteApproval, VendorRow } from '@/hooks/useVendors';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
 import { ValidationResult } from '@/types/vendor';
 import {
   Search,
