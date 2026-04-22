@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useVendorStats, useVendors, useBuyerCompanies } from '@/hooks/useVendors';
+import { useVendorStats, useVendors, useBuyerCompanies, useStuckApprovalVendors } from '@/hooks/useVendors';
 import {
   Users,
   Clock,
