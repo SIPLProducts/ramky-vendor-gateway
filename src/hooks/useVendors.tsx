@@ -230,9 +230,11 @@ export function useFinanceAction() {
         return { id: vendorId, status: 'draft' as VendorStatus };
       }
 
-      // For approve/reject, continue with existing logic
+      // New flow: Finance acts AFTER Purchase matrix completes.
+      // Finance approve -> purchase_approved (ready for SAP sync)
+      // Finance reject -> finance_rejected
       const statusMap: Record<string, VendorStatus> = {
-        approve: 'purchase_review',
+        approve: 'purchase_approved',
         reject: 'finance_rejected',
       };
 
@@ -267,7 +269,7 @@ export function useFinanceAction() {
       toast({
         title: variables.action === 'approve' ? 'Approved' : variables.action === 'reject' ? 'Rejected' : 'Clarification Requested',
         description: variables.action === 'approve'
-          ? 'Vendor forwarded to Purchase team'
+          ? 'Vendor approved by Finance — ready for SAP sync'
           : variables.action === 'reject'
             ? 'Vendor registration rejected'
             : 'Clarification email sent to vendor. Status changed to draft.',
