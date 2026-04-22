@@ -31,10 +31,14 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
   const [termsAccepted, setTermsAccepted] = useState(data.declaration?.termsAccepted || false);
   const canSubmit = selfDeclared && termsAccepted;
 
+  // Step numbers (6-step flow):
+  //  1 Doc Verification (PAN/GST/MSME/Bank captured & verified here)
+  //  2 Organization (incl. Statutory & Memberships)
+  //  3 Address  4 Contact  5 Financial/Infra  6 Review
   return (
     <div className="space-y-6">
       <div className="form-section">
-        <SectionHeader icon={Building2} title="Organization Details" step={1} onEdit={onEditStep} />
+        <SectionHeader icon={Building2} title="Organization Details" step={2} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="Legal Name" value={data.organization?.legalName} />
           <DataRow label="Trade Name" value={data.organization?.tradeName} />
@@ -46,7 +50,7 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={MapPin} title="Address Information" step={2} onEdit={onEditStep} />
+        <SectionHeader icon={MapPin} title="Address Information" step={3} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="Registered Address" value={data.address?.registeredAddress} />
           <DataRow label="City" value={data.address?.registeredCity} />
@@ -56,7 +60,7 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={Users} title="Contact Information" step={3} onEdit={onEditStep} />
+        <SectionHeader icon={Users} title="Contact Information" step={4} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="CEO/MD Name" value={data.contact?.ceoName} />
           <DataRow label="CEO/MD Email" value={data.contact?.ceoEmail} />
@@ -65,7 +69,7 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={FileCheck} title="Compliance & Statutory" step={4} onEdit={onEditStep} />
+        <SectionHeader icon={FileCheck} title="Compliance & Statutory" step={1} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="PAN" value={data.statutory?.pan} />
           <DataRow label="Entity Type" value={data.statutory?.entityType} />
@@ -98,17 +102,19 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={Landmark} title="Bank Details" step={5} onEdit={onEditStep} />
+        <SectionHeader icon={Landmark} title="Bank Details" step={1} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="Bank Name" value={data.bank?.bankName} />
-          <DataRow label="Account Number" value={data.bank?.accountNumber?.replace(/./g, '•').slice(0, -4) + data.bank?.accountNumber?.slice(-4)} />
+          <DataRow label="Account Number" value={data.bank?.accountNumber ? data.bank.accountNumber.replace(/./g, '•').slice(0, -4) + data.bank.accountNumber.slice(-4) : '-'} />
           <DataRow label="IFSC Code" value={data.bank?.ifscCode} />
           <DataRow label="Branch" value={data.bank?.branchName} />
+          <DataRow label="Account Type" value={data.bank?.accountType} />
+          <DataRow label="Bank Address" value={data.bank?.bankAddress} />
         </div>
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={TrendingUp} title="Financial Information" step={6} onEdit={onEditStep} />
+        <SectionHeader icon={TrendingUp} title="Financial Information" step={5} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="Expected Credit Period" value={data.financial?.creditPeriodExpected ? `${data.financial.creditPeriodExpected} days` : '-'} />
           <DataRow label="Major Customer 1" value={data.financial?.majorCustomer1} />

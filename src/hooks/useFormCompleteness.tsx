@@ -40,20 +40,33 @@ export function useFormCompleteness(
     const a = formData.address;
     const c = formData.contact;
     const s = formData.statutory;
-    const b = formData.bank;
     const f = formData.financial;
     const i = formData.infrastructure;
 
+    // 6-step flow: 1 Doc Verify, 2 Org (+ statutory/memberships),
+    // 3 Address, 4 Contact, 5 Fin/Infra, 6 Review.
     const steps: StepCompleteness[] = [
-      // Step 1 — Document Verification (3 mandatory verifications)
+      // Step 1 — Document Verification (PAN, GST, MSME-or-skip, Bank)
       {
         step: 1,
-        ...score([verifiedData?.pan, verifiedData?.gst, verifiedData?.bank]),
+        ...score([
+          verifiedData?.pan,
+          verifiedData?.gst || s.gstSelfDeclarationFile,
+          verifiedData?.msme || verifiedData?.isMsmeRegistered === false,
+          verifiedData?.bank,
+        ]),
       },
-      // Step 2 — Organization
+      // Step 2 — Organization + Statutory & Memberships
       {
         step: 2,
-        ...score([o.legalName, o.tradeName, o.industryType, o.organizationType, o.productCategories]),
+        ...score([
+          o.legalName,
+          o.tradeName,
+          o.industryType,
+          o.organizationType,
+          o.productCategories,
+          s.entityType,
+        ]),
       },
       // Step 3 — Address
       {
@@ -65,34 +78,17 @@ export function useFormCompleteness(
         step: 4,
         ...score([c.ceoName, c.ceoEmail, c.ceoPhone, c.marketingName || c.customerServiceName]),
       },
-      // Step 5 — Commercial / Statutory
+      // Step 5 — Financial & Infrastructure
       {
         step: 5,
-        ...score([
-          s.pan,
-          // GST handled either via gstin or self-declaration
-          s.isGstRegistered ? s.gstin : s.gstSelfDeclarationFile || s.gstDeclarationReason,
-          // MSME — answered if flag false, or filled if true
-          s.isMsmeRegistered ? s.msmeNumber : true,
-          s.entityType,
-        ]),
-      },
-      // Step 6 — Bank
-      {
-        step: 6,
-        ...score([b.bankName, b.accountNumber, b.ifscCode, b.accountType]),
-      },
-      // Step 7 — Financial & Infrastructure
-      {
-        step: 7,
         ...score([f.turnoverYear1, f.creditPeriodExpected, i.rawMaterialsUsed || i.productionCapacity]),
       },
-      // Step 8 — Review (always 100% by definition once reached)
-      { step: 8, filled: 1, total: 1, percent: 100 },
+      // Step 6 — Review (always 100% by definition once reached)
+      { step: 6, filled: 1, total: 1, percent: 100 },
     ];
 
-    const totalFilled = steps.slice(0, 7).reduce((acc, s) => acc + s.filled, 0);
-    const totalFields = steps.slice(0, 7).reduce((acc, s) => acc + s.total, 0);
+    const totalFilled = steps.slice(0, 5).reduce((acc, s) => acc + s.filled, 0);
+    const totalFields = steps.slice(0, 5).reduce((acc, s) => acc + s.total, 0);
     const overall = totalFields === 0 ? 0 : Math.round((totalFilled / totalFields) * 100);
 
     return { steps, overall };
