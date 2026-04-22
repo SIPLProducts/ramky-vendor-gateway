@@ -22,7 +22,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Save, Trash2, ArrowRight, ChevronsUpDown, AlertTriangle, CheckCircle2, Database, FlaskConical, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole } from '@/hooks/useTenant';
+import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole, type AppRole } from '@/hooks/useTenant';
+import { useQueryClient } from '@tanstack/react-query';
+
+const APP_ROLES: AppRole[] = ['sharvi_admin', 'admin', 'customer_admin', 'finance', 'purchase', 'approver', 'vendor'];
 import { AssignUsersToTenantDialog } from './AssignUsersToTenantDialog';
 import { UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
