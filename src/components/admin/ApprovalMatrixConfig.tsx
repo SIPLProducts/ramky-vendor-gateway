@@ -98,6 +98,7 @@ export function ApprovalMatrixConfig() {
       }
     });
     setRows(flat);
+    setSavedSnapshot(JSON.stringify(flat.map(({ rowKey, ...r }) => r)));
     setLoading(false);
   };
 
