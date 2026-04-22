@@ -151,23 +151,29 @@ export type Database = {
         Row: {
           added_at: string
           added_by: string | null
+          approver_email: string | null
+          approver_name: string | null
           id: string
           level_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           added_at?: string
           added_by?: string | null
+          approver_email?: string | null
+          approver_name?: string | null
           id?: string
           level_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           added_at?: string
           added_by?: string | null
+          approver_email?: string | null
+          approver_name?: string | null
           id?: string
           level_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
