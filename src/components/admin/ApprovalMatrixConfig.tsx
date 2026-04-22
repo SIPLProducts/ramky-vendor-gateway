@@ -316,6 +316,29 @@ export function ApprovalMatrixConfig() {
         await supabase.from('approval_matrix_levels').delete().in('id', toDelete);
       }
 
+      // Auto-link selected approvers to the tenant if not already linked
+      const selectedUserIds = Array.from(new Set(rows.map((r) => r.user_id).filter((x): x is string => !!x)));
+      if (selectedUserIds.length > 0) {
+        const { data: existingLinks } = await supabase
+          .from('user_tenants')
+          .select('user_id')
+          .eq('tenant_id', tenantId)
+          .in('user_id', selectedUserIds);
+        const linkedSet = new Set((existingLinks ?? []).map((l) => l.user_id));
+        const missing = selectedUserIds.filter((uid) => !linkedSet.has(uid));
+        if (missing.length > 0) {
+          console.log('[ApprovalMatrix] auto-linking', missing.length, 'users to tenant', tenantId);
+          const { error: linkErr } = await supabase
+            .from('user_tenants')
+            .insert(missing.map((uid) => ({ user_id: uid, tenant_id: tenantId })));
+          if (linkErr) throw linkErr;
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['tenant-users-with-roles'] }),
+            queryClient.invalidateQueries({ queryKey: ['tenant-user-counts'] }),
+          ]);
+        }
+      }
+
       await supabase.from('audit_logs').insert({
         action: 'approval_matrix_saved',
         user_id: user?.id,
