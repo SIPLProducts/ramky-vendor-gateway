@@ -811,12 +811,7 @@ function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect
               </div>
             ) : users.length === 0 ? (
               <div className="p-4 text-center space-y-2">
-                <p className="text-sm text-muted-foreground">No users assigned to this tenant.</p>
-                {onAssignUsers && (
-                  <Button size="sm" onClick={onAssignUsers}>
-                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign Users
-                  </Button>
-                )}
+                <p className="text-sm text-muted-foreground">No users found in the system.</p>
               </div>
             ) : (
               <CommandEmpty>No matching users.</CommandEmpty>
