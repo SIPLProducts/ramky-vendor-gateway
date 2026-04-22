@@ -393,11 +393,13 @@ export function DocumentVerificationStep({
     return out;
   }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc]);
 
-  // Lift state to parent in real time so outer Continue + Save Draft work
+  // Lift state to parent in real time so outer Continue + Save Draft work.
+  // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
+  const onStageChangeRef = useRef(onStageChange);
+  useEffect(() => { onStageChangeRef.current = onStageChange; }, [onStageChange]);
   useEffect(() => {
-    if (!onStageChange) return;
-    onStageChange(buildOutput());
-  }, [buildOutput, onStageChange]);
+    onStageChangeRef.current?.(buildOutput());
+  }, [buildOutput]);
 
   const handleContinue = () => {
     onComplete(buildOutput());
