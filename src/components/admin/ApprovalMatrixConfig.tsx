@@ -87,7 +87,7 @@ export function ApprovalMatrixConfig() {
     [rows, savedSnapshot, pendingRoleChanges]
   );
 
-  const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
+  const { data: tenantUsers = [], isLoading: usersLoading } = useAllProfilesWithRoles();
   const { data: tenantUserCounts = {} } = useTenantUserCounts();
   const userById = useMemo(() => new Map(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
