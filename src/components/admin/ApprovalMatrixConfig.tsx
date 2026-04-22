@@ -536,7 +536,7 @@ export function ApprovalMatrixConfig() {
               {[...grouped].reverse().map(([num, group]) => (
                 <span key={num} className="flex items-center gap-2">
                   <Badge>
-                    L{num} · {group[0]?.level_name || '(unnamed)'} · {group.length} approver{group.length > 1 ? 's' : ''}
+                    Level {num} · {group.length} approver{group.length > 1 ? 's' : ''}
                   </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </span>
