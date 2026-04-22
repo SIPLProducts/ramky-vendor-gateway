@@ -106,6 +106,50 @@ export interface ApprovalWorkflowStep {
   created_at: string;
 }
 
+// Fetch users belonging to a tenant, with their primary role
+export interface TenantUserWithRole {
+  user_id: string;
+  full_name: string | null;
+  email: string;
+  role: AppRole | null;
+}
+
+export function useTenantUsersWithRoles(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['tenant-users-with-roles', tenantId],
+    queryFn: async (): Promise<TenantUserWithRole[]> => {
+      if (!tenantId) return [];
+      const { data: links, error: linkErr } = await supabase
+        .from('user_tenants')
+        .select('user_id')
+        .eq('tenant_id', tenantId);
+      if (linkErr) throw linkErr;
+      const ids = (links ?? []).map((l) => l.user_id);
+      if (ids.length === 0) return [];
+
+      const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email').in('id', ids),
+        supabase.from('user_roles').select('user_id, role').in('user_id', ids),
+      ]);
+      if (pErr) throw pErr;
+      if (rErr) throw rErr;
+
+      const roleByUser = new Map<string, AppRole>();
+      (roles ?? []).forEach((r) => {
+        if (!roleByUser.has(r.user_id)) roleByUser.set(r.user_id, r.role as AppRole);
+      });
+
+      return (profiles ?? []).map((p) => ({
+        user_id: p.id,
+        full_name: p.full_name,
+        email: p.email,
+        role: roleByUser.get(p.id) ?? null,
+      })).sort((a, b) => (a.full_name ?? a.email).localeCompare(b.full_name ?? b.email));
+    },
+    enabled: !!tenantId,
+  });
+}
+
 // Fetch all tenants
 export function useTenants() {
   return useQuery({
