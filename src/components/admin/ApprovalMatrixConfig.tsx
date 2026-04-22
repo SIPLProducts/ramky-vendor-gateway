@@ -484,7 +484,20 @@ function ApproverCombobox({ users, value, excludeIds, onSelect, onAssignUsers }:
         <Command>
           <CommandInput placeholder="Search by name or email…" />
           <CommandList>
-            <CommandEmpty>No users found.</CommandEmpty>
+            {users.length === 0 ? (
+              <div className="p-4 text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  No users assigned to this tenant.
+                </p>
+                {onAssignUsers && (
+                  <Button size="sm" onClick={onAssignUsers}>
+                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign Users
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <CommandEmpty>No matching users.</CommandEmpty>
+            )}
             <CommandGroup>
               {users.map((u) => {
                 const disabled = exclude.has(u.user_id);
