@@ -275,8 +275,8 @@ export function ApprovalMatrixConfig() {
 
       {/* Save reminder banner */}
       {isDirty && !loading && rows.length > 0 && (
-        <div className="flex items-center gap-2 p-3 rounded-md border border-amber-500/50 bg-amber-500/10 text-sm">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <div className="flex items-center gap-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-sm">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
           <span><strong>You have unsaved changes.</strong> Click <strong>Save All</strong> to persist this matrix to the database.</span>
         </div>
       )}
