@@ -322,7 +322,7 @@ export function DocumentVerificationStep({
   const allDone = stage1Done && stage2Done && stage3Done && stage4Done;
   const completedCount = [stage1Done, stage2Done, stage3Done, stage4Done].filter(Boolean).length;
 
-  const handleContinue = () => {
+  const buildOutput = useCallback((): VerifiedDocumentData => {
     const out: VerifiedDocumentData = { isGstRegistered: isGstRegistered ?? undefined };
     if (isGstRegistered === true && gstDoc.status === "verified" && gstDoc.ocrData) {
       out.gst = {
@@ -369,7 +369,17 @@ export function DocumentVerificationStep({
         apiName: bankDoc.apiData?.accountHolderName || bankDoc.apiData?.name,
       };
     }
-    onComplete(out);
+    return out;
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc]);
+
+  // Lift state to parent in real time so outer Continue + Save Draft work
+  useEffect(() => {
+    if (!onStageChange) return;
+    onStageChange(buildOutput());
+  }, [buildOutput, onStageChange]);
+
+  const handleContinue = () => {
+    onComplete(buildOutput());
   };
 
   // ---------- Tabs ----------
