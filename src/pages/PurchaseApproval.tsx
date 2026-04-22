@@ -63,23 +63,45 @@ export default function PurchaseApproval() {
   const { userRole } = useAuth();
   const canReRoute = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
 
-  // Detect vendors stuck in purchase_review with NO approval progress rows (missing matrix)
+  // Fetch approval progress rows for all visible vendors (for stuck detection + status badge)
   const vendorIds = (pendingVendors ?? []).map(v => v.id);
-  const { data: stuckIds } = useQuery({
-    queryKey: ['stuck-progress-ids', vendorIds.sort().join(',')],
-    queryFn: async (): Promise<Set<string>> => {
-      if (vendorIds.length === 0) return new Set();
+  const { data: progressByVendor } = useQuery({
+    queryKey: ['purchase-progress', vendorIds.sort().join(',')],
+    queryFn: async (): Promise<Record<string, Array<{ level_number: number; status: string }>>> => {
+      if (vendorIds.length === 0) return {};
       const { data, error } = await supabase
         .from('vendor_approval_progress')
-        .select('vendor_id')
+        .select('vendor_id, level_number, status')
         .in('vendor_id', vendorIds);
       if (error) throw error;
-      const withProgress = new Set((data ?? []).map(d => d.vendor_id));
-      return new Set(vendorIds.filter(id => !withProgress.has(id)));
+      const map: Record<string, Array<{ level_number: number; status: string }>> = {};
+      (data ?? []).forEach(row => {
+        if (!map[row.vendor_id]) map[row.vendor_id] = [];
+        map[row.vendor_id].push({ level_number: row.level_number, status: row.status });
+      });
+      return map;
     },
     enabled: vendorIds.length > 0,
     staleTime: 30 * 1000,
   });
+
+  const stuckIds = new Set(vendorIds.filter(id => !progressByVendor?.[id]?.length));
+
+  const getScmStatusBadge = (vendorId: string) => {
+    const rows = progressByVendor?.[vendorId] ?? [];
+    if (rows.length === 0) {
+      return { label: 'Awaiting SCM Approval', className: 'bg-amber-100 text-amber-700 border-amber-200' };
+    }
+    const approved = rows.filter(r => r.status === 'approved').sort((a, b) => b.level_number - a.level_number);
+    const pending = rows.filter(r => r.status === 'pending').sort((a, b) => b.level_number - a.level_number);
+    if (approved.length > 0 && pending.length > 0) {
+      return {
+        label: `SCM L${approved[0].level_number} Approved · Pending L${pending[0].level_number}`,
+        className: 'bg-blue-100 text-blue-700 border-blue-200',
+      };
+    }
+    return { label: 'Awaiting SCM Approval', className: 'bg-amber-100 text-amber-700 border-amber-200' };
+  };
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
     const matchesSearch =
