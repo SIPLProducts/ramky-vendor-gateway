@@ -22,7 +22,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Save, Trash2, ArrowRight, ChevronsUpDown, AlertTriangle, CheckCircle2, Database, FlaskConical, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole } from '@/hooks/useTenant';
+import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole, type AppRole } from '@/hooks/useTenant';
+import { useQueryClient } from '@tanstack/react-query';
+
+const APP_ROLES: AppRole[] = ['sharvi_admin', 'admin', 'customer_admin', 'finance', 'purchase', 'approver', 'vendor'];
 import { AssignUsersToTenantDialog } from './AssignUsersToTenantDialog';
 import { UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -54,6 +57,7 @@ const newRowKey = () => Math.random().toString(36).slice(2, 10);
 export function ApprovalMatrixConfig() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: tenants = [] } = useTenants();
   const activeTenants = useMemo(() => tenants.filter((t) => t.is_active), [tenants]);
 
@@ -66,10 +70,21 @@ export function ApprovalMatrixConfig() {
   const [savedSnapshot, setSavedSnapshot] = useState<string>('[]');
   const [dbState, setDbState] = useState<DbState>({ levels: 0, approvers: 0, lastUpdated: null });
   const [lastSaveResult, setLastSaveResult] = useState<{ levels: number; approvers: number; at: number } | null>(null);
+  const [pendingRoleChanges, setPendingRoleChanges] = useState<Record<string, AppRole>>({});
+  const [canEditRoles, setCanEditRoles] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+      const roles = (data ?? []).map((r) => r.role);
+      setCanEditRoles(roles.includes('sharvi_admin') || roles.includes('admin'));
+    })();
+  }, [user?.id]);
 
   const isDirty = useMemo(
-    () => JSON.stringify(rows.map(({ rowKey, ...r }) => r)) !== savedSnapshot,
-    [rows, savedSnapshot]
+    () => JSON.stringify(rows.map(({ rowKey, ...r }) => r)) !== savedSnapshot || Object.keys(pendingRoleChanges).length > 0,
+    [rows, savedSnapshot, pendingRoleChanges]
   );
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
@@ -225,9 +240,6 @@ export function ApprovalMatrixConfig() {
       if (!r.level_number || r.level_number < 1) {
         errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: 'Invalid Level #' });
       }
-      if (!r.level_name.trim()) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: 'Level Name is empty' });
-      }
       if (!r.user_id) {
         errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: 'No approver selected' });
       } else {
@@ -262,8 +274,8 @@ export function ApprovalMatrixConfig() {
         const levelPayload = {
           tenant_id: tenantId,
           level_number: levelNumber,
-          level_name: first.level_name,
-          designation: first.designation || null,
+          level_name: `Level ${levelNumber}`,
+          designation: null,
           approval_mode: first.approval_mode,
         };
         console.log('[ApprovalMatrix] upserting level', levelNumber, levelPayload);
@@ -310,9 +322,26 @@ export function ApprovalMatrixConfig() {
         details: { tenant_id: tenantId, level_count: grouped.length, row_count: rows.length },
       });
 
-      console.log('[ApprovalMatrix] done — saved', grouped.length, 'levels and', savedApprovers, 'approvers');
+      // Apply pending role changes
+      const roleEntries = Object.entries(pendingRoleChanges);
+      let rolesUpdated = 0;
+      for (const [uid, newRole] of roleEntries) {
+        console.log('[ApprovalMatrix] updating role for user', uid, '->', newRole);
+        const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', uid);
+        if (delErr) throw delErr;
+        const { error: insErr } = await supabase.from('user_roles').insert({ user_id: uid, role: newRole });
+        if (insErr) throw insErr;
+        rolesUpdated++;
+      }
+      if (rolesUpdated > 0) {
+        await queryClient.invalidateQueries({ queryKey: ['tenant-users-with-roles'] });
+        await queryClient.invalidateQueries({ queryKey: ['all-profiles-with-roles'] });
+      }
+      setPendingRoleChanges({});
+
+      console.log('[ApprovalMatrix] done — saved', grouped.length, 'levels and', savedApprovers, 'approvers,', rolesUpdated, 'role changes');
       setLastSaveResult({ levels: grouped.length, approvers: savedApprovers, at: Date.now() });
-      toast({ title: 'Approval matrix saved', description: `${grouped.length} level(s), ${savedApprovers} approver(s)` });
+      toast({ title: 'Approval matrix saved', description: `${grouped.length} level(s), ${savedApprovers} approver(s)${rolesUpdated > 0 ? `, ${rolesUpdated} role update(s)` : ''}` });
       await Promise.all([loadMatrix(tenantId), loadDbState(tenantId)]);
     } catch (e: any) {
       console.error('[ApprovalMatrix] Save failed:', e);
@@ -507,7 +536,7 @@ export function ApprovalMatrixConfig() {
               {[...grouped].reverse().map(([num, group]) => (
                 <span key={num} className="flex items-center gap-2">
                   <Badge>
-                    L{num} · {group[0]?.level_name || '(unnamed)'} · {group.length} approver{group.length > 1 ? 's' : ''}
+                    Level {num} · {group.length} approver{group.length > 1 ? 's' : ''}
                   </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </span>
@@ -546,15 +575,13 @@ export function ApprovalMatrixConfig() {
         </CardHeader>
         <CardContent>
           <div className="border rounded-md overflow-x-auto">
-            <Table className="min-w-[1100px]">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-24">Level #</TableHead>
-                  <TableHead className="w-40">Level Name</TableHead>
-                  <TableHead className="w-36">Designation</TableHead>
-                  <TableHead className="w-64">Approver</TableHead>
-                  <TableHead className="w-56">Email</TableHead>
-                  <TableHead className="w-28">Role</TableHead>
+                  <TableHead className="w-64">Approver (User Name)</TableHead>
+                  <TableHead className="w-64">Email</TableHead>
+                  <TableHead className="w-40">Role</TableHead>
                   <TableHead className="w-28">Mode</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -563,12 +590,12 @@ export function ApprovalMatrixConfig() {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
+                      <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                       No approvers configured for this tenant. Click <strong>+ Add Row</strong> to start.
                     </TableCell>
                   </TableRow>
@@ -576,6 +603,13 @@ export function ApprovalMatrixConfig() {
                   rows.map((r) => {
                     const selectedUser = r.user_id ? userById.get(r.user_id) : null;
                     const hasError = errorRowKeys.has(r.rowKey);
+                    const currentRole = r.user_id
+                      ? (pendingRoleChanges[r.user_id] ?? selectedUser?.role ?? null)
+                      : null;
+                    const excludeForLevel = rows
+                      .filter((x) => x.rowKey !== r.rowKey && x.level_number === r.level_number && x.user_id)
+                      .map((x) => x.user_id!);
+                    const excludeSet = new Set(excludeForLevel);
                     return (
                       <TableRow key={r.rowKey} className={cn(hasError && 'bg-destructive/5')}>
                         <TableCell>
@@ -592,19 +626,15 @@ export function ApprovalMatrixConfig() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Input
-                            value={r.level_name}
-                            onChange={(e) => updateLevelMeta(r.level_number, { level_name: e.target.value })}
-                            placeholder="e.g. SCM Head"
-                            className={cn('h-8', !r.level_name.trim() && 'border-destructive')}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={r.designation}
-                            onChange={(e) => updateLevelMeta(r.level_number, { designation: e.target.value })}
-                            placeholder="e.g. Manager"
-                            className="h-8"
+                          <ApproverCombobox
+                            users={tenantUsers}
+                            loading={usersLoading}
+                            value={r.user_id}
+                            invalid={!r.user_id}
+                            excludeIds={excludeForLevel}
+                            onSelect={(uid) => updateRow(r.rowKey, { user_id: uid })}
+                            onAssignUsers={() => setAssignDialogOpen(true)}
+                            mode="name"
                           />
                         </TableCell>
                         <TableCell>
@@ -613,19 +643,41 @@ export function ApprovalMatrixConfig() {
                             loading={usersLoading}
                             value={r.user_id}
                             invalid={!r.user_id}
-                            excludeIds={rows
-                              .filter((x) => x.rowKey !== r.rowKey && x.level_number === r.level_number && x.user_id)
-                              .map((x) => x.user_id!)}
+                            excludeIds={excludeForLevel}
                             onSelect={(uid) => updateRow(r.rowKey, { user_id: uid })}
                             onAssignUsers={() => setAssignDialogOpen(true)}
+                            mode="email"
                           />
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground truncate max-w-[14rem]">
-                          {selectedUser?.email ?? '—'}
-                        </TableCell>
                         <TableCell>
-                          {selectedUser?.role ? (
-                            <Badge variant="outline" className="text-xs">{selectedUser.role}</Badge>
+                          {!r.user_id ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : canEditRoles ? (
+                            <Select
+                              value={currentRole ?? ''}
+                              onValueChange={(v) => {
+                                setPendingRoleChanges((prev) => {
+                                  const next = { ...prev };
+                                  if (v === (selectedUser?.role ?? '')) {
+                                    delete next[r.user_id!];
+                                  } else {
+                                    next[r.user_id!] = v as AppRole;
+                                  }
+                                  return next;
+                                });
+                              }}
+                            >
+                              <SelectTrigger className={cn('h-8', pendingRoleChanges[r.user_id] && 'border-primary')}>
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {APP_ROLES.map((role) => (
+                                  <SelectItem key={role} value={role}>{role}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : currentRole ? (
+                            <Badge variant="outline" className="text-xs">{currentRole}</Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
@@ -698,12 +750,15 @@ interface ComboProps {
   excludeIds: string[];
   onSelect: (userId: string) => void;
   onAssignUsers?: () => void;
+  mode?: 'name' | 'email';
 }
 
-function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect, onAssignUsers }: ComboProps) {
+function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect, onAssignUsers, mode = 'name' }: ComboProps) {
   const [open, setOpen] = useState(false);
   const selected = users.find((u) => u.user_id === value) ?? null;
   const exclude = new Set(excludeIds);
+  const placeholder = mode === 'email' ? 'Select email…' : 'Select approver…';
+  const display = selected ? (mode === 'email' ? selected.email : (selected.full_name ?? selected.email)) : placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -721,11 +776,7 @@ function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect
         >
           <span className="truncate flex items-center gap-1.5">
             {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-            {loading
-              ? 'Loading users…'
-              : selected
-              ? (selected.full_name ?? selected.email)
-              : 'Select approver…'}
+            {loading ? 'Loading users…' : display}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 ml-2 shrink-0" />
         </Button>
