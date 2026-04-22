@@ -127,30 +127,31 @@ export function DocumentVerificationStep({
   const [isGstRegistered, setIsGstRegistered] = useState<boolean | null>(
     initialData?.isGstRegistered ?? (initialData?.gst ? true : null),
   );
-  const [gstDoc, setGstDoc] = useState<DocState>(
-    initialData?.gst
-      ? {
-          status: "verified",
-          ocrData: {
-            gstin: initialData.gst.gstin,
-            legal_name: initialData.gst.legalName,
-            trade_name: initialData.gst.tradeName,
-            constitution_of_business: initialData.gst.constitutionOfBusiness,
-            principal_place_of_business: initialData.gst.principalPlaceOfBusiness,
-            address: initialData.gst.address,
-            gst_status: initialData.gst.status,
-            registration_date: initialData.gst.registrationDate,
-            taxpayer_type: initialData.gst.taxpayerType,
-            business_nature: initialData.gst.businessNature,
-            additional_places: initialData.gst.additionalPlaces,
-            jurisdiction_centre: initialData.gst.jurisdictionCentre,
-            jurisdiction_state: initialData.gst.jurisdictionState,
-          },
-          apiData: { legalName: initialData.gst.apiName },
-          nameMatchScore: initialData.gst.nameMatchScore,
-        }
-      : idleDoc,
-  );
+  const [gstDoc, setGstDoc] = useState<DocState>(() => {
+    if (!initialData?.gst) return idleDoc;
+    const data = {
+      gstin: initialData.gst.gstin,
+      legal_name: initialData.gst.legalName,
+      trade_name: initialData.gst.tradeName,
+      constitution_of_business: initialData.gst.constitutionOfBusiness,
+      principal_place_of_business: initialData.gst.principalPlaceOfBusiness,
+      address: initialData.gst.address,
+      gst_status: initialData.gst.status,
+      registration_date: initialData.gst.registrationDate,
+      taxpayer_type: initialData.gst.taxpayerType,
+      business_nature: initialData.gst.businessNature,
+      additional_places: initialData.gst.additionalPlaces,
+      jurisdiction_centre: initialData.gst.jurisdictionCentre,
+      jurisdiction_state: initialData.gst.jurisdictionState,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { legalName: initialData.gst.apiName },
+      nameMatchScore: initialData.gst.nameMatchScore,
+    };
+  });
   const [editablePrincipalPlace, setEditablePrincipalPlace] = useState<string>(
     initialData?.gst?.principalPlaceOfBusiness || initialData?.gst?.address || "",
   );
