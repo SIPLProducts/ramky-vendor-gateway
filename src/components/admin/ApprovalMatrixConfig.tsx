@@ -39,6 +39,8 @@ export function ApprovalMatrixConfig() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>('[]');
+  const isDirty = useMemo(() => JSON.stringify(rows.map(({ rowKey, ...r }) => r)) !== savedSnapshot, [rows, savedSnapshot]);
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
   const { data: tenantUserCounts = {} } = useTenantUserCounts();
@@ -96,6 +98,7 @@ export function ApprovalMatrixConfig() {
       }
     });
     setRows(flat);
+    setSavedSnapshot(JSON.stringify(flat.map(({ rowKey, ...r }) => r)));
     setLoading(false);
   };
 
@@ -230,7 +233,8 @@ export function ApprovalMatrixConfig() {
       toast({ title: 'Approval matrix saved' });
       await loadMatrix(tenantId);
     } catch (e: any) {
-      toast({ title: 'Save failed', description: e.message, variant: 'destructive' });
+      console.error('[ApprovalMatrix] Save failed:', e);
+      toast({ title: 'Save failed', description: e?.message ?? 'Unknown error — check console.', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -256,15 +260,26 @@ export function ApprovalMatrixConfig() {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {isDirty && !loading && (
+            <Badge variant="destructive" className="animate-pulse">Unsaved changes</Badge>
+          )}
           <Button variant="outline" onClick={addRow} disabled={!tenantId}>
             <Plus className="h-4 w-4 mr-1" /> Add Row
           </Button>
-          <Button onClick={saveAll} disabled={saving || !tenantId}>
+          <Button onClick={saveAll} disabled={saving || !tenantId} variant={isDirty ? 'default' : 'secondary'}>
             <Save className="h-4 w-4 mr-1" /> {saving ? 'Saving...' : 'Save All'}
           </Button>
         </div>
       </div>
+
+      {/* Save reminder banner */}
+      {isDirty && !loading && rows.length > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-sm">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <span><strong>You have unsaved changes.</strong> Click <strong>Save All</strong> to persist this matrix to the database.</span>
+        </div>
+      )}
 
       {/* Chain preview */}
       {grouped.length > 0 && (
