@@ -344,8 +344,37 @@ export default function PurchaseApproval() {
                         Re-route
                       </Button>
                     )}
-                    <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
-                    <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(vendor, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20 disabled:opacity-50"
+                              onClick={() => handleAction(vendor, 'approve')}
+                              disabled={!canAct}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />Approve
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canAct && <TooltipContent>{disabledReason}</TooltipContent>}
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="destructive"
+                              className="rounded-xl disabled:opacity-50"
+                              onClick={() => handleAction(vendor, 'reject')}
+                              disabled={!canAct}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />Reject
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canAct && <TooltipContent>{disabledReason}</TooltipContent>}
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
                 {isStuck && (
