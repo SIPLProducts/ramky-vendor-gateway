@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
 import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
+import { FieldTemplateActions } from '@/components/admin/FieldTemplateActions';
 import type { FormFieldConfig } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
 import {
@@ -371,13 +372,21 @@ export default function FormBuilder() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <h3 className="text-sm font-semibold">
                 Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
               </h3>
-              <Button size="sm" onClick={() => setEditingFieldId('new')} disabled={editingFieldId === 'new'}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Field
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <FieldTemplateActions
+                  tenantId={effectiveTenantId}
+                  stepKey={selectedStepKey}
+                  stepLabel={selectedStep?.step_label || selectedStepKey}
+                  fields={fieldsForStep}
+                />
+                <Button size="sm" onClick={() => setEditingFieldId('new')} disabled={editingFieldId === 'new'}>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Field
+                </Button>
+              </div>
             </div>
 
             {/* Inline new-field editor */}
