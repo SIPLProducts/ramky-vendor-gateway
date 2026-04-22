@@ -76,6 +76,33 @@ export default function VendorRegistration() {
     invitationToken: invitationToken || undefined,
   });
 
+  // Custom field values keyed by step_key -> field_name -> value
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, Record<string, unknown>>>({});
+
+  // Pull dynamic schema for this vendor's tenant (admin-defined extra tabs)
+  const tenantId = (existingVendor as { tenant_id?: string } | null)?.tenant_id || formData.organization.buyerCompanyId || null;
+  const { data: dynamicSchema } = useDynamicFormSchema(tenantId);
+  const customSteps = dynamicSchema?.steps || [];
+  const fieldsByStep = dynamicSchema?.fieldsByStep || {};
+
+  // Build the runtime step list: built-in 1..5 + custom tabs + Review (last)
+  const registrationSteps = useMemo(() => {
+    const list: Array<{ id: number; title: string; description: string; stepKey?: string }> = builtInSteps.map((s) => ({ ...s }));
+    customSteps.forEach((cs, i) => {
+      list.push({ id: 6 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
+    });
+    list.push({ id: 6 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
+    return list;
+  }, [customSteps]);
+
+  // Hydrate custom values from existing vendor on load
+  useEffect(() => {
+    const v = existingVendor as { custom_field_values?: Record<string, Record<string, unknown>> } | null;
+    if (v?.custom_field_values && Object.keys(v.custom_field_values).length > 0) {
+      setCustomFieldValues(v.custom_field_values);
+    }
+  }, [existingVendor]);
+
   // Validate token on mount and check authentication
   useEffect(() => {
     const validateToken = async () => {
