@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Save, Trash2, ArrowRight, ChevronsUpDown, AlertTriangle, CheckCircle2, Database, FlaskConical, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole, type AppRole } from '@/hooks/useTenant';
+import { useTenants, useAllProfilesWithRoles, useTenantUserCounts, type TenantUserWithRole, type AppRole } from '@/hooks/useTenant';
 import { useQueryClient } from '@tanstack/react-query';
 
 const APP_ROLES: AppRole[] = ['sharvi_admin', 'admin', 'customer_admin', 'finance', 'purchase', 'approver', 'vendor'];
@@ -87,9 +87,9 @@ export function ApprovalMatrixConfig() {
     [rows, savedSnapshot, pendingRoleChanges]
   );
 
-  const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
+  const { data: tenantUsers = [], isLoading: usersLoading } = useAllProfilesWithRoles();
   const { data: tenantUserCounts = {} } = useTenantUserCounts();
-  const userById = useMemo(() => new Map(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
+  const userById = useMemo(() => new Map<string, TenantUserWithRole>(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const currentTenant = activeTenants.find((t) => t.id === tenantId);
 
@@ -314,6 +314,29 @@ export function ApprovalMatrixConfig() {
       if (toDelete.length > 0) {
         console.log('[ApprovalMatrix] deleting', toDelete.length, 'orphan levels');
         await supabase.from('approval_matrix_levels').delete().in('id', toDelete);
+      }
+
+      // Auto-link selected approvers to the tenant if not already linked
+      const selectedUserIds = Array.from(new Set(rows.map((r) => r.user_id).filter((x): x is string => !!x)));
+      if (selectedUserIds.length > 0) {
+        const { data: existingLinks } = await supabase
+          .from('user_tenants')
+          .select('user_id')
+          .eq('tenant_id', tenantId)
+          .in('user_id', selectedUserIds);
+        const linkedSet = new Set((existingLinks ?? []).map((l) => l.user_id));
+        const missing = selectedUserIds.filter((uid) => !linkedSet.has(uid));
+        if (missing.length > 0) {
+          console.log('[ApprovalMatrix] auto-linking', missing.length, 'users to tenant', tenantId);
+          const { error: linkErr } = await supabase
+            .from('user_tenants')
+            .insert(missing.map((uid) => ({ user_id: uid, tenant_id: tenantId })));
+          if (linkErr) throw linkErr;
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['tenant-users-with-roles'] }),
+            queryClient.invalidateQueries({ queryKey: ['tenant-user-counts'] }),
+          ]);
+        }
       }
 
       await supabase.from('audit_logs').insert({
@@ -547,19 +570,16 @@ export function ApprovalMatrixConfig() {
         </Card>
       )}
 
-      {/* Missing-users banner */}
+      {/* Missing-users banner — only when zero profiles exist in the system */}
       {tenantId && !usersLoading && tenantUsers.length === 0 && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-md border border-dashed border-destructive/50 bg-destructive/5">
           <div className="flex items-start gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
             <div>
-              <strong>No users assigned to this tenant.</strong>{' '}
-              <span className="text-muted-foreground">Approver dropdowns will be empty until you assign at least one user.</span>
+              <strong>No users found in the system.</strong>{' '}
+              <span className="text-muted-foreground">Create users first before configuring approvers.</span>
             </div>
           </div>
-          <Button size="sm" onClick={() => setAssignDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-1" /> Assign Users
-          </Button>
         </div>
       )}
 
@@ -791,12 +811,7 @@ function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect
               </div>
             ) : users.length === 0 ? (
               <div className="p-4 text-center space-y-2">
-                <p className="text-sm text-muted-foreground">No users assigned to this tenant.</p>
-                {onAssignUsers && (
-                  <Button size="sm" onClick={onAssignUsers}>
-                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign Users
-                  </Button>
-                )}
+                <p className="text-sm text-muted-foreground">No users found in the system.</p>
               </div>
             ) : (
               <CommandEmpty>No matching users.</CommandEmpty>
