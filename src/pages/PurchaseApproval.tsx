@@ -294,10 +294,11 @@ export default function PurchaseApproval() {
           <DialogHeader><DialogTitle className="text-xl">Vendor Details - {selectedVendor?.legal_name}</DialogTitle></DialogHeader>
           {selectedVendor && (
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
+              <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted p-1">
                 <TabsTrigger value="details" className="rounded-lg">Details</TabsTrigger>
                 <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
+                <TabsTrigger value="workflow" className="rounded-lg">Workflow</TabsTrigger>
               </TabsList>
               <TabsContent value="details" className="mt-6">
                 <div className="grid grid-cols-2 gap-4 text-sm">
