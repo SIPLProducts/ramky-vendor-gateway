@@ -37,6 +37,19 @@ export interface VerifiedDocumentData {
   isMsmeRegistered?: boolean;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string };
+  // Step-1 uploaded files — lifted so parent draft saves include them
+  gstCertificateFile?: File | null;
+  panCardFile?: File | null;
+  msmeCertificateFile?: File | null;
+  cancelledChequeFile?: File | null;
+  // Authoritative completion status from the child
+  step1Status?: {
+    stage1Done: boolean;
+    stage2Done: boolean;
+    stage3Done: boolean;
+    stage4Done: boolean;
+    allDone: boolean;
+  };
 }
 
 interface DocumentVerificationStepProps {
