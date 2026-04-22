@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Bell, LogOut, Settings, User, X } from 'lucide-react';
+import { Menu, Bell, LogOut, Settings, User, X, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -18,9 +18,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useTenantContext } from '@/hooks/useTenantContext';
 
 interface MobileHeaderProps {
   userName: string;
@@ -42,6 +44,8 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const { isSubscribed, subscribe, permission } = usePushNotifications();
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const { myTenants, activeTenantId, setActiveTenantId, isSuperAdmin } = useTenantContext();
+  const showSwitcher = myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0);
 
   const handleNotificationClick = async () => {
     if (!isSubscribed && permission !== 'denied') {
@@ -60,7 +64,26 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
       </Link>
 
       {/* Right Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
+        {showSwitcher && (
+          <Select
+            value={activeTenantId ?? '__all__'}
+            onValueChange={(v) => setActiveTenantId(v === '__all__' ? null : v)}
+          >
+            <SelectTrigger className="h-8 w-[120px] gap-1 text-xs px-2">
+              <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Tenant" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {isSuperAdmin && <SelectItem value="__all__">All Tenants</SelectItem>}
+              {myTenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {/* Notification Bell */}
         <Button
           variant="ghost"

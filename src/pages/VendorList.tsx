@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useVendors, VendorRow } from '@/hooks/useVendors';
+import { useTenantContext } from '@/hooks/useTenantContext';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { ValidationResult } from '@/types/vendor';
@@ -78,6 +79,10 @@ export default function VendorList() {
 
   // Fetch all vendors from database
   const { data: vendors, isLoading, refetch } = useVendors();
+  const { activeTenantId, myTenants, setActiveTenantId, isSuperAdmin } = useTenantContext();
+  const activeTenantName = activeTenantId
+    ? myTenants.find((t) => t.id === activeTenantId)?.name ?? 'selected tenant'
+    : null;
 
   // Fetch buyer companies (tenants) for filter
   const { data: buyerCompanies } = useQuery({
@@ -321,7 +326,19 @@ export default function VendorList() {
                     {paginatedVendors.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No vendors found matching your criteria
+                          {activeTenantName ? (
+                            <div className="space-y-2">
+                              <p className="font-medium">No vendors found for {activeTenantName}</p>
+                              <p className="text-sm">Try switching the tenant from the header above{isSuperAdmin ? ' or view All Tenants' : ''}.</p>
+                              {isSuperAdmin && (
+                                <Button variant="link" size="sm" onClick={() => setActiveTenantId(null)}>
+                                  View All Tenants
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            'No vendors found matching your criteria'
+                          )}
                         </TableCell>
                       </TableRow>
                     ) : (
