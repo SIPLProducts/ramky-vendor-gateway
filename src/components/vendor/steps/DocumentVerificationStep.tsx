@@ -54,6 +54,8 @@ interface DocState {
   fileName?: string;
   fileSize?: number;
   ocrData?: Record<string, any>;
+  /** Original OCR snapshot — used to power the "Edited" badge and "Reset to OCR" link */
+  originalOcrData?: Record<string, any>;
   apiData?: Record<string, any>;
   nameMatchScore?: number;
   errorMessage?: string;
