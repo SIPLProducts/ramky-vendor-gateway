@@ -39,6 +39,8 @@ export function ApprovalMatrixConfig() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>('[]');
+  const isDirty = useMemo(() => JSON.stringify(rows.map(({ rowKey, ...r }) => r)) !== savedSnapshot, [rows, savedSnapshot]);
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
   const { data: tenantUserCounts = {} } = useTenantUserCounts();
