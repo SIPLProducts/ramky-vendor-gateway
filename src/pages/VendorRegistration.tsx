@@ -285,25 +285,14 @@ export default function VendorRegistration() {
       const msmeOk = verifiedData.isMsmeRegistered === false || !!verifiedData.msme;
       return gstOk && !!verifiedData.pan && msmeOk && !!verifiedData.bank;
     }
-    // Steps 5 (Commercial) and 6 (Bank) still allow inline verification
-    if (currentStep === 5) {
-      return stepValidationState[5] !== false;
-    }
-    if (currentStep === 6) {
-      return stepValidationState[6] === true;
-    }
+    // Steps 2–5 are presentational — Continue is always allowed; the embedded
+    // form's own validation (zod) gates submission of each step.
     return true;
   };
 
   const getValidationMessage = () => {
     if (currentStep === 1 && !canProceedFromCurrentStep()) {
       return 'Complete each stage in order: GST → PAN → MSME → Bank';
-    }
-    if (currentStep === 5 && stepValidationState[5] === false) {
-      return 'Please verify GST, PAN, and MSME details';
-    }
-    if (currentStep === 6 && stepValidationState[6] !== true) {
-      return 'Please verify bank account details';
     }
     return undefined;
   };
@@ -337,14 +326,12 @@ export default function VendorRegistration() {
           if (existingFormData.organization?.legalName) filledSteps.push(2);
           if (existingFormData.address?.registeredAddress) filledSteps.push(3);
           if (existingFormData.contact?.ceoName) filledSteps.push(4);
-          if (existingFormData.statutory?.entityType) filledSteps.push(5);
-          if (existingFormData.bank?.bankName) filledSteps.push(6);
-          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(7);
+          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
           setCompletedSteps(filledSteps);
           // Go to the first incomplete step or step 1
-          const allSteps = [1, 2, 3, 4, 5, 6, 7, 8];
+          const allSteps = [1, 2, 3, 4, 5, 6];
           const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-          setCurrentStep(nextStep || 8);
+          setCurrentStep(nextStep || 6);
         } else {
           setIsSubmitted(true);
           setIsEditMode(false);
@@ -411,7 +398,7 @@ export default function VendorRegistration() {
   const completeness = useFormCompleteness(formData, verifiedData);
 
 
-  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6, 7]); };
+  const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5]); };
 
   // Pure helper — merges Step-1 verified data into a form snapshot.
   // Used by both live stage updates and Save Draft so they always agree.
@@ -470,6 +457,8 @@ export default function VendorRegistration() {
         ifscCode: data.bank?.ifsc || prev.bank.ifscCode,
         bankName: data.bank?.bankName || prev.bank.bankName,
         branchName: data.bank?.branchName || prev.bank.branchName,
+        accountType: (data.bank?.accountType as BankDetails['accountType']) || prev.bank.accountType || 'current',
+        bankAddress: data.bank?.bankAddress || prev.bank.bankAddress,
         cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
       },
     };
@@ -501,18 +490,22 @@ export default function VendorRegistration() {
 
 
   const handleStepComplete = (step: number, data: unknown) => {
-    // step is the new step number (2..6); map to form key
+    // step is the new step number; map to form key
     const stepKeys: Record<number, keyof VendorFormData> = {
-      2: 'organization',
       3: 'address',
       4: 'contact',
-      5: 'statutory',
-      6: 'bank',
     };
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
     setCurrentStep(step + 1);
+  };
+
+  // Step 2 emits both organization + statutory (statutory & memberships moved here)
+  const handleOrganizationComplete = (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => {
+    setFormData((prev) => ({ ...prev, organization: data.organization, statutory: data.statutory }));
+    if (!completedSteps.includes(2)) setCompletedSteps((prev) => [...prev, 2]);
+    setCurrentStep(3);
   };
 
   const handleFinancialInfraComplete = (data: { financial: FinancialDetails; infrastructure: InfrastructureDetails; qhse: QHSEDetails }) => {
@@ -522,8 +515,8 @@ export default function VendorRegistration() {
       infrastructure: data.infrastructure,
       qhse: data.qhse,
     }));
-    if (!completedSteps.includes(7)) setCompletedSteps((prev) => [...prev, 7]);
-    setCurrentStep(8);
+    if (!completedSteps.includes(5)) setCompletedSteps((prev) => [...prev, 5]);
+    setCurrentStep(6);
   };
 
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
@@ -588,23 +581,18 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
-    const legalName = formData.organization.legalName;
     switch (currentStep) {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
       case 2:
-        return <OrganizationStep data={formData.organization} onNext={(data) => handleStepComplete(2, data)} />;
+        return <OrganizationStep data={formData.organization} statutoryData={formData.statutory} onNext={handleOrganizationComplete} />;
       case 3:
         return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
         return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
       case 5:
-        return <CommercialStep data={formData.statutory} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(5, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(5)} />;
-      case 6:
-        return <BankDetailsStep data={formData.bank} legalName={legalName} vendorId={vendorId} onNext={(data) => handleStepComplete(6, data)} onBack={handleBack} onValidationStateChange={handleValidationStateChange(6)} />;
-      case 7:
         return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
-      case 8:
+      case 6:
         return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
       default:
         return null;
@@ -779,10 +767,8 @@ export default function VendorRegistration() {
                   {currentStep === 2 && <span className="text-lg">🏢</span>}
                   {currentStep === 3 && <span className="text-lg">📍</span>}
                   {currentStep === 4 && <span className="text-lg">👤</span>}
-                  {currentStep === 5 && <span className="text-lg">📋</span>}
-                  {currentStep === 6 && <span className="text-lg">🏦</span>}
-                  {currentStep === 7 && <span className="text-lg">💰</span>}
-                  {currentStep === 8 && <span className="text-lg">✓</span>}
+                  {currentStep === 5 && <span className="text-lg">💰</span>}
+                  {currentStep === 6 && <span className="text-lg">✓</span>}
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">
