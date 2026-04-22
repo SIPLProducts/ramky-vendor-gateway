@@ -35,6 +35,8 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading, isOffline: statsOffline, cacheAge: statsCacheAge } = useVendorStats();
   const { data: recentVendors, isLoading: vendorsLoading, isOffline: vendorsOffline, cacheAge: vendorsCacheAge } = useVendors();
   const { data: buyerCompanies } = useBuyerCompanies();
+  const { data: stuckCount } = useStuckApprovalVendors();
+  const isAdmin = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
   const queryClient = useQueryClient();
 
   // Subscribe to real-time updates
