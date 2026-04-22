@@ -282,6 +282,33 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {isAdmin && (
+          <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/20 dark:to-red-950/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Stuck — No Approver
+              </CardTitle>
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-500 to-red-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                <AlertTriangle className="h-5 w-5 text-white" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <Skeleton className="h-9 w-20" />
+              ) : (
+                <>
+                  <div className="text-4xl font-bold text-rose-600 dark:text-rose-400">{stuckCount ?? 0}</div>
+                  <Link to="/admin/configuration">
+                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-rose-600 dark:text-rose-400">
+                      Configure Approval Matrix <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Content Grid */}
