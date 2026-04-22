@@ -688,9 +688,23 @@ export function DocumentVerificationStep({
                   panDoc.status === "verifying" ? "Verifying…" : ""
                 }
                 verifiedFields={
-                  <div className="grid md:grid-cols-2 gap-3">
-                    <ReadOnlyField label="PAN Number" value={panDoc.ocrData?.pan_number} mono />
-                    <ReadOnlyField label="Holder Name" value={panDoc.ocrData?.holder_name} />
+                  <div className="space-y-3">
+                    <ReviewBanner />
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <EditableOcrField
+                        label="PAN Number"
+                        value={panDoc.ocrData?.pan_number}
+                        originalValue={panDoc.originalOcrData?.pan_number}
+                        onChange={(v) => setOcrField(setPanDoc, "pan_number", v.toUpperCase())}
+                        mono
+                      />
+                      <EditableOcrField
+                        label="Holder Name"
+                        value={panDoc.ocrData?.holder_name}
+                        originalValue={panDoc.originalOcrData?.holder_name}
+                        onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
+                      />
+                    </div>
                   </div>
                 }
               />
