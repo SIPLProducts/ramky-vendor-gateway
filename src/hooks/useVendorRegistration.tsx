@@ -564,7 +564,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       // Initialise approval matrix progress (best-effort)
       try {
-        await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendor.id } });
+        const { data: routeData } = await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendor.id } });
+        const msg = (routeData as { message?: string } | null)?.message ?? '';
+        if (/no matrix/i.test(msg) || /skipping/i.test(msg)) {
+          toast({
+            title: 'Approval matrix not configured',
+            description: 'Your submission was received, but no SCM approval matrix is configured for this buyer company. An admin must set it up before approvers can act.',
+            variant: 'destructive',
+          });
+        }
       } catch (e) {
         console.warn('route-vendor-approval failed (non-blocking):', e);
       }

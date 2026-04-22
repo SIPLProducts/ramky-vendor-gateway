@@ -20,9 +20,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
-import { useVendors, usePurchaseAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
+import { ApprovalTimeline } from '@/components/vendor/ApprovalTimeline';
+import { useVendors, usePurchaseAction, useBuyerCompanies, useReRouteApproval, VendorRow } from '@/hooks/useVendors';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
 import { ValidationResult } from '@/types/vendor';
 import {
   Search,
@@ -34,6 +40,8 @@ import {
   Loader2,
   FolderOpen,
   MessageSquare,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -51,6 +59,27 @@ export default function PurchaseApproval() {
   const { data: pendingVendors, isLoading } = useVendors(['purchase_review']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const purchaseAction = usePurchaseAction();
+  const reRoute = useReRouteApproval();
+  const { userRole } = useAuth();
+  const canReRoute = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
+
+  // Detect vendors stuck in purchase_review with NO approval progress rows (missing matrix)
+  const vendorIds = (pendingVendors ?? []).map(v => v.id);
+  const { data: stuckIds } = useQuery({
+    queryKey: ['stuck-progress-ids', vendorIds.sort().join(',')],
+    queryFn: async (): Promise<Set<string>> => {
+      if (vendorIds.length === 0) return new Set();
+      const { data, error } = await supabase
+        .from('vendor_approval_progress')
+        .select('vendor_id')
+        .in('vendor_id', vendorIds);
+      if (error) throw error;
+      const withProgress = new Set((data ?? []).map(d => d.vendor_id));
+      return new Set(vendorIds.filter(id => !withProgress.has(id)));
+    },
+    enabled: vendorIds.length > 0,
+    staleTime: 30 * 1000,
+  });
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
     const matchesSearch =
@@ -187,7 +216,9 @@ export default function PurchaseApproval() {
             <p className="text-muted-foreground mt-2">No vendors pending purchase approval.</p>
           </CardContent></Card>
         ) : (
-          filteredVendors.map((vendor) => (
+          filteredVendors.map((vendor) => {
+            const isStuck = stuckIds?.has(vendor.id) ?? false;
+            return (
             <Card key={vendor.id} className="border-0 shadow-md card-interactive">
               <CardContent className="p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -205,7 +236,7 @@ export default function PurchaseApproval() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {vendor.finance_comments && (
                       <Button
                         variant="outline"
@@ -219,13 +250,42 @@ export default function PurchaseApproval() {
                       </Button>
                     )}
                     <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}><Eye className="h-4 w-4 mr-2" />Details</Button>
+                    {canReRoute && isStuck && (
+                      <Button
+                        variant="outline"
+                        className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10"
+                        onClick={() => reRoute.mutate(vendor.id)}
+                        disabled={reRoute.isPending}
+                      >
+                        {reRoute.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                        Re-route
+                      </Button>
+                    )}
                     <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/20" onClick={() => handleAction(vendor, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
                     <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(vendor, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
                   </div>
                 </div>
+                {isStuck && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>No SCM approval matrix configured</AlertTitle>
+                    <AlertDescription className="flex items-center justify-between gap-3 flex-wrap">
+                      <span>
+                        This vendor has no approval levels seeded. An admin must configure the matrix for{' '}
+                        <strong>{getBuyerCompanyName(vendor.tenant_id)}</strong>, then click <em>Re-route</em>.
+                      </span>
+                      {canReRoute && (
+                        <Link to="/admin/configuration" className="underline font-medium whitespace-nowrap">
+                          Open Approval Matrix →
+                        </Link>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -234,10 +294,11 @@ export default function PurchaseApproval() {
           <DialogHeader><DialogTitle className="text-xl">Vendor Details - {selectedVendor?.legal_name}</DialogTitle></DialogHeader>
           {selectedVendor && (
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
+              <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted p-1">
                 <TabsTrigger value="details" className="rounded-lg">Details</TabsTrigger>
                 <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
+                <TabsTrigger value="workflow" className="rounded-lg">Workflow</TabsTrigger>
               </TabsList>
               <TabsContent value="details" className="mt-6">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -258,6 +319,9 @@ export default function PurchaseApproval() {
               </TabsContent>
               <TabsContent value="validations" className="mt-6">
                 <ValidationStatus validations={mappedValidations} />
+              </TabsContent>
+              <TabsContent value="workflow" className="mt-6">
+                <ApprovalTimeline vendorId={selectedVendor.id} />
               </TabsContent>
             </Tabs>
           )}
