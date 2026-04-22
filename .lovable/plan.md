@@ -1,73 +1,44 @@
 
 
-## Reorder approval flow: Purchase matrix (sequential) → Finance → SAP sync
+## Remove Penny Drop validation — keep bank account validation only
 
-### New flow
-```text
-Vendor submits
-   ↓
-purchase_review  (Purchase / SCM matrix — Level N → … → Level 1, sequential)
-   ↓ (after final Purchase level approves)
-finance_review   (single Finance approval)
-   ↓ (Finance approves)
-purchase_approved  (ready for SAP sync)
-   ↓
-sap_synced
-```
+### What changes
 
-Rejection at any stage → `purchase_rejected` (Purchase) or `finance_rejected` (Finance).
-Finance "Clarify" still sends vendor back to `draft`.
+**1. Finance Review screen (`src/pages/FinanceReview.tsx`)**
+- Remove the `isApproveDisabled` gating that requires `pennydrop_verification_status === 'verified'`.
+- Remove any "Penny Drop" status badge/section from the vendor details dialog.
+- Approve and Reject buttons become always enabled for vendors in `finance_review` (and `validation_failed` for re-review).
+- Add the **Purchase / SCM Approval Trail** section (level name, approver, status, timestamp, comments from `vendor_approval_progress`).
 
-### Changes
+**2. Vendor Registration — Financial step**
+- `src/components/vendor/steps/FinancialStep.tsx` and `FinancialInfrastructureStep.tsx`: remove the Penny Drop verify button/UI block. Keep the existing **Bank Account Verification** (validate-bank) flow as the sole bank check.
+- `src/hooks/useValidationOrchestrator.tsx` / `useFieldValidation.tsx`: drop any `penny_drop` step from the orchestrated validations.
 
-**1. Submission** — `src/hooks/useVendorRegistration.tsx`
-- On submit, set vendor status to `purchase_review` (was `finance_review`).
-- Immediately invoke `route-vendor-approval` so Purchase matrix levels are seeded as `pending` rows in `vendor_approval_progress`.
+**3. Validation hook (`src/hooks/useVendorValidations.tsx`)**
+- Remove any penny-drop invocation. Only `validate-bank` runs for bank verification.
 
-**2. Edge function** — `supabase/functions/process-approval-action/index.ts`
-- When the final Purchase matrix level (level_number = 1) approves, set vendor status to `finance_review` (currently sets `purchase_approved`).
-- Intermediate level approvals: no vendor status change (advance to next level only).
-- Reject at any Purchase level → `purchase_rejected`.
+**4. Edge function**
+- Stop invoking `validate-penny-drop` from the app. The function file itself can stay (unused) — no deletion needed unless you want it gone.
 
-**3. Finance action** — `src/hooks/useVendors.tsx` `useFinanceAction`
-- `approve` → status `purchase_approved` (ready for SAP sync), set `finance_reviewed_by/at`.
-- `reject` → `finance_rejected` (unchanged).
-- `clarify` → unchanged (vendor back to `draft`).
+**5. Database**
+- No schema change required. The columns `pennydrop_verification_status`, `pennydrop_utr`, `pennydrop_verified_at` on `vendors` will simply be ignored by the UI. (We will not drop columns to avoid touching historical data.)
 
-**4. Purchase action page** — `src/pages/PurchaseApproval.tsx` / `useMyApprovals`
-- Purchase approvers act through the matrix via `process-approval-action` (already wired). The legacy `usePurchaseAction` direct-approve is removed/disabled to prevent bypassing the matrix.
+**6. Approval flow (unchanged)**
+- Submit → Purchase/SCM matrix (sequential) → Finance review → Finance approves → `purchase_approved` → SAP sync. This was already implemented.
 
-**5. SAP sync** — unchanged
-- `useSAPSync` still triggers from vendors in `purchase_approved`.
-
-**6. RLS migration**
-- Update `Vendors can update own draft data` policy to allow status transition to `purchase_review` on submit:
-  ```sql
-  WITH CHECK (
-    user_id = auth.uid()
-    AND status = ANY (ARRAY[
-      'draft','submitted','validation_pending','purchase_review'
-    ]::vendor_status[])
-  )
-  ```
-
-**7. Notifications** — `supabase/functions/send-status-notification/index.ts`
-- Update copy: `purchase_review` = "Awaiting Purchase/SCM approval", `finance_review` = "Awaiting Finance review", `purchase_approved` = "Approved — pending SAP sync".
-
-**8. Dashboard / labels**
-- Stat buckets in `useVendorStats` already key off statuses; counts re-bucket automatically. Update wording on dashboard cards from "Pending Finance" / "Pending Purchase" to reflect new order.
+### Hook addition
+- `useVendorApprovalTrail(vendorId)` in `src/hooks/useVendors.tsx` — fetches `vendor_approval_progress` joined with `approval_matrix_levels` + approver `profiles`, ordered by `level_number DESC`, used by the Finance Review dialog to show the Purchase/SCM trail with comments.
 
 ### Out of scope
-- No changes to SAP sync logic or Cloudflare Worker.
-- No changes to approval matrix admin UI (admins continue configuring SCM/Purchase levels in Approval Matrix).
-- No new tables.
+- No removal of `validate-penny-drop` edge function file or vendor table columns.
+- No change to bank validation logic.
+- No change to approval ordering, SAP sync, or notifications.
 
 ### Files touched
-- `src/hooks/useVendorRegistration.tsx`
-- `src/hooks/useVendors.tsx`
-- `src/pages/PurchaseApproval.tsx` (route through matrix only)
-- `src/pages/Dashboard.tsx` (label tweaks)
-- `supabase/functions/process-approval-action/index.ts`
-- `supabase/functions/send-status-notification/index.ts`
-- New migration: vendor submit RLS allows `purchase_review`
+- `src/pages/FinanceReview.tsx` — remove penny-drop gating + UI; add Purchase/SCM trail section
+- `src/components/vendor/steps/FinancialStep.tsx` — remove penny-drop UI
+- `src/components/vendor/steps/FinancialInfrastructureStep.tsx` — remove penny-drop UI (if present)
+- `src/hooks/useVendorValidations.tsx` — remove penny-drop call
+- `src/hooks/useValidationOrchestrator.tsx` — drop penny-drop step
+- `src/hooks/useVendors.tsx` — add `useVendorApprovalTrail` hook
 
