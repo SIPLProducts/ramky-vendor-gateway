@@ -245,9 +245,14 @@ export function ApprovalMatrixConfig() {
           <Select value={tenantId} onValueChange={setTenantId}>
             <SelectTrigger className="w-72"><SelectValue placeholder="Select tenant" /></SelectTrigger>
             <SelectContent>
-              {activeTenants.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
+              {activeTenants.map((t) => {
+                const count = tenantUserCounts[t.id] ?? 0;
+                return (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} · {count} user{count === 1 ? '' : 's'}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
