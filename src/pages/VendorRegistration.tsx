@@ -296,15 +296,6 @@ export default function VendorRegistration() {
     }
     return true;
   };
-    // Steps 5 (Commercial) and 6 (Bank) still allow inline verification
-    if (currentStep === 5) {
-      return stepValidationState[5] !== false;
-    }
-    if (currentStep === 6) {
-      return stepValidationState[6] === true;
-    }
-    return true;
-  };
 
   const getValidationMessage = () => {
     if (currentStep === 1 && !canProceedFromCurrentStep()) {
