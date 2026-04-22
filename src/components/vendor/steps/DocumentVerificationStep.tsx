@@ -821,13 +821,43 @@ export function DocumentVerificationStep({
                   bankDoc.status === "verifying" ? "Penny-drop verification…" : ""
                 }
                 verifiedFields={
-                  <div className="grid md:grid-cols-2 gap-3">
-                    <ReadOnlyField label="Account Number" value={bankDoc.ocrData?.account_number} mono />
-                    <ReadOnlyField label="IFSC Code" value={bankDoc.ocrData?.ifsc_code} mono />
-                    <ReadOnlyField label="Bank Name" value={bankDoc.ocrData?.bank_name} />
-                    <ReadOnlyField label="Branch" value={bankDoc.ocrData?.branch_name} />
-                    <div className="md:col-span-2">
-                      <ReadOnlyField label="Account Holder Name" value={bankDoc.ocrData?.account_holder_name} />
+                  <div className="space-y-3">
+                    <ReviewBanner />
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <EditableOcrField
+                        label="Account Number"
+                        value={bankDoc.ocrData?.account_number}
+                        originalValue={bankDoc.originalOcrData?.account_number}
+                        onChange={(v) => setOcrField(setBankDoc, "account_number", v)}
+                        mono
+                      />
+                      <EditableOcrField
+                        label="IFSC Code"
+                        value={bankDoc.ocrData?.ifsc_code}
+                        originalValue={bankDoc.originalOcrData?.ifsc_code}
+                        onChange={(v) => setOcrField(setBankDoc, "ifsc_code", v.toUpperCase())}
+                        mono
+                      />
+                      <EditableOcrField
+                        label="Bank Name"
+                        value={bankDoc.ocrData?.bank_name}
+                        originalValue={bankDoc.originalOcrData?.bank_name}
+                        onChange={(v) => setOcrField(setBankDoc, "bank_name", v)}
+                      />
+                      <EditableOcrField
+                        label="Branch"
+                        value={bankDoc.ocrData?.branch_name}
+                        originalValue={bankDoc.originalOcrData?.branch_name}
+                        onChange={(v) => setOcrField(setBankDoc, "branch_name", v)}
+                      />
+                      <div className="md:col-span-2">
+                        <EditableOcrField
+                          label="Account Holder Name"
+                          value={bankDoc.ocrData?.account_holder_name}
+                          originalValue={bankDoc.originalOcrData?.account_holder_name}
+                          onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
+                        />
+                      </div>
                     </div>
                   </div>
                 }
