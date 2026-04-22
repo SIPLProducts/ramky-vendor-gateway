@@ -160,7 +160,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   };
 
   // Convert form data to database format
-  const formDataToVendorRecord = (formData: VendorFormData, userId: string | null) => {
+  const formDataToVendorRecord = (formData: VendorFormData & { customFieldValues?: Record<string, Record<string, unknown>> }, userId: string | null) => {
     return {
       user_id: userId,
       tenant_id: formData.organization.buyerCompanyId || null,
@@ -318,6 +318,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // Declaration
       self_declared: formData.declaration.selfDeclared,
       terms_accepted: formData.declaration.termsAccepted,
+      // Admin-defined custom fields
+      ...(formData.customFieldValues ? { custom_field_values: formData.customFieldValues } : {}),
     } as VendorRecord;
   };
 
