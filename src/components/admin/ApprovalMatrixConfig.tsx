@@ -12,7 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Plus, Save, Trash2, ArrowRight, ChevronsUpDown, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useTenants, useTenantUsersWithRoles, type TenantUserWithRole } from '@/hooks/useTenant';
+import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole } from '@/hooks/useTenant';
+import { AssignUsersToTenantDialog } from './AssignUsersToTenantDialog';
+import { UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Row {
@@ -39,7 +41,10 @@ export function ApprovalMatrixConfig() {
   const [saving, setSaving] = useState(false);
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
+  const { data: tenantUserCounts = {} } = useTenantUserCounts();
   const userById = useMemo(() => new Map(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const currentTenant = activeTenants.find((t) => t.id === tenantId);
 
   useEffect(() => {
     if (activeTenants.length > 0 && !tenantId) {

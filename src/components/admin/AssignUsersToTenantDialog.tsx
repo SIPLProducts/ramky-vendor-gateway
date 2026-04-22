@@ -129,13 +129,13 @@ export function AssignUsersToTenantDialog({ open, onOpenChange, tenantId, tenant
             <div className="p-6 text-sm text-center text-muted-foreground">No users match your search.</div>
           ) : (
             filtered.map((p) => {
-              const checked = selected.has(p.id);
+              const checked = selected.has(p.user_id);
               return (
                 <label
-                  key={p.id}
+                  key={p.user_id}
                   className="flex items-center gap-3 p-3 hover:bg-accent cursor-pointer"
                 >
-                  <Checkbox checked={checked} onCheckedChange={() => toggle(p.id)} />
+                  <Checkbox checked={checked} onCheckedChange={() => toggle(p.user_id)} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{p.full_name ?? '—'}</div>
                     <div className="text-xs text-muted-foreground truncate">{p.email}</div>
