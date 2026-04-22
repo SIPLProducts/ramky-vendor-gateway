@@ -285,12 +285,24 @@ export function DocumentVerificationStep({
       fileName: file.name,
       fileSize: file.size,
       ocrData: ocrRes.extracted,
+      originalOcrData: ocrRes.extracted,
       apiData: v.apiData,
       nameMatchScore: score,
       verifiedAt: Date.now(),
       ocrModel: ocrRes.model,
     });
   };
+
+  // Mutate a single OCR field on a verified doc — used by EditableOcrField for manual corrections.
+  const setOcrField = useCallback(
+    (setDoc: React.Dispatch<React.SetStateAction<DocState>>, key: string, value: any) => {
+      setDoc((prev) => ({
+        ...prev,
+        ocrData: { ...(prev.ocrData || {}), [key]: value },
+      }));
+    },
+    [],
+  );
 
   const effectiveLegalName = useMemo(() => {
     if (isGstRegistered === true) return gstDoc.ocrData?.legal_name || gstDoc.apiData?.legalName;
