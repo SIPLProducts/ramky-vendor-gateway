@@ -1174,10 +1174,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function GstVerifiedDetails({
   ocr,
+  original,
+  onChangeField,
   editablePrincipalPlace,
   onChangePrincipalPlace,
 }: {
   ocr?: Record<string, any>;
+  original?: Record<string, any>;
+  onChangeField: (key: string, value: any) => void;
   editablePrincipalPlace: string;
   onChangePrincipalPlace: (v: string) => void;
 }) {
@@ -1189,14 +1193,37 @@ function GstVerifiedDetails({
   const hasRegistrationSection = !!(ocr.gst_status || ocr.registration_date || ocr.taxpayer_type || businessNature.length);
   return (
     <div className="space-y-5">
+      <ReviewBanner />
+
       {/* Identity */}
       <div className="space-y-2">
         <SectionHeading>Identity</SectionHeading>
         <div className="grid md:grid-cols-2 gap-3">
-          <ReadOnlyField label="Legal Name" value={ocr.legal_name} />
-          <ReadOnlyField label="Trade Name" value={ocr.trade_name} />
-          <ReadOnlyField label="GSTIN" value={ocr.gstin} mono />
-          <ReadOnlyField label="Constitution" value={ocr.constitution_of_business} />
+          <EditableOcrField
+            label="Legal Name"
+            value={ocr.legal_name}
+            originalValue={original?.legal_name}
+            onChange={(v) => onChangeField("legal_name", v)}
+          />
+          <EditableOcrField
+            label="Trade Name"
+            value={ocr.trade_name}
+            originalValue={original?.trade_name}
+            onChange={(v) => onChangeField("trade_name", v)}
+          />
+          <EditableOcrField
+            label="GSTIN"
+            value={ocr.gstin}
+            originalValue={original?.gstin}
+            onChange={(v) => onChangeField("gstin", v.toUpperCase())}
+            mono
+          />
+          <EditableOcrField
+            label="Constitution"
+            value={ocr.constitution_of_business}
+            originalValue={original?.constitution_of_business}
+            onChange={(v) => onChangeField("constitution_of_business", v)}
+          />
         </div>
       </div>
 
@@ -1214,10 +1241,20 @@ function GstVerifiedDetails({
               </div>
             )}
             {ocr.registration_date && (
-              <ReadOnlyField label="Registration Date" value={ocr.registration_date} />
+              <EditableOcrField
+                label="Registration Date"
+                value={ocr.registration_date}
+                originalValue={original?.registration_date}
+                onChange={(v) => onChangeField("registration_date", v)}
+              />
             )}
             {ocr.taxpayer_type && (
-              <ReadOnlyField label="Taxpayer Type" value={ocr.taxpayer_type} />
+              <EditableOcrField
+                label="Taxpayer Type"
+                value={ocr.taxpayer_type}
+                originalValue={original?.taxpayer_type}
+                onChange={(v) => onChangeField("taxpayer_type", v)}
+              />
             )}
             {businessNature.length > 0 && (
               <div className="md:col-span-2">
@@ -1264,10 +1301,20 @@ function GstVerifiedDetails({
           <SectionHeading>Jurisdiction</SectionHeading>
           <div className="grid md:grid-cols-2 gap-3">
             {ocr.jurisdiction_centre && (
-              <ReadOnlyField label="Centre Jurisdiction" value={ocr.jurisdiction_centre} />
+              <EditableOcrField
+                label="Centre Jurisdiction"
+                value={ocr.jurisdiction_centre}
+                originalValue={original?.jurisdiction_centre}
+                onChange={(v) => onChangeField("jurisdiction_centre", v)}
+              />
             )}
             {ocr.jurisdiction_state && (
-              <ReadOnlyField label="State Jurisdiction" value={ocr.jurisdiction_state} />
+              <EditableOcrField
+                label="State Jurisdiction"
+                value={ocr.jurisdiction_state}
+                originalValue={original?.jurisdiction_state}
+                onChange={(v) => onChangeField("jurisdiction_state", v)}
+              />
             )}
           </div>
         </div>
