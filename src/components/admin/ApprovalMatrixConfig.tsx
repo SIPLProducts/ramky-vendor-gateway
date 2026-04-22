@@ -570,19 +570,16 @@ export function ApprovalMatrixConfig() {
         </Card>
       )}
 
-      {/* Missing-users banner */}
+      {/* Missing-users banner — only when zero profiles exist in the system */}
       {tenantId && !usersLoading && tenantUsers.length === 0 && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-md border border-dashed border-destructive/50 bg-destructive/5">
           <div className="flex items-start gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
             <div>
-              <strong>No users assigned to this tenant.</strong>{' '}
-              <span className="text-muted-foreground">Approver dropdowns will be empty until you assign at least one user.</span>
+              <strong>No users found in the system.</strong>{' '}
+              <span className="text-muted-foreground">Create users first before configuring approvers.</span>
             </div>
           </div>
-          <Button size="sm" onClick={() => setAssignDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-1" /> Assign Users
-          </Button>
         </div>
       )}
 
