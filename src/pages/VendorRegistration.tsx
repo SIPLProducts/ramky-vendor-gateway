@@ -535,8 +535,14 @@ export default function VendorRegistration() {
   const handleSaveAsDraft = async () => {
     try {
       setAutoSaveState('saving');
-      await saveVendor(formData);
-      lastSavedHashRef.current = JSON.stringify(formData);
+      // On Step 1, build payload from the freshest lifted snapshot so we don't
+      // miss the user's latest OCR edit / verification (state may not have flushed yet).
+      const payload =
+        currentStep === 1 && latestStep1DataRef.current
+          ? mergeVerifiedDataIntoForm(formData, latestStep1DataRef.current)
+          : formData;
+      await saveVendor(payload);
+      lastSavedHashRef.current = JSON.stringify(payload);
       setLastSavedAt(new Date());
       setAutoSaveState('saved');
       toast({ title: 'Draft Saved', description: 'Your progress has been saved.' });
