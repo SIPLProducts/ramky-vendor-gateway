@@ -1232,18 +1232,45 @@ export type Database = {
         Row: {
           account_number: string | null
           account_type: string | null
+          authorized_distributor_address: string | null
+          authorized_distributor_name: string | null
+          bank_address: string | null
+          bank_branch_name: string | null
           bank_name: string | null
+          bank_verification_status: string | null
+          branch_address: string | null
+          branch_city: string | null
+          branch_contact_designation: string | null
+          branch_contact_email: string | null
+          branch_contact_fax: string | null
+          branch_contact_name: string | null
+          branch_contact_phone: string | null
+          branch_country: string | null
           branch_name: string | null
+          branch_pincode: string | null
+          branch_state: string | null
+          branch_website: string | null
+          certifications: Json | null
           communication_address: string | null
           communication_city: string | null
           communication_pincode: string | null
           communication_state: string | null
           created_at: string
           credit_period_expected: number | null
+          customer_service_designation: string | null
+          customer_service_email: string | null
+          customer_service_name: string | null
+          customer_service_phone: string | null
+          dg_capacity: string | null
+          enlistments: Json | null
           entity_type: string | null
+          environmental_issues: string | null
+          equipment_availability: string | null
+          esi_number: string | null
           finance_comments: string | null
           finance_reviewed_at: string | null
           finance_reviewed_by: string | null
+          firm_registration_no: string | null
           gst_additional_places: Json | null
           gst_business_nature: string[] | null
           gst_constitution_of_business: string | null
@@ -1254,32 +1281,81 @@ export type Database = {
           gst_registration_date: string | null
           gst_status: string | null
           gst_taxpayer_type: string | null
+          gst_verification_status: string | null
           gstin: string | null
+          health_issues: string | null
           id: string
+          iec_no: string | null
           ifsc_code: string | null
           industry_type: string | null
+          inspection_testing: string | null
           invitation_id: string | null
           is_gst_registered: boolean | null
           is_msme_registered: boolean | null
+          labour_permit_no: string | null
+          lead_time_required: string | null
           legal_name: string | null
+          machinery_availability: string | null
+          major_customer1: string | null
+          major_customer2: string | null
+          major_customer3: string | null
+          manpower: string | null
+          manufacturing_address: string | null
+          manufacturing_address_line2: string | null
+          manufacturing_address_line3: string | null
+          manufacturing_city: string | null
+          manufacturing_fax: string | null
+          manufacturing_phone: string | null
+          manufacturing_pincode: string | null
+          manufacturing_state: string | null
+          memberships: Json | null
+          micr_code: string | null
           msme_category: string | null
           msme_number: string | null
+          msme_verification_status: string | null
+          name_match_verification_status: string | null
+          nearest_airport: string | null
+          nearest_bus_station: string | null
+          nearest_port: string | null
+          nearest_railway: string | null
+          operational_network: string | null
+          organization_type: string | null
+          ownership_type: string | null
           pan: string | null
+          pan_verification_status: string | null
           pennydrop_init: boolean | null
           pennydrop_status: Json | null
           pennydrop_verification_status: string | null
+          pf_number: string | null
+          power_supply: string | null
           primary_contact_name: string | null
           primary_designation: string | null
           primary_email: string | null
           primary_phone: string | null
           product_categories: string[] | null
+          product_types: string[] | null
+          product_types_other: string | null
+          production_capacity: string | null
+          production_contact_name: string | null
+          production_designation: string | null
+          production_email: string | null
+          production_facilities: string[] | null
+          production_phone: string | null
           purchase_comments: string | null
           purchase_reviewed_at: string | null
           purchase_reviewed_by: string | null
+          quality_issues: string | null
+          raw_materials_used: string | null
           registered_address: string | null
+          registered_address_line2: string | null
+          registered_address_line3: string | null
           registered_city: string | null
+          registered_fax: string | null
+          registered_phone: string | null
           registered_pincode: string | null
           registered_state: string | null
+          registered_website: string | null
+          safety_issues: string | null
           same_as_registered: boolean | null
           sap_synced_at: string | null
           sap_vendor_code: string | null
@@ -1289,7 +1365,9 @@ export type Database = {
           secondary_phone: string | null
           self_declared: boolean | null
           status: Database["public"]["Enums"]["vendor_status"]
+          store_capacity: string | null
           submitted_at: string | null
+          supply_capacity: string | null
           tenant_id: string | null
           terms_accepted: boolean | null
           trade_name: string | null
@@ -1298,22 +1376,50 @@ export type Database = {
           turnover_year3: number | null
           updated_at: string
           user_id: string | null
+          water_supply: string | null
         }
         Insert: {
           account_number?: string | null
           account_type?: string | null
+          authorized_distributor_address?: string | null
+          authorized_distributor_name?: string | null
+          bank_address?: string | null
+          bank_branch_name?: string | null
           bank_name?: string | null
+          bank_verification_status?: string | null
+          branch_address?: string | null
+          branch_city?: string | null
+          branch_contact_designation?: string | null
+          branch_contact_email?: string | null
+          branch_contact_fax?: string | null
+          branch_contact_name?: string | null
+          branch_contact_phone?: string | null
+          branch_country?: string | null
           branch_name?: string | null
+          branch_pincode?: string | null
+          branch_state?: string | null
+          branch_website?: string | null
+          certifications?: Json | null
           communication_address?: string | null
           communication_city?: string | null
           communication_pincode?: string | null
           communication_state?: string | null
           created_at?: string
           credit_period_expected?: number | null
+          customer_service_designation?: string | null
+          customer_service_email?: string | null
+          customer_service_name?: string | null
+          customer_service_phone?: string | null
+          dg_capacity?: string | null
+          enlistments?: Json | null
           entity_type?: string | null
+          environmental_issues?: string | null
+          equipment_availability?: string | null
+          esi_number?: string | null
           finance_comments?: string | null
           finance_reviewed_at?: string | null
           finance_reviewed_by?: string | null
+          firm_registration_no?: string | null
           gst_additional_places?: Json | null
           gst_business_nature?: string[] | null
           gst_constitution_of_business?: string | null
@@ -1324,32 +1430,81 @@ export type Database = {
           gst_registration_date?: string | null
           gst_status?: string | null
           gst_taxpayer_type?: string | null
+          gst_verification_status?: string | null
           gstin?: string | null
+          health_issues?: string | null
           id?: string
+          iec_no?: string | null
           ifsc_code?: string | null
           industry_type?: string | null
+          inspection_testing?: string | null
           invitation_id?: string | null
           is_gst_registered?: boolean | null
           is_msme_registered?: boolean | null
+          labour_permit_no?: string | null
+          lead_time_required?: string | null
           legal_name?: string | null
+          machinery_availability?: string | null
+          major_customer1?: string | null
+          major_customer2?: string | null
+          major_customer3?: string | null
+          manpower?: string | null
+          manufacturing_address?: string | null
+          manufacturing_address_line2?: string | null
+          manufacturing_address_line3?: string | null
+          manufacturing_city?: string | null
+          manufacturing_fax?: string | null
+          manufacturing_phone?: string | null
+          manufacturing_pincode?: string | null
+          manufacturing_state?: string | null
+          memberships?: Json | null
+          micr_code?: string | null
           msme_category?: string | null
           msme_number?: string | null
+          msme_verification_status?: string | null
+          name_match_verification_status?: string | null
+          nearest_airport?: string | null
+          nearest_bus_station?: string | null
+          nearest_port?: string | null
+          nearest_railway?: string | null
+          operational_network?: string | null
+          organization_type?: string | null
+          ownership_type?: string | null
           pan?: string | null
+          pan_verification_status?: string | null
           pennydrop_init?: boolean | null
           pennydrop_status?: Json | null
           pennydrop_verification_status?: string | null
+          pf_number?: string | null
+          power_supply?: string | null
           primary_contact_name?: string | null
           primary_designation?: string | null
           primary_email?: string | null
           primary_phone?: string | null
           product_categories?: string[] | null
+          product_types?: string[] | null
+          product_types_other?: string | null
+          production_capacity?: string | null
+          production_contact_name?: string | null
+          production_designation?: string | null
+          production_email?: string | null
+          production_facilities?: string[] | null
+          production_phone?: string | null
           purchase_comments?: string | null
           purchase_reviewed_at?: string | null
           purchase_reviewed_by?: string | null
+          quality_issues?: string | null
+          raw_materials_used?: string | null
           registered_address?: string | null
+          registered_address_line2?: string | null
+          registered_address_line3?: string | null
           registered_city?: string | null
+          registered_fax?: string | null
+          registered_phone?: string | null
           registered_pincode?: string | null
           registered_state?: string | null
+          registered_website?: string | null
+          safety_issues?: string | null
           same_as_registered?: boolean | null
           sap_synced_at?: string | null
           sap_vendor_code?: string | null
@@ -1359,7 +1514,9 @@ export type Database = {
           secondary_phone?: string | null
           self_declared?: boolean | null
           status?: Database["public"]["Enums"]["vendor_status"]
+          store_capacity?: string | null
           submitted_at?: string | null
+          supply_capacity?: string | null
           tenant_id?: string | null
           terms_accepted?: boolean | null
           trade_name?: string | null
@@ -1368,22 +1525,50 @@ export type Database = {
           turnover_year3?: number | null
           updated_at?: string
           user_id?: string | null
+          water_supply?: string | null
         }
         Update: {
           account_number?: string | null
           account_type?: string | null
+          authorized_distributor_address?: string | null
+          authorized_distributor_name?: string | null
+          bank_address?: string | null
+          bank_branch_name?: string | null
           bank_name?: string | null
+          bank_verification_status?: string | null
+          branch_address?: string | null
+          branch_city?: string | null
+          branch_contact_designation?: string | null
+          branch_contact_email?: string | null
+          branch_contact_fax?: string | null
+          branch_contact_name?: string | null
+          branch_contact_phone?: string | null
+          branch_country?: string | null
           branch_name?: string | null
+          branch_pincode?: string | null
+          branch_state?: string | null
+          branch_website?: string | null
+          certifications?: Json | null
           communication_address?: string | null
           communication_city?: string | null
           communication_pincode?: string | null
           communication_state?: string | null
           created_at?: string
           credit_period_expected?: number | null
+          customer_service_designation?: string | null
+          customer_service_email?: string | null
+          customer_service_name?: string | null
+          customer_service_phone?: string | null
+          dg_capacity?: string | null
+          enlistments?: Json | null
           entity_type?: string | null
+          environmental_issues?: string | null
+          equipment_availability?: string | null
+          esi_number?: string | null
           finance_comments?: string | null
           finance_reviewed_at?: string | null
           finance_reviewed_by?: string | null
+          firm_registration_no?: string | null
           gst_additional_places?: Json | null
           gst_business_nature?: string[] | null
           gst_constitution_of_business?: string | null
@@ -1394,32 +1579,81 @@ export type Database = {
           gst_registration_date?: string | null
           gst_status?: string | null
           gst_taxpayer_type?: string | null
+          gst_verification_status?: string | null
           gstin?: string | null
+          health_issues?: string | null
           id?: string
+          iec_no?: string | null
           ifsc_code?: string | null
           industry_type?: string | null
+          inspection_testing?: string | null
           invitation_id?: string | null
           is_gst_registered?: boolean | null
           is_msme_registered?: boolean | null
+          labour_permit_no?: string | null
+          lead_time_required?: string | null
           legal_name?: string | null
+          machinery_availability?: string | null
+          major_customer1?: string | null
+          major_customer2?: string | null
+          major_customer3?: string | null
+          manpower?: string | null
+          manufacturing_address?: string | null
+          manufacturing_address_line2?: string | null
+          manufacturing_address_line3?: string | null
+          manufacturing_city?: string | null
+          manufacturing_fax?: string | null
+          manufacturing_phone?: string | null
+          manufacturing_pincode?: string | null
+          manufacturing_state?: string | null
+          memberships?: Json | null
+          micr_code?: string | null
           msme_category?: string | null
           msme_number?: string | null
+          msme_verification_status?: string | null
+          name_match_verification_status?: string | null
+          nearest_airport?: string | null
+          nearest_bus_station?: string | null
+          nearest_port?: string | null
+          nearest_railway?: string | null
+          operational_network?: string | null
+          organization_type?: string | null
+          ownership_type?: string | null
           pan?: string | null
+          pan_verification_status?: string | null
           pennydrop_init?: boolean | null
           pennydrop_status?: Json | null
           pennydrop_verification_status?: string | null
+          pf_number?: string | null
+          power_supply?: string | null
           primary_contact_name?: string | null
           primary_designation?: string | null
           primary_email?: string | null
           primary_phone?: string | null
           product_categories?: string[] | null
+          product_types?: string[] | null
+          product_types_other?: string | null
+          production_capacity?: string | null
+          production_contact_name?: string | null
+          production_designation?: string | null
+          production_email?: string | null
+          production_facilities?: string[] | null
+          production_phone?: string | null
           purchase_comments?: string | null
           purchase_reviewed_at?: string | null
           purchase_reviewed_by?: string | null
+          quality_issues?: string | null
+          raw_materials_used?: string | null
           registered_address?: string | null
+          registered_address_line2?: string | null
+          registered_address_line3?: string | null
           registered_city?: string | null
+          registered_fax?: string | null
+          registered_phone?: string | null
           registered_pincode?: string | null
           registered_state?: string | null
+          registered_website?: string | null
+          safety_issues?: string | null
           same_as_registered?: boolean | null
           sap_synced_at?: string | null
           sap_vendor_code?: string | null
@@ -1429,7 +1663,9 @@ export type Database = {
           secondary_phone?: string | null
           self_declared?: boolean | null
           status?: Database["public"]["Enums"]["vendor_status"]
+          store_capacity?: string | null
           submitted_at?: string | null
+          supply_capacity?: string | null
           tenant_id?: string | null
           terms_accepted?: boolean | null
           trade_name?: string | null
@@ -1438,6 +1674,7 @@ export type Database = {
           turnover_year3?: number | null
           updated_at?: string
           user_id?: string | null
+          water_supply?: string | null
         }
         Relationships: [
           {
