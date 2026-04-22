@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
 import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
+import { FieldTemplateActions } from '@/components/admin/FieldTemplateActions';
 import type { FormFieldConfig } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
 import {
