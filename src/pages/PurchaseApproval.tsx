@@ -64,7 +64,6 @@ export default function PurchaseApproval() {
   const { userRole, user } = useAuth();
   const canReRoute = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
 
-  const { user } = useAuth();
   const userEmail = (user?.email ?? '').toLowerCase();
 
   // Fetch approval progress rows for all visible vendors (for stuck detection + status badge)
