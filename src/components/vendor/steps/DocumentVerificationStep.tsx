@@ -336,6 +336,45 @@ export function DocumentVerificationStep({
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
   const handleBankUpload = (file: File) => runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName);
 
+  // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
+  useEffect(() => {
+    if (panDoc.status !== "verified" || isGstRegistered !== true) {
+      setPanCrossCheckError(null);
+      return;
+    }
+    const gstin = gstDoc.ocrData?.gstin;
+    const panOcr = String(panDoc.ocrData?.pan_number || "").toUpperCase();
+    if (!gstin || !panOcr) {
+      setPanCrossCheckError(null);
+      return;
+    }
+    const panFromGst = String(gstin).slice(2, 12).toUpperCase();
+    if (panFromGst.length === 10 && panFromGst !== panOcr) {
+      setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`);
+    } else {
+      setPanCrossCheckError(null);
+    }
+  }, [panDoc.status, panDoc.ocrData?.pan_number, gstDoc.ocrData?.gstin, isGstRegistered]);
+
+  // Re-compute name-match scores live as user corrects names.
+  useEffect(() => {
+    if (panDoc.status !== "verified") return;
+    const score = nameMatchScore(effectiveLegalName, panDoc.ocrData?.holder_name);
+    setPanDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
+  }, [panDoc.status, panDoc.ocrData?.holder_name, effectiveLegalName]);
+
+  useEffect(() => {
+    if (msmeDoc.status !== "verified") return;
+    const score = nameMatchScore(effectiveLegalName, msmeDoc.ocrData?.enterprise_name);
+    setMsmeDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
+  }, [msmeDoc.status, msmeDoc.ocrData?.enterprise_name, effectiveLegalName]);
+
+  useEffect(() => {
+    if (gstDoc.status !== "verified") return;
+    const score = nameMatchScore(gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName);
+    setGstDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
+  }, [gstDoc.status, gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName]);
+
   // ---------- Gating ----------
   const stage1Done =
     isGstRegistered === true
