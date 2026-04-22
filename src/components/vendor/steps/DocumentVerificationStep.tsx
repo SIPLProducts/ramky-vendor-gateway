@@ -463,8 +463,15 @@ export function DocumentVerificationStep({
         apiName: bankDoc.apiData?.accountHolderName || bankDoc.apiData?.name,
       };
     }
+    // Lift uploaded files so the parent can persist them in the draft
+    out.gstCertificateFile = gstDoc.file ?? null;
+    out.panCardFile = panDoc.file ?? null;
+    out.msmeCertificateFile = msmeDoc.file ?? null;
+    out.cancelledChequeFile = bankDoc.file ?? null;
+    // Authoritative completion status (mirrors what the UI shows green)
+    out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
