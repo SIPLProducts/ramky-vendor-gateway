@@ -30,28 +30,28 @@ const statusMessages: Record<string, { subject: string; body: string }> = {
     body: 'We found some issues during the validation of your documents. Please log in to the portal to review and resubmit the required information.',
   },
   finance_review: {
-    subject: 'Registration Under Finance Review',
-    body: 'Your documents have been validated successfully. Your registration is now under finance review.',
+    subject: 'Awaiting Finance Review',
+    body: 'Your registration has cleared all Purchase/SCM approval levels and is now awaiting Finance review.',
   },
   finance_approved: {
-    subject: 'Finance Review Approved',
-    body: 'Great news! Your registration has been approved by the finance team and is now pending final purchase approval.',
+    subject: 'Finance Approved — Ready for SAP Sync',
+    body: 'Great news! Finance has approved your registration. Your vendor record is now ready to be synced to our ERP (SAP) system.',
   },
   finance_rejected: {
     subject: 'Finance Review: Action Required',
     body: 'The finance team has requested some clarifications regarding your registration. Please log in to review the feedback.',
   },
   purchase_review: {
-    subject: 'Registration Under Purchase Review',
-    body: 'Your registration is now under final review by the purchase team.',
+    subject: 'Awaiting Purchase / SCM Approval',
+    body: 'Your registration has been submitted and is now moving through the Purchase/SCM approval matrix. We will notify you as it progresses.',
   },
   purchase_approved: {
-    subject: 'Congratulations! Registration Approved',
-    body: 'Your vendor registration has been fully approved! Your vendor code will be generated and synced to our ERP system shortly.',
+    subject: 'Approved — Pending SAP Sync',
+    body: 'Your vendor registration has been fully approved by Purchase and Finance. Your vendor code will be generated and synced to our ERP system shortly.',
   },
   purchase_rejected: {
     subject: 'Purchase Review: Action Required',
-    body: 'The purchase team has requested some changes to your registration. Please log in to review and address the feedback.',
+    body: 'The Purchase/SCM team has requested some changes to your registration. Please log in to review and address the feedback.',
   },
   sap_synced: {
     subject: 'Vendor Code Generated - Onboarding Complete',
