@@ -810,11 +810,17 @@ function ApproverCombobox({ users, loading, value, invalid, excludeIds, onSelect
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading users…
               </div>
             ) : users.length === 0 ? (
-              <div className="p-4 text-center space-y-2">
+              <div className="p-4 text-center space-y-1">
                 <p className="text-sm text-muted-foreground">No users found in the system.</p>
+                <p className="text-xs text-muted-foreground">Invite new users from User Management.</p>
               </div>
             ) : (
-              <CommandEmpty>No matching users.</CommandEmpty>
+              <CommandEmpty>
+                <div className="p-2 text-center space-y-1">
+                  <p className="text-sm">No users match.</p>
+                  <p className="text-xs text-muted-foreground">Invite new users from User Management.</p>
+                </div>
+              </CommandEmpty>
             )}
             {!loading && users.length > 0 && (
               <CommandGroup>
