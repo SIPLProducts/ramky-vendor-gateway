@@ -667,5 +667,87 @@ export function useAuditLogs(vendorId?: string) {
   });
 }
 
+// SCM Matrix action — routes the SCM Approve/Reject through process-approval-action edge function.
+// Resolves the current user's active pending progress row for the vendor and invokes the function.
+export function useScmMatrixAction() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      vendorId,
+      action,
+      comments,
+    }: {
+      vendorId: string;
+      action: 'approve' | 'reject';
+      comments: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const userEmail = (user.email ?? '').toLowerCase();
+
+      // 1) Load all pending progress rows for this vendor
+      const { data: progressRows, error: pErr } = await supabase
+        .from('vendor_approval_progress')
+        .select('id, level_id, level_number, status')
+        .eq('vendor_id', vendorId)
+        .eq('status', 'pending')
+        .order('level_number', { ascending: true });
+      if (pErr) throw pErr;
+      if (!progressRows || progressRows.length === 0) {
+        throw new Error('No pending SCM approval levels for this vendor.');
+      }
+
+      // 2) Active level is the lowest-numbered pending row
+      const activeLevel = progressRows[0];
+
+      // 3) Confirm current user is an approver for this level (user_id OR email)
+      const { data: approvers, error: aErr } = await supabase
+        .from('approval_matrix_approvers')
+        .select('user_id, approver_email')
+        .eq('level_id', activeLevel.level_id);
+      if (aErr) throw aErr;
+      const isApprover = (approvers ?? []).some(
+        (a) =>
+          a.user_id === user.id ||
+          (a.approver_email && a.approver_email.toLowerCase() === userEmail)
+      );
+      if (!isApprover) {
+        throw new Error('You are not the active SCM approver for this vendor.');
+      }
+
+      // 4) Invoke edge function
+      const { data, error } = await supabase.functions.invoke('process-approval-action', {
+        body: { progress_id: activeLevel.id, action, comments },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-approval-trail'] });
+      queryClient.invalidateQueries({ queryKey: ['my-approvals'] });
+      toast({
+        title: variables.action === 'approve' ? '✅ Approved' : 'Rejected',
+        description:
+          variables.action === 'approve'
+            ? 'Recorded at the active SCM matrix level.'
+            : 'Vendor rejected at SCM stage.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Action failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Export types for use in components
 export type { VendorRow, VendorInsert, VendorUpdate, ValidationRow, VendorStatus };
