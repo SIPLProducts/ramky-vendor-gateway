@@ -721,7 +721,23 @@ export function useScmMatrixAction() {
       const { data, error } = await supabase.functions.invoke('process-approval-action', {
         body: { progress_id: activeLevel.id, action, comments },
       });
-      if (error) throw error;
+      // Surface the actual error message from the edge function body, not the generic "non-2xx".
+      if (error) {
+        let detailedMessage = error.message;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            if (body?.error) detailedMessage = body.error;
+          } else if (ctx && typeof ctx.text === 'function') {
+            const text = await ctx.text();
+            if (text) detailedMessage = text;
+          }
+        } catch (_) {
+          // ignore parse errors, fall back to original message
+        }
+        throw new Error(detailedMessage);
+      }
       if (data?.error) throw new Error(data.error);
       return data;
     },
