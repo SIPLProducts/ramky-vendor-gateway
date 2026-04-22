@@ -4,22 +4,28 @@ import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Building2, Loader2 } from 'lucide-react';
+import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  OrganizationDetails, 
-  INDUSTRY_TYPES, 
+import {
+  OrganizationDetails,
+  StatutoryDetails,
+  INDUSTRY_TYPES,
   ORGANIZATION_TYPES,
   OWNERSHIP_TYPES,
-  PRODUCT_CATEGORIES 
+  PRODUCT_CATEGORIES,
+  ENTITY_TYPES,
+  MEMBERSHIP_OPTIONS,
+  ENLISTMENT_OPTIONS,
+  CERTIFICATION_OPTIONS,
+  OPERATIONAL_NETWORKS,
 } from '@/types/vendor';
 
 const schema = z.object({
@@ -30,15 +36,39 @@ const schema = z.object({
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
+  // Statutory & Memberships (moved here from former Commercial step)
+  entityType: z.string().min(1, 'Entity type is required'),
+  firmRegistrationNo: z.string().optional(),
+  pfNumber: z.string().optional(),
+  esiNumber: z.string().optional(),
+  iecNo: z.string().optional(),
+  labourPermitNo: z.string().optional(),
+  memberships: z.array(z.string()).optional(),
+  enlistments: z.array(z.string()).optional(),
+  certifications: z.array(z.string()).optional(),
+  operationalNetwork: z.string().optional(),
 });
+
+type FormValues = OrganizationDetails & {
+  entityType: string;
+  firmRegistrationNo: string;
+  pfNumber: string;
+  esiNumber: string;
+  iecNo: string;
+  labourPermitNo: string;
+  memberships: string[];
+  enlistments: string[];
+  certifications: string[];
+  operationalNetwork: string;
+};
 
 interface OrganizationStepProps {
   data: OrganizationDetails;
-  onNext: (data: OrganizationDetails) => void;
+  statutoryData: StatutoryDetails;
+  onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
-  // Fetch buyer companies (tenants)
+export function OrganizationStep({ data, statutoryData, onNext }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
@@ -47,7 +77,6 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
         .select('id, name, code')
         .eq('is_active', true)
         .order('name');
-      
       if (error) throw error;
       return data;
     },
@@ -58,13 +87,51 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
     handleSubmit,
     control,
     formState: { errors },
-  } = useForm<OrganizationDetails>({
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: data,
+    defaultValues: {
+      ...data,
+      entityType: statutoryData?.entityType || '',
+      firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
+      pfNumber: statutoryData?.pfNumber || '',
+      esiNumber: statutoryData?.esiNumber || '',
+      iecNo: statutoryData?.iecNo || '',
+      labourPermitNo: statutoryData?.labourPermitNo || '',
+      memberships: statutoryData?.memberships || [],
+      enlistments: statutoryData?.enlistments || [],
+      certifications: statutoryData?.certifications || [],
+      operationalNetwork: statutoryData?.operationalNetwork || '',
+    },
   });
 
+  const handleFormSubmit = (values: FormValues) => {
+    const organization: OrganizationDetails = {
+      buyerCompanyId: values.buyerCompanyId,
+      legalName: values.legalName,
+      tradeName: values.tradeName || '',
+      industryType: values.industryType,
+      organizationType: values.organizationType,
+      ownershipType: values.ownershipType,
+      productCategories: values.productCategories,
+    };
+    const statutory: StatutoryDetails = {
+      ...statutoryData,
+      entityType: values.entityType,
+      firmRegistrationNo: values.firmRegistrationNo || '',
+      pfNumber: values.pfNumber || '',
+      esiNumber: values.esiNumber || '',
+      iecNo: values.iecNo || '',
+      labourPermitNo: values.labourPermitNo || '',
+      memberships: values.memberships || [],
+      enlistments: values.enlistments || [],
+      certifications: values.certifications || [],
+      operationalNetwork: values.operationalNetwork || '',
+    };
+    onNext({ organization, statutory });
+  };
+
   return (
-    <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">
           <Building2 className="h-5 w-5 text-primary" />
@@ -72,7 +139,6 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
         </h3>
 
         <div className="grid gap-5">
-          {/* Buyer Company - Mandatory Field */}
           <div className="grid gap-1.5">
             <Label>Buyer Company *</Label>
             <Controller
@@ -215,6 +281,146 @@ export function OrganizationStep({ data, onNext }: OrganizationStepProps) {
             {errors.productCategories && (
               <p className="text-xs text-destructive">{errors.productCategories.message}</p>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Statutory & Registrations (moved from Commercial Details) */}
+      <div className="form-section">
+        <h3 className="form-section-title">
+          <FileCheck className="h-5 w-5 text-primary" />
+          Statutory & Registrations
+        </h3>
+
+        <div className="grid gap-5">
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label>Entity Type *</Label>
+              <Controller
+                name="entityType"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className={errors.entityType ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select entity type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ENTITY_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.entityType && (
+                <p className="text-xs text-destructive">{errors.entityType.message}</p>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="firmRegistrationNo">Firm Registration No.</Label>
+              <Input
+                id="firmRegistrationNo"
+                {...register('firmRegistrationNo')}
+                placeholder="Enter registration number"
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="pfNumber">PF Number</Label>
+              <Input id="pfNumber" {...register('pfNumber')} placeholder="PF registration number" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="esiNumber">ESI Number</Label>
+              <Input id="esiNumber" {...register('esiNumber')} placeholder="ESI registration number" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="labourPermitNo">Labour Permit No.</Label>
+              <Input id="labourPermitNo" {...register('labourPermitNo')} placeholder="Labour permit number" />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="iecNo">IEC No. (Import/Export)</Label>
+              <Input id="iecNo" {...register('iecNo')} placeholder="IEC Number" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Operational Network</Label>
+              <Controller
+                name="operationalNetwork"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select operational network" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OPERATIONAL_NETWORKS.map((network) => (
+                        <SelectItem key={network} value={network}>{network}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Memberships & Certifications */}
+      <div className="form-section">
+        <h3 className="form-section-title">
+          <Award className="h-5 w-5 text-primary" />
+          Memberships & Certifications
+        </h3>
+
+        <div className="grid gap-5">
+          <div className="grid gap-1.5">
+            <Label>Memberships</Label>
+            <Controller
+              name="memberships"
+              control={control}
+              render={({ field }) => (
+                <MultiSelect
+                  options={MEMBERSHIP_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
+                  selected={field.value || []}
+                  onChange={field.onChange}
+                  placeholder="Select memberships"
+                />
+              )}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Enlistment With</Label>
+            <Controller
+              name="enlistments"
+              control={control}
+              render={({ field }) => (
+                <MultiSelect
+                  options={ENLISTMENT_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
+                  selected={field.value || []}
+                  onChange={field.onChange}
+                  placeholder="Select enlistments"
+                />
+              )}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Certifications</Label>
+            <Controller
+              name="certifications"
+              control={control}
+              render={({ field }) => (
+                <MultiSelect
+                  options={CERTIFICATION_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
+                  selected={field.value || []}
+                  onChange={field.onChange}
+                  placeholder="Select certifications"
+                />
+              )}
+            />
           </div>
         </div>
       </div>
