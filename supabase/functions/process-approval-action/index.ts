@@ -89,9 +89,16 @@ Deno.serve(async (req) => {
 
     // For ALL mode we'd need to check sibling approvers — current schema has one row per level so single approval = level done.
 
-    // Final Purchase/SCM matrix level (level_number = 1) approved -> hand off to Finance review.
-    // Intermediate levels: just advance, no vendor status change.
-    if (level && level.level_number === 1) {
+    // Re-check remaining pending levels AFTER this approval.
+    // If none remain pending -> all SCM matrix levels are approved -> hand off to Finance review.
+    // Otherwise, advance to the next pending level (no vendor status change).
+    const { data: remainingProgress } = await admin
+      .from('vendor_approval_progress')
+      .select('level_number, status')
+      .eq('vendor_id', progress.vendor_id);
+    const stillPending = (remainingProgress ?? []).filter((p) => p.status === 'pending');
+
+    if (stillPending.length === 0) {
       await admin.from('vendors').update({
         status: 'finance_review',
         purchase_reviewed_by: userId,
@@ -102,7 +109,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, advanced_to_level: (level?.level_number ?? 0) - 1 }), {
+    const nextLevel = stillPending.reduce((min, p) => Math.min(min, p.level_number), Infinity);
+    return new Response(JSON.stringify({ ok: true, advanced_to_level: nextLevel }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
