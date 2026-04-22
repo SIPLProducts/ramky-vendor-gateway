@@ -586,6 +586,8 @@ export function DocumentVerificationStep({
                       verifiedFields={
                         <GstVerifiedDetails
                           ocr={gstDoc.ocrData}
+                          original={gstDoc.originalOcrData}
+                          onChangeField={(k, v) => setOcrField(setGstDoc, k, v)}
                           editablePrincipalPlace={editablePrincipalPlace}
                           onChangePrincipalPlace={setEditablePrincipalPlace}
                         />
