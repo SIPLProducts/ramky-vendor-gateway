@@ -415,10 +415,9 @@ export default function VendorRegistration() {
 
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5, 6, 7]); };
 
-  const applyVerifiedDataToForm = (data: VerifiedDocumentData) => {
-    setVerifiedData(data);
-
-    // Resolve legal + address depending on GST path
+  // Pure helper — merges Step-1 verified data into a form snapshot.
+  // Used by both live stage updates and Save Draft so they always agree.
+  const mergeVerifiedDataIntoForm = (prev: VendorFormData, data: VerifiedDocumentData): VendorFormData => {
     const gstYes = data.isGstRegistered === true;
     const legalName =
       (gstYes ? data.gst?.legalName : data.manualLegalName) ||
@@ -427,7 +426,7 @@ export default function VendorRegistration() {
     const tradeName = data.gst?.tradeName || '';
     const principalPlace = data.gst?.principalPlaceOfBusiness || data.gst?.address || '';
 
-    setFormData((prev) => ({
+    return {
       ...prev,
       organization: {
         ...prev.organization,
@@ -461,6 +460,10 @@ export default function VendorRegistration() {
         pan: data.pan?.number || prev.statutory.pan,
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
         msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
+        // Carry the actual uploaded files into the form so draft saves include them
+        gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
+        panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
+        msmeCertificateFile: data.msmeCertificateFile ?? prev.statutory.msmeCertificateFile,
       },
       bank: {
         ...prev.bank,
@@ -469,19 +472,35 @@ export default function VendorRegistration() {
         ifscCode: data.bank?.ifsc || prev.bank.ifscCode,
         bankName: data.bank?.bankName || prev.bank.bankName,
         branchName: data.bank?.branchName || prev.bank.branchName,
+        cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
       },
-    }));
+    };
   };
 
+  // Holds the most recent Step-1 snapshot from the child, even if React hasn't
+  // flushed setState yet — used by Save Draft to avoid stale renders.
+  const latestStep1DataRef = useRef<VerifiedDocumentData | null>(null);
+
   const handleDocStageChange = (data: VerifiedDocumentData) => {
-    applyVerifiedDataToForm(data);
+    latestStep1DataRef.current = data;
+    setVerifiedData(data);
+    setFormData((prev) => {
+      const next = mergeVerifiedDataIntoForm(prev, data);
+      // Avoid no-op updates that would re-trigger autosave
+      const prevKey = JSON.stringify({ o: prev.organization, a: prev.address, s: prev.statutory, b: prev.bank });
+      const nextKey = JSON.stringify({ o: next.organization, a: next.address, s: next.statutory, b: next.bank });
+      return prevKey === nextKey ? prev : next;
+    });
   };
 
   const handleDocVerificationComplete = (data: VerifiedDocumentData) => {
-    applyVerifiedDataToForm(data);
+    latestStep1DataRef.current = data;
+    setVerifiedData(data);
+    setFormData((prev) => mergeVerifiedDataIntoForm(prev, data));
     if (!completedSteps.includes(1)) setCompletedSteps((prev) => [...prev, 1]);
     setCurrentStep(2);
   };
+
 
   const handleStepComplete = (step: number, data: unknown) => {
     // step is the new step number (2..6); map to form key
