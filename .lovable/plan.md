@@ -1,44 +1,45 @@
 
 
-## Remove Penny Drop validation — keep bank account validation only
+## Why the SCM approval queue is empty
 
-### What changes
+I checked the database and found two problems for tenant `SHARVI INFOTECH`:
 
-**1. Finance Review screen (`src/pages/FinanceReview.tsx`)**
-- Remove the `isApproveDisabled` gating that requires `pennydrop_verification_status === 'verified'`.
-- Remove any "Penny Drop" status badge/section from the vendor details dialog.
-- Approve and Reject buttons become always enabled for vendors in `finance_review` (and `validation_failed` for re-review).
-- Add the **Purchase / SCM Approval Trail** section (level name, approver, status, timestamp, comments from `vendor_approval_progress`).
+1. **No approval matrix is configured** for this tenant. `approval_matrix_levels` has zero rows for tenant `6fd07201-…`, so `route-vendor-approval` ran on submit, found no levels, and skipped seeding (silent — no error). The vendor sits in `purchase_review` with no progress rows and no approver can see it in **My Approvals**.
+2. **No assigned approvers** even when levels are eventually added — `approval_matrix_approvers` is empty.
 
-**2. Vendor Registration — Financial step**
-- `src/components/vendor/steps/FinancialStep.tsx` and `FinancialInfrastructureStep.tsx`: remove the Penny Drop verify button/UI block. Keep the existing **Bank Account Verification** (validate-bank) flow as the sole bank check.
-- `src/hooks/useValidationOrchestrator.tsx` / `useFieldValidation.tsx`: drop any `penny_drop` step from the orchestrated validations.
+Result: the `My Approvals` page shows "No pending approvals" for everyone, and `vendor_approval_progress` is empty.
 
-**3. Validation hook (`src/hooks/useVendorValidations.tsx`)**
-- Remove any penny-drop invocation. Only `validate-bank` runs for bank verification.
+## What you need to do (configuration, no code change required for this vendor)
 
-**4. Edge function**
-- Stop invoking `validate-penny-drop` from the app. The function file itself can stay (unused) — no deletion needed unless you want it gone.
+Go to **Admin → Approval Matrix** and for the tenant **SHARVI INFOTECH**:
+1. Add one or more SCM approval levels (e.g., L1 = SCM Manager, L2 = SCM Head). Levels execute from **highest level_number → 1** sequentially.
+2. For each level, assign one or more approver users.
+3. Then re-route the existing vendor (see fix below) so progress rows get created retroactively.
 
-**5. Database**
-- No schema change required. The columns `pennydrop_verification_status`, `pennydrop_utr`, `pennydrop_verified_at` on `vendors` will simply be ignored by the UI. (We will not drop columns to avoid touching historical data.)
+## What I will build (so this never happens silently again)
 
-**6. Approval flow (unchanged)**
-- Submit → Purchase/SCM matrix (sequential) → Finance review → Finance approves → `purchase_approved` → SAP sync. This was already implemented.
+### A. Visibility — "Approval Progress" panel on vendor screens
+- Add a **Workflow** tab/section in `PurchaseApproval.tsx` (and reuse on `FinanceReview.tsx`) using the existing `ApprovalTimeline` component. Shows every level (L_n → L_1), status badge (pending / approved / rejected), approver name, timestamp, and comments — so anyone reviewing a vendor can see exactly where it is in the SCM chain and who's holding it up.
+- Reuse the existing `useVendorApprovalTrail` hook.
 
-### Hook addition
-- `useVendorApprovalTrail(vendorId)` in `src/hooks/useVendors.tsx` — fetches `vendor_approval_progress` joined with `approval_matrix_levels` + approver `profiles`, ordered by `level_number DESC`, used by the Finance Review dialog to show the Purchase/SCM trail with comments.
+### B. Banner when matrix is missing
+- In `PurchaseApproval.tsx`, when a vendor in `purchase_review` has **zero rows** in `vendor_approval_progress`, show a red warning card on the vendor row: "No SCM approval matrix configured for this buyer company. Configure it in Admin → Approval Matrix." with a deep link to the admin page.
+- In the submit flow (`useVendorRegistration`), after invoking `route-vendor-approval`, surface a non-blocking toast warning when the function returns `message: 'No matrix configured; skipping'` so the submitting user knows.
+
+### C. Manual "Re-route approval" action
+- Add a small **"Re-route"** button (admin/customer_admin only) on the vendor card in `PurchaseApproval.tsx` that re-invokes `route-vendor-approval` for that vendor. Use this once the matrix is configured to seed `vendor_approval_progress` for the existing stuck SHARVI INFOTECH vendor without re-submitting.
+
+### D. Admin dashboard widget
+- New small card on `Dashboard.tsx` for admins: "Vendors stuck without approver" — counts vendors in `purchase_review` with no `vendor_approval_progress` rows. Click → goes to Approval Matrix admin.
 
 ### Out of scope
-- No removal of `validate-penny-drop` edge function file or vendor table columns.
-- No change to bank validation logic.
-- No change to approval ordering, SAP sync, or notifications.
+- No change to approval ordering, Finance step, or SAP sync.
+- No auto-creation of default matrix (intentional — needs admin choice of levels/approvers).
 
 ### Files touched
-- `src/pages/FinanceReview.tsx` — remove penny-drop gating + UI; add Purchase/SCM trail section
-- `src/components/vendor/steps/FinancialStep.tsx` — remove penny-drop UI
-- `src/components/vendor/steps/FinancialInfrastructureStep.tsx` — remove penny-drop UI (if present)
-- `src/hooks/useVendorValidations.tsx` — remove penny-drop call
-- `src/hooks/useValidationOrchestrator.tsx` — drop penny-drop step
-- `src/hooks/useVendors.tsx` — add `useVendorApprovalTrail` hook
+- `src/pages/PurchaseApproval.tsx` — add Workflow tab in details dialog, "missing matrix" warning, "Re-route" admin button
+- `src/pages/FinanceReview.tsx` — confirm the Workflow tab already added there is wired (no functional change)
+- `src/hooks/useVendorRegistration.tsx` — surface "no matrix" warning toast on submit
+- `src/pages/Dashboard.tsx` — add "stuck vendors" admin widget
+- New hook helper in `src/hooks/useVendors.tsx` — `useReRouteApproval(vendorId)` that invokes the existing `route-vendor-approval` edge function (no edge function changes)
 
