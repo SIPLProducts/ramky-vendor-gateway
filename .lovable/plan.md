@@ -1,58 +1,38 @@
 
 
-## Rebuild Approval Matrix screen — single row-per-approver with dropdowns
+## Fix empty Approver dropdown — surface the cause and fix it inline
 
-### New layout
+### Why the dropdown looks empty
+The Approver combobox queries `user_tenants` for the selected tenant and joins to `profiles`/`user_roles`. For most tenants in your DB, **zero users are assigned** (only "Ramky Infrastructure Limited" has 1 user — Brijesh Kabra). So the dropdown correctly returns no items.
 
-A flat editable table where each row represents **one approver assignment**. All inputs are dropdowns sourced from existing data, except the level name/designation text fields.
+This is not a code bug — it is missing tenant-user assignments. The current screen does show a small warning at the bottom, but it's easy to miss and there's no way to fix it without leaving the page.
 
-| Column | Source | Type |
-|---|---|---|
-| **Tenant** | `tenants` (active) | dropdown |
-| **Level #** | 1..N (auto-suggested, editable) | dropdown |
-| **Level Name** | free text (e.g. "SCM Manager") | text |
-| **Designation** | free text (optional) | text |
-| **Approver Name** | `profiles.full_name` filtered by users belonging to selected tenant (`user_tenants` join) | dropdown (searchable) |
-| **Email** | `profiles.email` — auto-filled when Approver chosen, read-only | display |
-| **Role** | `user_roles.role` for chosen user — auto-filled, read-only badge | display |
-| **Mode** | `ANY` / `ALL` | dropdown |
-| **Actions** | Remove row | button |
+### What I'll change
 
-Top toolbar: **Tenant filter** (default = first active tenant), **+ Add Row** button, **Save All** button, **Approval Chain** preview strip below toolbar (unchanged behaviour, grouped by level_number desc → 1).
+**1. Make the empty state loud and actionable inside the Approver combobox**
+- When the combobox opens and `tenantUsers.length === 0`, replace the "No users found" text with a clear message:
+  > "No users assigned to this tenant. Click below to assign users."
+  followed by an **"Assign Users"** button that opens a dialog (option A) or links to **User Management** filtered to this tenant (option B). I'll go with **option A — inline dialog** so the admin never leaves the screen.
 
-### Behaviour
+**2. New inline "Assign Users to Tenant" dialog**
+- File: `src/components/admin/AssignUsersToTenantDialog.tsx` (new).
+- Lists **all profiles** (RLS allows admins/customer_admins to see them) with: full name, email, current role badge, and a checkbox indicating whether they are already in `user_tenants` for this tenant.
+- Searchable input.
+- "Save" performs a diff: insert new `user_tenants` rows, delete unchecked ones. Invalidates the `tenant-users-with-roles` query so the Approver dropdown refreshes immediately.
 
-- Selecting a **Tenant** filters the **Approver Name** dropdown to users in `user_tenants` for that tenant. Email + Role auto-populate from `profiles` and `user_roles`.
-- Multiple rows can share the same **Level #** + **Level Name** — they become co-approvers for that level (mode applies per level).
-- On **Save**, rows are grouped by `(tenant_id, level_number)`:
-  - Upsert one `approval_matrix_levels` row per group (level_name, designation, approval_mode taken from the first row of the group; UI will warn if mode/name differ within a group).
-  - Replace `approval_matrix_approvers` for each level with the union of `user_id`s in that group.
-  - Remove levels no longer present.
-- Validation before save: tenant, level #, level name, and approver required on every row; no duplicate (level#, user) pairs.
-- Audit log entry `approval_matrix_saved` (existing).
+**3. Promote the missing-users banner**
+- In `ApprovalMatrixConfig.tsx`, move the dashed warning banner to the **top of the card** (above the table) and add an **"Assign Users"** button right inside it that opens the same dialog.
 
-### Data sources (read-only joins, no schema changes)
-
-- `tenants` → tenant dropdown.
-- `user_tenants` joined with `profiles` and `user_roles` → approver dropdown showing "Full Name · email · role".
-- `approval_matrix_levels` + `approval_matrix_approvers` → existing rows hydrated into the flat table on tenant change.
-
-### UX details
-
-- Approver dropdown uses a searchable `Command`/`Popover` combobox (already used in `ApproverPicker`). Shows name, email, role badge in each option.
-- Level # dropdown lists 1..max(existing)+1 with a "+ New level" option that increments.
-- Empty state: "No approvers configured for this tenant. Click + Add Row to start."
-- Compact responsive layout: horizontal scroll on small screens; key columns (Approver, Level #, Mode) sticky-left on mobile.
+**4. Tenant dropdown — show user counts**
+- Annotate each tenant option in the top toolbar as `Tenant Name · N users` so admins can see at a glance which tenants are unconfigured. The count comes from a single grouped query (one extra lightweight `user_tenants` select).
 
 ### Files touched
-
-- `src/components/admin/ApprovalMatrixConfig.tsx` — full rewrite to the flat-row model described above.
-- `src/components/admin/ApproverPicker.tsx` — extend the option renderer to also surface email + role badge (used inside the new combobox cell). No API change.
-- New small helper hook `useTenantUsersWithRoles(tenantId)` in `src/hooks/useTenant.tsx` — returns `{ user_id, full_name, email, role }[]` by joining `user_tenants` → `profiles` → `user_roles` (single tenant scope, RLS already permits).
+- `src/components/admin/ApprovalMatrixConfig.tsx` — promote empty state, wire up the new dialog, annotate tenant dropdown with user counts, update the `ApproverCombobox` empty-state UI.
+- `src/components/admin/AssignUsersToTenantDialog.tsx` — **new**: searchable list of profiles with checkboxes, save = diff `user_tenants`.
+- `src/hooks/useTenant.tsx` — small helper `useAllProfilesWithRoles()` returning every profile + primary role for the dialog list (single query, admin-only via RLS).
 
 ### Out of scope
-
-- No changes to approval execution flow (`process-approval-action`, `route-vendor-approval`).
-- No schema migration (table structure stays one-level / many-approvers; UI just presents it flat).
-- No change to the Approval Chain preview semantics.
+- No schema change.
+- No change to approval execution, Finance, or SAP sync.
+- No change to the User Management page itself.
 
