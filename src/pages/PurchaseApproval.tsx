@@ -239,7 +239,8 @@ export default function PurchaseApproval() {
           </CardContent></Card>
         ) : (
           filteredVendors.map((vendor) => {
-            const isStuck = stuckIds?.has(vendor.id) ?? false;
+            const isStuck = stuckIds.has(vendor.id);
+            const scmBadge = getScmStatusBadge(vendor.id);
             return (
             <Card key={vendor.id} className="border-0 shadow-md card-interactive">
               <CardContent className="p-6">
@@ -249,7 +250,7 @@ export default function PurchaseApproval() {
                     <div>
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
-                        <Badge className="bg-green-100 text-green-700 border-green-200">Finance Approved</Badge>
+                        <Badge className={scmBadge.className}>{scmBadge.label}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
