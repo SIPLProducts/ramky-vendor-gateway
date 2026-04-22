@@ -1,140 +1,69 @@
 
-## Fix missing approvals — align tenant data, seed progress, and support email-based approvers end to end
 
-### What is happening now
+## Fix the misleading "Finance Approved" badge on SCM Approval
 
-I verified three separate issues causing the approvals not to appear:
+### What you're seeing vs what is true
 
-1. **The approval matrix is still stored under REEL, not RIL**
-   - Current DB rows for Brijesh Kabra and soumendukumar exist only under **REEL**
-   - **RIL currently has no approval matrix levels**
-   - So RIL vendors cannot be routed into the approval workflow
+On the **SCM Approval** page, every vendor card shows a green **"Finance Approved"** badge — including SHARVI INFOTECH. That badge is hard‑coded and wrong.
 
-2. **The RIL vendor in `purchase_review` has no approval progress rows**
-   - There is at least one active RIL vendor in `purchase_review`
-   - `vendor_approval_progress` is empty for RIL
-   - Without seeded progress rows, there is nothing to show in approver inboxes
-
-3. **The app still looks up approvers by `user_id`, but the new matrix saves free-text name/email**
-   - `ApprovalMatrixConfig` now saves `approver_name` + `approver_email` with `user_id = null`
-   - But both:
-     - `src/hooks/useMyApprovals.tsx`
-     - `src/hooks/useScreenPermissions.tsx`
-     still query `approval_matrix_approvers.eq('user_id', user.id)`
-   - The RLS policy on `vendor_approval_progress` also still checks only `a.user_id = auth.uid()`
-
-So the current system is half-migrated: saving works, but visibility and access still depend on the old `user_id` model.
-
-### Fix to implement
-
-#### 1) Move or copy the matrix to RIL in the database
-Correct the tenant assignment for the two configured levels so the approval matrix matches the tenant where the vendors live.
-
-Plan:
-- Reassign the existing approval matrix levels from **REEL** to **RIL** if REEL should no longer use them
-- Keep the approver rows attached to those levels
-- Verify RIL now has:
-  - Level 1 — Brijesh Kabra
-  - Level 2 — soumendukumar
-
-If both tenants should keep the same approvers, duplicate instead of move.
-
-#### 2) Re-seed approval progress for existing RIL vendors already in `purchase_review`
-Existing vendors submitted before the matrix was correctly attached to RIL were never routed.
-
-Plan:
-- Re-run approval routing for RIL vendors currently in `purchase_review`
-- This should insert `vendor_approval_progress` rows for the active levels
-- Verify each affected vendor gets pending rows for Level 1 and Level 2
-
-#### 3) Update “My Approvals” lookup to match by email as well as `user_id`
-Approvers are now stored as free-text email, so the inbox must resolve assignments using the logged-in user’s email.
-
-Update:
-- `src/hooks/useMyApprovals.tsx`
-  - fetch approver levels where:
-    - `user_id = current user id`, **or**
-    - `approver_email = current user email` (case-insensitive)
-  - then continue loading active pending progress exactly as now
-
-Result:
-- Brijesh and soumendukumar will see approvals even when their matrix rows were saved without `user_id`
-
-#### 4) Update sidebar permission logic for the “My Approvals” menu
-The menu entry is currently hidden unless `approval_matrix_approvers.user_id = user.id`.
-
-Update:
-- `src/hooks/useScreenPermissions.tsx`
-  - grant `my_approvals` when the current user matches an approver row by:
-    - `user_id`, or
-    - email
-
-Result:
-- Email-based approvers will actually see the inbox link in navigation
-
-#### 5) Fix RLS on `vendor_approval_progress` for email-based approvers
-Even if the UI asks for progress rows, RLS currently only allows access when `approval_matrix_approvers.user_id = auth.uid()`.
-
-Add a migration to update the SELECT policy:
-- Extend “Approvers view their level progress” to allow:
-  - `a.user_id = auth.uid()`
-  - or `lower(a.approver_email) = lower(auth.jwt() ->> 'email')`
-
-This is the key backend fix that makes email-based approvers able to read their assigned progress rows securely.
-
-#### 6) Keep `process-approval-action` as-is, but validate the whole flow
-That function already supports email fallback:
-- it checks `user_id`
-- or matching `approver_email`
-
-After the earlier fixes, this function should work end to end without logic changes.
-
-### Files / assets to update
-
-#### Code
-- `src/hooks/useMyApprovals.tsx`
-- `src/hooks/useScreenPermissions.tsx`
-
-#### Database
-- data update for `approval_matrix_levels.tenant_id` (REEL → RIL) or copy rows to RIL
-- data operation to re-route existing RIL `purchase_review` vendors
-- new migration updating RLS policy on `vendor_approval_progress`
-
-### Technical details
+The actual workflow already runs in the correct order:
 
 ```text
-Current broken path:
-Approval matrix saved as name/email only
-  -> user_id stays null
-  -> My Approvals queries by user_id only
-  -> sidebar permission checks by user_id only
-  -> RLS on vendor_approval_progress checks user_id only
-  -> approver sees no approvals
+Vendor submits
+  → validations pass
+  → status = purchase_review     ← SCM matrix approves here (Brijesh → soumendukumar)
+  → status = finance_review      ← Finance reviews
+  → status = purchase_approved   ← Ready for SAP sync
+  → status = sap_synced
 ```
 
-```text
-Fixed path:
-Approval matrix row has approver_email
-  -> approver logs in with same email
-  -> UI resolves assigned levels by email
-  -> RLS also allows progress visibility by email
-  -> routed vendor has pending progress rows
-  -> approval appears in My Approvals
+So Finance happens **after** SCM, exactly as you want. Only the badge label is lying.
+
+### Root cause
+
+`src/pages/PurchaseApproval.tsx` line 230 renders a static badge regardless of vendor state:
+
+```tsx
+<Badge className="bg-green-100 text-green-700 border-green-200">Finance Approved</Badge>
 ```
+
+These vendors are actually in `purchase_review` and have **not** been to Finance.
+
+### Fix
+
+#### 1) Replace the static badge with an accurate, status‑driven one
+In `src/pages/PurchaseApproval.tsx`:
+
+- Remove the hard‑coded "Finance Approved" badge.
+- Show **"Awaiting SCM Approval"** (amber) for vendors in `purchase_review`.
+- If at least one SCM matrix level has already been approved for that vendor (intermediate level done), show **"SCM L{n} Approved · Pending L{n‑1}"** to reflect multi‑level progress.
+- Keep the existing "No SCM approval matrix configured" alert untouched.
+
+#### 2) Tighten copy on Finance Review for symmetry
+In `src/pages/FinanceReview.tsx`, the page subtitle already says "after Purchase/SCM approval" — keep as is. No status logic change needed because Finance only loads `finance_review` + `validation_failed`, which is correct.
+
+#### 3) Confirm no backend change is needed
+- `useVendorRegistration` already routes new submissions to `purchase_review` first.
+- `process-approval-action` already promotes `purchase_review → finance_review` only after the **final** SCM level (level_number = 1) approves.
+- `useFinanceAction` already promotes `finance_review → purchase_approved` after Finance approve.
+
+So this is a pure UI label fix — no DB migration, no edge function change.
+
+### Files to update
+
+- `src/pages/PurchaseApproval.tsx` — replace static badge with status‑aware badge using `vendor_approval_progress` rows already loaded for the stuck‑detection query.
 
 ### Acceptance checks
 
-1. RIL is the selected tenant for the approval matrix
-2. RIL has Level 1 Brijesh + Level 2 soumendukumar in DB
-3. Existing RIL vendor(s) in `purchase_review` now have `vendor_approval_progress` rows
-4. Logged in as Brijesh:
-   - “My Approvals” appears in sidebar
-   - pending RIL vendor appears in inbox
-5. Logged in as soumendukumar:
-   - sees the item only when Level 1 is completed, or according to active-level logic
-6. Approve action succeeds through `process-approval-action`
-7. Vendor advances to the next stage correctly
+1. Open **SCM Approval** while a RIL vendor sits in `purchase_review`.
+2. Card shows **"Awaiting SCM Approval"**, not "Finance Approved".
+3. After Brijesh approves L2, card refreshes and shows **"SCM L2 Approved · Pending L1"** (or similar) until soumendukumar acts.
+4. After L1 approves, vendor disappears from SCM Approval and appears on **Finance Review**.
+5. After Finance approves, vendor moves to **SAP Sync** queue.
 
-### Notes
-- The console warning in `ApprovalMatrixConfig` about refs is separate from the missing approvals issue
-- No change is needed to the free-text approver input model; the missing piece is finishing the read/access side of that migration
+### Out of scope
+
+- No change to approval routing order (already correct).
+- No change to RLS, edge functions, or DB schema.
+- No change to Finance Review page logic.
+
