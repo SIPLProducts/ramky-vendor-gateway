@@ -762,10 +762,29 @@ export function DocumentVerificationStep({
                       msmeDoc.status === "verifying" ? "Verifying…" : ""
                     }
                     verifiedFields={
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <ReadOnlyField label="Udyam Number" value={msmeDoc.ocrData?.udyam_number} mono />
-                        <ReadOnlyField label="Enterprise Name" value={msmeDoc.ocrData?.enterprise_name} />
-                        <ReadOnlyField label="Enterprise Type" value={msmeDoc.ocrData?.enterprise_type} />
+                      <div className="space-y-3">
+                        <ReviewBanner />
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <EditableOcrField
+                            label="Udyam Number"
+                            value={msmeDoc.ocrData?.udyam_number}
+                            originalValue={msmeDoc.originalOcrData?.udyam_number}
+                            onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
+                            mono
+                          />
+                          <EditableOcrField
+                            label="Enterprise Name"
+                            value={msmeDoc.ocrData?.enterprise_name}
+                            originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                            onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                          />
+                          <EditableOcrField
+                            label="Enterprise Type"
+                            value={msmeDoc.ocrData?.enterprise_type}
+                            originalValue={msmeDoc.originalOcrData?.enterprise_type}
+                            onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
+                          />
+                        </div>
                       </div>
                     }
                   />
