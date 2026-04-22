@@ -1,44 +1,66 @@
 
 
-## Make the Approval Matrix save flow impossible to silently miss
+## Simplify Approval Matrix table — drop Level Name & Designation, make Role editable
 
-### What's actually wrong
+### New columns (left → right)
 
-Database check confirms `approval_matrix_levels` and `approval_matrix_approvers` are **completely empty**, and there is **no `approval_matrix_saved` audit log** for the past day. The Save All click is either being blocked by validation, throwing an error the user dismissed, or the row state was never populated. The save logic itself is correct and RLS permits writes for your `sharvi_admin` role.
+| Column | Type | Source / behavior |
+|---|---|---|
+| **Tenant** | dropdown (toolbar) | `tenants` — unchanged |
+| **Level #** | dropdown | 1…max+1 — unchanged |
+| **Approver** (User Name) | searchable dropdown | `tenant_users_with_roles` — unchanged |
+| **Email** | dropdown | Same user list, searchable by email — selecting it picks the same user (auto-syncs Approver) |
+| **Role** | dropdown | `app_role` enum — editable; saving updates `user_roles` for that user |
+| **Mode** | dropdown | ANY / ALL per level — unchanged |
+| 🗑 | button | Remove row |
 
-### Fixes
+**Removed:** Level Name, Designation columns and their inputs.
 
-**1. Make Save All explicit and observable** (`src/components/admin/ApprovalMatrixConfig.tsx`)
-- Show a **persistent diagnostics panel** above the table while editing: row count, levels grouped, missing fields per row (e.g. "Row 2 · Level 1 · no approver selected"), and a green check when all rows are valid.
-- Replace the validate-then-toast pattern with **inline red highlights** on the offending row + a banner listing every problem; Save All stays disabled until the banner is empty.
-- After a successful save, show a **green "Saved · N levels · M approvers"** confirmation strip that stays visible for 10s, plus reload the matrix from DB and display the hydrated row count so the user can confirm round-trip persistence.
-- Console-log every step: `[ApprovalMatrix] validating`, `[ApprovalMatrix] upserting level X`, `[ApprovalMatrix] inserting N approvers`, `[ApprovalMatrix] done`.
+### Database compatibility
 
-**2. Surface load state for the existing matrix**
-- Add a "Currently in database: N levels, M approvers (last updated …)" line at the top of the card, fetched on mount and after every save. If 0/0, show "Nothing saved yet for this tenant."
-- This proves to the user whether prior saves persisted, independent of whatever is in the editor.
+`approval_matrix_levels.level_name` is `NOT NULL`. To avoid a schema migration, I'll auto-fill it on save:
+- `level_name` = `"Level {N}"` (e.g. `"Level 1"`)
+- `designation` = `null`
 
-**3. Guard against navigation loss**
-- If `isDirty` and the user clicks the Tenant dropdown or tries to leave the tab, show a confirm dialog: "Discard unsaved approval matrix changes?"
+This keeps existing data readable and the route-vendor-approval / chain preview working.
 
-**4. One-click "Test Save" diagnostic**
-- Small "Test write access" button next to Save All (only visible to `sharvi_admin`/`admin`). Inserts a sentinel level, immediately deletes it, and toasts the result. If RLS or network is the problem this surfaces it in one click without touching real data.
+### Role dropdown behavior
 
-**5. Wider warning when user list is loading**
-- Today, if `useTenantUsersWithRoles` is still loading, the approver dropdown shows "no users". Add a clear "Loading users…" state inside the combobox so users don't think it's empty and skip selecting an approver.
+- Options come from the `app_role` enum: `sharvi_admin`, `admin`, `customer_admin`, `finance`, `purchase`, `approver`, `vendor`.
+- Default value = the user's current role (from `tenantUsers`).
+- Changing it queues a role update; on **Save All**, after the matrix upsert succeeds, run `user_roles` upsert (`delete` existing rows for that user + `insert` new role) for every changed user. Wrapped in the same try/catch with console tracing.
+- Permission: only `sharvi_admin` / `admin` see the Role column as editable; for others it's read-only badge (matches existing RLS on `user_roles`).
+
+### Email column behavior
+
+- Renders as a `Select` showing user emails for the tenant.
+- Selecting an email is equivalent to selecting that user in the Approver column (both columns stay in sync via shared `user_id`).
+- If no approver chosen yet → placeholder "Select email…".
+
+### Validation changes
+
+- Drop the "Level Name is empty" rule.
+- Keep: invalid Level #, missing approver, duplicate approver per level.
+- Diagnostics panel & Save All gating updated accordingly.
+
+### Chain preview
+
+- Replace `(unnamed)` with `Level {N}` since names are now auto-generated.
 
 ### Files touched
-- `src/components/admin/ApprovalMatrixConfig.tsx` — diagnostics panel, inline row errors, persisted-save confirmation, test-write button, navigation guard, console tracing.
+
+- `src/components/admin/ApprovalMatrixConfig.tsx`
+  - Remove Level Name / Designation `<TableHead>` and `<TableCell>` entries.
+  - Add Email `<Select>` cell synced to Approver.
+  - Convert Role cell from read-only `<Badge>` to `<Select>` (admin only).
+  - Track `pendingRoleChanges: Map<user_id, app_role>` in component state.
+  - In `saveAll`: set `level_name = "Level ${N}"`, `designation = null`; after matrix save, apply role changes via `user_roles` delete+insert and invalidate `tenant-users-with-roles` query.
+  - Update `rowErrors` to drop name check.
+  - Update chain preview label.
+  - Adjust `min-w-[1100px]` table width down to fit fewer columns.
 
 ### Out of scope
-- No DB schema or RLS change (already verified correct).
-- No change to `route-vendor-approval` or downstream approval execution.
-- No change to Assign Users dialog (already working — tenants now have users).
-
-### After the fix — what to do
-1. Open Approval Matrix → pick **Ramky Infrastructure Limited**.
-2. Top strip will show "Currently in database: 0 levels, 0 approvers".
-3. Add rows; the diagnostic panel will list any missing fields in real time.
-4. When green, click **Save All**. The strip will refresh to show the new counts and a green confirmation banner appears.
-5. If anything fails, the exact error message + step will be visible in both the toast and the browser console.
+- No DB schema change (column stays NOT NULL, auto-filled).
+- No change to `route-vendor-approval`, `process-approval-action`, or downstream flow.
+- No change to AssignUsers dialog or tenant-user counts.
 
