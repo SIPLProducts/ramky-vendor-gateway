@@ -6,8 +6,6 @@ import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { AddressStep } from '@/components/vendor/steps/AddressStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
-import { CommercialStep } from '@/components/vendor/steps/CommercialStep';
-import { BankDetailsStep } from '@/components/vendor/steps/BankDetailsStep';
 import { FinancialInfrastructureStep } from '@/components/vendor/steps/FinancialInfrastructureStep';
 import { ReviewStep } from '@/components/vendor/steps/ReviewStep';
 import { DocumentVerificationStep, VerifiedDocumentData } from '@/components/vendor/steps/DocumentVerificationStep';
@@ -25,16 +23,16 @@ import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoS
 import { CompletenessRing } from '@/components/vendor/CompletenessRing';
 import { useFormCompleteness } from '@/hooks/useFormCompleteness';
 
-// 8-step registration flow — Step 1 is the OCR + verification gate
+// 6-step registration flow — Step 1 is the OCR + verification gate.
+// Commercial Details and Bank Details have been folded into Step 1 (OCR + APIs)
+// and Step 2 (statutory & memberships) — vendors enter PAN/GST/MSME/Bank only once.
 const registrationSteps = [
   { id: 1, title: 'Document Verification', description: 'Upload & auto-verify PAN, GST, MSME, Bank' },
-  { id: 2, title: 'Organization Profile', description: 'Company name and type' },
+  { id: 2, title: 'Organization Profile', description: 'Company, statutory & memberships' },
   { id: 3, title: 'Address Information', description: 'Registered, manufacturing & branch' },
   { id: 4, title: 'Contact Details', description: 'Key contact persons' },
-  { id: 5, title: 'Commercial Details', description: 'GST, PAN, MSME verification' },
-  { id: 6, title: 'Bank Details', description: 'Bank account verification' },
-  { id: 7, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
-  { id: 8, title: 'Review & Submit', description: 'Verify and submit application' },
+  { id: 5, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
+  { id: 6, title: 'Review & Submit', description: 'Verify and submit application' },
 ];
 
 const initialFormData: VendorFormData = {
