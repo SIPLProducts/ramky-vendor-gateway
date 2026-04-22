@@ -12,7 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Plus, Save, Trash2, ArrowRight, ChevronsUpDown, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useTenants, useTenantUsersWithRoles, type TenantUserWithRole } from '@/hooks/useTenant';
+import { useTenants, useTenantUsersWithRoles, useTenantUserCounts, type TenantUserWithRole } from '@/hooks/useTenant';
+import { AssignUsersToTenantDialog } from './AssignUsersToTenantDialog';
+import { UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Row {
@@ -39,7 +41,10 @@ export function ApprovalMatrixConfig() {
   const [saving, setSaving] = useState(false);
 
   const { data: tenantUsers = [], isLoading: usersLoading } = useTenantUsersWithRoles(tenantId || null);
+  const { data: tenantUserCounts = {} } = useTenantUserCounts();
   const userById = useMemo(() => new Map(tenantUsers.map((u) => [u.user_id, u])), [tenantUsers]);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const currentTenant = activeTenants.find((t) => t.id === tenantId);
 
   useEffect(() => {
     if (activeTenants.length > 0 && !tenantId) {
@@ -240,9 +245,14 @@ export function ApprovalMatrixConfig() {
           <Select value={tenantId} onValueChange={setTenantId}>
             <SelectTrigger className="w-72"><SelectValue placeholder="Select tenant" /></SelectTrigger>
             <SelectContent>
-              {activeTenants.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
+              {activeTenants.map((t) => {
+                const count = tenantUserCounts[t.id] ?? 0;
+                return (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} · {count} user{count === 1 ? '' : 's'}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -280,10 +290,31 @@ export function ApprovalMatrixConfig() {
         </Card>
       )}
 
+      {/* Missing-users banner (promoted to top of card) */}
+      {tenantId && !usersLoading && tenantUsers.length === 0 && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-md border border-dashed border-destructive/50 bg-destructive/5">
+          <div className="flex items-start gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <div>
+              <strong>No users assigned to this tenant.</strong>{' '}
+              <span className="text-muted-foreground">Approver dropdowns will be empty until you assign at least one user.</span>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => setAssignDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-1" /> Assign Users
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Approvers (one row per person · group rows by Level # for co-approvers)</CardTitle>
+          {tenantId && tenantUsers.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1" /> Manage Users
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="border rounded-md overflow-x-auto">
@@ -355,6 +386,7 @@ export function ApprovalMatrixConfig() {
                               .filter((x) => x.rowKey !== r.rowKey && x.level_number === r.level_number && x.user_id)
                               .map((x) => x.user_id!) }
                             onSelect={(uid) => updateRow(r.rowKey, { user_id: uid })}
+                            onAssignUsers={() => setAssignDialogOpen(true)}
                           />
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground truncate max-w-[14rem]">
@@ -407,6 +439,15 @@ export function ApprovalMatrixConfig() {
           )}
         </CardContent>
       </Card>
+
+      {tenantId && (
+        <AssignUsersToTenantDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          tenantId={tenantId}
+          tenantName={currentTenant?.name}
+        />
+      )}
     </div>
   );
 }
@@ -416,9 +457,10 @@ interface ComboProps {
   value: string | null;
   excludeIds: string[];
   onSelect: (userId: string) => void;
+  onAssignUsers?: () => void;
 }
 
-function ApproverCombobox({ users, value, excludeIds, onSelect }: ComboProps) {
+function ApproverCombobox({ users, value, excludeIds, onSelect, onAssignUsers }: ComboProps) {
   const [open, setOpen] = useState(false);
   const selected = users.find((u) => u.user_id === value) ?? null;
   const exclude = new Set(excludeIds);
@@ -443,7 +485,20 @@ function ApproverCombobox({ users, value, excludeIds, onSelect }: ComboProps) {
         <Command>
           <CommandInput placeholder="Search by name or email…" />
           <CommandList>
-            <CommandEmpty>No users found.</CommandEmpty>
+            {users.length === 0 ? (
+              <div className="p-4 text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  No users assigned to this tenant.
+                </p>
+                {onAssignUsers && (
+                  <Button size="sm" onClick={onAssignUsers}>
+                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign Users
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <CommandEmpty>No matching users.</CommandEmpty>
+            )}
             <CommandGroup>
               {users.map((u) => {
                 const disabled = exclude.has(u.user_id);
