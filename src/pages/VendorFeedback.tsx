@@ -117,10 +117,11 @@ export default function VendorFeedback() {
         description: 'Your feedback has been submitted successfully.',
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('Feedback submission error:', error);
       toast({
         title: 'Submission Failed',
-        description: error.message,
+        description: error?.message || 'Could not submit feedback. Please try again.',
         variant: 'destructive',
       });
     },
