@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,11 +22,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
-import { useVendors, useFinanceAction, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
+import {
+  useVendors,
+  useFinanceAction,
+  useBuyerCompanies,
+  useVendorApprovalTrail,
+  VendorRow,
+} from '@/hooks/useVendors';
 import { useRunValidations } from '@/hooks/useVendorValidations';
 import { addSampleDocumentsForVendor } from '@/utils/sampleDocuments';
 import { ValidationResult } from '@/types/vendor';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Search,
   Eye,
@@ -37,57 +42,16 @@ import {
   FileText,
   IndianRupee,
   User,
-  Filter,
   Loader2,
-  RefreshCw,
   FolderOpen,
   Plus,
-  Sparkles,
   CheckCircle2,
-  ArrowRight,
-  Mail
+  Clock,
+  Circle,
+  Workflow,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-
-interface PennyDropResult {
-  success: boolean;
-  verified: boolean;
-  message: string;
-  data?: {
-    transactionId: string;
-    accountNumber: string;
-    ifscCode: string;
-    bankName: string;
-    branchName: string;
-    accountHolderName: string;
-    nameMatchScore: number;
-    nameMatchStatus: 'exact' | 'partial' | 'mismatch';
-    accountStatus: string;
-    accountType: string;
-    transferAmount: number;
-    transferStatus: string;
-    transferTimestamp: string;
-    utrNumber: string;
-    responseTime: number;
-  };
-  stages?: {
-    stage: string;
-    status: 'completed' | 'in_progress' | 'pending' | 'failed';
-    message: string;
-    timestamp: string;
-  }[];
-}
-
-// Name validation result from edge function
-interface NameValidationResult {
-  isValid: boolean;
-  score: number;
-  legalName: string;
-  holderName: string;
-  matchMethod?: string;
-  status: 'match' | 'partial' | 'mismatch';
-}
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,23 +63,11 @@ export default function FinanceReview() {
   const [comments, setComments] = useState('');
   const [addingSampleDocs, setAddingSampleDocs] = useState(false);
 
-  // Penny Drop states
-  const [isVerifyingPennyDrop, setIsVerifyingPennyDrop] = useState(false);
-  const [pennyDropStage, setPennyDropStage] = useState(0);
-  const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
-
-  // Reverse Penny Drop states (Surepass)
-  const [isInitializingPennyDrop, setIsInitializingPennyDrop] = useState(false);
-  const [isCheckingPennyDropStatus, setIsCheckingPennyDropStatus] = useState(false);
-  const [reversePennyDropResult, setReversePennyDropResult] = useState<any>(null);
-
-  // Name validation state
-  const [nameValidation, setNameValidation] = useState<NameValidationResult | null>(null);
-
   const { data: pendingVendors, isLoading } = useVendors(['finance_review', 'validation_failed']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const financeAction = useFinanceAction();
   const runValidations = useRunValidations();
+  const { data: approvalTrail = [], isLoading: isTrailLoading } = useVendorApprovalTrail(selectedVendor?.id);
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
     const matchesSearch =
@@ -125,92 +77,6 @@ export default function FinanceReview() {
     const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
     return matchesSearch && matchesBuyerCompany;
   }) || [];
-
-  // Effect to load penny drop data when vendor is selected
-  // Uses name validation from edge function only (no local computation)
-  useEffect(() => {
-    if (!selectedVendor) {
-      setReversePennyDropResult(null);
-      setNameValidation(null);
-      return;
-    }
-
-    // If vendor has stored penny drop status data, load it directly
-    const storedData = selectedVendor.pennydrop_status as any;
-    const verificationStatus = selectedVendor.pennydrop_verification_status;
-
-    if ((verificationStatus === 'verified' || verificationStatus === 'rejected') && storedData) {
-      // Already verified or rejected - use stored data
-      setReversePennyDropResult({
-        success: true,
-        verified: verificationStatus === 'verified',
-        status: verificationStatus,
-        data: storedData,
-        nameValidation: storedData.name_validation || null,
-      });
-
-      // Use name validation from edge function (stored in pennydrop_status)
-      if (storedData.name_validation) {
-        const nv = storedData.name_validation;
-        setNameValidation({
-          isValid: nv.is_match,
-          score: nv.match_score,
-          legalName: nv.legal_name,
-          holderName: nv.holder_name,
-          matchMethod: nv.match_method,
-          status: nv.is_match
-            ? (nv.match_score >= 95 ? 'match' : 'partial')
-            : 'mismatch',
-        });
-      } else {
-        setNameValidation(null);
-      }
-    } else {
-      // Not verified yet - reset state
-      setReversePennyDropResult(null);
-      setNameValidation(null);
-    }
-  }, [selectedVendor]);
-
-  // Effect to use name validation from edge function response
-  useEffect(() => {
-    if (!reversePennyDropResult?.nameValidation) {
-      return;
-    }
-
-    const nv = reversePennyDropResult.nameValidation;
-    // Edge function returns snake_case: is_match, match_score, legal_name, holder_name, match_method
-    setNameValidation({
-      isValid: nv.is_match ?? nv.isMatch,
-      score: nv.match_score ?? nv.score,
-      legalName: nv.legal_name ?? nv.legalName,
-      holderName: nv.holder_name ?? nv.holderName,
-      matchMethod: nv.match_method ?? nv.matchMethod,
-      status: (nv.is_match ?? nv.isMatch)
-        ? ((nv.match_score ?? nv.score) >= 95 ? 'match' : 'partial')
-        : 'mismatch',
-    });
-  }, [reversePennyDropResult]);
-
-  // Computed value to check if approve should be disabled (penny drop not verified)
-  const isApproveDisabled = useMemo(() => {
-    // Approve is only enabled when penny drop verification status is 'verified'
-    const verificationStatus = selectedVendor?.pennydrop_verification_status;
-
-    // If not verified, disable approve
-    if (verificationStatus !== 'verified') {
-      return true;
-    }
-
-    // If verified but name validation explicitly failed (extra safety check)
-    if (nameValidation !== null && !nameValidation.isValid) {
-      return true;
-    }
-
-    return false;
-  }, [selectedVendor, nameValidation]);
-
-
 
   const getBuyerCompanyName = (tenantId: string | null) => {
     if (!tenantId || !buyerCompanies) return 'Unassigned';
@@ -225,186 +91,22 @@ export default function FinanceReview() {
     setShowActionDialog(true);
   };
 
-  const pennyDropStageLabels = [
-    "IFSC Validation",
-    "Account Lookup",
-    "IMPS Transfer",
-    "Transfer Confirmation",
-    "Name Verification",
-  ];
-
-  const handlePennyDrop = async () => {
-    if (!selectedVendor) return;
-
-    setIsVerifyingPennyDrop(true);
-    setPennyDropStage(0);
-    setPennyDropResult(null);
-
-    try {
-      // Simulate stage progression for UI
-      const stageInterval = setInterval(() => {
-        setPennyDropStage(prev => Math.min(prev + 1, 5));
-      }, 400);
-
-      const { data, error } = await supabase.functions.invoke('validate-penny-drop', {
-        body: {
-          accountNumber: selectedVendor.account_number,
-          ifscCode: selectedVendor.ifsc_code,
-          accountHolderName: selectedVendor.legal_name,
-          vendorName: selectedVendor.legal_name,
-        },
-      });
-
-      clearInterval(stageInterval);
-
-      if (error) throw error;
-
-      setPennyDropResult(data);
-      setPennyDropStage(data.stages?.length || 5);
-
-      toast(data.verified ? 'Bank account verified successfully' : 'Bank verification completed with warnings', {
-        description: data.message,
-      });
-    } catch (error) {
-      console.error('Penny drop error:', error);
-      toast.error('Failed to perform penny drop verification');
-    } finally {
-      setIsVerifyingPennyDrop(false);
-    }
-  };
-
-  // Initialize Reverse Penny Drop (Surepass) - sends email to vendor
-  const handleInitReversePennyDrop = async () => {
-    if (!selectedVendor) return;
-
-    setIsInitializingPennyDrop(true);
-    setReversePennyDropResult(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('init-reverse-penny-drop', {
-        body: {
-          vendorId: selectedVendor.id,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.success) {
-        toast.success('Penny drop verification initiated', {
-          description: `Email sent to ${data.emailSentTo}`,
-        });
-        setReversePennyDropResult(data);
-      } else {
-        throw new Error(data.error || 'Failed to initialize penny drop');
-      }
-    } catch (error: any) {
-      console.error('Init reverse penny drop error:', error);
-      toast.error('Failed to initialize penny drop', {
-        description: error.message,
-      });
-    } finally {
-      setIsInitializingPennyDrop(false);
-    }
-  };
-
-  // Verify Reverse Penny Drop status (Surepass)
-  const handleVerifyReversePennyDrop = async () => {
-    if (!selectedVendor) return;
-
-    setIsCheckingPennyDropStatus(true);
-    setReversePennyDropResult(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-reverse-penny-drop', {
-        body: {
-          vendorId: selectedVendor.id,
-        },
-      });
-
-      if (error) throw error;
-
-      setReversePennyDropResult(data);
-
-      // Also set nameValidation directly from the response
-      if (data.nameValidation) {
-        const nv = data.nameValidation;
-        setNameValidation({
-          isValid: nv.is_match ?? nv.isMatch,
-          score: nv.match_score ?? nv.score,
-          legalName: nv.legal_name ?? nv.legalName,
-          holderName: nv.holder_name ?? nv.holderName,
-          matchMethod: nv.match_method ?? nv.matchMethod,
-          status: (nv.is_match ?? nv.isMatch)
-            ? ((nv.match_score ?? nv.score) >= 95 ? 'match' : 'partial')
-            : 'mismatch',
-        });
-      }
-
-      if (data.success) {
-        if (data.verified) {
-          toast.success('Bank account verified!', {
-            description: `Account holder: ${data.data?.holder_name}`,
-          });
-        } else if (data.status === 'rejected') {
-          toast.error('Bank verification rejected', {
-            description: 'Name mismatch detected. Vendor must use correct bank account.',
-          });
-        } else {
-          toast.info('Verification pending', {
-            description: 'Vendor has not completed the payment yet.',
-          });
-        }
-      } else {
-        throw new Error(data.error || 'Failed to verify penny drop');
-      }
-    } catch (error: any) {
-      console.error('Verify reverse penny drop error:', error);
-      toast.error('Failed to verify penny drop', {
-        description: error.message,
-      });
-    } finally {
-      setIsCheckingPennyDropStatus(false);
-    }
-  };
-
-  const handleRerunValidations = async () => {
-    if (!selectedVendor) return;
-
-    await runValidations.mutateAsync({
-      vendorId: selectedVendor.id,
-      gstin: selectedVendor.gstin,
-      pan: selectedVendor.pan,
-      legalName: selectedVendor.legal_name,
-      accountNumber: selectedVendor.account_number,
-      ifscCode: selectedVendor.ifsc_code,
-      msmeNumber: selectedVendor.msme_number,
-    });
-  };
-
   const handleAddSampleDocs = async () => {
     if (!selectedVendor) return;
     setAddingSampleDocs(true);
-
     const result = await addSampleDocumentsForVendor(selectedVendor.id);
-
-    if (result.success) {
-      toast.success('Sample documents added successfully');
-    } else {
-      toast.error('Failed to add sample documents');
-    }
-
+    if (result.success) toast.success('Sample documents added successfully');
+    else toast.error('Failed to add sample documents');
     setAddingSampleDocs(false);
   };
 
   const submitAction = async () => {
     if (!selectedVendor) return;
-
     await financeAction.mutateAsync({
       vendorId: selectedVendor.id,
       action: actionType,
       comments,
     });
-
     setShowActionDialog(false);
     setShowDetails(false);
     setSelectedVendor(null);
@@ -417,55 +119,31 @@ export default function FinanceReview() {
     return <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">Pending Review</Badge>;
   };
 
-  // Helper function to map vendor verification status columns to ValidationResult format
   const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
     if (!vendor) return [];
-
-    const vendorData = vendor as VendorRow & {
+    const v = vendor as VendorRow & {
       gst_verification_status?: string;
       pan_verification_status?: string;
       bank_verification_status?: string;
       msme_verification_status?: string;
       name_match_verification_status?: string;
     };
-
     return [
-      {
-        type: 'gst' as const,
-        status: (vendorData.gst_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.gst_verification_status === 'passed' ? 'GST verified' : 'GST verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'pan' as const,
-        status: (vendorData.pan_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.pan_verification_status === 'passed' ? 'PAN verified' : 'PAN verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'bank' as const,
-        status: (vendorData.bank_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.bank_verification_status === 'passed' ? 'Bank account verified' : 'Bank verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'msme' as const,
-        status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
-          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'name_match' as const,
-        status: (vendorData.name_match_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.name_match_verification_status === 'passed' ? 'Name match verified' : 'Name match pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
+      { type: 'gst', status: (v.gst_verification_status || 'pending') as ValidationResult['status'], message: v.gst_verification_status === 'passed' ? 'GST verified' : 'GST verification pending', timestamp: vendor.submitted_at || vendor.created_at },
+      { type: 'pan', status: (v.pan_verification_status || 'pending') as ValidationResult['status'], message: v.pan_verification_status === 'passed' ? 'PAN verified' : 'PAN verification pending', timestamp: vendor.submitted_at || vendor.created_at },
+      { type: 'bank', status: (v.bank_verification_status || 'pending') as ValidationResult['status'], message: v.bank_verification_status === 'passed' ? 'Bank account verified' : 'Bank verification pending', timestamp: vendor.submitted_at || vendor.created_at },
+      { type: 'msme', status: (v.msme_verification_status || 'skipped') as ValidationResult['status'], message: v.msme_verification_status === 'passed' ? 'MSME verified' : v.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending', timestamp: vendor.submitted_at || vendor.created_at },
+      { type: 'name_match', status: (v.name_match_verification_status || 'pending') as ValidationResult['status'], message: v.name_match_verification_status === 'passed' ? 'Name match verified' : 'Name match pending', timestamp: vendor.submitted_at || vendor.created_at },
     ];
   };
 
-  // Get validations from vendor's verification status columns
   const mappedValidations: ValidationResult[] = getValidationsFromVendor(selectedVendor);
+
+  const trailStatusBadge = (status: string) => {
+    if (status === 'approved') return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Approved</Badge>;
+    if (status === 'rejected') return <Badge variant="destructive">Rejected</Badge>;
+    return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pending</Badge>;
+  };
 
   return (
     <div className="space-y-8">
@@ -478,7 +156,7 @@ export default function FinanceReview() {
             </div>
             <h1 className="text-3xl font-bold text-foreground">Finance Review</h1>
           </div>
-          <p className="text-muted-foreground">Review and approve vendor registrations</p>
+          <p className="text-muted-foreground">Review and approve vendor registrations after Purchase/SCM approval</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative w-64">
@@ -556,21 +234,6 @@ export default function FinanceReview() {
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                         <span className="font-mono bg-muted px-2 py-0.5 rounded">ID: {vendor.id.slice(0, 8)}...</span>
                         <span>GSTIN: {vendor.gstin || 'N/A'}</span>
-                        {vendor.product_categories && vendor.product_categories.length > 0 && (
-                          <span className="flex items-center gap-1.5">
-                            <span className="text-muted-foreground">Categories:</span>
-                            {vendor.product_categories.slice(0, 2).map((category, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
-                                {category}
-                              </Badge>
-                            ))}
-                            {vendor.product_categories.length > 2 && (
-                              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
-                                +{vendor.product_categories.length - 2} more
-                              </Badge>
-                            )}
-                          </span>
-                        )}
                         <span>Submitted: {vendor.submitted_at ? new Date(vendor.submitted_at).toLocaleDateString('en-IN') : '-'}</span>
                       </div>
                     </div>
@@ -589,12 +252,8 @@ export default function FinanceReview() {
                       View Details
                     </Button>
                     <Button
-                      disabled={vendor.pennydrop_verification_status !== 'verified'}
-                      className={`rounded-xl ${vendor.pennydrop_verification_status === 'verified'
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/20'
-                        : 'bg-gray-400 cursor-not-allowed'}`}
+                      className="rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/20"
                       onClick={() => handleAction(vendor, 'approve')}
-                      title={vendor.pennydrop_verification_status !== 'verified' ? 'Complete penny drop verification first' : ''}
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Approve
@@ -630,7 +289,7 @@ export default function FinanceReview() {
           <DialogHeader>
             <DialogTitle className="text-xl">Vendor Details - {selectedVendor?.legal_name}</DialogTitle>
             <DialogDescription>
-              Review complete vendor information, documents, and validations
+              Review complete vendor information, Purchase/SCM approval trail, documents, and validations
             </DialogDescription>
           </DialogHeader>
 
@@ -638,13 +297,13 @@ export default function FinanceReview() {
             <Tabs defaultValue="details" className="w-full">
               <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted p-1">
                 <TabsTrigger value="details" className="rounded-lg">Details</TabsTrigger>
+                <TabsTrigger value="approval-trail" className="flex items-center gap-2 rounded-lg">
+                  <Workflow className="h-4 w-4" />
+                  Approval Trail
+                </TabsTrigger>
                 <TabsTrigger value="documents" className="flex items-center gap-2 rounded-lg">
                   <FolderOpen className="h-4 w-4" />
                   Documents
-                </TabsTrigger>
-                <TabsTrigger value="bank-verify" className="flex items-center gap-2 rounded-lg">
-                  <IndianRupee className="h-4 w-4" />
-                  Penny Drop
                 </TabsTrigger>
                 <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
               </TabsList>
@@ -661,26 +320,11 @@ export default function FinanceReview() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-3">
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Legal Name</span>
-                        <span className="font-semibold">{selectedVendor.legal_name}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Trade Name</span>
-                        <span>{selectedVendor.trade_name || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Industry</span>
-                        <span>{selectedVendor.industry_type || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Location</span>
-                        <span>{selectedVendor.registered_city}, {selectedVendor.registered_state}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-muted-foreground">Address</span>
-                        <span className="text-right max-w-[200px]">{selectedVendor.registered_address}</span>
-                      </div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Legal Name</span><span className="font-semibold">{selectedVendor.legal_name}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Trade Name</span><span>{selectedVendor.trade_name || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Industry</span><span>{selectedVendor.industry_type || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Location</span><span>{selectedVendor.registered_city}, {selectedVendor.registered_state}</span></div>
+                      <div className="flex justify-between py-2"><span className="text-muted-foreground">Address</span><span className="text-right max-w-[200px]">{selectedVendor.registered_address}</span></div>
                     </CardContent>
                   </Card>
 
@@ -694,22 +338,10 @@ export default function FinanceReview() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-3">
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Name</span>
-                        <span className="font-semibold">{selectedVendor.primary_contact_name || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Designation</span>
-                        <span>{selectedVendor.primary_designation || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Email</span>
-                        <span>{selectedVendor.primary_email || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-muted-foreground">Phone</span>
-                        <span>{selectedVendor.primary_phone || 'N/A'}</span>
-                      </div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Name</span><span className="font-semibold">{selectedVendor.primary_contact_name || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Designation</span><span>{selectedVendor.primary_designation || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Email</span><span>{selectedVendor.primary_email || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2"><span className="text-muted-foreground">Phone</span><span>{selectedVendor.primary_phone || 'N/A'}</span></div>
                     </CardContent>
                   </Card>
 
@@ -723,28 +355,13 @@ export default function FinanceReview() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-3">
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">GSTIN</span>
-                        <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.gstin || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">PAN</span>
-                        <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.pan || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Entity Type</span>
-                        <span>{selectedVendor.entity_type || 'N/A'}</span>
-                      </div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">GSTIN</span><span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.gstin || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">PAN</span><span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.pan || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Entity Type</span><span>{selectedVendor.entity_type || 'N/A'}</span></div>
                       {selectedVendor.msme_number && (
                         <>
-                          <div className="flex justify-between py-2 border-b">
-                            <span className="text-muted-foreground">MSME No.</span>
-                            <span className="font-mono">{selectedVendor.msme_number}</span>
-                          </div>
-                          <div className="flex justify-between py-2">
-                            <span className="text-muted-foreground">MSME Category</span>
-                            <span>{selectedVendor.msme_category || 'N/A'}</span>
-                          </div>
+                          <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">MSME No.</span><span className="font-mono">{selectedVendor.msme_number}</span></div>
+                          <div className="flex justify-between py-2"><span className="text-muted-foreground">MSME Category</span><span>{selectedVendor.msme_category || 'N/A'}</span></div>
                         </>
                       )}
                     </CardContent>
@@ -760,35 +377,78 @@ export default function FinanceReview() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-3">
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Bank</span>
-                        <span>{selectedVendor.bank_name || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Account</span>
-                        <span className="font-mono">
-                          {selectedVendor.account_number ? `XXXX${selectedVendor.account_number.slice(-4)}` : 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">IFSC</span>
-                        <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.ifsc_code || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Branch</span>
-                        <span>{selectedVendor.branch_name || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Account Type</span>
-                        <span className="capitalize">{selectedVendor.account_type || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-muted-foreground">Credit Period</span>
-                        <span>{selectedVendor.credit_period_expected ? `${selectedVendor.credit_period_expected} Days` : 'N/A'}</span>
-                      </div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Bank</span><span>{selectedVendor.bank_name || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Account</span><span className="font-mono">{selectedVendor.account_number ? `XXXX${selectedVendor.account_number.slice(-4)}` : 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">IFSC</span><span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.ifsc_code || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Branch</span><span>{selectedVendor.branch_name || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Account Type</span><span className="capitalize">{selectedVendor.account_type || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2"><span className="text-muted-foreground">Credit Period</span><span>{selectedVendor.credit_period_expected ? `${selectedVendor.credit_period_expected} Days` : 'N/A'}</span></div>
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              {/* Purchase / SCM Approval Trail */}
+              <TabsContent value="approval-trail" className="space-y-4 mt-6">
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Workflow className="h-4 w-4 text-primary" />
+                      Purchase / SCM Approval Trail
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isTrailLoading ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                      </div>
+                    ) : approvalTrail.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-6 text-center">
+                        No Purchase/SCM approval trail available for this vendor.
+                      </p>
+                    ) : (
+                      <ol className="space-y-4">
+                        {approvalTrail.map((row) => {
+                          const Icon = row.status === 'approved' ? CheckCircle2
+                            : row.status === 'rejected' ? XCircle
+                            : row.status === 'pending' ? Clock : Circle;
+                          const iconColor = row.status === 'approved' ? 'text-green-600'
+                            : row.status === 'rejected' ? 'text-destructive'
+                            : 'text-amber-500';
+                          return (
+                            <li key={row.id} className="flex items-start gap-3 p-3 rounded-xl border bg-card">
+                              <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${iconColor}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <Badge variant="outline">L{row.level_number}</Badge>
+                                  <span className="font-semibold text-sm">{row.level_name}</span>
+                                  {trailStatusBadge(row.status)}
+                                </div>
+                                {row.approver_name || row.approver_email ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    by {row.approver_name || row.approver_email}
+                                    {row.acted_at ? ` · ${new Date(row.acted_at).toLocaleString('en-IN')}` : ''}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">Awaiting action</p>
+                                )}
+                                <div className="mt-2 p-2 rounded-lg bg-muted/50">
+                                  <p className="text-xs text-muted-foreground mb-0.5">SCM comments</p>
+                                  {row.comments ? (
+                                    <p className="text-sm italic">"{row.comments}"</p>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No comments provided</p>
+                                  )}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="documents" className="mt-6">
@@ -802,416 +462,13 @@ export default function FinanceReview() {
                     className="rounded-xl"
                   >
                     {addingSampleDocs ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Adding...
-                      </>
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding...</>
                     ) : (
-                      <>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Sample Docs
-                      </>
+                      <><Plus className="h-4 w-4 mr-2" />Add Sample Docs</>
                     )}
                   </Button>
                 </div>
                 <VendorDocuments vendorId={selectedVendor.id} />
-              </TabsContent>
-
-              <TabsContent value="bank-verify" className="space-y-4 mt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">Penny Drop Verification</h3>
-                    <p className="text-sm text-muted-foreground">Verify bank account with ₹1 transfer</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleInitReversePennyDrop}
-                      disabled={isInitializingPennyDrop || !selectedVendor?.primary_email}
-                      className={`rounded-xl ${selectedVendor?.pennydrop_init
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
-                        }`}
-                    >
-                      {isInitializingPennyDrop ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {selectedVendor?.pennydrop_init ? 'Updating...' : 'Sending...'}
-                        </>
-                      ) : (
-                        <>
-                          {selectedVendor?.pennydrop_init ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              Update Penny Drop
-                            </>
-                          ) : (
-                            <>
-                              <IndianRupee className="h-4 w-4 mr-2" />
-                              Run Penny Drop
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={handleVerifyReversePennyDrop}
-                      disabled={isCheckingPennyDropStatus || !selectedVendor?.pennydrop_init}
-                      variant="outline"
-                      className="rounded-xl"
-                    >
-                      {isCheckingPennyDropStatus ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Checking...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Verify Penny Drop
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Bank Details Summary */}
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center">
-                        <Building2 className="h-4 w-4 text-green-600" />
-                      </div>
-                      Bank Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm grid grid-cols-2 gap-4">
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Bank Name</span>
-                      <span className="font-medium">{selectedVendor.bank_name || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Branch</span>
-                      <span className="font-medium">{selectedVendor.branch_name || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Account Number</span>
-                      <span className="font-mono">{selectedVendor.account_number || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">IFSC Code</span>
-                      <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.ifsc_code || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Account Type</span>
-                      <span className="capitalize">{selectedVendor.account_type || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Account Holder</span>
-                      <span className="font-medium">{selectedVendor.legal_name || 'N/A'}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Verification Progress */}
-                {(isVerifyingPennyDrop || pennyDropResult) && (
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Verification Progress</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {pennyDropStageLabels.map((stage, index) => {
-                        const resultStage = pennyDropResult?.stages?.[index];
-                        const isCompleted = resultStage?.status === 'completed' || pennyDropStage > index;
-                        const isFailed = resultStage?.status === 'failed';
-                        const isActive = isVerifyingPennyDrop && pennyDropStage === index;
-
-                        return (
-                          <div key={stage} className="flex items-center gap-3">
-                            <div className={`
-                              w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                              ${isFailed ? 'bg-destructive/10 text-destructive' :
-                                isCompleted ? 'bg-green-100 text-green-700' :
-                                  isActive ? 'bg-primary/10 text-primary' :
-                                    'bg-muted text-muted-foreground'}
-                            `}>
-                              {isFailed ? (
-                                <XCircle className="h-4 w-4" />
-                              ) : isCompleted ? (
-                                <CheckCircle2 className="h-4 w-4" />
-                              ) : isActive ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                index + 1
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-sm font-medium ${isFailed ? 'text-destructive' :
-                                  isCompleted ? 'text-green-700' :
-                                    isActive ? 'text-primary' :
-                                      'text-muted-foreground'
-                                  }`}>
-                                  {stage}
-                                </span>
-                                {resultStage && (
-                                  <Badge variant={isFailed ? 'destructive' : 'secondary'} className="text-xs">
-                                    {resultStage.status}
-                                  </Badge>
-                                )}
-                              </div>
-                              {resultStage && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {resultStage.message}
-                                </p>
-                              )}
-                            </div>
-                            {index < pennyDropStageLabels.length - 1 && (
-                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Result Details */}
-                {pennyDropResult?.data && (
-                  <Card className={`border-2 ${pennyDropResult.verified ? 'border-green-200 bg-green-50 dark:bg-green-950/20' : 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20'}`}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-2 mb-4">
-                        {pennyDropResult.verified ? (
-                          <CheckCircle2 className="h-6 w-6 text-green-600" />
-                        ) : (
-                          <XCircle className="h-6 w-6 text-yellow-600" />
-                        )}
-                        <span className="font-semibold text-lg">
-                          {pennyDropResult.verified ? 'Account Verified' : 'Verification Warning'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Transaction ID</span>
-                          <p className="font-mono font-medium">{pennyDropResult.data.transactionId}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">UTR Number</span>
-                          <p className="font-mono font-medium">{pennyDropResult.data.utrNumber}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Bank</span>
-                          <p className="font-medium">{pennyDropResult.data.bankName}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Account Holder</span>
-                          <p className="font-medium">{pennyDropResult.data.accountHolderName}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Transfer Amount</span>
-                          <p className="font-medium">₹{pennyDropResult.data.transferAmount.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Name Match Score</span>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{pennyDropResult.data.nameMatchScore}%</p>
-                            <Badge
-                              variant={pennyDropResult.data.nameMatchStatus === 'exact' ? 'default' :
-                                pennyDropResult.data.nameMatchStatus === 'partial' ? 'secondary' : 'destructive'}
-                            >
-                              {pennyDropResult.data.nameMatchStatus}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {!selectedVendor?.account_number && (
-                  <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800">
-                    <p className="text-sm text-amber-700 dark:text-amber-400">
-                      ⚠️ Bank account details not available for this vendor
-                    </p>
-                  </div>
-                )}
-
-                {/* Reverse Penny Drop Status */}
-                {(selectedVendor?.pennydrop_init || reversePennyDropResult) && (
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${(reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
-                          ? 'bg-gradient-to-br from-green-500/20 to-green-500/5'
-                          : 'bg-gradient-to-br from-blue-500/20 to-blue-500/5'
-                          }`}>
-                          <CheckCircle2 className={`h-4 w-4 ${(reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
-                            ? 'text-green-600'
-                            : 'text-blue-600'
-                            }`} />
-                        </div>
-                        Reverse Penny Drop Status
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-3">
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Client ID</span>
-                        <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
-                          {selectedVendor?.pennydrop_init || reversePennyDropResult?.clientId || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Verification Status</span>
-                        <Badge variant={
-                          (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
-                            ? 'default'
-                            : 'secondary'
-                        } className={
-                          (reversePennyDropResult?.status === 'verified' || selectedVendor?.pennydrop_verification_status === 'verified')
-                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                            : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-                        }>
-                          {reversePennyDropResult?.status || selectedVendor?.pennydrop_verification_status || 'pending'}
-                        </Badge>
-                      </div>
-                      {reversePennyDropResult?.data && reversePennyDropResult.data.holder_name && (
-                        <>
-                          <div className="flex justify-between py-2 border-b">
-                            <span className="text-muted-foreground">Account Holder</span>
-                            <span className="font-medium">{reversePennyDropResult.data.holder_name}</span>
-                          </div>
-                          {reversePennyDropResult.data.account_number && (
-                            <div className="flex justify-between py-2 border-b">
-                              <span className="text-muted-foreground">Account Number</span>
-                              <span className="font-mono">{reversePennyDropResult.data.account_number}</span>
-                            </div>
-                          )}
-                          {reversePennyDropResult.data.ifsc && (
-                            <div className="flex justify-between py-2 border-b">
-                              <span className="text-muted-foreground">IFSC</span>
-                              <span className="font-mono bg-muted px-2 py-0.5 rounded">{reversePennyDropResult.data.ifsc}</span>
-                            </div>
-                          )}
-                          {reversePennyDropResult.data.upi_id && (
-                            <div className="flex justify-between py-2 border-b">
-                              <span className="text-muted-foreground">UPI ID</span>
-                              <span className="font-mono">{reversePennyDropResult.data.upi_id}</span>
-                            </div>
-                          )}
-                          {reversePennyDropResult.data.payment_mode && (
-                            <div className="flex justify-between py-2">
-                              <span className="text-muted-foreground">Payment Mode</span>
-                              <span>{reversePennyDropResult.data.payment_mode}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Pending Payment Warning */}
-                {(reversePennyDropResult?.status === 'pending' ||
-                  (selectedVendor?.pennydrop_verification_status === 'pending' && !reversePennyDropResult?.verified)) && (
-                    <Card className="border-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-                      <CardContent className="pt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Loader2 className="h-5 w-5 text-amber-600" />
-                          <span className="font-semibold text-amber-700">Verification Pending</span>
-                        </div>
-                        <p className="text-sm text-amber-600">
-                          The vendor has not completed the ₹1 verification payment yet. Please ask the vendor to scan the QR code sent via email and complete the payment.
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                {/* Rejected - Name Mismatch */}
-                {(reversePennyDropResult?.status === 'rejected' || selectedVendor?.pennydrop_verification_status === 'rejected') && (
-                  <Card className="border-2 border-red-200 bg-red-50 dark:bg-red-950/20">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <XCircle className="h-5 w-5 text-red-600" />
-                        <span className="font-semibold text-red-700">❌ Bank Verification Rejected - Name Mismatch</span>
-                      </div>
-                      <p className="text-sm text-red-600 mb-3">
-                        The vendor completed the ₹1 payment, but the bank account holder name does not match the company's legal name. The vendor must pay using a bank account registered under their company name.
-                      </p>
-                      <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-sm">
-                        <p className="text-red-700 dark:text-red-300 mb-2">
-                          <strong>Action Required:</strong> Click "Update Penny Drop" above to send a new verification link to the vendor with instructions to use the correct bank account.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {(reversePennyDropResult?.verified || selectedVendor?.pennydrop_verification_status === 'verified') && (
-                  <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-950/20">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        <span className="font-semibold text-green-700">Bank Account Verified</span>
-                      </div>
-                      <p className="text-sm text-green-600">
-                        The vendor has successfully completed the ₹1 verification payment. Bank account ownership confirmed.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Name Validation Status */}
-                {nameValidation && nameValidation.score > 0 && (
-                  reversePennyDropResult?.verified ||
-                  selectedVendor?.pennydrop_verification_status === 'verified' ||
-                  reversePennyDropResult?.status === 'rejected' ||
-                  selectedVendor?.pennydrop_verification_status === 'rejected'
-                ) && (
-                    <Card className={`border-2 ${nameValidation.isValid
-                      ? 'border-green-200 bg-green-50 dark:bg-green-950/20'
-                      : 'border-red-200 bg-red-50 dark:bg-red-950/20'
-                      }`}>
-                      <CardContent className="pt-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          {nameValidation.isValid ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-600" />
-                          )}
-                          <span className={`font-semibold ${nameValidation.isValid ? 'text-green-700' : 'text-red-700'
-                            }`}>
-                            {nameValidation.isValid ? 'Name Verification Passed' : '⚠️ Name Mismatch Detected'}
-                          </span>
-                          <Badge
-                            variant={nameValidation.status === 'match' ? 'default' :
-                              nameValidation.status === 'partial' ? 'secondary' : 'destructive'}
-                            className="ml-auto"
-                          >
-                            {nameValidation.score}% Match
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">Vendor Legal Name:</span>
-                            <span className="font-medium">{nameValidation.legalName || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">Bank Account Holder:</span>
-                            <span className="font-medium">{nameValidation.holderName || 'N/A'}</span>
-                          </div>
-                        </div>
-
-                        {!nameValidation.isValid && (
-                          <div className="mt-3 p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                            <p className="text-sm text-red-700 dark:text-red-300">
-                              <strong>Approval Blocked:</strong> The bank account holder name does not match the vendor's legal name (score below 70%). Please verify with the vendor before proceeding.
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
               </TabsContent>
 
               <TabsContent value="validations" className="space-y-4 mt-6">
@@ -1237,12 +494,7 @@ export default function FinanceReview() {
             </Button>
             <Button
               onClick={() => handleAction(selectedVendor!, 'approve')}
-              disabled={isApproveDisabled}
-              className={`rounded-xl ${isApproveDisabled
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
-                }`}
-              title={isApproveDisabled ? 'Complete penny drop verification first' : ''}
+              className="rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Approve
@@ -1261,7 +513,7 @@ export default function FinanceReview() {
               {actionType === 'clarify' && '💬 Request Clarification'}
             </DialogTitle>
             <DialogDescription>
-              {actionType === 'approve' && 'This vendor will be forwarded to the Purchase team for final approval.'}
+              {actionType === 'approve' && 'Vendor will be marked Finance Approved and queued for SAP sync.'}
               {actionType === 'reject' && 'This vendor registration will be rejected. Please provide a reason.'}
               {actionType === 'clarify' && 'A clarification request will be sent to the vendor.'}
             </DialogDescription>
@@ -1275,7 +527,7 @@ export default function FinanceReview() {
                 onChange={(e) => setComments(e.target.value)}
                 placeholder={
                   actionType === 'approve'
-                    ? 'Optional comments for Purchase team...'
+                    ? 'Optional comments...'
                     : 'Enter reason or clarification request...'
                 }
                 className="mt-2 rounded-xl"
@@ -1295,10 +547,7 @@ export default function FinanceReview() {
               className={`rounded-xl ${actionType === 'approve' ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600' : ''}`}
             >
               {financeAction.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
               ) : (
                 <>
                   {actionType === 'approve' && 'Confirm Approval'}

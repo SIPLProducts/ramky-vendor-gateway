@@ -105,6 +105,62 @@ export function useMyVendor() {
   });
 }
 
+// Fetch Purchase / SCM approval trail (vendor_approval_progress + level + approver profile)
+export interface ApprovalTrailRow {
+  id: string;
+  level_number: number;
+  level_name: string;
+  status: string;
+  acted_at: string | null;
+  comments: string | null;
+  approver_name: string | null;
+  approver_email: string | null;
+}
+
+export function useVendorApprovalTrail(vendorId: string | undefined) {
+  return useQuery({
+    queryKey: ['vendor-approval-trail', vendorId],
+    queryFn: async (): Promise<ApprovalTrailRow[]> => {
+      if (!vendorId) return [];
+      const { data: progress, error } = await supabase
+        .from('vendor_approval_progress')
+        .select('id, level_id, level_number, status, acted_at, acted_by, comments')
+        .eq('vendor_id', vendorId)
+        .order('level_number', { ascending: false });
+      if (error) throw error;
+      if (!progress || progress.length === 0) return [];
+
+      const levelIds = Array.from(new Set(progress.map(p => p.level_id)));
+      const userIds = Array.from(new Set(progress.map(p => p.acted_by).filter(Boolean) as string[]));
+
+      const [{ data: levels }, { data: profiles }] = await Promise.all([
+        supabase.from('approval_matrix_levels').select('id, level_name').in('id', levelIds),
+        userIds.length
+          ? supabase.from('profiles').select('id, full_name, email').in('id', userIds)
+          : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string }[] }),
+      ]);
+
+      const lMap = new Map((levels ?? []).map(l => [l.id, l.level_name]));
+      const pMap = new Map((profiles ?? []).map(p => [p.id, p]));
+
+      return progress.map(p => {
+        const prof = p.acted_by ? pMap.get(p.acted_by) : null;
+        return {
+          id: p.id,
+          level_number: p.level_number,
+          level_name: lMap.get(p.level_id) ?? '—',
+          status: p.status,
+          acted_at: p.acted_at,
+          comments: p.comments,
+          approver_name: prof?.full_name ?? null,
+          approver_email: prof?.email ?? null,
+        };
+      });
+    },
+    enabled: !!vendorId,
+  });
+}
+
 // Fetch vendor validations
 export function useVendorValidations(vendorId: string | undefined) {
   return useQuery({
