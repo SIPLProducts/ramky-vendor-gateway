@@ -48,6 +48,9 @@ Deno.serve(async (req) => {
     // Clear existing progress (re-route)
     await supabase.from('vendor_approval_progress').delete().eq('vendor_id', vendor_id);
 
+    // Note: approvers may be referenced by user_id OR by free-text approver_email
+    // (see approval_matrix_approvers table). Downstream notification flows should
+    // resolve the recipient address using approver_email when user_id is null.
     const rows = levels.map((l) => ({
       vendor_id,
       level_id: l.id,
