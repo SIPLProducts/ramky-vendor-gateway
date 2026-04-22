@@ -40,6 +40,8 @@ import {
   Loader2,
   FolderOpen,
   MessageSquare,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
