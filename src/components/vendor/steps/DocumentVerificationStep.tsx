@@ -1385,3 +1385,74 @@ function InlineFilePicker({
     </>
   );
 }
+
+/**
+ * EditableOcrField — used inside verified panels so users can correct
+ * OCR mis-reads inline. Shows an "Edited" pill when the value differs from
+ * the OCR'd original, plus a "Reset to OCR" link to revert.
+ */
+function EditableOcrField({
+  label,
+  value,
+  originalValue,
+  onChange,
+  mono,
+  placeholder,
+}: {
+  label: string;
+  value?: string;
+  originalValue?: string;
+  onChange: (v: string) => void;
+  mono?: boolean;
+  placeholder?: string;
+}) {
+  const current = value ?? "";
+  const original = originalValue ?? "";
+  const isEdited = current.trim() !== original.trim() && original.length > 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+        <div className="flex items-center gap-2">
+          {isEdited && (
+            <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-1.5 py-0.5 text-[10px] font-medium">
+              Edited
+            </span>
+          )}
+          {isEdited && (
+            <button
+              type="button"
+              onClick={() => onChange(original)}
+              className="text-[10px] text-primary hover:underline"
+            >
+              Reset to OCR
+            </button>
+          )}
+        </div>
+      </div>
+      <Input
+        value={current}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? "—"}
+        className={cn(
+          "mt-1 bg-muted/40 border-border/60",
+          mono && "font-mono text-sm tracking-wide",
+          isEdited && "border-warning/40 bg-warning/5",
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * One-line helper inside each verified panel telling the user they can
+ * correct any field if the OCR mis-read the document.
+ */
+function ReviewBanner() {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      <Sparkles className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+      <span>Review the extracted details. Click any field to correct it if the document was misread.</span>
+    </div>
+  );
+}
