@@ -1,51 +1,133 @@
 
+## Fix Step-1 deadlock so green verification always enables Continue and Save Draft
 
-## Make OCR-extracted fields editable for manual corrections
+### Root cause
+Step 1 currently has two different sources of truth:
 
-### What you'll get
+- `DocumentVerificationStep` shows the green/verified state from its **local doc state**
+- The outer action bar (`Continue`, `Save Draft`) depends on **parent state** (`verifiedData` + `formData`)
 
-Today, after each document is OCR'd (PAN, GST, MSME, Bank cheque), the extracted fields are shown as **locked, read-only boxes**. If Gemini reads "RAJESH" instead of "RAJESH KUMAR", or misses one digit of an account number, there's no way to fix it — you'd have to re-upload a clearer scan and hope for the best.
+Those two can drift. In the current code:
 
-This change unlocks every extracted field so you can review what the OCR captured and **type a correction inline** before continuing. The corrected values are what flow into the rest of the registration (Save Draft, Continue, downstream steps, and final submit).
+1. The child only lifts extracted values, not the actual uploaded files.
+2. The parent re-derives “can proceed” from partial data instead of using the child’s real completion state.
+3. `Save Draft` uses the parent `formData` snapshot, which can be one render behind the latest Step-1 OCR/edit state.
 
-### Behaviour after the change
+So the UI can show all green in Step 1 while the parent still thinks Step 1 is incomplete, and draft save can run with stale/incomplete data.
 
-For each of the 4 documents, once the green "Verified" panel appears:
+### What to change
 
-- **PAN panel** — PAN Number, Holder Name → editable.
-- **GST panel** — Legal Name, Trade Name, GSTIN, Constitution, Registration Date, Taxpayer Type, Centre/State Jurisdiction → editable. Status pill (Active/Cancelled/Suspended) stays as a badge — not user-editable. Business Nature and Additional Places (chip lists) stay read-only in this pass; they're rarely wrong and editing arrays needs a different UI. Principal Place of Business is already editable today — unchanged.
-- **MSME panel** — Udyam Number, Enterprise Name, Enterprise Type → editable.
-- **Bank panel** — Account Number, IFSC, Bank Name, Branch, Account Holder Name → editable.
+#### 1. Make Step 1 emit one authoritative snapshot
+File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
 
-Visual cues:
-- Each field gets a subtle "Edited" pill next to its label the moment the user changes the OCR'd value, so reviewers can see what was manually overridden.
-- A small one-line helper appears at the top of each verified panel: **"Review the extracted details. Click any field to correct it if the document was misread."**
-- A "Reset to OCR" link per field restores Gemini's original value with one click.
-- The lock icon is removed (it implies you can't edit). Background stays the muted style so OCR-filled fields still look distinct from blank inputs.
+Extend the Step-1 payload so the child sends everything the parent actually needs:
 
-### Data flow
+- extracted/corrected OCR values
+- uploaded file objects for GST / PAN / MSME / cancelled cheque
+- explicit stage-completion metadata:
+  - `stage1Done`
+  - `stage2Done`
+  - `stage3Done`
+  - `stage4Done`
+  - `allDone`
 
-- Edits update the same `ocrData` object the component already holds, so `buildOutput()` automatically forwards the corrected values to `VendorRegistration` via the existing `onStageChange` / `onComplete` callbacks. No change to the parent or to `applyVerifiedDataToForm`.
-- "Save Draft" and "Continue" continue to work exactly as today — they just see the edited values now.
-- Cross-checks that depend on these fields (PAN-from-GSTIN match, name-match score) **re-run automatically** when the corrected value changes, so the score and any error banner stay accurate.
-- Each manual edit is tracked locally as `edited: true` so the UI can show the "Edited" badge. (Not persisted as a separate column — the corrected value itself is the source of truth.)
+Implementation changes:
+- Add `file?: File` to `DocState`
+- Save the uploaded `File` in `runDocFlow(...)`
+- Extend `VerifiedDocumentData` with:
+  - `gstCertificateFile?: File | null`
+  - `panCardFile?: File | null`
+  - `msmeCertificateFile?: File | null`
+  - `cancelledChequeFile?: File | null`
+  - `step1Status?: { stage1Done: boolean; stage2Done: boolean; stage3Done: boolean; stage4Done: boolean; allDone: boolean }`
+- Include those fields in `buildOutput()`
 
-### Files to touch
+This makes the Step-1 payload the real source of truth instead of forcing the parent to guess from fragments.
 
+#### 2. Parent should merge the Step-1 snapshot into a draft-safe form object
+File: `src/pages/VendorRegistration.tsx`
+
+Refactor the current mapping logic into a pure helper:
+
+- `mergeVerifiedDataIntoForm(prevFormData, verifiedData): VendorFormData`
+
+That helper should map:
+- organization legal/trade names
+- statutory GST/PAN/MSME values
+- bank values
+- Step-1 uploaded files:
+  - `gstCertificateFile`
+  - `panCardFile`
+  - `msmeCertificateFile`
+  - `cancelledChequeFile`
+
+Then:
+- `handleDocStageChange` updates a `latestStep1DataRef`
+- `handleDocStageChange` only calls `setVerifiedData` / `setFormData` when the merged values actually changed
+- `handleDocVerificationComplete` reuses the same merge helper, then advances to Step 2
+
+This removes duplication and keeps draft save + continue aligned.
+
+#### 3. Stop re-deriving completion in the parent
+File: `src/pages/VendorRegistration.tsx`
+
+Update `canProceedFromCurrentStep()` for Step 1 to use the child’s explicit completion result:
+
+- Prefer `verifiedData?.step1Status?.allDone`
+- Keep the old field-based fallback only as a defensive backup
+
+This ensures:
+- if the child shows all 4 tiles green, the parent action bar also enables
+- no mismatch between local child state and outer footer state
+
+#### 4. Save Draft should save the freshest Step-1 data, not a stale render snapshot
+File: `src/pages/VendorRegistration.tsx`
+
+Change `handleSaveAsDraft()` so when `currentStep === 1` it builds the payload from the latest lifted Step-1 snapshot before calling `saveVendor(...)`.
+
+Pattern:
+- read `latestStep1DataRef.current`
+- build `draftPayload = mergeVerifiedDataIntoForm(formData, latestStep1DataRef.current)`
+- pass `draftPayload` to `saveVendor(draftPayload)`
+
+Also update `lastSavedHashRef` using that same final payload.
+
+This fixes the case where the user clicks Save Draft immediately after the last verification/edit and the parent state has not fully flushed yet.
+
+#### 5. Prevent autosave/button churn from no-op state writes
+Files:
+- `src/pages/VendorRegistration.tsx`
+- optionally `src/components/vendor/steps/DocumentVerificationStep.tsx`
+
+Guard against repeated identical updates:
+- do not call `setVerifiedData` if the new Step-1 snapshot is materially unchanged
+- do not call `setFormData` if the merged result is the same as the previous form state
+
+That reduces unnecessary autosaves and avoids keeping the footer in a “saving/pending” loop.
+
+### Files to edit
 - `src/components/vendor/steps/DocumentVerificationStep.tsx`
-  - Replace the `ReadOnlyField` component used inside the verified panels with a new `EditableOcrField` that:
-    - Accepts `value`, `originalValue`, `onChange`, `mono`, `label`.
-    - Shows an "Edited" pill when `value !== originalValue`.
-    - Shows a "Reset" link to revert to `originalValue`.
-  - Add small helpers: `setOcrField(setDoc, key, value)` to mutate a single field on `gstDoc.ocrData` / `panDoc.ocrData` / etc.
-  - Wire all four verified-panel grids (GST, PAN, MSME, Bank) to the new editable field.
-  - Recompute `nameMatchScore` and the PAN-vs-GSTIN cross-check whenever the relevant edited values change (move both into `useEffect`s keyed on the OCR fields, instead of being set only at verify-time).
-  - Add the one-line helper banner inside each `verifiedFields` block.
+  - store uploaded `File` objects in doc state
+  - extend `VerifiedDocumentData`
+  - emit `step1Status` + file objects from `buildOutput()`
+
+- `src/pages/VendorRegistration.tsx`
+  - add `mergeVerifiedDataIntoForm(...)`
+  - add `latestStep1DataRef`
+  - update `handleDocStageChange`
+  - update `handleDocVerificationComplete`
+  - update `canProceedFromCurrentStep()`
+  - update `handleSaveAsDraft()` to save the merged latest Step-1 payload
+
+### Result after the fix
+- When all four Step-1 checks are green, `Continue` enables reliably
+- Clicking `Continue` advances to Step 2 reliably
+- `Save Draft` saves the latest OCR/manual-correction values reliably
+- Uploaded Step-1 files are carried into the form state, so draft saves include the actual documents too
+- The green state in Step 1 and the footer button state stay in sync
 
 ### Out of scope
-
-- Business Nature and Additional Places chip arrays — read-only in this pass.
-- GST Status badge — read-only (status comes from registry, not user-editable).
-- The "self-declaration" flow (when user picks "Not GST registered") — already fully editable, no change.
-- No DB migrations, no edge-function changes, no change to gating, tab auto-advance, Continue/Save Draft mechanics, or any other step.
-
+- No OCR extraction logic changes
+- No backend schema changes
+- No workflow or approval changes
+- No changes to steps 2–8 except consuming the corrected Step-1 data
