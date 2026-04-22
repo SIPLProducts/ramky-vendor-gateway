@@ -608,7 +608,17 @@ export default function VendorRegistration() {
       setShowFeedback(true);
       // Skip runValidations since frontend already validated
     } catch (error) {
-      toast({ title: 'Submission Failed', description: error instanceof Error ? error.message : 'An error occurred', variant: 'destructive' });
+      // Surface the deepest message we can find — Supabase errors often nest details/hint
+      const err = error as { message?: string; details?: string; hint?: string; code?: string } | null;
+      const description =
+        err?.message ||
+        err?.details ||
+        err?.hint ||
+        (err?.code ? `Database error (${err.code})` : '') ||
+        (typeof error === 'string' ? error : '') ||
+        'An unexpected error occurred. Please check your data and try again.';
+      console.error('[VendorRegistration] Submit failed:', error);
+      toast({ title: 'Submission Failed', description, variant: 'destructive' });
     }
   };
 
