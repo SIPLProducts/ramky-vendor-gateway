@@ -184,37 +184,39 @@ export function DocumentVerificationStep({
   const [isMsmeRegistered, setIsMsmeRegistered] = useState<boolean | null>(
     initialData?.isMsmeRegistered ?? (initialData?.msme ? true : null),
   );
-  const [msmeDoc, setMsmeDoc] = useState<DocState>(
-    initialData?.msme
-      ? {
-          status: "verified",
-          ocrData: {
-            udyam_number: initialData.msme.udyamNumber,
-            enterprise_name: initialData.msme.enterpriseName,
-            enterprise_type: initialData.msme.enterpriseType,
-          },
-          apiData: { name: initialData.msme.apiName },
-          nameMatchScore: initialData.msme.nameMatchScore,
-        }
-      : idleDoc,
-  );
+  const [msmeDoc, setMsmeDoc] = useState<DocState>(() => {
+    if (!initialData?.msme) return idleDoc;
+    const data = {
+      udyam_number: initialData.msme.udyamNumber,
+      enterprise_name: initialData.msme.enterpriseName,
+      enterprise_type: initialData.msme.enterpriseType,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.msme.apiName },
+      nameMatchScore: initialData.msme.nameMatchScore,
+    };
+  });
 
   // Stage 4: Bank
-  const [bankDoc, setBankDoc] = useState<DocState>(
-    initialData?.bank
-      ? {
-          status: "verified",
-          ocrData: {
-            account_number: initialData.bank.accountNumber,
-            ifsc_code: initialData.bank.ifsc,
-            bank_name: initialData.bank.bankName,
-            branch_name: initialData.bank.branchName,
-            account_holder_name: initialData.bank.accountHolderName,
-          },
-          apiData: { name: initialData.bank.apiName },
-        }
-      : idleDoc,
-  );
+  const [bankDoc, setBankDoc] = useState<DocState>(() => {
+    if (!initialData?.bank) return idleDoc;
+    const data = {
+      account_number: initialData.bank.accountNumber,
+      ifsc_code: initialData.bank.ifsc,
+      bank_name: initialData.bank.bankName,
+      branch_name: initialData.bank.branchName,
+      account_holder_name: initialData.bank.accountHolderName,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.bank.apiName },
+    };
+  });
 
   // ---------- Verification (dummy / simulated) ----------
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
