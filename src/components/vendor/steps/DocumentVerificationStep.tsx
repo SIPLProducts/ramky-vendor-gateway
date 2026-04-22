@@ -1008,6 +1008,150 @@ function ReadOnlyField({ label, value, mono }: { label: string; value?: string; 
   );
 }
 
+function GstStatusPill({ status }: { status?: string }) {
+  if (!status) return null;
+  const s = status.trim().toLowerCase();
+  const cls =
+    s === "active"
+      ? "bg-success/10 text-success"
+      : s === "cancelled" || s === "canceled" || s === "inactive"
+        ? "bg-destructive/10 text-destructive"
+        : s === "suspended"
+          ? "bg-warning/10 text-warning"
+          : "bg-muted text-muted-foreground";
+  return (
+    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", cls)}>
+      {status}
+    </span>
+  );
+}
+
+function ChipList({ items }: { items?: string[] }) {
+  const filtered = (items || []).filter((s) => typeof s === "string" && s.trim().length > 0);
+  if (filtered.length === 0) return <span className="text-sm text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {filtered.map((t, i) => (
+        <span key={`${t}-${i}`} className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {children}
+    </h4>
+  );
+}
+
+function GstVerifiedDetails({
+  ocr,
+  editablePrincipalPlace,
+  onChangePrincipalPlace,
+}: {
+  ocr?: Record<string, any>;
+  editablePrincipalPlace: string;
+  onChangePrincipalPlace: (v: string) => void;
+}) {
+  if (!ocr) return null;
+  const businessNature: string[] = Array.isArray(ocr.business_nature) ? ocr.business_nature : [];
+  const additionalPlaces: string[] = Array.isArray(ocr.additional_places) ? ocr.additional_places : [];
+  const hasAdditional = additionalPlaces.some((s) => typeof s === "string" && s.trim().length > 0);
+  const hasJurisdiction = !!(ocr.jurisdiction_centre || ocr.jurisdiction_state);
+  const hasRegistrationSection = !!(ocr.gst_status || ocr.registration_date || ocr.taxpayer_type || businessNature.length);
+  return (
+    <div className="space-y-5">
+      {/* Identity */}
+      <div className="space-y-2">
+        <SectionHeading>Identity</SectionHeading>
+        <div className="grid md:grid-cols-2 gap-3">
+          <ReadOnlyField label="Legal Name" value={ocr.legal_name} />
+          <ReadOnlyField label="Trade Name" value={ocr.trade_name} />
+          <ReadOnlyField label="GSTIN" value={ocr.gstin} mono />
+          <ReadOnlyField label="Constitution" value={ocr.constitution_of_business} />
+        </div>
+      </div>
+
+      {/* Registration */}
+      {hasRegistrationSection && (
+        <div className="space-y-2">
+          <SectionHeading>Registration</SectionHeading>
+          <div className="grid md:grid-cols-2 gap-3">
+            {ocr.gst_status && (
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">GST Status</Label>
+                <div className="mt-1 h-10 flex items-center rounded-md border border-border/60 bg-muted/40 px-3">
+                  <GstStatusPill status={ocr.gst_status} />
+                </div>
+              </div>
+            )}
+            {ocr.registration_date && (
+              <ReadOnlyField label="Registration Date" value={ocr.registration_date} />
+            )}
+            {ocr.taxpayer_type && (
+              <ReadOnlyField label="Taxpayer Type" value={ocr.taxpayer_type} />
+            )}
+            {businessNature.length > 0 && (
+              <div className="md:col-span-2">
+                <Label className="text-xs font-medium text-muted-foreground">Nature of Business</Label>
+                <div className="mt-1.5">
+                  <ChipList items={businessNature} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Place of Business */}
+      <div className="space-y-2">
+        <SectionHeading>Place of Business</SectionHeading>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="md:col-span-2">
+            <Label htmlFor="principal-place" className="text-xs font-medium text-muted-foreground">
+              Principal Place of Business
+            </Label>
+            <Input
+              id="principal-place"
+              value={editablePrincipalPlace}
+              onChange={(e) => onChangePrincipalPlace(e.target.value)}
+              placeholder="As per GST certificate"
+              className="mt-1"
+            />
+          </div>
+          {hasAdditional && (
+            <div className="md:col-span-2">
+              <Label className="text-xs font-medium text-muted-foreground">Additional Places of Business</Label>
+              <div className="mt-1.5">
+                <ChipList items={additionalPlaces} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Jurisdiction */}
+      {hasJurisdiction && (
+        <div className="space-y-2">
+          <SectionHeading>Jurisdiction</SectionHeading>
+          <div className="grid md:grid-cols-2 gap-3">
+            {ocr.jurisdiction_centre && (
+              <ReadOnlyField label="Centre Jurisdiction" value={ocr.jurisdiction_centre} />
+            )}
+            {ocr.jurisdiction_state && (
+              <ReadOnlyField label="State Jurisdiction" value={ocr.jurisdiction_state} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FormField({
   label, value, onChange, placeholder,
 }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
