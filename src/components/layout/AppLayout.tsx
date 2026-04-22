@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { MobileHeader } from './MobileHeader';
+import { EnterpriseHeader } from './EnterpriseHeader';
 import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
@@ -92,19 +93,27 @@ export function AppLayout() {
       )}
       
       {/* Main Content */}
-      <main className={cn(
-        "flex-1 overflow-auto transition-all duration-300",
-        // Mobile: Add padding for header and bottom nav
-        showMobileLayout && "pt-14 pb-20",
-        // Desktop with sidebar
-        showDesktopSidebar && "h-screen p-6",
-        // Vendor on any device (true vendor only — not custom-role users)
-        isVendor && "p-4 md:p-8",
-        // Mobile without sidebar (true vendor only)
-        isMobile && isVendor && "px-4"
+      <div className={cn(
+        "flex-1 flex flex-col overflow-hidden transition-all duration-300",
+        showDesktopSidebar && "h-screen",
       )}>
-        <Outlet />
-      </main>
+        {/* Desktop tenant switcher header for portal users */}
+        {showDesktopSidebar && <EnterpriseHeader />}
+
+        <main className={cn(
+          "flex-1 overflow-auto",
+          // Mobile: Add padding for header and bottom nav
+          showMobileLayout && "pt-14 pb-20",
+          // Desktop with sidebar — content padding
+          showDesktopSidebar && "p-6",
+          // Vendor on any device (true vendor only — not custom-role users)
+          isVendor && "p-4 md:p-8",
+          // Mobile without sidebar (true vendor only)
+          isMobile && isVendor && "px-4"
+        )}>
+          <Outlet />
+        </main>
+      </div>
 
       {/* Mobile Bottom Navigation */}
       {showMobileLayout && (

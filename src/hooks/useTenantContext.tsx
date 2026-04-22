@@ -28,7 +28,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const [activeTenantId, setActiveTenantIdState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(STORAGE_KEY) || null;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored && stored !== 'null' ? stored : null;
   });
 
   // Load tenants the user belongs to (for super admins, load all active tenants)
@@ -68,9 +69,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (isLoading || !user?.id) return;
 
     if (isSuperAdmin) {
-      // Super admin: validate stored id, otherwise null = all
+      // Super admin: default to "All Tenants" (null). Only honor a stored id if it's still valid.
       if (activeTenantId && !myTenantIds.includes(activeTenantId)) {
         setActiveTenantIdState(null);
+        if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY);
       }
       return;
     }
