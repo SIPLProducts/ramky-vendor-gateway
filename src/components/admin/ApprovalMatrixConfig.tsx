@@ -438,6 +438,15 @@ export function ApprovalMatrixConfig() {
           )}
         </CardContent>
       </Card>
+
+      {tenantId && (
+        <AssignUsersToTenantDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          tenantId={tenantId}
+          tenantName={currentTenant?.name}
+        />
+      )}
     </div>
   );
 }
@@ -447,9 +456,10 @@ interface ComboProps {
   value: string | null;
   excludeIds: string[];
   onSelect: (userId: string) => void;
+  onAssignUsers?: () => void;
 }
 
-function ApproverCombobox({ users, value, excludeIds, onSelect }: ComboProps) {
+function ApproverCombobox({ users, value, excludeIds, onSelect, onAssignUsers }: ComboProps) {
   const [open, setOpen] = useState(false);
   const selected = users.find((u) => u.user_id === value) ?? null;
   const exclude = new Set(excludeIds);
