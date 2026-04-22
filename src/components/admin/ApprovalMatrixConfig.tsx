@@ -233,7 +233,8 @@ export function ApprovalMatrixConfig() {
       toast({ title: 'Approval matrix saved' });
       await loadMatrix(tenantId);
     } catch (e: any) {
-      toast({ title: 'Save failed', description: e.message, variant: 'destructive' });
+      console.error('[ApprovalMatrix] Save failed:', e);
+      toast({ title: 'Save failed', description: e?.message ?? 'Unknown error — check console.', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
