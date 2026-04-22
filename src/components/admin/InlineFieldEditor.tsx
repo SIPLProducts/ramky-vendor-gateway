@@ -1,22 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpsertFormField } from '@/hooks/useFormBuilder';
 import type { FormFieldConfig } from '@/hooks/useTenant';
+import { cn } from '@/lib/utils';
 
 interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   tenantId: string;
   stepKey: string;
   field?: FormFieldConfig | null;
   defaultOrder?: number;
+  onClose: () => void;
 }
 
 const FIELD_TYPES = [
@@ -34,8 +33,9 @@ const FIELD_TYPES = [
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-export function FieldEditorDrawer({ open, onOpenChange, tenantId, stepKey, field, defaultOrder = 1 }: Props) {
+export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose }: Props) {
   const upsert = useUpsertFormField();
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
     field_name: '',
     display_label: '',
@@ -78,7 +78,7 @@ export function FieldEditorDrawer({ open, onOpenChange, tenantId, stepKey, field
         display_order: defaultOrder, options: [],
       });
     }
-  }, [field, open, defaultOrder]);
+  }, [field, defaultOrder]);
 
   const needsOptions = form.field_type === 'select' || form.field_type === 'multi-select';
 
@@ -103,94 +103,96 @@ export function FieldEditorDrawer({ open, onOpenChange, tenantId, stepKey, field
       display_order: Number(form.display_order) || 1,
       options: needsOptions ? form.options : null,
     });
-    onOpenChange(false);
+    onClose();
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{field ? 'Edit Field' : 'Add Field'}</SheetTitle>
-          <SheetDescription>Configure how this field appears to vendors.</SheetDescription>
-        </SheetHeader>
+    <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Display Label *</Label>
+          <Input
+            autoFocus
+            value={form.display_label}
+            onChange={(e) => setForm({ ...form, display_label: e.target.value })}
+            placeholder="e.g. ISO 9001 Certificate Number"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Field Key</Label>
+          <Input
+            value={form.field_name}
+            onChange={(e) => setForm({ ...form, field_name: e.target.value })}
+            placeholder={form.display_label ? slugify(form.display_label) : 'iso_9001_cert_no'}
+            disabled={!!field}
+          />
+        </div>
+      </div>
 
-        <div className="space-y-4 py-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Type</Label>
+          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 md:col-span-2">
+          <Label className="text-xs">Placeholder</Label>
+          <Input value={form.placeholder} onChange={(e) => setForm({ ...form, placeholder: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Order</Label>
+          <Input type="number" value={form.display_order}
+            onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 1 })} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="flex items-center justify-between rounded-md border p-2 bg-background">
+          <Label className="text-xs">Visible</Label>
+          <Switch checked={form.is_visible} onCheckedChange={(v) => setForm({ ...form, is_visible: v })} />
+        </div>
+        <div className="flex items-center justify-between rounded-md border p-2 bg-background">
+          <Label className="text-xs">Required</Label>
+          <Switch checked={form.is_mandatory} onCheckedChange={(v) => setForm({ ...form, is_mandatory: v })} />
+        </div>
+        <div className="flex items-center justify-between rounded-md border p-2 bg-background">
+          <Label className="text-xs">Editable</Label>
+          <Switch checked={form.is_editable} onCheckedChange={(v) => setForm({ ...form, is_editable: v })} />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+      >
+        {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+      </button>
+
+      {showAdvanced && (
+        <div className="space-y-3 pt-2 border-t">
           <div className="space-y-1.5">
-            <Label>Display Label *</Label>
-            <Input
-              value={form.display_label}
-              onChange={(e) => setForm({ ...form, display_label: e.target.value })}
-              placeholder="e.g. ISO 9001 Certificate Number"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Field Key</Label>
-            <Input
-              value={form.field_name}
-              onChange={(e) => setForm({ ...form, field_name: e.target.value })}
-              placeholder={form.display_label ? slugify(form.display_label) : 'iso_9001_cert_no'}
-              disabled={!!field}
-            />
-            <p className="text-xs text-muted-foreground">Lowercase + underscores. Auto-generated from label.</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Field Type</Label>
-              <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Display Order</Label>
-              <Input type="number" value={form.display_order}
-                onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 1 })} />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Placeholder</Label>
-            <Input value={form.placeholder} onChange={(e) => setForm({ ...form, placeholder: e.target.value })} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Help Text</Label>
+            <Label className="text-xs">Help Text</Label>
             <Textarea rows={2} value={form.help_text} onChange={(e) => setForm({ ...form, help_text: e.target.value })} />
           </div>
-
           <div className="space-y-1.5">
-            <Label>Default Value</Label>
+            <Label className="text-xs">Default Value</Label>
             <Input value={form.default_value} onChange={(e) => setForm({ ...form, default_value: e.target.value })} />
           </div>
-
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <Label className="text-xs">Visible</Label>
-              <Switch checked={form.is_visible} onCheckedChange={(v) => setForm({ ...form, is_visible: v })} />
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <Label className="text-xs">Required</Label>
-              <Switch checked={form.is_mandatory} onCheckedChange={(v) => setForm({ ...form, is_mandatory: v })} />
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <Label className="text-xs">Editable</Label>
-              <Switch checked={form.is_editable} onCheckedChange={(v) => setForm({ ...form, is_editable: v })} />
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Validation Regex</Label>
+              <Label className="text-xs">Validation Regex</Label>
               <Input value={form.validation_regex}
                 onChange={(e) => setForm({ ...form, validation_regex: e.target.value })}
                 placeholder="^[A-Z]{3}-\d{4}$" />
             </div>
             <div className="space-y-1.5">
-              <Label>Validation Message</Label>
+              <Label className="text-xs">Validation Message</Label>
               <Input value={form.validation_message}
                 onChange={(e) => setForm({ ...form, validation_message: e.target.value })}
                 placeholder="Invalid format" />
@@ -198,14 +200,14 @@ export function FieldEditorDrawer({ open, onOpenChange, tenantId, stepKey, field
           </div>
 
           {needsOptions && (
-            <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+            <div className="space-y-2 border rounded-lg p-3 bg-background">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Options</Label>
                 <Button type="button" size="sm" variant="outline" onClick={() => setForm({ ...form, options: [...form.options, { value: '', label: '' }] })}>
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add
                 </Button>
               </div>
-              {form.options.length === 0 && <p className="text-xs text-muted-foreground">No options yet. Add at least one.</p>}
+              {form.options.length === 0 && <p className="text-xs text-muted-foreground">No options yet.</p>}
               {form.options.map((opt, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input placeholder="Label" value={opt.label}
@@ -229,15 +231,15 @@ export function FieldEditorDrawer({ open, onOpenChange, tenantId, stepKey, field
             </div>
           )}
         </div>
+      )}
 
-        <SheetFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={upsert.isPending || !form.display_label.trim()}>
-            {upsert.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save Field
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+        <Button size="sm" onClick={handleSave} disabled={upsert.isPending || !form.display_label.trim()}>
+          {upsert.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+          {field ? 'Save Changes' : 'Add Field'}
+        </Button>
+      </div>
+    </div>
   );
 }
