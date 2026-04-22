@@ -575,15 +575,13 @@ export function ApprovalMatrixConfig() {
         </CardHeader>
         <CardContent>
           <div className="border rounded-md overflow-x-auto">
-            <Table className="min-w-[1100px]">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-24">Level #</TableHead>
-                  <TableHead className="w-40">Level Name</TableHead>
-                  <TableHead className="w-36">Designation</TableHead>
-                  <TableHead className="w-64">Approver</TableHead>
-                  <TableHead className="w-56">Email</TableHead>
-                  <TableHead className="w-28">Role</TableHead>
+                  <TableHead className="w-64">Approver (User Name)</TableHead>
+                  <TableHead className="w-64">Email</TableHead>
+                  <TableHead className="w-40">Role</TableHead>
                   <TableHead className="w-28">Mode</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -592,12 +590,12 @@ export function ApprovalMatrixConfig() {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
+                      <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                       No approvers configured for this tenant. Click <strong>+ Add Row</strong> to start.
                     </TableCell>
                   </TableRow>
@@ -605,6 +603,13 @@ export function ApprovalMatrixConfig() {
                   rows.map((r) => {
                     const selectedUser = r.user_id ? userById.get(r.user_id) : null;
                     const hasError = errorRowKeys.has(r.rowKey);
+                    const currentRole = r.user_id
+                      ? (pendingRoleChanges[r.user_id] ?? selectedUser?.role ?? null)
+                      : null;
+                    const excludeForLevel = rows
+                      .filter((x) => x.rowKey !== r.rowKey && x.level_number === r.level_number && x.user_id)
+                      .map((x) => x.user_id!);
+                    const excludeSet = new Set(excludeForLevel);
                     return (
                       <TableRow key={r.rowKey} className={cn(hasError && 'bg-destructive/5')}>
                         <TableCell>
@@ -621,19 +626,15 @@ export function ApprovalMatrixConfig() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Input
-                            value={r.level_name}
-                            onChange={(e) => updateLevelMeta(r.level_number, { level_name: e.target.value })}
-                            placeholder="e.g. SCM Head"
-                            className={cn('h-8', !r.level_name.trim() && 'border-destructive')}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={r.designation}
-                            onChange={(e) => updateLevelMeta(r.level_number, { designation: e.target.value })}
-                            placeholder="e.g. Manager"
-                            className="h-8"
+                          <ApproverCombobox
+                            users={tenantUsers}
+                            loading={usersLoading}
+                            value={r.user_id}
+                            invalid={!r.user_id}
+                            excludeIds={excludeForLevel}
+                            onSelect={(uid) => updateRow(r.rowKey, { user_id: uid })}
+                            onAssignUsers={() => setAssignDialogOpen(true)}
+                            mode="name"
                           />
                         </TableCell>
                         <TableCell>
@@ -642,19 +643,41 @@ export function ApprovalMatrixConfig() {
                             loading={usersLoading}
                             value={r.user_id}
                             invalid={!r.user_id}
-                            excludeIds={rows
-                              .filter((x) => x.rowKey !== r.rowKey && x.level_number === r.level_number && x.user_id)
-                              .map((x) => x.user_id!)}
+                            excludeIds={excludeForLevel}
                             onSelect={(uid) => updateRow(r.rowKey, { user_id: uid })}
                             onAssignUsers={() => setAssignDialogOpen(true)}
+                            mode="email"
                           />
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground truncate max-w-[14rem]">
-                          {selectedUser?.email ?? '—'}
-                        </TableCell>
                         <TableCell>
-                          {selectedUser?.role ? (
-                            <Badge variant="outline" className="text-xs">{selectedUser.role}</Badge>
+                          {!r.user_id ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : canEditRoles ? (
+                            <Select
+                              value={currentRole ?? ''}
+                              onValueChange={(v) => {
+                                setPendingRoleChanges((prev) => {
+                                  const next = { ...prev };
+                                  if (v === (selectedUser?.role ?? '')) {
+                                    delete next[r.user_id!];
+                                  } else {
+                                    next[r.user_id!] = v as AppRole;
+                                  }
+                                  return next;
+                                });
+                              }}
+                            >
+                              <SelectTrigger className={cn('h-8', pendingRoleChanges[r.user_id] && 'border-primary')}>
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {APP_ROLES.map((role) => (
+                                  <SelectItem key={role} value={role}>{role}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : currentRole ? (
+                            <Badge variant="outline" className="text-xs">{currentRole}</Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
