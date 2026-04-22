@@ -240,9 +240,6 @@ export function ApprovalMatrixConfig() {
       if (!r.level_number || r.level_number < 1) {
         errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: 'Invalid Level #' });
       }
-      if (!r.level_name.trim()) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: 'Level Name is empty' });
-      }
       if (!r.user_id) {
         errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: 'No approver selected' });
       } else {
