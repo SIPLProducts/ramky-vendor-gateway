@@ -267,9 +267,12 @@ export default function VendorRegistration() {
   };
 
   const canProceedFromCurrentStep = () => {
-    // Step 1 (Document Verification) requires all required stages resolved
+    // Step 1 (Document Verification) — trust the child's authoritative completion flag
     if (currentStep === 1) {
       if (!verifiedData) return false;
+      // Primary source of truth: child's explicit completion status
+      if (verifiedData.step1Status?.allDone) return true;
+      // Defensive fallback (covers legacy snapshots without step1Status)
       const gstOk =
         verifiedData.isGstRegistered === true
           ? !!verifiedData.gst
@@ -284,6 +287,15 @@ export default function VendorRegistration() {
       const msmeOk = verifiedData.isMsmeRegistered === false || !!verifiedData.msme;
       return gstOk && !!verifiedData.pan && msmeOk && !!verifiedData.bank;
     }
+    // Steps 5 (Commercial) and 6 (Bank) still allow inline verification
+    if (currentStep === 5) {
+      return stepValidationState[5] !== false;
+    }
+    if (currentStep === 6) {
+      return stepValidationState[6] === true;
+    }
+    return true;
+  };
     // Steps 5 (Commercial) and 6 (Bank) still allow inline verification
     if (currentStep === 5) {
       return stepValidationState[5] !== false;
