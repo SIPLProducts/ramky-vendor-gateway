@@ -44,11 +44,16 @@ Deno.serve(async (req) => {
     if (!progress) throw new Error('Progress not found');
     if (progress.status !== 'pending') throw new Error('Already actioned');
 
-    // Validate user is approver for this level
-    const { data: appr } = await admin
+    // Validate user is approver for this level — either by user_id OR by matching email
+    const userEmail = (userData.user.email ?? '').toLowerCase();
+    const { data: approvers } = await admin
       .from('approval_matrix_approvers')
-      .select('id').eq('level_id', progress.level_id).eq('user_id', userId).maybeSingle();
-    if (!appr) throw new Error('You are not an approver for this level');
+      .select('id, user_id, approver_email')
+      .eq('level_id', progress.level_id);
+    const isApprover = (approvers ?? []).some(
+      (a: any) => a.user_id === userId || (a.approver_email && a.approver_email.toLowerCase() === userEmail)
+    );
+    if (!isApprover) throw new Error('You are not an approver for this level');
 
     // Validate it is the active (lowest-numbered pending) level for the vendor
     const { data: allProgress } = await admin
