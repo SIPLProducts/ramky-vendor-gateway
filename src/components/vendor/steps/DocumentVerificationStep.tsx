@@ -36,6 +36,7 @@ interface DocumentVerificationStepProps {
   vendorId?: string;
   initialData?: VerifiedDocumentData;
   onComplete: (data: VerifiedDocumentData) => void;
+  onStageChange?: (data: VerifiedDocumentData) => void;
 }
 
 type DocStatus = "idle" | "uploading" | "ocr" | "verifying" | "verified" | "failed";
