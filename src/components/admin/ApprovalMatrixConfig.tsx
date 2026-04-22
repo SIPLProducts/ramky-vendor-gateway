@@ -322,9 +322,26 @@ export function ApprovalMatrixConfig() {
         details: { tenant_id: tenantId, level_count: grouped.length, row_count: rows.length },
       });
 
-      console.log('[ApprovalMatrix] done — saved', grouped.length, 'levels and', savedApprovers, 'approvers');
+      // Apply pending role changes
+      const roleEntries = Object.entries(pendingRoleChanges);
+      let rolesUpdated = 0;
+      for (const [uid, newRole] of roleEntries) {
+        console.log('[ApprovalMatrix] updating role for user', uid, '->', newRole);
+        const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', uid);
+        if (delErr) throw delErr;
+        const { error: insErr } = await supabase.from('user_roles').insert({ user_id: uid, role: newRole });
+        if (insErr) throw insErr;
+        rolesUpdated++;
+      }
+      if (rolesUpdated > 0) {
+        await queryClient.invalidateQueries({ queryKey: ['tenant-users-with-roles'] });
+        await queryClient.invalidateQueries({ queryKey: ['all-profiles-with-roles'] });
+      }
+      setPendingRoleChanges({});
+
+      console.log('[ApprovalMatrix] done — saved', grouped.length, 'levels and', savedApprovers, 'approvers,', rolesUpdated, 'role changes');
       setLastSaveResult({ levels: grouped.length, approvers: savedApprovers, at: Date.now() });
-      toast({ title: 'Approval matrix saved', description: `${grouped.length} level(s), ${savedApprovers} approver(s)` });
+      toast({ title: 'Approval matrix saved', description: `${grouped.length} level(s), ${savedApprovers} approver(s)${rolesUpdated > 0 ? `, ${rolesUpdated} role update(s)` : ''}` });
       await Promise.all([loadMatrix(tenantId), loadDbState(tenantId)]);
     } catch (e: any) {
       console.error('[ApprovalMatrix] Save failed:', e);
