@@ -86,6 +86,8 @@ export interface ContactDetails {
   ceoDesignation: string;
   ceoPhone: string;
   ceoEmail: string;
+  ceoPhone2?: string;
+  ceoEmail2?: string;
   
   // Marketing/Sales Contact
   marketingName: string;

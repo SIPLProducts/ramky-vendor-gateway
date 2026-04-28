@@ -230,6 +230,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       primary_designation: formData.contact.ceoDesignation,
       primary_email: formData.contact.ceoEmail,
       primary_phone: formData.contact.ceoPhone,
+      primary_phone_2: formData.contact.ceoPhone2 || null,
+      primary_email_2: formData.contact.ceoEmail2 || null,
       // Secondary Contact (Marketing)
       secondary_contact_name: formData.contact.marketingName || null,
       secondary_designation: formData.contact.marketingDesignation || null,
@@ -392,6 +394,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         ceoDesignation: vendor.primary_designation || '',
         ceoPhone: vendor.primary_phone || '',
         ceoEmail: vendor.primary_email || '',
+        ceoPhone2: (vendor as any).primary_phone_2 || '',
+        ceoEmail2: (vendor as any).primary_email_2 || '',
         marketingName: vendor.secondary_contact_name || '',
         marketingDesignation: vendor.secondary_designation || '',
         marketingPhone: vendor.secondary_phone || '',
