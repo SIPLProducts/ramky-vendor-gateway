@@ -458,6 +458,7 @@ export function DocumentVerificationStep({
         udyamNumber: msmeDoc.ocrData.udyam_number,
         enterpriseName: msmeDoc.ocrData.enterprise_name,
         enterpriseType: msmeDoc.ocrData.enterprise_type,
+        majorActivity: msmeDoc.ocrData.major_activity,
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
       };
