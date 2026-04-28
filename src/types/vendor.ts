@@ -125,6 +125,7 @@ export interface StatutoryDetails {
   msmeCategory: 'micro' | 'small' | 'medium' | '';
   labourPermitNo: string;
   iecNo: string;
+  swiftIbanCode: string;
   entityType: string;
 
   memberships: string[];
@@ -135,6 +136,8 @@ export interface StatutoryDetails {
   gstCertificateFile: File | null;
   panCardFile: File | null;
   msmeCertificateFile: File | null;
+  iecCertificateFile: File | null;
+  swiftIbanProofFile: File | null;
 }
 
 // Step 5: Bank Details
