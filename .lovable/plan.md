@@ -1,31 +1,32 @@
-## Add "Major Activity" to MSME Document Verification
+## Auto-fill Branch Name in Bank Details
 
-Udyam/MSME certificates print a "Major Activity" line (e.g. "Manufacturing" / "Services / Trading"). Today we extract Udyam Number, Enterprise Name, and Enterprise Type. We will add Major Activity, OCR it from the uploaded certificate, and show it beside Enterprise Type — editable like the other OCR fields.
+Today the Branch field in the Bank Details tab is populated only from cheque OCR (`branch_name`). On many cheques the branch line is faint, cropped or not printed at all, so the field stays empty and the vendor has to type it.
+
+We'll keep the current cheque-OCR behavior, and add an **IFSC fallback**: whenever the IFSC code is present but Branch (and/or Bank Name) is empty, we look the IFSC up and auto-fill Branch — and Bank Name and Bank Address if those are blank too.
 
 ### What changes
 
-1. **OCR schema** — `supabase/functions/ocr-extract/index.ts`
-   - In the `msme` extraction tool schema, add a new property:
-     - `major_activity` — string, description: "Major Activity printed on the certificate, e.g. Manufacturing, Services, Trading"
-   - Keep it optional (not in `required`) so older/poor-quality scans still pass.
+1. **New tiny helper** — `src/lib/ifscLookup.ts`
+   - Calls the public Razorpay IFSC API: `https://ifsc.razorpay.com/<IFSC>`.
+   - Returns `{ bank, branch, address, city, state }` or `null` on failure.
+   - Validates IFSC format (`^[A-Z]{4}0[A-Z0-9]{6}$`) before calling.
+   - In-memory cache so the same IFSC isn't re-fetched.
 
-2. **Document Verification UI** — `src/components/vendor/steps/DocumentVerificationStep.tsx`
-   - In the MSME tab's `verifiedFields` grid (currently Udyam Number, Enterprise Name, Enterprise Type), add a fourth `EditableOcrField`:
-     - Label: "Major Activity"
-     - Value bound to `msmeDoc.ocrData?.major_activity` with `setOcrField(setMsmeDoc, "major_activity", v)`.
-   - Extend the local `msme` initial-data hydration (around line 202–214) and the `out.msme = { ... }` writer (around line 456–462) to round-trip `majorActivity`.
-   - Update the inline `msme?` type at the top of the file (line 38) to include `majorActivity?: string`.
+2. **Document Verification step** — `src/components/vendor/steps/DocumentVerificationStep.tsx`
+   - After cheque OCR completes (in `runDocFlow` for the `cheque` branch, near line 267), if `ifsc_code` is valid AND `branch_name` is empty, call the IFSC helper and patch:
+     - `branch_name` ← API `branch`
+     - `bank_name` ← API `bank` (only if cheque OCR didn't return one)
+     - `bankBranchAddress` state ← API `address` (only if user hasn't typed one)
+   - Also trigger the same lookup whenever the user **edits the IFSC field manually** and Branch is empty — debounced, so it fires once they stop typing.
+   - Show a subtle inline hint under the Branch field when it was filled from IFSC (e.g. "Auto-filled from IFSC"), so the vendor knows to verify.
 
-3. **No DB schema change** required for this step
-   - The Document Verification screen stores the verified MSME object on the in-memory form snapshot it returns to the parent. Major Activity will flow alongside Enterprise Type in that same payload.
-   - If/when we want to persist it to the `vendors` table or display it on Finance/Purchase review, that's a follow-up — out of scope here per the request ("add that field … beside the enterprise type").
-
-### Files touched
-
-- `supabase/functions/ocr-extract/index.ts` — add `major_activity` to MSME schema
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — add field + hydrate/serialize
+3. **No DB or edge-function changes** — Razorpay's IFSC endpoint is public, free, no key required, and CORS-enabled, so it can be called straight from the browser.
 
 ### Out of scope
+- Server-side caching of IFSC lookups.
+- Changing how `validate-bank` derives branch (it already uses its own IFSC mapping during penny-drop).
+- Backfilling branch for vendors already submitted.
 
-- Adding a column to `vendors` for `msme_major_activity` (can be added later if you want it surfaced in Finance Review / SAP Sync).
-- Changes to ComplianceStep or ReviewStep.
+### Files touched
+- `src/lib/ifscLookup.ts` (new)
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` (cheque post-OCR hook + IFSC onChange hook + small "Auto-filled from IFSC" hint)
