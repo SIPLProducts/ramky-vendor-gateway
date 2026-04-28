@@ -36,6 +36,7 @@ const schema = z.object({
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
+  productCategoriesOther: z.string().optional(),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
@@ -47,6 +48,14 @@ const schema = z.object({
   enlistments: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
   operationalNetwork: z.string().optional(),
+}).superRefine((vals, ctx) => {
+  if (vals.productCategories?.includes('Others') && !vals.productCategoriesOther?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['productCategoriesOther'],
+      message: 'Please specify the other category/service',
+    });
+  }
 });
 
 type FormValues = OrganizationDetails & {
