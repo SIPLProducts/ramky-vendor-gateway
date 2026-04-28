@@ -973,7 +973,7 @@ export function DocumentVerificationStep({
                         <Label className="text-xs font-medium text-muted-foreground">Bank Address</Label>
                         <Input
                           value={bankBranchAddress}
-                          onChange={(e) => setBankBranchAddress(e.target.value)}
+                          onChange={(e) => { bankAddressTouchedRef.current = true; setBankBranchAddress(e.target.value); }}
                           placeholder="Branch address (optional)"
                           className="mt-1 bg-muted/40 border-border/60"
                         />
