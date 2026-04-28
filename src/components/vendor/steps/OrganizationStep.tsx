@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { FileUpload } from '@/components/vendor/FileUpload';
 import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -43,6 +44,7 @@ const schema = z.object({
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
   iecNo: z.string().optional(),
+  swiftIbanCode: z.string().optional(),
   labourPermitNo: z.string().optional(),
   memberships: z.array(z.string()).optional(),
   enlistments: z.array(z.string()).optional(),
@@ -65,6 +67,7 @@ type FormValues = OrganizationDetails & {
   pfNumber: string;
   esiNumber: string;
   iecNo: string;
+  swiftIbanCode: string;
   labourPermitNo: string;
   memberships: string[];
   enlistments: string[];
