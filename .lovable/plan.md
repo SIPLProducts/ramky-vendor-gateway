@@ -1,17 +1,35 @@
-I found the root cause: the OCR backend is already extracting `major_activity` correctly as `Services`, but the UI in your preview is still rendering the old MSME field block with only 3 fields. I will make the field rendering more robust and ensure loaded draft data also carries the extracted value.
+# Add "Others" Free-Text Input for Product/Service Categories
 
-Plan:
-1. Update the MSME verified details UI so `Major Activity` always renders beside `Enterprise Type`, even when the value is empty.
-2. Add explicit fallback display logic so if OCR does not fill it, the input still appears with a clear placeholder/manual-entry message instead of disappearing.
-3. Fix draft hydration in `VendorRegistration.tsx` so existing verified MSME data maps back into the document step with `enterpriseType` and `majorActivity` instead of only `udyamNumber` and `enterpriseName`.
-4. Fix the Step 1 to form merge so MSME enterprise type/category is carried into the statutory data where appropriate.
-5. Keep OCR backend as-is for now because recent logs/database records confirm it is already returning:
-   - `enterprise_type`: `Micro`
-   - `major_activity`: `Services`
+When the user selects **"Others"** in the Product/Service Categories multi-select on the Organization Profile step, show an additional text input where they can manually type the custom category/service. The value is required when "Others" is selected, and is persisted with the rest of the organization profile.
 
-Technical details:
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` already has `major_activity` in OCR output and build output, but I will make the field block more defensive so it cannot be hidden by missing data or older state.
-- `src/pages/VendorRegistration.tsx` currently rehydrates existing draft MSME data with only:
-  `udyamNumber` and `enterpriseName`.
-  I will extend that mapping to include `enterpriseType` and `majorActivity` when available.
-- If the database/form model does not currently persist a dedicated `majorActivity` field, I will preserve the visible Step 1 value in the verified data and avoid breaking existing schema.
+## Changes
+
+### 1. `src/types/vendor.ts`
+- Add a new optional field on `OrganizationDetails`:
+  - `productCategoriesOther?: string` — free-text value used only when "Others" is in `productCategories`.
+
+### 2. `src/components/vendor/steps/OrganizationStep.tsx`
+- Extend the zod schema with `productCategoriesOther: z.string().optional()` and add a `superRefine` (or `.refine`) rule: if `productCategories` includes `"Others"`, then `productCategoriesOther` must be a non-empty trimmed string (error: "Please specify the other category").
+- Add `productCategoriesOther` to `defaultValues` (hydrated from `data.productCategoriesOther || ''`).
+- Watch the `productCategories` field via `useWatch` to conditionally render the input.
+- Render a new `<Input>` (label: "Please specify other category/service *", placeholder: "e.g. Drone surveying, Software licensing") **directly below** the MultiSelect, only when `"Others"` is present in the selection.
+- Include `productCategoriesOther` in the `organization` object passed to `onNext`. If "Others" is not selected, clear it to `''` before submit so stale text isn't kept.
+
+### 3. `src/pages/VendorRegistration.tsx`
+- Add `productCategoriesOther: ''` to the initial `organization` default state object (line ~44) so the form has a stable initial value and draft hydration works.
+- In the draft hydration mapping (where other org fields are reloaded from the saved vendor row), include `productCategoriesOther` so it persists across sessions.
+
+### 4. `src/components/vendor/steps/ReviewStep.tsx` (lightweight)
+- If "Others" is part of `productCategories`, display the custom value alongside the categories list (e.g. `"Others: <text>"`) so reviewers/admins can see what the vendor specified. No structural changes — just an additional line in the categories summary.
+
+## UX details
+
+- Input appears immediately below the MultiSelect with the same spacing as other fields.
+- Required indicator (`*`) shown only when "Others" is selected.
+- Validation error renders inline below the input in the existing destructive-text style.
+- If the user removes "Others" from the selection, the input is hidden and its value is cleared on next submit.
+
+## Out of scope
+
+- No database migration is needed; the new field rides inside the existing `organization` JSON blob already saved with the vendor draft.
+- No changes to admin form-builder dynamic fields or to the OCR pipeline.
