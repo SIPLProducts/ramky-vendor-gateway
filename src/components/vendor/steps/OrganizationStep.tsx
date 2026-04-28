@@ -36,6 +36,7 @@ const schema = z.object({
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
+  productCategoriesOther: z.string().optional(),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
@@ -47,9 +48,18 @@ const schema = z.object({
   enlistments: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
   operationalNetwork: z.string().optional(),
+}).superRefine((vals, ctx) => {
+  if (vals.productCategories?.includes('Others') && !vals.productCategoriesOther?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['productCategoriesOther'],
+      message: 'Please specify the other category/service',
+    });
+  }
 });
 
 type FormValues = OrganizationDetails & {
+  productCategoriesOther: string;
   entityType: string;
   firmRegistrationNo: string;
   pfNumber: string;
@@ -86,11 +96,14 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
     register,
     handleSubmit,
     control,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       ...data,
+      productCategoriesOther: data?.productCategoriesOther || '',
       entityType: statutoryData?.entityType || '',
       firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
       pfNumber: statutoryData?.pfNumber || '',
@@ -104,7 +117,11 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
     },
   });
 
+  const selectedCategories = watch('productCategories') || [];
+  const showOtherInput = selectedCategories.includes('Others');
+
   const handleFormSubmit = (values: FormValues) => {
+    const includesOthers = values.productCategories?.includes('Others');
     const organization: OrganizationDetails = {
       buyerCompanyId: values.buyerCompanyId,
       legalName: values.legalName,
@@ -113,6 +130,7 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
       organizationType: values.organizationType,
       ownershipType: values.ownershipType,
       productCategories: values.productCategories,
+      productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
     };
     const statutory: StatutoryDetails = {
       ...statutoryData,
@@ -282,6 +300,23 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
               <p className="text-xs text-destructive">{errors.productCategories.message}</p>
             )}
           </div>
+
+          {showOtherInput && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="productCategoriesOther">
+                Please specify other category/service <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="productCategoriesOther"
+                {...register('productCategoriesOther')}
+                placeholder="e.g. Drone surveying, Software licensing"
+                className={errors.productCategoriesOther ? 'border-destructive' : ''}
+              />
+              {errors.productCategoriesOther && (
+                <p className="text-xs text-destructive">{errors.productCategoriesOther.message as string}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

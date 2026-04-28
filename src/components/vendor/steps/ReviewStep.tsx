@@ -46,6 +46,9 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
           <DataRow label="Organization Type" value={data.organization?.organizationType} />
           <DataRow label="Ownership Type" value={data.organization?.ownershipType} />
           <DataRow label="Product Categories" value={data.organization?.productCategories?.join(', ')} />
+          {data.organization?.productCategories?.includes('Others') && data.organization?.productCategoriesOther && (
+            <DataRow label="Others (Specified)" value={data.organization.productCategoriesOther} />
+          )}
         </div>
       </div>
 

@@ -32,6 +32,7 @@ export interface OrganizationDetails {
   organizationType: string;
   ownershipType: string;
   productCategories: string[];
+  productCategoriesOther?: string;
 }
 
 // Step 2: Address Information
