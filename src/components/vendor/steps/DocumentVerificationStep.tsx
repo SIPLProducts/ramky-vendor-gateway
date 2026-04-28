@@ -863,18 +863,34 @@ export function DocumentVerificationStep({
                             originalValue={msmeDoc.originalOcrData?.enterprise_name}
                             onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
                           />
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-3">
                           <EditableOcrField
                             label="Enterprise Type"
                             value={msmeDoc.ocrData?.enterprise_type}
                             originalValue={msmeDoc.originalOcrData?.enterprise_type}
                             onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                           />
-                          <EditableOcrField
-                            label="Major Activity"
-                            value={msmeDoc.ocrData?.major_activity}
-                            originalValue={msmeDoc.originalOcrData?.major_activity}
-                            onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
-                          />
+                          <div>
+                            <EditableOcrField
+                              label="Major Activity"
+                              value={msmeDoc.ocrData?.major_activity}
+                              originalValue={msmeDoc.originalOcrData?.major_activity}
+                              onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
+                              placeholder="e.g. Manufacturing, Services, Trading"
+                            />
+                            {!msmeDoc.ocrData?.major_activity && !msmeDoc.file && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                Couldn't read Major Activity from the certificate — please enter manually.
+                              </p>
+                            )}
+                            {!msmeDoc.ocrData?.major_activity && msmeDoc.file && (
+                              <p className="mt-1 text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                <Sparkles className="h-3 w-3 text-primary" />
+                                Reading Major Activity from certificate…
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     }
