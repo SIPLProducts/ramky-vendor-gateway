@@ -1,63 +1,68 @@
-## Add IEC + SWIFT/IBAN fields with file uploads in Statutory & Registrations
+## Add Address Line 4 + Email field across all address blocks
 
-In the **Organization Profile → Statutory & Registrations** section, the IEC No. field needs a document upload, and a new **SWIFT / IBAN Code** field (also with upload) must be added beside it.
+In the **Address Information** step, extend each address block (Registered, Manufacturing, Branch) with a new **Address Line 4** field, enforce a **40-character limit on all four address lines**, and add a **required Email ID** field beside the Website field.
 
-### UI changes (`src/components/vendor/steps/OrganizationStep.tsx`)
+### Type changes (`src/types/vendor.ts`)
 
-Replace the current single-row layout for `IEC No.` + `Operational Network` with a new layout:
+Extend `AddressDetails` with:
+- `registeredAddressLine4: string`
+- `registeredEmail: string` (required)
+- `manufacturingAddressLine4: string`
+- `manufacturingEmail: string`
+- `branchAddressLine2: string`, `branchAddressLine3: string`, `branchAddressLine4: string` (currently branch has only one address line)
+- `branchEmail: string`
 
-```text
-Row 1:  [ IEC No. (Import/Export) ]   [ SWIFT / IBAN Code ]
-Row 2:  [ IEC Certificate Upload  ]   [ SWIFT/IBAN Proof Upload ]
-Row 3:  [ Operational Network (full width or paired) ]
-```
+### Schema / form changes (`src/components/vendor/steps/AddressStep.tsx`)
 
-- Add a new text field **SWIFT / IBAN Code** (optional, placeholder: `e.g. SBININBB123 or GB29NWBK60161331926819`).
-- Add two `<FileUpload>` components below the inputs:
-  - **IEC Certificate** — `documentType="iec_certificate"`, accepts `.pdf,.jpg,.jpeg,.png`, max 5MB.
-  - **SWIFT / IBAN Proof** — `documentType="swift_iban_proof"`, same accept/size.
-- Both uploads use the existing `FileUpload` component, which already pushes files to the `vendor-documents` Supabase storage bucket using `vendorId`.
-- Pass the current `vendorId` (already available in `VendorRegistration.tsx`) down to `OrganizationStep` as a new prop so `FileUpload` can persist files to storage.
+- Update zod schema: each of the four address lines uses `z.string().max(40, 'Maximum 40 characters allowed')`. Line 1 stays required (`.min(5)`), Lines 2–4 stay optional but capped at 40.
+- `registeredEmail` becomes required: `z.string().trim().email('Valid email required').max(100)`.
+- `manufacturingEmail` and `branchEmail`: optional, validated as email when present.
+- UI updates:
+  - **Registered block** — add Address Line 4 input next to Line 3 (or in a new row), apply `maxLength={40}` on Lines 1–4, and add an **Email ID *** field in the same row as Website.
+  - **Manufacturing block** — same Line 4 + Email additions, mirroring registered when "same as registered" is checked (extend the `useEffect` sync logic).
+  - **Branch block** — split current single `branchAddress` into Lines 1–4 (each with `maxLength={40}`) and add Email field beside the existing Website field.
+- Add `maxLength={40}` HTML attribute on all address line inputs as a UX safeguard alongside zod validation.
 
-### Schema / type changes (`src/types/vendor.ts`)
+### Initial state (`src/pages/VendorRegistration.tsx`)
 
-Extend `StatutoryDetails` with:
-- `swiftIbanCode: string`
-- `iecCertificateFile: File | null`
-- `swiftIbanProofFile: File | null`
-
-### Form state (`src/components/vendor/steps/OrganizationStep.tsx`)
-
-- Add the three new fields to the zod schema (`swiftIbanCode` optional string; the file fields are tracked in local component state, not the zod form, mirroring how `gstCertificateFile` etc. are handled today).
-- Hydrate from `statutoryData` in `defaultValues` and pass them through in `handleFormSubmit`'s `statutory` object.
-
-### Registration page (`src/pages/VendorRegistration.tsx`)
-
-- Add `swiftIbanCode: ''`, `iecCertificateFile: null`, `swiftIbanProofFile: null` to the initial `statutory` default state.
-- Pass `vendorId` prop into `OrganizationStep`.
+Add the new keys with empty-string defaults to the `address` object in `initialFormData` so the form has stable initial values and draft hydration works.
 
 ### Persistence (`src/hooks/useVendorRegistration.tsx`)
 
-- Map two new columns when saving/loading drafts:
-  - `swift_iban_code` ↔ `swiftIbanCode`
-  - File paths are already implicitly handled via storage bucket naming (`{vendorId}/iec_certificate_*`, `{vendorId}/swift_iban_proof_*`); no extra DB column needed for the files themselves (matches existing pattern for cert files).
+- Map the new fields when saving (`saveVendor`) and hydrating (`existingFormData`) drafts:
+  - `registered_address_line4`, `registered_email`
+  - `manufacturing_address_line4`, `manufacturing_email`
+  - `branch_address_line2`, `branch_address_line3`, `branch_address_line4`, `branch_email`
 
 ### Database migration
 
-Add one column to the `vendors` table:
+Add the new columns to the `vendors` table:
+
 ```sql
 ALTER TABLE public.vendors
-  ADD COLUMN IF NOT EXISTS swift_iban_code text;
+  ADD COLUMN IF NOT EXISTS registered_address_line4 text,
+  ADD COLUMN IF NOT EXISTS registered_email text,
+  ADD COLUMN IF NOT EXISTS manufacturing_address_line4 text,
+  ADD COLUMN IF NOT EXISTS manufacturing_email text,
+  ADD COLUMN IF NOT EXISTS branch_address_line2 text,
+  ADD COLUMN IF NOT EXISTS branch_address_line3 text,
+  ADD COLUMN IF NOT EXISTS branch_address_line4 text,
+  ADD COLUMN IF NOT EXISTS branch_email text;
 ```
-No new column for files — they live in the existing `vendor-documents` storage bucket and are listed via `VendorDocuments.tsx`.
 
-### Review step (`src/components/vendor/steps/ReviewStep.tsx`)
+### Mock data (`src/data/mockVendors.ts`)
 
-- Show **SWIFT / IBAN Code** value in the Statutory summary block.
-- Show indicators for **IEC Certificate** and **SWIFT/IBAN Proof** (uploaded / not uploaded), matching how other certificate uploads are summarized.
+Add the new fields with empty/sample values so existing mock vendors remain type-valid.
+
+### UX details
+
+- Address Line 4 placeholder: `"Additional address detail (max 40 chars)"`.
+- Email field placeholder: `"contact@company.com"`, `type="email"`, required indicator (*) only on the Registered Office block. Manufacturing and Branch emails stay optional.
+- Validation errors render inline under each input in the existing destructive style.
+- The "same as registered" toggle on Manufacturing also copies Line 4 and Email.
 
 ### Out of scope
 
-- No validation API for SWIFT/IBAN format (kept as free-text like IEC).
-- No OCR auto-extraction for these certificates.
-- No changes to admin form-builder or approval workflows.
+- No changes to ReviewStep summary (existing block already iterates address lines generically — the new fields will surface there once persisted; only verify no hard-coded line-list).
+- No OCR auto-population for the new fields.
+- No SAP field mapping changes (can be added later by admin).
