@@ -40,30 +40,38 @@ export interface AddressDetails {
   registeredAddress: string;
   registeredAddressLine2: string;
   registeredAddressLine3: string;
+  registeredAddressLine4: string;
   registeredCity: string;
   registeredState: string;
   registeredPincode: string;
   registeredPhone: string;
   registeredFax: string;
   registeredWebsite: string;
+  registeredEmail: string;
   
   manufacturingAddress: string;
   manufacturingAddressLine2: string;
   manufacturingAddressLine3: string;
+  manufacturingAddressLine4: string;
   manufacturingCity: string;
   manufacturingState: string;
   manufacturingPincode: string;
   manufacturingPhone: string;
   manufacturingFax: string;
+  manufacturingEmail: string;
   sameAsRegistered: boolean;
   
   branchName: string;
   branchAddress: string;
+  branchAddressLine2: string;
+  branchAddressLine3: string;
+  branchAddressLine4: string;
   branchCity: string;
   branchState: string;
   branchPincode: string;
   branchCountry: string;
   branchWebsite: string;
+  branchEmail: string;
   branchContactName: string;
   branchContactDesignation: string;
   branchContactEmail: string;

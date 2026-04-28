@@ -1292,6 +1292,9 @@ export type Database = {
           bank_name: string | null
           bank_verification_status: string | null
           branch_address: string | null
+          branch_address_line2: string | null
+          branch_address_line3: string | null
+          branch_address_line4: string | null
           branch_city: string | null
           branch_contact_designation: string | null
           branch_contact_email: string | null
@@ -1299,6 +1302,7 @@ export type Database = {
           branch_contact_name: string | null
           branch_contact_phone: string | null
           branch_country: string | null
+          branch_email: string | null
           branch_name: string | null
           branch_pincode: string | null
           branch_state: string | null
@@ -1357,7 +1361,9 @@ export type Database = {
           manufacturing_address: string | null
           manufacturing_address_line2: string | null
           manufacturing_address_line3: string | null
+          manufacturing_address_line4: string | null
           manufacturing_city: string | null
+          manufacturing_email: string | null
           manufacturing_fax: string | null
           manufacturing_phone: string | null
           manufacturing_pincode: string | null
@@ -1403,7 +1409,9 @@ export type Database = {
           registered_address: string | null
           registered_address_line2: string | null
           registered_address_line3: string | null
+          registered_address_line4: string | null
           registered_city: string | null
+          registered_email: string | null
           registered_fax: string | null
           registered_phone: string | null
           registered_pincode: string | null
@@ -1443,6 +1451,9 @@ export type Database = {
           bank_name?: string | null
           bank_verification_status?: string | null
           branch_address?: string | null
+          branch_address_line2?: string | null
+          branch_address_line3?: string | null
+          branch_address_line4?: string | null
           branch_city?: string | null
           branch_contact_designation?: string | null
           branch_contact_email?: string | null
@@ -1450,6 +1461,7 @@ export type Database = {
           branch_contact_name?: string | null
           branch_contact_phone?: string | null
           branch_country?: string | null
+          branch_email?: string | null
           branch_name?: string | null
           branch_pincode?: string | null
           branch_state?: string | null
@@ -1508,7 +1520,9 @@ export type Database = {
           manufacturing_address?: string | null
           manufacturing_address_line2?: string | null
           manufacturing_address_line3?: string | null
+          manufacturing_address_line4?: string | null
           manufacturing_city?: string | null
+          manufacturing_email?: string | null
           manufacturing_fax?: string | null
           manufacturing_phone?: string | null
           manufacturing_pincode?: string | null
@@ -1554,7 +1568,9 @@ export type Database = {
           registered_address?: string | null
           registered_address_line2?: string | null
           registered_address_line3?: string | null
+          registered_address_line4?: string | null
           registered_city?: string | null
+          registered_email?: string | null
           registered_fax?: string | null
           registered_phone?: string | null
           registered_pincode?: string | null
@@ -1594,6 +1610,9 @@ export type Database = {
           bank_name?: string | null
           bank_verification_status?: string | null
           branch_address?: string | null
+          branch_address_line2?: string | null
+          branch_address_line3?: string | null
+          branch_address_line4?: string | null
           branch_city?: string | null
           branch_contact_designation?: string | null
           branch_contact_email?: string | null
@@ -1601,6 +1620,7 @@ export type Database = {
           branch_contact_name?: string | null
           branch_contact_phone?: string | null
           branch_country?: string | null
+          branch_email?: string | null
           branch_name?: string | null
           branch_pincode?: string | null
           branch_state?: string | null
@@ -1659,7 +1679,9 @@ export type Database = {
           manufacturing_address?: string | null
           manufacturing_address_line2?: string | null
           manufacturing_address_line3?: string | null
+          manufacturing_address_line4?: string | null
           manufacturing_city?: string | null
+          manufacturing_email?: string | null
           manufacturing_fax?: string | null
           manufacturing_phone?: string | null
           manufacturing_pincode?: string | null
@@ -1705,7 +1727,9 @@ export type Database = {
           registered_address?: string | null
           registered_address_line2?: string | null
           registered_address_line3?: string | null
+          registered_address_line4?: string | null
           registered_city?: string | null
+          registered_email?: string | null
           registered_fax?: string | null
           registered_phone?: string | null
           registered_pincode?: string | null
