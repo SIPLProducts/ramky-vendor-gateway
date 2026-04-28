@@ -1,32 +1,30 @@
-## Auto-fill Branch Name in Bank Details
+## Show "Major Activity" beside Enterprise Type in MSME details
 
-Today the Branch field in the Bank Details tab is populated only from cheque OCR (`branch_name`). On many cheques the branch line is faint, cropped or not printed at all, so the field stays empty and the vendor has to type it.
+### Current state
+The "Major Activity" field is already wired into the MSME OCR schema and rendered in `DocumentVerificationStep.tsx` inside a 2-column grid right after "Enterprise Type", so on a fresh MSME upload it appears beside it and is auto-filled from the Udyam certificate.
 
-We'll keep the current cheque-OCR behavior, and add an **IFSC fallback**: whenever the IFSC code is present but Branch (and/or Bank Name) is empty, we look the IFSC up and auto-fill Branch — and Bank Name and Bank Address if those are blank too.
+In your screenshot the field is missing because that MSME certificate was extracted **before** `major_activity` was added to the OCR schema. The saved draft holds the old OCR JSON (no `major_activity` key), so the input renders blank — and the layout currently hides it on this row because the prior row already filled both columns. Visually, Enterprise Type ends up alone on its row.
 
-### What changes
+### What this plan changes
 
-1. **New tiny helper** — `src/lib/ifscLookup.ts`
-   - Calls the public Razorpay IFSC API: `https://ifsc.razorpay.com/<IFSC>`.
-   - Returns `{ bank, branch, address, city, state }` or `null` on failure.
-   - Validates IFSC format (`^[A-Z]{4}0[A-Z0-9]{6}$`) before calling.
-   - In-memory cache so the same IFSC isn't re-fetched.
+1. **Force Major Activity to always render beside Enterprise Type**
+   - In `src/components/vendor/steps/DocumentVerificationStep.tsx`, regroup the MSME `verifiedFields` so each logical row is its own grid:
+     - Row 1: Udyam Number | Enterprise Name
+     - Row 2: Enterprise Type | Major Activity
+   - This guarantees Major Activity is visually adjacent to Enterprise Type even when its value is empty, and matches your screenshot intent.
 
-2. **Document Verification step** — `src/components/vendor/steps/DocumentVerificationStep.tsx`
-   - After cheque OCR completes (in `runDocFlow` for the `cheque` branch, near line 267), if `ifsc_code` is valid AND `branch_name` is empty, call the IFSC helper and patch:
-     - `branch_name` ← API `branch`
-     - `bank_name` ← API `bank` (only if cheque OCR didn't return one)
-     - `bankBranchAddress` state ← API `address` (only if user hasn't typed one)
-   - Also trigger the same lookup whenever the user **edits the IFSC field manually** and Branch is empty — debounced, so it fires once they stop typing.
-   - Show a subtle inline hint under the Branch field when it was filled from IFSC (e.g. "Auto-filled from IFSC"), so the vendor knows to verify.
+2. **Auto-backfill `major_activity` for already-uploaded MSME docs**
+   - When the step mounts and `msmeDoc.status === "verified"` but `ocrData.major_activity` is missing, re-run OCR on the stored MSME file in the background (silent, no UI disruption) and merge `major_activity` into both `ocrData` and `originalOcrData`.
+   - If the file is no longer in memory (only saved as a storage path), skip the re-OCR and just leave the field editable with placeholder "—" so the vendor can type it. A small inline hint "Couldn't read Major Activity from the certificate — please enter manually" will appear under the field in this case.
+   - The OCR extract path already exists (`useOcrExtraction` → `ocr-extract` edge function) and `major_activity` is already in the MSME schema, so no edge function or DB changes are needed.
 
-3. **No DB or edge-function changes** — Razorpay's IFSC endpoint is public, free, no key required, and CORS-enabled, so it can be called straight from the browser.
+3. **Persist Major Activity into the form payload**
+   - Already handled (lines 208 and 510 read/write `majorActivity`), so no extra wiring is required — only confirm the value flows into the saved draft after backfill.
 
 ### Out of scope
-- Server-side caching of IFSC lookups.
-- Changing how `validate-bank` derives branch (it already uses its own IFSC mapping during penny-drop).
-- Backfilling branch for vendors already submitted.
+- Changing the OCR model or schema.
+- Backfilling Major Activity for vendors who have already submitted (final) registrations.
+- Adding Major Activity as a manual field outside the MSME card.
 
 ### Files touched
-- `src/lib/ifscLookup.ts` (new)
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` (cheque post-OCR hook + IFSC onChange hook + small "Auto-filled from IFSC" hint)
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` (regroup MSME grid into two rows + add silent re-OCR effect for missing `major_activity`)
