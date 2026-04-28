@@ -300,6 +300,23 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
               <p className="text-xs text-destructive">{errors.productCategories.message}</p>
             )}
           </div>
+
+          {showOtherInput && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="productCategoriesOther">
+                Please specify other category/service <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="productCategoriesOther"
+                {...register('productCategoriesOther')}
+                placeholder="e.g. Drone surveying, Software licensing"
+                className={errors.productCategoriesOther ? 'border-destructive' : ''}
+              />
+              {errors.productCategoriesOther && (
+                <p className="text-xs text-destructive">{errors.productCategoriesOther.message as string}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
