@@ -35,7 +35,7 @@ export interface VerifiedDocumentData {
   gstSelfDeclarationFile?: File | null;
   pan?: { number: string; holderName: string; apiName?: string; nameMatchScore?: number };
   isMsmeRegistered?: boolean;
-  msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; apiName?: string; nameMatchScore?: number };
+  msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
