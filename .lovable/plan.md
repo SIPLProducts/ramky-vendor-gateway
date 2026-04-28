@@ -1,68 +1,31 @@
-## Add Address Line 4 + Email field across all address blocks
+## Add Contact 2 and Email 2 to CEO / Managing Director block
 
-In the **Address Information** step, extend each address block (Registered, Manufacturing, Branch) with a new **Address Line 4** field, enforce a **40-character limit on all four address lines**, and add a **required Email ID** field beside the Website field.
+In the Contact Details step, the CEO / Managing Director section currently has one Contact Number and one Email. Add a secondary phone and secondary email so the CEO/MD card has two of each, with Contact 1 and Email 1 remaining required and Contact 2 and Email 2 optional.
 
-### Type changes (`src/types/vendor.ts`)
+### UI changes — `src/components/vendor/steps/ContactStep.tsx`
+- Rename the existing labels for clarity:
+  - "Contact Number *" → "Contact Number 1 *" (still `ceoPhone`)
+  - "Email Address *" → "Email Address 1 *" (still `ceoEmail`)
+- Add a new row inside the CEO / Managing Director section with:
+  - "Contact Number 2" (optional) → field `ceoPhone2`
+  - "Email Address 2" (optional) → field `ceoEmail2`
+- Extend the Zod schema:
+  - `ceoPhone2: z.string().optional()`
+  - `ceoEmail2: z.string().email('Valid email required').optional().or(z.literal(''))`
+- Other contact blocks (Marketing, Production, Customer Service) stay unchanged.
 
-Extend `AddressDetails` with:
-- `registeredAddressLine4: string`
-- `registeredEmail: string` (required)
-- `manufacturingAddressLine4: string`
-- `manufacturingEmail: string`
-- `branchAddressLine2: string`, `branchAddressLine3: string`, `branchAddressLine4: string` (currently branch has only one address line)
-- `branchEmail: string`
+### Type & state changes
+- `src/types/vendor.ts` → `ContactDetails`: add `ceoPhone2?: string` and `ceoEmail2?: string`.
+- `src/pages/VendorRegistration.tsx` → initial `contact` object: add `ceoPhone2: ''`, `ceoEmail2: ''`.
+- `src/data/mockVendors.ts` → add empty defaults to keep mock data type-safe.
+- `src/components/vendor/steps/ReviewStep.tsx` → render the two new values under the CEO/MD review block (only when present).
 
-### Schema / form changes (`src/components/vendor/steps/AddressStep.tsx`)
+### Persistence
+- Database migration on `public.vendors`: add `primary_phone_2 text` and `primary_email_2 text` (both nullable).
+- `src/hooks/useVendorRegistration.tsx`:
+  - Save: map `formData.contact.ceoPhone2` → `primary_phone_2`, `formData.contact.ceoEmail2` → `primary_email_2`.
+  - Hydrate: map back into `contact.ceoPhone2` / `contact.ceoEmail2` when loading a draft.
 
-- Update zod schema: each of the four address lines uses `z.string().max(40, 'Maximum 40 characters allowed')`. Line 1 stays required (`.min(5)`), Lines 2–4 stay optional but capped at 40.
-- `registeredEmail` becomes required: `z.string().trim().email('Valid email required').max(100)`.
-- `manufacturingEmail` and `branchEmail`: optional, validated as email when present.
-- UI updates:
-  - **Registered block** — add Address Line 4 input next to Line 3 (or in a new row), apply `maxLength={40}` on Lines 1–4, and add an **Email ID *** field in the same row as Website.
-  - **Manufacturing block** — same Line 4 + Email additions, mirroring registered when "same as registered" is checked (extend the `useEffect` sync logic).
-  - **Branch block** — split current single `branchAddress` into Lines 1–4 (each with `maxLength={40}`) and add Email field beside the existing Website field.
-- Add `maxLength={40}` HTML attribute on all address line inputs as a UX safeguard alongside zod validation.
-
-### Initial state (`src/pages/VendorRegistration.tsx`)
-
-Add the new keys with empty-string defaults to the `address` object in `initialFormData` so the form has stable initial values and draft hydration works.
-
-### Persistence (`src/hooks/useVendorRegistration.tsx`)
-
-- Map the new fields when saving (`saveVendor`) and hydrating (`existingFormData`) drafts:
-  - `registered_address_line4`, `registered_email`
-  - `manufacturing_address_line4`, `manufacturing_email`
-  - `branch_address_line2`, `branch_address_line3`, `branch_address_line4`, `branch_email`
-
-### Database migration
-
-Add the new columns to the `vendors` table:
-
-```sql
-ALTER TABLE public.vendors
-  ADD COLUMN IF NOT EXISTS registered_address_line4 text,
-  ADD COLUMN IF NOT EXISTS registered_email text,
-  ADD COLUMN IF NOT EXISTS manufacturing_address_line4 text,
-  ADD COLUMN IF NOT EXISTS manufacturing_email text,
-  ADD COLUMN IF NOT EXISTS branch_address_line2 text,
-  ADD COLUMN IF NOT EXISTS branch_address_line3 text,
-  ADD COLUMN IF NOT EXISTS branch_address_line4 text,
-  ADD COLUMN IF NOT EXISTS branch_email text;
-```
-
-### Mock data (`src/data/mockVendors.ts`)
-
-Add the new fields with empty/sample values so existing mock vendors remain type-valid.
-
-### UX details
-
-- Address Line 4 placeholder: `"Additional address detail (max 40 chars)"`.
-- Email field placeholder: `"contact@company.com"`, `type="email"`, required indicator (*) only on the Registered Office block. Manufacturing and Branch emails stay optional.
-- Validation errors render inline under each input in the existing destructive style.
-- The "same as registered" toggle on Manufacturing also copies Line 4 and Email.
-
-### Out of scope
-
-- No changes to ReviewStep summary (existing block already iterates address lines generically — the new fields will surface there once persisted; only verify no hard-coded line-list).
-- No OCR auto-population for the new fields.
-- No SAP field mapping changes (can be added later by admin).
+### Validation rules
+- Contact 1 required (min 10 chars), Email 1 required (valid email) — unchanged behaviour.
+- Contact 2 and Email 2 optional; if Email 2 is filled, it must be a valid email.

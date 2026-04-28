@@ -66,8 +66,10 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
         <SectionHeader icon={Users} title="Contact Information" step={4} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="CEO/MD Name" value={data.contact?.ceoName} />
-          <DataRow label="CEO/MD Email" value={data.contact?.ceoEmail} />
-          <DataRow label="CEO/MD Phone" value={data.contact?.ceoPhone} />
+          <DataRow label="CEO/MD Email 1" value={data.contact?.ceoEmail} />
+          <DataRow label="CEO/MD Phone 1" value={data.contact?.ceoPhone} />
+          {data.contact?.ceoEmail2 && <DataRow label="CEO/MD Email 2" value={data.contact.ceoEmail2} />}
+          {data.contact?.ceoPhone2 && <DataRow label="CEO/MD Phone 2" value={data.contact.ceoPhone2} />}
         </div>
       </div>
 
