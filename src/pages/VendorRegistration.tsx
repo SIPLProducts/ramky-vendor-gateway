@@ -477,6 +477,11 @@ export default function VendorRegistration() {
         pan: data.pan?.number || prev.statutory.pan,
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
         msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
+        msmeCategory: ((): StatutoryDetails['msmeCategory'] => {
+          const t = (data.msme?.enterpriseType || '').toLowerCase();
+          if (t === 'micro' || t === 'small' || t === 'medium') return t;
+          return prev.statutory.msmeCategory;
+        })(),
         // Carry the actual uploaded files into the form so draft saves include them
         gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
         panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
