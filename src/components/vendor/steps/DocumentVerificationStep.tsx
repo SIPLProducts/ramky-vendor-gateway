@@ -242,6 +242,8 @@ export function DocumentVerificationStep({
   const [bankBranchAddress, setBankBranchAddress] = useState<string>(
     initialData?.bank?.bankAddress || "",
   );
+  const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
+  const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
 
   // ---------- Verification (dummy / simulated) ----------
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
