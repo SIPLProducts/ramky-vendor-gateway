@@ -1428,6 +1428,7 @@ export type Database = {
           secondary_email: string | null
           secondary_phone: string | null
           self_declared: boolean | null
+          state: string | null
           status: Database["public"]["Enums"]["vendor_status"]
           store_capacity: string | null
           submitted_at: string | null
@@ -1589,6 +1590,7 @@ export type Database = {
           secondary_email?: string | null
           secondary_phone?: string | null
           self_declared?: boolean | null
+          state?: string | null
           status?: Database["public"]["Enums"]["vendor_status"]
           store_capacity?: string | null
           submitted_at?: string | null
@@ -1750,6 +1752,7 @@ export type Database = {
           secondary_email?: string | null
           secondary_phone?: string | null
           self_declared?: boolean | null
+          state?: string | null
           status?: Database["public"]["Enums"]["vendor_status"]
           store_capacity?: string | null
           submitted_at?: string | null
