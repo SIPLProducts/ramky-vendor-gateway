@@ -935,12 +935,19 @@ export function DocumentVerificationStep({
                         originalValue={bankDoc.originalOcrData?.bank_name}
                         onChange={(v) => setOcrField(setBankDoc, "bank_name", v)}
                       />
-                      <EditableOcrField
-                        label="Branch"
-                        value={bankDoc.ocrData?.branch_name}
-                        originalValue={bankDoc.originalOcrData?.branch_name}
-                        onChange={(v) => setOcrField(setBankDoc, "branch_name", v)}
-                      />
+                      <div>
+                        <EditableOcrField
+                          label="Branch"
+                          value={bankDoc.ocrData?.branch_name}
+                          originalValue={bankDoc.originalOcrData?.branch_name}
+                          onChange={(v) => { setOcrField(setBankDoc, "branch_name", v); setBankBranchAutoFilled(false); }}
+                        />
+                        {bankBranchAutoFilled && bankDoc.ocrData?.branch_name && (
+                          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
+                          </p>
+                        )}
+                      </div>
                       <div className="md:col-span-2">
                         <EditableOcrField
                           label="Account Holder Name"
