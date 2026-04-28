@@ -1391,7 +1391,9 @@ export type Database = {
           primary_contact_name: string | null
           primary_designation: string | null
           primary_email: string | null
+          primary_email_2: string | null
           primary_phone: string | null
+          primary_phone_2: string | null
           product_categories: string[] | null
           product_types: string[] | null
           product_types_other: string | null
@@ -1550,7 +1552,9 @@ export type Database = {
           primary_contact_name?: string | null
           primary_designation?: string | null
           primary_email?: string | null
+          primary_email_2?: string | null
           primary_phone?: string | null
+          primary_phone_2?: string | null
           product_categories?: string[] | null
           product_types?: string[] | null
           product_types_other?: string | null
@@ -1709,7 +1713,9 @@ export type Database = {
           primary_contact_name?: string | null
           primary_designation?: string | null
           primary_email?: string | null
+          primary_email_2?: string | null
           primary_phone?: string | null
+          primary_phone_2?: string | null
           product_categories?: string[] | null
           product_types?: string[] | null
           product_types_other?: string | null
