@@ -444,6 +444,32 @@ export function DocumentVerificationStep({
     setMsmeDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
   }, [msmeDoc.status, msmeDoc.ocrData?.enterprise_name, effectiveLegalName]);
 
+  // Silent backfill: older drafts may have MSME OCR data without `major_activity`
+  // (the field was added later). If the original certificate file is still in
+  // memory, re-run OCR in the background and merge the missing field.
+  const msmeBackfillTriedRef = useRef(false);
+  useEffect(() => {
+    if (msmeBackfillTriedRef.current) return;
+    if (msmeDoc.status !== "verified") return;
+    if (!msmeDoc.file) return;
+    if (msmeDoc.ocrData?.major_activity) return;
+    msmeBackfillTriedRef.current = true;
+    (async () => {
+      try {
+        const res = await extractFromFile(msmeDoc.file as File, "msme", vendorId);
+        const ma = res?.extracted?.major_activity;
+        if (!ma) return;
+        setMsmeDoc((p) => ({
+          ...p,
+          ocrData: { ...(p.ocrData || {}), major_activity: ma },
+          originalOcrData: { ...(p.originalOcrData || {}), major_activity: ma },
+        }));
+      } catch {
+        // silent — user can still type it manually
+      }
+    })();
+  }, [msmeDoc.status, msmeDoc.file, msmeDoc.ocrData?.major_activity, extractFromFile, vendorId]);
+
   useEffect(() => {
     if (gstDoc.status !== "verified") return;
     const score = nameMatchScore(gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName);
