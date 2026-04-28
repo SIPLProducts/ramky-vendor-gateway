@@ -444,6 +444,32 @@ export function DocumentVerificationStep({
     setMsmeDoc((p) => (p.nameMatchScore === score ? p : { ...p, nameMatchScore: score }));
   }, [msmeDoc.status, msmeDoc.ocrData?.enterprise_name, effectiveLegalName]);
 
+  // Silent backfill: older drafts may have MSME OCR data without `major_activity`
+  // (the field was added later). If the original certificate file is still in
+  // memory, re-run OCR in the background and merge the missing field.
+  const msmeBackfillTriedRef = useRef(false);
+  useEffect(() => {
+    if (msmeBackfillTriedRef.current) return;
+    if (msmeDoc.status !== "verified") return;
+    if (!msmeDoc.file) return;
+    if (msmeDoc.ocrData?.major_activity) return;
+    msmeBackfillTriedRef.current = true;
+    (async () => {
+      try {
+        const res = await extractFromFile(msmeDoc.file as File, "msme", vendorId);
+        const ma = res?.extracted?.major_activity;
+        if (!ma) return;
+        setMsmeDoc((p) => ({
+          ...p,
+          ocrData: { ...(p.ocrData || {}), major_activity: ma },
+          originalOcrData: { ...(p.originalOcrData || {}), major_activity: ma },
+        }));
+      } catch {
+        // silent — user can still type it manually
+      }
+    })();
+  }, [msmeDoc.status, msmeDoc.file, msmeDoc.ocrData?.major_activity, extractFromFile, vendorId]);
+
   useEffect(() => {
     if (gstDoc.status !== "verified") return;
     const score = nameMatchScore(gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName);
@@ -863,18 +889,34 @@ export function DocumentVerificationStep({
                             originalValue={msmeDoc.originalOcrData?.enterprise_name}
                             onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
                           />
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-3">
                           <EditableOcrField
                             label="Enterprise Type"
                             value={msmeDoc.ocrData?.enterprise_type}
                             originalValue={msmeDoc.originalOcrData?.enterprise_type}
                             onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                           />
-                          <EditableOcrField
-                            label="Major Activity"
-                            value={msmeDoc.ocrData?.major_activity}
-                            originalValue={msmeDoc.originalOcrData?.major_activity}
-                            onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
-                          />
+                          <div>
+                            <EditableOcrField
+                              label="Major Activity"
+                              value={msmeDoc.ocrData?.major_activity}
+                              originalValue={msmeDoc.originalOcrData?.major_activity}
+                              onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
+                              placeholder="e.g. Manufacturing, Services, Trading"
+                            />
+                            {!msmeDoc.ocrData?.major_activity && !msmeDoc.file && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                Couldn't read Major Activity from the certificate — please enter manually.
+                              </p>
+                            )}
+                            {!msmeDoc.ocrData?.major_activity && msmeDoc.file && (
+                              <p className="mt-1 text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                <Sparkles className="h-3 w-3 text-primary" />
+                                Reading Major Activity from certificate…
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     }
