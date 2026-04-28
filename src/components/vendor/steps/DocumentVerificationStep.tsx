@@ -205,6 +205,7 @@ export function DocumentVerificationStep({
       udyam_number: initialData.msme.udyamNumber,
       enterprise_name: initialData.msme.enterpriseName,
       enterprise_type: initialData.msme.enterpriseType,
+      major_activity: initialData.msme.majorActivity,
     };
     return {
       status: "verified",
