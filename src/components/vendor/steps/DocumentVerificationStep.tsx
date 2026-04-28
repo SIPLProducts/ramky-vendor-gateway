@@ -819,6 +819,12 @@ export function DocumentVerificationStep({
                             originalValue={msmeDoc.originalOcrData?.enterprise_type}
                             onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                           />
+                          <EditableOcrField
+                            label="Major Activity"
+                            value={msmeDoc.ocrData?.major_activity}
+                            originalValue={msmeDoc.originalOcrData?.major_activity}
+                            onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
+                          />
                         </div>
                       </div>
                     }
