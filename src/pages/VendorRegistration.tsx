@@ -351,7 +351,7 @@ export default function VendorRegistration() {
             setVerifiedData({
               pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
               gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
-              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '' } : undefined,
+              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
               bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
             });
           }
