@@ -362,7 +362,54 @@ export function DocumentVerificationStep({
     });
 
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
-  const handleBankUpload = (file: File) => runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName);
+  const handleBankUpload = (file: File) =>
+    runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
+      // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
+      setBankDoc((prev) => {
+        const ifsc = prev.ocrData?.ifsc_code;
+        const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
+        if (!isValidIfsc(ifsc) || hasBranch) return prev;
+        // Fire & forget the lookup, then patch.
+        lookupIfsc(ifsc).then((info) => {
+          if (!info) return;
+          setBankDoc((curr) => {
+            const next = { ...(curr.ocrData || {}) };
+            let touched = false;
+            if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+            if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+            if (touched) setBankBranchAutoFilled(true);
+            return { ...curr, ocrData: next };
+          });
+          if (info.address && !bankAddressTouchedRef.current) {
+            setBankBranchAddress(info.address);
+          }
+        });
+        return prev;
+      });
+    });
+
+  // When the user manually edits the IFSC code (and Branch is blank), look it up.
+  useEffect(() => {
+    const ifsc = bankDoc.ocrData?.ifsc_code;
+    const hasBranch = !!(bankDoc.ocrData?.branch_name && String(bankDoc.ocrData.branch_name).trim());
+    if (!isValidIfsc(ifsc) || hasBranch) return;
+    const t = setTimeout(async () => {
+      const info = await lookupIfsc(ifsc!);
+      if (!info) return;
+      setBankDoc((curr) => {
+        const next = { ...(curr.ocrData || {}) };
+        let touched = false;
+        if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+        if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+        if (touched) setBankBranchAutoFilled(true);
+        return { ...curr, ocrData: next };
+      });
+      if (info.address && !bankAddressTouchedRef.current) {
+        setBankBranchAddress(info.address);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [bankDoc.ocrData?.ifsc_code, bankDoc.ocrData?.branch_name]);
 
   // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
   useEffect(() => {
