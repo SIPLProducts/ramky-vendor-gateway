@@ -35,7 +35,7 @@ export interface VerifiedDocumentData {
   gstSelfDeclarationFile?: File | null;
   pan?: { number: string; holderName: string; apiName?: string; nameMatchScore?: number };
   isMsmeRegistered?: boolean;
-  msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; apiName?: string; nameMatchScore?: number };
+  msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
@@ -205,6 +205,7 @@ export function DocumentVerificationStep({
       udyam_number: initialData.msme.udyamNumber,
       enterprise_name: initialData.msme.enterpriseName,
       enterprise_type: initialData.msme.enterpriseType,
+      major_activity: initialData.msme.majorActivity,
     };
     return {
       status: "verified",
@@ -457,6 +458,7 @@ export function DocumentVerificationStep({
         udyamNumber: msmeDoc.ocrData.udyam_number,
         enterpriseName: msmeDoc.ocrData.enterprise_name,
         enterpriseType: msmeDoc.ocrData.enterprise_type,
+        majorActivity: msmeDoc.ocrData.major_activity,
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
       };
@@ -816,6 +818,12 @@ export function DocumentVerificationStep({
                             value={msmeDoc.ocrData?.enterprise_type}
                             originalValue={msmeDoc.originalOcrData?.enterprise_type}
                             onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
+                          />
+                          <EditableOcrField
+                            label="Major Activity"
+                            value={msmeDoc.ocrData?.major_activity}
+                            originalValue={msmeDoc.originalOcrData?.major_activity}
+                            onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
                           />
                         </div>
                       </div>
