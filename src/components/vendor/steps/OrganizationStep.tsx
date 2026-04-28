@@ -78,10 +78,11 @@ type FormValues = OrganizationDetails & {
 interface OrganizationStepProps {
   data: OrganizationDetails;
   statutoryData: StatutoryDetails;
+  vendorId?: string;
   onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, onNext }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, onNext }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
@@ -112,6 +113,7 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
       pfNumber: statutoryData?.pfNumber || '',
       esiNumber: statutoryData?.esiNumber || '',
       iecNo: statutoryData?.iecNo || '',
+      swiftIbanCode: statutoryData?.swiftIbanCode || '',
       labourPermitNo: statutoryData?.labourPermitNo || '',
       memberships: statutoryData?.memberships || [],
       enlistments: statutoryData?.enlistments || [],
@@ -142,6 +144,7 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
       pfNumber: values.pfNumber || '',
       esiNumber: values.esiNumber || '',
       iecNo: values.iecNo || '',
+      swiftIbanCode: values.swiftIbanCode || '',
       labourPermitNo: values.labourPermitNo || '',
       memberships: values.memberships || [],
       enlistments: values.enlistments || [],
