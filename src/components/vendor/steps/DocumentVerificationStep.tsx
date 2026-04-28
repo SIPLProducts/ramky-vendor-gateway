@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useOcrExtraction, OcrDocumentType } from "@/hooks/useOcrExtraction";
+import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
 
 export interface VerifiedDocumentData {
   isGstRegistered?: boolean;
