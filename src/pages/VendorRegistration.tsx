@@ -351,7 +351,7 @@ export default function VendorRegistration() {
             setVerifiedData({
               pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
               gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
-              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '' } : undefined,
+              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
               bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
             });
           }
@@ -477,6 +477,11 @@ export default function VendorRegistration() {
         pan: data.pan?.number || prev.statutory.pan,
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
         msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
+        msmeCategory: ((): StatutoryDetails['msmeCategory'] => {
+          const t = (data.msme?.enterpriseType || '').toLowerCase();
+          if (t === 'micro' || t === 'small' || t === 'medium') return t;
+          return prev.statutory.msmeCategory;
+        })(),
         // Carry the actual uploaded files into the form so draft saves include them
         gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
         panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
