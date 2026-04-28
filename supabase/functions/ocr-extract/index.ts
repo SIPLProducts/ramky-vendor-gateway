@@ -59,6 +59,7 @@ const SCHEMAS: Record<DocType, { name: string; description: string; parameters: 
         udyam_number: { type: "string", description: "UDYAM-XX-00-0000000 format" },
         enterprise_name: { type: "string" },
         enterprise_type: { type: "string", description: "Micro, Small, or Medium" },
+        major_activity: { type: "string", description: "Major Activity printed on the certificate, e.g. Manufacturing, Services, Trading" },
         registration_date: { type: "string" },
         confidence: { type: "number" },
       },
