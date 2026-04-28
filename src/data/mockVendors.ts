@@ -9,6 +9,7 @@ const createMockFormData = (): VendorFormData => ({
     organizationType: 'Private Limited',
     ownershipType: 'Board of Directors',
     productCategories: ['Cement', 'Construction Chemicals'],
+    state: 'Telangana',
   },
   address: {
     registeredAddress: '123, Industrial Area, Phase 2',
