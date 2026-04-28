@@ -95,11 +95,14 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
     register,
     handleSubmit,
     control,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       ...data,
+      productCategoriesOther: data?.productCategoriesOther || '',
       entityType: statutoryData?.entityType || '',
       firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
       pfNumber: statutoryData?.pfNumber || '',
@@ -113,7 +116,11 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
     },
   });
 
+  const selectedCategories = watch('productCategories') || [];
+  const showOtherInput = selectedCategories.includes('Others');
+
   const handleFormSubmit = (values: FormValues) => {
+    const includesOthers = values.productCategories?.includes('Others');
     const organization: OrganizationDetails = {
       buyerCompanyId: values.buyerCompanyId,
       legalName: values.legalName,
@@ -122,6 +129,7 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
       organizationType: values.organizationType,
       ownershipType: values.ownershipType,
       productCategories: values.productCategories,
+      productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
     };
     const statutory: StatutoryDetails = {
       ...statutoryData,
