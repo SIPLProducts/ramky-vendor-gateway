@@ -83,6 +83,7 @@ const createMockFormData = (): VendorFormData => ({
     msmeCategory: 'small',
     labourPermitNo: '',
     iecNo: '',
+    swiftIbanCode: '',
     entityType: 'Private Limited Company',
     memberships: ['CII'],
     enlistments: [],
@@ -91,6 +92,8 @@ const createMockFormData = (): VendorFormData => ({
     gstCertificateFile: null,
     panCardFile: null,
     msmeCertificateFile: null,
+    iecCertificateFile: null,
+    swiftIbanProofFile: null,
   },
   bank: {
     bankName: 'HDFC Bank',

@@ -1422,6 +1422,7 @@ export type Database = {
           store_capacity: string | null
           submitted_at: string | null
           supply_capacity: string | null
+          swift_iban_code: string | null
           tenant_id: string | null
           terms_accepted: boolean | null
           trade_name: string | null
@@ -1572,6 +1573,7 @@ export type Database = {
           store_capacity?: string | null
           submitted_at?: string | null
           supply_capacity?: string | null
+          swift_iban_code?: string | null
           tenant_id?: string | null
           terms_accepted?: boolean | null
           trade_name?: string | null
@@ -1722,6 +1724,7 @@ export type Database = {
           store_capacity?: string | null
           submitted_at?: string | null
           supply_capacity?: string | null
+          swift_iban_code?: string | null
           tenant_id?: string | null
           terms_accepted?: boolean | null
           trade_name?: string | null

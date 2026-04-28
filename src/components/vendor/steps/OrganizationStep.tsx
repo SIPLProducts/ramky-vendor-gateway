@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { FileUpload } from '@/components/vendor/FileUpload';
 import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -43,6 +44,7 @@ const schema = z.object({
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
   iecNo: z.string().optional(),
+  swiftIbanCode: z.string().optional(),
   labourPermitNo: z.string().optional(),
   memberships: z.array(z.string()).optional(),
   enlistments: z.array(z.string()).optional(),
@@ -65,6 +67,7 @@ type FormValues = OrganizationDetails & {
   pfNumber: string;
   esiNumber: string;
   iecNo: string;
+  swiftIbanCode: string;
   labourPermitNo: string;
   memberships: string[];
   enlistments: string[];
@@ -75,10 +78,11 @@ type FormValues = OrganizationDetails & {
 interface OrganizationStepProps {
   data: OrganizationDetails;
   statutoryData: StatutoryDetails;
+  vendorId?: string;
   onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, onNext }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, onNext }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
@@ -109,6 +113,7 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
       pfNumber: statutoryData?.pfNumber || '',
       esiNumber: statutoryData?.esiNumber || '',
       iecNo: statutoryData?.iecNo || '',
+      swiftIbanCode: statutoryData?.swiftIbanCode || '',
       labourPermitNo: statutoryData?.labourPermitNo || '',
       memberships: statutoryData?.memberships || [],
       enlistments: statutoryData?.enlistments || [],
@@ -139,6 +144,7 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
       pfNumber: values.pfNumber || '',
       esiNumber: values.esiNumber || '',
       iecNo: values.iecNo || '',
+      swiftIbanCode: values.swiftIbanCode || '',
       labourPermitNo: values.labourPermitNo || '',
       memberships: values.memberships || [],
       enlistments: values.enlistments || [],
@@ -381,6 +387,38 @@ export function OrganizationStep({ data, statutoryData, onNext }: OrganizationSt
               <Label htmlFor="iecNo">IEC No. (Import/Export)</Label>
               <Input id="iecNo" {...register('iecNo')} placeholder="IEC Number" />
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="swiftIbanCode">SWIFT / IBAN Code</Label>
+              <Input
+                id="swiftIbanCode"
+                {...register('swiftIbanCode')}
+                placeholder="e.g. SBININBB123 or GB29NWBK60161331926819"
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <FileUpload
+              label="IEC Certificate"
+              vendorId={vendorId}
+              documentType="iec_certificate"
+              currentFile={statutoryData?.iecCertificateFile || null}
+              onFileSelect={(file) => {
+                statutoryData.iecCertificateFile = file;
+              }}
+            />
+            <FileUpload
+              label="SWIFT / IBAN Proof"
+              vendorId={vendorId}
+              documentType="swift_iban_proof"
+              currentFile={statutoryData?.swiftIbanProofFile || null}
+              onFileSelect={(file) => {
+                statutoryData.swiftIbanProofFile = file;
+              }}
+            />
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label>Operational Network</Label>
               <Controller
