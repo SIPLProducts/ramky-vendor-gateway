@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useOcrExtraction, OcrDocumentType } from "@/hooks/useOcrExtraction";
+import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
 
 export interface VerifiedDocumentData {
   isGstRegistered?: boolean;
@@ -241,6 +242,8 @@ export function DocumentVerificationStep({
   const [bankBranchAddress, setBankBranchAddress] = useState<string>(
     initialData?.bank?.bankAddress || "",
   );
+  const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
+  const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
 
   // ---------- Verification (dummy / simulated) ----------
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
@@ -359,7 +362,54 @@ export function DocumentVerificationStep({
     });
 
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
-  const handleBankUpload = (file: File) => runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName);
+  const handleBankUpload = (file: File) =>
+    runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
+      // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
+      setBankDoc((prev) => {
+        const ifsc = prev.ocrData?.ifsc_code;
+        const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
+        if (!isValidIfsc(ifsc) || hasBranch) return prev;
+        // Fire & forget the lookup, then patch.
+        lookupIfsc(ifsc).then((info) => {
+          if (!info) return;
+          setBankDoc((curr) => {
+            const next = { ...(curr.ocrData || {}) };
+            let touched = false;
+            if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+            if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+            if (touched) setBankBranchAutoFilled(true);
+            return { ...curr, ocrData: next };
+          });
+          if (info.address && !bankAddressTouchedRef.current) {
+            setBankBranchAddress(info.address);
+          }
+        });
+        return prev;
+      });
+    });
+
+  // When the user manually edits the IFSC code (and Branch is blank), look it up.
+  useEffect(() => {
+    const ifsc = bankDoc.ocrData?.ifsc_code;
+    const hasBranch = !!(bankDoc.ocrData?.branch_name && String(bankDoc.ocrData.branch_name).trim());
+    if (!isValidIfsc(ifsc) || hasBranch) return;
+    const t = setTimeout(async () => {
+      const info = await lookupIfsc(ifsc!);
+      if (!info) return;
+      setBankDoc((curr) => {
+        const next = { ...(curr.ocrData || {}) };
+        let touched = false;
+        if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+        if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+        if (touched) setBankBranchAutoFilled(true);
+        return { ...curr, ocrData: next };
+      });
+      if (info.address && !bankAddressTouchedRef.current) {
+        setBankBranchAddress(info.address);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [bankDoc.ocrData?.ifsc_code, bankDoc.ocrData?.branch_name]);
 
   // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
   useEffect(() => {
@@ -885,12 +935,19 @@ export function DocumentVerificationStep({
                         originalValue={bankDoc.originalOcrData?.bank_name}
                         onChange={(v) => setOcrField(setBankDoc, "bank_name", v)}
                       />
-                      <EditableOcrField
-                        label="Branch"
-                        value={bankDoc.ocrData?.branch_name}
-                        originalValue={bankDoc.originalOcrData?.branch_name}
-                        onChange={(v) => setOcrField(setBankDoc, "branch_name", v)}
-                      />
+                      <div>
+                        <EditableOcrField
+                          label="Branch"
+                          value={bankDoc.ocrData?.branch_name}
+                          originalValue={bankDoc.originalOcrData?.branch_name}
+                          onChange={(v) => { setOcrField(setBankDoc, "branch_name", v); setBankBranchAutoFilled(false); }}
+                        />
+                        {bankBranchAutoFilled && bankDoc.ocrData?.branch_name && (
+                          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
+                          </p>
+                        )}
+                      </div>
                       <div className="md:col-span-2">
                         <EditableOcrField
                           label="Account Holder Name"
@@ -916,7 +973,7 @@ export function DocumentVerificationStep({
                         <Label className="text-xs font-medium text-muted-foreground">Bank Address</Label>
                         <Input
                           value={bankBranchAddress}
-                          onChange={(e) => setBankBranchAddress(e.target.value)}
+                          onChange={(e) => { bankAddressTouchedRef.current = true; setBankBranchAddress(e.target.value); }}
                           placeholder="Branch address (optional)"
                           className="mt-1 bg-muted/40 border-border/60"
                         />
