@@ -171,6 +171,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       organization_type: formData.organization.organizationType || null,
       ownership_type: formData.organization.ownershipType || null,
       product_categories: formData.organization.productCategories,
+      state: formData.organization.state || null,
       // Registered Address
       registered_address: formData.address.registeredAddress,
       registered_address_line2: formData.address.registeredAddressLine2 || null,
@@ -348,6 +349,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         organizationType: vendor.organization_type || '',
         ownershipType: vendor.ownership_type || '',
         productCategories: vendor.product_categories || [],
+        productCategoriesOther: (vendor as VendorRecord & { product_categories_other?: string }).product_categories_other || '',
+        state: (vendor as VendorRecord & { state?: string }).state || '',
       },
       address: {
         registeredAddress: vendor.registered_address || '',

@@ -27,6 +27,7 @@ import {
   ENLISTMENT_OPTIONS,
   CERTIFICATION_OPTIONS,
   OPERATIONAL_NETWORKS,
+  INDIAN_STATES,
 } from '@/types/vendor';
 
 const schema = z.object({
@@ -38,6 +39,7 @@ const schema = z.object({
   ownershipType: z.string().min(1, 'Ownership type is required'),
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
   productCategoriesOther: z.string().optional(),
+  state: z.string().min(1, 'State is required'),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
@@ -107,6 +109,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, onNext }: Orga
     resolver: zodResolver(schema),
     defaultValues: {
       ...data,
+      state: data?.state || '',
       productCategoriesOther: data?.productCategoriesOther || '',
       entityType: statutoryData?.entityType || '',
       firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
@@ -136,6 +139,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, onNext }: Orga
       ownershipType: values.ownershipType,
       productCategories: values.productCategories,
       productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
+      state: values.state,
     };
     const statutory: StatutoryDetails = {
       ...statutoryData,
@@ -323,6 +327,29 @@ export function OrganizationStep({ data, statutoryData, vendorId, onNext }: Orga
               )}
             </div>
           )}
+
+          <div className="grid gap-1.5">
+            <Label>State *</Label>
+            <Controller
+              name="state"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDIAN_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.state && (
+              <p className="text-xs text-destructive">{errors.state.message as string}</p>
+            )}
+          </div>
         </div>
       </div>
 
