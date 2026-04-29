@@ -68,7 +68,27 @@ export default function SapApiConfigEdit() {
     return <div className="space-y-4"><Skeleton className="h-10 w-72" /><Skeleton className="h-96 w-full" /></div>;
   }
 
-  const saveDetails = () => update.mutate({ id: config.id, ...form });
+  const saveDetails = () => {
+    if ((form.connection_mode || "proxy") === "proxy") {
+      if (!form.middleware_url || !String(form.middleware_url).trim()) {
+        toast({
+          title: "Middleware URL is required",
+          description: "In Proxy mode, set 'Node.js Middleware URL' to your public middleware URL (e.g. https://abc123.ngrok-free.app).",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!form.proxy_secret || !String(form.proxy_secret).trim()) {
+        toast({
+          title: "Proxy Secret / Password is required",
+          description: "Paste the same value as MIDDLEWARE_SHARED_SECRET from middleware/.env into 'Proxy Secret / Password', then save.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    update.mutate({ id: config.id, ...form });
+  };
   const saveRequest = () => saveReq.mutate({ configId: config.id, rows: reqRows });
   const saveResponse = () => saveRes.mutate({ configId: config.id, rows: resRows });
   const saveCredentials = () => {
