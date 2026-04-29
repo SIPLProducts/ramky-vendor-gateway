@@ -416,9 +416,94 @@ export default function FormBuilder() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* ---------- Built-in fields ---------- */}
+            {builtInFields.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold">
+                    Built-in Fields{' '}
+                    <span className="text-muted-foreground font-normal">({builtInFields.length})</span>
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    These ship with the vendor form. Hide a field to stop collecting it.
+                  </span>
+                </div>
+                <div className="border rounded-lg divide-y overflow-hidden">
+                  {(() => {
+                    let lastGroup: string | undefined;
+                    return builtInFields.map((bf) => {
+                      const override = builtInOverrides[bf.field_name];
+                      const hidden = override?.is_visible === false;
+                      const showHeader = bf.group && bf.group !== lastGroup;
+                      lastGroup = bf.group;
+                      return (
+                        <div key={bf.field_name}>
+                          {showHeader && (
+                            <div className="px-3 py-1.5 bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+                              {bf.group}
+                            </div>
+                          )}
+                          <div className={cn(
+                            'flex items-center justify-between gap-3 px-3 py-2.5 bg-background',
+                            hidden && 'opacity-60',
+                          )}>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium truncate">{bf.display_label}</span>
+                                <Badge variant="outline" className="text-[10px]">{bf.field_type}</Badge>
+                                <Badge variant="secondary" className="text-[10px]">Built-in</Badge>
+                                {bf.is_mandatory && !hidden && (
+                                  <Badge className="text-[10px]">Required</Badge>
+                                )}
+                                {bf.locked && (
+                                  <Badge variant="outline" className="text-[10px] gap-1">
+                                    <Lock className="h-2.5 w-2.5" /> Verification
+                                  </Badge>
+                                )}
+                                {hidden && (
+                                  <Badge variant="secondary" className="text-[10px] gap-1">
+                                    <EyeOff className="h-2.5 w-2.5" /> Hidden
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">{bf.field_name}</div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {hidden ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleBuiltInVisibility(bf, true)}
+                                  disabled={upsertField.isPending || deleteField.isPending}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  disabled={bf.locked || upsertField.isPending}
+                                  title={bf.locked ? 'This field powers verification and cannot be removed' : 'Remove from vendor form'}
+                                  onClick={() => toggleBuiltInVisibility(bf, false)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* ---------- Custom fields header + actions ---------- */}
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <h3 className="text-sm font-semibold">
-                Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
+                Custom Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
                 <FieldTemplateActions
@@ -446,12 +531,11 @@ export default function FormBuilder() {
             )}
 
             {fieldsForStep.length === 0 && editingFieldId !== 'new' ? (
-              <div className="border border-dashed rounded-lg p-10 text-center">
-                <p className="text-sm text-muted-foreground">No custom fields configured for this tab yet.</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {selectedStep?.is_built_in
-                    ? 'Built-in fields are managed in code; add tenant overrides here.'
-                    : 'Click "Add Field" above to start collecting data.'}
+              <div className="border border-dashed rounded-lg p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {builtInFields.length > 0
+                    ? 'No additional custom fields. Click "Add Field" to extend this tab.'
+                    : 'No fields configured yet. Click "Add Field" to start collecting data.'}
                 </p>
               </div>
             ) : fieldsForStep.length > 0 ? (
