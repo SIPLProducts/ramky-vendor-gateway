@@ -26,34 +26,36 @@ export interface BuiltInField {
    *  and we do NOT allow hiding it from the Form Builder. */
   locked?: boolean;
   group?: string;
+  placeholder?: string;
+  help_text?: string;
 }
 
 export const BUILT_IN_FIELDS: Record<string, BuiltInField[]> = {
   // ---------- Document Verification (locked — drives OCR + verification) ----------
   document_verification: [
-    { field_name: 'is_gst_registered',  display_label: 'GST Registered?',           field_type: 'checkbox', is_mandatory: true,  locked: true, group: 'GST' },
-    { field_name: 'gst_certificate',    display_label: 'GST Certificate',           field_type: 'file',     is_mandatory: true,  locked: true, group: 'GST' },
-    { field_name: 'gstin',              display_label: 'GSTIN',                     field_type: 'text',     is_mandatory: true,  locked: true, group: 'GST' },
-    { field_name: 'legal_name_gst',     display_label: 'Legal Name (per GST)',      field_type: 'text',     is_mandatory: true,  locked: true, group: 'GST' },
-    { field_name: 'trade_name',         display_label: 'Trade Name',                field_type: 'text',     is_mandatory: false, locked: true, group: 'GST' },
-    { field_name: 'principal_place',    display_label: 'Principal Place of Business', field_type: 'textarea', is_mandatory: true, locked: true, group: 'GST' },
-    { field_name: 'gst_self_declaration', display_label: 'GST Self-Declaration (if not registered)', field_type: 'file', is_mandatory: false, locked: true, group: 'GST' },
+    { field_name: 'is_gst_registered',  display_label: 'GST Registered?',           field_type: 'checkbox', is_mandatory: true,  locked: true, group: 'GST', help_text: 'Tick if the vendor has an active GSTIN.' },
+    { field_name: 'gst_certificate',    display_label: 'GST Certificate',           field_type: 'file',     is_mandatory: true,  locked: true, group: 'GST', help_text: 'Upload the GST registration certificate (PDF / image).' },
+    { field_name: 'gstin',              display_label: 'GSTIN',                     field_type: 'text',     is_mandatory: true,  locked: true, group: 'GST', placeholder: '22AAAAA0000A1Z5', help_text: '15-character GSTIN. Verified live against the GST portal.' },
+    { field_name: 'legal_name_gst',     display_label: 'Legal Name (per GST)',      field_type: 'text',     is_mandatory: true,  locked: true, group: 'GST', placeholder: 'Legal name as per GSTIN', help_text: 'Auto-filled from GSTIN verification.' },
+    { field_name: 'trade_name',         display_label: 'Trade Name',                field_type: 'text',     is_mandatory: false, locked: true, group: 'GST', placeholder: 'Brand / trade name (if different)' },
+    { field_name: 'principal_place',    display_label: 'Principal Place of Business', field_type: 'textarea', is_mandatory: true, locked: true, group: 'GST', placeholder: 'Address as per GST registration' },
+    { field_name: 'gst_self_declaration', display_label: 'GST Self-Declaration (if not registered)', field_type: 'file', is_mandatory: false, locked: true, group: 'GST', help_text: 'Required only when the vendor is not GST-registered.' },
 
-    { field_name: 'pan_card',           display_label: 'PAN Card',                  field_type: 'file',     is_mandatory: true,  locked: true, group: 'PAN' },
-    { field_name: 'pan_number',         display_label: 'PAN Number',                field_type: 'text',     is_mandatory: true,  locked: true, group: 'PAN' },
-    { field_name: 'pan_holder_name',    display_label: 'PAN Holder Name',           field_type: 'text',     is_mandatory: true,  locked: true, group: 'PAN' },
+    { field_name: 'pan_card',           display_label: 'PAN Card',                  field_type: 'file',     is_mandatory: true,  locked: true, group: 'PAN', help_text: 'Upload PAN card (PDF / image).' },
+    { field_name: 'pan_number',         display_label: 'PAN Number',                field_type: 'text',     is_mandatory: true,  locked: true, group: 'PAN', placeholder: 'ABCDE1234F', help_text: '10-character PAN. Verified against Income Tax records.' },
+    { field_name: 'pan_holder_name',    display_label: 'PAN Holder Name',           field_type: 'text',     is_mandatory: true,  locked: true, group: 'PAN', placeholder: 'Name as printed on PAN' },
 
-    { field_name: 'is_msme_registered', display_label: 'MSME Registered?',          field_type: 'checkbox', is_mandatory: true,  locked: true, group: 'MSME' },
+    { field_name: 'is_msme_registered', display_label: 'MSME Registered?',          field_type: 'checkbox', is_mandatory: true,  locked: true, group: 'MSME', help_text: 'Tick if the vendor holds a Udyam / MSME certificate.' },
     { field_name: 'msme_certificate',   display_label: 'MSME / Udyam Certificate',  field_type: 'file',     is_mandatory: false, locked: true, group: 'MSME' },
-    { field_name: 'udyam_number',       display_label: 'Udyam Number',              field_type: 'text',     is_mandatory: false, locked: true, group: 'MSME' },
-    { field_name: 'enterprise_name',    display_label: 'Enterprise Name',           field_type: 'text',     is_mandatory: false, locked: true, group: 'MSME' },
+    { field_name: 'udyam_number',       display_label: 'Udyam Number',              field_type: 'text',     is_mandatory: false, locked: true, group: 'MSME', placeholder: 'UDYAM-XX-00-0000000' },
+    { field_name: 'enterprise_name',    display_label: 'Enterprise Name',           field_type: 'text',     is_mandatory: false, locked: true, group: 'MSME', placeholder: 'Enterprise name as on Udyam' },
 
-    { field_name: 'cancelled_cheque',   display_label: 'Cancelled Cheque',          field_type: 'file',     is_mandatory: true,  locked: true, group: 'Bank' },
-    { field_name: 'bank_account_number',display_label: 'Bank Account Number',       field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank' },
-    { field_name: 'bank_ifsc',          display_label: 'IFSC Code',                 field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank' },
-    { field_name: 'bank_name',          display_label: 'Bank Name',                 field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank' },
-    { field_name: 'bank_branch',        display_label: 'Branch Name',               field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank' },
-    { field_name: 'bank_account_holder',display_label: 'Account Holder Name',       field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank' },
+    { field_name: 'cancelled_cheque',   display_label: 'Cancelled Cheque',          field_type: 'file',     is_mandatory: true,  locked: true, group: 'Bank', help_text: 'Upload a cancelled cheque image. We extract account details via OCR.' },
+    { field_name: 'bank_account_number',display_label: 'Bank Account Number',       field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank', placeholder: 'e.g. 1234567890123', help_text: 'Validated by ₹1 penny-drop to confirm beneficiary name.' },
+    { field_name: 'bank_ifsc',          display_label: 'IFSC Code',                 field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank', placeholder: 'SBIN0001234', help_text: '11-character IFSC. Branch is auto-filled.' },
+    { field_name: 'bank_name',          display_label: 'Bank Name',                 field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank', placeholder: 'Auto-filled from IFSC' },
+    { field_name: 'bank_branch',        display_label: 'Branch Name',               field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank', placeholder: 'Auto-filled from IFSC' },
+    { field_name: 'bank_account_holder',display_label: 'Account Holder Name',       field_type: 'text',     is_mandatory: true,  locked: true, group: 'Bank', placeholder: 'Name as per bank records' },
     { field_name: 'bank_account_type',  display_label: 'Account Type',              field_type: 'select',   is_mandatory: true,  locked: true, group: 'Bank' },
     { field_name: 'bank_branch_address',display_label: 'Branch Address',            field_type: 'textarea', is_mandatory: false, locked: true, group: 'Bank' },
   ],

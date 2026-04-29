@@ -586,6 +586,8 @@ export default function FormBuilder() {
                                       display_label: bf.display_label,
                                       field_type: bf.field_type,
                                       is_mandatory: bf.is_mandatory,
+                                      placeholder: bf.placeholder,
+                                      help_text: bf.help_text,
                                     }}
                                     onClose={() => setEditingBuiltIn(null)}
                                   />
