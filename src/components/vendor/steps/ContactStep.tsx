@@ -61,38 +61,50 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
         </h3>
         <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="ceoName">Name *</Label>
-              <Input id="ceoName" {...register('ceoName')} placeholder="Full name" className={errors.ceoName ? 'border-destructive' : ''} />
-              {errors.ceoName && <p className="text-xs text-destructive">{errors.ceoName.message}</p>}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="ceoDesignation">Designation</Label>
-              <Input id="ceoDesignation" {...register('ceoDesignation')} placeholder="e.g., CEO" />
-            </div>
+            {show('ceoName') && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="ceoName">Name *</Label>
+                <Input id="ceoName" {...register('ceoName')} placeholder="Full name" className={errors.ceoName ? 'border-destructive' : ''} />
+                {errors.ceoName && <p className="text-xs text-destructive">{errors.ceoName.message}</p>}
+              </div>
+            )}
+            {show('ceoDesignation') && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="ceoDesignation">Designation</Label>
+                <Input id="ceoDesignation" {...register('ceoDesignation')} placeholder="e.g., CEO" />
+              </div>
+            )}
           </div>
           <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="ceoPhone">Contact Number 1 *</Label>
-              <Input id="ceoPhone" {...register('ceoPhone')} placeholder="+91 XXXXX XXXXX" className={errors.ceoPhone ? 'border-destructive' : ''} />
-              {errors.ceoPhone && <p className="text-xs text-destructive">{errors.ceoPhone.message}</p>}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="ceoEmail">Email Address 1 *</Label>
-              <Input id="ceoEmail" type="email" {...register('ceoEmail')} placeholder="email@company.com" className={errors.ceoEmail ? 'border-destructive' : ''} />
-              {errors.ceoEmail && <p className="text-xs text-destructive">{errors.ceoEmail.message}</p>}
-            </div>
+            {show('ceoPhone') && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="ceoPhone">Contact Number 1 *</Label>
+                <Input id="ceoPhone" {...register('ceoPhone')} placeholder="+91 XXXXX XXXXX" className={errors.ceoPhone ? 'border-destructive' : ''} />
+                {errors.ceoPhone && <p className="text-xs text-destructive">{errors.ceoPhone.message}</p>}
+              </div>
+            )}
+            {show('ceoEmail') && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="ceoEmail">Email Address 1 *</Label>
+                <Input id="ceoEmail" type="email" {...register('ceoEmail')} placeholder="email@company.com" className={errors.ceoEmail ? 'border-destructive' : ''} />
+                {errors.ceoEmail && <p className="text-xs text-destructive">{errors.ceoEmail.message}</p>}
+              </div>
+            )}
           </div>
           <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="ceoPhone2">Contact Number 2</Label>
-              <Input id="ceoPhone2" {...register('ceoPhone2')} placeholder="+91 XXXXX XXXXX (optional)" />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="ceoEmail2">Email Address 2</Label>
-              <Input id="ceoEmail2" type="email" {...register('ceoEmail2')} placeholder="alternate@company.com (optional)" className={errors.ceoEmail2 ? 'border-destructive' : ''} />
-              {errors.ceoEmail2 && <p className="text-xs text-destructive">{errors.ceoEmail2.message}</p>}
-            </div>
+            {show('ceoPhone2') && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="ceoPhone2">Contact Number 2</Label>
+                <Input id="ceoPhone2" {...register('ceoPhone2')} placeholder="+91 XXXXX XXXXX (optional)" />
+              </div>
+            )}
+            {show('ceoEmail2') && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="ceoEmail2">Email Address 2</Label>
+                <Input id="ceoEmail2" type="email" {...register('ceoEmail2')} placeholder="alternate@company.com (optional)" className={errors.ceoEmail2 ? 'border-destructive' : ''} />
+                {errors.ceoEmail2 && <p className="text-xs text-destructive">{errors.ceoEmail2.message}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>
