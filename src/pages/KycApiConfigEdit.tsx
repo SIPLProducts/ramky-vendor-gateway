@@ -133,7 +133,7 @@ export default function KycApiConfigEdit() {
     let request_headers: Record<string, string> = {};
     if (headersAdvanced) {
       const parsed = lenientHeaderParse(headersText);
-      if (!parsed.ok) {
+      if (parsed.ok === false) {
         setHeadersError(parsed.error);
         toast({ title: "Headers — couldn't parse", description: parsed.error, variant: "destructive" });
         return;
