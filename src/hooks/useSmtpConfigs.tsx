@@ -80,10 +80,13 @@ export function useSmtpConfigs() {
   });
 
   const test = useMutation({
-    mutationFn: async ({ id, to }: { id: string; to?: string }) => {
+    mutationFn: async (
+      args: { id: string; to?: string } | { inline: SmtpInlineTest },
+    ) => {
+      const body: any = "inline" in args ? args.inline : args;
       const { data, error } = await supabase.functions.invoke(
         "smtp-config-test",
-        { body: { id, to } },
+        { body },
       );
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
