@@ -75,49 +75,49 @@ export default function AdminInvitations() {
   const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: tenants } = useTenants();
+  const { data: allTenants } = useTenants();
   const { user, userRole } = useAuth();
-  const isSharviAdmin = userRole === 'sharvi_admin';
+  const { myTenants, activeTenantId } = useTenantContext();
+  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
 
-  // Auto-derive tenant for current (non-sharvi) admin from user_tenants
-  const { data: currentUserTenantId } = useQuery({
-    queryKey: ['current-user-tenant', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('user_tenants')
-        .select('tenant_id, is_default')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) { console.error(error); return null; }
-      return data?.tenant_id ?? null;
-    },
-    enabled: !!user?.id,
-  });
+  // Tenants the user is allowed to invite for:
+  // - Super admins: all active tenants
+  // - Everyone else: tenants assigned to them via user_tenants
+  const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
 
-  const effectiveTenantId = isSharviAdmin ? (selectedTenantId || null) : (currentUserTenantId || null);
+  // Default the dialog selection: prefer header's active tenant if allowed, else first allowed tenant
+  const defaultTenantId =
+    (activeTenantId && allowedTenants.some((t) => t.id === activeTenantId) ? activeTenantId : null) ||
+    allowedTenants[0]?.id ||
+    '';
+
+  // Initialize selectedTenantId once allowedTenants resolve
+  if (!selectedTenantId && defaultTenantId) {
+    // setState during render is safe here because it converges in one extra render
+    setSelectedTenantId(defaultTenantId);
+  }
+
+  const effectiveTenantId = selectedTenantId || null;
 
   // Fetch invitations (RLS scopes by tenant for non-super-admins)
   const { data: invitations, isLoading } = useQuery({
-    queryKey: ['vendor-invitations', isSharviAdmin ? 'all' : currentUserTenantId],
+    queryKey: ['vendor-invitations', isSuperAdmin ? 'all' : (activeTenantId || 'mine')],
     queryFn: async () => {
       let q = supabase
         .from('vendor_invitations')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Non-super-admins: client filter by their tenant for tidy UX (RLS already enforces)
-      if (!isSharviAdmin && currentUserTenantId) {
-        q = q.eq('tenant_id', currentUserTenantId);
+      // Non-super-admins: client filter by header's active tenant when one is chosen (RLS already enforces)
+      if (!isSuperAdmin && activeTenantId) {
+        q = q.eq('tenant_id', activeTenantId);
       }
 
       const { data, error } = await q;
       if (error) throw error;
       return data;
     },
-    enabled: isSharviAdmin || !!currentUserTenantId,
+    enabled: !!user?.id,
   });
 
   // Create invitation mutation
