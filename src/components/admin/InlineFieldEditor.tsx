@@ -156,7 +156,14 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
 
   return (
     <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+      {builtInMode && (
+        <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/80">
+          Editing built-in field — <span className="font-mono">{form.field_name}</span> and type are locked.
+          Saving stores an override for this tenant only.
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
         <div className="space-y-1.5">
           <Label className="text-xs">Display Label *</Label>
           <Input
