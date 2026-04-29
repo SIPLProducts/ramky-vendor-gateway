@@ -25,7 +25,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff, ShieldAlert, Type, Hash, Mail, Phone, Calendar, ListChecks, CheckSquare, FileText, AlignLeft } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
 import { FieldTemplateActions } from '@/components/admin/FieldTemplateActions';
 import type { FormFieldConfig } from '@/hooks/useTenant';
