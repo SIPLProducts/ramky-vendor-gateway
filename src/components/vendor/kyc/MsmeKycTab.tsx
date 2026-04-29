@@ -6,7 +6,7 @@ import { Pencil, Upload } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
 import { useFieldValidation } from '@/hooks/useFieldValidation';
-import { supabase } from '@/integrations/supabase/client';
+import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 
 interface MsmeKycTabProps {
   isMsmeRegistered: boolean;
@@ -24,6 +24,7 @@ interface MsmeKycTabProps {
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
   const { validationStates, validateMSME } = useFieldValidation(props.vendorId);
+  const { callProvider } = useConfiguredKycApi();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
   const state = validationStates.msme;
 
@@ -36,47 +37,44 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     if (ok) props.onVerifiedDetails?.(state.data || {});
   };
 
+  const runMsmeOcr = async (file: File) => {
+    const r = await callProvider({ providerName: 'MSME_OCR', file });
+    if (!r.found) return { success: false, error: r.message || 'MSME OCR provider not configured' };
+    if (!r.ok || !r.data) return { success: false, error: r.message || 'MSME OCR failed' };
+    return { success: true, extracted: r.data };
+  };
+
   const handleOcrVerify = async (extracted: Record<string, any>) => {
-    const extractedNum = (extracted.udyam_number || '').toUpperCase().trim();
+    const extractedNum = String(extracted.udyam_number || '').toUpperCase().trim();
     if (!extractedNum) {
       return { ok: false, message: 'Could not read a valid Udyam number from the certificate.' };
     }
     props.onMsmeNumberChange(extractedNum);
-    try {
-      const { data, error } = await supabase.functions.invoke('validate-msme', {
-        body: { id_number: extractedNum },
-      });
-      if (error) throw error;
-      if (!data?.success) return { ok: false, message: data?.message || 'MSME verification failed' };
-      const apiData = data.data || {};
-      const apiName = (apiData.enterprise_name || '').toString();
-      if (props.legalName && apiName) {
-        const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-        const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-        if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
-          return {
-            ok: false,
-            message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`,
-            apiData,
-          };
-        }
+    const apiName = String(extracted.enterprise_name || '').trim();
+    if (props.legalName && apiName) {
+      const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+        return {
+          ok: false,
+          message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`,
+          apiData: extracted,
+        };
       }
-      const cat = (apiData.enterprise_type || '').toString().toLowerCase();
-      if (cat === 'micro' || cat === 'small' || cat === 'medium') {
-        props.onMsmeCategoryChange?.(cat as any);
-      }
-      props.onVerifiedDetails?.(apiData);
-      return { ok: true, message: `MSME verified — ${apiName || extractedNum}`, apiData };
-    } catch (e: any) {
-      return { ok: false, message: e?.message || 'Verification service unavailable' };
     }
+    const cat = String(extracted.enterprise_type || '').toLowerCase();
+    if (cat === 'micro' || cat === 'small' || cat === 'medium') {
+      props.onMsmeCategoryChange?.(cat as any);
+    }
+    props.onVerifiedDetails?.(extracted);
+    return { ok: true, message: `MSME verified — ${apiName || extractedNum}`, apiData: extracted };
   };
 
-  const buildRows = (extracted: Record<string, any>, apiData?: Record<string, any>): ComparisonRow[] => [
-    { label: 'Udyam Number', ocrValue: extracted.udyam_number, apiValue: apiData?.udyam_number },
-    { label: 'Enterprise Name', ocrValue: extracted.enterprise_name, apiValue: apiData?.enterprise_name },
-    { label: 'Type', ocrValue: extracted.enterprise_type, apiValue: apiData?.enterprise_type },
-    { label: 'Major Activity', ocrValue: extracted.major_activity, apiValue: apiData?.major_activity },
+  const buildRows = (extracted: Record<string, any>): ComparisonRow[] => [
+    { label: 'Udyam Number', ocrValue: extracted.udyam_number },
+    { label: 'Enterprise Name', ocrValue: extracted.enterprise_name },
+    { label: 'Type', ocrValue: extracted.enterprise_type },
+    { label: 'Major Activity', ocrValue: extracted.major_activity },
   ];
 
   return (
