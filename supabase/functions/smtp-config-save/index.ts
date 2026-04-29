@@ -16,6 +16,7 @@ interface SaveBody {
   smtp_username: string;
   app_password?: string; // optional on update if unchanged
   from_name?: string | null;
+  reply_to?: string | null;
   is_active?: boolean;
 }
 
@@ -82,6 +83,7 @@ serve(async (req) => {
         encryption: body.encryption,
         smtp_username: body.smtp_username.trim(),
         from_name: body.from_name ?? null,
+        reply_to: body.reply_to ? String(body.reply_to).trim() : null,
         is_active: body.is_active ?? true,
       };
       if (body.app_password && body.app_password.length > 0) {
@@ -119,6 +121,7 @@ serve(async (req) => {
         smtp_username: body.smtp_username.trim(),
         app_password: body.app_password,
         from_name: body.from_name ?? null,
+        reply_to: body.reply_to ? String(body.reply_to).trim() : null,
         is_active: body.is_active ?? true,
         created_by: userRes.user.id,
       })

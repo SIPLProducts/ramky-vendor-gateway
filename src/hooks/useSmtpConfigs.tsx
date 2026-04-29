@@ -9,6 +9,7 @@ export interface SmtpConfig {
   encryption: "none" | "ssl" | "tls" | "starttls";
   smtp_username: string;
   from_name: string | null;
+  reply_to: string | null;
   is_active: boolean;
   has_password: boolean;
   created_at: string;
@@ -24,7 +25,20 @@ export interface SmtpConfigInput {
   smtp_username: string;
   app_password?: string;
   from_name?: string | null;
+  reply_to?: string | null;
   is_active?: boolean;
+}
+
+export interface SmtpInlineTest {
+  to: string;
+  smtp_host: string;
+  smtp_port: number;
+  encryption: "none" | "ssl" | "tls" | "starttls";
+  smtp_username: string;
+  app_password: string;
+  from_email: string;
+  from_name?: string | null;
+  reply_to?: string | null;
 }
 
 export function useSmtpConfigs() {
@@ -66,10 +80,13 @@ export function useSmtpConfigs() {
   });
 
   const test = useMutation({
-    mutationFn: async ({ id, to }: { id: string; to?: string }) => {
+    mutationFn: async (
+      args: { id: string; to?: string } | { inline: SmtpInlineTest },
+    ) => {
+      const body: any = "inline" in args ? args.inline : args;
       const { data, error } = await supabase.functions.invoke(
         "smtp-config-test",
-        { body: { id, to } },
+        { body },
       );
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);

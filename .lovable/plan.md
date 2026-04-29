@@ -1,64 +1,63 @@
-## Email Configuration Screen
+# Update Email Configuration to match SMTP layout
 
-A new admin screen at `/admin/email-config` to manage multiple SMTP credentials (one per sender email), shown in a table with Excel/PDF export.
+Bring the existing `/admin/email-config` screen in line with the uploaded SMTP Email Configuration design while keeping the multi-config table + Excel/PDF exports already in place.
 
-### What you'll get
+## New / changed fields
 
-- Sidebar entry **Email Configuration** (icon: Mail), visible to `sharvi_admin`, `admin`, `customer_admin`.
-- Form with: **User Email** (dropdown of registered portal users + free-text option), **SMTP Host**, **Port**, **Encryption** (TLS/SSL/STARTTLS/None), **App Password**, **From Name** (optional), **Active** toggle.
-- Save / Update / Delete actions, plus **Test Send** button (sends a test email to the configured address using `send-smtp-email`).
-- Table of saved configs: Email, Host, Port, Encryption, Active, Last Updated, Actions (Edit / Delete / Test).
-- **Download Excel** (.xlsx) and **Download PDF** buttons that export the current table.
-- App Password stored server-side; never shown after save (masked as `••••••••`, only re-entered when editing).
+The Add/Edit dialog will be expanded to the full set shown in the screenshot:
 
-### Data model
+| Field | Notes |
+|---|---|
+| Enable SMTP Sending | Toggle (maps to `is_active`). When off, system falls back to default provider. |
+| SMTP Host | existing |
+| Port | existing — auto-suggest 465/587 based on encryption |
+| Encryption | dropdown: SSL (465), TLS (587), STARTTLS (587), None |
+| Use App Password | Toggle (UI-only hint that switches password label/help text) |
+| Username | existing `smtp_username` |
+| App Password | existing, with show/hide eye toggle |
+| From Email | NEW — `user_email` doubles as From Email; relabel + autofill from Username |
+| From Name | existing, default "Sharvi Vendor Portal" |
+| Reply-To (optional) | NEW field `reply_to` |
+| Provider hint box | static helper text for Gmail / Outlook 365 |
+| Send test to + Send Test Email | inline test sender (uses entered values without saving) |
 
-New table `smtp_email_configs`:
+The list table and exports remain unchanged (still show Email/Host/Port/Encryption/Status/Updated and export to Excel/PDF).
 
-```text
-id              uuid pk
-user_email      text  unique not null    -- the sender email this config belongs to
-smtp_host       text  not null
-smtp_port       int   not null  default 587
-encryption      text  not null  default 'tls'   -- 'none'|'ssl'|'tls'|'starttls'
-smtp_username   text  not null            -- usually = user_email
-app_password    text  not null            -- stored server-side, never returned to client
-from_name       text
-is_active       boolean not null default true
-created_by      uuid
-created_at, updated_at  timestamptz
+## Database
+
+Add one nullable column to `public.smtp_email_configs`:
+
+```sql
+alter table public.smtp_email_configs
+  add column if not exists reply_to text;
 ```
 
-RLS: only `sharvi_admin`, `admin`, `customer_admin` can SELECT/INSERT/UPDATE/DELETE. The `app_password` column is excluded from any client-readable view; reads go through a SECURITY DEFINER RPC `list_smtp_configs()` that returns everything except the password.
+No other schema changes — `is_active`, `from_name`, `app_password`, `smtp_username`, `user_email` already exist and cover the rest of the form.
 
-### Edge functions
+`list_smtp_configs` RPC will be updated to return `reply_to` as well.
 
-- `smtp-config-save` — upserts a row (writes `app_password` server-side using service role).
-- `smtp-config-delete` — deletes by id.
-- `smtp-config-test` — sends a test email through the existing `send-smtp-email` flow using an inline `smtp` override built from the row.
+## Edge functions
 
-The existing global SMTP in `portal_config` stays untouched; this new table is additive and used when a per-sender override is needed.
+- `smtp-config-save`: accept and persist `reply_to`.
+- `smtp-config-test`: accept an optional inline payload `{ host, port, encryption, username, app_password, from_email, from_name, reply_to, send_to }` so the form can run a test before the row is saved (in addition to the existing "test by id" path used from the table).
 
-### UI / Export
+## Frontend changes (`src/pages/EmailConfiguration.tsx` + `src/hooks/useSmtpConfigs.tsx`)
 
-- Built with existing shadcn `Table`, `Dialog`, `Form`, `Select` components.
-- Excel export via `xlsx` (SheetJS) — column headers match the table; password column omitted.
-- PDF export via `jspdf` + `jspdf-autotable` — same columns; "Sharvi Vendor Portal — Email Configuration" header with timestamp.
-- Follows project visual identity: grey bg, white rounded cards, blue primary accents.
+1. Replace the current dialog body with a 2-column layout matching the screenshot:
+   - Top banner row: **Enable SMTP Sending** switch with helper text.
+   - Row 1: SMTP Host | Port
+   - Row 2: Encryption | Use App Password toggle
+   - Row 3: Username | App Password (with eye show/hide)
+   - Row 4: From Email | From Name
+   - Row 5: Reply-To (full width)
+   - Helper card: Gmail + Outlook/Office 365 instructions.
+   - Footer right: "Send test to" input + **Send Test Email** button (calls `smtp-config-test` with the unsaved form values).
+2. When Encryption changes, auto-set Port (465 for SSL, 587 for TLS/STARTTLS) unless the user has manually edited it.
+3. Keep dropdown of existing user emails for the From Email field plus free-text entry.
+4. Update `SmtpConfigInput` / `SmtpConfig` types to include `reply_to`.
+5. Add `reply_to` to the export rows and PDF/Excel columns.
 
-### Files to add / change
+## Out of scope
 
-- DB migration: create `smtp_email_configs`, RLS policies, RPC `list_smtp_configs()`.
-- `src/pages/EmailConfiguration.tsx` — the new screen.
-- `src/hooks/useSmtpConfigs.tsx` — CRUD + test hook.
-- `src/App.tsx` — add `/admin/email-config` route.
-- `src/components/layout/Sidebar.tsx` — add nav item with `screenKey: 'email_configuration'`.
-- Seed `role_screen_permissions` for the new screen key for admin roles.
-- `supabase/functions/smtp-config-save/index.ts`
-- `supabase/functions/smtp-config-delete/index.ts`
-- `supabase/functions/smtp-config-test/index.ts`
-- `package.json` — add `xlsx`, `jspdf`, `jspdf-autotable`.
-
-### Out of scope
-
-- Auto-routing outbound mail through per-sender configs (the existing `send-smtp-email` continues to use the global config unless explicitly passed an override). Switching the default sender resolution can be a follow-up.
+- No change to roles, RLS, or sidebar entry.
+- No change to how outbound mail (`send-smtp-email`) currently picks credentials — that can be wired to active rows in a follow-up.

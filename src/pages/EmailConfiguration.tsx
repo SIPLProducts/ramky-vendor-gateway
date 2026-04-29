@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,9 @@ import {
   Send,
   FileSpreadsheet,
   FileText,
+  Eye,
+  EyeOff,
+  Info,
 } from "lucide-react";
 import {
   useSmtpConfigs,
@@ -58,16 +61,30 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-const EMPTY: SmtpConfigInput = {
+interface FormState extends SmtpConfigInput {
+  use_app_password: boolean;
+  reply_to: string | null;
+}
+
+const EMPTY: FormState = {
   user_email: "",
   smtp_host: "smtp.gmail.com",
   smtp_port: 587,
   encryption: "tls",
   smtp_username: "",
   app_password: "",
-  from_name: "",
+  from_name: "Sharvi Vendor Portal",
+  reply_to: "",
   is_active: true,
+  use_app_password: true,
 };
+
+const ENCRYPTION_OPTIONS = [
+  { value: "ssl", label: "SSL (465)", port: 465 },
+  { value: "tls", label: "TLS (587)", port: 587 },
+  { value: "starttls", label: "STARTTLS (587)", port: 587 },
+  { value: "none", label: "None", port: 25 },
+] as const;
 
 export default function EmailConfiguration() {
   const { list, save, remove, test } = useSmtpConfigs();
@@ -75,8 +92,12 @@ export default function EmailConfiguration() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SmtpConfig | null>(null);
-  const [form, setForm] = useState<SmtpConfigInput>(EMPTY);
+  const [form, setForm] = useState<FormState>(EMPTY);
   const [confirmDelete, setConfirmDelete] = useState<SmtpConfig | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [portTouched, setPortTouched] = useState(false);
+  const [testTo, setTestTo] = useState("");
+  const [testing, setTesting] = useState(false);
 
   const emailOptions = useMemo(() => {
     const set = new Map<string, string>();
@@ -87,9 +108,22 @@ export default function EmailConfiguration() {
     return Array.from(set.values()).sort();
   }, [profiles, list.data]);
 
+  // Auto-suggest port when encryption changes (unless user typed a port)
+  useEffect(() => {
+    if (portTouched) return;
+    const opt = ENCRYPTION_OPTIONS.find((o) => o.value === form.encryption);
+    if (opt && form.smtp_port !== opt.port) {
+      setForm((f) => ({ ...f, smtp_port: opt.port }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.encryption]);
+
   function openNew() {
     setEditing(null);
     setForm(EMPTY);
+    setShowPassword(false);
+    setPortTouched(false);
+    setTestTo("");
     setOpen(true);
   }
 
@@ -104,14 +138,19 @@ export default function EmailConfiguration() {
       smtp_username: cfg.smtp_username,
       app_password: "",
       from_name: cfg.from_name ?? "",
+      reply_to: cfg.reply_to ?? "",
       is_active: cfg.is_active,
+      use_app_password: true,
     });
+    setShowPassword(false);
+    setPortTouched(true);
+    setTestTo(cfg.reply_to ?? cfg.user_email);
     setOpen(true);
   }
 
   async function handleSave() {
     if (!form.user_email || !form.smtp_host || !form.smtp_username) {
-      toast({ title: "Missing fields", description: "Email, host and username are required.", variant: "destructive" });
+      toast({ title: "Missing fields", description: "From Email, Host and Username are required.", variant: "destructive" });
       return;
     }
     if (!editing && !form.app_password) {
@@ -119,7 +158,8 @@ export default function EmailConfiguration() {
       return;
     }
     try {
-      await save.mutateAsync(form);
+      const { use_app_password: _u, ...payload } = form;
+      await save.mutateAsync(payload as SmtpConfigInput);
       toast({ title: editing ? "Updated" : "Saved", description: "Email configuration saved." });
       setOpen(false);
     } catch (e: any) {
@@ -137,13 +177,47 @@ export default function EmailConfiguration() {
     }
   }
 
-  async function handleTest(cfg: SmtpConfig) {
+  async function handleRowTest(cfg: SmtpConfig) {
     try {
       toast({ title: "Sending test email…", description: cfg.user_email });
       const res = await test.mutateAsync({ id: cfg.id });
       toast({ title: "Test email sent", description: `Delivered to ${res.sentTo ?? cfg.user_email}` });
     } catch (e: any) {
       toast({ title: "Test failed", description: e.message, variant: "destructive" });
+    }
+  }
+
+  async function handleInlineTest() {
+    if (!form.smtp_host || !form.smtp_username || !form.app_password || !form.user_email) {
+      toast({
+        title: "Fill the form first",
+        description: "Host, Username, App Password and From Email are required to test.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const recipient = (testTo || form.user_email).trim();
+    setTesting(true);
+    try {
+      toast({ title: "Sending test email…", description: recipient });
+      const res = await test.mutateAsync({
+        inline: {
+          to: recipient,
+          smtp_host: form.smtp_host,
+          smtp_port: form.smtp_port,
+          encryption: form.encryption,
+          smtp_username: form.smtp_username,
+          app_password: form.app_password!,
+          from_email: form.user_email,
+          from_name: form.from_name ?? null,
+          reply_to: form.reply_to ?? null,
+        },
+      });
+      toast({ title: "Test email sent", description: `Delivered to ${res.sentTo ?? recipient}` });
+    } catch (e: any) {
+      toast({ title: "Test failed", description: e.message, variant: "destructive" });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -155,6 +229,7 @@ export default function EmailConfiguration() {
       Encryption: c.encryption.toUpperCase(),
       Username: c.smtp_username,
       "From Name": c.from_name ?? "",
+      "Reply-To": c.reply_to ?? "",
       Active: c.is_active ? "Yes" : "No",
       "Last Updated": new Date(c.updated_at).toLocaleString(),
     }));
@@ -210,51 +285,37 @@ export default function EmailConfiguration() {
                 <Plus className="h-4 w-4 mr-2" /> Add Config
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>
-                  {editing ? "Edit Email Configuration" : "New Email Configuration"}
+                <DialogTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-primary" />
+                  SMTP Email Configuration
                 </DialogTitle>
+                <CardDescription>
+                  Configure outbound email delivery via your own SMTP server. Supports app passwords (Gmail, Outlook, Zoho, etc.).
+                </CardDescription>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-2">
-                <div className="col-span-2 space-y-2">
-                  <Label>User Email</Label>
-                  <Select
-                    value={form.user_email}
-                    onValueChange={(v) =>
-                      setForm((f) => ({
-                        ...f,
-                        user_email: v,
-                        smtp_username: f.smtp_username || v,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pick a user email or type below" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {emailOptions.map((e) => (
-                        <SelectItem key={e} value={e}>
-                          {e}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    placeholder="or enter a custom email"
-                    value={form.user_email}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        user_email: e.target.value,
-                        smtp_username: f.smtp_username || e.target.value,
-                      }))
-                    }
-                  />
+
+              {/* Enable SMTP Sending banner */}
+              <div className="flex items-center justify-between border rounded-lg p-4 bg-muted/30">
+                <div>
+                  <Label className="text-base font-semibold">Enable SMTP Sending</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When off, the system uses the default email provider.
+                  </p>
                 </div>
+                <Switch
+                  checked={form.is_active ?? true}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, is_active: v }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                {/* Row 1: Host | Port */}
                 <div className="space-y-2">
                   <Label>SMTP Host</Label>
                   <Input
+                    placeholder="smtp.gmail.com"
                     value={form.smtp_host}
                     onChange={(e) => setForm((f) => ({ ...f, smtp_host: e.target.value }))}
                   />
@@ -264,57 +325,166 @@ export default function EmailConfiguration() {
                   <Input
                     type="number"
                     value={form.smtp_port}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, smtp_port: Number(e.target.value) }))
-                    }
+                    onChange={(e) => {
+                      setPortTouched(true);
+                      setForm((f) => ({ ...f, smtp_port: Number(e.target.value) }));
+                    }}
                   />
                 </div>
+
+                {/* Row 2: Encryption | Use App Password toggle */}
                 <div className="space-y-2">
                   <Label>Encryption</Label>
                   <Select
                     value={form.encryption}
-                    onValueChange={(v: any) => setForm((f) => ({ ...f, encryption: v }))}
+                    onValueChange={(v: any) => {
+                      setPortTouched(false);
+                      setForm((f) => ({ ...f, encryption: v }));
+                    }}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tls">TLS</SelectItem>
-                      <SelectItem value="ssl">SSL</SelectItem>
-                      <SelectItem value="starttls">STARTTLS</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
+                      {ENCRYPTION_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-center justify-between border rounded-lg px-4 py-3">
+                  <div>
+                    <Label className="font-semibold">Use App Password</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recommended for Gmail / Outlook with 2FA
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.use_app_password}
+                    onCheckedChange={(v) => setForm((f) => ({ ...f, use_app_password: v }))}
+                  />
+                </div>
+
+                {/* Row 3: Username | App Password */}
                 <div className="space-y-2">
-                  <Label>SMTP Username</Label>
+                  <Label>Username</Label>
                   <Input
+                    placeholder="user@example.com"
                     value={form.smtp_username}
-                    onChange={(e) => setForm((f) => ({ ...f, smtp_username: e.target.value }))}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>App Password {editing && <span className="text-xs text-muted-foreground">(leave empty to keep existing)</span>}</Label>
-                  <Input
-                    type="password"
-                    placeholder={editing ? "••••••••" : "App password"}
-                    value={form.app_password ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, app_password: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        smtp_username: e.target.value,
+                        user_email: f.user_email || e.target.value,
+                      }))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>From Name (optional)</Label>
+                  <Label>
+                    {form.use_app_password ? "App Password" : "Password"}
+                    {editing && <span className="text-xs text-muted-foreground ml-2">(leave empty to keep existing)</span>}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder={editing ? "••••••••" : "App password"}
+                      value={form.app_password ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, app_password: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 4: From Email | From Name */}
+                <div className="space-y-2">
+                  <Label>From Email</Label>
+                  {emailOptions.length > 0 ? (
+                    <Select
+                      value={form.user_email}
+                      onValueChange={(v) =>
+                        setForm((f) => ({
+                          ...f,
+                          user_email: v,
+                          smtp_username: f.smtp_username || v,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pick an email or type below" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {emailOptions.map((e) => (
+                          <SelectItem key={e} value={e}>{e}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
                   <Input
+                    placeholder="from@example.com"
+                    value={form.user_email}
+                    onChange={(e) => setForm((f) => ({ ...f, user_email: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>From Name</Label>
+                  <Input
+                    placeholder="Sharvi Vendor Portal"
                     value={form.from_name ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, from_name: e.target.value }))}
                   />
                 </div>
-                <div className="flex items-center gap-3 mt-7">
-                  <Switch
-                    checked={form.is_active ?? true}
-                    onCheckedChange={(v) => setForm((f) => ({ ...f, is_active: v }))}
+
+                {/* Row 5: Reply-To full width */}
+                <div className="col-span-2 space-y-2">
+                  <Label>Reply-To (optional)</Label>
+                  <Input
+                    placeholder="replies@example.com"
+                    value={form.reply_to ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, reply_to: e.target.value }))}
                   />
-                  <Label>Active</Label>
                 </div>
               </div>
+
+              {/* Provider hints */}
+              <div className="flex gap-3 border rounded-lg p-4 bg-muted/30 text-sm">
+                <Info className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                <div className="space-y-1">
+                  <p>
+                    <span className="font-semibold">Gmail:</span> Enable 2-Step Verification, then create an App Password at{" "}
+                    <span className="font-mono text-xs">myaccount.google.com/apppasswords</span>. Use port 587 with TLS.
+                  </p>
+                  <p>
+                    <span className="font-semibold">Outlook/Office 365:</span> Use{" "}
+                    <span className="font-mono text-xs">smtp.office365.com</span>, port 587, STARTTLS, with an app password.
+                  </p>
+                </div>
+              </div>
+
+              {/* Inline test sender */}
+              <div className="flex items-end justify-end gap-3 pt-2 border-t">
+                <div className="space-y-2 w-72">
+                  <Label className="text-xs">Send test to</Label>
+                  <Input
+                    placeholder="recipient@example.com"
+                    value={testTo}
+                    onChange={(e) => setTestTo(e.target.value)}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleInlineTest}
+                  disabled={testing}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  {testing ? "Sending…" : "Send Test Email"}
+                </Button>
+              </div>
+
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={handleSave} disabled={save.isPending}>
@@ -341,6 +511,7 @@ export default function EmailConfiguration() {
                 <TableHead>Host</TableHead>
                 <TableHead>Port</TableHead>
                 <TableHead>Encryption</TableHead>
+                <TableHead>Reply-To</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Updated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -348,9 +519,9 @@ export default function EmailConfiguration() {
             </TableHeader>
             <TableBody>
               {list.isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>
               ) : data.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No configurations yet. Click "Add Config" to create one.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No configurations yet. Click "Add Config" to create one.</TableCell></TableRow>
               ) : (
                 data.map((c) => (
                   <TableRow key={c.id}>
@@ -358,6 +529,7 @@ export default function EmailConfiguration() {
                     <TableCell>{c.smtp_host}</TableCell>
                     <TableCell>{c.smtp_port}</TableCell>
                     <TableCell>{c.encryption.toUpperCase()}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.reply_to ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={c.is_active ? "default" : "secondary"}>
                         {c.is_active ? "Active" : "Inactive"}
@@ -365,7 +537,7 @@ export default function EmailConfiguration() {
                     </TableCell>
                     <TableCell>{new Date(c.updated_at).toLocaleString()}</TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button size="sm" variant="ghost" onClick={() => handleTest(c)} disabled={test.isPending}>
+                      <Button size="sm" variant="ghost" onClick={() => handleRowTest(c)} disabled={test.isPending}>
                         <Send className="h-4 w-4" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
