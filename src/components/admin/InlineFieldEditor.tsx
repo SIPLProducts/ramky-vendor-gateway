@@ -30,6 +30,8 @@ interface Props {
     is_mandatory: boolean;
     placeholder?: string;
     help_text?: string;
+    locked?: boolean;
+    group?: string;
   };
 }
 
