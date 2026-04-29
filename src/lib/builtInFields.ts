@@ -28,6 +28,10 @@ export interface BuiltInField {
   group?: string;
   placeholder?: string;
   help_text?: string;
+  /** Admin-facing: 1-2 sentence plain-English description of what this field captures. */
+  usage?: string;
+  /** Admin-facing: bullet points explaining downstream impact (verification, SAP, compliance, etc.). */
+  importance?: string[];
 }
 
 export const BUILT_IN_FIELDS: Record<string, BuiltInField[]> = {

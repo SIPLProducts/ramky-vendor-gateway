@@ -1,85 +1,72 @@
-## Why pre-fill isn't showing on Edit
+## Goal
 
-Two real bugs in the built-in field editor:
+Add an **eye (info) indicator** next to every built-in field in the Form Builder. When the admin clicks it, a small popover/tooltip explains:
 
-### Bug 1 — The form keeps resetting on every keystroke
+- **What the field is for** (usage)
+- **Why it matters** (importance — e.g. drives GST verification, blocks SAP transfer, used for compliance scoring, etc.)
 
-In `FormBuilder.tsx` we render the editor like this:
+This helps admins decide before they hide/edit a field.
 
-```tsx
-<InlineFieldEditor
-  builtInDefaults={{ field_name: bf.field_name, display_label: bf.display_label, ... }}
-  ...
-/>
+## UX
+
+In the right pane → "Built-in Fields" cards, each field row already shows:
+`[icon]  Label  [type]  [Required]  [Verification]    Edit | Remove`
+
+We add a new info button right after the badges:
+
+```text
+[icon] Label [type] [Required] [Verification] [ⓘ]    Edit | Remove
 ```
 
-`builtInDefaults` is a **fresh object literal on every render**, so its reference changes constantly. Inside `InlineFieldEditor` the seeding effect lists `builtInDefaults` in its dependency array:
+- Icon: `Info` (lucide) — small, muted, hover turns primary.
+- Click opens a `Popover` (already used in the project via shadcn) anchored to the icon.
+- Popover content (compact, ~280px wide):
+  - Field title + `field_name` (mono)
+  - **Usage** — 1–2 sentence plain-English description of what data is captured
+  - **Why it matters** — bullet list (1–3 items): verification impact, downstream system (SAP / OCR / penny-drop), compliance/legal need, or "Display-only, safe to hide".
+  - For `locked` (verification) fields: an amber callout "Hiding this disables {GST / PAN / Bank / MSME} verification."
+
+No popover for custom fields (admin authored those themselves) — only built-in fields get the info button.
+
+## Where the copy comes from
+
+Extend the `BuiltInField` interface in `src/lib/builtInFields.ts` with two optional fields used purely for documentation:
 
 ```ts
-useEffect(() => { ...setForm(...) }, [field, defaultOrder, builtInMode, builtInDefaults]);
+interface BuiltInField {
+  // ...existing
+  usage?: string;        // 1–2 sentence description
+  importance?: string[]; // bullet points; first item shown bold if locked
+}
 ```
 
-Result: every render the effect fires again and **overwrites whatever you typed** with the catalog defaults. Visually it looks like the field "won't edit" or "resets to blank for a flash" because React schedules the reset right after the input change.
+Then enrich the catalog. Existing `help_text` (vendor-facing hint) stays as-is — `usage`/`importance` are admin-facing and richer.
 
-### Bug 2 — Catalog has no placeholder / help text to seed with
+We'll seed sensible copy for every built-in field across the 5 tabs (Document Verification, Organization, Address, Contact, Financial). Examples:
 
-`BuiltInField` only stores `field_name`, `display_label`, `field_type`, `is_mandatory`. So even when seeding works, Placeholder and Help Text fields in the editor are blank. Today the vendor form has no placeholders for most built-ins, so this isn't a regression — but the user expects to see "the current vendor field details", which means we should at least show what's in the catalog.
+- **gstin** → Usage: "15-character GST Identification Number issued by GSTN." Importance: ["Verified live against the GST portal — disables auto-fill of legal name & address if hidden", "Required by SAP master-data for tax computation", "Mandatory for B2B invoicing in India"].
+- **bank_account_number** → Usage: "Vendor's payout bank account." Importance: ["Validated by ₹1 penny-drop to confirm beneficiary", "Used as payment account in SAP", "Required for any vendor payout"].
+- **ceoEmail** → Usage: "Primary contact email of the CEO/MD." Importance: ["Receives onboarding & approval notifications", "Used as fallback authority contact"].
+- **registeredPincode** → Usage: "PIN code of registered office." Importance: ["Determines GST place-of-supply", "Used in vendor geographic reports"].
 
-### Bug 3 (minor) — Override row may not exist yet
+For fields with no special verification/system role, we use generic phrasing like "Profile information shown on the vendor master record."
 
-When the user clicks Edit on a built-in field that has never been overridden, no row exists in `form_field_configs` yet. We pass `field={null}` and rely on `builtInDefaults` to seed. That part is correct, but combined with Bug 1 the form looked empty.
+## Technical Changes
 
-## What I'll change
+1. **`src/lib/builtInFields.ts`**
+   - Add `usage?: string` and `importance?: string[]` to `BuiltInField`.
+   - Populate for all ~120 built-in fields. Bulk fields (like turnover years, address lines, branch contacts) get short shared phrasing; verification/banking/legal fields get specific copy.
 
-### 1. Stabilize the seeding effect
+2. **`src/pages/FormBuilder.tsx`** (built-in field row, around lines 503–526)
+   - Import `Popover, PopoverContent, PopoverTrigger` from `@/components/ui/popover` and `Info` from `lucide-react`.
+   - Add `<Popover>` with a small ghost icon button after the badges row.
+   - PopoverContent renders: label, field_name, "Usage" section, "Why it matters" bullet list, and an amber callout when `bf.locked`.
+   - Keep button compact (`h-6 w-6`) and `aria-label="Field details"` for accessibility.
 
-In `src/components/admin/InlineFieldEditor.tsx`, depend on **primitive** values from `builtInDefaults`, not the object reference:
+3. No DB / migration / hook changes — purely catalog + UI.
 
-```ts
-useEffect(() => {
-  if (field) { /* seed from existing override row */ }
-  else if (builtInMode && builtInDefaults) { /* seed from catalog */ }
-  else { /* blank for new custom field */ }
-}, [
-  field?.id,
-  defaultOrder,
-  builtInMode,
-  builtInDefaults?.field_name,
-  builtInDefaults?.display_label,
-  builtInDefaults?.field_type,
-  builtInDefaults?.is_mandatory,
-  builtInDefaults?.placeholder,
-  builtInDefaults?.help_text,
-]);
-```
+## Out of Scope
 
-This way the effect only fires when the field actually changes, not on every render. Typing into the editor stays put.
-
-### 2. Pass placeholder + help_text through
-
-- Extend `BuiltInField` in `src/lib/builtInFields.ts` with optional `placeholder` and `help_text`.
-- Add sensible placeholders/help text for the most common built-ins (GSTIN: "22AAAAA0000A1Z5", PAN: "ABCDE1234F", IFSC: "SBIN0001234", etc.) so the Edit dialog isn't empty.
-- Extend `builtInDefaults` in `FormBuilder.tsx` to forward those fields.
-- Extend the `else if` seeding branch in `InlineFieldEditor.tsx` so Placeholder / Help Text auto-fill from the catalog (and from the existing override row when one exists).
-
-### 3. Auto-show the Advanced section when there's content
-
-If `help_text` or `validation_regex` is non-empty when the editor opens, default `showAdvanced` to `true` so the user sees those fields immediately instead of having to click "Show advanced".
-
-### 4. Tiny UX polish
-
-- Add a small caption inside the inline editor when in `builtInMode`:
-  > "Editing built-in field — `field_name` and type are locked. Save will store an override for this tenant."
-- Save button copy becomes "Save Override" in built-in mode so it's clear what's being persisted.
-
-## Files touched
-
-- `src/components/admin/InlineFieldEditor.tsx` — stable effect deps, seed placeholder/help_text, default-open advanced section, built-in caption.
-- `src/lib/builtInFields.ts` — add optional `placeholder` / `help_text` to `BuiltInField` and seed them for the high-traffic fields (GSTIN, PAN, Udyam, bank fields, addresses).
-- `src/pages/FormBuilder.tsx` — forward `placeholder` and `help_text` from the catalog into `builtInDefaults`.
-
-## Out of scope
-
-- Reading the live placeholder strings from each step component at runtime (would require refactoring vendor step components). Catalog entries are sufficient for now.
-
-Approve and I'll implement.
+- Vendor-side help (`help_text` already handled).
+- Per-tenant overrideable usage text.
+- Editing usage/importance from the UI (it stays code-managed).
