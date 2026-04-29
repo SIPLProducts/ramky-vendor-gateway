@@ -1,80 +1,98 @@
-## Goal
+I found the cause of the repeated error:
 
-The SAP Business Partner API (`http://10.200.1.2:8000/...`) lives on a **private network** and cannot be reached directly from Lovable Cloud Edge Functions (which run on the public internet). We'll add a small **middleware service** the customer hosts inside their own network. It receives requests from the Edge Function over HTTPS, forwards them to SAP, and returns SAP's response unchanged.
+The SAP Sync button is still invoking the `sync-vendor-to-sap` backend function, and that function only checks runtime secrets named `SAP_MIDDLEWARE_URL` and `SAP_MIDDLEWARE_KEY`. Those secrets are not currently configured. Because `SAP_MIDDLEWARE_URL` is missing, the function falls back to the direct SAP URL `http://10.200.1.2:8000/...`, which Lovable Cloud cannot reach, causing:
 
 ```text
-Browser ──► Edge Function (sync-vendor-to-sap)
-                │  HTTPS + shared secret
-                ▼
-        Middleware (Node.js / Express)   ← runs inside Ramky network
-                │  HTTP + Basic Auth
-                ▼
-        SAP S/4HANA  10.200.1.2:8000
+Could not reach SAP: The signal has been aborted
 ```
 
-## What we'll add
+The middleware also printed:
 
-### 1. `middleware/` folder in the repo (not deployed by Lovable — for the customer to host)
+```text
+MIDDLEWARE_SHARED_SECRET is not set
+SAP target: (not configured)
+```
 
-Files:
+so the local `middleware/.env` setup is also incomplete.
 
-- `middleware/package.json` — Express, node-fetch, dotenv, helmet, morgan.
-- `middleware/server.js` — the proxy.
-- `middleware/.env.example` — template for SAP creds + shared secret.
-- `middleware/Dockerfile` — so it can be deployed to any Docker host inside the Ramky network.
-- `middleware/README.md` — install / run / deploy / troubleshooting instructions.
+## Plan to fix
 
-### 2. Endpoints exposed by the middleware
+1. Update `sync-vendor-to-sap` so it no longer depends only on hidden runtime secrets.
+   - It will read the active Business Partner SAP API configuration from the app database (`sap_api_configs` + `sap_api_credentials`).
+   - If the config is set to `connection_mode = proxy` and has `middleware_url`, it will call:
+     ```text
+     {middleware_url}/sap/bp/create
+     ```
+   - It will send the configured `proxy_secret` as `x-middleware-key`.
+   - It will only fall back to the direct SAP URL when the saved config is explicitly set to direct mode.
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET`  | `/health` | Liveness check (returns `{ ok: true }`) |
-| `POST` | `/sap/bp/create` | Forwards JSON body to SAP `vendor/bp/create`, returns SAP JSON unchanged |
-| `POST` | `/sap/proxy` | Generic forwarder (body: `{ url, method, headers, body }`) for future SAP APIs |
+2. Improve failure messages in `sync-vendor-to-sap`.
+   - If no middleware URL is configured, return a clear setup error instead of silently trying the private IP.
+   - If the middleware returns `401`, show that the proxy secret does not match `MIDDLEWARE_SHARED_SECRET`.
+   - If the middleware returns `500` for missing SAP env vars, show that the middleware `.env` is incomplete.
+   - If SAP times out behind the middleware, show that the middleware can be reached but SAP is unreachable from that machine.
 
-Middleware behavior:
+3. Fix middleware usability.
+   - Add a friendly `GET /` response instead of `404`, pointing to `/health` and available endpoints.
+   - Keep `/health` as the quick test URL.
+   - Keep `/sap/bp/create` as the sync endpoint.
 
-- Requires header `x-middleware-key: <MIDDLEWARE_SHARED_SECRET>` on every non-health request. Rejects with 401 otherwise.
-- Reads `SAP_BP_API_URL`, `SAP_BP_USERNAME`, `SAP_BP_PASSWORD` from its own `.env` (so the SAP password never leaves Ramky's network).
-- Adds `Authorization: Basic base64(user:pass)` and forwards body as-is.
-- 30s timeout, logs request/response (with password redacted), returns SAP status + body verbatim.
-- CORS locked down (only allows the Edge Function host + localhost for testing).
-- Self-signed TLS support (so the Edge Function can call `https://...` directly), or it can sit behind nginx/Caddy.
+4. Fix SAP Connectivity Guide text.
+   - It currently says `POST /proxy`, but the implemented endpoint is `/sap/bp/create` for vendor sync and `/sap/proxy` for generic proxying.
+   - Update the instructions so the user stores only the base middleware URL, for example:
+     ```text
+     https://abc123.ngrok-free.app
+     ```
+     not `/sap/bp/create`.
 
-### 3. Update the Edge Function `sync-vendor-to-sap`
+5. Add or update the app-side configuration behavior.
+   - On the SAP API Settings page, the saved `Node.js Middleware URL` and `Proxy Secret / Password` will become the source of truth for the SAP Sync button.
+   - This avoids needing manual Lovable Cloud secret setup for every middleware URL change, especially when using ngrok URLs that change often.
 
-- Add 2 new optional secrets: `SAP_MIDDLEWARE_URL` and `SAP_MIDDLEWARE_KEY`.
-- If `SAP_MIDDLEWARE_URL` is set, the function POSTs the existing payload to `${SAP_MIDDLEWARE_URL}/sap/bp/create` with header `x-middleware-key` instead of calling SAP directly.
-- If not set, falls back to today's behavior (direct call to `SAP_BP_API_URL`) — so nothing breaks until the middleware is deployed.
-- Response parsing stays identical (still expects the SAP JSON array with `MSGTYP` / `BP_LIFNR`).
+## Required local middleware setup after code fix
 
-### 4. Tiny UI hint on **SAP API Settings** screen
+On your Windows machine in:
 
-Add a one-line note in the existing `SapConnectivityGuide` component pointing to the new `middleware/README.md` so admins know the recommended deployment path.
+```text
+D:\VPCL_Ramky\ramky-vendor-gateway\middleware
+```
 
-## Files to add / change
+you still need a real `.env` file, copied from `.env.example`, with these values filled:
 
-- **add** `middleware/package.json`
-- **add** `middleware/server.js`
-- **add** `middleware/.env.example`
-- **add** `middleware/Dockerfile`
-- **add** `middleware/README.md`
-- **edit** `supabase/functions/sync-vendor-to-sap/index.ts` (route through middleware when configured)
-- **edit** `src/components/sap/SapConnectivityGuide.tsx` (link to middleware README)
+```text
+PORT=3002
+MIDDLEWARE_SHARED_SECRET=<same value saved in SAP API Settings as Proxy Secret / Password>
+SAP_BP_API_URL=http://10.200.1.2:8000/vendor/bp/create?sap-client=300
+SAP_BP_USERNAME=22000208
+SAP_BP_PASSWORD=Nani@1432
+SAP_REQUEST_TIMEOUT_MS=30000
+CORS_ORIGINS=*
+ALLOW_INSECURE_TLS=0
+```
 
-## Secrets to request after approval
+Then restart:
 
-- `SAP_MIDDLEWARE_URL` — public HTTPS URL of the middleware (e.g. `https://sap-proxy.ramky.com`)
-- `SAP_MIDDLEWARE_KEY` — shared secret matching the middleware's `MIDDLEWARE_SHARED_SECRET`
+```text
+node server.js
+```
 
-(Existing `SAP_BP_API_URL` / `SAP_BP_USERNAME` / `SAP_BP_PASSWORD` move into the middleware's own `.env` and can be removed from Lovable Cloud once cutover is done.)
+Expected startup should become:
 
-## Out of scope
+```text
+Sharvi SAP middleware listening on :3002
+SAP target: 10.200.1.2:8000
+```
 
-- Hosting/deploying the middleware itself (customer-managed, infra decision).
-- Changing the SAP payload mapping or the SAP Sync UI.
-- Database migrations.
+## Expected result
 
-## Open question
+After approval and implementation:
 
-Do you want the middleware to also expose a generic `/sap/proxy` endpoint now (so future APIs like PO/Invoice can reuse it), or keep it strict to `/sap/bp/create` only for this iteration?
+```text
+SAP Sync button
+  -> sync-vendor-to-sap function
+  -> saved middleware URL
+  -> local middleware /sap/bp/create
+  -> SAP private API
+```
+
+The app will stop falling back to the private SAP IP from Lovable Cloud, and if setup is still incomplete it will show a precise message telling whether the missing piece is the app config, proxy secret, middleware `.env`, or SAP network reachability.

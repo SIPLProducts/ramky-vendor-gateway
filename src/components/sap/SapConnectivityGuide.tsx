@@ -10,9 +10,10 @@ export function SapConnectivityGuide() {
           <h3 className="font-semibold text-lg">How SAP Connection Works</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          All requests go through your <strong>Node.js middleware</strong> via its{" "}
-          <code className="px-1 py-0.5 bg-muted rounded text-xs">POST /proxy</code> endpoint. The middleware URL is the{" "}
-          <strong>base URL only</strong> (do not append <code className="px-1 py-0.5 bg-muted rounded text-xs">/proxy</code>).
+          Lovable Cloud cannot reach SAP's private IP (<code className="px-1 py-0.5 bg-muted rounded text-xs">10.200.1.2</code>) directly.
+          The <strong>SAP Sync</strong> button calls a Node.js middleware running inside your network, which then forwards the request to SAP.
+          Save the middleware's <strong>base URL only</strong> below — the system appends{" "}
+          <code className="px-1 py-0.5 bg-muted rounded text-xs">/sap/bp/create</code> automatically.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -23,10 +24,10 @@ export function SapConnectivityGuide() {
                 <h4 className="font-semibold">Lovable Cloud Preview</h4>
               </div>
               <p className="text-xs text-muted-foreground">
-                App → Backend Function → ngrok → local proxy → SAP
+                App → Backend Function → ngrok → local middleware → SAP
               </p>
               <p className="text-xs text-muted-foreground">
-                → Set <strong>"Node.js Middleware URL"</strong> to your <strong>public ngrok URL</strong>
+                Set <strong>"Node.js Middleware URL"</strong> to your <strong>public ngrok URL</strong>
               </p>
               <p className="text-[11px] text-muted-foreground font-mono">e.g. https://abc123.ngrok-free.app</p>
             </CardContent>
@@ -39,27 +40,39 @@ export function SapConnectivityGuide() {
                 <h4 className="font-semibold">Self-Hosted / Client Server</h4>
               </div>
               <p className="text-xs text-muted-foreground">
-                Browser → internal middleware → SAP
+                Backend Function → internal middleware → SAP
               </p>
               <p className="text-xs text-muted-foreground">
-                → Set <strong>"Node.js Middleware URL"</strong> to{" "}
-                <code className="px-1 bg-muted rounded text-[11px]">http://host.docker.internal:3002</code>
+                Set <strong>"Node.js Middleware URL"</strong> to a URL reachable from the public internet (reverse proxy with TLS).
               </p>
               <p className="text-[11px] text-muted-foreground">
-                or <code className="px-1 bg-muted rounded">http://10.10.4.178:3002</code> (default port: 3002)
+                Default port: <code className="px-1 bg-muted rounded">3002</code>
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <p className="text-xs text-muted-foreground border-t pt-3">
-          💡 Credentials are read from this page. The system tries multiple auth strategies automatically if SAP rejects the first attempt.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          🛠️ A ready-to-deploy proxy lives in the repo at{" "}
-          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">middleware/</code> — see{" "}
-          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">middleware/README.md</code> for setup, Docker, and ngrok instructions.
-        </p>
+        <div className="text-xs text-muted-foreground border-t pt-3 space-y-2">
+          <p className="font-semibold text-foreground">Required setup checklist:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>
+              In <code className="px-1 py-0.5 bg-muted rounded">middleware/.env</code> set:{" "}
+              <code className="px-1 py-0.5 bg-muted rounded">MIDDLEWARE_SHARED_SECRET</code>,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded">SAP_BP_API_URL</code>,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded">SAP_BP_USERNAME</code>,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded">SAP_BP_PASSWORD</code>, then{" "}
+              <code className="px-1 py-0.5 bg-muted rounded">node server.js</code>.
+            </li>
+            <li>Expose port 3002 publicly (e.g. <code className="px-1 py-0.5 bg-muted rounded">ngrok http 3002</code>).</li>
+            <li>
+              In the <strong>Business Partner</strong> SAP API config above, set Connection Mode = <em>Via Proxy Server</em>,
+              paste the public URL into <strong>Node.js Middleware URL</strong>, and copy the same{" "}
+              <code className="px-1 py-0.5 bg-muted rounded">MIDDLEWARE_SHARED_SECRET</code> into{" "}
+              <strong>Proxy Secret / Password</strong>.
+            </li>
+            <li>Click <strong>Test SAP connection</strong> → should return HTTP 200 from the middleware.</li>
+          </ol>
+        </div>
       </CardContent>
     </Card>
   );
