@@ -235,6 +235,10 @@ export default function FormBuilder() {
 
   // Inline field editor state: 'new' | field id | null
   const [editingFieldId, setEditingFieldId] = useState<string | 'new' | null>(null);
+  // Built-in field currently being edited inline (by field_name)
+  const [editingBuiltIn, setEditingBuiltIn] = useState<string | null>(null);
+  // Built-in pending remove confirmation (locked fields warn first)
+  const [confirmRemoveBuiltIn, setConfirmRemoveBuiltIn] = useState<BuiltInField | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
