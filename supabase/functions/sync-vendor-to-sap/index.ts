@@ -112,8 +112,24 @@ serve(async (req) => {
     const envMiddlewareUrl = Deno.env.get("SAP_MIDDLEWARE_URL");
     const envMiddlewareKey = Deno.env.get("SAP_MIDDLEWARE_KEY");
 
-    const middlewareUrl = config?.middleware_url || envMiddlewareUrl || "";
-    const middlewareKey = config?.proxy_secret || envMiddlewareKey || "";
+    // Normalize the middleware URL: strip whitespace and any trailing endpoint paths
+    // so that pasting "https://x.ngrok.dev  /sap/bp/create" still works.
+    function normalizeMiddlewareBase(raw: string): string {
+      if (!raw) return "";
+      let v = String(raw).replace(/\s+/g, "").trim();
+      // remove trailing slashes
+      v = v.replace(/\/+$/, "");
+      // strip known endpoint suffixes if user pasted full URL
+      v = v.replace(/\/sap\/bp\/create$/i, "");
+      v = v.replace(/\/sap\/proxy$/i, "");
+      v = v.replace(/\/health$/i, "");
+      v = v.replace(/\/+$/, "");
+      return v;
+    }
+
+    const rawMiddlewareUrl = config?.middleware_url || envMiddlewareUrl || "";
+    const middlewareUrl = normalizeMiddlewareBase(rawMiddlewareUrl);
+    const middlewareKey = (config?.proxy_secret || envMiddlewareKey || "").trim();
     const connectionMode = (config?.connection_mode || "proxy").toLowerCase();
 
     let targetUrl = "";
@@ -125,8 +141,21 @@ serve(async (req) => {
           "SAP middleware URL is not configured. Open SAP API Settings → Business Partner config and set 'Node.js Middleware URL' (e.g. your ngrok https URL) and 'Proxy Secret / Password'.",
         );
       }
+      if (!/^https?:\/\//i.test(middlewareUrl)) {
+        return fail(
+          `The saved Node.js Middleware URL is invalid: "${rawMiddlewareUrl}". It must start with http:// or https:// and contain no spaces. Open SAP API Settings → Business Partner config and re-enter just the base URL (e.g. https://abc123.ngrok-free.app).`,
+        );
+      }
+      try {
+        // sanity check
+        new URL(middlewareUrl);
+      } catch {
+        return fail(
+          `The saved Node.js Middleware URL could not be parsed: "${rawMiddlewareUrl}". Re-enter just the public base URL (e.g. https://abc123.ngrok-free.app) without any trailing path or spaces.`,
+        );
+      }
       useMiddleware = true;
-      targetUrl = `${middlewareUrl.replace(/\/$/, "")}/sap/bp/create`;
+      targetUrl = `${middlewareUrl}/sap/bp/create`;
     } else {
       // direct mode — only sensible if Edge Function can actually reach SAP
       const directBase = config?.base_url || "";
