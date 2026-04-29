@@ -45,25 +45,52 @@ serve(async (req) => {
       });
     }
 
-    const { id, to } = await req.json();
-    if (!id) {
-      return new Response(JSON.stringify({ error: "Missing id" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const body = await req.json();
+    const { id, to } = body ?? {};
+
+    let host: string;
+    let port: number;
+    let encryption: string;
+    let username: string;
+    let password: string;
+    let fromEmail: string;
+    let fromName: string;
+    let replyTo: string | null;
+
+    if (id) {
+      const { data: cfg, error } = await admin
+        .from("smtp_email_configs")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+      if (!cfg) throw new Error("Config not found");
+      host = String(cfg.smtp_host).trim();
+      port = Number(cfg.smtp_port);
+      encryption = String(cfg.encryption).toLowerCase();
+      username = cfg.smtp_username;
+      password = cfg.app_password;
+      fromEmail = cfg.user_email;
+      fromName = (cfg.from_name ?? "").toString();
+      replyTo = (cfg.reply_to ?? null) as string | null;
+    } else {
+      // Inline test from form values (not yet saved)
+      if (!body?.smtp_host || !body?.smtp_port || !body?.smtp_username || !body?.app_password || !body?.from_email) {
+        return new Response(
+          JSON.stringify({ error: "Missing fields for inline test" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      host = String(body.smtp_host).trim();
+      port = Number(body.smtp_port);
+      encryption = String(body.encryption ?? "tls").toLowerCase();
+      username = String(body.smtp_username).trim();
+      password = String(body.app_password);
+      fromEmail = String(body.from_email).trim();
+      fromName = String(body.from_name ?? "");
+      replyTo = body.reply_to ? String(body.reply_to).trim() : null;
     }
 
-    const { data: cfg, error } = await admin
-      .from("smtp_email_configs")
-      .select("*")
-      .eq("id", id)
-      .single();
-    if (error) throw error;
-    if (!cfg) throw new Error("Config not found");
-
-    const host = String(cfg.smtp_host).trim();
-    const port = Number(cfg.smtp_port);
-    const encryption = String(cfg.encryption).toLowerCase();
     const isGmail = host.toLowerCase().includes("gmail");
     const effectivePort = isGmail && port === 587 ? 465 : port;
     const useImplicitTls =
@@ -76,17 +103,18 @@ serve(async (req) => {
         hostname: host,
         port: effectivePort,
         tls: useImplicitTls,
-        auth: { username: cfg.smtp_username, password: cfg.app_password },
+        auth: { username, password },
       },
     });
 
-    const fromName = (cfg.from_name ?? "").toString().replace(/[<>"]/g, "");
-    const from = fromName ? `${fromName} <${cfg.user_email}>` : cfg.user_email;
-    const recipient = (to && String(to).trim()) || cfg.user_email;
+    const cleanFromName = fromName.replace(/[<>"]/g, "");
+    const from = cleanFromName ? `${cleanFromName} <${fromEmail}>` : fromEmail;
+    const recipient = (to && String(to).trim()) || fromEmail;
 
     await client.send({
       from,
       to: [recipient],
+      replyTo: replyTo ?? undefined,
       subject: "Sharvi Vendor Portal — SMTP Test Email",
       content:
         "This is a test email confirming your SMTP configuration is working.",
