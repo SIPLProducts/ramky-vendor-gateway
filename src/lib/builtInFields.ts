@@ -26,6 +26,8 @@ export interface BuiltInField {
    *  and we do NOT allow hiding it from the Form Builder. */
   locked?: boolean;
   group?: string;
+  placeholder?: string;
+  help_text?: string;
 }
 
 export const BUILT_IN_FIELDS: Record<string, BuiltInField[]> = {

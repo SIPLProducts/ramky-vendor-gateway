@@ -1,79 +1,85 @@
-## Why some fields don't show "Remove"
+## Why pre-fill isn't showing on Edit
 
-In `src/lib/builtInFields.ts` every field on the **Document Verification** tab and the first two fields on **Organization Profile** (`buyerCompanyId`, `legalName`) are flagged `locked: true`. In `FormBuilder.tsx` the Remove button is rendered as `disabled={bf.locked || ...}`, so those rows show only the gray "Verification" pill with no working Remove action. That's why fields like GSTIN, PAN, IFSC, Buyer Company, Legal Name look un-removable while Trade Name etc. can be removed fine.
+Two real bugs in the built-in field editor:
 
-You also asked for an **Edit** option on built-in fields (today only custom fields have one) and a **nicer visual design** for the whole fields panel.
+### Bug 1 — The form keeps resetting on every keystroke
+
+In `FormBuilder.tsx` we render the editor like this:
+
+```tsx
+<InlineFieldEditor
+  builtInDefaults={{ field_name: bf.field_name, display_label: bf.display_label, ... }}
+  ...
+/>
+```
+
+`builtInDefaults` is a **fresh object literal on every render**, so its reference changes constantly. Inside `InlineFieldEditor` the seeding effect lists `builtInDefaults` in its dependency array:
+
+```ts
+useEffect(() => { ...setForm(...) }, [field, defaultOrder, builtInMode, builtInDefaults]);
+```
+
+Result: every render the effect fires again and **overwrites whatever you typed** with the catalog defaults. Visually it looks like the field "won't edit" or "resets to blank for a flash" because React schedules the reset right after the input change.
+
+### Bug 2 — Catalog has no placeholder / help text to seed with
+
+`BuiltInField` only stores `field_name`, `display_label`, `field_type`, `is_mandatory`. So even when seeding works, Placeholder and Help Text fields in the editor are blank. Today the vendor form has no placeholders for most built-ins, so this isn't a regression — but the user expects to see "the current vendor field details", which means we should at least show what's in the catalog.
+
+### Bug 3 (minor) — Override row may not exist yet
+
+When the user clicks Edit on a built-in field that has never been overridden, no row exists in `form_field_configs` yet. We pass `field={null}` and rely on `builtInDefaults` to seed. That part is correct, but combined with Bug 1 the form looked empty.
 
 ## What I'll change
 
-### 1. Make every built-in field removable (with a clear warning)
+### 1. Stabilize the seeding effect
 
-- Remove the hard `disabled` on locked rows. Locked fields will still show the **"Verification"** pill so admins know hiding them disables OCR/API verification for that block, and clicking Remove on a locked field opens a small confirm dialog:
-  > "GSTIN drives GST verification. Hiding it will disable GST OCR + GSTIN lookup for this tenant. Continue?"
-- Non-locked fields keep today's one-click Remove.
-- Restore Default keeps working the same way (deletes the override row).
+In `src/components/admin/InlineFieldEditor.tsx`, depend on **primitive** values from `builtInDefaults`, not the object reference:
 
-### 2. Add Edit on built-in fields
-
-- New **Edit** button on every built-in row (pencil icon, same look as custom rows).
-- Clicking it opens an inline editor (reuses `InlineFieldEditor` in a new `builtInMode`) where the admin can change:
-  - Display label
-  - Placeholder
-  - Help text
-  - Required toggle
-- `field_name` and `field_type` stay locked (changing them would break DB columns + verification).
-- Saving writes/updates the same override row in `form_field_configs` (with `default_value = '__builtin_override__'`). The vendor steps already read these via `useBuiltInFieldOverrides` so the new label/required will reflect on the vendor form automatically.
-
-### 3. Redesign the fields panel
-
-Goal: enterprise-clean, scannable, grouped — matches the rest of the SAP Fiori-inspired UI.
-
-```text
-┌─ Document Verification  [Built-in]  PAN / GST / MSME / Bank — OCR + API verified ─┐
-│                                                                                    │
-│  ┌─ GST ────────────────────────────────────────── 6 fields ─┐                    │
-│  │ ▸ GST Registered?   checkbox · Required · Verification    [Edit] [Remove]      │
-│  │   is_gst_registered                                                            │
-│  ├──────────────────────────────────────────────────────────┤                    │
-│  │ ▸ GSTIN             text · Required · Verification        [Edit] [Remove]      │
-│  │   gstin                                                                        │
-│  └──────────────────────────────────────────────────────────┘                    │
-│                                                                                    │
-│  ┌─ PAN ────────────────────────────────────────── 3 fields ─┐                    │
-│  │ ...                                                                            │
-│  └──────────────────────────────────────────────────────────┘                    │
-│                                                                                    │
-│  ── Custom Fields (2) ──────────────────────────── [+ Add Field] [Templates] ──   │
-│  ┌────────────────────────────────────────────────────────────┐                  │
-│  │ ⋮ Preferred Delivery Slot   select                  [Edit] [Delete]            │
-│  └────────────────────────────────────────────────────────────┘                  │
-└────────────────────────────────────────────────────────────────────────────────────┘
+```ts
+useEffect(() => {
+  if (field) { /* seed from existing override row */ }
+  else if (builtInMode && builtInDefaults) { /* seed from catalog */ }
+  else { /* blank for new custom field */ }
+}, [
+  field?.id,
+  defaultOrder,
+  builtInMode,
+  builtInDefaults?.field_name,
+  builtInDefaults?.display_label,
+  builtInDefaults?.field_type,
+  builtInDefaults?.is_mandatory,
+  builtInDefaults?.placeholder,
+  builtInDefaults?.help_text,
+]);
 ```
 
-Concrete UI changes inside `src/pages/FormBuilder.tsx`:
+This way the effect only fires when the field actually changes, not on every render. Typing into the editor stays put.
 
-- Group built-in fields by their `group` property into **collapsible group cards** (rounded card per group with a sticky header showing group name + field count). Replaces the current flat divided list with a small "GST", "PAN", "MSME", "Bank" header strip.
-- Add small colored **icon chips** for field type (text / file / checkbox / select) instead of plain outline badges, using the existing `Badge` variants and tone matching the rest of the app (blue = built-in, amber = verification, green = required).
-- Hidden rows render with a subtle striped background + an inline "Hidden — vendors won't see this" caption and a prominent **Restore Default** button (so it's obvious how to bring it back).
-- Action buttons move to a right-aligned cluster: `[Edit]` (ghost) + `[Remove]` (destructive ghost) or `[Restore Default]` (primary ghost) when hidden.
-- Same visual rhythm applied to the Custom Fields list (group divider, hover highlight, drag handle on the left) so both lists feel like one panel.
-- Keep the existing top alert; rephrase to: "Built-in steps are locked. You can hide, edit labels, or restore any built-in field — verification-critical fields will warn before hiding."
+### 2. Pass placeholder + help_text through
 
-### 4. Confirm dialog component
+- Extend `BuiltInField` in `src/lib/builtInFields.ts` with optional `placeholder` and `help_text`.
+- Add sensible placeholders/help text for the most common built-ins (GSTIN: "22AAAAA0000A1Z5", PAN: "ABCDE1234F", IFSC: "SBIN0001234", etc.) so the Edit dialog isn't empty.
+- Extend `builtInDefaults` in `FormBuilder.tsx` to forward those fields.
+- Extend the `else if` seeding branch in `InlineFieldEditor.tsx` so Placeholder / Help Text auto-fill from the catalog (and from the existing override row when one exists).
 
-Add a tiny `ConfirmDialog` (reusing shadcn `AlertDialog`) for the "this field powers verification" warning so we don't rely on the browser `confirm()` for destructive built-in actions.
+### 3. Auto-show the Advanced section when there's content
+
+If `help_text` or `validation_regex` is non-empty when the editor opens, default `showAdvanced` to `true` so the user sees those fields immediately instead of having to click "Show advanced".
+
+### 4. Tiny UX polish
+
+- Add a small caption inside the inline editor when in `builtInMode`:
+  > "Editing built-in field — `field_name` and type are locked. Save will store an override for this tenant."
+- Save button copy becomes "Save Override" in built-in mode so it's clear what's being persisted.
 
 ## Files touched
 
-- `src/pages/FormBuilder.tsx` — group rendering, new Edit/Remove on built-ins, redesigned card layout.
-- `src/components/admin/InlineFieldEditor.tsx` — accept a `builtInMode` prop that locks `field_name` + `field_type` inputs and writes the row with `default_value = '__builtin_override__'`.
-- `src/lib/builtInFields.ts` — keep `locked` flag (used only for the warning copy, no longer disables the button).
-- (optional) `src/components/ui/confirm-dialog.tsx` — small wrapper around `AlertDialog` for the verification-warning prompt.
+- `src/components/admin/InlineFieldEditor.tsx` — stable effect deps, seed placeholder/help_text, default-open advanced section, built-in caption.
+- `src/lib/builtInFields.ts` — add optional `placeholder` / `help_text` to `BuiltInField` and seed them for the high-traffic fields (GSTIN, PAN, Udyam, bank fields, addresses).
+- `src/pages/FormBuilder.tsx` — forward `placeholder` and `help_text` from the catalog into `builtInDefaults`.
 
 ## Out of scope
 
-- Reordering built-in fields against each other (still natural order from the catalog).
-- Changing `field_type` of built-ins (would break vendor form + DB columns).
-- Touching the Review tab.
+- Reading the live placeholder strings from each step component at runtime (would require refactoring vendor step components). Catalog entries are sufficient for now.
 
 Approve and I'll implement.
