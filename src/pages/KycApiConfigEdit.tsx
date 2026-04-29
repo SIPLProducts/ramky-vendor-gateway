@@ -360,22 +360,136 @@ export default function KycApiConfigEdit() {
         </TabsContent>
 
         <TabsContent value="headers">
-          <Card><CardContent className="p-6 space-y-2">
-            <Label>Extra Request Headers (JSON)</Label>
-            <Textarea rows={10} className="font-mono text-xs" value={headersText} onChange={(e) => setHeadersText(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Authorization header is added automatically from the credential — only put extras here.</p>
+          <Card><CardContent className="p-6 space-y-4">
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                The <strong>Authorization</strong> header is added automatically from the credential
+                you set in the <strong>Authentication</strong> tab — do not paste it here.
+                Add only extras like <code>x-api-key</code> or <code>Accept</code>.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex items-center justify-between">
+              <Label>Extra Request Headers</Label>
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" variant="ghost" onClick={() => {
+                  // Sync between modes when toggling
+                  if (!headersAdvanced) {
+                    setHeadersText(jsonStr(rowsToObj(headerRows)));
+                  } else {
+                    const parsed = lenientHeaderParse(headersText);
+                    if (parsed.ok === true) {
+                      setHeaderRows(objToRows(parsed.obj));
+                      setHeadersError(null);
+                    } else {
+                      setHeadersError(parsed.error);
+                      toast({ title: "Cannot switch to simple view", description: parsed.error, variant: "destructive" });
+                      return;
+                    }
+                  }
+                  setHeadersAdvanced((v) => !v);
+                }}>
+                  {headersAdvanced ? "Simple editor" : "Advanced (JSON)"}
+                </Button>
+              </div>
+            </div>
+
+            {!headersAdvanced ? (
+              <div className="space-y-2">
+                {headerRows.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No extra headers. Click "Add header" to add one.</p>
+                )}
+                {headerRows.map((row, i) => {
+                  const isAuth = row.key.trim().toLowerCase() === "authorization";
+                  return (
+                    <div key={i} className="flex items-start gap-2">
+                      <Input
+                        placeholder="Header name (e.g. x-api-key)"
+                        value={row.key}
+                        onChange={(e) => updateHeaderRow(i, { key: e.target.value })}
+                        className={isAuth ? "border-destructive" : ""}
+                      />
+                      <Input
+                        placeholder="Header value"
+                        value={row.value}
+                        onChange={(e) => updateHeaderRow(i, { value: e.target.value })}
+                      />
+                      <Button type="button" size="icon" variant="ghost" onClick={() => removeHeaderRow(i)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {headerRows.some((r) => r.key.trim().toLowerCase() === "authorization") && (
+                  <p className="text-xs text-destructive">
+                    Authorization headers entered here are ignored — use the Authentication tab instead.
+                  </p>
+                )}
+                <Button type="button" size="sm" variant="outline" onClick={addHeaderRow}>
+                  <Plus className="h-4 w-4 mr-1" /> Add header
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Textarea
+                  rows={10}
+                  className="font-mono text-xs"
+                  value={headersText}
+                  onChange={(e) => {
+                    setHeadersText(e.target.value);
+                    const parsed = lenientHeaderParse(e.target.value);
+                    setHeadersError(parsed.ok === true ? null : parsed.error);
+                  }}
+                  placeholder='{ "x-api-key": "your-key" }'
+                />
+                {headersError ? (
+                  <p className="text-xs text-destructive">Invalid — {headersError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Accepts strict JSON or pasted <code>Header: value</code> lines.
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent></Card>
         </TabsContent>
 
         <TabsContent value="payload">
-          <Card><CardContent className="p-6 space-y-2">
-            <Label>Request Body Template (JSON)</Label>
-            <Textarea rows={10} className="font-mono text-xs" value={bodyText} onChange={(e) => setBodyText(e.target.value)}
-              disabled={form.request_mode === "multipart"} />
-            <p className="text-xs text-muted-foreground">
-              Use <code>{"{{placeholder}}"}</code> tokens — e.g. <code>{`{ "id_number": "{{gstin}}" }`}</code>.
-              For multipart OCR, the file is sent under field <code>{form.file_field_name || "file"}</code> instead of a body.
-            </p>
+          <Card><CardContent className="p-6 space-y-3">
+            {form.request_mode === "multipart" ? (
+              <>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    This is a <strong>multipart upload</strong> endpoint — no JSON body is needed.
+                    The vendor's uploaded document is forwarded automatically as form-data under the
+                    field <code>{form.file_field_name || "file"}</code>.
+                  </AlertDescription>
+                </Alert>
+                <Label className="text-xs text-muted-foreground">Request preview</Label>
+                <pre className="bg-muted p-3 rounded text-xs overflow-auto">
+{`POST ${form.base_url || ""}${form.endpoint_path || ""}
+${form.auth_header_name || "Authorization"}: ${form.auth_header_prefix || "Bearer"} ********
+Content-Type: multipart/form-data
+
+${form.file_field_name || "file"}: <vendor-uploaded document>`}
+                </pre>
+                <p className="text-xs text-muted-foreground">
+                  Vendor flow: the document uploaded on the registration form (e.g. GST Certificate)
+                  is sent here. The API's response is then mapped back to vendor form fields using
+                  the <strong>Response Mapping</strong> tab.
+                </p>
+              </>
+            ) : (
+              <>
+                <Label>Request Body Template (JSON)</Label>
+                <Textarea rows={10} className="font-mono text-xs" value={bodyText} onChange={(e) => setBodyText(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Use <code>{"{{placeholder}}"}</code> tokens — e.g. <code>{`{ "id_number": "{{gstin}}" }`}</code>.
+                </p>
+              </>
+            )}
           </CardContent></Card>
         </TabsContent>
 
@@ -402,6 +516,26 @@ export default function KycApiConfigEdit() {
                 Map output field → JSON path in the API response (dot notation), e.g. <code>{`{ "legalName": "data.legal_name" }`}</code>.
               </p>
             </div>
+            {(() => {
+              try {
+                const m = JSON.parse(mappingText || "{}");
+                const entries = Object.entries(m);
+                if (!entries.length) return null;
+                return (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label className="text-xs">How API response maps to vendor form fields</Label>
+                    <div className="rounded border divide-y text-xs">
+                      {entries.map(([field, path]) => (
+                        <div key={field} className="flex items-center justify-between px-3 py-2">
+                          <span className="font-medium">{field}</span>
+                          <code className="text-muted-foreground">{String(path)}</code>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
           </CardContent></Card>
         </TabsContent>
 
