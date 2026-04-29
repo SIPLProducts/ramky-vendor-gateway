@@ -193,6 +193,88 @@ export default function FormBuilder() {
   // Inline field editor state: 'new' | field id | null
   const [editingFieldId, setEditingFieldId] = useState<string | 'new' | null>(null);
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [seededTenants, setSeededTenants] = useState<Set<string>>(new Set());
+
+  // Auto-seed catalog rows for built-in steps that have zero rows yet for this
+  // tenant. Idempotent: skipped once a step has any row, so deletes by the
+  // admin are not undone on next load.
+  useEffect(() => {
+    if (!effectiveTenantId) return;
+    if (seededTenants.has(effectiveTenantId)) return;
+
+    const stepsMissingSeed = Object.keys(BUILT_IN_FIELDS_CATALOG).filter(
+      (stepKey) => !allFields.some((f) => f.step_name === stepKey),
+    );
+    setSeededTenants((prev) => {
+      const next = new Set(prev);
+      next.add(effectiveTenantId);
+      return next;
+    });
+    if (stepsMissingSeed.length === 0) return;
+
+    const rows = stepsMissingSeed.flatMap((stepKey) =>
+      BUILT_IN_FIELDS_CATALOG[stepKey].map((f) => ({
+        tenant_id: effectiveTenantId,
+        step_name: stepKey,
+        field_name: f.field_name,
+        display_label: f.display_label,
+        field_type: f.field_type,
+        is_visible: true,
+        is_mandatory: f.is_mandatory,
+        is_editable: true,
+        display_order: f.display_order,
+        placeholder: f.placeholder ?? null,
+        default_value: BUILT_IN_FIELD_MARKER,
+      })),
+    );
+    supabase
+      .from('form_field_configs')
+      .insert(rows as never)
+      .then(({ error }) => {
+        if (error) {
+          console.warn('[FormBuilder] auto-seed warning:', error.message);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ['form-field-configs'] });
+      });
+  }, [effectiveTenantId, allFields, seededTenants, queryClient]);
+
+  const restoreBuiltInDefaults = async (stepKey: string) => {
+    if (!effectiveTenantId) return;
+    const catalog = BUILT_IN_FIELDS_CATALOG[stepKey];
+    if (!catalog) return;
+    const existingNames = new Set(
+      allFields.filter((f) => f.step_name === stepKey).map((f) => f.field_name),
+    );
+    const missing = catalog.filter((c) => !existingNames.has(c.field_name));
+    if (missing.length === 0) {
+      toast({ title: 'Nothing to restore', description: 'All built-in fields are already present.' });
+      return;
+    }
+    const rows = missing.map((f) => ({
+      tenant_id: effectiveTenantId,
+      step_name: stepKey,
+      field_name: f.field_name,
+      display_label: f.display_label,
+      field_type: f.field_type,
+      is_visible: true,
+      is_mandatory: f.is_mandatory,
+      is_editable: true,
+      display_order: f.display_order,
+      placeholder: f.placeholder ?? null,
+      default_value: BUILT_IN_FIELD_MARKER,
+    }));
+    const { error } = await supabase.from('form_field_configs').insert(rows as never);
+    if (error) {
+      toast({ title: 'Restore failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ['form-field-configs'] });
+    toast({ title: 'Restored', description: `Re-added ${missing.length} built-in field(s).` });
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
