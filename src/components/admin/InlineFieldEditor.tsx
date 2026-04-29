@@ -159,12 +159,61 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
 
   return (
     <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
-      {builtInMode && (
-        <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/80">
-          Editing built-in field — <span className="font-mono">{form.field_name}</span> and type are locked.
-          Saving stores an override for this tenant only.
-        </div>
-      )}
+      {builtInMode && (() => {
+        const fname = builtInDefaults?.field_name || form.field_name;
+        const info = getBuiltInFieldInfo(fname);
+        const isLocked = !!builtInDefaults?.locked;
+        return (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 overflow-hidden">
+            <div className="flex items-start gap-2.5 px-3 py-2.5 border-b border-primary/10 bg-primary/10">
+              <div className="h-6 w-6 rounded-md bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                <Info className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold leading-tight">
+                  {builtInDefaults?.display_label || form.display_label}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  <span className="font-mono">{fname}</span>
+                  <span className="mx-1.5">•</span>
+                  <span>field key &amp; type are locked — saves an override for this tenant</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-3 py-2.5 space-y-2.5">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+                  Usage
+                </div>
+                <p className="text-xs text-foreground/90 leading-relaxed">{info.usage}</p>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  Why it matters
+                </div>
+                <ul className="space-y-1">
+                  {info.importance.map((pt, i) => (
+                    <li key={i} className="text-xs text-foreground/90 leading-relaxed flex gap-2">
+                      <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
+                      <span>{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {isLocked && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 flex gap-2">
+                  <ShieldAlert className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Hiding this field disables automated{' '}
+                    <span className="font-semibold">{builtInDefaults?.group}</span>{' '}
+                    verification for vendors of this tenant.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
         <div className="space-y-1.5">
