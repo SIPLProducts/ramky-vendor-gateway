@@ -1,61 +1,53 @@
-# Use Logged-in User's SMTP Config for Vendor Invitations
+# Fix: Show specific "You are not configured" error in Vendor Invitations toast
 
-When an admin clicks **Create Invitation**, the invitation email should be sent **From** the logged-in user's email using the SMTP/App Password they saved in the **Email Configuration** screen, **To** the vendor's email. If the logged-in user has no matching active record in `smtp_email_configs`, the action should fail with the message: **"You are not configured in Email Configuration"**.
+## Problem
 
-## Scope
+When a logged-in user (e.g. vidyasagar) without an active row in **Email Configuration** clicks **Send Email** (or **Create Invitation**) on `/admin/invitations`, the edge function `send-vendor-invitation` correctly returns:
 
-- Applies to the `Create Invitation` flow (`AdminInvitations.tsx`).
-- Also applies to the per-row `Send Email` / resend action on the same page (same intent — uses logged-in user's SMTP).
-- Other system emails (status notifications, etc.) are out of scope and continue to use the existing portal-level SMTP.
+```
+HTTP 400 { "error": "You are not configured in Email Configuration" }
+```
 
-## Behavior
+But the UI shows a generic toast: **"Email Failed — Edge Function returned a non-2xx status code"**.
 
-1. On Create / Resend Invitation:
-   - Backend looks up `smtp_email_configs` where `lower(user_email) = lower(<logged-in user email>)` AND `is_active = true`.
-   - If found → send email using that config: `from = user_email`, `to = vendor email`, with `smtp_host/port/encryption/smtp_username/app_password/from_name/reply_to`.
-   - If not found (or inactive / missing app password) → return error `You are not configured in Email Configuration`. The frontend shows it as a toast and does NOT show "Invitation Sent".
-2. The vendor invitation row is still created in the DB even if email fails (current behavior preserved), but the toast clearly states the SMTP misconfiguration.
+## Root Cause
 
-## Technical Changes
+`supabase.functions.invoke()` from the JS SDK treats any non-2xx response as an error: it sets `data = null` and `error = FunctionsHttpError` whose `.message` is the generic `"Edge Function returned a non-2xx status code"`. The actual JSON body (`{ error: "You are not configured..." }`) is on `error.context` (a `Response` object) and must be read with `await error.context.json()`.
 
-### 1. Edge function: `send-vendor-invitation`
-- Accept new optional field `senderEmail` in the request body (the logged-in user's email).
-- Before calling `send-smtp-email`, query `smtp_email_configs` (with service-role client) for an active row matching `senderEmail`.
-- If not found → return `400 { error: "You are not configured in Email Configuration" }` and skip sending.
-- If found → forward the SMTP credentials to `send-smtp-email` via the existing `smtp` override block:
+The current code in `src/pages/AdminInvitations.tsx` only inspects `data?.error` and `error.message`, so the specific message is never detected and the generic toast wins.
+
+## Fix
+
+In `src/pages/AdminInvitations.tsx`, in **both** `createInvitation.mutationFn` and `sendEmailInvitation.mutationFn`, when `emailError`/`error` is present, parse the response body before falling back to the generic message:
 
 ```ts
-{
-  to: vendorEmail,
-  subject,
-  html,
-  smtp: {
-    host: cfg.smtp_host,
-    port: cfg.smtp_port,
-    encryption: cfg.encryption,
-    username: cfg.smtp_username,
-    password: cfg.app_password,
-    from_email: cfg.user_email,   // From = logged-in user
-    from_name: cfg.from_name,
-    reply_to: cfg.reply_to,
-  },
+let serverMsg = '';
+if (emailError) {
+  try {
+    const ctx: any = (emailError as any).context;
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.json();
+      serverMsg = body?.error || '';
+    } else if (ctx && typeof ctx.text === 'function') {
+      const txt = await ctx.text();
+      try { serverMsg = JSON.parse(txt)?.error || txt; } catch { serverMsg = txt; }
+    }
+  } catch { /* ignore parse errors */ }
+}
+
+const notConfiguredMsg = 'You are not configured in Email Configuration';
+if (serverMsg.includes(notConfiguredMsg) || (data as any)?.error?.includes?.(notConfiguredMsg)) {
+  // createInvitation: return { invitation, emailSent: false, notConfigured: true }
+  // sendEmailInvitation: throw new Error(notConfiguredMsg)
 }
 ```
 
-- Remove reliance on portal-level SMTP fallback for this flow. If `senderEmail` is missing from the request, also return the same "not configured" error.
+Result:
+- **Create Invitation** flow: invitation row is still created, and the toast shows **"Email Not Configured — You are not configured in Email Configuration"** (existing onSuccess branch already handles this).
+- **Send Email** (resend) flow: the destructive toast shows **"Email Not Configured — You are not configured in Email Configuration"** (existing onError branch already handles `isNotConfigured`).
 
-### 2. `send-smtp-email` (no schema change required)
-- Already supports an inline `smtp` override block; just verify the override path is used and the portal-config fallback is bypassed when override is provided. No code changes expected beyond ensuring the override fully wins over `portal_config` (it already does).
+No edge function changes — the backend already returns the correct payload. No schema changes.
 
-### 3. Frontend: `src/pages/AdminInvitations.tsx`
-- In both `createInvitation` and `sendEmailInvitation` mutations, pass `senderEmail: user?.email` in the `supabase.functions.invoke('send-vendor-invitation', { body: { ... } })` call.
-- Update error handling: if the edge function returns the "You are not configured in Email Configuration" error, show that exact message in the destructive toast (title: `Email Not Configured`, description: that string). Do not show the generic "Invitation Sent" toast in this case.
+## Files Changed
 
-### 4. RLS / data access
-- The lookup happens inside the edge function using the service role key, so no RLS policy changes are needed. We match strictly by `lower(user_email)` to avoid case mismatches.
-
-## Out of Scope
-
-- Editing the `Email Configuration` screen UI.
-- Changing the schema of `smtp_email_configs`.
-- Changing other email flows (status notifications, finance approvals, etc.).
+- `src/pages/AdminInvitations.tsx` — parse `error.context` JSON body in both mutations so the "not configured" message is detected and surfaced in the toast.

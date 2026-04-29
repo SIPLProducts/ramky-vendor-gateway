@@ -166,7 +166,20 @@ export default function AdminInvitations() {
 
       // Surface "not configured" error from edge function (returns non-2xx with JSON body)
       const notConfiguredMsg = 'You are not configured in Email Configuration';
-      const respErrMsg = (emailData as any)?.error || (emailError as any)?.message || '';
+      let serverErrMsg = '';
+      if (emailError) {
+        try {
+          const ctx: any = (emailError as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            serverErrMsg = body?.error || '';
+          } else if (ctx && typeof ctx.text === 'function') {
+            const txt = await ctx.text();
+            try { serverErrMsg = JSON.parse(txt)?.error || txt; } catch { serverErrMsg = txt; }
+          }
+        } catch { /* ignore */ }
+      }
+      const respErrMsg = serverErrMsg || (emailData as any)?.error || (emailError as any)?.message || '';
       if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
         return { invitation, emailSent: false, notConfigured: true };
       }
@@ -244,7 +257,20 @@ export default function AdminInvitations() {
       });
 
       const notConfiguredMsg = 'You are not configured in Email Configuration';
-      const respErrMsg = (data as any)?.error || (error as any)?.message || '';
+      let serverErrMsg = '';
+      if (error) {
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            serverErrMsg = body?.error || '';
+          } else if (ctx && typeof ctx.text === 'function') {
+            const txt = await ctx.text();
+            try { serverErrMsg = JSON.parse(txt)?.error || txt; } catch { serverErrMsg = txt; }
+          }
+        } catch { /* ignore */ }
+      }
+      const respErrMsg = serverErrMsg || (data as any)?.error || (error as any)?.message || '';
       if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
         throw new Error(notConfiguredMsg);
       }
@@ -252,7 +278,7 @@ export default function AdminInvitations() {
       if (error) {
         console.error('Edge function error:', error);
         console.error('Error details:', JSON.stringify(error, null, 2));
-        throw new Error(error.message || 'Failed to send email');
+        throw new Error(serverErrMsg || error.message || 'Failed to send email');
       }
 
       console.log('Edge function response:', data);
