@@ -35,6 +35,7 @@ import FormBuilder from "./pages/FormBuilder";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import MyApprovals from "./pages/MyApprovals";
+import EmailConfiguration from "./pages/EmailConfiguration";
 
 const queryClient = new QueryClient();
 
