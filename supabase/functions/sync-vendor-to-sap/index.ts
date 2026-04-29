@@ -71,7 +71,7 @@ const trunc = (v: any, n: number) => (v == null ? "" : String(v)).slice(0, n);
 function buildPayload(vendor: any) {
   const legalName = vendor.legal_name || "";
   const tradeName = vendor.trade_name || "";
-  const region = vendor.registered_state ? (stateToRegion[vendor.registered_state] || "") : "";
+  const region = resolveRegion(vendor.registered_state);
 
   const row: Record<string, any> = {
     bpartner: "", partn_cat: "2", partn_grp: "ZDOM", title: "",
