@@ -16,6 +16,18 @@ interface Props {
   field?: FormFieldConfig | null;
   defaultOrder?: number;
   onClose: () => void;
+  /** When true, this is editing a built-in field override.
+   *  - field_name & field_type are locked
+   *  - default_value is forced to BUILTIN_OVERRIDE_MARK so the row stays
+   *    classified as a built-in override.
+   *  - When `field` is null we expect `builtInDefaults` to seed the form. */
+  builtInMode?: boolean;
+  builtInDefaults?: {
+    field_name: string;
+    display_label: string;
+    field_type: string;
+    is_mandatory: boolean;
+  };
 }
 
 const FIELD_TYPES = [
