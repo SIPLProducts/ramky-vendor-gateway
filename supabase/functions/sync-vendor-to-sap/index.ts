@@ -163,12 +163,18 @@ serve(async (req) => {
       .single();
     if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
 
+    const middlewareUrl = Deno.env.get("SAP_MIDDLEWARE_URL");
+    const middlewareKey = Deno.env.get("SAP_MIDDLEWARE_KEY");
     const sapUrl = Deno.env.get("SAP_BP_API_URL") || DEFAULT_SAP_URL;
     const sapUser = Deno.env.get("SAP_BP_USERNAME") || DEFAULT_SAP_USER;
     const sapPass = Deno.env.get("SAP_BP_PASSWORD") || DEFAULT_SAP_PASS;
 
     const payload = [buildPayload(vendor)];
-    console.log("SAP request URL:", sapUrl);
+    const useMiddleware = !!middlewareUrl;
+    const targetUrl = useMiddleware
+      ? `${middlewareUrl!.replace(/\/$/, "")}/sap/bp/create`
+      : sapUrl;
+    console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl);
     console.log("SAP request payload:", JSON.stringify(payload));
 
     let sapResponse: any[] | null = null;
@@ -178,12 +184,15 @@ serve(async (req) => {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30000);
-      const res = await fetch(sapUrl, {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (useMiddleware) {
+        if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
+      } else {
+        headers["Authorization"] = `Basic ${btoa(`${sapUser}:${sapPass}`)}`;
+      }
+      const res = await fetch(targetUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Basic ${btoa(`${sapUser}:${sapPass}`)}`,
-        },
+        headers,
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
@@ -192,8 +201,16 @@ serve(async (req) => {
       const text = await res.text();
       console.log("SAP raw response:", text);
       try {
-        sapResponse = JSON.parse(text);
-        if (!Array.isArray(sapResponse)) sapResponse = [sapResponse];
+        const parsed = JSON.parse(text);
+        // Middleware wraps the SAP response as { ok, sapStatus, sapResponse }.
+        // Direct calls return SAP's array verbatim.
+        const raw = useMiddleware && parsed && typeof parsed === "object" && "sapResponse" in parsed
+          ? parsed.sapResponse
+          : parsed;
+        sapResponse = Array.isArray(raw) ? raw : [raw];
+        if (useMiddleware && parsed && parsed.ok === false && !sapResponse.length) {
+          networkError = parsed.error || `Middleware error (HTTP ${httpStatus})`;
+        }
       } catch {
         networkError = `Invalid JSON from SAP (HTTP ${httpStatus}): ${text.slice(0, 300)}`;
       }

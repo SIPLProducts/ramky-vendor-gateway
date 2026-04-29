@@ -55,6 +55,11 @@ export function SapConnectivityGuide() {
         <p className="text-xs text-muted-foreground border-t pt-3">
           💡 Credentials are read from this page. The system tries multiple auth strategies automatically if SAP rejects the first attempt.
         </p>
+        <p className="text-xs text-muted-foreground">
+          🛠️ A ready-to-deploy proxy lives in the repo at{" "}
+          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">middleware/</code> — see{" "}
+          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">middleware/README.md</code> for setup, Docker, and ngrok instructions.
+        </p>
       </CardContent>
     </Card>
   );
