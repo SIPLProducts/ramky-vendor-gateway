@@ -15,9 +15,6 @@ interface Props {
   stepKey: string;
   field?: FormFieldConfig | null;
   defaultOrder?: number;
-  /** When true, the field is one of the built-in catalog fields — restrict
-   *  field key and field type editing to avoid breaking the vendor form. */
-  isBuiltIn?: boolean;
   onClose: () => void;
 }
 
@@ -36,7 +33,7 @@ const FIELD_TYPES = [
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, isBuiltIn = false, onClose }: Props) {
+export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose }: Props) {
   const upsert = useUpsertFormField();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
@@ -134,8 +131,8 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Type {isBuiltIn && <span className="text-muted-foreground">(locked)</span>}</Label>
-          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })} disabled={isBuiltIn}>
+          <Label className="text-xs">Type</Label>
+          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}

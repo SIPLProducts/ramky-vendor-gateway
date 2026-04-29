@@ -22,14 +22,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
 import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
 import { FieldTemplateActions } from '@/components/admin/FieldTemplateActions';
 import type { FormFieldConfig } from '@/hooks/useTenant';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { BUILT_IN_FIELDS_CATALOG, BUILT_IN_FIELD_MARKER, isBuiltInField } from '@/lib/builtInFields';
 import { cn } from '@/lib/utils';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -87,9 +83,9 @@ function SortableTab({
 
 // ---------- Sortable Field Row ----------
 function SortableField({
-  field, isEditing, isBuiltIn, onEdit, onDelete,
+  field, isEditing, onEdit, onDelete,
 }: {
-  field: FormFieldConfig; isEditing: boolean; isBuiltIn: boolean;
+  field: FormFieldConfig; isEditing: boolean;
   onEdit: () => void; onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
@@ -115,7 +111,6 @@ function SortableField({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium truncate">{field.display_label}</span>
             <Badge variant="outline" className="text-[10px]">{field.field_type}</Badge>
-            {isBuiltIn && <Badge variant="secondary" className="text-[10px]">Built-in</Badge>}
             {field.is_mandatory && <Badge className="text-[10px]">Required</Badge>}
             {!field.is_visible && (
               <Badge variant="secondary" className="text-[10px] gap-1">
@@ -192,88 +187,6 @@ export default function FormBuilder() {
 
   // Inline field editor state: 'new' | field id | null
   const [editingFieldId, setEditingFieldId] = useState<string | 'new' | null>(null);
-
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [seededTenants, setSeededTenants] = useState<Set<string>>(new Set());
-
-  // Auto-seed catalog rows for built-in steps that have zero rows yet for this
-  // tenant. Idempotent: skipped once a step has any row, so deletes by the
-  // admin are not undone on next load.
-  useEffect(() => {
-    if (!effectiveTenantId) return;
-    if (seededTenants.has(effectiveTenantId)) return;
-
-    const stepsMissingSeed = Object.keys(BUILT_IN_FIELDS_CATALOG).filter(
-      (stepKey) => !allFields.some((f) => f.step_name === stepKey),
-    );
-    setSeededTenants((prev) => {
-      const next = new Set(prev);
-      next.add(effectiveTenantId);
-      return next;
-    });
-    if (stepsMissingSeed.length === 0) return;
-
-    const rows = stepsMissingSeed.flatMap((stepKey) =>
-      BUILT_IN_FIELDS_CATALOG[stepKey].map((f) => ({
-        tenant_id: effectiveTenantId,
-        step_name: stepKey,
-        field_name: f.field_name,
-        display_label: f.display_label,
-        field_type: f.field_type,
-        is_visible: true,
-        is_mandatory: f.is_mandatory,
-        is_editable: true,
-        display_order: f.display_order,
-        placeholder: f.placeholder ?? null,
-        default_value: BUILT_IN_FIELD_MARKER,
-      })),
-    );
-    supabase
-      .from('form_field_configs')
-      .insert(rows as never)
-      .then(({ error }) => {
-        if (error) {
-          console.warn('[FormBuilder] auto-seed warning:', error.message);
-          return;
-        }
-        queryClient.invalidateQueries({ queryKey: ['form-field-configs'] });
-      });
-  }, [effectiveTenantId, allFields, seededTenants, queryClient]);
-
-  const restoreBuiltInDefaults = async (stepKey: string) => {
-    if (!effectiveTenantId) return;
-    const catalog = BUILT_IN_FIELDS_CATALOG[stepKey];
-    if (!catalog) return;
-    const existingNames = new Set(
-      allFields.filter((f) => f.step_name === stepKey).map((f) => f.field_name),
-    );
-    const missing = catalog.filter((c) => !existingNames.has(c.field_name));
-    if (missing.length === 0) {
-      toast({ title: 'Nothing to restore', description: 'All built-in fields are already present.' });
-      return;
-    }
-    const rows = missing.map((f) => ({
-      tenant_id: effectiveTenantId,
-      step_name: stepKey,
-      field_name: f.field_name,
-      display_label: f.display_label,
-      field_type: f.field_type,
-      is_visible: true,
-      is_mandatory: f.is_mandatory,
-      is_editable: true,
-      display_order: f.display_order,
-      placeholder: f.placeholder ?? null,
-      default_value: BUILT_IN_FIELD_MARKER,
-    }));
-    const { error } = await supabase.from('form_field_configs').insert(rows as never);
-    if (error) {
-      toast({ title: 'Restore failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-    queryClient.invalidateQueries({ queryKey: ['form-field-configs'] });
-    toast({ title: 'Restored', description: `Re-added ${missing.length} built-in field(s).` });
-  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -464,11 +377,6 @@ export default function FormBuilder() {
                 Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
-                {BUILT_IN_FIELDS_CATALOG[selectedStepKey] && (
-                  <Button size="sm" variant="outline" onClick={() => restoreBuiltInDefaults(selectedStepKey)}>
-                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore defaults
-                  </Button>
-                )}
                 <FieldTemplateActions
                   tenantId={effectiveTenantId}
                   stepKey={selectedStepKey}
@@ -511,14 +419,9 @@ export default function FormBuilder() {
                         <SortableField
                           field={f}
                           isEditing={editingFieldId === f.id}
-                          isBuiltIn={isBuiltInField(f)}
                           onEdit={() => setEditingFieldId(editingFieldId === f.id ? null : f.id)}
                           onDelete={async () => {
-                            const builtIn = isBuiltInField(f);
-                            const msg = builtIn
-                              ? `Remove built-in field "${f.display_label}"? You can re-add it via "Restore defaults".`
-                              : `Delete field "${f.display_label}"?`;
-                            if (confirm(msg)) await deleteField.mutateAsync(f.id);
+                            if (confirm(`Delete field "${f.display_label}"?`)) await deleteField.mutateAsync(f.id);
                           }}
                         />
                         {editingFieldId === f.id && (
@@ -527,7 +430,6 @@ export default function FormBuilder() {
                               tenantId={effectiveTenantId}
                               stepKey={selectedStepKey}
                               field={f}
-                              isBuiltIn={isBuiltInField(f)}
                               onClose={() => setEditingFieldId(null)}
                             />
                           </div>
