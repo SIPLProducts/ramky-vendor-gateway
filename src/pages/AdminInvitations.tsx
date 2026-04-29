@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenants } from '@/hooks/useTenant';
+import { useTenantContext } from '@/hooks/useTenantContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,49 +75,49 @@ export default function AdminInvitations() {
   const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: tenants } = useTenants();
+  const { data: allTenants } = useTenants();
   const { user, userRole } = useAuth();
-  const isSharviAdmin = userRole === 'sharvi_admin';
+  const { myTenants, activeTenantId } = useTenantContext();
+  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
 
-  // Auto-derive tenant for current (non-sharvi) admin from user_tenants
-  const { data: currentUserTenantId } = useQuery({
-    queryKey: ['current-user-tenant', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('user_tenants')
-        .select('tenant_id, is_default')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) { console.error(error); return null; }
-      return data?.tenant_id ?? null;
-    },
-    enabled: !!user?.id,
-  });
+  // Tenants the user is allowed to invite for:
+  // - Super admins: all active tenants
+  // - Everyone else: tenants assigned to them via user_tenants
+  const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
 
-  const effectiveTenantId = isSharviAdmin ? (selectedTenantId || null) : (currentUserTenantId || null);
+  // Default the dialog selection: prefer header's active tenant if allowed, else first allowed tenant
+  const defaultTenantId =
+    (activeTenantId && allowedTenants.some((t) => t.id === activeTenantId) ? activeTenantId : null) ||
+    allowedTenants[0]?.id ||
+    '';
+
+  // Initialize selectedTenantId once allowedTenants resolve
+  if (!selectedTenantId && defaultTenantId) {
+    // setState during render is safe here because it converges in one extra render
+    setSelectedTenantId(defaultTenantId);
+  }
+
+  const effectiveTenantId = selectedTenantId || null;
 
   // Fetch invitations (RLS scopes by tenant for non-super-admins)
   const { data: invitations, isLoading } = useQuery({
-    queryKey: ['vendor-invitations', isSharviAdmin ? 'all' : currentUserTenantId],
+    queryKey: ['vendor-invitations', isSuperAdmin ? 'all' : (activeTenantId || 'mine')],
     queryFn: async () => {
       let q = supabase
         .from('vendor_invitations')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Non-super-admins: client filter by their tenant for tidy UX (RLS already enforces)
-      if (!isSharviAdmin && currentUserTenantId) {
-        q = q.eq('tenant_id', currentUserTenantId);
+      // Non-super-admins: client filter by header's active tenant when one is chosen (RLS already enforces)
+      if (!isSuperAdmin && activeTenantId) {
+        q = q.eq('tenant_id', activeTenantId);
       }
 
       const { data, error } = await q;
       if (error) throw error;
       return data;
     },
-    enabled: isSharviAdmin || !!currentUserTenantId,
+    enabled: !!user?.id,
   });
 
   // Create invitation mutation
@@ -128,7 +129,7 @@ export default function AdminInvitations() {
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
       // Get tenant name for email
-      const selectedTenant = tenants?.find(t => t.id === tenantId);
+      const selectedTenant = allowedTenants.find(t => t.id === tenantId) || allTenants?.find(t => t.id === tenantId);
       const tenantName = selectedTenant?.name || 'Ramky Infrastructure';
 
       // Step 1: Create invitation in database
@@ -319,7 +320,7 @@ export default function AdminInvitations() {
     if (!effectiveTenantId) {
       toast({
         title: 'No Company Assigned',
-        description: isSharviAdmin
+        description: allowedTenants.length > 0
           ? 'Please select a company.'
           : 'Your account is not assigned to any company. Contact your administrator.',
         variant: 'destructive',
@@ -487,15 +488,15 @@ export default function AdminInvitations() {
                 </Select>
               </div>
 
-              {isSharviAdmin ? (
+              {allowedTenants.length > 1 ? (
                 <div className="space-y-2">
-                  <Label htmlFor="company">Company (Tenant)</Label>
+                  <Label htmlFor="company">Company {isSuperAdmin ? '(Tenant)' : ''}</Label>
                   <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
                     <SelectTrigger id="company">
                       <SelectValue placeholder="Select a company" />
                     </SelectTrigger>
                     <SelectContent>
-                      {tenants?.map((tenant) => (
+                      {allowedTenants.map((tenant) => (
                         <SelectItem key={tenant.id} value={tenant.id}>
                           {tenant.name}
                         </SelectItem>
@@ -507,7 +508,7 @@ export default function AdminInvitations() {
                 <div className="space-y-2">
                   <Label>Company</Label>
                   <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
-                    {tenants?.find(t => t.id === currentUserTenantId)?.name || (currentUserTenantId ? 'Loading…' : 'No company assigned to your account')}
+                    {allowedTenants[0]?.name || 'No company assigned to your account'}
                   </div>
                 </div>
               )}
