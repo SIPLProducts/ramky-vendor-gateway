@@ -27,6 +27,8 @@ interface Props {
     display_label: string;
     field_type: string;
     is_mandatory: boolean;
+    placeholder?: string;
+    help_text?: string;
   };
 }
 
