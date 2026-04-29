@@ -8,9 +8,12 @@ import {
   useDeleteFormField,
   useReorderFormSteps,
   useReorderFormFields,
+  useUpsertFormField,
   BUILT_IN_STEPS,
   type FormStepConfig,
 } from '@/hooks/useFormBuilder';
+import { getBuiltInFields, BUILTIN_OVERRIDE_MARK, type BuiltInField } from '@/lib/builtInFields';
+import { RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
