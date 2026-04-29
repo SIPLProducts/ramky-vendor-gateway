@@ -69,6 +69,7 @@ const navItems: NavItem[] = [
   { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
   { label: 'SAP Sync', href: '/sap/sync', icon: RefreshCw, screenKey: 'sap_sync' },
   { label: 'SAP API Settings', href: '/sap/api-settings', icon: Settings, screenKey: 'sap_api_settings' },
+  { label: 'KYC API Settings', href: '/admin/kyc-api-settings', icon: ShieldCheck, screenKey: 'kyc_api_settings' },
   { label: 'All Vendors', href: '/vendors', icon: Users, screenKey: 'vendors' },
   { label: 'GST Compliance', href: '/compliance/gst', icon: CheckCircle, screenKey: 'gst_compliance' },
   { label: 'Scheduled Checks', href: '/compliance/scheduled', icon: ClipboardCheck, screenKey: 'scheduled_checks' },
