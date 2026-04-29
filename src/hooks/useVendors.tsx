@@ -500,7 +500,10 @@ export function useSAPSync() {
 
       if (!sapResult.success) {
         console.error('SAP sync failed:', sapResult);
-        throw new Error(sapResult.message || 'SAP sync failed');
+        const err: any = new Error(sapResult.message || 'SAP sync failed');
+        err.sapResponse = sapResult.sapResponse;
+        err.sapResult = sapResult;
+        throw err;
       }
 
       console.log('SAP sync successful:', sapResult);
