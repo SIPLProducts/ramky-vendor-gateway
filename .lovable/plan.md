@@ -1,122 +1,44 @@
+## Goal
 
-## SAP Module — SAP API Settings
+The SAP Module and SAP API Settings screen already exist with a 6-tab editor (API Details, Request Fields, Response Fields, Scheduler, Credentials, Settings). The remaining ask is to make the **Request, Response, and Credentials** tabs more usable by letting the user **upload a sample payload** and auto-detecting the fields from it.
 
-Your message was cut off after "API Configurations and i want", so I'm proceeding with the most complete interpretation of the four screenshots you uploaded: build the full **SAP API Settings** screen plus its detailed **Edit API Configuration** page, persisted in the database. We can trim scope after you review.
+## Changes
 
-### 1. Navigation — new "SAP" module group
+### 1. Reusable Payload Auto-Detect utility
+Create `src/lib/payloadAutoDetect.ts`:
+- `parsePayload(text)` — accepts JSON or CSV text, returns a normalized object/array.
+- `flattenFields(obj, prefix)` — walks nested JSON and returns flat dotted paths (e.g. `d.results[0].BPARTNER` → `BPARTNER`, plus full path).
+- `detectRequestFields(payload)` → `[{ field_name, source, default_value, required }]` with sensible defaults (`required` inferred from non-null leaves, `default_value` from sample value).
+- `detectResponseFields(payload)` → `[{ field_name, target_column }]` with `target_column` auto-suggested as `snake_case(field_name)`.
+- Handles common SAP shapes: `{ d: { results: [...] } }`, OData v4 `{ value: [...] }`, raw arrays, single objects.
 
-In `src/components/layout/Sidebar.tsx`, group SAP entries under a "SAP" section:
+### 2. Payload upload component
+Create `src/components/sap/PayloadUploader.tsx`:
+- Drag-and-drop + file picker (`.json`, `.txt`, `.csv`) and a paste-JSON textarea (tabbed inside the dialog).
+- "Auto-detect fields" button → runs the detector and previews detected fields in a small table with checkboxes (user can deselect any).
+- Two modes via prop: `mode: "request" | "response"` — controls preview columns and what is emitted.
+- Emits `onApply(rows)` with the chosen rows; parent appends or replaces existing rows (user choice via radio: **Replace all** / **Append new only**).
 
-- `SAP Sync` (existing) → `/sap/sync`
-- **`SAP API Settings`** (new) → `/sap/api-settings` — icon `Settings2`, screenKey `sap_api_settings`, restricted to **System Admin** (`admin` / `sharvi_admin`).
+### 3. Wire uploader into editors
+- `RequestFieldsEditor.tsx`: add an "Upload payload" button next to "Add field"; opens `PayloadUploader mode="request"`. On apply, merge into rows and call `onChange`.
+- `ResponseFieldsEditor.tsx`: same, with `mode="response"`.
+- `SapApiConfigEdit.tsx` Credentials tab: add an "Upload headers JSON" button that parses an uploaded JSON file into the **Extra Headers** textarea (auto-pretty-printed). If the file contains `username` / `password` / `token` keys, populate those fields too.
 
-Register the new routes in `src/App.tsx`:
-- `/sap/api-settings` → `SapApiSettings` page
-- `/sap/api-settings/:configId` → `SapApiConfigEdit` page
+### 4. Small UX polish on the screen (matches uploaded mockup)
+- `SapApiSettings.tsx`: confirm the page header shows "SAP API Settings" with a `System Admin` badge on the right (already exists — verify and keep).
+- The Add API Configuration dialog stays as-is; no schema changes.
 
-### 2. Database — new tables (Lovable Cloud)
+## Technical notes
 
-```text
-sap_api_configs
-├─ id (uuid, pk)
-├─ name (text, required)
-├─ description (text)
-├─ base_url (text, required)
-├─ endpoint_path (text, required)
-├─ http_method (text: GET|POST|PUT|PATCH|DELETE)
-├─ auth_type (text: Basic|Bearer|None)
-├─ sap_client (text, e.g. "100")
-├─ timeout_ms (int, default 30000)
-├─ connection_mode (text: proxy|direct)
-├─ deployment_mode (text: cloud|self_hosted)
-├─ middleware_url (text)
-├─ middleware_port (int)
-├─ proxy_secret (text, nullable)
-├─ list_endpoint (text), create_endpoint (text)
-├─ update_endpoint (text), update_method (text)
-├─ key_field (text)
-├─ api_type (text: sync|fetch)
-├─ auto_sync_enabled (bool, default false)
-├─ schedule_cron (text, nullable)
-├─ last_synced_at (timestamptz), next_sync_at (timestamptz)
-├─ is_active (bool, default true)
-├─ created_at, updated_at, created_by (uuid)
+- No database migrations needed — existing tables (`sap_api_request_fields`, `sap_api_response_fields`, `sap_api_credentials`) already cover the data shape.
+- All parsing happens client-side; no edge function changes.
+- File size guard: reject >2 MB uploads with a toast.
+- CSV parsing: simple split (comma + newline, header row → field names). For complex CSVs, JSON is the recommended format (mention in helper text).
 
-sap_api_request_fields   — id, config_id (fk), field_name, source, default_value, required, order_index
-sap_api_response_fields  — id, config_id (fk), field_name, target_column, order_index
-sap_api_credentials      — id, config_id (fk, unique), username, password_encrypted, extra_headers (jsonb)
-```
+## Files
 
-- RLS enabled on all four tables.
-- Policies: `SELECT/INSERT/UPDATE/DELETE` allowed only when `has_role(auth.uid(), 'admin')` OR `has_role(auth.uid(), 'sharvi_admin')`.
-- `update_updated_at_column` trigger on each table.
-
-### 3. SAP API Settings list page (`src/pages/SapApiSettings.tsx`)
-
-Matches screenshots 1 & 2:
-
-- Page header: **"SAP API Settings"** + subtitle, **System Admin** badge (top-right).
-- Tabs: `API Configurations` | `SAP Connectivity Guide`.
-- Top-right actions: `Test SAP connection`, `Download PDF`.
-- Info banner card "How SAP Connection Works" with the two side-by-side cards (Lovable Cloud Preview / Self-Hosted) — static copy taken verbatim from screenshot 1.
-- Toolbar above table: `Export APIs`, `Import APIs`, `+ Add API Configuration` (primary green).
-- Table columns: Name (with "Proxy" badge), Endpoint (mono, truncated), HTTP Method, Auth, Last Sync, Next Sync, Actions (Edit / Delete / Toggle Active).
-- Empty state and loading skeletons.
-- Data via a new `useSapApiConfigs` hook (`@tanstack/react-query`).
-
-### 4. Quick "Add API Configuration" dialog (screenshot 4)
-
-Component `AddSapApiConfigDialog.tsx` — small modal with:
-Name*, Description, Base URL, Endpoint Path*, HTTP Method, Auth Type, Connection (Proxy/Direct), API Type (Sync/Fetch), `Enable Auto-Sync` toggle, footer link **"Save & open advanced editor →"** (saves + navigates to the edit page) and `Save API` button.
-
-Uses `react-hook-form` + zod validation.
-
-### 5. Advanced edit page (`src/pages/SapApiConfigEdit.tsx`) — screenshot 3
-
-Header: `← Back` + `Edit API Configuration`. Six tabs:
-
-1. **API Details** — full form: Name, Description, Base URL, Endpoint Path, List Endpoint, Create Endpoint, Update Endpoint, Update Method, Key Field, HTTP Method, Auth Type, SAP Client, Timeout, Connection Mode, Deployment Mode, Middleware Port, Node.js Middleware URL, Proxy Secret. Sticky footer with `Cancel` / `Save API Details`.
-2. **Request Fields** — editable table (Field Name, Source, Default Value, Required) with add/remove row.
-3. **Response Fields** — editable table (Field Name, Target Column) with add/remove row.
-4. **Scheduler** — auto-sync toggle, cron input + presets (Every 5 min / Hourly / Daily), next/last run readouts.
-5. **Credentials** — Username, Password (masked), extra headers JSON editor. Password stored via edge function (never round-tripped to client after save).
-6. **Settings** — Active toggle, danger zone (Delete configuration with confirm).
-
-### 6. Import / Export
-
-- **Export APIs** → downloads JSON of all configs (excluding password fields).
-- **Import APIs** → file input accepts the same JSON, validates with zod, upserts rows.
-
-### 7. "Test SAP connection" action
-
-New edge function **`sap-api-test-connection`**:
-- Input: `configId`.
-- Loads config + credentials, performs a `HEAD`/`GET` against `base_url + endpoint_path` (or middleware URL if proxy mode) with Basic/Bearer auth.
-- Returns `{ ok, status, latency_ms, message }`.
-- UI shows result in a toast + a small results dialog.
-
-### 8. Files added / changed
-
-**New**
-- `src/pages/SapApiSettings.tsx`
-- `src/pages/SapApiConfigEdit.tsx`
-- `src/components/sap/AddSapApiConfigDialog.tsx`
-- `src/components/sap/SapConnectivityGuide.tsx`
-- `src/components/sap/RequestFieldsEditor.tsx`
-- `src/components/sap/ResponseFieldsEditor.tsx`
-- `src/hooks/useSapApiConfigs.tsx`
-- `supabase/functions/sap-api-test-connection/index.ts`
-- One migration creating the four tables + RLS + triggers.
-
-**Edited**
-- `src/App.tsx` — register the two new routes.
-- `src/components/layout/Sidebar.tsx` — add "SAP API Settings" entry, restrict to admin roles.
-- `src/hooks/useScreenPermissions.tsx` — register the new `sap_api_settings` screen key (if it gates by key).
-
-### Defaults I'm assuming (since you skipped the questions)
-
-- **Scope**: full screen matching all four mockups (list + quick add + advanced edit).
-- **Persistence**: real DB tables in Lovable Cloud (so configs survive across sessions / users).
-- **Access**: `admin` and `sharvi_admin` roles only.
-
-If any of these defaults are wrong — for example you only want the list + quick-add for now, or want it to be frontend-only mock data — tell me and I'll adjust before implementation.
+- New: `src/lib/payloadAutoDetect.ts`
+- New: `src/components/sap/PayloadUploader.tsx`
+- Edit: `src/components/sap/RequestFieldsEditor.tsx` (add Upload button)
+- Edit: `src/components/sap/ResponseFieldsEditor.tsx` (add Upload button)
+- Edit: `src/pages/SapApiConfigEdit.tsx` (Credentials tab: upload headers JSON)
