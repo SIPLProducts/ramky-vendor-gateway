@@ -27,6 +27,53 @@ function jsonStr(v: any) {
   try { return JSON.stringify(v ?? {}, null, 2); } catch { return "{}"; }
 }
 
+type HeaderRow = { key: string; value: string };
+
+function objToRows(obj: Record<string, any> | null | undefined): HeaderRow[] {
+  if (!obj || typeof obj !== "object") return [];
+  return Object.entries(obj).map(([key, value]) => ({ key, value: String(value ?? "") }));
+}
+
+function rowsToObj(rows: HeaderRow[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const k = r.key.trim();
+    if (!k) continue;
+    if (k.toLowerCase() === "authorization") continue; // auto-added from credential
+    out[k] = r.value;
+  }
+  return out;
+}
+
+/** Accepts strict JSON or pasted "Key: Value" header lines. */
+function lenientHeaderParse(text: string): { ok: true; obj: Record<string, string> } | { ok: false; error: string } {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return { ok: true, obj: {} };
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed)) out[k] = String(v ?? "");
+      return { ok: true, obj: out };
+    }
+  } catch { /* fall through to lenient */ }
+  // Strip wrapping braces and try line-by-line "Key: Value"
+  const body = trimmed.replace(/^\{/, "").replace(/\}$/, "");
+  const out: Record<string, string> = {};
+  const lines = body.split(/\r?\n/);
+  for (let raw of lines) {
+    let line = raw.trim().replace(/,$/, "");
+    if (!line) continue;
+    const colon = line.indexOf(":");
+    if (colon === -1) return { ok: false, error: `Cannot parse line: "${line}"` };
+    const k = line.slice(0, colon).trim().replace(/^["']|["']$/g, "");
+    const v = line.slice(colon + 1).trim().replace(/^["']|["']$/g, "").replace(/,$/, "");
+    if (!k) continue;
+    out[k] = v;
+  }
+  return { ok: true, obj: out };
+}
+
 export default function KycApiConfigEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
