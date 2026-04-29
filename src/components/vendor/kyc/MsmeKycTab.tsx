@@ -124,6 +124,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               fileLabel="MSME / Udyam Certificate *"
               currentFile={props.msmeCertificateFile}
               onFileChange={props.onMsmeCertificateFileChange}
+              runOcr={runMsmeOcr}
+              skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
               buildComparisonRows={buildRows}
               onVerified={() => {}}
