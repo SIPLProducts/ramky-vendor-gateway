@@ -160,11 +160,18 @@ export default function AdminInvitations() {
           tenantName: tenantName,
           simulationMode: false,
           frontendUrl: window.location.origin,
+          senderEmail: user?.email,
         },
       });
 
+      // Surface "not configured" error from edge function (returns non-2xx with JSON body)
+      const notConfiguredMsg = 'You are not configured in Email Configuration';
+      const respErrMsg = (emailData as any)?.error || (emailError as any)?.message || '';
+      if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
+        return { invitation, emailSent: false, notConfigured: true };
+      }
+
       if (emailError) {
-        // Don't throw - invitation is created, just email failed
         return { invitation, emailSent: false, error: emailError };
       }
 
