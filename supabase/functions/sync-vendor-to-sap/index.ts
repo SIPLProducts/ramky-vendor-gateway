@@ -6,24 +6,72 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Indian state -> SAP region code (REGION column, length 3)
+// Indian state -> SAP T005S numeric region code for country IN.
+// SAP S/4HANA India localization uses numeric codes (Maharashtra=13 etc.),
+// not 2-letter alpha codes. Keys are normalized (lowercased, trimmed) at lookup time.
 const stateToRegion: Record<string, string> = {
-  "Andhra Pradesh": "AP", "Arunachal Pradesh": "AR", "Assam": "AS", "Bihar": "BR",
-  "Chhattisgarh": "CG", "Goa": "GA", "Gujarat": "GJ", "Haryana": "HR",
-  "Himachal Pradesh": "HP", "Jharkhand": "JH", "Karnataka": "KA", "Kerala": "KL",
-  "Madhya Pradesh": "MP", "Maharashtra": "13", "Manipur": "MN", "Meghalaya": "ML",
-  "Mizoram": "MZ", "Nagaland": "NL", "Odisha": "OR", "Punjab": "PB",
-  "Rajasthan": "RJ", "Sikkim": "SK", "Tamil Nadu": "TN", "Telangana": "TG",
-  "Tripura": "TR", "Uttar Pradesh": "UP", "Uttarakhand": "UK", "West Bengal": "WB",
-  "Delhi": "DL",
+  "andhra pradesh": "01",
+  "arunachal pradesh": "02",
+  "assam": "03",
+  "bihar": "04",
+  "goa": "05",
+  "gujarat": "06",
+  "haryana": "07",
+  "himachal pradesh": "08",
+  "jammu and kashmir": "09",
+  "jammu & kashmir": "09",
+  "j&k": "09",
+  "karnataka": "10",
+  "kerala": "11",
+  "madhya pradesh": "12",
+  "maharashtra": "13",
+  "manipur": "14",
+  "meghalaya": "15",
+  "mizoram": "16",
+  "nagaland": "17",
+  "odisha": "18",
+  "orissa": "18",
+  "punjab": "19",
+  "rajasthan": "20",
+  "sikkim": "21",
+  "tamil nadu": "22",
+  "tripura": "23",
+  "uttar pradesh": "24",
+  "west bengal": "25",
+  "andaman and nicobar islands": "26",
+  "andaman & nicobar": "26",
+  "chandigarh": "27",
+  "dadra and nagar haveli": "28",
+  "dadra & nagar haveli": "28",
+  "dadra and nagar haveli and daman and diu": "28",
+  "daman and diu": "29",
+  "daman & diu": "29",
+  "delhi": "30",
+  "nct of delhi": "30",
+  "lakshadweep": "31",
+  "puducherry": "32",
+  "pondicherry": "32",
+  "chhattisgarh": "33",
+  "chattisgarh": "33",
+  "jharkhand": "34",
+  "uttarakhand": "35",
+  "uttaranchal": "35",
+  "telangana": "36",
+  "ladakh": "37",
 };
+
+function resolveRegion(state: string | null | undefined): string {
+  if (!state) return "";
+  const key = String(state).trim().toLowerCase().replace(/\s+/g, " ");
+  return stateToRegion[key] || "";
+}
 
 const trunc = (v: any, n: number) => (v == null ? "" : String(v)).slice(0, n);
 
 function buildPayload(vendor: any) {
   const legalName = vendor.legal_name || "";
   const tradeName = vendor.trade_name || "";
-  const region = vendor.registered_state ? (stateToRegion[vendor.registered_state] || "") : "";
+  const region = resolveRegion(vendor.registered_state);
 
   const row: Record<string, any> = {
     bpartner: "", partn_cat: "2", partn_grp: "ZDOM", title: "",
@@ -93,6 +141,13 @@ serve(async (req) => {
     const { data: vendor, error: vendorError } = await supabase
       .from("vendors").select("*").eq("id", vendorId).single();
     if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
+
+    // Pre-validate: vendor's registered_state must map to an SAP region code.
+    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+      return fail(
+        `Cannot sync to SAP: vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for country IN. Please correct the vendor's Registered State and retry.`,
+      );
+    }
 
     // 2) Resolve SAP API config from app DB (preferred) — Business Partner Create.
     //    Match by api_type='sync' or by name containing 'business partner' / 'bp'.
