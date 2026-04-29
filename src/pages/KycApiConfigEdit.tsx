@@ -84,7 +84,10 @@ export default function KycApiConfigEdit() {
   const test = useTestKycApi();
 
   const [form, setForm] = useState<any>(null);
+  const [headerRows, setHeaderRows] = useState<HeaderRow[]>([]);
+  const [headersAdvanced, setHeadersAdvanced] = useState(false);
   const [headersText, setHeadersText] = useState("{}");
+  const [headersError, setHeadersError] = useState<string | null>(null);
   const [bodyText, setBodyText] = useState("{}");
   const [mappingText, setMappingText] = useState("{}");
   const [credValue, setCredValue] = useState("");
@@ -96,7 +99,16 @@ export default function KycApiConfigEdit() {
   useEffect(() => {
     if (provider) {
       setForm({ ...provider });
-      setHeadersText(jsonStr(provider.request_headers));
+      const hdrs = (provider.request_headers || {}) as Record<string, any>;
+      // Strip any Authorization header from extras (it's auto-added from credential)
+      const cleaned: Record<string, string> = {};
+      for (const [k, v] of Object.entries(hdrs)) {
+        if (k.toLowerCase() === "authorization") continue;
+        cleaned[k] = String(v ?? "");
+      }
+      setHeaderRows(objToRows(cleaned));
+      setHeadersText(jsonStr(cleaned));
+      setHeadersError(null);
       setBodyText(jsonStr(provider.request_body_template));
       setMappingText(jsonStr(provider.response_data_mapping));
     }
@@ -110,10 +122,36 @@ export default function KycApiConfigEdit() {
     return <div className="p-8 text-center text-muted-foreground">Loading…</div>;
   }
 
+  const addHeaderRow = () => setHeaderRows((r) => [...r, { key: "", value: "" }]);
+  const updateHeaderRow = (i: number, patch: Partial<HeaderRow>) =>
+    setHeaderRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const removeHeaderRow = (i: number) =>
+    setHeaderRows((rows) => rows.filter((_, idx) => idx !== i));
+
   const onSave = async () => {
-    let request_headers, request_body_template, response_data_mapping;
+    // Resolve headers from whichever editor is active
+    let request_headers: Record<string, string> = {};
+    if (headersAdvanced) {
+      const parsed = lenientHeaderParse(headersText);
+      if (!parsed.ok) {
+        setHeadersError(parsed.error);
+        toast({ title: "Headers — couldn't parse", description: parsed.error, variant: "destructive" });
+        return;
+      }
+      // Strip Authorization (auto-added)
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed.obj)) {
+        if (k.toLowerCase() === "authorization") continue;
+        out[k] = v;
+      }
+      request_headers = out;
+      setHeadersError(null);
+    } else {
+      request_headers = rowsToObj(headerRows);
+    }
+
+    let request_body_template, response_data_mapping;
     try {
-      request_headers = JSON.parse(headersText || "{}");
       request_body_template = JSON.parse(bodyText || "{}");
       response_data_mapping = JSON.parse(mappingText || "{}");
     } catch (e: any) {
