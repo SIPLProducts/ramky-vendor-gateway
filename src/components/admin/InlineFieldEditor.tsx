@@ -16,6 +16,18 @@ interface Props {
   field?: FormFieldConfig | null;
   defaultOrder?: number;
   onClose: () => void;
+  /** When true, this is editing a built-in field override.
+   *  - field_name & field_type are locked
+   *  - default_value is forced to BUILTIN_OVERRIDE_MARK so the row stays
+   *    classified as a built-in override.
+   *  - When `field` is null we expect `builtInDefaults` to seed the form. */
+  builtInMode?: boolean;
+  builtInDefaults?: {
+    field_name: string;
+    display_label: string;
+    field_type: string;
+    is_mandatory: boolean;
+  };
 }
 
 const FIELD_TYPES = [
@@ -33,7 +45,9 @@ const FIELD_TYPES = [
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose }: Props) {
+const BUILTIN_OVERRIDE_MARK = '__builtin_override__';
+
+export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose, builtInMode, builtInDefaults }: Props) {
   const upsert = useUpsertFormField();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
@@ -69,6 +83,17 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         display_order: field.display_order || 1,
         options: field.options || [],
       });
+    } else if (builtInMode && builtInDefaults) {
+      setForm({
+        field_name: builtInDefaults.field_name,
+        display_label: builtInDefaults.display_label,
+        field_type: builtInDefaults.field_type,
+        placeholder: '', help_text: '', default_value: '',
+        is_mandatory: builtInDefaults.is_mandatory,
+        is_visible: true, is_editable: true,
+        validation_regex: '', validation_message: '',
+        display_order: defaultOrder, options: [],
+      });
     } else {
       setForm({
         field_name: '', display_label: '', field_type: 'text',
@@ -78,7 +103,7 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         display_order: defaultOrder, options: [],
       });
     }
-  }, [field, defaultOrder]);
+  }, [field, defaultOrder, builtInMode, builtInDefaults]);
 
   const needsOptions = form.field_type === 'select' || form.field_type === 'multi-select';
 
@@ -94,7 +119,7 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
       field_type: form.field_type,
       placeholder: form.placeholder || null,
       help_text: form.help_text || null,
-      default_value: form.default_value || null,
+      default_value: builtInMode ? BUILTIN_OVERRIDE_MARK : (form.default_value || null),
       is_mandatory: form.is_mandatory,
       is_visible: form.is_visible,
       is_editable: form.is_editable,
@@ -119,20 +144,20 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Field Key</Label>
+          <Label className="text-xs">Field Key{builtInMode && ' (locked)'}</Label>
           <Input
             value={form.field_name}
             onChange={(e) => setForm({ ...form, field_name: e.target.value })}
             placeholder={form.display_label ? slugify(form.display_label) : 'iso_9001_cert_no'}
-            disabled={!!field}
+            disabled={!!field || builtInMode}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Type</Label>
-          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })}>
+          <Label className="text-xs">Type{builtInMode && ' (locked)'}</Label>
+          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })} disabled={builtInMode}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}

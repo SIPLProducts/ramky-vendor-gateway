@@ -25,7 +25,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff, ShieldAlert, Type, Hash, Mail, Phone, Calendar, ListChecks, CheckSquare, FileText, AlignLeft } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
 import { FieldTemplateActions } from '@/components/admin/FieldTemplateActions';
 import type { FormFieldConfig } from '@/hooks/useTenant';
@@ -231,6 +235,10 @@ export default function FormBuilder() {
 
   // Inline field editor state: 'new' | field id | null
   const [editingFieldId, setEditingFieldId] = useState<string | 'new' | null>(null);
+  // Built-in field currently being edited inline (by field_name)
+  const [editingBuiltIn, setEditingBuiltIn] = useState<string | null>(null);
+  // Built-in pending remove confirmation (locked fields warn first)
+  const [confirmRemoveBuiltIn, setConfirmRemoveBuiltIn] = useState<BuiltInField | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -418,85 +426,178 @@ export default function FormBuilder() {
           <CardContent>
             {/* ---------- Built-in fields ---------- */}
             {builtInFields.length > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold">
-                    Built-in Fields{' '}
-                    <span className="text-muted-foreground font-normal">({builtInFields.length})</span>
-                  </h3>
-                  <span className="text-xs text-muted-foreground">
-                    These ship with the vendor form. Hide a field to stop collecting it.
-                  </span>
+              <div className="mb-6 space-y-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      Built-in Fields
+                      <Badge variant="secondary" className="text-[10px] font-normal">
+                        {builtInFields.length}
+                      </Badge>
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Ship with the vendor form. Edit labels, mark optional, or hide any field — verification-critical fields will warn before hiding.
+                    </p>
+                  </div>
                 </div>
-                <div className="border rounded-lg divide-y overflow-hidden">
-                  {(() => {
-                    let lastGroup: string | undefined;
-                    return builtInFields.map((bf) => {
-                      const override = builtInOverrides[bf.field_name];
-                      const hidden = override?.is_visible === false;
-                      const showHeader = bf.group && bf.group !== lastGroup;
-                      lastGroup = bf.group;
-                      return (
-                        <div key={bf.field_name}>
-                          {showHeader && (
-                            <div className="px-3 py-1.5 bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
-                              {bf.group}
-                            </div>
-                          )}
-                          <div className={cn(
-                            'flex items-center justify-between gap-3 px-3 py-2.5 bg-background',
-                            hidden && 'opacity-60',
-                          )}>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium truncate">{bf.display_label}</span>
-                                <Badge variant="outline" className="text-[10px]">{bf.field_type}</Badge>
-                                <Badge variant="secondary" className="text-[10px]">Built-in</Badge>
-                                {bf.is_mandatory && !hidden && (
-                                  <Badge className="text-[10px]">Required</Badge>
+
+                {(() => {
+                  // Group by .group
+                  const groups: Array<{ name: string; items: BuiltInField[] }> = [];
+                  for (const bf of builtInFields) {
+                    const key = bf.group || 'Other';
+                    let g = groups.find((x) => x.name === key);
+                    if (!g) { g = { name: key, items: [] }; groups.push(g); }
+                    g.items.push(bf);
+                  }
+
+                  const TYPE_ICONS: Record<string, typeof Type> = {
+                    text: Type, textarea: AlignLeft, number: Hash, email: Mail, phone: Phone,
+                    date: Calendar, select: ListChecks, 'multi-select': ListChecks,
+                    checkbox: CheckSquare, file: FileText,
+                  };
+
+                  return groups.map((g) => (
+                    <div key={g.name} className="rounded-xl border bg-card overflow-hidden shadow-sm">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-muted/40 border-b">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            {g.name}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                          {g.items.length} field{g.items.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div className="divide-y">
+                        {g.items.map((bf) => {
+                          const override = builtInOverrides[bf.field_name];
+                          const hidden = override?.is_visible === false;
+                          const isEditing = editingBuiltIn === bf.field_name;
+                          const TypeIcon = TYPE_ICONS[bf.field_type] || Type;
+                          const effectiveLabel = override?.display_label || bf.display_label;
+                          const effectiveRequired = (override?.is_mandatory ?? bf.is_mandatory) && !hidden;
+
+                          return (
+                            <div key={bf.field_name}>
+                              <div
+                                className={cn(
+                                  'flex items-center justify-between gap-3 px-4 py-3 transition-colors',
+                                  hidden
+                                    ? 'bg-[repeating-linear-gradient(135deg,hsl(var(--muted)/0.4)_0,hsl(var(--muted)/0.4)_8px,transparent_8px,transparent_16px)] opacity-70'
+                                    : 'hover:bg-muted/30',
+                                  isEditing && 'bg-primary/5',
                                 )}
-                                {bf.locked && (
-                                  <Badge variant="outline" className="text-[10px] gap-1">
-                                    <Lock className="h-2.5 w-2.5" /> Verification
-                                  </Badge>
-                                )}
-                                {hidden && (
-                                  <Badge variant="secondary" className="text-[10px] gap-1">
-                                    <EyeOff className="h-2.5 w-2.5" /> Hidden
-                                  </Badge>
-                                )}
+                              >
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                  <div
+                                    className={cn(
+                                      'mt-0.5 h-7 w-7 rounded-md flex items-center justify-center shrink-0',
+                                      hidden ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary',
+                                    )}
+                                  >
+                                    <TypeIcon className="h-3.5 w-3.5" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-sm font-medium">{effectiveLabel}</span>
+                                      <Badge variant="outline" className="text-[10px] font-normal">
+                                        {bf.field_type}
+                                      </Badge>
+                                      {effectiveRequired && (
+                                        <Badge className="text-[10px] bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
+                                          Required
+                                        </Badge>
+                                      )}
+                                      {bf.locked && !hidden && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] gap-1 border-amber-300 text-amber-700 bg-amber-50"
+                                        >
+                                          <ShieldAlert className="h-2.5 w-2.5" /> Verification
+                                        </Badge>
+                                      )}
+                                      {hidden && (
+                                        <Badge variant="secondary" className="text-[10px] gap-1">
+                                          <EyeOff className="h-2.5 w-2.5" /> Hidden
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-0.5 font-mono">
+                                      {bf.field_name}
+                                    </div>
+                                    {hidden && (
+                                      <div className="text-[11px] text-muted-foreground mt-1 italic">
+                                        Vendors won't see this field. Click Restore to bring it back.
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {hidden ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => toggleBuiltInVisibility(bf, true)}
+                                      disabled={upsertField.isPending || deleteField.isPending}
+                                      className="h-8 gap-1.5"
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5" /> Restore
+                                    </Button>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setEditingBuiltIn(isEditing ? null : bf.field_name)}
+                                        className="h-8 gap-1.5"
+                                      >
+                                        <Edit className="h-3.5 w-3.5" /> Edit
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => {
+                                          if (bf.locked) {
+                                            setConfirmRemoveBuiltIn(bf);
+                                          } else {
+                                            toggleBuiltInVisibility(bf, false);
+                                          }
+                                        }}
+                                        disabled={upsertField.isPending}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-xs text-muted-foreground truncate">{bf.field_name}</div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {hidden ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleBuiltInVisibility(bf, true)}
-                                  disabled={upsertField.isPending || deleteField.isPending}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  disabled={bf.locked || upsertField.isPending}
-                                  title={bf.locked ? 'This field powers verification and cannot be removed' : 'Remove from vendor form'}
-                                  onClick={() => toggleBuiltInVisibility(bf, false)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                                </Button>
+                              {isEditing && !hidden && (
+                                <div className="p-3 bg-muted/20 border-t">
+                                  <InlineFieldEditor
+                                    tenantId={effectiveTenantId}
+                                    stepKey={selectedStepKey}
+                                    field={override || null}
+                                    builtInMode
+                                    builtInDefaults={{
+                                      field_name: bf.field_name,
+                                      display_label: bf.display_label,
+                                      field_type: bf.field_type,
+                                      is_mandatory: bf.is_mandatory,
+                                    }}
+                                    onClose={() => setEditingBuiltIn(null)}
+                                  />
+                                </div>
                               )}
                             </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             )}
 
@@ -616,6 +717,44 @@ export default function FormBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm dialog for removing verification-critical built-in fields */}
+      <AlertDialog
+        open={!!confirmRemoveBuiltIn}
+        onOpenChange={(open) => !open && setConfirmRemoveBuiltIn(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-amber-500" />
+              Hide verification field?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">
+                {confirmRemoveBuiltIn?.display_label}
+              </span>{' '}
+              powers verification (OCR / API lookups) for the{' '}
+              <span className="font-medium">{confirmRemoveBuiltIn?.group}</span> block.
+              Hiding it will disable that verification for vendors of this tenant.
+              You can restore it any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (confirmRemoveBuiltIn) {
+                  await toggleBuiltInVisibility(confirmRemoveBuiltIn, false);
+                }
+                setConfirmRemoveBuiltIn(null);
+              }}
+            >
+              Yes, hide field
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
