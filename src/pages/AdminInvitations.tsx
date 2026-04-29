@@ -160,11 +160,18 @@ export default function AdminInvitations() {
           tenantName: tenantName,
           simulationMode: false,
           frontendUrl: window.location.origin,
+          senderEmail: user?.email,
         },
       });
 
+      // Surface "not configured" error from edge function (returns non-2xx with JSON body)
+      const notConfiguredMsg = 'You are not configured in Email Configuration';
+      const respErrMsg = (emailData as any)?.error || (emailError as any)?.message || '';
+      if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
+        return { invitation, emailSent: false, notConfigured: true };
+      }
+
       if (emailError) {
-        // Don't throw - invitation is created, just email failed
         return { invitation, emailSent: false, error: emailError };
       }
 
@@ -184,6 +191,12 @@ export default function AdminInvitations() {
         toast({
           title: 'Invitation Sent',
           description: `Invitation email has been sent to ${result.invitation.email}`,
+        });
+      } else if ((result as any).notConfigured) {
+        toast({
+          title: 'Email Not Configured',
+          description: 'You are not configured in Email Configuration',
+          variant: 'destructive',
         });
       } else {
         toast({
@@ -226,8 +239,15 @@ export default function AdminInvitations() {
           tenantName: tenantName,
           simulationMode: false, // Real email sending
           frontendUrl: window.location.origin,
+          senderEmail: user?.email,
         },
       });
+
+      const notConfiguredMsg = 'You are not configured in Email Configuration';
+      const respErrMsg = (data as any)?.error || (error as any)?.message || '';
+      if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
+        throw new Error(notConfiguredMsg);
+      }
 
       if (error) {
         console.error('Edge function error:', error);
@@ -249,8 +269,9 @@ export default function AdminInvitations() {
     },
     onError: (error: any) => {
       console.error('Send email mutation error:', error);
+      const isNotConfigured = (error?.message || '').includes('You are not configured in Email Configuration');
       toast({
-        title: 'Email Failed',
+        title: isNotConfigured ? 'Email Not Configured' : 'Email Failed',
         description: error.message || 'Failed to send invitation email. You can still copy the link.',
         variant: 'destructive',
       });
