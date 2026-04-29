@@ -1,51 +1,48 @@
-## Goal
+## Problem
 
-Surface the same **info (ⓘ) + Usage + Why-it-matters** copy inside the inline editor when an admin clicks **Edit** on a built-in field — not just on the row header. This keeps the field's purpose visible while the admin is changing labels / requirement / placeholder.
+When admins click **Edit** on a built-in field in the Form Builder, the same usage/importance information shows up twice:
 
-## UX
+1. **Above** — on the field row itself, behind the ⓘ (Info) icon popover (added earlier).
+2. **Below** — inside the inline editor as a large blue "Usage / Why it matters" panel (added more recently).
 
-Replace the current plain blue "Editing built-in field — fieldName and type are locked…" notice at the top of the inline editor with a richer card:
+The two surfaces show identical copy from `getBuiltInFieldInfo()`, so the editor view feels cluttered and repetitive. The user wants the duplicate gone — keep it in **one place only**.
+
+## Decision
+
+Keep the ⓘ popover on the row (it's compact, always reachable, doesn't take vertical space) and remove the large duplicate info panel from inside the inline editor. Replace it with a slim one-line reminder so admins still know it's a locked built-in field and where to read its purpose.
+
+## UX after the change
+
+Editing a built-in field will look like:
 
 ```text
 ┌──────────────────────────────────────────────────┐
-│ ⓘ  Registered: State                              │
-│    registeredState • locked field key & type      │
-│ ─────────────────────────────────────────────── │
-│ USAGE                                             │
-│ State of the registered office.                   │
-│                                                   │
-│ WHY IT MATTERS                                    │
-│ • Determines GST place-of-supply                  │
-│ • Used for state-wise vendor analytics            │
-│                                                   │
-│ ⚠ Hiding this disables GST verification (only     │
-│   for verification-locked fields)                 │
+│ ⓘ  Editing built-in field "Registered: State"     │
+│    field key & type are locked. Click the ⓘ on    │
+│    the row above to see usage & why it matters.   │
+├──────────────────────────────────────────────────┤
+│ Display Label *        Field Key (locked)         │
+│ [ ............... ]    [ registeredState ]        │
+│ Type (locked)  Placeholder       Order            │
+│ ...                                               │
 └──────────────────────────────────────────────────┘
 ```
 
-- Same `getBuiltInFieldInfo(field_name)` lookup already used by the row popover — single source of truth.
-- Compact: same width as the editor card, primary-tinted background to match current "edit" highlight.
-- Amber callout block only renders when the underlying built-in field is `locked` (verification-critical).
-- For non-built-in (custom) fields the panel is not shown — editor behaves exactly as today.
+- No more big duplicated Usage / Why-it-matters / amber warning block in the editor.
+- The amber verification warning still lives in the row's ⓘ popover for locked fields, so nothing is lost.
+- Custom-field editor is unaffected (it never had the panel).
 
 ## Technical Changes
 
-1. **`src/components/admin/InlineFieldEditor.tsx`**
-   - Import `Info` from lucide-react and `getBuiltInFieldInfo` from `@/lib/builtInFieldInfo`.
-   - Extend the `builtInDefaults` prop with an optional `locked?: boolean` and `group?: string` so the editor can decide whether to render the amber verification callout (these come for free from the `BuiltInField` catalog).
-   - Replace the existing one-line `builtInMode` notice (lines 159–164) with a styled info panel that renders:
-     - Header: `Info` icon + display label + monospace field_name + "locked" hint
-     - "Usage" section
-     - "Why it matters" bulleted list
-     - Conditional amber verification warning when `builtInDefaults.locked`
-   - No changes to save logic, state seeding, or API contract.
+**`src/components/admin/InlineFieldEditor.tsx`**
+- Remove the entire `builtInMode && (() => { ... })()` block (lines 162–216) that renders the rich info card with `getBuiltInFieldInfo`, the importance bullets, and the amber `ShieldAlert`.
+- Replace it with a single compact strip when `builtInMode` is true: `Info` icon + text "Editing built-in field — field key & type are locked. See the ⓘ on the row above for usage details."
+- Drop the now-unused imports (`getBuiltInFieldInfo`, `ShieldAlert`) and the `locked` / `group` reads (`builtInDefaults?.locked`, `builtInDefaults?.group`) inside the editor.
+- Keep the `builtInDefaults` prop shape unchanged to avoid touching the parent — `locked` and `group` simply become unused.
 
-2. **`src/pages/FormBuilder.tsx`**
-   - When mounting `<InlineFieldEditor builtInMode … />` (around line 583) pass two extra fields into `builtInDefaults`: `locked: bf.locked` and `group: bf.group`.
-
-3. No DB / hook / migration changes.
+**No changes** to `FormBuilder.tsx`, `builtInFieldInfo.ts`, hooks, DB, or the row-level popover.
 
 ## Out of Scope
 
-- Editing the usage/importance text from the UI — it stays code-managed in `builtInFieldInfo.ts`.
-- Adding the panel to the custom-field editor (custom fields are admin-authored, no canned info).
+- The ⓘ popover on each built-in field row stays exactly as is (single source of truth for the documentation).
+- No content edits to `builtInFieldInfo.ts`.

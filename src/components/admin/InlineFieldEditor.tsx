@@ -5,11 +5,10 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Loader2, ChevronDown, ChevronUp, Info, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { useUpsertFormField } from '@/hooks/useFormBuilder';
 import type { FormFieldConfig } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
-import { getBuiltInFieldInfo } from '@/lib/builtInFieldInfo';
 
 interface Props {
   tenantId: string;
