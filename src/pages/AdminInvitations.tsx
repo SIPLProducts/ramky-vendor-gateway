@@ -320,7 +320,7 @@ export default function AdminInvitations() {
     if (!effectiveTenantId) {
       toast({
         title: 'No Company Assigned',
-        description: isSharviAdmin
+        description: allowedTenants.length > 0
           ? 'Please select a company.'
           : 'Your account is not assigned to any company. Contact your administrator.',
         variant: 'destructive',
