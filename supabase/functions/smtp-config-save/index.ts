@@ -121,6 +121,7 @@ serve(async (req) => {
         smtp_username: body.smtp_username.trim(),
         app_password: body.app_password,
         from_name: body.from_name ?? null,
+        reply_to: body.reply_to ? String(body.reply_to).trim() : null,
         is_active: body.is_active ?? true,
         created_by: userRes.user.id,
       })
