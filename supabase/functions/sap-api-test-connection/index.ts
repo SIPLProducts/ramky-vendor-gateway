@@ -93,6 +93,36 @@ serve(async (req) => {
     }
     const latency_ms = Date.now() - start;
 
+    // In proxy mode, also verify the proxy secret authenticates against /sap/bp/create
+    if (isProxy && ok) {
+      const secret = ((config as any).proxy_secret || "").toString().trim();
+      if (!secret) {
+        ok = false;
+        message = "Middleware reachable, but 'Proxy Secret / Password' is empty in SAP API Settings. Set it to the same value as MIDDLEWARE_SHARED_SECRET in middleware/.env.";
+      } else {
+        try {
+          const authCtrl = new AbortController();
+          const authTimer = setTimeout(() => authCtrl.abort(), 10000);
+          const authRes = await fetch(`${mwBase}/sap/bp/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-middleware-key": secret },
+            body: JSON.stringify([]),
+            signal: authCtrl.signal,
+          });
+          clearTimeout(authTimer);
+          if (authRes.status === 401) {
+            ok = false;
+            message = "Middleware rejected the proxy secret (401). The 'Proxy Secret / Password' in SAP API Settings does not match MIDDLEWARE_SHARED_SECRET in middleware/.env.";
+          } else {
+            message = `Middleware reachable and proxy secret accepted (HTTP ${authRes.status}).`;
+          }
+        } catch (e: any) {
+          // Don't fail the test on transient auth-check errors
+          message = `${message} (auth check skipped: ${e?.message || "network error"})`;
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ ok, status, latency_ms, message, target: targetUrl }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },

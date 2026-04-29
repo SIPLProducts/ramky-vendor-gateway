@@ -141,6 +141,11 @@ serve(async (req) => {
           "SAP middleware URL is not configured. Open SAP API Settings → Business Partner config and set 'Node.js Middleware URL' (e.g. your ngrok https URL) and 'Proxy Secret / Password'.",
         );
       }
+      if (!middlewareKey) {
+        return fail(
+          "Proxy Secret / Password is not set in SAP API Settings. Open the Business Partner config, paste the same value as MIDDLEWARE_SHARED_SECRET from middleware/.env into 'Proxy Secret / Password', save, and try again.",
+        );
+      }
       if (!/^https?:\/\//i.test(middlewareUrl)) {
         return fail(
           `The saved Node.js Middleware URL is invalid: "${rawMiddlewareUrl}". It must start with http:// or https:// and contain no spaces. Open SAP API Settings → Business Partner config and re-enter just the base URL (e.g. https://abc123.ngrok-free.app).`,
