@@ -2,6 +2,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock } from 'lucide-react';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { toastKycResult } from '@/lib/kycToast';
 
 interface PanKycTabProps {
   pan: string;
@@ -20,6 +21,7 @@ export function PanKycTab(props: PanKycTabProps) {
   const runPanOcr = async (file: File) => {
     props.onStatusChange?.('validating');
     const r = await callProvider({ providerName: 'PAN_OCR', file });
+    toastKycResult('PAN OCR', r);
     if (!r.found) {
       props.onStatusChange?.('failed');
       return { success: false, error: r.message || 'PAN OCR provider not configured' };

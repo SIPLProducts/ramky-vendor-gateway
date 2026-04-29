@@ -11,6 +11,7 @@ import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
+import { toastKycResult } from '@/lib/kycToast';
 
 interface GstKycTabProps {
   isGstRegistered: boolean;
@@ -44,6 +45,7 @@ export function GstKycTab(props: GstKycTabProps) {
   const handleManualVerify = async () => {
     const r = await verify({
       providerName: 'GST',
+      label: 'GST',
       input: { gstin: props.gstin, id_number: props.gstin },
       validate: (data) => {
         const apiName = String(data.legal_name || data.business_name || '').trim();
@@ -63,6 +65,7 @@ export function GstKycTab(props: GstKycTabProps) {
   // Run the admin-configured GST_OCR provider as the "OCR" step.
   const runGstOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'GST_OCR', file });
+    toastKycResult('GST OCR', r);
     if (!r.found) return { success: false, error: r.message || 'GST OCR provider not configured' };
     if (!r.ok || !r.data) return { success: false, error: r.message || 'GST OCR failed' };
     return { success: true, extracted: r.data };

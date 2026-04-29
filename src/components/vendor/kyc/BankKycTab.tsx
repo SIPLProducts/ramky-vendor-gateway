@@ -2,6 +2,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock } from 'lucide-react';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { toastKycResult } from '@/lib/kycToast';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -27,6 +28,7 @@ export function BankKycTab(props: BankKycTabProps) {
   // OCR step: read cancelled cheque via configured BANK_OCR provider.
   const runBankOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'BANK_OCR', file });
+    toastKycResult('Bank OCR', r);
     if (!r.found) return { success: false, error: r.message || 'Bank OCR provider not configured' };
     if (!r.ok || !r.data) return { success: false, error: r.message || 'Could not read cheque' };
     return { success: true, extracted: r.data };
@@ -58,6 +60,7 @@ export function BankKycTab(props: BankKycTabProps) {
       providerName: 'BANK',
       input: { account, ifsc },
     });
+    toastKycResult('Bank', r);
     if (!r.found) {
       props.onStatusChange?.('failed');
       return { ok: false, message: r.message || 'Bank validation provider not configured' };

@@ -7,6 +7,7 @@ import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
+import { toastKycResult } from '@/lib/kycToast';
 
 interface MsmeKycTabProps {
   isMsmeRegistered: boolean;
@@ -34,6 +35,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const handleManualVerify = async () => {
     const r = await verify({
       providerName: 'MSME',
+      label: 'MSME',
       input: { msme: props.msmeNumber, id_number: props.msmeNumber },
       validate: (data) => {
         const apiName = String(data.enterprise_name || data.legal_name || '').trim();
@@ -56,6 +58,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
 
   const runMsmeOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'MSME_OCR', file });
+    toastKycResult('MSME OCR', r);
     if (!r.found) return { success: false, error: r.message || 'MSME OCR provider not configured' };
     if (!r.ok || !r.data) return { success: false, error: r.message || 'MSME OCR failed' };
     return { success: true, extracted: r.data };
