@@ -1,123 +1,93 @@
-
 ## Goal
 
-Create a dedicated **"KYC / Validation API Settings"** screen, modeled on the existing `SapApiSettings` page, to manage configurations (URL, payload, headers, response mapping, credentials) for the four external services:
+Restructure the **Compliance / KYC** section of vendor registration into **4 tabs** — one per identity to verify — with the right capture mode per tab:
 
-- **GST OCR** (`/api/v1/ocr/gst`)
-- **PAN OCR** (`/api/v1/ocr/pan`)
-- **MSME / Udyog Aadhaar** (`/api/v1/corporate/udyog-aadhaar`)
-- **Bank Verification** (`/api/v1/bank-verification/`)
+| Tab    | Manual entry + Verify | OCR upload + Verify |
+|--------|:--:|:--:|
+| GST    | Yes | Yes |
+| PAN    | No  | Yes (OCR only) |
+| MSME   | Yes | Yes |
+| Bank   | No  | Yes (OCR only) |
 
-(Default sample base: `https://kyc-api.surepass.app`, matching the uploaded screenshots.)
+Inside GST and MSME tabs there is a secondary toggle (sub-tabs) to pick **Enter manually** or **Upload document**. PAN and Bank tabs show only the upload flow.
 
-The existing `api_providers` / `api_credentials` tables already support most of what we need — they are simply not exposed via a real settings page yet (the only consumer is buried inside `SharviAdminConsole`). We will add a first-class page, a list/edit flow, a test action, and wire the validation edge functions to read from these configs instead of the hardcoded Cashfree URLs.
+In every flow, the value that ultimately gets saved is the one **verified against the configured KYC validation API** (Surepass / configured provider through `kyc-api-execute`). For OCR flows, the extracted value is auto-fed into the validation API and a side-by-side comparison is shown.
 
-## Database
-
-Use the existing tables; add a few small things via migration:
-
-1. `api_providers`
-   - Add column `request_mode text default 'json'` — values: `json`, `multipart` (for OCR file uploads), `form`.
-   - Add column `file_field_name text` — multipart field name for the file (e.g. `file`).
-   - Add column `category text default 'VALIDATION'` — values: `OCR`, `VALIDATION`. Used to group on the screen.
-   - Allow `tenant_id` to be `NULL` for **global** (system-wide) providers, since OCR/KYC keys are typically shared across tenants. Update RLS to also allow `sharvi_admin` to read/write rows with `tenant_id IS NULL`.
-2. Seed 4 default rows (idempotent `ON CONFLICT DO NOTHING`) for GST OCR, PAN OCR, MSME, Bank, with the Surepass URLs as defaults so the screen is non-empty on first open.
-3. RLS: `sharvi_admin` full CRUD on `api_providers` and `api_credentials`; existing tenant-scoped policies remain.
-
-## New Page: `/admin/kyc-api-settings`
-
-File: `src/pages/KycApiSettings.tsx` — list view, modeled on `SapApiSettings.tsx`.
-
-Layout:
+## Tab structure (new layout)
 
 ```text
-┌───────────────────────────────────────────────────────────────┐
-│ KYC & Validation API Settings              [System Admin]     │
-├───────────────────────────────────────────────────────────────┤
-│ Tabs: [ OCR APIs ] [ Validation APIs ]                        │
-│                                       [Export] [Import] [+Add]│
-│ ┌─────────────────────────────────────────────────────────┐   │
-│ │ Name      │ Endpoint                  │ Method │ Auth   │   │
-│ │ GST OCR   │ POST .../ocr/gst          │ POST   │ Bearer │   │
-│ │ PAN OCR   │ POST .../ocr/pan          │ POST   │ Bearer │   │
-│ │ MSME      │ POST .../udyog-aadhaar    │ POST   │ Bearer │   │
-│ │ Bank      │ POST .../bank-verification│ POST   │ Bearer │   │
-│ └─────────────────────────────────────────────────────────┘   │
-│ Per-row actions: [Test] [Edit] [Delete]                       │
-└───────────────────────────────────────────────────────────────┘
+┌─ KYC & Statutory Verification ────────────────────────────────────┐
+│ [ GST ●verified ] [ PAN ○ ] [ MSME ○ ] [ Bank ○ ]                  │
+├───────────────────────────────────────────────────────────────────┤
+│  (tab content: manual/upload sub-tabs OR upload-only)             │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-Tabs split by the new `category` column (OCR vs Validation).
+Each tab header shows a small status pill (Pending / Verified / Failed / Not applicable) so the vendor sees overall progress at a glance. A footer summary line shows "X of 4 verified" and gates the Next button (respecting existing rules: GST is skippable if "not registered", MSME skippable if "not registered", PAN + Bank are mandatory).
 
-## New Page: `/admin/kyc-api-settings/:id`
+### Tab 1 — GST
+- Yes/No question stays at the top: "Are you GST registered?"
+- If **No** → existing self-declaration flow (download template, upload signed copy, reason).
+- If **Yes** → sub-tabs:
+  - **Enter manually**: GSTIN input + Verify (current `validate-gst`).
+  - **Upload certificate**: `FileUpload` for GST certificate → OCR (`documentType=gst`) → auto-call `validate-gst` with extracted GSTIN → `OcrComparisonCard` (GSTIN, legal_name, trade_name, status, address). On pass, GSTIN field is locked, certificate file attached, extended GST fields auto-populated.
 
-File: `src/pages/KycApiConfigEdit.tsx` — edit view, modeled on `SapApiConfigEdit.tsx`, with sub-tabs:
+### Tab 2 — PAN (upload only)
+- `FileUpload` for PAN card → OCR (`documentType=pan`) → auto-call `verify-pan` with extracted PAN → `OcrComparisonCard` (pan_number, holder_name vs API full_name, name match score). On pass, PAN value is set on the form (read-only "Verified PAN: ABCDE1234F" chip) and PAN file attached.
 
-1. **Basic** — display name, provider type (GST_OCR / PAN_OCR / MSME / BANK / CUSTOM), base URL, endpoint path, HTTP method, request mode (`json` / `multipart`), file field name (multipart only), timeout, retry count, enabled, mandatory.
-2. **Authentication** — auth type (`API_KEY` / `BEARER_TOKEN` / `BASIC` / `NONE`), header name, header prefix; credential value stored in `api_credentials` (masked input, "show/hide", saved separately).
-3. **Headers** — JSON editor for `request_headers` (Surepass needs `Authorization: Bearer <token>`).
-4. **Request payload** — JSON template editor with `{{placeholders}}` (e.g. `{ "id_number": "{{gstin}}" }`, `{ "id_number": "{{msme}}" }`, `{ "id_number": "{{account}}", "ifsc": "{{ifsc}}", "ifsc_details": true }`). For multipart OCR there is no body — the screen shows the file field name and a help note.
-5. **Response mapping** — JSON editor for `response_data_mapping` (e.g. `{ "legalName": "data.legal_name", "tradeName": "data.trade_name" }`) plus `response_success_path` / `response_success_value`.
-6. **Test** — pick a sample value (GSTIN / PAN / MSME / account+IFSC) or upload a file (for OCR), call a new edge function `kyc-api-test`, show status, latency, raw response, and the mapped result.
+### Tab 3 — MSME
+- Yes/No question: "Are you MSME registered?"
+- If **No** → tab marked "Not applicable".
+- If **Yes** → sub-tabs:
+  - **Enter manually**: Udyam number + Verify (`validate-msme`).
+  - **Upload certificate**: OCR (`documentType=msme`) → auto-call `validate-msme` → comparison card (udyam_number, enterprise_name, type). On pass, MSME number + category auto-fill, file attached.
 
-Reuse `Card`, `Tabs`, `Table`, `Input`, `Textarea`, `Switch`, `Select`, `Dialog`, `AlertDialog` from `src/components/ui` and the same enterprise styling used in `SapApiConfigEdit.tsx`.
+### Tab 4 — Bank (upload only)
+- `FileUpload` for cancelled cheque → OCR (`documentType=cheque`) → auto-call `validate-bank` with extracted account_number + ifsc_code → `OcrComparisonCard` (account_number, ifsc_code, bank_name, branch_name, account_holder_name vs API name_at_bank). On pass, bank account number, IFSC, bank name, branch, etc. are set on the form (read-only chips) and cheque file attached.
+- Banner: "Bank details are captured from your cancelled cheque and verified with your bank. Manual entry is disabled."
 
-## Hook
+## Shared UX rules
 
-File: `src/hooks/useKycApiConfigs.tsx` — mirrors `useSapApiConfigs.tsx`:
+- **Only one in_progress at a time** per tab; while OCR/validation runs the tab badge shows a spinner.
+- **Mismatch handling**: file stays uploaded, comparison card shows red ✕ on mismatched rows, "Re-upload" + (for GST/MSME) "Switch to manual entry" buttons.
+- **Lock after success**: locked padlock icon + green border, "View details" toggle re-opens the comparison card.
+- **Auto-advance**: completing a tab auto-focuses the next pending tab (no auto-skip if user is mid-edit).
+- **Resume**: if vendor returns later, tabs hydrate from saved `vendor_validations` rows + uploaded file metadata so verified state persists.
 
-- `useKycApiProviders(category?)`, `useKycApiProvider(id)`
-- `useCreateKycApiProvider`, `useUpdateKycApiProvider`, `useDeleteKycApiProvider`
-- `useKycApiCredential(id)`, `useSaveKycApiCredential`
-- `useTestKycApi(id, sampleInput)` → invokes edge function
+## Files
 
-All queries hit `api_providers` / `api_credentials` (filtered by `category` and `tenant_id IS NULL OR matches tenant`).
+**New**
+- `src/components/vendor/kyc/KycTabs.tsx` — owns the 4-tab shell, status badges, "X of 4 verified" footer, gating logic.
+- `src/components/vendor/kyc/GstKycTab.tsx`
+- `src/components/vendor/kyc/PanKycTab.tsx`
+- `src/components/vendor/kyc/MsmeKycTab.tsx`
+- `src/components/vendor/kyc/BankKycTab.tsx`
+- `src/components/vendor/kyc/OcrUploadAndVerify.tsx` — shared block: FileUpload → OCR → auto-validate → OcrComparisonCard → locked summary. Takes `documentType`, `validateFn`, field-mapping callback.
+- `src/components/vendor/kyc/ManualEntryAndVerify.tsx` — shared block: input + Verify button + ValidationMessage; calls the right `useFieldValidation` method.
 
-## New Edge Functions
+**Edited**
+- `src/components/vendor/steps/ComplianceStep.tsx`
+  - Replace existing GST + PAN + MSME blocks with `<KycTabs ...>` rendering the 4 sub-tabs (PAN moves out of "Registration Details" into its own tab, GST/MSME sections are removed in their current form). The Yes/No questions live inside their respective tabs.
+  - Keep the non-KYC fields (Firm Reg No., Entity Type, IEC No., memberships, enlistments, certifications, operational network) outside the KYC tabs in a separate section above.
+- `src/components/vendor/steps/EnterpriseOrganizationStep.tsx`
+  - Replace manual bank account / confirm / IFSC inputs with the new `<BankKycTab>` (or extract a shared `<BankCaptureBlock>` if reusing the same component is cleaner). Verified bank values populate the existing form fields read-only.
+- `src/hooks/useFieldValidation.tsx` — no API changes; reused for all four validate calls.
 
-1. **`kyc-api-test`** — accepts `{ providerId, sampleInput, file? (base64) }`, looks up the provider + credential, builds the request from the saved template/headers, calls the upstream API, returns `{ ok, status, latency_ms, response, mappedResult }`. Used by the **Test** sub-tab. CORS, JWT validation, role check (`sharvi_admin`).
-2. **`kyc-api-execute`** — generic runtime caller used by the existing validation pipeline. Takes `{ providerName, input }`, resolves the active row from `api_providers`, substitutes `{{placeholders}}` into `request_body_template`, attaches credentials/headers, posts to the upstream API, applies `response_data_mapping`, returns the normalized `{ valid, message, data, simulated }` shape that `validate-gst`, `validate-pan`, `validate-msme`, `validate-bank` already return.
+## Backend reuse (no new endpoints)
 
-## Wire Existing Validation Functions Through the Config
+- OCR continues to use `supabase/functions/ocr-extract` (Lovable AI gateway, Gemini 2.5 Flash, schemas already present for pan/gst/msme/cheque).
+- Validation continues via existing `validate-gst`, `verify-pan` / `validate-pan`, `validate-msme`, `validate-bank`, which already route through `kyc-api-execute` + `api_providers` config (set up in the previous KYC API Settings work).
+- Comparison and tab-state logic is fully client-side.
 
-Update each of these to first try the configured provider (via `kyc-api-execute`), and only fall back to the current Cashfree/simulation path if no active config exists:
+## Visual / Fiori styling
 
-- `supabase/functions/validate-gst/index.ts` — provider name `GST` (validation) — falls back to existing simulation if no row.
-- `supabase/functions/validate-pan/index.ts` — provider name `PAN`.
-- `supabase/functions/validate-msme/index.ts` — provider name `MSME`.
-- `supabase/functions/validate-bank/index.ts` — provider name `BANK`.
-- `supabase/functions/ocr-extract/index.ts` — for `documentType` ∈ `pan|gst|msme|cheque`, look up the corresponding OCR provider (`PAN_OCR`, `GST_OCR`, `MSME_OCR`, `CHEQUE_OCR`) and POST the file as multipart using `file_field_name`. Falls back to current Lovable AI OCR if no row.
+- Top-level tabs use existing `tabs.tsx` with the Fiori grey-on-white look; status pill uses existing `Badge` (`success`/`warning`/`secondary`).
+- Sub-tabs (manual / upload) inside GST and MSME use the same `tabs.tsx` but with a lighter, segmented-control variant.
+- Locked verified state mirrors `VerificationField` styling (lock icon, green border, success message).
+- Comparison rows use the existing `OcrComparisonCard`.
 
-This means the screen is the source of truth, and removing/disabling a row immediately changes runtime behavior.
+## Out of scope
 
-## Routing & Navigation
-
-- `src/App.tsx` — add two routes (admin-only):
-  - `/admin/kyc-api-settings` → `KycApiSettings`
-  - `/admin/kyc-api-settings/:id` → `KycApiConfigEdit`
-- `src/components/layout/Sidebar.tsx` — add a sidebar entry **"KYC API Settings"** under the existing Admin / SAP grouping (icon: `KeyRound` or `ShieldCheck`), guarded by `sharvi_admin` / system-admin role using the same pattern as the SAP entry.
-- Optionally remove the embedded `<ApiProviderConfig />` panel from `SharviAdminConsole` (or keep it tenant-scoped only) so there is one obvious place to manage these.
-
-## Secrets
-
-Surepass / Cashfree / etc. API tokens are stored as `credential_value` in `api_credentials` (encrypted column flag already exists). No new project-level secrets are required for the screen itself. If the user later wants the keys stored as Lovable Cloud secrets instead of in the DB, that is a follow-up.
-
-## Out of Scope
-
-- No change to the registration UI — vendors continue to use `useOcrExtraction` and the validation hooks; the change is invisible to them.
-- Penny-drop and name-match are not in this round (can be added later — same pattern, just add provider names `PENNY_DROP`, `NAME_MATCH`).
-- No bulk import of pre-shipped vendor templates beyond the 4 seed rows.
-
-## Files Touched
-
-- New: `src/pages/KycApiSettings.tsx`, `src/pages/KycApiConfigEdit.tsx`, `src/hooks/useKycApiConfigs.tsx`, `supabase/functions/kyc-api-test/index.ts`, `supabase/functions/kyc-api-execute/index.ts`
-- Edited: `src/App.tsx`, `src/components/layout/Sidebar.tsx`, `supabase/functions/validate-gst/index.ts`, `validate-pan/index.ts`, `validate-msme/index.ts`, `validate-bank/index.ts`, `ocr-extract/index.ts`
-- Migration: add columns + seed rows + RLS for `api_providers` / `api_credentials`
-
-## Acceptance
-
-1. Sidebar shows **KYC API Settings** for system admins.
-2. Page lists 4 default rows (GST OCR, PAN OCR, MSME, Bank) with editable URL, headers, payload, response mapping, and credentials.
-3. Each row has a working **Test** action that calls the upstream API and shows the response.
-4. After saving a row, the corresponding `validate-*` / `ocr-extract` function uses the new config on the next vendor submission.
-5. Disabling a row makes the validation fall back to the existing simulation path.
+- Changes to KYC API admin settings (already shipped).
+- Adding new providers / replacing the OCR engine.
+- Approval workflow / notifications.
