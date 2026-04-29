@@ -134,8 +134,8 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Type</Label>
-          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })}>
+          <Label className="text-xs">Type {isBuiltIn && <span className="text-muted-foreground">(locked)</span>}</Label>
+          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })} disabled={isBuiltIn}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
