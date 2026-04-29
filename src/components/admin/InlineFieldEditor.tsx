@@ -83,6 +83,17 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         display_order: field.display_order || 1,
         options: field.options || [],
       });
+    } else if (builtInMode && builtInDefaults) {
+      setForm({
+        field_name: builtInDefaults.field_name,
+        display_label: builtInDefaults.display_label,
+        field_type: builtInDefaults.field_type,
+        placeholder: '', help_text: '', default_value: '',
+        is_mandatory: builtInDefaults.is_mandatory,
+        is_visible: true, is_editable: true,
+        validation_regex: '', validation_message: '',
+        display_order: defaultOrder, options: [],
+      });
     } else {
       setForm({
         field_name: '', display_label: '', field_type: 'text',
@@ -92,7 +103,7 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         display_order: defaultOrder, options: [],
       });
     }
-  }, [field, defaultOrder]);
+  }, [field, defaultOrder, builtInMode, builtInDefaults]);
 
   const needsOptions = form.field_type === 'select' || form.field_type === 'multi-select';
 
