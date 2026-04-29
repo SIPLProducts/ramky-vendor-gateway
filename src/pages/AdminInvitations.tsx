@@ -269,8 +269,9 @@ export default function AdminInvitations() {
     },
     onError: (error: any) => {
       console.error('Send email mutation error:', error);
+      const isNotConfigured = (error?.message || '').includes('You are not configured in Email Configuration');
       toast({
-        title: 'Email Failed',
+        title: isNotConfigured ? 'Email Not Configured' : 'Email Failed',
         description: error.message || 'Failed to send invitation email. You can still copy the link.',
         variant: 'destructive',
       });
