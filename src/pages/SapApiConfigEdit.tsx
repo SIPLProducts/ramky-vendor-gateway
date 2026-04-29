@@ -179,8 +179,12 @@ export default function SapApiConfigEdit() {
                   </Select>
                 </Field>
                 <Field label="Middleware Port"><Input type="number" value={form.middleware_port || ""} onChange={(e) => set("middleware_port", parseInt(e.target.value) || null)} placeholder="3002" /></Field>
-                <Field label="Node.js Middleware URL"><Input value={form.middleware_url || ""} onChange={(e) => set("middleware_url", e.target.value)} placeholder="https://...ngrok-free.app" /></Field>
-                <Field label="Proxy Secret / Password"><Input type="password" value={form.proxy_secret || ""} onChange={(e) => set("proxy_secret", e.target.value)} placeholder="Optional" /></Field>
+                <Field label={`Node.js Middleware URL${(form.connection_mode || "proxy") === "proxy" ? " *" : ""}`}>
+                  <Input value={form.middleware_url || ""} onChange={(e) => set("middleware_url", e.target.value)} placeholder="https://...ngrok-free.app" />
+                </Field>
+                <Field label={`Proxy Secret / Password${(form.connection_mode || "proxy") === "proxy" ? " *" : ""}`}>
+                  <Input type="password" value={form.proxy_secret || ""} onChange={(e) => set("proxy_secret", e.target.value)} placeholder="Must match MIDDLEWARE_SHARED_SECRET in middleware/.env" />
+                </Field>
               </div>
             </CardContent>
           </Card>
