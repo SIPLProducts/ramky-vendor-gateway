@@ -488,15 +488,15 @@ export default function AdminInvitations() {
                 </Select>
               </div>
 
-              {isSharviAdmin ? (
+              {allowedTenants.length > 1 ? (
                 <div className="space-y-2">
-                  <Label htmlFor="company">Company (Tenant)</Label>
+                  <Label htmlFor="company">Company {isSuperAdmin ? '(Tenant)' : ''}</Label>
                   <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
                     <SelectTrigger id="company">
                       <SelectValue placeholder="Select a company" />
                     </SelectTrigger>
                     <SelectContent>
-                      {tenants?.map((tenant) => (
+                      {allowedTenants.map((tenant) => (
                         <SelectItem key={tenant.id} value={tenant.id}>
                           {tenant.name}
                         </SelectItem>
@@ -508,7 +508,7 @@ export default function AdminInvitations() {
                 <div className="space-y-2">
                   <Label>Company</Label>
                   <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
-                    {tenants?.find(t => t.id === currentUserTenantId)?.name || (currentUserTenantId ? 'Loading…' : 'No company assigned to your account')}
+                    {allowedTenants[0]?.name || 'No company assigned to your account'}
                   </div>
                 </div>
               )}
