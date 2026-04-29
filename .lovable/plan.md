@@ -1,107 +1,141 @@
-# Fix KYC API Settings — Headers Save Error + GST OCR Payload Mapping
 
-## Problem 1 — "Invalid JSON" when saving Headers
+## Goal
 
-In your screenshot the Headers textarea contains:
+Make the **KYC & Validation API Settings** screen the single source of truth for every KYC call (GST, PAN, MSME, Bank/Cheque) made from the **Vendor Registration** form. Disconnect the legacy hardcoded edge functions (`validate-gst`, `validate-pan`, `validate-msme`, `validate-bank`, `validate-penny-drop`, `ocr-extract`) from the registration KYC tabs so admins fully control endpoints, headers, payloads and response mapping from one place.
 
+---
+
+## AS-IS (today)
+
+The vendor registration KYC tabs use a **mix of two pipelines** depending on which sub-action the user picks. This is the root cause of confusion.
+
+```text
+Vendor Registration → KYC Tabs
+│
+├── GST tab
+│   ├── "Enter manually" → useFieldValidation.validateGST()
+│   │                     → edge fn: validate-gst   ◄── HARDCODED, ignores admin settings
+│   └── "Upload certificate" → useConfiguredKycApi(GST_OCR)
+│                            → edge fn: kyc-api-execute  ◄── uses KYC API Settings ✅
+│
+├── PAN tab
+│   └── Upload PAN → useConfiguredKycApi(PAN_OCR)
+│                  → kyc-api-execute  ◄── uses KYC API Settings ✅
+│
+├── MSME tab
+│   ├── "Enter manually" → useFieldValidation.validateMSME()
+│   │                     → edge fn: validate-msme  ◄── HARDCODED
+│   └── "Upload certificate" → useConfiguredKycApi(MSME_OCR)
+│                            → kyc-api-execute  ◄── uses KYC API Settings ✅
+│
+└── Bank tab
+    └── Upload cheque → BANK_OCR (configured) + BANK penny-drop (configured)
+                       → kyc-api-execute  ◄── uses KYC API Settings ✅
 ```
-{
-Content-Type:application/json,
-Authorization:Bearer eyJhbGci...
-}
+
+Other places that still call the hardcoded validators (out of scope for the registration form, but noted for awareness):
+- `useVendorRegistration.tsx` (auto-validate on save)
+- `validation-orchestrator` edge function
+- `DocumentVerification.tsx`, `GstCompliance.tsx`, `PennyDropDemo.tsx`
+
+**Problem:** when an admin updates a Surepass URL/header/key in *KYC & Validation API Settings*, the **manual-entry** GST and MSME paths in registration **do not pick it up** — they still hit the hardcoded `validate-gst` / `validate-msme` edge functions with their own credentials/secrets. PAN and Bank are already clean.
+
+---
+
+## TO-BE (target)
+
+Every KYC call originating from the vendor registration form goes through one funnel: `useConfiguredKycApi → kyc-api-execute → admin-configured provider`.
+
+```text
+Vendor Registration → KYC Tabs
+│
+├── GST tab (manual OR upload)  ─┐
+├── PAN tab (upload)              │   useConfiguredKycApi
+├── MSME tab (manual OR upload)   ├──►  (callProvider by name)
+└── Bank tab (upload cheque)     ─┘            │
+                                                ▼
+                                       supabase fn: kyc-api-execute
+                                                │
+                                                ▼
+                              ┌───────────────────────────────────┐
+                              │  KYC & Validation API Settings    │
+                              │  (admin-configured providers)     │
+                              │                                   │
+                              │  OCR:        GST_OCR, PAN_OCR,    │
+                              │              MSME_OCR, BANK_OCR   │
+                              │  Validation: GST, PAN, MSME, BANK │
+                              └───────────────────────────────────┘
 ```
 
-This is not valid JSON (keys/values aren't quoted, uses `,` between lines, includes trailing token). `JSON.parse` rejects it, so Save aborts with the toast you saw.
+Provider-name contract used by registration (must exist in KYC API Settings):
 
-Two issues compound this:
-1. There is **no friendly editor** — admins must hand-write JSON, which is error-prone.
-2. The `Authorization` header is **already added automatically** from the credential you save on the **Authentication** tab (`auth_header_name` + `auth_header_prefix` + the API token). Pasting it again here is wrong and will double up on the request.
+| Tab  | Action          | Provider name | Mode      |
+|------|-----------------|---------------|-----------|
+| GST  | Manual verify   | `GST`         | json      |
+| GST  | Upload + verify | `GST_OCR`     | multipart |
+| PAN  | Upload + verify | `PAN_OCR`     | multipart |
+| MSME | Manual verify   | `MSME`        | json      |
+| MSME | Upload + verify | `MSME_OCR`    | multipart |
+| Bank | Cheque OCR      | `BANK_OCR`    | multipart |
+| Bank | Penny-drop      | `BANK`        | json      |
 
-## Problem 2 — GST OCR Request Payload mapping
+If a provider is not configured or disabled, the tab shows a clear inline message:
+*"This verification is not configured. Ask your admin to add the **GST** provider in KYC & Validation API Settings."*
 
-For the GST OCR provider (Surepass `/api/v1/ocr/gst`), the API expects a **multipart/form-data** upload — the GST certificate file is sent under the field name `file`. There is **no JSON body** for OCR endpoints, so the "Request Payload" tab does not apply to it.
+---
 
-How the vendor → API flow works today:
-1. Vendor opens GST tab → selects "Yes" for GST registered → switches to "Upload certificate".
-2. `OcrUploadAndVerify` captures the file and calls `useConfiguredKycApi.callProvider({ providerName: 'GST_OCR', file })`.
-3. The `kyc-api-execute` edge function looks up the `GST_OCR` provider, sees `request_mode = multipart`, builds a `FormData` with the file under `file_field_name` (default `file`), and POSTs to `base_url + endpoint_path`.
-4. Surepass returns JSON like `{ success: true, data: { gstin, legal_name, business_name, pan_number, ... } }`.
-5. The edge function applies `response_data_mapping` (e.g. `gstin → data.gstin`) to produce the normalized `data` object.
-6. `GstKycTab.handleOcrVerify` reads the extracted `gstin` + `legal_name`, copies the GSTIN into the form, runs a name-match against the vendor's "Legal Name", and marks the tab Verified/Failed.
+## Changes
 
-So for GST OCR you do **not** need a Request Payload — only:
-- **Basic**: Request Mode = `multipart`, File Field Name = `file`, Method = `POST`.
-- **Authentication**: Auth Type = `BEARER_TOKEN`, Header Name = `Authorization`, Prefix = `Bearer`, paste your Surepass token in **API Token / Credential**.
-- **Headers**: leave `{}` (or only add non-auth extras).
-- **Response Mapping**: already pre-filled by the template (gstin, legal_name, etc.).
+### 1. Disconnect manual-entry GST from `validate-gst`
+File: `src/components/vendor/kyc/GstKycTab.tsx`
+- Remove `useFieldValidation` usage.
+- Replace `handleManualVerify` with a call to `callProvider({ providerName: 'GST', input: { gstin } })`.
+- Drive the local verify state from the result (idle/validating/passed/failed) instead of `validationStates.gst`.
+- Keep the existing name-match logic on the returned payload.
+- Add a `GST` template entry (json mode, `id_number: "{{gstin}}"`) in `KycApiSettings.tsx`.
 
-## Plan
+### 2. Disconnect manual-entry MSME from `validate-msme`
+File: `src/components/vendor/kyc/MsmeKycTab.tsx`
+- Same treatment as GST, using provider `MSME` (template already exists in KYC API Settings).
+- Remove `useFieldValidation` import and `validateMSME` call.
 
-### 1. Make the Headers tab forgiving and self-correcting
-File: `src/pages/KycApiConfigEdit.tsx`
+### 3. Add a small local state hook for manual verify
+New helper inside each tab (or a tiny shared `useProviderVerify`) so we no longer depend on `useFieldValidation` for the registration KYC tabs. Shape mirrors `FieldValidationState` so `ManualEntryAndVerify` keeps working unchanged.
 
-- Add a **Key/Value editor** (rows of two inputs + add/remove buttons) as the primary UI for headers. Keep the JSON textarea as an "Advanced" toggle for power users.
-- On save:
-  - Preferred path: serialise from the key/value rows — never throws.
-  - Advanced path: try `JSON.parse`; if it fails, attempt a **lenient parse** that accepts `Key: Value` lines (like a pasted HTTP headers block) and converts them to an object. Only show the toast when both fail.
-- Strip a manually-entered `Authorization` header before saving and show a small inline note: *"Authorization is added automatically from the credential — removed from extras."* This prevents the duplicate-auth bug.
-- Inline-validate as the admin types: show a green "Valid" / red "Invalid — line N" hint under the textarea instead of only at save time.
-- Pre-fill new providers with `{}` instead of leaving an empty textarea so the first save always succeeds.
+### 4. Add the missing `GST` validation template
+File: `src/pages/KycApiSettings.tsx` — add to `TEMPLATES`:
+```ts
+{ provider_name: "GST", display_name: "GSTIN Validation", category: "VALIDATION",
+  base_url: "https://kyc-api.surepass.app",
+  endpoint_path: "/api/v1/corporate/gstin",
+  request_mode: "json",
+  request_body_template: { id_number: "{{gstin}}" },
+  response_data_mapping: {
+    gstin: "data.gstin",
+    legal_name: "data.legal_name",
+    business_name: "data.business_name",
+    pan_number: "data.pan_number",
+    gst_status: "data.gstin_status",
+  } }
+```
 
-### 2. Clarify the Request Payload tab for OCR endpoints
-File: `src/pages/KycApiConfigEdit.tsx`
+### 5. "Not configured" UX
+File: `src/components/vendor/kyc/OcrUploadAndVerify.tsx` and `ManualEntryAndVerify.tsx`
+- When `callProvider` returns `found: false`, surface a friendly inline alert with a deep-link button: *"Open KYC & Validation API Settings"* → `/admin/kyc-api-settings` (only shown to admins; otherwise plain message).
 
-- When `request_mode === "multipart"`, replace the textarea with an info card:
+### 6. Out of scope (kept as-is for now)
+The following still call the legacy edge functions because they belong to other screens, not the vendor registration form:
+- `useVendorRegistration.tsx` server-side re-validation on save
+- `validation-orchestrator`, `DocumentVerification.tsx`, `GstCompliance.tsx`, `PennyDropDemo.tsx`
 
-  > *"This endpoint receives the uploaded file as multipart form-data under field `file`. No JSON body is needed. The vendor's uploaded GST certificate is forwarded automatically."*
+We will **not** delete the `validate-gst / validate-pan / validate-msme / validate-bank / validate-penny-drop / ocr-extract` edge functions in this change, so those other screens keep working. They simply stop being called from the vendor registration KYC tabs.
 
-- Show the exact request shape that will be sent (read-only preview):
-  ```
-  POST {base_url}{endpoint_path}
-  Authorization: Bearer ********
-  Content-Type: multipart/form-data
-  file: <vendor-uploaded GST certificate>
-  ```
+---
 
-### 3. Add a small "How vendor data maps to this API" helper
-File: `src/pages/KycApiConfigEdit.tsx` (Response Mapping tab, for OCR providers only)
+## Verification checklist after implementation
 
-Show a 2-column legend so admins understand the mapping isn't abstract:
-
-| Form field on vendor screen | Comes from API path |
-|---|---|
-| GSTIN              | `data.gstin` |
-| Legal Name         | `data.legal_name` |
-| Business Name      | `data.business_name` |
-| PAN                | `data.pan_number` |
-| Status             | `data.gstin_status` |
-| Registration Date  | `data.date_of_registration` |
-
-Built from `response_data_mapping` automatically — same legend works for PAN_OCR / MSME_OCR / BANK_OCR.
-
-### 4. Tiny safety fix in the edge function
-File: `supabase/functions/kyc-api-execute/index.ts`
-
-If, despite the UI guard, an admin still saves an `Authorization` key in `request_headers`, **let the credential-based one win** — currently the credential header overwrites it, which is correct, but assert this with a comment + small safeguard so future edits don't regress.
-
-## Technical notes
-
-- Lenient header parser handles three input shapes:
-  1. `{}` — valid JSON object (current behaviour).
-  2. Key/value rows from the new UI — always serialises cleanly.
-  3. Pasted `Header-Name: value` lines — split on first `:`, trim, build object.
-- The Headers payload column in the DB (`api_providers.request_headers`) stays a `jsonb` object — no schema change.
-- No edge-function deployment is required for the UX fixes (steps 1–3). Step 4 is a one-line safety comment + redeploy of `kyc-api-execute`.
-
-## Files to change
-
-- `src/pages/KycApiConfigEdit.tsx` — key/value headers editor, lenient parser, multipart payload info card, response-mapping legend.
-- `supabase/functions/kyc-api-execute/index.ts` — comment + guard ensuring credential auth header wins over any extras.
-
-## What you should do in the GST OCR config right now
-
-1. Open the **Authentication** tab → set Auth Type `BEARER_TOKEN`, Header Name `Authorization`, Prefix `Bearer`, paste your Surepass token in **API Token / Credential**, Save.
-2. Open the **Headers** tab → clear the textarea down to just `{}` (the Authorization line you pasted is unnecessary and is what is breaking the save).
-3. Leave **Request Payload** as `{}` — GST OCR is multipart, the vendor's uploaded certificate is sent automatically as the `file` field.
-4. **Response Mapping** is pre-populated by the template; no change needed.
-5. Save — then test from the **Live Test** tab by uploading a sample GST certificate.
+1. KYC API Settings → add **GST** (Validation) and confirm GST_OCR, PAN_OCR, MSME_OCR, MSME, BANK_OCR, BANK are present.
+2. Vendor Registration → GST tab → "Enter manually" → click Verify → network shows `kyc-api-execute` (not `validate-gst`).
+3. Same check for MSME manual entry.
+4. Disable the `GST` provider in settings → manual verify in registration shows the friendly "not configured" alert.
+5. PAN and Bank tabs continue to work unchanged.
