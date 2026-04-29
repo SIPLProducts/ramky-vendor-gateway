@@ -129,7 +129,7 @@ export default function AdminInvitations() {
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
       // Get tenant name for email
-      const selectedTenant = tenants?.find(t => t.id === tenantId);
+      const selectedTenant = allowedTenants.find(t => t.id === tenantId) || allTenants?.find(t => t.id === tenantId);
       const tenantName = selectedTenant?.name || 'Ramky Infrastructure';
 
       // Step 1: Create invitation in database
