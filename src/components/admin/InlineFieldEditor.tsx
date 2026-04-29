@@ -292,7 +292,7 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
         <Button size="sm" onClick={handleSave} disabled={upsert.isPending || !form.display_label.trim()}>
           {upsert.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-          {field ? 'Save Changes' : 'Add Field'}
+          {builtInMode ? 'Save Override' : (field ? 'Save Changes' : 'Add Field')}
         </Button>
       </div>
     </div>
