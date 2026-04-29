@@ -47,7 +47,7 @@ export default function KycApiSettings() {
   const test = useTestKycApi();
   const create = useCreateKycApiProvider();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [tab, setTab] = useState<"OCR" | "VALIDATION">("OCR");
+  const [tab, setTab] = useState<"OCR" | "VALIDATION" | "TEST">("OCR");
 
   const filtered = (providers || []).filter((p) => p.category === tab);
 
