@@ -511,9 +511,14 @@ export default function FormBuilder() {
                         <SortableField
                           field={f}
                           isEditing={editingFieldId === f.id}
+                          isBuiltIn={isBuiltInField(f)}
                           onEdit={() => setEditingFieldId(editingFieldId === f.id ? null : f.id)}
                           onDelete={async () => {
-                            if (confirm(`Delete field "${f.display_label}"?`)) await deleteField.mutateAsync(f.id);
+                            const builtIn = isBuiltInField(f);
+                            const msg = builtIn
+                              ? `Remove built-in field "${f.display_label}"? You can re-add it via "Restore defaults".`
+                              : `Delete field "${f.display_label}"?`;
+                            if (confirm(msg)) await deleteField.mutateAsync(f.id);
                           }}
                         />
                         {editingFieldId === f.id && (
@@ -522,6 +527,7 @@ export default function FormBuilder() {
                               tenantId={effectiveTenantId}
                               stepKey={selectedStepKey}
                               field={f}
+                              isBuiltIn={isBuiltInField(f)}
                               onClose={() => setEditingFieldId(null)}
                             />
                           </div>
