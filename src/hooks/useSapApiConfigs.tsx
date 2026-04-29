@@ -62,6 +62,16 @@ export function useSapApiConfig(id: string | undefined) {
   });
 }
 
+function normalizeMiddlewareBase(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let v = String(raw).replace(/\s+/g, "").trim().replace(/\/+$/, "");
+  v = v.replace(/\/sap\/bp\/create$/i, "")
+       .replace(/\/sap\/proxy$/i, "")
+       .replace(/\/health$/i, "")
+       .replace(/\/+$/, "");
+  return v || null;
+}
+
 export function useCreateSapApiConfig() {
   const qc = useQueryClient();
   return useMutation({
@@ -78,9 +88,9 @@ export function useCreateSapApiConfig() {
         timeout_ms: payload.timeout_ms ?? 30000,
         connection_mode: payload.connection_mode ?? "proxy",
         deployment_mode: payload.deployment_mode ?? "cloud",
-        middleware_url: payload.middleware_url ?? null,
+        middleware_url: normalizeMiddlewareBase(payload.middleware_url ?? null),
         middleware_port: payload.middleware_port ?? null,
-        proxy_secret: payload.proxy_secret ?? null,
+        proxy_secret: payload.proxy_secret ? String(payload.proxy_secret).trim() : null,
         list_endpoint: payload.list_endpoint ?? null,
         create_endpoint: payload.create_endpoint ?? null,
         update_endpoint: payload.update_endpoint ?? null,
@@ -114,9 +124,16 @@ export function useUpdateSapApiConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...patch }: Partial<SapApiConfig> & { id: string }) => {
+      const cleanPatch: any = { ...patch };
+      if ("middleware_url" in cleanPatch) {
+        cleanPatch.middleware_url = normalizeMiddlewareBase(cleanPatch.middleware_url);
+      }
+      if ("proxy_secret" in cleanPatch && cleanPatch.proxy_secret != null) {
+        cleanPatch.proxy_secret = String(cleanPatch.proxy_secret).trim() || null;
+      }
       const { data, error } = await supabase
         .from("sap_api_configs")
-        .update(patch)
+        .update(cleanPatch)
         .eq("id", id)
         .select()
         .single();
