@@ -9,8 +9,8 @@ import { Download, FileText, Pencil, Upload } from 'lucide-react';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
-import { useFieldValidation } from '@/hooks/useFieldValidation';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { useProviderVerify } from '@/hooks/useProviderVerify';
 
 interface GstKycTabProps {
   isGstRegistered: boolean;
@@ -30,11 +30,9 @@ interface GstKycTabProps {
 }
 
 export function GstKycTab(props: GstKycTabProps) {
-  const { validationStates, validateGST, resetValidation } = useFieldValidation(props.vendorId);
   const { callProvider } = useConfiguredKycApi();
+  const { state, verify, reset } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
-
-  const state = validationStates.gst;
 
   if (props.onStatusChange) {
     const status = !props.isGstRegistered
@@ -44,8 +42,22 @@ export function GstKycTab(props: GstKycTabProps) {
   }
 
   const handleManualVerify = async () => {
-    const ok = await validateGST(props.gstin, props.legalName);
-    if (ok) props.onVerifiedDetails?.(state.data || {});
+    const r = await verify({
+      providerName: 'GST',
+      input: { gstin: props.gstin, id_number: props.gstin },
+      validate: (data) => {
+        const apiName = String(data.legal_name || data.business_name || '').trim();
+        if (props.legalName && apiName) {
+          const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+          const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+          if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+            return { ok: false, message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`, data };
+          }
+        }
+        return { ok: true, message: `GSTIN verified — ${apiName || props.gstin}`, data };
+      },
+    });
+    if (r.ok) props.onVerifiedDetails?.(r.data || {});
   };
 
   // Run the admin-configured GST_OCR provider as the "OCR" step.
