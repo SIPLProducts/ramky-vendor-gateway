@@ -717,6 +717,219 @@ export type Database = {
           },
         ]
       }
+      sap_api_configs: {
+        Row: {
+          api_type: string
+          auth_type: string
+          auto_sync_enabled: boolean
+          base_url: string
+          connection_mode: string
+          create_endpoint: string | null
+          created_at: string
+          created_by: string | null
+          deployment_mode: string
+          description: string | null
+          endpoint_path: string
+          http_method: string
+          id: string
+          is_active: boolean
+          key_field: string | null
+          last_synced_at: string | null
+          list_endpoint: string | null
+          middleware_port: number | null
+          middleware_url: string | null
+          name: string
+          next_sync_at: string | null
+          proxy_secret: string | null
+          sap_client: string | null
+          schedule_cron: string | null
+          timeout_ms: number
+          update_endpoint: string | null
+          update_method: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_type?: string
+          auth_type?: string
+          auto_sync_enabled?: boolean
+          base_url?: string
+          connection_mode?: string
+          create_endpoint?: string | null
+          created_at?: string
+          created_by?: string | null
+          deployment_mode?: string
+          description?: string | null
+          endpoint_path?: string
+          http_method?: string
+          id?: string
+          is_active?: boolean
+          key_field?: string | null
+          last_synced_at?: string | null
+          list_endpoint?: string | null
+          middleware_port?: number | null
+          middleware_url?: string | null
+          name: string
+          next_sync_at?: string | null
+          proxy_secret?: string | null
+          sap_client?: string | null
+          schedule_cron?: string | null
+          timeout_ms?: number
+          update_endpoint?: string | null
+          update_method?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_type?: string
+          auth_type?: string
+          auto_sync_enabled?: boolean
+          base_url?: string
+          connection_mode?: string
+          create_endpoint?: string | null
+          created_at?: string
+          created_by?: string | null
+          deployment_mode?: string
+          description?: string | null
+          endpoint_path?: string
+          http_method?: string
+          id?: string
+          is_active?: boolean
+          key_field?: string | null
+          last_synced_at?: string | null
+          list_endpoint?: string | null
+          middleware_port?: number | null
+          middleware_url?: string | null
+          name?: string
+          next_sync_at?: string | null
+          proxy_secret?: string | null
+          sap_client?: string | null
+          schedule_cron?: string | null
+          timeout_ms?: number
+          update_endpoint?: string | null
+          update_method?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sap_api_credentials: {
+        Row: {
+          config_id: string
+          created_at: string
+          extra_headers: Json
+          id: string
+          password_encrypted: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          config_id: string
+          created_at?: string
+          extra_headers?: Json
+          id?: string
+          password_encrypted?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          config_id?: string
+          created_at?: string
+          extra_headers?: Json
+          id?: string
+          password_encrypted?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sap_api_credentials_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: true
+            referencedRelation: "sap_api_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sap_api_request_fields: {
+        Row: {
+          config_id: string
+          created_at: string
+          default_value: string | null
+          field_name: string
+          id: string
+          order_index: number
+          required: boolean
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          config_id: string
+          created_at?: string
+          default_value?: string | null
+          field_name: string
+          id?: string
+          order_index?: number
+          required?: boolean
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config_id?: string
+          created_at?: string
+          default_value?: string | null
+          field_name?: string
+          id?: string
+          order_index?: number
+          required?: boolean
+          source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sap_api_request_fields_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "sap_api_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sap_api_response_fields: {
+        Row: {
+          config_id: string
+          created_at: string
+          field_name: string
+          id: string
+          order_index: number
+          target_column: string | null
+          updated_at: string
+        }
+        Insert: {
+          config_id: string
+          created_at?: string
+          field_name: string
+          id?: string
+          order_index?: number
+          target_column?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config_id?: string
+          created_at?: string
+          field_name?: string
+          id?: string
+          order_index?: number
+          target_column?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sap_api_response_fields_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "sap_api_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_validations: {
         Row: {
           created_at: string
