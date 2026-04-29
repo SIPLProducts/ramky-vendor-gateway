@@ -8,7 +8,11 @@ const corsHeaders = {
 
 function getPath(obj: any, path?: string | null): any {
   if (!path) return undefined;
-  return path.split(".").reduce((a: any, k: string) => (a == null ? a : a[k]), obj);
+  return path.split(".").reduce((a: any, k: string) => {
+    if (a == null) return a;
+    const idx: any = /^\d+$/.test(k) ? Number(k) : k;
+    return a[idx];
+  }, obj);
 }
 
 function substitute(template: any, vars: Record<string, any>): any {
@@ -106,6 +110,9 @@ serve(async (req) => {
     if (provider.response_success_path) {
       const v = getPath(parsed, provider.response_success_path);
       ok = ok && String(v) === String(provider.response_success_value ?? "true");
+    } else if (parsed && typeof parsed === "object" && "success" in parsed) {
+      // Surepass-style default: { success: true, ... }
+      ok = ok && parsed.success === true;
     }
 
     const mapping = (provider.response_data_mapping || {}) as Record<string, string>;
