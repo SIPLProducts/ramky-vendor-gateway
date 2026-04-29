@@ -18,6 +18,8 @@ import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
 import SAPSync from "./pages/SAPSync";
+import SapApiSettings from "./pages/SapApiSettings";
+import SapApiConfigEdit from "./pages/SapApiConfigEdit";
 import VendorList from "./pages/VendorList";
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
@@ -63,6 +65,8 @@ const App = () => (
                 <Route path="/finance/review" element={<FinanceReview />} />
                 <Route path="/purchase/approval" element={<PurchaseApproval />} />
                 <Route path="/sap/sync" element={<SAPSync />} />
+                <Route path="/sap/api-settings" element={<SapApiSettings />} />
+                <Route path="/sap/api-settings/:configId" element={<SapApiConfigEdit />} />
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
