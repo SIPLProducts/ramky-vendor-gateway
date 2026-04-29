@@ -22,10 +22,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Lock, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { InlineFieldEditor } from '@/components/admin/InlineFieldEditor';
 import { FieldTemplateActions } from '@/components/admin/FieldTemplateActions';
 import type { FormFieldConfig } from '@/hooks/useTenant';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { BUILT_IN_FIELDS_CATALOG, BUILT_IN_FIELD_MARKER, isBuiltInField } from '@/lib/builtInFields';
 import { cn } from '@/lib/utils';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
