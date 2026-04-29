@@ -15,6 +15,9 @@ interface Props {
   stepKey: string;
   field?: FormFieldConfig | null;
   defaultOrder?: number;
+  /** When true, the field is one of the built-in catalog fields — restrict
+   *  field key and field type editing to avoid breaking the vendor form. */
+  isBuiltIn?: boolean;
   onClose: () => void;
 }
 
