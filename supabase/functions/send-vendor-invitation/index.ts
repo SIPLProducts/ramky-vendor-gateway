@@ -25,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const body: InvitationEmailRequest = await req.json();
-    const { email, token, expiresAt, invitationId, simulationMode = false } = body;
+    const { email, token, expiresAt, invitationId, simulationMode = false, senderEmail } = body;
 
     // Resolve frontend URL dynamically — no hardcoded fallback.
     // Priority: explicit body param > Origin header > Referer header > FRONTEND_URL env.
