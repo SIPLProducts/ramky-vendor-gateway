@@ -75,6 +75,8 @@ serve(async (req) => {
     const headers: Record<string, string> = {};
     if (provider.request_headers && typeof provider.request_headers === "object") {
       for (const [k, v] of Object.entries(provider.request_headers as Record<string, any>)) {
+        // Never accept an Authorization header from extras — credential always wins.
+        if (k.toLowerCase() === "authorization") continue;
         headers[k] = String(v);
       }
     }

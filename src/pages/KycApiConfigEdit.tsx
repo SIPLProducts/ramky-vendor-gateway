@@ -11,7 +11,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, Eye, EyeOff, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Eye, EyeOff, Play, Loader2, Plus, Trash2, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import {
   useKycApiProvider, useUpdateKycApiProvider, useKycApiCredential,
@@ -26,6 +27,53 @@ function jsonStr(v: any) {
   try { return JSON.stringify(v ?? {}, null, 2); } catch { return "{}"; }
 }
 
+type HeaderRow = { key: string; value: string };
+
+function objToRows(obj: Record<string, any> | null | undefined): HeaderRow[] {
+  if (!obj || typeof obj !== "object") return [];
+  return Object.entries(obj).map(([key, value]) => ({ key, value: String(value ?? "") }));
+}
+
+function rowsToObj(rows: HeaderRow[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const k = r.key.trim();
+    if (!k) continue;
+    if (k.toLowerCase() === "authorization") continue; // auto-added from credential
+    out[k] = r.value;
+  }
+  return out;
+}
+
+/** Accepts strict JSON or pasted "Key: Value" header lines. */
+function lenientHeaderParse(text: string): { ok: true; obj: Record<string, string> } | { ok: false; error: string } {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return { ok: true, obj: {} };
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed)) out[k] = String(v ?? "");
+      return { ok: true, obj: out };
+    }
+  } catch { /* fall through to lenient */ }
+  // Strip wrapping braces and try line-by-line "Key: Value"
+  const body = trimmed.replace(/^\{/, "").replace(/\}$/, "");
+  const out: Record<string, string> = {};
+  const lines = body.split(/\r?\n/);
+  for (let raw of lines) {
+    let line = raw.trim().replace(/,$/, "");
+    if (!line) continue;
+    const colon = line.indexOf(":");
+    if (colon === -1) return { ok: false, error: `Cannot parse line: "${line}"` };
+    const k = line.slice(0, colon).trim().replace(/^["']|["']$/g, "");
+    const v = line.slice(colon + 1).trim().replace(/^["']|["']$/g, "").replace(/,$/, "");
+    if (!k) continue;
+    out[k] = v;
+  }
+  return { ok: true, obj: out };
+}
+
 export default function KycApiConfigEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -36,7 +84,10 @@ export default function KycApiConfigEdit() {
   const test = useTestKycApi();
 
   const [form, setForm] = useState<any>(null);
+  const [headerRows, setHeaderRows] = useState<HeaderRow[]>([]);
+  const [headersAdvanced, setHeadersAdvanced] = useState(false);
   const [headersText, setHeadersText] = useState("{}");
+  const [headersError, setHeadersError] = useState<string | null>(null);
   const [bodyText, setBodyText] = useState("{}");
   const [mappingText, setMappingText] = useState("{}");
   const [credValue, setCredValue] = useState("");
@@ -48,7 +99,16 @@ export default function KycApiConfigEdit() {
   useEffect(() => {
     if (provider) {
       setForm({ ...provider });
-      setHeadersText(jsonStr(provider.request_headers));
+      const hdrs = (provider.request_headers || {}) as Record<string, any>;
+      // Strip any Authorization header from extras (it's auto-added from credential)
+      const cleaned: Record<string, string> = {};
+      for (const [k, v] of Object.entries(hdrs)) {
+        if (k.toLowerCase() === "authorization") continue;
+        cleaned[k] = String(v ?? "");
+      }
+      setHeaderRows(objToRows(cleaned));
+      setHeadersText(jsonStr(cleaned));
+      setHeadersError(null);
       setBodyText(jsonStr(provider.request_body_template));
       setMappingText(jsonStr(provider.response_data_mapping));
     }
@@ -62,10 +122,36 @@ export default function KycApiConfigEdit() {
     return <div className="p-8 text-center text-muted-foreground">Loading…</div>;
   }
 
+  const addHeaderRow = () => setHeaderRows((r) => [...r, { key: "", value: "" }]);
+  const updateHeaderRow = (i: number, patch: Partial<HeaderRow>) =>
+    setHeaderRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const removeHeaderRow = (i: number) =>
+    setHeaderRows((rows) => rows.filter((_, idx) => idx !== i));
+
   const onSave = async () => {
-    let request_headers, request_body_template, response_data_mapping;
+    // Resolve headers from whichever editor is active
+    let request_headers: Record<string, string> = {};
+    if (headersAdvanced) {
+      const parsed = lenientHeaderParse(headersText);
+      if (parsed.ok === false) {
+        setHeadersError(parsed.error);
+        toast({ title: "Headers — couldn't parse", description: parsed.error, variant: "destructive" });
+        return;
+      }
+      // Strip Authorization (auto-added)
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed.obj)) {
+        if (k.toLowerCase() === "authorization") continue;
+        out[k] = v;
+      }
+      request_headers = out;
+      setHeadersError(null);
+    } else {
+      request_headers = rowsToObj(headerRows);
+    }
+
+    let request_body_template, response_data_mapping;
     try {
-      request_headers = JSON.parse(headersText || "{}");
       request_body_template = JSON.parse(bodyText || "{}");
       response_data_mapping = JSON.parse(mappingText || "{}");
     } catch (e: any) {
@@ -274,22 +360,136 @@ export default function KycApiConfigEdit() {
         </TabsContent>
 
         <TabsContent value="headers">
-          <Card><CardContent className="p-6 space-y-2">
-            <Label>Extra Request Headers (JSON)</Label>
-            <Textarea rows={10} className="font-mono text-xs" value={headersText} onChange={(e) => setHeadersText(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Authorization header is added automatically from the credential — only put extras here.</p>
+          <Card><CardContent className="p-6 space-y-4">
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                The <strong>Authorization</strong> header is added automatically from the credential
+                you set in the <strong>Authentication</strong> tab — do not paste it here.
+                Add only extras like <code>x-api-key</code> or <code>Accept</code>.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex items-center justify-between">
+              <Label>Extra Request Headers</Label>
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" variant="ghost" onClick={() => {
+                  // Sync between modes when toggling
+                  if (!headersAdvanced) {
+                    setHeadersText(jsonStr(rowsToObj(headerRows)));
+                  } else {
+                    const parsed = lenientHeaderParse(headersText);
+                    if (parsed.ok === true) {
+                      setHeaderRows(objToRows(parsed.obj));
+                      setHeadersError(null);
+                    } else {
+                      setHeadersError(parsed.error);
+                      toast({ title: "Cannot switch to simple view", description: parsed.error, variant: "destructive" });
+                      return;
+                    }
+                  }
+                  setHeadersAdvanced((v) => !v);
+                }}>
+                  {headersAdvanced ? "Simple editor" : "Advanced (JSON)"}
+                </Button>
+              </div>
+            </div>
+
+            {!headersAdvanced ? (
+              <div className="space-y-2">
+                {headerRows.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No extra headers. Click "Add header" to add one.</p>
+                )}
+                {headerRows.map((row, i) => {
+                  const isAuth = row.key.trim().toLowerCase() === "authorization";
+                  return (
+                    <div key={i} className="flex items-start gap-2">
+                      <Input
+                        placeholder="Header name (e.g. x-api-key)"
+                        value={row.key}
+                        onChange={(e) => updateHeaderRow(i, { key: e.target.value })}
+                        className={isAuth ? "border-destructive" : ""}
+                      />
+                      <Input
+                        placeholder="Header value"
+                        value={row.value}
+                        onChange={(e) => updateHeaderRow(i, { value: e.target.value })}
+                      />
+                      <Button type="button" size="icon" variant="ghost" onClick={() => removeHeaderRow(i)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {headerRows.some((r) => r.key.trim().toLowerCase() === "authorization") && (
+                  <p className="text-xs text-destructive">
+                    Authorization headers entered here are ignored — use the Authentication tab instead.
+                  </p>
+                )}
+                <Button type="button" size="sm" variant="outline" onClick={addHeaderRow}>
+                  <Plus className="h-4 w-4 mr-1" /> Add header
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Textarea
+                  rows={10}
+                  className="font-mono text-xs"
+                  value={headersText}
+                  onChange={(e) => {
+                    setHeadersText(e.target.value);
+                    const parsed = lenientHeaderParse(e.target.value);
+                    setHeadersError(parsed.ok === true ? null : parsed.error);
+                  }}
+                  placeholder='{ "x-api-key": "your-key" }'
+                />
+                {headersError ? (
+                  <p className="text-xs text-destructive">Invalid — {headersError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Accepts strict JSON or pasted <code>Header: value</code> lines.
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent></Card>
         </TabsContent>
 
         <TabsContent value="payload">
-          <Card><CardContent className="p-6 space-y-2">
-            <Label>Request Body Template (JSON)</Label>
-            <Textarea rows={10} className="font-mono text-xs" value={bodyText} onChange={(e) => setBodyText(e.target.value)}
-              disabled={form.request_mode === "multipart"} />
-            <p className="text-xs text-muted-foreground">
-              Use <code>{"{{placeholder}}"}</code> tokens — e.g. <code>{`{ "id_number": "{{gstin}}" }`}</code>.
-              For multipart OCR, the file is sent under field <code>{form.file_field_name || "file"}</code> instead of a body.
-            </p>
+          <Card><CardContent className="p-6 space-y-3">
+            {form.request_mode === "multipart" ? (
+              <>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    This is a <strong>multipart upload</strong> endpoint — no JSON body is needed.
+                    The vendor's uploaded document is forwarded automatically as form-data under the
+                    field <code>{form.file_field_name || "file"}</code>.
+                  </AlertDescription>
+                </Alert>
+                <Label className="text-xs text-muted-foreground">Request preview</Label>
+                <pre className="bg-muted p-3 rounded text-xs overflow-auto">
+{`POST ${form.base_url || ""}${form.endpoint_path || ""}
+${form.auth_header_name || "Authorization"}: ${form.auth_header_prefix || "Bearer"} ********
+Content-Type: multipart/form-data
+
+${form.file_field_name || "file"}: <vendor-uploaded document>`}
+                </pre>
+                <p className="text-xs text-muted-foreground">
+                  Vendor flow: the document uploaded on the registration form (e.g. GST Certificate)
+                  is sent here. The API's response is then mapped back to vendor form fields using
+                  the <strong>Response Mapping</strong> tab.
+                </p>
+              </>
+            ) : (
+              <>
+                <Label>Request Body Template (JSON)</Label>
+                <Textarea rows={10} className="font-mono text-xs" value={bodyText} onChange={(e) => setBodyText(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Use <code>{"{{placeholder}}"}</code> tokens — e.g. <code>{`{ "id_number": "{{gstin}}" }`}</code>.
+                </p>
+              </>
+            )}
           </CardContent></Card>
         </TabsContent>
 
@@ -316,6 +516,26 @@ export default function KycApiConfigEdit() {
                 Map output field → JSON path in the API response (dot notation), e.g. <code>{`{ "legalName": "data.legal_name" }`}</code>.
               </p>
             </div>
+            {(() => {
+              try {
+                const m = JSON.parse(mappingText || "{}");
+                const entries = Object.entries(m);
+                if (!entries.length) return null;
+                return (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label className="text-xs">How API response maps to vendor form fields</Label>
+                    <div className="rounded border divide-y text-xs">
+                      {entries.map(([field, path]) => (
+                        <div key={field} className="flex items-center justify-between px-3 py-2">
+                          <span className="font-medium">{field}</span>
+                          <code className="text-muted-foreground">{String(path)}</code>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
           </CardContent></Card>
         </TabsContent>
 

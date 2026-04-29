@@ -1,128 +1,107 @@
+# Fix KYC API Settings — Headers Save Error + GST OCR Payload Mapping
 
-## Goal
+## Problem 1 — "Invalid JSON" when saving Headers
 
-Make Vendor Registration → Compliance step actually call the **admin-configured** APIs in KYC API Settings (GST_OCR, PAN_OCR, MSME, BANK) instead of the current Lovable-AI Gemini OCR + simulated validators. Each tab's behaviour must match the spec:
+In your screenshot the Headers textarea contains:
 
-| Tab | Trigger | Pipeline |
-|---|---|---|
-| GST | "Yes" + upload GST certificate | `GST_OCR` provider → extract `gstin/legal_name/...` → display & save |
-| PAN | Upload PAN card (no Yes/No) | `PAN_OCR` provider → extract `pan_number/full_name/dob/...` → display & save |
-| MSME | "Yes" + upload Udyam certificate | `MSME` provider (configured as OCR multipart) → extract → save |
-| Bank | Upload cancelled cheque | `BANK_OCR` (new) → extract account+IFSC → `BANK` validation (penny-drop) → auto-fill verified bank fields |
+```
+{
+Content-Type:application/json,
+Authorization:Bearer eyJhbGci...
+}
+```
 
-Configuration lives in **KYC API Settings** with one provider row per category. Bearer token is stored once per provider in `api_credentials`. Already wired through `kyc-api-execute`.
+This is not valid JSON (keys/values aren't quoted, uses `,` between lines, includes trailing token). `JSON.parse` rejects it, so Save aborts with the toast you saw.
 
----
+Two issues compound this:
+1. There is **no friendly editor** — admins must hand-write JSON, which is error-prone.
+2. The `Authorization` header is **already added automatically** from the credential you save on the **Authentication** tab (`auth_header_name` + `auth_header_prefix` + the API token). Pasting it again here is wrong and will double up on the request.
+
+## Problem 2 — GST OCR Request Payload mapping
+
+For the GST OCR provider (Surepass `/api/v1/ocr/gst`), the API expects a **multipart/form-data** upload — the GST certificate file is sent under the field name `file`. There is **no JSON body** for OCR endpoints, so the "Request Payload" tab does not apply to it.
+
+How the vendor → API flow works today:
+1. Vendor opens GST tab → selects "Yes" for GST registered → switches to "Upload certificate".
+2. `OcrUploadAndVerify` captures the file and calls `useConfiguredKycApi.callProvider({ providerName: 'GST_OCR', file })`.
+3. The `kyc-api-execute` edge function looks up the `GST_OCR` provider, sees `request_mode = multipart`, builds a `FormData` with the file under `file_field_name` (default `file`), and POSTs to `base_url + endpoint_path`.
+4. Surepass returns JSON like `{ success: true, data: { gstin, legal_name, business_name, pan_number, ... } }`.
+5. The edge function applies `response_data_mapping` (e.g. `gstin → data.gstin`) to produce the normalized `data` object.
+6. `GstKycTab.handleOcrVerify` reads the extracted `gstin` + `legal_name`, copies the GSTIN into the form, runs a name-match against the vendor's "Legal Name", and marks the tab Verified/Failed.
+
+So for GST OCR you do **not** need a Request Payload — only:
+- **Basic**: Request Mode = `multipart`, File Field Name = `file`, Method = `POST`.
+- **Authentication**: Auth Type = `BEARER_TOKEN`, Header Name = `Authorization`, Prefix = `Bearer`, paste your Surepass token in **API Token / Credential**.
+- **Headers**: leave `{}` (or only add non-auth extras).
+- **Response Mapping**: already pre-filled by the template (gstin, legal_name, etc.).
 
 ## Plan
 
-### 1. Seed/repair the four provider templates and response mappings
+### 1. Make the Headers tab forgiving and self-correcting
+File: `src/pages/KycApiConfigEdit.tsx`
 
-Update `src/pages/KycApiSettings.tsx` `TEMPLATES` so each row matches the actual Surepass response shape:
+- Add a **Key/Value editor** (rows of two inputs + add/remove buttons) as the primary UI for headers. Keep the JSON textarea as an "Advanced" toggle for power users.
+- On save:
+  - Preferred path: serialise from the key/value rows — never throws.
+  - Advanced path: try `JSON.parse`; if it fails, attempt a **lenient parse** that accepts `Key: Value` lines (like a pasted HTTP headers block) and converts them to an object. Only show the toast when both fail.
+- Strip a manually-entered `Authorization` header before saving and show a small inline note: *"Authorization is added automatically from the credential — removed from extras."* This prevents the duplicate-auth bug.
+- Inline-validate as the admin types: show a green "Valid" / red "Invalid — line N" hint under the textarea instead of only at save time.
+- Pre-fill new providers with `{}` instead of leaving an empty textarea so the first save always succeeds.
 
-- **GST_OCR** (multipart, `file`) — `https://kyc-api.surepass.app/api/v1/ocr/gst`
-  - `response_success_path: success`, success value `true`
-  - mapping (matches the sample payload you posted):
-    - `gstin → data.gstin`
-    - `pan_number → data.pan_number`
-    - `legal_name → data.legal_name`
-    - `business_name → data.business_name`
-    - `address → data.address`
-    - `gst_status → data.gstin_status`
-    - `taxpayer_type → data.taxpayer_type`
-    - `registration_date → data.date_of_registration`
-    - `constitution_of_business → data.constitution_of_business`
+### 2. Clarify the Request Payload tab for OCR endpoints
+File: `src/pages/KycApiConfigEdit.tsx`
 
-- **PAN_OCR** (multipart, `file`) — `/api/v1/ocr/pan`
-  - mapping (handles the nested `ocr_fields[0].xxx.value` shape):
-    - `pan_number → data.ocr_fields.0.pan_number.value`
-    - `full_name → data.ocr_fields.0.full_name.value`
-    - `father_name → data.ocr_fields.0.father_name.value`
-    - `dob → data.ocr_fields.0.dob.value`
+- When `request_mode === "multipart"`, replace the textarea with an info card:
 
-- **MSME_OCR** (new — multipart, `file`) — `/api/v1/ocr/udyam` (or whichever OCR endpoint is used; admin can edit)
-  - mapping: `udyam_number, enterprise_name, enterprise_type, major_activity` from `data.*`
+  > *"This endpoint receives the uploaded file as multipart form-data under field `file`. No JSON body is needed. The vendor's uploaded GST certificate is forwarded automatically."*
 
-- **BANK_OCR** (new — multipart, `file`) — `/api/v1/ocr/cheque`
-  - mapping: `account_number, ifsc_code, bank_name, branch_name, account_holder_name` from `data.*`
+- Show the exact request shape that will be sent (read-only preview):
+  ```
+  POST {base_url}{endpoint_path}
+  Authorization: Bearer ********
+  Content-Type: multipart/form-data
+  file: <vendor-uploaded GST certificate>
+  ```
 
-- **BANK** (existing JSON validation) — `/api/v1/bank-verification/`
-  - body template: `{ "id_number": "{{account}}", "ifsc": "{{ifsc}}", "ifsc_details": true }`
-  - mapping: `name_at_bank → data.full_name`, `bank_name → data.ifsc_details.bank_name`, `branch_name → data.ifsc_details.branch`, `ifsc → data.ifsc`
+### 3. Add a small "How vendor data maps to this API" helper
+File: `src/pages/KycApiConfigEdit.tsx` (Response Mapping tab, for OCR providers only)
 
-`kyc-api-execute` already supports `getPath` with numeric indices (`split(".").reduce`) — I'll add explicit array index handling so paths like `data.ocr_fields.0.pan_number.value` resolve.
+Show a 2-column legend so admins understand the mapping isn't abstract:
 
-### 2. Extend `getPath` in `supabase/functions/kyc-api-execute/index.ts`
+| Form field on vendor screen | Comes from API path |
+|---|---|
+| GSTIN              | `data.gstin` |
+| Legal Name         | `data.legal_name` |
+| Business Name      | `data.business_name` |
+| PAN                | `data.pan_number` |
+| Status             | `data.gstin_status` |
+| Registration Date  | `data.date_of_registration` |
 
-Update the reducer so numeric segments index into arrays:
-```ts
-function getPath(obj, path) {
-  if (!path) return undefined;
-  return path.split(".").reduce((a, k) => {
-    if (a == null) return a;
-    const idx = /^\d+$/.test(k) ? Number(k) : k;
-    return a[idx];
-  }, obj);
-}
-```
-Also: when `response_success_path` is missing, fall back to `parsed.success === true` (Surepass convention).
+Built from `response_data_mapping` automatically — same legend works for PAN_OCR / MSME_OCR / BANK_OCR.
 
-### 3. New shared client hook: `useConfiguredKycApi`
+### 4. Tiny safety fix in the edge function
+File: `supabase/functions/kyc-api-execute/index.ts`
 
-`src/hooks/useConfiguredKycApi.tsx` — thin wrapper around `supabase.functions.invoke('kyc-api-execute', { body: { providerName, fileBase64, fileMimeType, input } })`. Returns `{ found, ok, message, data, raw }`.
+If, despite the UI guard, an admin still saves an `Authorization` key in `request_headers`, **let the credential-based one win** — currently the credential header overwrites it, which is correct, but assert this with a comment + small safeguard so future edits don't regress.
 
-This becomes the single entry point used by all four KYC tabs and the admin Live Test panel.
+## Technical notes
 
-### 4. Refactor each KYC tab to use configured providers
+- Lenient header parser handles three input shapes:
+  1. `{}` — valid JSON object (current behaviour).
+  2. Key/value rows from the new UI — always serialises cleanly.
+  3. Pasted `Header-Name: value` lines — split on first `:`, trim, build object.
+- The Headers payload column in the DB (`api_providers.request_headers`) stays a `jsonb` object — no schema change.
+- No edge-function deployment is required for the UX fixes (steps 1–3). Step 4 is a one-line safety comment + redeploy of `kyc-api-execute`.
 
-For OCR-driven tabs, replace the call to `useOcrExtraction` (which hits the Lovable AI Gemini function) with `useConfiguredKycApi`:
+## Files to change
 
-- **`GstKycTab.tsx`**: `OcrUploadAndVerify` callback now does **one** call → `kyc-api-execute({ providerName: 'GST_OCR', fileBase64, fileMimeType })`. The returned `data` already contains the verified GST record — no second `validate-gst` call needed. Show the result in `OcrComparisonCard` (single column, since OCR == validation here). Drop GSTIN to parent via `onGstinChange` and bubble `onVerifiedDetails` for downstream auto-fill.
-- **`PanKycTab.tsx`**: Same pattern with `PAN_OCR`. Use the mapped `pan_number` and `full_name` for display + name-match against `legalName`.
-- **`MsmeKycTab.tsx`**: Same pattern with `MSME_OCR` (when registered). Manual entry tab can stay but its "Verify" button also goes through the configured `MSME` JSON validation provider via `kyc-api-execute`.
-- **`BankKycTab.tsx`**: Two-step pipeline:
-  1. `kyc-api-execute({ providerName: 'BANK_OCR', fileBase64, fileMimeType })` → extracts `account_number` + `ifsc_code`.
-  2. `kyc-api-execute({ providerName: 'BANK', input: { account, ifsc } })` → penny-drop validation. Auto-fill `bankAccountNumber`, `ifscCode`, `bankName`, `branchName`, `accountHolderName` on success.
+- `src/pages/KycApiConfigEdit.tsx` — key/value headers editor, lenient parser, multipart payload info card, response-mapping legend.
+- `supabase/functions/kyc-api-execute/index.ts` — comment + guard ensuring credential auth header wins over any extras.
 
-Helper `OcrUploadAndVerify` keeps its current pipeline shape (OCR phase → verify phase → result), so the UX stays identical.
+## What you should do in the GST OCR config right now
 
-### 5. Refactor `OcrUploadAndVerify` to be provider-aware
-
-Add an optional `runOcr` prop — when provided, the component calls it instead of the built-in `useOcrExtraction`. Each tab passes a closure that uses `useConfiguredKycApi` with its own `providerName`. This keeps the file-upload UI and result panel reusable.
-
-### 6. Admin "Live Test" panel: no changes needed
-
-`KycLiveTestPanel` already mounts the same four KYC components, so once the components switch to configured providers, the admin test screen automatically exercises the live APIs end-to-end.
-
-### 7. Bearer token configuration
-
-In `src/pages/KycApiConfigEdit.tsx` (already exists) admins enter the Surepass bearer token under the credential field `API_TOKEN`. The execute function already injects it as `Authorization: Bearer <token>`.
-
-### 8. Edge function deploy
-
-Deploy `kyc-api-execute` after the `getPath` fix.
-
----
-
-## Files
-
-**Edited**
-- `src/pages/KycApiSettings.tsx` — corrected `TEMPLATES` (4 → 5 entries, refined mappings)
-- `src/components/vendor/kyc/OcrUploadAndVerify.tsx` — accept optional `runOcr`
-- `src/components/vendor/kyc/GstKycTab.tsx` — call `GST_OCR` provider; remove second validate-gst call
-- `src/components/vendor/kyc/PanKycTab.tsx` — call `PAN_OCR` provider
-- `src/components/vendor/kyc/MsmeKycTab.tsx` — call `MSME_OCR` (upload) and `MSME` (manual)
-- `src/components/vendor/kyc/BankKycTab.tsx` — chain `BANK_OCR` then `BANK`
-- `supabase/functions/kyc-api-execute/index.ts` — array-index `getPath`, default success on `parsed.success`
-
-**New**
-- `src/hooks/useConfiguredKycApi.tsx`
-
-**No changes**
-- `src/components/admin/KycLiveTestPanel.tsx`, `KycTabs.tsx` — automatically inherit new behaviour
-
----
-
-## After approval
-
-I'll also tell you exactly what to enter in **KYC API Settings** for each provider (Base URL, endpoint, file field name, bearer token field) so the live calls succeed on first try.
+1. Open the **Authentication** tab → set Auth Type `BEARER_TOKEN`, Header Name `Authorization`, Prefix `Bearer`, paste your Surepass token in **API Token / Credential**, Save.
+2. Open the **Headers** tab → clear the textarea down to just `{}` (the Authorization line you pasted is unnecessary and is what is breaking the save).
+3. Leave **Request Payload** as `{}` — GST OCR is multipart, the vendor's uploaded certificate is sent automatically as the `file` field.
+4. **Response Mapping** is pre-populated by the template; no change needed.
+5. Save — then test from the **Live Test** tab by uploading a sample GST certificate.
