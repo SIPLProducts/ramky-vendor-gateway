@@ -1,17 +1,14 @@
 import { useCallback, useState } from 'react';
 import { FieldValidationState } from '@/hooks/useFieldValidation';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { toastKycResult } from '@/lib/kycToast';
 
 /**
  * Lightweight verification state hook for the vendor registration KYC tabs.
  * Wraps `useConfiguredKycApi.callProvider` and exposes a state object that is
- * shape-compatible with `FieldValidationState`, so existing UI components
- * (ManualEntryAndVerify, VerifyButton, ValidationMessage) keep working.
- *
- * This intentionally bypasses the legacy `useFieldValidation` hook (which
- * called the hardcoded `validate-*` edge functions) so that every KYC call
- * from the registration form goes through the admin-configured providers in
- * "KYC & Validation API Settings".
+ * shape-compatible with `FieldValidationState`. Also fires a sonner toast
+ * showing the upstream `message_code` / `status_code` so it's obvious the
+ * call ran through the admin-configured provider (not Gemini OCR).
  */
 export function useProviderVerify() {
   const { callProvider } = useConfiguredKycApi();
@@ -22,9 +19,10 @@ export function useProviderVerify() {
   const verify = useCallback(
     async (params: {
       providerName: string;
+      /** Friendly label shown in the toast, e.g. "GST". Defaults to providerName. */
+      label?: string;
       input?: Record<string, any>;
       file?: File | null;
-      /** Optional post-processor; return { ok, message, data } to override the raw API result. */
       validate?: (data: Record<string, any>) => { ok: boolean; message: string; data?: Record<string, any> } | Promise<{ ok: boolean; message: string; data?: Record<string, any> }>;
     }) => {
       setState({ status: 'validating', message: null });
@@ -33,6 +31,9 @@ export function useProviderVerify() {
         input: params.input,
         file: params.file ?? undefined,
       });
+
+      const label = params.label || params.providerName;
+      toastKycResult(label, r);
 
       if (!r.found) {
         const msg = `${params.providerName} provider is not configured. Ask an admin to add it in KYC & Validation API Settings.`;
