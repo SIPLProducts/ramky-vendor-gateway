@@ -45,7 +45,9 @@ const FIELD_TYPES = [
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose }: Props) {
+const BUILTIN_OVERRIDE_MARK = '__builtin_override__';
+
+export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose, builtInMode, builtInDefaults }: Props) {
   const upsert = useUpsertFormField();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
