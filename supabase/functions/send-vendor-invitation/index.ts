@@ -15,6 +15,7 @@ interface InvitationEmailRequest {
   invitationId?: string;
   simulationMode?: boolean;
   frontendUrl?: string;
+  senderEmail?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
