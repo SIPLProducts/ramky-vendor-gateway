@@ -464,6 +464,11 @@ export default function FormBuilder() {
                 Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
+                {BUILT_IN_FIELDS_CATALOG[selectedStepKey] && (
+                  <Button size="sm" variant="outline" onClick={() => restoreBuiltInDefaults(selectedStepKey)}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore defaults
+                  </Button>
+                )}
                 <FieldTemplateActions
                   tenantId={effectiveTenantId}
                   stepKey={selectedStepKey}
