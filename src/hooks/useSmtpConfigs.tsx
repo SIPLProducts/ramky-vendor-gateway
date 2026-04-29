@@ -9,6 +9,7 @@ export interface SmtpConfig {
   encryption: "none" | "ssl" | "tls" | "starttls";
   smtp_username: string;
   from_name: string | null;
+  reply_to: string | null;
   is_active: boolean;
   has_password: boolean;
   created_at: string;
@@ -24,7 +25,20 @@ export interface SmtpConfigInput {
   smtp_username: string;
   app_password?: string;
   from_name?: string | null;
+  reply_to?: string | null;
   is_active?: boolean;
+}
+
+export interface SmtpInlineTest {
+  to: string;
+  smtp_host: string;
+  smtp_port: number;
+  encryption: "none" | "ssl" | "tls" | "starttls";
+  smtp_username: string;
+  app_password: string;
+  from_email: string;
+  from_name?: string | null;
+  reply_to?: string | null;
 }
 
 export function useSmtpConfigs() {
