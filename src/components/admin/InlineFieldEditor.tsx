@@ -36,7 +36,7 @@ const FIELD_TYPES = [
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, onClose }: Props) {
+export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, isBuiltIn = false, onClose }: Props) {
   const upsert = useUpsertFormField();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
