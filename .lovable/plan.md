@@ -1,40 +1,96 @@
-# Fix: Vendor Invitation "Company" dropdown only shows one tenant
+## Goal
 
-## Problem
+Today the Form Builder shows built-in tabs (Document Verification, Organization Profile, Address, Contact, Financial) as **locked** with an empty fields list. You want each built-in tab to **list all real fields** that the vendor sees in that tab, so admins can:
 
-In **Create Vendor Invitation** dialog (`/admin/invitations`), users like `suresh.mareddy@ramky.com` who are assigned to **5 companies** in User Management see only **one** company — and as a read-only field, not a dropdown.
+- See every field already in the vendor form (PAN, GSTIN, Legal Name, CEO Name, Bank IFSC, Registered Address, etc.).
+- Hide / remove a field they don't want to collect.
+- Re-add a removed field later (restore default).
+- Add brand-new custom fields below the built-in ones.
 
-### Root cause (verified in DB)
+This applies to all built-in tabs: Document Verification, Organization Profile, Address Information, Contact Details, Financial & Infrastructure.
 
-`suresh.mareddy@ramky.com` has role `vendor` and is assigned to 5 tenants in `user_tenants`. The current code in `src/pages/AdminInvitations.tsx`:
+## Approach
 
-1. Only renders a tenant **dropdown** when `userRole === 'sharvi_admin'`.
-2. For every other role, runs a query with `.limit(1).maybeSingle()` against `user_tenants` and renders the result as a **read-only label**.
+### 1. Build a catalog of built-in fields
 
-So even though Suresh has 5 assigned companies, the UI hard-codes the first one and gives no way to pick another.
+Create `src/lib/builtInFields.ts` exporting a typed list of every field currently hardcoded in the vendor step components, grouped by `step_key`. Each entry includes:
 
-## Fix
+- `field_name` (e.g. `gstin`, `ceoName`, `registeredAddress`)
+- `display_label`, `field_type`, `is_mandatory` (matching today's behavior)
+- `placeholder` / `help_text` where useful
+- `display_order` to preserve existing on-screen order
 
-Replace the single-tenant lookup with the multi-tenant list already maintained by `useTenantContext` (the same source the global tenant switcher in the header uses), and render a real dropdown whenever the user has more than one assigned company.
+Source of truth comes from the existing files:
 
-### Changes in `src/pages/AdminInvitations.tsx`
+- `DocumentVerificationStep.tsx` — GST registration toggle, GSTIN, Legal Name (GST), Trade Name, PAN Number, PAN Holder Name, MSME toggle, Udyam Number, Enterprise Name, Bank Account Number, IFSC, Bank Name, Branch, Account Holder Name + 4 file uploads.
+- `OrganizationStep.tsx` — Buyer Company, Legal Name, Trade Name, Industry Type, Organization Type, Ownership Type, Product Categories, State, Entity Type, Firm Reg #, PF, ESI, IEC, SWIFT/IBAN, Labour Permit, Memberships, Enlistments, Certifications, Operational Network.
+- `AddressStep.tsx` — Registered / Manufacturing / Branch address blocks (full set of `register('...')` names already inventoried).
+- `ContactStep.tsx` — CEO, Marketing, Production, Customer Service contacts (name / designation / phone / email).
+- `FinancialInfrastructureStep.tsx` — Turnover Y1-Y3, credit period, major customers, distributor, raw materials, machinery, power, water, DG, capacities, manpower, transport, product types, lead time, QHSE issues.
 
-1. **Remove** the `current-user-tenant` `useQuery` (the `.limit(1).maybeSingle()` block, lines ~81–97).
-2. **Import and use** `useTenantContext` to get `myTenants` (the full list of tenants the logged-in user belongs to) and `activeTenantId` (current header selection).
-3. Compute the list of tenants to offer in the dialog:
-   - `sharvi_admin` / `admin` super-admin: all tenants (`tenants` from `useTenants`) — unchanged behavior.
-   - Everyone else: `myTenants` from `useTenantContext` (all tenants they're assigned to).
-4. Default `selectedTenantId` when the dialog opens:
-   - Prefer the header's `activeTenantId` if it's in the allowed list.
-   - Else first entry of the allowed list.
-5. Render the **Company** field as a `Select` dropdown for **all** users when the allowed list has 2+ entries; render the existing read-only label only when there is exactly one tenant; keep the "No company assigned" message when the list is empty.
-6. `effectiveTenantId` becomes simply `selectedTenantId || null` (single source of truth across roles).
-7. Update the invitations list query (`vendor-invitations` queryKey + the client-side `tenant_id` filter) to use the chosen `selectedTenantId` instead of the removed `currentUserTenantId`, so the table filters consistently with the chosen company.
+### 2. Surface built-ins in the Form Builder UI
 
-### Files touched
+In `src/pages/FormBuilder.tsx` change the right-hand "Fields" pane so it shows:
 
-- `src/pages/AdminInvitations.tsx` — only file changed. No backend / migration / edge-function changes required (RLS already permits these inserts because Suresh is in `user_tenants` for each tenant).
+```text
+Fields (28)
+├─ [Built-in] GSTIN              text   Required   [Hide] [Restore]
+├─ [Built-in] Legal Name (GST)   text   Required   [Hide]
+├─ [Built-in] PAN Number         text   Required   [Hide]
+├─ ...
+├─ ─── Custom fields ───
+└─ Preferred Delivery Slot       select            [Edit] [Delete]
+```
 
-## Outcome
+For each built-in field row:
 
-Suresh (and any non-super-admin user assigned to multiple tenants) will see a working **Company** dropdown in the Create Vendor Invitation dialog listing all their assigned companies, defaulting to the one currently selected in the header tenant switcher.
+- Show a small **"Built-in"** badge (reuse existing `Badge`).
+- If the admin has not overridden it → show a **Remove** (eye-off) button. Clicking it inserts a row in `form_field_configs` with `is_visible = false` and a marker so we know it's a built-in override.
+- If a built-in is currently hidden → show a **Restore default** button that deletes that override row.
+- Allow editing of label / placeholder / required only (field_name and field_type stay locked for built-ins) by reusing `InlineFieldEditor` in a "built-in mode".
+
+Custom fields keep today's full Edit / Delete / drag-reorder behavior and are listed below the built-ins.
+
+The "Add Field" button still adds a new custom field appended to the bottom.
+
+### 3. Make the vendor form respect the overrides
+
+Add a tiny helper hook `useBuiltInFieldOverrides(tenantId, stepKey)` that returns a map `{ [field_name]: { is_visible, is_mandatory, display_label, placeholder } }` derived from `form_field_configs` rows whose `field_name` matches a known built-in.
+
+In each step component (`DocumentVerificationStep`, `OrganizationStep`, `AddressStep`, `ContactStep`, `FinancialInfrastructureStep`) wrap each rendered field with:
+
+```tsx
+const cfg = overrides['gstin'];
+if (cfg?.is_visible === false) return null;
+// otherwise render as today, optionally using cfg.display_label / cfg.is_mandatory
+```
+
+Validation schemas (`zod`) are tweaked so a hidden field becomes optional — we don't want zod to block submit on a field the admin removed.
+
+Custom fields configured by the admin continue to render through the existing `DynamicStep` mechanism on custom tabs; we are **not** changing how custom tabs work.
+
+### 4. Storage convention
+
+We piggy-back on the existing `form_field_configs` table (no schema change). Built-in overrides are normal rows where:
+
+- `step_name` = the built-in `step_key`
+- `field_name` matches the catalog entry
+- `default_value = '__builtin_override__'` acts as the marker so the UI can tell them apart from custom fields
+
+This keeps RLS, queries, and the existing hooks unchanged.
+
+## Files touched
+
+- **New:** `src/lib/builtInFields.ts` (catalog)
+- **New:** `src/hooks/useBuiltInFieldOverrides.tsx`
+- **Edit:** `src/pages/FormBuilder.tsx` (render built-ins + Hide/Restore actions)
+- **Edit:** `src/components/admin/InlineFieldEditor.tsx` (lock `field_name` / `field_type` when editing a built-in)
+- **Edit:** `DocumentVerificationStep.tsx`, `OrganizationStep.tsx`, `AddressStep.tsx`, `ContactStep.tsx`, `FinancialInfrastructureStep.tsx` (respect overrides; relax zod for hidden fields)
+
+## Out of scope
+
+- Reordering built-in fields against each other (they keep their natural order; only custom fields stay drag-reorderable).
+- Changing field types of built-ins (would break verification + DB columns).
+- Touching the `review` tab.
+
+Approve and I'll implement it.
