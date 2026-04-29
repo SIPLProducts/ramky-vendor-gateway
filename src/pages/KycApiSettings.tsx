@@ -8,8 +8,9 @@ import {
   Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
 } from "@/components/ui/table";
 import {
-  Activity, Plus, FileText, Trash2, Pencil, ScanLine, ShieldCheck,
+  Activity, Plus, FileText, Trash2, Pencil, ScanLine, ShieldCheck, FlaskConical,
 } from "lucide-react";
+import { KycLiveTestPanel } from "@/components/admin/KycLiveTestPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import {
