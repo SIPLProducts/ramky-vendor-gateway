@@ -24,20 +24,62 @@ import {
 const TEMPLATES: Array<{
   provider_name: string; display_name: string; category: "OCR" | "VALIDATION";
   base_url: string; endpoint_path: string; request_mode: string; file_field_name?: string;
-  request_body_template: any;
+  request_body_template: any; response_data_mapping?: Record<string, string>;
 }> = [
   { provider_name: "GST_OCR", display_name: "GST OCR", category: "OCR",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/ocr/gst",
-    request_mode: "multipart", file_field_name: "file", request_body_template: {} },
+    request_mode: "multipart", file_field_name: "file", request_body_template: {},
+    response_data_mapping: {
+      gstin: "data.gstin",
+      pan_number: "data.pan_number",
+      legal_name: "data.legal_name",
+      business_name: "data.business_name",
+      address: "data.address",
+      gst_status: "data.gstin_status",
+      taxpayer_type: "data.taxpayer_type",
+      registration_date: "data.date_of_registration",
+      constitution_of_business: "data.constitution_of_business",
+    } },
   { provider_name: "PAN_OCR", display_name: "PAN OCR", category: "OCR",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/ocr/pan",
-    request_mode: "multipart", file_field_name: "file", request_body_template: {} },
+    request_mode: "multipart", file_field_name: "file", request_body_template: {},
+    response_data_mapping: {
+      pan_number: "data.ocr_fields.0.pan_number.value",
+      full_name: "data.ocr_fields.0.full_name.value",
+      father_name: "data.ocr_fields.0.father_name.value",
+      dob: "data.ocr_fields.0.dob.value",
+    } },
+  { provider_name: "MSME_OCR", display_name: "MSME / Udyam OCR", category: "OCR",
+    base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/ocr/udyam",
+    request_mode: "multipart", file_field_name: "file", request_body_template: {},
+    response_data_mapping: {
+      udyam_number: "data.udyam_number",
+      enterprise_name: "data.enterprise_name",
+      enterprise_type: "data.enterprise_type",
+      major_activity: "data.major_activity",
+    } },
+  { provider_name: "BANK_OCR", display_name: "Cancelled Cheque OCR", category: "OCR",
+    base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/ocr/cheque",
+    request_mode: "multipart", file_field_name: "file", request_body_template: {},
+    response_data_mapping: {
+      account_number: "data.account_number",
+      ifsc_code: "data.ifsc_code",
+      bank_name: "data.bank_name",
+      branch_name: "data.branch_name",
+      account_holder_name: "data.account_holder_name",
+    } },
   { provider_name: "MSME", display_name: "MSME / Udyog Aadhaar", category: "VALIDATION",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/corporate/udyog-aadhaar",
     request_mode: "json", request_body_template: { id_number: "{{msme}}" } },
-  { provider_name: "BANK", display_name: "Bank Verification", category: "VALIDATION",
+  { provider_name: "BANK", display_name: "Bank Verification (Penny Drop)", category: "VALIDATION",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/bank-verification/",
-    request_mode: "json", request_body_template: { id_number: "{{account}}", ifsc: "{{ifsc}}", ifsc_details: true } },
+    request_mode: "json", request_body_template: { id_number: "{{account}}", ifsc: "{{ifsc}}", ifsc_details: true },
+    response_data_mapping: {
+      ifsc: "data.ifsc",
+      bank_name: "data.ifsc_details.bank_name",
+      branch_name: "data.ifsc_details.branch",
+      name_at_bank: "data.full_name",
+    } },
 ];
 
 export default function KycApiSettings() {
