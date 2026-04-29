@@ -74,8 +74,8 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         field_name: field.field_name,
         display_label: field.display_label,
         field_type: field.field_type,
-        placeholder: field.placeholder || '',
-        help_text: field.help_text || '',
+        placeholder: field.placeholder || builtInDefaults?.placeholder || '',
+        help_text: field.help_text || builtInDefaults?.help_text || '',
         default_value: field.default_value || '',
         is_mandatory: !!field.is_mandatory,
         is_visible: !!field.is_visible,
@@ -85,17 +85,24 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         display_order: field.display_order || 1,
         options: field.options || [],
       });
+      // Auto-open advanced when there's content worth showing
+      if (field.help_text || field.validation_regex || field.default_value) {
+        setShowAdvanced(true);
+      }
     } else if (builtInMode && builtInDefaults) {
       setForm({
         field_name: builtInDefaults.field_name,
         display_label: builtInDefaults.display_label,
         field_type: builtInDefaults.field_type,
-        placeholder: '', help_text: '', default_value: '',
+        placeholder: builtInDefaults.placeholder || '',
+        help_text: builtInDefaults.help_text || '',
+        default_value: '',
         is_mandatory: builtInDefaults.is_mandatory,
         is_visible: true, is_editable: true,
         validation_regex: '', validation_message: '',
         display_order: defaultOrder, options: [],
       });
+      if (builtInDefaults.help_text) setShowAdvanced(true);
     } else {
       setForm({
         field_name: '', display_label: '', field_type: 'text',
@@ -105,7 +112,21 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
         display_order: defaultOrder, options: [],
       });
     }
-  }, [field, defaultOrder, builtInMode, builtInDefaults]);
+    // Depend on PRIMITIVE values so a fresh `builtInDefaults` object literal
+    // on every render of the parent doesn't keep resetting the form (which
+    // would wipe whatever the admin is typing).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    field?.id,
+    defaultOrder,
+    builtInMode,
+    builtInDefaults?.field_name,
+    builtInDefaults?.display_label,
+    builtInDefaults?.field_type,
+    builtInDefaults?.is_mandatory,
+    builtInDefaults?.placeholder,
+    builtInDefaults?.help_text,
+  ]);
 
   const needsOptions = form.field_type === 'select' || form.field_type === 'multi-select';
 
