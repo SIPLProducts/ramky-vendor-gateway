@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -5,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Users, User, Briefcase, Headphones } from 'lucide-react';
 import { ContactDetails } from '@/types/vendor';
+import { useBuiltInFieldOverrides, isFieldVisible } from '@/hooks/useBuiltInFieldOverrides';
 
 const schema = z.object({
   ceoName: z.string().min(2, 'Name is required'),
@@ -29,15 +31,26 @@ const schema = z.object({
 
 interface ContactStepProps {
   data: ContactDetails;
+  tenantId?: string | null;
   onNext: (data: ContactDetails) => void;
   onBack: () => void;
 }
 
-export function ContactStep({ data, onNext }: ContactStepProps) {
-  const { register, handleSubmit, formState: { errors } } = useForm<ContactDetails>({
+export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
+  const overrides = useBuiltInFieldOverrides(tenantId, 'contact');
+  const show = (name: string) => isFieldVisible(overrides, name);
+
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<ContactDetails>({
     resolver: zodResolver(schema),
     defaultValues: data,
   });
+
+  // Required fields that the admin hid → seed a placeholder so zod passes
+  useEffect(() => {
+    if (!show('ceoName') && !data.ceoName) setValue('ceoName', 'N/A');
+    if (!show('ceoPhone') && !data.ceoPhone) setValue('ceoPhone', '0000000000');
+    if (!show('ceoEmail') && !data.ceoEmail) setValue('ceoEmail', 'na@example.com');
+  }, [overrides, setValue, data]);
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">
