@@ -18,6 +18,8 @@ interface OcrUploadAndVerifyProps {
   acceptedFileTypes?: string;
   currentFile?: File | null;
   onFileChange: (file: File | null) => void;
+  /** Optional custom OCR runner. When provided, replaces the built-in Lovable AI OCR. */
+  runOcr?: (file: File) => Promise<{ success: boolean; extracted?: Record<string, any>; error?: string }>;
   /** Run validation API after OCR. Return { ok, message, apiData } */
   onVerifyExtracted: (extracted: Record<string, any>) => Promise<{
     ok: boolean;
@@ -32,6 +34,8 @@ interface OcrUploadAndVerifyProps {
   /** Called once verification passes — parent should commit verified values to its form */
   onVerified: (verified: { extracted: Record<string, any>; apiData?: Record<string, any> }) => void;
   vendorId?: string;
+  /** When OCR result is the same as the validated record, skip the second "Verifying" phase. */
+  skipVerifyPhase?: boolean;
 }
 
 type Phase = 'idle' | 'ocr' | 'verifying' | 'passed' | 'failed';
