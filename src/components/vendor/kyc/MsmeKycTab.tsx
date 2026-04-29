@@ -5,8 +5,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Pencil, Upload } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
-import { useFieldValidation } from '@/hooks/useFieldValidation';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { useProviderVerify } from '@/hooks/useProviderVerify';
 
 interface MsmeKycTabProps {
   isMsmeRegistered: boolean;
@@ -23,18 +23,35 @@ interface MsmeKycTabProps {
 }
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
-  const { validationStates, validateMSME } = useFieldValidation(props.vendorId);
   const { callProvider } = useConfiguredKycApi();
+  const { state, verify } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
-  const state = validationStates.msme;
 
   if (props.onStatusChange) {
     props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
   }
 
   const handleManualVerify = async () => {
-    const ok = await validateMSME(props.msmeNumber, props.legalName);
-    if (ok) props.onVerifiedDetails?.(state.data || {});
+    const r = await verify({
+      providerName: 'MSME',
+      input: { msme: props.msmeNumber, id_number: props.msmeNumber },
+      validate: (data) => {
+        const apiName = String(data.enterprise_name || data.legal_name || '').trim();
+        if (props.legalName && apiName) {
+          const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+          const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+          if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+            return { ok: false, message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`, data };
+          }
+        }
+        const cat = String(data.enterprise_type || '').toLowerCase();
+        if (cat === 'micro' || cat === 'small' || cat === 'medium') {
+          props.onMsmeCategoryChange?.(cat as any);
+        }
+        return { ok: true, message: `MSME verified — ${apiName || props.msmeNumber}`, data };
+      },
+    });
+    if (r.ok) props.onVerifiedDetails?.(r.data || {});
   };
 
   const runMsmeOcr = async (file: File) => {
