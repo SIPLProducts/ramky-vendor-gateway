@@ -1,53 +1,40 @@
-# Fix: Show specific "You are not configured" error in Vendor Invitations toast
+# Fix: Vendor Invitation "Company" dropdown only shows one tenant
 
 ## Problem
 
-When a logged-in user (e.g. vidyasagar) without an active row in **Email Configuration** clicks **Send Email** (or **Create Invitation**) on `/admin/invitations`, the edge function `send-vendor-invitation` correctly returns:
+In **Create Vendor Invitation** dialog (`/admin/invitations`), users like `suresh.mareddy@ramky.com` who are assigned to **5 companies** in User Management see only **one** company — and as a read-only field, not a dropdown.
 
-```
-HTTP 400 { "error": "You are not configured in Email Configuration" }
-```
+### Root cause (verified in DB)
 
-But the UI shows a generic toast: **"Email Failed — Edge Function returned a non-2xx status code"**.
+`suresh.mareddy@ramky.com` has role `vendor` and is assigned to 5 tenants in `user_tenants`. The current code in `src/pages/AdminInvitations.tsx`:
 
-## Root Cause
+1. Only renders a tenant **dropdown** when `userRole === 'sharvi_admin'`.
+2. For every other role, runs a query with `.limit(1).maybeSingle()` against `user_tenants` and renders the result as a **read-only label**.
 
-`supabase.functions.invoke()` from the JS SDK treats any non-2xx response as an error: it sets `data = null` and `error = FunctionsHttpError` whose `.message` is the generic `"Edge Function returned a non-2xx status code"`. The actual JSON body (`{ error: "You are not configured..." }`) is on `error.context` (a `Response` object) and must be read with `await error.context.json()`.
-
-The current code in `src/pages/AdminInvitations.tsx` only inspects `data?.error` and `error.message`, so the specific message is never detected and the generic toast wins.
+So even though Suresh has 5 assigned companies, the UI hard-codes the first one and gives no way to pick another.
 
 ## Fix
 
-In `src/pages/AdminInvitations.tsx`, in **both** `createInvitation.mutationFn` and `sendEmailInvitation.mutationFn`, when `emailError`/`error` is present, parse the response body before falling back to the generic message:
+Replace the single-tenant lookup with the multi-tenant list already maintained by `useTenantContext` (the same source the global tenant switcher in the header uses), and render a real dropdown whenever the user has more than one assigned company.
 
-```ts
-let serverMsg = '';
-if (emailError) {
-  try {
-    const ctx: any = (emailError as any).context;
-    if (ctx && typeof ctx.json === 'function') {
-      const body = await ctx.json();
-      serverMsg = body?.error || '';
-    } else if (ctx && typeof ctx.text === 'function') {
-      const txt = await ctx.text();
-      try { serverMsg = JSON.parse(txt)?.error || txt; } catch { serverMsg = txt; }
-    }
-  } catch { /* ignore parse errors */ }
-}
+### Changes in `src/pages/AdminInvitations.tsx`
 
-const notConfiguredMsg = 'You are not configured in Email Configuration';
-if (serverMsg.includes(notConfiguredMsg) || (data as any)?.error?.includes?.(notConfiguredMsg)) {
-  // createInvitation: return { invitation, emailSent: false, notConfigured: true }
-  // sendEmailInvitation: throw new Error(notConfiguredMsg)
-}
-```
+1. **Remove** the `current-user-tenant` `useQuery` (the `.limit(1).maybeSingle()` block, lines ~81–97).
+2. **Import and use** `useTenantContext` to get `myTenants` (the full list of tenants the logged-in user belongs to) and `activeTenantId` (current header selection).
+3. Compute the list of tenants to offer in the dialog:
+   - `sharvi_admin` / `admin` super-admin: all tenants (`tenants` from `useTenants`) — unchanged behavior.
+   - Everyone else: `myTenants` from `useTenantContext` (all tenants they're assigned to).
+4. Default `selectedTenantId` when the dialog opens:
+   - Prefer the header's `activeTenantId` if it's in the allowed list.
+   - Else first entry of the allowed list.
+5. Render the **Company** field as a `Select` dropdown for **all** users when the allowed list has 2+ entries; render the existing read-only label only when there is exactly one tenant; keep the "No company assigned" message when the list is empty.
+6. `effectiveTenantId` becomes simply `selectedTenantId || null` (single source of truth across roles).
+7. Update the invitations list query (`vendor-invitations` queryKey + the client-side `tenant_id` filter) to use the chosen `selectedTenantId` instead of the removed `currentUserTenantId`, so the table filters consistently with the chosen company.
 
-Result:
-- **Create Invitation** flow: invitation row is still created, and the toast shows **"Email Not Configured — You are not configured in Email Configuration"** (existing onSuccess branch already handles this).
-- **Send Email** (resend) flow: the destructive toast shows **"Email Not Configured — You are not configured in Email Configuration"** (existing onError branch already handles `isNotConfigured`).
+### Files touched
 
-No edge function changes — the backend already returns the correct payload. No schema changes.
+- `src/pages/AdminInvitations.tsx` — only file changed. No backend / migration / edge-function changes required (RLS already permits these inserts because Suresh is in `user_tenants` for each tenant).
 
-## Files Changed
+## Outcome
 
-- `src/pages/AdminInvitations.tsx` — parse `error.context` JSON body in both mutations so the "not configured" message is detected and surfaced in the toast.
+Suresh (and any non-super-admin user assigned to multiple tenants) will see a working **Company** dropdown in the Create Vendor Invitation dialog listing all their assigned companies, defaulting to the one currently selected in the header tenant switcher.
