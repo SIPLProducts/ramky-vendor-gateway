@@ -87,9 +87,9 @@ function SortableTab({
 
 // ---------- Sortable Field Row ----------
 function SortableField({
-  field, isEditing, onEdit, onDelete,
+  field, isEditing, isBuiltIn, onEdit, onDelete,
 }: {
-  field: FormFieldConfig; isEditing: boolean;
+  field: FormFieldConfig; isEditing: boolean; isBuiltIn: boolean;
   onEdit: () => void; onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
@@ -115,6 +115,7 @@ function SortableField({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium truncate">{field.display_label}</span>
             <Badge variant="outline" className="text-[10px]">{field.field_type}</Badge>
+            {isBuiltIn && <Badge variant="secondary" className="text-[10px]">Built-in</Badge>}
             {field.is_mandatory && <Badge className="text-[10px]">Required</Badge>}
             {!field.is_visible && (
               <Badge variant="secondary" className="text-[10px] gap-1">
