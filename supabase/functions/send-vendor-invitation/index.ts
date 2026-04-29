@@ -273,11 +273,37 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Real email sending - delegate to send-smtp-email which has the working SMTP logic
-    console.log("Sending invitation email to:", email);
+    // Real email sending - look up logged-in user's SMTP config
+    console.log("Sending invitation email to:", email, "from:", senderEmail);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    if (!senderEmail) {
+      return new Response(
+        JSON.stringify({ error: "You are not configured in Email Configuration" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
+    const adminClient = createClient(supabaseUrl, serviceKey);
+    const { data: smtpCfg, error: smtpCfgErr } = await adminClient
+      .from("smtp_email_configs")
+      .select("smtp_host, smtp_port, encryption, smtp_username, app_password, user_email, from_name, reply_to, is_active")
+      .ilike("user_email", senderEmail)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (smtpCfgErr) {
+      console.error("smtp_email_configs lookup error", smtpCfgErr);
+    }
+
+    if (!smtpCfg || !smtpCfg.app_password) {
+      return new Response(
+        JSON.stringify({ error: "You are not configured in Email Configuration" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
 
     const smtpResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
       method: "POST",
@@ -289,6 +315,16 @@ const handler = async (req: Request): Promise<Response> => {
         to: email,
         subject: `Vendor Registration Invitation - ${companyName}`,
         html: emailHtml,
+        smtp: {
+          host: smtpCfg.smtp_host,
+          port: smtpCfg.smtp_port,
+          encryption: smtpCfg.encryption,
+          username: smtpCfg.smtp_username,
+          password: smtpCfg.app_password,
+          from_email: smtpCfg.user_email,
+          from_name: smtpCfg.from_name ?? undefined,
+          reply_to: smtpCfg.reply_to ?? undefined,
+        },
       }),
     });
 
