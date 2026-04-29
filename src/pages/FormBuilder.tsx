@@ -717,6 +717,44 @@ export default function FormBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm dialog for removing verification-critical built-in fields */}
+      <AlertDialog
+        open={!!confirmRemoveBuiltIn}
+        onOpenChange={(open) => !open && setConfirmRemoveBuiltIn(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-amber-500" />
+              Hide verification field?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">
+                {confirmRemoveBuiltIn?.display_label}
+              </span>{' '}
+              powers verification (OCR / API lookups) for the{' '}
+              <span className="font-medium">{confirmRemoveBuiltIn?.group}</span> block.
+              Hiding it will disable that verification for vendors of this tenant.
+              You can restore it any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (confirmRemoveBuiltIn) {
+                  await toggleBuiltInVisibility(confirmRemoveBuiltIn, false);
+                }
+                setConfirmRemoveBuiltIn(null);
+              }}
+            >
+              Yes, hide field
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
