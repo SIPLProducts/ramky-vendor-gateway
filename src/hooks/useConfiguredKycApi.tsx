@@ -6,9 +6,18 @@ export interface KycApiResult {
   ok: boolean;
   message: string;
   status?: number;
+  /** Upstream provider's `status_code` field (falls back to HTTP status). */
+  status_code?: number;
+  /** Upstream provider's `success` boolean (falls back to ok). */
+  success?: boolean;
+  /** Upstream provider's `message_code` (e.g. "success"). */
+  message_code?: string | null;
   latency_ms?: number;
   data?: Record<string, any>;
   raw?: any;
+  provider_id?: string;
+  provider_name?: string;
+  endpoint_url?: string;
 }
 
 function fileToBase64(file: File): Promise<string> {

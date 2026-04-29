@@ -1,141 +1,64 @@
+# Verify KYC API source + surface `message_code` in toasts
 
 ## Goal
 
-Make the **KYC & Validation API Settings** screen the single source of truth for every KYC call (GST, PAN, MSME, Bank/Cheque) made from the **Vendor Registration** form. Disconnect the legacy hardcoded edge functions (`validate-gst`, `validate-pan`, `validate-msme`, `validate-bank`, `validate-penny-drop`, `ocr-extract`) from the registration KYC tabs so admins fully control endpoints, headers, payloads and response mapping from one place.
+Make it explicit (and visible to the vendor + admin) that GST / PAN / MSME / Bank verifications are running through the **KYC & Validation API Settings** providers — not the legacy Gemini 2.5 Flash OCR — and surface the API's `message_code` / `status_code` / `success` fields in toaster messages.
 
----
+## Current state (confirmed)
 
-## AS-IS (today)
-
-The vendor registration KYC tabs use a **mix of two pipelines** depending on which sub-action the user picks. This is the root cause of confusion.
-
-```text
-Vendor Registration → KYC Tabs
-│
-├── GST tab
-│   ├── "Enter manually" → useFieldValidation.validateGST()
-│   │                     → edge fn: validate-gst   ◄── HARDCODED, ignores admin settings
-│   └── "Upload certificate" → useConfiguredKycApi(GST_OCR)
-│                            → edge fn: kyc-api-execute  ◄── uses KYC API Settings ✅
-│
-├── PAN tab
-│   └── Upload PAN → useConfiguredKycApi(PAN_OCR)
-│                  → kyc-api-execute  ◄── uses KYC API Settings ✅
-│
-├── MSME tab
-│   ├── "Enter manually" → useFieldValidation.validateMSME()
-│   │                     → edge fn: validate-msme  ◄── HARDCODED
-│   └── "Upload certificate" → useConfiguredKycApi(MSME_OCR)
-│                            → kyc-api-execute  ◄── uses KYC API Settings ✅
-│
-└── Bank tab
-    └── Upload cheque → BANK_OCR (configured) + BANK penny-drop (configured)
-                       → kyc-api-execute  ◄── uses KYC API Settings ✅
-```
-
-Other places that still call the hardcoded validators (out of scope for the registration form, but noted for awareness):
-- `useVendorRegistration.tsx` (auto-validate on save)
-- `validation-orchestrator` edge function
-- `DocumentVerification.tsx`, `GstCompliance.tsx`, `PennyDropDemo.tsx`
-
-**Problem:** when an admin updates a Surepass URL/header/key in *KYC & Validation API Settings*, the **manual-entry** GST and MSME paths in registration **do not pick it up** — they still hit the hardcoded `validate-gst` / `validate-msme` edge functions with their own credentials/secrets. PAN and Bank are already clean.
-
----
-
-## TO-BE (target)
-
-Every KYC call originating from the vendor registration form goes through one funnel: `useConfiguredKycApi → kyc-api-execute → admin-configured provider`.
-
-```text
-Vendor Registration → KYC Tabs
-│
-├── GST tab (manual OR upload)  ─┐
-├── PAN tab (upload)              │   useConfiguredKycApi
-├── MSME tab (manual OR upload)   ├──►  (callProvider by name)
-└── Bank tab (upload cheque)     ─┘            │
-                                                ▼
-                                       supabase fn: kyc-api-execute
-                                                │
-                                                ▼
-                              ┌───────────────────────────────────┐
-                              │  KYC & Validation API Settings    │
-                              │  (admin-configured providers)     │
-                              │                                   │
-                              │  OCR:        GST_OCR, PAN_OCR,    │
-                              │              MSME_OCR, BANK_OCR   │
-                              │  Validation: GST, PAN, MSME, BANK │
-                              └───────────────────────────────────┘
-```
-
-Provider-name contract used by registration (must exist in KYC API Settings):
-
-| Tab  | Action          | Provider name | Mode      |
-|------|-----------------|---------------|-----------|
-| GST  | Manual verify   | `GST`         | json      |
-| GST  | Upload + verify | `GST_OCR`     | multipart |
-| PAN  | Upload + verify | `PAN_OCR`     | multipart |
-| MSME | Manual verify   | `MSME`        | json      |
-| MSME | Upload + verify | `MSME_OCR`    | multipart |
-| Bank | Cheque OCR      | `BANK_OCR`    | multipart |
-| Bank | Penny-drop      | `BANK`        | json      |
-
-If a provider is not configured or disabled, the tab shows a clear inline message:
-*"This verification is not configured. Ask your admin to add the **GST** provider in KYC & Validation API Settings."*
-
----
+- All four KYC tabs (`GstKycTab`, `PanKycTab`, `MsmeKycTab`, `BankKycTab`) already call `useConfiguredKycApi.callProvider(...)` → edge function `kyc-api-execute` → admin-configured provider row in `api_providers`.
+- `OcrUploadAndVerify` accepts a `runOcr` override; every tab now passes one, so the Gemini-based `useOcrExtraction` (`ocr-extract` edge function) is **never invoked** from the registration flow today.
+- `useOcrExtraction` is still imported inside `OcrUploadAndVerify` as a fallback path. It is dead code in this flow but creates ambiguity ("is Gemini still used?").
+- `kyc-api-execute` returns `{ found, ok, status, latency_ms, message, data, raw }` but **drops `message_code` / `status_code` / `success`** from the upstream response, so the UI can't display them.
+- No success/error toast is shown on verification — only an inline alert. The user has no toast confirming the source/result of the call.
 
 ## Changes
 
-### 1. Disconnect manual-entry GST from `validate-gst`
-File: `src/components/vendor/kyc/GstKycTab.tsx`
-- Remove `useFieldValidation` usage.
-- Replace `handleManualVerify` with a call to `callProvider({ providerName: 'GST', input: { gstin } })`.
-- Drive the local verify state from the result (idle/validating/passed/failed) instead of `validationStates.gst`.
-- Keep the existing name-match logic on the returned payload.
-- Add a `GST` template entry (json mode, `id_number: "{{gstin}}"`) in `KycApiSettings.tsx`.
+### 1. `supabase/functions/kyc-api-execute/index.ts`
+- Pass through provider identity + raw status flags so the client can prove the call came from the configured provider:
+  - Add `provider_name`, `provider_id`, `endpoint_url` to the response.
+  - Add `message_code` (read from `provider.response_message_code_path` if set, else fall back to `raw.message_code`).
+  - Always echo upstream `status_code` (from JSON body when present) and `success` (boolean) alongside the existing `status` (HTTP) and `ok` (computed).
 
-### 2. Disconnect manual-entry MSME from `validate-msme`
-File: `src/components/vendor/kyc/MsmeKycTab.tsx`
-- Same treatment as GST, using provider `MSME` (template already exists in KYC API Settings).
-- Remove `useFieldValidation` import and `validateMSME` call.
+### 2. `src/hooks/useConfiguredKycApi.tsx`
+- Extend `KycApiResult` with `provider_name?`, `message_code?`, `status_code?`, `success?`, `endpoint_url?` and forward them from the edge response.
 
-### 3. Add a small local state hook for manual verify
-New helper inside each tab (or a tiny shared `useProviderVerify`) so we no longer depend on `useFieldValidation` for the registration KYC tabs. Shape mirrors `FieldValidationState` so `ManualEntryAndVerify` keeps working unchanged.
+### 3. `src/hooks/useProviderVerify.tsx`
+- After a call, fire a toast (sonner) showing the source + outcome:
+  - Success: `toast.success("GST verified", { description: "via <provider_name> · message_code: success · 200" })`
+  - Not configured (`!found`): `toast.error("GST provider not configured", { description: "Configure it in KYC & Validation API Settings" })`
+  - Failure: `toast.error("GST verification failed", { description: "<message_code or message> · HTTP <status>" })`
+- Keep the existing `state` shape for inline UI.
 
-### 4. Add the missing `GST` validation template
-File: `src/pages/KycApiSettings.tsx` — add to `TEMPLATES`:
-```ts
-{ provider_name: "GST", display_name: "GSTIN Validation", category: "VALIDATION",
-  base_url: "https://kyc-api.surepass.app",
-  endpoint_path: "/api/v1/corporate/gstin",
-  request_mode: "json",
-  request_body_template: { id_number: "{{gstin}}" },
-  response_data_mapping: {
-    gstin: "data.gstin",
-    legal_name: "data.legal_name",
-    business_name: "data.business_name",
-    pan_number: "data.pan_number",
-    gst_status: "data.gstin_status",
-  } }
-```
+### 4. KYC tab OCR runners (`GstKycTab`, `PanKycTab`, `MsmeKycTab`, `BankKycTab`)
+- Wrap each `runOcr` / `callProvider` invocation to also fire a sonner toast on completion using the same pattern as `useProviderVerify`. This covers the OCR-only paths that don't go through `useProviderVerify`.
+- For Bank's penny-drop step inside `handleVerify`, also toast the BANK provider result.
 
-### 5. "Not configured" UX
-File: `src/components/vendor/kyc/OcrUploadAndVerify.tsx` and `ManualEntryAndVerify.tsx`
-- When `callProvider` returns `found: false`, surface a friendly inline alert with a deep-link button: *"Open KYC & Validation API Settings"* → `/admin/kyc-api-settings` (only shown to admins; otherwise plain message).
+### 5. `OcrUploadAndVerify` — remove Gemini fallback
+- Drop the `useOcrExtraction` import + the `runOcr ?? extractFromFile(...)` branch.
+- Make `runOcr` a **required** prop. If a caller ever forgets it, fail with a clear "OCR provider not configured" alert instead of silently calling Gemini.
+- This guarantees no path in the registration flow can fall back to `google/gemini-2.5-flash`.
 
-### 6. Out of scope (kept as-is for now)
-The following still call the legacy edge functions because they belong to other screens, not the vendor registration form:
-- `useVendorRegistration.tsx` server-side re-validation on save
-- `validation-orchestrator`, `DocumentVerification.tsx`, `GstCompliance.tsx`, `PennyDropDemo.tsx`
+### 6. Admin visibility (small QoL)
+- In `OcrUploadAndVerify`'s success alert, append `via <provider_name>` (passed back from the runner) so admins testing the flow can see at a glance which configured provider answered.
 
-We will **not** delete the `validate-gst / validate-pan / validate-msme / validate-bank / validate-penny-drop / ocr-extract` edge functions in this change, so those other screens keep working. They simply stop being called from the vendor registration KYC tabs.
+## Out of scope
 
----
+- The legacy `ocr-extract` edge function and `useOcrExtraction` hook stay in the repo (other screens like `KycLiveTestPanel` may still use them). Only the **vendor registration KYC path** is hard-wired to configured providers.
 
-## Verification checklist after implementation
+## Files
 
-1. KYC API Settings → add **GST** (Validation) and confirm GST_OCR, PAN_OCR, MSME_OCR, MSME, BANK_OCR, BANK are present.
-2. Vendor Registration → GST tab → "Enter manually" → click Verify → network shows `kyc-api-execute` (not `validate-gst`).
-3. Same check for MSME manual entry.
-4. Disable the `GST` provider in settings → manual verify in registration shows the friendly "not configured" alert.
-5. PAN and Bank tabs continue to work unchanged.
+- edit `supabase/functions/kyc-api-execute/index.ts`
+- edit `src/hooks/useConfiguredKycApi.tsx`
+- edit `src/hooks/useProviderVerify.tsx`
+- edit `src/components/vendor/kyc/OcrUploadAndVerify.tsx`
+- edit `src/components/vendor/kyc/GstKycTab.tsx`
+- edit `src/components/vendor/kyc/PanKycTab.tsx`
+- edit `src/components/vendor/kyc/MsmeKycTab.tsx`
+- edit `src/components/vendor/kyc/BankKycTab.tsx`
+
+## How you'll verify after approval
+
+1. Trigger GST upload — toast shows `message_code: success` and `via GST_OCR (Surepass)`; Network tab shows POST to `kyc-api-execute`, **not** `ocr-extract`.
+2. Disable the GST_OCR provider in KYC & Validation API Settings → re-upload → toast says "provider not configured" (no Gemini fallback).
+3. Repeat for PAN / MSME / Bank.
