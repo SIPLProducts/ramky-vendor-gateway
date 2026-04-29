@@ -1,64 +1,80 @@
 ## Goal
-When a user clicks **Sync** on the SAP Sync screen, the app should call the new **RAMKY VMS – Create Business Partner** API documented in the PDF, using the full lowercase-keyed payload and the new credentials, then show success/failure based on the response.
 
-## What changes
+The SAP Business Partner API (`http://10.200.1.2:8000/...`) lives on a **private network** and cannot be reached directly from Lovable Cloud Edge Functions (which run on the public internet). We'll add a small **middleware service** the customer hosts inside their own network. It receives requests from the Edge Function over HTTPS, forwards them to SAP, and returns SAP's response unchanged.
 
-### 1. SAP endpoint + credentials (secrets, not hardcoded)
-The PDF gives:
-- URL: `http://10.200.1.2:8000/vendor/bp/create?sap-client=300`
-- User: `22000208`, Password: `Nani@1432`
-- Method: `POST`, Basic Auth
+```text
+Browser ──► Edge Function (sync-vendor-to-sap)
+                │  HTTPS + shared secret
+                ▼
+        Middleware (Node.js / Express)   ← runs inside Ramky network
+                │  HTTP + Basic Auth
+                ▼
+        SAP S/4HANA  10.200.1.2:8000
+```
 
-Because the URL is an **internal IP** and credentials may change, store them as Lovable Cloud secrets instead of hardcoding:
-- `SAP_BP_API_URL`
-- `SAP_BP_USERNAME`
-- `SAP_BP_PASSWORD`
+## What we'll add
 
-We will request these via the secret tool. (If you want, we can pre-seed them with the PDF values.)
+### 1. `middleware/` folder in the repo (not deployed by Lovable — for the customer to host)
 
-> Note: `10.200.1.2` is a private IP. Edge Functions run on the public internet and won't be able to reach it unless the SAP host is exposed publicly or via a tunnel/proxy (e.g. the existing middleware/Cloudflare Worker mentioned in the codebase). We'll keep the URL configurable so you can point it at a public/proxy URL when ready. Sync will return a clear network error if the host isn't reachable.
+Files:
 
-### 2. Rewrite the edge function `sync-vendor-to-sap`
-Replace the current implementation (which uses old uppercase keys, hardcoded URL/creds and company code 1710) with the new mapping:
+- `middleware/package.json` — Express, node-fetch, dotenv, helmet, morgan.
+- `middleware/server.js` — the proxy.
+- `middleware/.env.example` — template for SAP creds + shared secret.
+- `middleware/Dockerfile` — so it can be deployed to any Docker host inside the Ramky network.
+- `middleware/README.md` — install / run / deploy / troubleshooting instructions.
 
-- Read vendor + bank details from the database.
-- Build a **single-element JSON array** with all lowercase keys exactly as in the PDF (`bpartner`, `partn_cat`, `partn_grp`, `name1`…`taxkd07`).
-- Apply the field-length truncations from the PDF spec table (e.g. `name1`/`name2` ≤ 40, `street` ≤ 60, `taxnumxl` ≤ 20, `bank_acct` ≤ 18, etc.).
-- Map vendor data:
-  - `name1` ← `legal_name`, `name2` ← `trade_name`, `sterm1` ← `legal_name`, `sterm2` ← first word of trade name
-  - `street`, `str_suppl1`, `str_suppl2`, `city`, `postl_cod1`, `country`="IN", `region` ← state→SAP region code (reuse existing map; default fallback)
-  - `mob_number` ← `primary_phone`, `tel_number` ← `registered_phone`, `smtp_addr` ← `primary_email`
-  - `taxtype`="IN3", `taxnumxl` ← `gstin`
-  - `bankdetailid`="0001", `bank_ctry`="IN", `bank_key` ← IFSC (or blank if not derivable), `bank_acct` ← `account_number`, `accountholder` ← `legal_name`
-  - `bukrs`="1000", `akont`="155000005", `zuawa`="014", `cdi`="X", `fdgrv`="A1"
-  - `msme` ← "MIC" if MSME provided else blank
-  - `j_1ipanno` ← `pan`
-  - `vkorg`="1000", `waers`="INR", `kalsk`="L1", `webre`="X", `lebre`="X"
-  - `partn_cat`="2", `partn_grp`="ZDOM", `langu`="EN"
-  - All other fields default to empty strings (per PDF sample).
-- POST as JSON array, with `Authorization: Basic base64(user:pass)` and `Content-Type: application/json`.
-- Parse the response array. Treat as **success** when any item has `MSGTYP==="S"` and `MSG` contains "Business Partner Created". Pull `BP_LIFNR` as the SAP vendor code.
-- On success: update `vendors` row with `sap_vendor_code`, `sap_synced_at = now()`, `status = 'sap_synced'`, then return `{ success:true, sapVendorCode, sapResponse, message }`.
-- On failure (HTTP error, `MSGTYP==="E"`, or unreachable host): return `{ success:false, message, sapResponse? }` with HTTP 200 so the client can render the error nicely.
-- Log full request/response to function logs for debugging.
+### 2. Endpoints exposed by the middleware
 
-### 3. Frontend (SAP Sync screen)
-No structural changes needed — `useSAPSync` already calls `sync-vendor-to-sap` and the screen already shows the result dialog. We will:
-- Make sure the result dialog correctly renders the new response shape (it already iterates `sapResponse[]` showing `MSGTYP`, `MSG`, `BP_LIFNR`).
-- Show the failure message when `success:false` (currently it just throws — we'll surface the SAP error message in a toast and still open the result dialog so you can see the SAP message like `"No Bank Key Available"`).
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`  | `/health` | Liveness check (returns `{ ok: true }`) |
+| `POST` | `/sap/bp/create` | Forwards JSON body to SAP `vendor/bp/create`, returns SAP JSON unchanged |
+| `POST` | `/sap/proxy` | Generic forwarder (body: `{ url, method, headers, body }`) for future SAP APIs |
 
-### 4. Audit log
-Keep the existing `audit_logs` insert with `action: 'sap_sync'` and the SAP response payload.
+Middleware behavior:
+
+- Requires header `x-middleware-key: <MIDDLEWARE_SHARED_SECRET>` on every non-health request. Rejects with 401 otherwise.
+- Reads `SAP_BP_API_URL`, `SAP_BP_USERNAME`, `SAP_BP_PASSWORD` from its own `.env` (so the SAP password never leaves Ramky's network).
+- Adds `Authorization: Basic base64(user:pass)` and forwards body as-is.
+- 30s timeout, logs request/response (with password redacted), returns SAP status + body verbatim.
+- CORS locked down (only allows the Edge Function host + localhost for testing).
+- Self-signed TLS support (so the Edge Function can call `https://...` directly), or it can sit behind nginx/Caddy.
+
+### 3. Update the Edge Function `sync-vendor-to-sap`
+
+- Add 2 new optional secrets: `SAP_MIDDLEWARE_URL` and `SAP_MIDDLEWARE_KEY`.
+- If `SAP_MIDDLEWARE_URL` is set, the function POSTs the existing payload to `${SAP_MIDDLEWARE_URL}/sap/bp/create` with header `x-middleware-key` instead of calling SAP directly.
+- If not set, falls back to today's behavior (direct call to `SAP_BP_API_URL`) — so nothing breaks until the middleware is deployed.
+- Response parsing stays identical (still expects the SAP JSON array with `MSGTYP` / `BP_LIFNR`).
+
+### 4. Tiny UI hint on **SAP API Settings** screen
+
+Add a one-line note in the existing `SapConnectivityGuide` component pointing to the new `middleware/README.md` so admins know the recommended deployment path.
+
+## Files to add / change
+
+- **add** `middleware/package.json`
+- **add** `middleware/server.js`
+- **add** `middleware/.env.example`
+- **add** `middleware/Dockerfile`
+- **add** `middleware/README.md`
+- **edit** `supabase/functions/sync-vendor-to-sap/index.ts` (route through middleware when configured)
+- **edit** `src/components/sap/SapConnectivityGuide.tsx` (link to middleware README)
+
+## Secrets to request after approval
+
+- `SAP_MIDDLEWARE_URL` — public HTTPS URL of the middleware (e.g. `https://sap-proxy.ramky.com`)
+- `SAP_MIDDLEWARE_KEY` — shared secret matching the middleware's `MIDDLEWARE_SHARED_SECRET`
+
+(Existing `SAP_BP_API_URL` / `SAP_BP_USERNAME` / `SAP_BP_PASSWORD` move into the middleware's own `.env` and can be removed from Lovable Cloud once cutover is done.)
 
 ## Out of scope
-- No DB migrations (vendor table already has `sap_vendor_code`, `sap_synced_at`, `status`).
-- No changes to the SAP API Settings screen (that remains a separate config tool).
-- No UI redesign of the SAP Sync page.
 
-## Files to change
-- `supabase/functions/sync-vendor-to-sap/index.ts` — rewrite payload + auth + URL from secrets.
-- `src/pages/SAPSync.tsx` — small tweak to show failure messages from the new response shape.
-- `src/hooks/useVendors.tsx` — small tweak so failures don't lose the `sapResponse` for the dialog.
+- Hosting/deploying the middleware itself (customer-managed, infra decision).
+- Changing the SAP payload mapping or the SAP Sync UI.
+- Database migrations.
 
 ## Open question
-Do you want me to use the PDF credentials/URL **as the secret defaults** (so it works immediately), or should I just create empty secrets and have you paste the values yourself?
+
+Do you want the middleware to also expose a generic `/sap/proxy` endpoint now (so future APIs like PO/Invoice can reuse it), or keep it strict to `/sap/bp/create` only for this iteration?
