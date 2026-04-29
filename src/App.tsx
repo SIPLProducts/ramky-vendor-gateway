@@ -82,6 +82,7 @@ const App = () => (
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
                 <Route path="/admin/form-builder" element={<FormBuilder />} />
                 <Route path="/admin/my-approvals" element={<MyApprovals />} />
+                <Route path="/admin/email-config" element={<EmailConfiguration />} />
               </Route>
             </Route>
 
