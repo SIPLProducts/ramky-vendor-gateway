@@ -8,8 +8,9 @@ import {
   Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
 } from "@/components/ui/table";
 import {
-  Activity, Plus, FileText, Trash2, Pencil, ScanLine, ShieldCheck,
+  Activity, Plus, FileText, Trash2, Pencil, ScanLine, ShieldCheck, FlaskConical,
 } from "lucide-react";
+import { KycLiveTestPanel } from "@/components/admin/KycLiveTestPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -46,7 +47,7 @@ export default function KycApiSettings() {
   const test = useTestKycApi();
   const create = useCreateKycApiProvider();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [tab, setTab] = useState<"OCR" | "VALIDATION">("OCR");
+  const [tab, setTab] = useState<"OCR" | "VALIDATION" | "TEST">("OCR");
 
   const filtered = (providers || []).filter((p) => p.category === tab);
 
@@ -97,93 +98,102 @@ export default function KycApiSettings() {
           <TabsList>
             <TabsTrigger value="OCR"><ScanLine className="h-4 w-4 mr-2" />OCR APIs</TabsTrigger>
             <TabsTrigger value="VALIDATION"><ShieldCheck className="h-4 w-4 mr-2" />Validation APIs</TabsTrigger>
+            <TabsTrigger value="TEST"><FlaskConical className="h-4 w-4 mr-2" />Live Test</TabsTrigger>
           </TabsList>
-          <div className="flex gap-2 flex-wrap">
-            {TEMPLATES.filter((t) => t.category === tab).map((t) => (
-              <Button key={t.provider_name} variant="outline" size="sm" onClick={() => addFromTemplate(t)}>
-                <Plus className="h-4 w-4 mr-1" />{t.display_name}
-              </Button>
-            ))}
-          </div>
+          {tab !== "TEST" && (
+            <div className="flex gap-2 flex-wrap">
+              {TEMPLATES.filter((t) => t.category === tab).map((t) => (
+                <Button key={t.provider_name} variant="outline" size="sm" onClick={() => addFromTemplate(t)}>
+                  <Plus className="h-4 w-4 mr-1" />{t.display_name}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <TabsContent value={tab} className="space-y-4">
-          <Card>
-            <CardContent className="p-0">
-              <div className="p-6 border-b">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold text-lg">
-                    {tab === "OCR" ? "OCR API Configurations" : "Validation API Configurations"}
-                  </h3>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {tab === "OCR"
-                    ? "Document OCR endpoints used to extract data from uploaded files."
-                    : "Identifier-based validation endpoints (GSTIN, PAN, MSME number, bank account)."}
-                </p>
-              </div>
-              {isLoading ? (
-                <div className="p-6 space-y-3">
-                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-                </div>
-              ) : !filtered.length ? (
-                <div className="p-12 text-center text-muted-foreground">
-                  No {tab === "OCR" ? "OCR" : "validation"} APIs yet. Use a template above to add one.
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Endpoint</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Mode</TableHead>
-                      <TableHead>Auth</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((c) => (
-                      <TableRow key={c.id} className="cursor-pointer"
-                        onClick={() => navigate(`/admin/kyc-api-settings/${c.id}`)}>
-                        <TableCell>
-                          <div className="font-semibold">{c.display_name}</div>
-                          <div className="text-xs text-muted-foreground">{c.provider_name}</div>
-                        </TableCell>
-                        <TableCell>
-                          <code className="text-xs bg-muted px-2 py-1 rounded block max-w-md truncate">
-                            {c.base_url}{c.endpoint_path}
-                          </code>
-                        </TableCell>
-                        <TableCell><Badge variant="secondary">{c.http_method}</Badge></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{c.request_mode}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{c.auth_type}</TableCell>
-                        <TableCell>
-                          <Badge variant={c.is_enabled ? "default" : "secondary"}>
-                            {c.is_enabled ? "Active" : "Disabled"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <Button size="sm" variant="ghost" onClick={() => handleTest(c.id)} disabled={test.isPending}>
-                            <Activity className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/kyc-api-settings/${c.id}`)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(c.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="TEST" className="space-y-4">
+          <KycLiveTestPanel />
         </TabsContent>
+
+        {(tab === "OCR" || tab === "VALIDATION") && (
+          <TabsContent value={tab} className="space-y-4">
+            <Card>
+              <CardContent className="p-0">
+                <div className="p-6 border-b">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-lg">
+                      {tab === "OCR" ? "OCR API Configurations" : "Validation API Configurations"}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {tab === "OCR"
+                      ? "Document OCR endpoints used to extract data from uploaded files."
+                      : "Identifier-based validation endpoints (GSTIN, PAN, MSME number, bank account)."}
+                  </p>
+                </div>
+                {isLoading ? (
+                  <div className="p-6 space-y-3">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+                  </div>
+                ) : !filtered.length ? (
+                  <div className="p-12 text-center text-muted-foreground">
+                    No {tab === "OCR" ? "OCR" : "validation"} APIs yet. Use a template above to add one.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Endpoint</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead>Auth</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((c) => (
+                        <TableRow key={c.id} className="cursor-pointer"
+                          onClick={() => navigate(`/admin/kyc-api-settings/${c.id}`)}>
+                          <TableCell>
+                            <div className="font-semibold">{c.display_name}</div>
+                            <div className="text-xs text-muted-foreground">{c.provider_name}</div>
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-xs bg-muted px-2 py-1 rounded block max-w-md truncate">
+                              {c.base_url}{c.endpoint_path}
+                            </code>
+                          </TableCell>
+                          <TableCell><Badge variant="secondary">{c.http_method}</Badge></TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{c.request_mode}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{c.auth_type}</TableCell>
+                          <TableCell>
+                            <Badge variant={c.is_enabled ? "default" : "secondary"}>
+                              {c.is_enabled ? "Active" : "Disabled"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <Button size="sm" variant="ghost" onClick={() => handleTest(c.id)} disabled={test.isPending}>
+                              <Activity className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/kyc-api-settings/${c.id}`)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(c.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(null)}>
