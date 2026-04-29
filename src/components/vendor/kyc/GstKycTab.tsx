@@ -76,7 +76,7 @@ export function GstKycTab(props: GstKycTabProps) {
       return { ok: false, message: 'Could not read a valid 15-character GSTIN from the certificate.' };
     }
     props.onGstinChange(extractedGstin);
-    resetValidation('gst');
+    reset();
 
     const apiName = String(extracted.legal_name || extracted.business_name || '').trim();
     if (props.legalName && apiName) {
