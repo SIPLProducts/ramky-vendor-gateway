@@ -10,7 +10,7 @@ import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
 import { useFieldValidation } from '@/hooks/useFieldValidation';
-import { supabase } from '@/integrations/supabase/client';
+import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 
 interface GstKycTabProps {
   isGstRegistered: boolean;
@@ -31,11 +31,11 @@ interface GstKycTabProps {
 
 export function GstKycTab(props: GstKycTabProps) {
   const { validationStates, validateGST, resetValidation } = useFieldValidation(props.vendorId);
+  const { callProvider } = useConfiguredKycApi();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
 
   const state = validationStates.gst;
 
-  // Bubble status to parent
   if (props.onStatusChange) {
     const status = !props.isGstRegistered
       ? (props.gstSelfDeclarationFile ? 'passed' : 'na')
@@ -48,48 +48,49 @@ export function GstKycTab(props: GstKycTabProps) {
     if (ok) props.onVerifiedDetails?.(state.data || {});
   };
 
+  // Run the admin-configured GST_OCR provider as the "OCR" step.
+  const runGstOcr = async (file: File) => {
+    const r = await callProvider({ providerName: 'GST_OCR', file });
+    if (!r.found) return { success: false, error: r.message || 'GST OCR provider not configured' };
+    if (!r.ok || !r.data) return { success: false, error: r.message || 'GST OCR failed' };
+    return { success: true, extracted: r.data };
+  };
+
+  // The Surepass GST OCR endpoint already returns the verified GST record,
+  // so the "verify" phase just runs the name-match check on the same payload.
   const handleOcrVerify = async (extracted: Record<string, any>) => {
-    const extractedGstin = (extracted.gstin || '').toUpperCase().trim();
+    const extractedGstin = String(extracted.gstin || '').toUpperCase().trim();
     if (!extractedGstin || extractedGstin.length !== 15) {
       return { ok: false, message: 'Could not read a valid 15-character GSTIN from the certificate.' };
     }
     props.onGstinChange(extractedGstin);
     resetValidation('gst');
-    try {
-      const { data, error } = await supabase.functions.invoke('validate-gst', {
-        body: { id_number: extractedGstin },
-      });
-      if (error) throw error;
-      if (!data?.success) {
-        return { ok: false, message: data?.message || 'GSTIN verification failed' };
+
+    const apiName = String(extracted.legal_name || extracted.business_name || '').trim();
+    if (props.legalName && apiName) {
+      const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+        return {
+          ok: false,
+          message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`,
+          apiData: extracted,
+        };
       }
-      const apiData = data.data || {};
-      // simple name check vs legalName
-      const apiName = (apiData.legal_name || apiData.trade_name || '').toString();
-      if (props.legalName && apiName) {
-        const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-        const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-        if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
-          return {
-            ok: false,
-            message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`,
-            apiData,
-          };
-        }
-      }
-      props.onVerifiedDetails?.(apiData);
-      return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin}`, apiData };
-    } catch (e: any) {
-      return { ok: false, message: e?.message || 'Verification service unavailable' };
     }
+    props.onVerifiedDetails?.(extracted);
+    return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin}`, apiData: extracted };
   };
 
-  const buildRows = (extracted: Record<string, any>, apiData?: Record<string, any>): ComparisonRow[] => [
-    { label: 'GSTIN', ocrValue: extracted.gstin, apiValue: apiData?.gstin },
-    { label: 'Legal Name', ocrValue: extracted.legal_name, apiValue: apiData?.legal_name },
-    { label: 'Trade Name', ocrValue: extracted.trade_name, apiValue: apiData?.trade_name },
-    { label: 'Status', ocrValue: extracted.gst_status, apiValue: apiData?.status },
-    { label: 'Address', ocrValue: extracted.principal_place_of_business, apiValue: apiData?.address },
+  const buildRows = (extracted: Record<string, any>): ComparisonRow[] => [
+    { label: 'GSTIN', ocrValue: extracted.gstin },
+    { label: 'Legal Name', ocrValue: extracted.legal_name },
+    { label: 'Business Name', ocrValue: extracted.business_name },
+    { label: 'PAN', ocrValue: extracted.pan_number },
+    { label: 'Status', ocrValue: extracted.gst_status },
+    { label: 'Taxpayer Type', ocrValue: extracted.taxpayer_type },
+    { label: 'Registration Date', ocrValue: extracted.registration_date },
+    { label: 'Address', ocrValue: extracted.address },
   ];
 
   return (
@@ -140,6 +141,8 @@ export function GstKycTab(props: GstKycTabProps) {
               fileLabel="GST Certificate *"
               currentFile={props.gstCertificateFile}
               onFileChange={props.onGstCertificateFileChange}
+              runOcr={runGstOcr}
+              skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
               buildComparisonRows={buildRows}
               onVerified={() => { /* state already updated via props */ }}
