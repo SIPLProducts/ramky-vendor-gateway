@@ -109,47 +109,53 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
         </div>
       </div>
 
-      <div className="form-section">
-        <h3 className="form-section-title"><Briefcase className="h-5 w-5 text-primary" />Marketing / Sales Contact</h3>
-        <div className="grid gap-5">
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5"><Label htmlFor="marketingName">Name</Label><Input id="marketingName" {...register('marketingName')} placeholder="Full name" /></div>
-            <div className="grid gap-1.5"><Label htmlFor="marketingDesignation">Designation</Label><Input id="marketingDesignation" {...register('marketingDesignation')} placeholder="Sales Manager" /></div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5"><Label htmlFor="marketingPhone">Contact Number</Label><Input id="marketingPhone" {...register('marketingPhone')} placeholder="+91 XXXXX XXXXX" /></div>
-            <div className="grid gap-1.5"><Label htmlFor="marketingEmail">Email Address</Label><Input id="marketingEmail" type="email" {...register('marketingEmail')} placeholder="email@company.com" /></div>
+      {(show('marketingName') || show('marketingDesignation') || show('marketingPhone') || show('marketingEmail')) && (
+        <div className="form-section">
+          <h3 className="form-section-title"><Briefcase className="h-5 w-5 text-primary" />Marketing / Sales Contact</h3>
+          <div className="grid gap-5">
+            <div className="grid md:grid-cols-2 gap-5">
+              {show('marketingName') && <div className="grid gap-1.5"><Label htmlFor="marketingName">Name</Label><Input id="marketingName" {...register('marketingName')} placeholder="Full name" /></div>}
+              {show('marketingDesignation') && <div className="grid gap-1.5"><Label htmlFor="marketingDesignation">Designation</Label><Input id="marketingDesignation" {...register('marketingDesignation')} placeholder="Sales Manager" /></div>}
+            </div>
+            <div className="grid md:grid-cols-2 gap-5">
+              {show('marketingPhone') && <div className="grid gap-1.5"><Label htmlFor="marketingPhone">Contact Number</Label><Input id="marketingPhone" {...register('marketingPhone')} placeholder="+91 XXXXX XXXXX" /></div>}
+              {show('marketingEmail') && <div className="grid gap-1.5"><Label htmlFor="marketingEmail">Email Address</Label><Input id="marketingEmail" type="email" {...register('marketingEmail')} placeholder="email@company.com" /></div>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="form-section">
-        <h3 className="form-section-title"><Users className="h-5 w-5 text-primary" />Production Contact</h3>
-        <div className="grid gap-5">
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5"><Label htmlFor="productionName">Name</Label><Input id="productionName" {...register('productionName')} placeholder="Full name" /></div>
-            <div className="grid gap-1.5"><Label htmlFor="productionDesignation">Designation</Label><Input id="productionDesignation" {...register('productionDesignation')} placeholder="Production Manager" /></div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5"><Label htmlFor="productionPhone">Contact Number</Label><Input id="productionPhone" {...register('productionPhone')} placeholder="+91 XXXXX XXXXX" /></div>
-            <div className="grid gap-1.5"><Label htmlFor="productionEmail">Email Address</Label><Input id="productionEmail" type="email" {...register('productionEmail')} placeholder="email@company.com" /></div>
+      {(show('productionName') || show('productionDesignation') || show('productionPhone') || show('productionEmail')) && (
+        <div className="form-section">
+          <h3 className="form-section-title"><Users className="h-5 w-5 text-primary" />Production Contact</h3>
+          <div className="grid gap-5">
+            <div className="grid md:grid-cols-2 gap-5">
+              {show('productionName') && <div className="grid gap-1.5"><Label htmlFor="productionName">Name</Label><Input id="productionName" {...register('productionName')} placeholder="Full name" /></div>}
+              {show('productionDesignation') && <div className="grid gap-1.5"><Label htmlFor="productionDesignation">Designation</Label><Input id="productionDesignation" {...register('productionDesignation')} placeholder="Production Manager" /></div>}
+            </div>
+            <div className="grid md:grid-cols-2 gap-5">
+              {show('productionPhone') && <div className="grid gap-1.5"><Label htmlFor="productionPhone">Contact Number</Label><Input id="productionPhone" {...register('productionPhone')} placeholder="+91 XXXXX XXXXX" /></div>}
+              {show('productionEmail') && <div className="grid gap-1.5"><Label htmlFor="productionEmail">Email Address</Label><Input id="productionEmail" type="email" {...register('productionEmail')} placeholder="email@company.com" /></div>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="form-section">
-        <h3 className="form-section-title"><Headphones className="h-5 w-5 text-primary" />Customer Service Contact</h3>
-        <div className="grid gap-5">
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5"><Label htmlFor="customerServiceName">Name</Label><Input id="customerServiceName" {...register('customerServiceName')} placeholder="Full name" /></div>
-            <div className="grid gap-1.5"><Label htmlFor="customerServiceDesignation">Designation</Label><Input id="customerServiceDesignation" {...register('customerServiceDesignation')} placeholder="Customer Service Head" /></div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5"><Label htmlFor="customerServicePhone">Contact Number</Label><Input id="customerServicePhone" {...register('customerServicePhone')} placeholder="+91 XXXXX XXXXX" /></div>
-            <div className="grid gap-1.5"><Label htmlFor="customerServiceEmail">Email Address</Label><Input id="customerServiceEmail" type="email" {...register('customerServiceEmail')} placeholder="email@company.com" /></div>
+      {(show('customerServiceName') || show('customerServiceDesignation') || show('customerServicePhone') || show('customerServiceEmail')) && (
+        <div className="form-section">
+          <h3 className="form-section-title"><Headphones className="h-5 w-5 text-primary" />Customer Service Contact</h3>
+          <div className="grid gap-5">
+            <div className="grid md:grid-cols-2 gap-5">
+              {show('customerServiceName') && <div className="grid gap-1.5"><Label htmlFor="customerServiceName">Name</Label><Input id="customerServiceName" {...register('customerServiceName')} placeholder="Full name" /></div>}
+              {show('customerServiceDesignation') && <div className="grid gap-1.5"><Label htmlFor="customerServiceDesignation">Designation</Label><Input id="customerServiceDesignation" {...register('customerServiceDesignation')} placeholder="Customer Service Head" /></div>}
+            </div>
+            <div className="grid md:grid-cols-2 gap-5">
+              {show('customerServicePhone') && <div className="grid gap-1.5"><Label htmlFor="customerServicePhone">Contact Number</Label><Input id="customerServicePhone" {...register('customerServicePhone')} placeholder="+91 XXXXX XXXXX" /></div>}
+              {show('customerServiceEmail') && <div className="grid gap-1.5"><Label htmlFor="customerServiceEmail">Email Address</Label><Input id="customerServiceEmail" type="email" {...register('customerServiceEmail')} placeholder="email@company.com" /></div>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </form>
   );
 }
