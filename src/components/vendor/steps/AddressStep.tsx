@@ -73,11 +73,12 @@ const schema = z.object({
 
 interface AddressStepProps {
   data: AddressDetails;
+  tenantId?: string | null;
   onNext: (data: AddressDetails) => void;
   onBack: () => void;
 }
 
-export function AddressStep({ data, onNext, onBack }: AddressStepProps) {
+export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: AddressStepProps) {
   const {
     register,
     handleSubmit,
