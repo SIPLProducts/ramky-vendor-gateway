@@ -980,6 +980,7 @@ export type Database = {
           from_name: string | null
           id: string
           is_active: boolean
+          reply_to: string | null
           smtp_host: string
           smtp_port: number
           smtp_username: string
@@ -994,6 +995,7 @@ export type Database = {
           from_name?: string | null
           id?: string
           is_active?: boolean
+          reply_to?: string | null
           smtp_host: string
           smtp_port?: number
           smtp_username: string
@@ -1008,6 +1010,7 @@ export type Database = {
           from_name?: string | null
           id?: string
           is_active?: boolean
+          reply_to?: string | null
           smtp_host?: string
           smtp_port?: number
           smtp_username?: string
@@ -2090,6 +2093,7 @@ export type Database = {
           has_password: boolean
           id: string
           is_active: boolean
+          reply_to: string
           smtp_host: string
           smtp_port: number
           smtp_username: string
