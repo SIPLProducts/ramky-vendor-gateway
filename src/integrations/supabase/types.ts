@@ -971,6 +971,51 @@ export type Database = {
           },
         ]
       }
+      smtp_email_configs: {
+        Row: {
+          app_password: string
+          created_at: string
+          created_by: string | null
+          encryption: string
+          from_name: string | null
+          id: string
+          is_active: boolean
+          smtp_host: string
+          smtp_port: number
+          smtp_username: string
+          updated_at: string
+          user_email: string
+        }
+        Insert: {
+          app_password: string
+          created_at?: string
+          created_by?: string | null
+          encryption?: string
+          from_name?: string | null
+          id?: string
+          is_active?: boolean
+          smtp_host: string
+          smtp_port?: number
+          smtp_username: string
+          updated_at?: string
+          user_email: string
+        }
+        Update: {
+          app_password?: string
+          created_at?: string
+          created_by?: string | null
+          encryption?: string
+          from_name?: string | null
+          id?: string
+          is_active?: boolean
+          smtp_host?: string
+          smtp_port?: number
+          smtp_username?: string
+          updated_at?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
       tenant_branding: {
         Row: {
           accent_color: string | null
@@ -2034,6 +2079,23 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      list_smtp_configs: {
+        Args: never
+        Returns: {
+          created_at: string
+          created_by: string
+          encryption: string
+          from_name: string
+          has_password: boolean
+          id: string
+          is_active: boolean
+          smtp_host: string
+          smtp_port: number
+          smtp_username: string
+          updated_at: string
+          user_email: string
+        }[]
       }
       record_invitation_access: {
         Args: { _token: string }
