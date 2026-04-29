@@ -127,9 +127,29 @@ serve(async (req) => {
       ? String(getPath(parsed, provider.response_message_path) ?? (ok ? "OK" : `HTTP ${resp.status}`))
       : (ok ? "OK" : `HTTP ${resp.status}`);
 
+    // Surface upstream provider identity + raw status flags so the client can
+    // prove the call came through the configured provider (not Gemini OCR).
+    const message_code = (provider as any).response_message_code_path
+      ? getPath(parsed, (provider as any).response_message_code_path)
+      : (parsed && typeof parsed === "object" ? parsed.message_code : undefined);
+    const upstream_status_code = parsed && typeof parsed === "object" ? parsed.status_code : undefined;
+    const upstream_success = parsed && typeof parsed === "object" ? parsed.success : undefined;
+
     return new Response(JSON.stringify({
-      found: true, valid: ok, ok, status: resp.status, latency_ms,
-      message, data, raw: parsed,
+      found: true,
+      valid: ok,
+      ok,
+      status: resp.status,
+      status_code: upstream_status_code ?? resp.status,
+      success: typeof upstream_success === "boolean" ? upstream_success : ok,
+      message_code: message_code ?? null,
+      latency_ms,
+      message,
+      data,
+      raw: parsed,
+      provider_id: provider.id,
+      provider_name: provider.provider_name,
+      endpoint_url: url,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("[kyc-api-execute]", e);
