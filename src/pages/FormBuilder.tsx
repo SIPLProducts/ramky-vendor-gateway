@@ -13,7 +13,9 @@ import {
   type FormStepConfig,
 } from '@/hooks/useFormBuilder';
 import { getBuiltInFields, BUILTIN_OVERRIDE_MARK, type BuiltInField } from '@/lib/builtInFields';
-import { RotateCcw } from 'lucide-react';
+import { getBuiltInFieldInfo } from '@/lib/builtInFieldInfo';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { RotateCcw, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
