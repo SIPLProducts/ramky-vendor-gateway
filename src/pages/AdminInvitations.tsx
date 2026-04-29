@@ -192,6 +192,12 @@ export default function AdminInvitations() {
           title: 'Invitation Sent',
           description: `Invitation email has been sent to ${result.invitation.email}`,
         });
+      } else if ((result as any).notConfigured) {
+        toast({
+          title: 'Email Not Configured',
+          description: 'You are not configured in Email Configuration',
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Invitation Created',
