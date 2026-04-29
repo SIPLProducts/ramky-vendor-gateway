@@ -58,10 +58,12 @@ export type Database = {
           auth_header_prefix: string | null
           auth_type: string | null
           base_url: string
+          category: string
           created_at: string | null
           display_name: string
           endpoint_path: string
           execution_order: number | null
+          file_field_name: string | null
           http_method: string | null
           id: string
           is_enabled: boolean | null
@@ -69,6 +71,7 @@ export type Database = {
           provider_name: string
           request_body_template: Json | null
           request_headers: Json | null
+          request_mode: string
           response_data_mapping: Json | null
           response_message_path: string | null
           response_success_path: string | null
@@ -86,10 +89,12 @@ export type Database = {
           auth_header_prefix?: string | null
           auth_type?: string | null
           base_url: string
+          category?: string
           created_at?: string | null
           display_name: string
           endpoint_path: string
           execution_order?: number | null
+          file_field_name?: string | null
           http_method?: string | null
           id?: string
           is_enabled?: boolean | null
@@ -97,6 +102,7 @@ export type Database = {
           provider_name: string
           request_body_template?: Json | null
           request_headers?: Json | null
+          request_mode?: string
           response_data_mapping?: Json | null
           response_message_path?: string | null
           response_success_path?: string | null
@@ -114,10 +120,12 @@ export type Database = {
           auth_header_prefix?: string | null
           auth_type?: string | null
           base_url?: string
+          category?: string
           created_at?: string | null
           display_name?: string
           endpoint_path?: string
           execution_order?: number | null
+          file_field_name?: string | null
           http_method?: string | null
           id?: string
           is_enabled?: boolean | null
@@ -125,6 +133,7 @@ export type Database = {
           provider_name?: string
           request_body_template?: Json | null
           request_headers?: Json | null
+          request_mode?: string
           response_data_mapping?: Json | null
           response_message_path?: string | null
           response_success_path?: string | null
