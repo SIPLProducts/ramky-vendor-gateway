@@ -239,8 +239,15 @@ export default function AdminInvitations() {
           tenantName: tenantName,
           simulationMode: false, // Real email sending
           frontendUrl: window.location.origin,
+          senderEmail: user?.email,
         },
       });
+
+      const notConfiguredMsg = 'You are not configured in Email Configuration';
+      const respErrMsg = (data as any)?.error || (error as any)?.message || '';
+      if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
+        throw new Error(notConfiguredMsg);
+      }
 
       if (error) {
         console.error('Edge function error:', error);
