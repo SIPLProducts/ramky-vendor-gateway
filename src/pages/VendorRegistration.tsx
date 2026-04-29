@@ -633,13 +633,13 @@ export default function VendorRegistration() {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
       case 2:
-        return <OrganizationStep data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} onNext={handleOrganizationComplete} />;
+        return <OrganizationStep tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} onNext={handleOrganizationComplete} />;
       case 3:
-        return <AddressStep data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
+        return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
-        return <ContactStep data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
+        return <ContactStep tenantId={tenantId} data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
       case 5:
-        return <FinancialInfrastructureStep financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
+        return <FinancialInfrastructureStep tenantId={tenantId} financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
     }
     // Last step is always Review
     if (currentStep === registrationSteps.length) {

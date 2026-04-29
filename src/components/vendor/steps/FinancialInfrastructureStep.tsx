@@ -65,11 +65,12 @@ interface FinancialInfrastructureStepProps {
   financialData: FinancialDetails;
   infrastructureData: InfrastructureDetails;
   qhseData: QHSEDetails;
+  tenantId?: string | null;
   onNext: (data: { financial: FinancialDetails; infrastructure: InfrastructureDetails; qhse: QHSEDetails }) => void;
   onBack: () => void;
 }
 
-export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, onNext }: FinancialInfrastructureStepProps) {
+export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, tenantId: _tenantId, onNext }: FinancialInfrastructureStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(financialData.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(financialData.financialDocsFile);
   

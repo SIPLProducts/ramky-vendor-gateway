@@ -8,9 +8,12 @@ import {
   useDeleteFormField,
   useReorderFormSteps,
   useReorderFormFields,
+  useUpsertFormField,
   BUILT_IN_STEPS,
   type FormStepConfig,
 } from '@/hooks/useFormBuilder';
+import { getBuiltInFields, BUILTIN_OVERRIDE_MARK, type BuiltInField } from '@/lib/builtInFields';
+import { RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -147,6 +150,7 @@ export default function FormBuilder() {
   const upsertStep = useUpsertFormStep();
   const deleteStep = useDeleteFormStep();
   const deleteField = useDeleteFormField();
+  const upsertField = useUpsertFormField();
   const reorderSteps = useReorderFormSteps();
   const reorderFields = useReorderFormFields();
 
@@ -174,10 +178,50 @@ export default function FormBuilder() {
   }, [allSteps, selectedStepKey]);
 
   const selectedStep = allSteps.find((s) => s.step_key === selectedStepKey);
+  // Custom fields = rows in form_field_configs that are NOT built-in overrides
   const fieldsForStep = useMemo(
-    () => allFields.filter((f) => f.step_name === selectedStepKey).sort((a, b) => a.display_order - b.display_order),
+    () =>
+      allFields
+        .filter((f) => f.step_name === selectedStepKey && f.default_value !== BUILTIN_OVERRIDE_MARK)
+        .sort((a, b) => a.display_order - b.display_order),
     [allFields, selectedStepKey],
   );
+
+  // Built-in field catalog for the selected tab + admin overrides on top
+  const builtInFields = getBuiltInFields(selectedStepKey);
+  const builtInOverrides = useMemo(() => {
+    const map: Record<string, typeof allFields[number]> = {};
+    for (const f of allFields) {
+      if (f.step_name !== selectedStepKey) continue;
+      if (f.default_value !== BUILTIN_OVERRIDE_MARK) continue;
+      map[f.field_name] = f;
+    }
+    return map;
+  }, [allFields, selectedStepKey]);
+
+  const toggleBuiltInVisibility = async (bf: BuiltInField, makeVisible: boolean) => {
+    if (!effectiveTenantId) return;
+    const existing = builtInOverrides[bf.field_name];
+    if (makeVisible) {
+      // Restore default = remove override row entirely
+      if (existing) await deleteField.mutateAsync(existing.id);
+      return;
+    }
+    // Hide: upsert a row with is_visible=false
+    await upsertField.mutateAsync({
+      id: existing?.id,
+      tenant_id: effectiveTenantId,
+      step_name: selectedStepKey,
+      field_name: bf.field_name,
+      display_label: bf.display_label,
+      field_type: bf.field_type,
+      is_visible: false,
+      is_mandatory: bf.is_mandatory,
+      is_editable: true,
+      display_order: 0,
+      default_value: BUILTIN_OVERRIDE_MARK,
+    });
+  };
 
   // Tab dialog state
   const [tabDialogOpen, setTabDialogOpen] = useState(false);
@@ -372,9 +416,94 @@ export default function FormBuilder() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* ---------- Built-in fields ---------- */}
+            {builtInFields.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold">
+                    Built-in Fields{' '}
+                    <span className="text-muted-foreground font-normal">({builtInFields.length})</span>
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    These ship with the vendor form. Hide a field to stop collecting it.
+                  </span>
+                </div>
+                <div className="border rounded-lg divide-y overflow-hidden">
+                  {(() => {
+                    let lastGroup: string | undefined;
+                    return builtInFields.map((bf) => {
+                      const override = builtInOverrides[bf.field_name];
+                      const hidden = override?.is_visible === false;
+                      const showHeader = bf.group && bf.group !== lastGroup;
+                      lastGroup = bf.group;
+                      return (
+                        <div key={bf.field_name}>
+                          {showHeader && (
+                            <div className="px-3 py-1.5 bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+                              {bf.group}
+                            </div>
+                          )}
+                          <div className={cn(
+                            'flex items-center justify-between gap-3 px-3 py-2.5 bg-background',
+                            hidden && 'opacity-60',
+                          )}>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium truncate">{bf.display_label}</span>
+                                <Badge variant="outline" className="text-[10px]">{bf.field_type}</Badge>
+                                <Badge variant="secondary" className="text-[10px]">Built-in</Badge>
+                                {bf.is_mandatory && !hidden && (
+                                  <Badge className="text-[10px]">Required</Badge>
+                                )}
+                                {bf.locked && (
+                                  <Badge variant="outline" className="text-[10px] gap-1">
+                                    <Lock className="h-2.5 w-2.5" /> Verification
+                                  </Badge>
+                                )}
+                                {hidden && (
+                                  <Badge variant="secondary" className="text-[10px] gap-1">
+                                    <EyeOff className="h-2.5 w-2.5" /> Hidden
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">{bf.field_name}</div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {hidden ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleBuiltInVisibility(bf, true)}
+                                  disabled={upsertField.isPending || deleteField.isPending}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  disabled={bf.locked || upsertField.isPending}
+                                  title={bf.locked ? 'This field powers verification and cannot be removed' : 'Remove from vendor form'}
+                                  onClick={() => toggleBuiltInVisibility(bf, false)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* ---------- Custom fields header + actions ---------- */}
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <h3 className="text-sm font-semibold">
-                Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
+                Custom Fields <span className="text-muted-foreground font-normal">({fieldsForStep.length})</span>
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
                 <FieldTemplateActions
@@ -402,12 +531,11 @@ export default function FormBuilder() {
             )}
 
             {fieldsForStep.length === 0 && editingFieldId !== 'new' ? (
-              <div className="border border-dashed rounded-lg p-10 text-center">
-                <p className="text-sm text-muted-foreground">No custom fields configured for this tab yet.</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {selectedStep?.is_built_in
-                    ? 'Built-in fields are managed in code; add tenant overrides here.'
-                    : 'Click "Add Field" above to start collecting data.'}
+              <div className="border border-dashed rounded-lg p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {builtInFields.length > 0
+                    ? 'No additional custom fields. Click "Add Field" to extend this tab.'
+                    : 'No fields configured yet. Click "Add Field" to start collecting data.'}
                 </p>
               </div>
             ) : fieldsForStep.length > 0 ? (
