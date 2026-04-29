@@ -178,10 +178,50 @@ export default function FormBuilder() {
   }, [allSteps, selectedStepKey]);
 
   const selectedStep = allSteps.find((s) => s.step_key === selectedStepKey);
+  // Custom fields = rows in form_field_configs that are NOT built-in overrides
   const fieldsForStep = useMemo(
-    () => allFields.filter((f) => f.step_name === selectedStepKey).sort((a, b) => a.display_order - b.display_order),
+    () =>
+      allFields
+        .filter((f) => f.step_name === selectedStepKey && f.default_value !== BUILTIN_OVERRIDE_MARK)
+        .sort((a, b) => a.display_order - b.display_order),
     [allFields, selectedStepKey],
   );
+
+  // Built-in field catalog for the selected tab + admin overrides on top
+  const builtInFields = getBuiltInFields(selectedStepKey);
+  const builtInOverrides = useMemo(() => {
+    const map: Record<string, typeof allFields[number]> = {};
+    for (const f of allFields) {
+      if (f.step_name !== selectedStepKey) continue;
+      if (f.default_value !== BUILTIN_OVERRIDE_MARK) continue;
+      map[f.field_name] = f;
+    }
+    return map;
+  }, [allFields, selectedStepKey]);
+
+  const toggleBuiltInVisibility = async (bf: BuiltInField, makeVisible: boolean) => {
+    if (!effectiveTenantId) return;
+    const existing = builtInOverrides[bf.field_name];
+    if (makeVisible) {
+      // Restore default = remove override row entirely
+      if (existing) await deleteField.mutateAsync(existing.id);
+      return;
+    }
+    // Hide: upsert a row with is_visible=false
+    await upsertField.mutateAsync({
+      id: existing?.id,
+      tenant_id: effectiveTenantId,
+      step_name: selectedStepKey,
+      field_name: bf.field_name,
+      display_label: bf.display_label,
+      field_type: bf.field_type,
+      is_visible: false,
+      is_mandatory: bf.is_mandatory,
+      is_editable: true,
+      display_order: 0,
+      default_value: BUILTIN_OVERRIDE_MARK,
+    });
+  };
 
   // Tab dialog state
   const [tabDialogOpen, setTabDialogOpen] = useState(false);
