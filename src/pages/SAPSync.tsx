@@ -87,8 +87,19 @@ export default function SAPSync() {
       setSapSyncResult(result.sapResponse);
       setSelectedVendor(vendor);
       setShowSapResultDialog(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('SAP sync failed:', error);
+      // Still surface SAP's response (error messages from S/4HANA) in the dialog
+      const fallbackResponse = error?.sapResponse ?? [
+        { MSGTYP: 'E', MSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
+      ];
+      setSapSyncResult({
+        success: false,
+        message: error?.message || 'SAP sync failed',
+        sapResponse: fallbackResponse,
+      });
+      setSelectedVendor(vendor);
+      setShowSapResultDialog(true);
     } finally {
       setSyncingVendorId(null);
     }
