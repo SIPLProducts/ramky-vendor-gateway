@@ -1,40 +1,79 @@
-# Fix: Vendor Invitation "Company" dropdown only shows one tenant
+# Show & manage built-in fields in Form Builder
 
 ## Problem
 
-In **Create Vendor Invitation** dialog (`/admin/invitations`), users like `suresh.mareddy@ramky.com` who are assigned to **5 companies** in User Management see only **one** company — and as a read-only field, not a dropdown.
+Today, when an admin clicks a built-in tab in **Form Builder** (Document Verification, Organization Profile, Address Information, Contact Details, Financial & Infrastructure, Review & Submit), the Fields list is empty. That's because these tabs render hardcoded JSX inside step components (`OrganizationStep.tsx`, `AddressStep.tsx`, `ContactStep.tsx`, `DocumentVerificationStep.tsx`, `FinancialInfrastructureStep.tsx`) — they were never registered as `form_field_configs` rows.
 
-### Root cause (verified in DB)
+The user wants every built-in tab to behave like a custom tab:
+- See the full list of existing fields when the tab is opened.
+- Toggle a field off (hide) or remove it from the vendor form entirely.
+- Add new fields under the same tab.
+- Keep all existing fields untouched if no changes are made.
 
-`suresh.mareddy@ramky.com` has role `vendor` and is assigned to 5 tenants in `user_tenants`. The current code in `src/pages/AdminInvitations.tsx`:
+## Solution overview
 
-1. Only renders a tenant **dropdown** when `userRole === 'sharvi_admin'`.
-2. For every other role, runs a query with `.limit(1).maybeSingle()` against `user_tenants` and renders the result as a **read-only label**.
+1. **Seed built-in fields per tenant** into `form_field_configs` so they appear in Form Builder exactly like custom fields.
+2. **Make the vendor form respect overrides** so hide/remove/required toggles in Form Builder actually take effect on the registration UI.
+3. Keep "Add Field" working as it already does — new admin fields render via existing `DynamicStep` logic appended below the built-in section of each tab.
 
-So even though Suresh has 5 assigned companies, the UI hard-codes the first one and gives no way to pick another.
+## Step-by-step plan
 
-## Fix
+### 1. Catalogue built-in fields (code-side reference)
 
-Replace the single-tenant lookup with the multi-tenant list already maintained by `useTenantContext` (the same source the global tenant switcher in the header uses), and render a real dropdown whenever the user has more than one assigned company.
+Build a single source of truth `BUILT_IN_FIELDS_CATALOG` (in `src/lib/builtInFields.ts`) that lists every hardcoded field per built-in `step_key`, with: `field_name`, `display_label`, `field_type`, `is_mandatory`, `display_order`. Mined from existing step files:
 
-### Changes in `src/pages/AdminInvitations.tsx`
+- `document_verification`: GST registered toggle, GSTIN, PAN, MSME toggle, Udyam Number, Bank Account No, IFSC, Bank Name, Cancelled Cheque, GST/PAN/MSME documents.
+- `organization`: Buyer Company, Legal Name, Trade Name, Industry Type, Organization Type, Ownership Type, Product Categories, State, Entity Type, Firm Reg No, PF Number, ESI Number, Labour Permit, IEC No, SWIFT/IBAN, Operational Network, Memberships, Enlistments, Certifications.
+- `address`: Registered, Manufacturing, Branch address blocks (line1, line2, city, state, pincode, country).
+- `contact`: Primary Contact Name, Designation, Email, Phone, Alternate Contact.
+- `financial`: Annual Turnover, Net Worth, Facility Size, QHSE flags, etc.
+- `review`: read-only — no editable fields.
 
-1. **Remove** the `current-user-tenant` `useQuery` (the `.limit(1).maybeSingle()` block, lines ~81–97).
-2. **Import and use** `useTenantContext` to get `myTenants` (the full list of tenants the logged-in user belongs to) and `activeTenantId` (current header selection).
-3. Compute the list of tenants to offer in the dialog:
-   - `sharvi_admin` / `admin` super-admin: all tenants (`tenants` from `useTenants`) — unchanged behavior.
-   - Everyone else: `myTenants` from `useTenantContext` (all tenants they're assigned to).
-4. Default `selectedTenantId` when the dialog opens:
-   - Prefer the header's `activeTenantId` if it's in the allowed list.
-   - Else first entry of the allowed list.
-5. Render the **Company** field as a `Select` dropdown for **all** users when the allowed list has 2+ entries; render the existing read-only label only when there is exactly one tenant; keep the "No company assigned" message when the list is empty.
-6. `effectiveTenantId` becomes simply `selectedTenantId || null` (single source of truth across roles).
-7. Update the invitations list query (`vendor-invitations` queryKey + the client-side `tenant_id` filter) to use the chosen `selectedTenantId` instead of the removed `currentUserTenantId`, so the table filters consistently with the chosen company.
+### 2. Auto-seed on Form Builder load
 
-### Files touched
+In `src/pages/FormBuilder.tsx`, when fields for the active tenant load:
+- For each built-in step key, check if there's at least one `form_field_configs` row for that tenant + `step_name`.
+- If none exist, bulk-insert the catalog rows with a flag `default_value = '__builtin__'` (or add a new column later) so we can recognise them as auto-seeded.
+- Use a one-time `useEffect` keyed by `(tenantId, hasBuiltins)` and a small mutation to insert.
 
-- `src/pages/AdminInvitations.tsx` — only file changed. No backend / migration / edge-function changes required (RLS already permits these inserts because Suresh is in `user_tenants` for each tenant).
+After seeding, the existing Form Builder UI shows them automatically — drag-to-reorder, edit, hide and delete already work for any rows in `form_field_configs`.
 
-## Outcome
+### 3. Vendor form respects overrides
 
-Suresh (and any non-super-admin user assigned to multiple tenants) will see a working **Company** dropdown in the Create Vendor Invitation dialog listing all their assigned companies, defaulting to the one currently selected in the header tenant switcher.
+For each built-in step component (`OrganizationStep`, `AddressStep`, `ContactStep`, `DocumentVerificationStep`, `FinancialInfrastructureStep`):
+- Read `useFormFieldConfigs(tenantId)` and filter by the step's `step_name`.
+- Build a `Map<field_name, FormFieldConfig>`.
+- Wrap each hardcoded block in a small helper `renderIfVisible(field_name, jsx)` that:
+  - Hides the block if the override row has `is_visible = false`.
+  - Hides the block if no override row exists (means admin removed/deleted it).
+  - Applies `is_mandatory` from override to the validation rule.
+- Render any extra admin-added fields (whose `field_name` isn't in the built-in catalog) at the bottom of the tab via a small `DynamicStep`-style renderer so vendors actually see them.
+
+### 4. UX polish in Form Builder
+
+- In the Fields list, show a `Built-in` badge on rows whose `field_name` matches the catalog, so admins know the difference.
+- Allow "Edit" on built-in field rows but only for: `display_label`, `placeholder`, `help_text`, `is_visible`, `is_mandatory`, `display_order`. Disable changing `field_name` and `field_type` for built-in fields to avoid breaking the vendor form.
+- Allow "Delete" on built-in field rows — deletion removes the row, which the vendor form interprets as "hide this block".
+- Add a small "Restore defaults" button per tab that re-seeds any deleted built-in rows.
+
+### 5. Data integrity
+
+- No DB schema changes required — uses the existing `form_field_configs` table.
+- Seeding runs only when the tenant has zero rows for that built-in `step_name`, so it is idempotent and safe across reloads and existing tenants that already customised some tabs.
+
+## Files to change
+
+- New: `src/lib/builtInFields.ts` — catalog for the 5 built-in editable tabs.
+- `src/pages/FormBuilder.tsx` — auto-seed effect + Built-in badge + restore-defaults button + edit-restrictions for built-in rows.
+- `src/components/admin/InlineFieldEditor.tsx` — accept an `isBuiltIn` prop and disable `field_name` / `field_type` inputs accordingly.
+- `src/components/vendor/steps/OrganizationStep.tsx`
+- `src/components/vendor/steps/AddressStep.tsx`
+- `src/components/vendor/steps/ContactStep.tsx`
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- `src/components/vendor/steps/FinancialInfrastructureStep.tsx`
+  Each gets the `renderIfVisible` wrapper + appended dynamic-extras section.
+
+## Out of scope
+
+- No changes to the `review` step (no editable fields there).
+- No re-architecture of validation logic — only the `required` flag is wired through to existing yup/zod schemas where applicable; deeper validation logic stays as-is.
