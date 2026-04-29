@@ -1,96 +1,64 @@
-# Fix "Region TG is not defined for IN" SAP sync error
+## Email Configuration Screen
 
-## What's happening
+A new admin screen at `/admin/email-config` to manage multiple SMTP credentials (one per sender email), shown in a table with Excel/PDF export.
 
-Good news: the middleware + proxy secret are now working correctly. The request reached SAP and SAP responded. The remaining failure is a **data mapping issue**, not a connectivity issue.
+### What you'll get
 
-SAP returned:
+- Sidebar entry **Email Configuration** (icon: Mail), visible to `sharvi_admin`, `admin`, `customer_admin`.
+- Form with: **User Email** (dropdown of registered portal users + free-text option), **SMTP Host**, **Port**, **Encryption** (TLS/SSL/STARTTLS/None), **App Password**, **From Name** (optional), **Active** toggle.
+- Save / Update / Delete actions, plus **Test Send** button (sends a test email to the configured address using `send-smtp-email`).
+- Table of saved configs: Email, Host, Port, Encryption, Active, Last Updated, Actions (Edit / Delete / Test).
+- **Download Excel** (.xlsx) and **Download PDF** buttons that export the current table.
+- App Password stored server-side; never shown after save (masked as `••••••••`, only re-entered when editing).
 
-```text
-Region TG is not defined for IN.
-Business Partner: SHARVI INFOTECH PRIVATE LIMITE
-```
+### Data model
 
-The vendor's `registered_state = "Telangana"`. The edge function is sending `REGION = "TG"`, but in your SAP system the configured region code for Telangana under country IN is **not** `TG`. We already see proof of this in the same mapping table — Maharashtra is mapped to `"13"` (a numeric T005S code), while every other state still uses 2-letter ISO-style codes. So this SAP system uses **numeric T005S region codes**, not 2-letter codes.
-
-That's why only Maharashtra works today and Telangana (and likely every other state) fails.
-
-## Root cause
-
-In `supabase/functions/sync-vendor-to-sap/index.ts`, the `stateToRegion` map mixes two schemes:
+New table `smtp_email_configs`:
 
 ```text
-"Maharashtra": "13",   // numeric  <-- accepted by SAP
-"Telangana":   "TG",   // alpha    <-- rejected by SAP
-"Andhra Pradesh": "AP" // alpha    <-- will also be rejected
-... etc
+id              uuid pk
+user_email      text  unique not null    -- the sender email this config belongs to
+smtp_host       text  not null
+smtp_port       int   not null  default 587
+encryption      text  not null  default 'tls'   -- 'none'|'ssl'|'tls'|'starttls'
+smtp_username   text  not null            -- usually = user_email
+app_password    text  not null            -- stored server-side, never returned to client
+from_name       text
+is_active       boolean not null default true
+created_by      uuid
+created_at, updated_at  timestamptz
 ```
 
-SAP table T005S for country `IN` in your system uses numeric codes (the standard SAP India localization), so every alpha entry will fail the same way.
+RLS: only `sharvi_admin`, `admin`, `customer_admin` can SELECT/INSERT/UPDATE/DELETE. The `app_password` column is excluded from any client-readable view; reads go through a SECURITY DEFINER RPC `list_smtp_configs()` that returns everything except the password.
 
-## Fix plan
+### Edge functions
 
-1. **Update the state → region mapping** in `supabase/functions/sync-vendor-to-sap/index.ts` to use the standard SAP T005S numeric region codes for India:
+- `smtp-config-save` — upserts a row (writes `app_password` server-side using service role).
+- `smtp-config-delete` — deletes by id.
+- `smtp-config-test` — sends a test email through the existing `send-smtp-email` flow using an inline `smtp` override built from the row.
 
-   ```text
-   Andhra Pradesh     -> 01
-   Arunachal Pradesh  -> 02
-   Assam              -> 03
-   Bihar              -> 04
-   Chhattisgarh       -> 33
-   Goa                -> 05
-   Gujarat            -> 06
-   Haryana            -> 07
-   Himachal Pradesh   -> 08
-   Jammu & Kashmir    -> 09
-   Karnataka          -> 10
-   Kerala             -> 11
-   Madhya Pradesh     -> 12
-   Maharashtra        -> 13
-   Manipur            -> 14
-   Meghalaya          -> 15
-   Mizoram            -> 16
-   Nagaland           -> 17
-   Odisha             -> 18
-   Punjab             -> 19
-   Rajasthan          -> 20
-   Sikkim             -> 21
-   Tamil Nadu         -> 22
-   Tripura            -> 23
-   Uttar Pradesh      -> 24
-   West Bengal        -> 25
-   Andaman & Nicobar  -> 26
-   Chandigarh         -> 27
-   Dadra & Nagar Haveli -> 28
-   Daman & Diu        -> 29
-   Delhi              -> 30
-   Lakshadweep        -> 31
-   Puducherry         -> 32
-   Jharkhand          -> 34
-   Uttarakhand        -> 35
-   Telangana          -> 36
-   Ladakh             -> 37
-   ```
+The existing global SMTP in `portal_config` stays untouched; this new table is additive and used when a per-sender override is needed.
 
-   Also accept common aliases (e.g. `Orissa` → 18, `Pondicherry` → 32, `J&K` → 09) and do a case-insensitive trimmed lookup so minor casing/whitespace differences in vendor data still resolve.
+### UI / Export
 
-2. **Make the failure mode friendlier**: if the vendor's `registered_state` is missing or doesn't resolve to a known code, surface a clear message in the SAP Sync dialog like:
+- Built with existing shadcn `Table`, `Dialog`, `Form`, `Select` components.
+- Excel export via `xlsx` (SheetJS) — column headers match the table; password column omitted.
+- PDF export via `jspdf` + `jspdf-autotable` — same columns; "Sharvi Vendor Portal — Email Configuration" header with timestamp.
+- Follows project visual identity: grey bg, white rounded cards, blue primary accents.
 
-   ```text
-   Cannot sync to SAP: vendor state "<value>" is not mapped to an SAP region code.
-   Please correct the vendor's Registered State and retry.
-   ```
+### Files to add / change
 
-   instead of letting SAP reject it generically.
+- DB migration: create `smtp_email_configs`, RLS policies, RPC `list_smtp_configs()`.
+- `src/pages/EmailConfiguration.tsx` — the new screen.
+- `src/hooks/useSmtpConfigs.tsx` — CRUD + test hook.
+- `src/App.tsx` — add `/admin/email-config` route.
+- `src/components/layout/Sidebar.tsx` — add nav item with `screenKey: 'email_configuration'`.
+- Seed `role_screen_permissions` for the new screen key for admin roles.
+- `supabase/functions/smtp-config-save/index.ts`
+- `supabase/functions/smtp-config-delete/index.ts`
+- `supabase/functions/smtp-config-test/index.ts`
+- `package.json` — add `xlsx`, `jspdf`, `jspdf-autotable`.
 
-3. **Redeploy** the `sync-vendor-to-sap` edge function so the new mapping takes effect immediately.
+### Out of scope
 
-4. **Retry sync** for SHARVI INFOTECH PRIVATE LIMITED. With Telangana now sent as `36`, SAP should accept the Business Partner create call and return a `BP_LIFNR`.
-
-## Files to change
-
-- `supabase/functions/sync-vendor-to-sap/index.ts` — replace the `stateToRegion` map with the numeric T005S codes above and add a normalized lookup + clearer pre-validation error.
-
-## Note on region codes
-
-These are the **standard SAP India T005S codes** that match GSTIN state codes (Telangana = 36, Andhra Pradesh = 37 in GSTIN, but in SAP T005S Telangana is 36 in most India localization configurations). If your specific SAP client uses a customized T005S table and one or two states still fail after this fix, share the SAP error and we'll adjust just those entries — the mapping is now in one place and easy to tweak.
+- Auto-routing outbound mail through per-sender configs (the existing `send-smtp-email` continues to use the global config unless explicitly passed an override). Switching the default sender resolution can be a follow-up.

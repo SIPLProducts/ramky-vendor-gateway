@@ -35,6 +35,7 @@ import FormBuilder from "./pages/FormBuilder";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import MyApprovals from "./pages/MyApprovals";
+import EmailConfiguration from "./pages/EmailConfiguration";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,7 @@ const App = () => (
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
                 <Route path="/admin/form-builder" element={<FormBuilder />} />
                 <Route path="/admin/my-approvals" element={<MyApprovals />} />
+                <Route path="/admin/email-config" element={<EmailConfiguration />} />
               </Route>
             </Route>
 
