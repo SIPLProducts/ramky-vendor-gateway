@@ -6,217 +6,219 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface VendorData {
-  id: string;
-  legal_name: string | null;
-  trade_name: string | null;
-  registered_address: string | null;
-  registered_address_line2: string | null;
-  registered_address_line3: string | null;
-  registered_city: string | null;
-  registered_state: string | null;
-  registered_pincode: string | null;
-  registered_phone: string | null;
-  registered_fax: string | null;
-  registered_website: string | null;
-  primary_contact_name: string | null;
-  primary_email: string | null;
-  primary_phone: string | null;
-  gstin: string | null;
-  pan: string | null;
-  bank_name: string | null;
-  account_number: string | null;
-  ifsc_code: string | null;
-  bank_branch_name: string | null;
-  industry_type: string | null;
-}
+// Default to the values from RAMKY_VMS_API_Endpoints_For_BP_Creation.pdf.
+// Override at runtime by setting the SAP_BP_API_URL / SAP_BP_USERNAME / SAP_BP_PASSWORD secrets.
+const DEFAULT_SAP_URL = "http://10.200.1.2:8000/vendor/bp/create?sap-client=300";
+const DEFAULT_SAP_USER = "22000208";
+const DEFAULT_SAP_PASS = "Nani@1432";
 
-interface SAPPayload {
-  BPARTNER: string;
-  PARTN_CAT: string;
-  PARTN_GRP: string;
-  TITLE: string;
-  NAME1: string;
-  NAME2: string;
-  STERM1: string;
-  STERM2: string;
-  STREET: string;
-  HOUSE_NO: string;
-  STR_SUPPL1: string;
-  LOCATION: string;
-  DISTRICT: string;
-  POSTL_COD1: string;
-  CITY: string;
-  COUNTRY: string;
-  REGION: string;
-  LANGU: string;
-  TEL_NUMBER: string;
-  MOB_NUMBER: string;
-  SMTP_ADDR: string;
-  TAXNUMXL: string;
-  BUKRS: string;
-  WITHT: string;
-  TAXKD07: string;
-}
-
-interface SAPResponse {
-  BP_LIFNR: string;
-  MSGTYP: string;
-  MSGNR: string;
-  ERDAT: string;
-  UZEIT: string;
-  UNAME: string;
-  MSG: string;
-  BP_LIFNRX: string;
-  BPNAME: string;
-  PERNR: number;
-  EXCEL_ROW: number;
-}
-
-// Map Indian state codes to SAP region codes
-const stateToRegionMap: Record<string, string> = {
-  "Andhra Pradesh": "AP",
-  "Arunachal Pradesh": "AR",
-  "Assam": "AS",
-  "Bihar": "BR",
-  "Chhattisgarh": "CG",
-  "Goa": "GA",
-  "Gujarat": "GJ",
-  "Haryana": "HR",
-  "Himachal Pradesh": "HP",
-  "Jharkhand": "JH",
-  "Karnataka": "KA",
-  "Kerala": "KL",
-  "Madhya Pradesh": "MP",
-  "Maharashtra": "MH",
-  "Manipur": "MN",
-  "Meghalaya": "ML",
-  "Mizoram": "MZ",
-  "Nagaland": "NL",
-  "Odisha": "OR",
-  "Punjab": "PB",
-  "Rajasthan": "RJ",
-  "Sikkim": "SK",
-  "Tamil Nadu": "TN",
-  "Telangana": "TG",
-  "Tripura": "TR",
-  "Uttar Pradesh": "UP",
-  "Uttarakhand": "UK",
-  "West Bengal": "WB",
+// Indian state -> SAP region code (REGION column, length 3)
+const stateToRegion: Record<string, string> = {
+  "Andhra Pradesh": "AP", "Arunachal Pradesh": "AR", "Assam": "AS", "Bihar": "BR",
+  "Chhattisgarh": "CG", "Goa": "GA", "Gujarat": "GJ", "Haryana": "HR",
+  "Himachal Pradesh": "HP", "Jharkhand": "JH", "Karnataka": "KA", "Kerala": "KL",
+  "Madhya Pradesh": "MP", "Maharashtra": "13", "Manipur": "MN", "Meghalaya": "ML",
+  "Mizoram": "MZ", "Nagaland": "NL", "Odisha": "OR", "Punjab": "PB",
+  "Rajasthan": "RJ", "Sikkim": "SK", "Tamil Nadu": "TN", "Telangana": "TG",
+  "Tripura": "TR", "Uttar Pradesh": "UP", "Uttarakhand": "UK", "West Bengal": "WB",
   "Delhi": "DL",
 };
 
-function mapVendorToSAP(vendor: VendorData): SAPPayload {
-  // Extract search terms from legal name (first 2 words or parts)
-  const nameParts = (vendor.legal_name || "").split(" ");
-  const sterm1 = nameParts[0] || "";
-  const sterm2 = nameParts[1] || "";
+const trunc = (v: any, n: number) => (v == null ? "" : String(v)).slice(0, n);
 
-  // Get region code from state
-  const regionCode = vendor.registered_state 
-    ? stateToRegionMap[vendor.registered_state] || "AP" 
-    : "AP";
+function buildPayload(vendor: any) {
+  const legalName = vendor.legal_name || "";
+  const tradeName = vendor.trade_name || "";
+  const region = vendor.registered_state ? (stateToRegion[vendor.registered_state] || "") : "";
 
-  return {
-    BPARTNER: "", // Empty - SAP will generate
-    PARTN_CAT: "1", // Category 1 for vendors
-    PARTN_GRP: "S001", // Standard vendor group
-    TITLE: "0002", // Standard title
-    NAME1: (vendor.legal_name || "").substring(0, 40), // Max 40 chars
-    NAME2: (vendor.trade_name || "").substring(0, 40), // Max 40 chars
-    STERM1: sterm1.substring(0, 20), // Search term 1
-    STERM2: sterm2.substring(0, 20), // Search term 2
-    STREET: (vendor.registered_address || "").substring(0, 60),
-    HOUSE_NO: (vendor.registered_address_line2 || "").substring(0, 10),
-    STR_SUPPL1: (vendor.registered_address_line3 || vendor.registered_city || "").substring(0, 40),
-    LOCATION: (vendor.registered_city || "").substring(0, 40),
-    DISTRICT: (vendor.registered_city || "").substring(0, 40),
-    POSTL_COD1: (vendor.registered_pincode || "").substring(0, 10),
-    CITY: (vendor.registered_city || "").substring(0, 40),
-    COUNTRY: "IN", // India
-    REGION: regionCode,
-    LANGU: "E", // English
-    TEL_NUMBER: (vendor.registered_phone || "").substring(0, 16),
-    MOB_NUMBER: (vendor.primary_phone || "").substring(0, 16),
-    SMTP_ADDR: (vendor.primary_email || "").substring(0, 241),
-    TAXNUMXL: (vendor.gstin || "").substring(0, 20), // GST Number
-    BUKRS: "1710", // Company code
-    WITHT: "1710", // Withholding tax type
-    TAXKD07: "X", // Tax indicator
+  const row: Record<string, any> = {
+    bpartner: "",
+    partn_cat: "2",
+    partn_grp: "ZDOM",
+    title: "",
+    name1: trunc(legalName, 40),
+    name2: trunc(tradeName, 40),
+    name3: "",
+    sterm1: trunc(legalName, 20),
+    sterm2: trunc((tradeName.split(" ")[0] || ""), 20),
+    street: trunc(vendor.registered_address, 60),
+    house_no: trunc(vendor.registered_address_line2, 10),
+    str_suppl1: trunc(vendor.registered_address_line3 || vendor.registered_address_line2, 40),
+    str_suppl2: "",
+    str_suppl3: "",
+    location: trunc(vendor.registered_city, 40),
+    district: trunc(vendor.registered_city, 40),
+    postl_cod1: trunc(vendor.registered_pincode, 10),
+    city: trunc(vendor.registered_city, 40),
+    country: "IN",
+    region: trunc(region, 3),
+    langu: "EN",
+    tel_number: trunc(vendor.registered_phone, 30),
+    mob_number: trunc(vendor.primary_phone, 30),
+    smtp_addr: trunc(vendor.primary_email, 241),
+
+    taxtype: "IN3",
+    taxnumxl: trunc(vendor.gstin, 20),
+    legaform: "",
+    legaenty: "",
+    bp_type: "",
+    due_digi: "",
+    idtype: "",
+    idnum: "",
+
+    bankdetailid: "0001",
+    bank_ctry: "IN",
+    bank_key: trunc(vendor.ifsc_code, 15),
+    bank_acct: trunc(vendor.account_number, 18),
+    ctrl_key: "",
+    accountholder: trunc(legalName, 60),
+    bankaccountname: trunc(vendor.bank_name, 60),
+    pernr: "",
+
+    bukrs: "1000",
+    akont: "155000005",
+    zuawa: "014",
+    cdi: "X",
+    fdgrv: "A1",
+    xzver: "",
+    msme: vendor.msme_number ? "MIC" : "",
+
+    j_1iexcd: "",
+    j_1iexrn: "",
+    j_1iexrg: "",
+    j_1iexdi: "",
+    j_1iexco: "",
+    j_1iexcicu: "",
+    j_1icstno: "",
+    j_1ilstno: "",
+    j_1ipanno: trunc(vendor.pan, 10),
+    j_1isern: "",
+
+    witht: "",
+    wt_withcd: "",
+    wt_subjct: "",
+    qsrec: "",
+    qland: "",
+
+    vkorg: "1000",
+    waers: "INR",
+    zterm: "",
+    inco1: "",
+    inco2: "",
+    kalsk: "L1",
+    webre: "X",
+    lebre: "X",
+    ven_class: "",
+
+    zvkorg: "",
+    vtweg: "",
+    spart: "",
+    bzirk: "",
+    kdgrp: "",
+    vkbur: "",
+    vkgrp: "",
+    zwaers: "",
+    kurst: "",
+    konda: "",
+    kalks: "",
+    pltyp: "",
+    versg: "",
+    lprio: "",
+    kzazu: "",
+    vsbed: "",
+    untto: "",
+    uebto: "",
+    zinco1: "",
+    zinco2: "",
+    zzterm: "",
+    kkber: "",
+    ktgrd: "",
+    taxkd01: "",
+    taxkd02: "",
+    taxkd03: "",
+    taxkd04: "",
+    taxkd05: "",
+    taxkd06: "",
+    taxkd07: "",
   };
+  return row;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { vendorId } = await req.json();
+    if (!vendorId) throw new Error("vendorId is required");
 
-    if (!vendorId) {
-      throw new Error("vendorId is required");
-    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Fetch vendor data
     const { data: vendor, error: vendorError } = await supabase
       .from("vendors")
       .select("*")
       .eq("id", vendorId)
       .single();
+    if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
 
-    if (vendorError || !vendor) {
-      throw new Error(`Vendor not found: ${vendorError?.message}`);
-    }
+    const sapUrl = Deno.env.get("SAP_BP_API_URL") || DEFAULT_SAP_URL;
+    const sapUser = Deno.env.get("SAP_BP_USERNAME") || DEFAULT_SAP_USER;
+    const sapPass = Deno.env.get("SAP_BP_PASSWORD") || DEFAULT_SAP_PASS;
 
-    // Map vendor data to SAP format
-    const sapPayload = mapVendorToSAP(vendor as VendorData);
+    const payload = [buildPayload(vendor)];
+    console.log("SAP request URL:", sapUrl);
+    console.log("SAP request payload:", JSON.stringify(payload));
 
-    // SAP API credentials from environment
-    const sapUrl = Deno.env.get("SAP_API_URL") || "https://49.207.9.62:44325/vendor/bp/create?sap-client=100";
-    const sapUsername = Deno.env.get("SAP_USERNAME") || "s23hana2";
-    const sapPassword = Deno.env.get("SAP_PASSWORD") || "Sh@rv!3220";
+    let sapResponse: any[] | null = null;
+    let httpStatus = 0;
+    let networkError: string | null = null;
 
-    // Create Basic Auth header
-    const authHeader = `Basic ${btoa(`${sapUsername}:${sapPassword}`)}`;
-
-    // Call SAP API
-    console.log("Calling SAP API with payload:", JSON.stringify([sapPayload], null, 2));
-
-    const sapResponse = await fetch(sapUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": authHeader,
-      },
-      body: JSON.stringify([sapPayload]),
-    });
-
-    const sapResponseText = await sapResponse.text();
-    console.log("SAP Response:", sapResponseText);
-
-    let sapData: SAPResponse[];
     try {
-      sapData = JSON.parse(sapResponseText);
-    } catch (e) {
-      throw new Error(`Invalid SAP response: ${sapResponseText}`);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(sapUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Basic ${btoa(`${sapUser}:${sapPass}`)}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      httpStatus = res.status;
+      const text = await res.text();
+      console.log("SAP raw response:", text);
+      try {
+        sapResponse = JSON.parse(text);
+        if (!Array.isArray(sapResponse)) sapResponse = [sapResponse];
+      } catch {
+        networkError = `Invalid JSON from SAP (HTTP ${httpStatus}): ${text.slice(0, 300)}`;
+      }
+    } catch (e: any) {
+      networkError = e?.message || "Network error reaching SAP";
+      console.error("SAP fetch error:", networkError);
     }
 
-    // Check if SAP sync was successful
-    const isSuccess = sapData.some(
-      (item) => item.MSGTYP === "S" && item.MSG.includes("Business Partner Created")
+    if (networkError) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `Could not reach SAP: ${networkError}`,
+          sapResponse: sapResponse ?? [],
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
+    const successItem = (sapResponse || []).find(
+      (it: any) => it?.MSGTYP === "S" && typeof it?.MSG === "string" && it.MSG.toLowerCase().includes("business partner created"),
     );
+    const sapVendorCode = successItem?.BP_LIFNR || (sapResponse || []).find((i: any) => i?.BP_LIFNR)?.BP_LIFNR || null;
 
-    const sapVendorCode = sapData[0]?.BP_LIFNR || null;
-
-    if (isSuccess && sapVendorCode) {
-      // Update vendor with SAP details
+    if (successItem && sapVendorCode) {
       await supabase
         .from("vendors")
         .update({
@@ -231,38 +233,26 @@ serve(async (req) => {
           success: true,
           sapVendorCode,
           message: "Vendor successfully synced to SAP",
-          sapResponse: sapData,
+          sapResponse,
         }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    } else {
-      // SAP sync failed
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "SAP sync failed",
-          sapResponse: sapData,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
       );
     }
-  } catch (error) {
-    console.error("Error syncing to SAP:", error);
+
+    const errorItem = (sapResponse || []).find((it: any) => it?.MSGTYP === "E");
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        message: errorItem?.MSG || `SAP sync failed (HTTP ${httpStatus})`,
+        sapResponse,
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+    );
+  } catch (error: any) {
+    console.error("sync-vendor-to-sap error:", error);
+    return new Response(
+      JSON.stringify({ success: false, message: error.message || "Unknown error" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   }
 });

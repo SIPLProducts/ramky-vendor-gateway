@@ -87,8 +87,19 @@ export default function SAPSync() {
       setSapSyncResult(result.sapResponse);
       setSelectedVendor(vendor);
       setShowSapResultDialog(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('SAP sync failed:', error);
+      // Still surface SAP's response (error messages from S/4HANA) in the dialog
+      const fallbackResponse = error?.sapResponse ?? [
+        { MSGTYP: 'E', MSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
+      ];
+      setSapSyncResult({
+        success: false,
+        message: error?.message || 'SAP sync failed',
+        sapResponse: fallbackResponse,
+      });
+      setSelectedVendor(vendor);
+      setShowSapResultDialog(true);
     } finally {
       setSyncingVendorId(null);
     }
@@ -559,27 +570,52 @@ export default function SAPSync() {
         <DialogContent className="rounded-2xl max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-6 w-6 text-green-600" />
-              SAP Sync Successful
+              {sapSyncResult?.success === false ? (
+                <>
+                  <Server className="h-6 w-6 text-red-600" />
+                  SAP Sync Failed
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                  SAP Sync Successful
+                </>
+              )}
             </DialogTitle>
             <DialogDescription>
-              Vendor has been successfully synced to SAP
+              {sapSyncResult?.success === false
+                ? 'SAP rejected the request. Review the response details below.'
+                : 'Vendor has been successfully synced to SAP'}
             </DialogDescription>
           </DialogHeader>
           {sapSyncResult && (
             <div className="space-y-4 py-4">
-              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
+              <div className={`border rounded-xl p-4 ${
+                sapSyncResult.success === false
+                  ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                  : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+              }`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="font-semibold text-green-900 dark:text-green-100">
+                  {sapSyncResult.success === false ? (
+                    <Server className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  )}
+                  <span className={`font-semibold ${
+                    sapSyncResult.success === false
+                      ? 'text-red-900 dark:text-red-100'
+                      : 'text-green-900 dark:text-green-100'
+                  }`}>
                     {sapSyncResult.message}
                   </span>
                 </div>
-                <div className="text-sm text-green-800 dark:text-green-200">
-                  <p className="font-mono bg-white dark:bg-green-950/40 px-3 py-2 rounded-lg mt-2">
-                    SAP Vendor Code: <span className="font-bold">{sapSyncResult.sapVendorCode}</span>
-                  </p>
-                </div>
+                {sapSyncResult.sapVendorCode && (
+                  <div className="text-sm text-green-800 dark:text-green-200">
+                    <p className="font-mono bg-white dark:bg-green-950/40 px-3 py-2 rounded-lg mt-2">
+                      SAP Vendor Code: <span className="font-bold">{sapSyncResult.sapVendorCode}</span>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {sapSyncResult.sapResponse && sapSyncResult.sapResponse.length > 0 && (
@@ -594,9 +630,10 @@ export default function SAPSync() {
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground space-y-0.5">
-                        <p>Business Partner: {response.BPNAME}</p>
-                        <p>Date: {response.ERDAT} at {response.UZEIT}</p>
-                        <p>Created by: {response.UNAME}</p>
+                        {response.BP_LIFNR && <p>BP / Vendor No: <span className="font-mono">{response.BP_LIFNR}</span></p>}
+                        {response.BPNAME && <p>Business Partner: {response.BPNAME}</p>}
+                        {(response.ERDAT || response.UZEIT) && <p>Date: {response.ERDAT} at {response.UZEIT}</p>}
+                        {response.UNAME && <p>Created by: {response.UNAME}</p>}
                       </div>
                     </div>
                   ))}
