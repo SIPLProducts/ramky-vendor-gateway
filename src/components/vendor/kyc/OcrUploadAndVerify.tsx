@@ -46,10 +46,12 @@ export function OcrUploadAndVerify({
   acceptedFileTypes = '.pdf,.jpg,.jpeg,.png',
   currentFile,
   onFileChange,
+  runOcr,
   onVerifyExtracted,
   buildComparisonRows,
   onVerified,
   vendorId,
+  skipVerifyPhase,
 }: OcrUploadAndVerifyProps) {
   const { extractFromFile } = useOcrExtraction();
   const [phase, setPhase] = useState<Phase>('idle');
@@ -64,7 +66,9 @@ export function OcrUploadAndVerify({
     setPhase('ocr');
     setMessage('Reading document with OCR…');
 
-    const ocr = await extractFromFile(file, documentType, vendorId);
+    const ocr = runOcr
+      ? await runOcr(file)
+      : await extractFromFile(file, documentType, vendorId);
     if (!ocr.success || !ocr.extracted) {
       setPhase('failed');
       setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
@@ -72,8 +76,10 @@ export function OcrUploadAndVerify({
     }
     setExtracted(ocr.extracted);
 
-    setPhase('verifying');
-    setMessage('Verifying extracted details with the validation API…');
+    if (!skipVerifyPhase) {
+      setPhase('verifying');
+      setMessage('Verifying extracted details with the validation API…');
+    }
     const verify = await onVerifyExtracted(ocr.extracted);
     setApiData(verify.apiData);
 
