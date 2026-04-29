@@ -142,6 +142,13 @@ serve(async (req) => {
       .from("vendors").select("*").eq("id", vendorId).single();
     if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
 
+    // Pre-validate: vendor's registered_state must map to an SAP region code.
+    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+      return fail(
+        `Cannot sync to SAP: vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for country IN. Please correct the vendor's Registered State and retry.`,
+      );
+    }
+
     // 2) Resolve SAP API config from app DB (preferred) — Business Partner Create.
     //    Match by api_type='sync' or by name containing 'business partner' / 'bp'.
     const { data: configs } = await supabase
