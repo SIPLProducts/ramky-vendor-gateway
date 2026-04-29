@@ -4,7 +4,7 @@ import { OcrComparisonCard } from '@/components/vendor/OcrComparisonCard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Loader2, ScanLine, ShieldCheck, CheckCircle2, XCircle, RotateCw } from 'lucide-react';
-import { useOcrExtraction, OcrDocumentType } from '@/hooks/useOcrExtraction';
+import type { OcrDocumentType } from '@/hooks/useOcrExtraction';
 
 export interface ComparisonRow {
   label: string;
@@ -18,8 +18,8 @@ interface OcrUploadAndVerifyProps {
   acceptedFileTypes?: string;
   currentFile?: File | null;
   onFileChange: (file: File | null) => void;
-  /** Optional custom OCR runner. When provided, replaces the built-in Lovable AI OCR. */
-  runOcr?: (file: File) => Promise<{ success: boolean; extracted?: Record<string, any>; error?: string }>;
+  /** Required: OCR runner backed by an admin-configured KYC provider. */
+  runOcr: (file: File) => Promise<{ success: boolean; extracted?: Record<string, any>; error?: string }>;
   /** Run validation API after OCR. Return { ok, message, apiData } */
   onVerifyExtracted: (extracted: Record<string, any>) => Promise<{
     ok: boolean;
@@ -53,7 +53,6 @@ export function OcrUploadAndVerify({
   vendorId,
   skipVerifyPhase,
 }: OcrUploadAndVerifyProps) {
-  const { extractFromFile } = useOcrExtraction();
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<string>('');
   const [extracted, setExtracted] = useState<Record<string, any> | undefined>();
@@ -64,11 +63,14 @@ export function OcrUploadAndVerify({
     setExtracted(undefined);
     setApiData(undefined);
     setPhase('ocr');
-    setMessage('Reading document with OCR…');
+    setMessage('Reading document via configured OCR provider…');
 
-    const ocr = runOcr
-      ? await runOcr(file)
-      : await extractFromFile(file, documentType, vendorId);
+    if (!runOcr) {
+      setPhase('failed');
+      setMessage('OCR provider not configured. Add it in KYC & Validation API Settings.');
+      return;
+    }
+    const ocr = await runOcr(file);
     if (!ocr.success || !ocr.extracted) {
       setPhase('failed');
       setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
