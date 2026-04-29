@@ -144,20 +144,20 @@ export function InlineFieldEditor({ tenantId, stepKey, field, defaultOrder = 1, 
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Field Key</Label>
+          <Label className="text-xs">Field Key{builtInMode && ' (locked)'}</Label>
           <Input
             value={form.field_name}
             onChange={(e) => setForm({ ...form, field_name: e.target.value })}
             placeholder={form.display_label ? slugify(form.display_label) : 'iso_9001_cert_no'}
-            disabled={!!field}
+            disabled={!!field || builtInMode}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Type</Label>
-          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })}>
+          <Label className="text-xs">Type{builtInMode && ' (locked)'}</Label>
+          <Select value={form.field_type} onValueChange={(v) => setForm({ ...form, field_type: v })} disabled={builtInMode}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {FIELD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
