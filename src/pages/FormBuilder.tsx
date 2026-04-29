@@ -150,6 +150,7 @@ export default function FormBuilder() {
   const upsertStep = useUpsertFormStep();
   const deleteStep = useDeleteFormStep();
   const deleteField = useDeleteFormField();
+  const upsertField = useUpsertFormField();
   const reorderSteps = useReorderFormSteps();
   const reorderFields = useReorderFormFields();
 
