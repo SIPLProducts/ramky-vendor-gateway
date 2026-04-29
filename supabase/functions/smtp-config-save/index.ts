@@ -16,6 +16,7 @@ interface SaveBody {
   smtp_username: string;
   app_password?: string; // optional on update if unchanged
   from_name?: string | null;
+  reply_to?: string | null;
   is_active?: boolean;
 }
 
