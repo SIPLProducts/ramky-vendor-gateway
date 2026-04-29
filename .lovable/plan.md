@@ -1,63 +1,61 @@
-# Update Email Configuration to match SMTP layout
+# Use Logged-in User's SMTP Config for Vendor Invitations
 
-Bring the existing `/admin/email-config` screen in line with the uploaded SMTP Email Configuration design while keeping the multi-config table + Excel/PDF exports already in place.
+When an admin clicks **Create Invitation**, the invitation email should be sent **From** the logged-in user's email using the SMTP/App Password they saved in the **Email Configuration** screen, **To** the vendor's email. If the logged-in user has no matching active record in `smtp_email_configs`, the action should fail with the message: **"You are not configured in Email Configuration"**.
 
-## New / changed fields
+## Scope
 
-The Add/Edit dialog will be expanded to the full set shown in the screenshot:
+- Applies to the `Create Invitation` flow (`AdminInvitations.tsx`).
+- Also applies to the per-row `Send Email` / resend action on the same page (same intent — uses logged-in user's SMTP).
+- Other system emails (status notifications, etc.) are out of scope and continue to use the existing portal-level SMTP.
 
-| Field | Notes |
-|---|---|
-| Enable SMTP Sending | Toggle (maps to `is_active`). When off, system falls back to default provider. |
-| SMTP Host | existing |
-| Port | existing — auto-suggest 465/587 based on encryption |
-| Encryption | dropdown: SSL (465), TLS (587), STARTTLS (587), None |
-| Use App Password | Toggle (UI-only hint that switches password label/help text) |
-| Username | existing `smtp_username` |
-| App Password | existing, with show/hide eye toggle |
-| From Email | NEW — `user_email` doubles as From Email; relabel + autofill from Username |
-| From Name | existing, default "Sharvi Vendor Portal" |
-| Reply-To (optional) | NEW field `reply_to` |
-| Provider hint box | static helper text for Gmail / Outlook 365 |
-| Send test to + Send Test Email | inline test sender (uses entered values without saving) |
+## Behavior
 
-The list table and exports remain unchanged (still show Email/Host/Port/Encryption/Status/Updated and export to Excel/PDF).
+1. On Create / Resend Invitation:
+   - Backend looks up `smtp_email_configs` where `lower(user_email) = lower(<logged-in user email>)` AND `is_active = true`.
+   - If found → send email using that config: `from = user_email`, `to = vendor email`, with `smtp_host/port/encryption/smtp_username/app_password/from_name/reply_to`.
+   - If not found (or inactive / missing app password) → return error `You are not configured in Email Configuration`. The frontend shows it as a toast and does NOT show "Invitation Sent".
+2. The vendor invitation row is still created in the DB even if email fails (current behavior preserved), but the toast clearly states the SMTP misconfiguration.
 
-## Database
+## Technical Changes
 
-Add one nullable column to `public.smtp_email_configs`:
+### 1. Edge function: `send-vendor-invitation`
+- Accept new optional field `senderEmail` in the request body (the logged-in user's email).
+- Before calling `send-smtp-email`, query `smtp_email_configs` (with service-role client) for an active row matching `senderEmail`.
+- If not found → return `400 { error: "You are not configured in Email Configuration" }` and skip sending.
+- If found → forward the SMTP credentials to `send-smtp-email` via the existing `smtp` override block:
 
-```sql
-alter table public.smtp_email_configs
-  add column if not exists reply_to text;
+```ts
+{
+  to: vendorEmail,
+  subject,
+  html,
+  smtp: {
+    host: cfg.smtp_host,
+    port: cfg.smtp_port,
+    encryption: cfg.encryption,
+    username: cfg.smtp_username,
+    password: cfg.app_password,
+    from_email: cfg.user_email,   // From = logged-in user
+    from_name: cfg.from_name,
+    reply_to: cfg.reply_to,
+  },
+}
 ```
 
-No other schema changes — `is_active`, `from_name`, `app_password`, `smtp_username`, `user_email` already exist and cover the rest of the form.
+- Remove reliance on portal-level SMTP fallback for this flow. If `senderEmail` is missing from the request, also return the same "not configured" error.
 
-`list_smtp_configs` RPC will be updated to return `reply_to` as well.
+### 2. `send-smtp-email` (no schema change required)
+- Already supports an inline `smtp` override block; just verify the override path is used and the portal-config fallback is bypassed when override is provided. No code changes expected beyond ensuring the override fully wins over `portal_config` (it already does).
 
-## Edge functions
+### 3. Frontend: `src/pages/AdminInvitations.tsx`
+- In both `createInvitation` and `sendEmailInvitation` mutations, pass `senderEmail: user?.email` in the `supabase.functions.invoke('send-vendor-invitation', { body: { ... } })` call.
+- Update error handling: if the edge function returns the "You are not configured in Email Configuration" error, show that exact message in the destructive toast (title: `Email Not Configured`, description: that string). Do not show the generic "Invitation Sent" toast in this case.
 
-- `smtp-config-save`: accept and persist `reply_to`.
-- `smtp-config-test`: accept an optional inline payload `{ host, port, encryption, username, app_password, from_email, from_name, reply_to, send_to }` so the form can run a test before the row is saved (in addition to the existing "test by id" path used from the table).
+### 4. RLS / data access
+- The lookup happens inside the edge function using the service role key, so no RLS policy changes are needed. We match strictly by `lower(user_email)` to avoid case mismatches.
 
-## Frontend changes (`src/pages/EmailConfiguration.tsx` + `src/hooks/useSmtpConfigs.tsx`)
+## Out of Scope
 
-1. Replace the current dialog body with a 2-column layout matching the screenshot:
-   - Top banner row: **Enable SMTP Sending** switch with helper text.
-   - Row 1: SMTP Host | Port
-   - Row 2: Encryption | Use App Password toggle
-   - Row 3: Username | App Password (with eye show/hide)
-   - Row 4: From Email | From Name
-   - Row 5: Reply-To (full width)
-   - Helper card: Gmail + Outlook/Office 365 instructions.
-   - Footer right: "Send test to" input + **Send Test Email** button (calls `smtp-config-test` with the unsaved form values).
-2. When Encryption changes, auto-set Port (465 for SSL, 587 for TLS/STARTTLS) unless the user has manually edited it.
-3. Keep dropdown of existing user emails for the From Email field plus free-text entry.
-4. Update `SmtpConfigInput` / `SmtpConfig` types to include `reply_to`.
-5. Add `reply_to` to the export rows and PDF/Excel columns.
-
-## Out of scope
-
-- No change to roles, RLS, or sidebar entry.
-- No change to how outbound mail (`send-smtp-email`) currently picks credentials — that can be wired to active rows in a follow-up.
+- Editing the `Email Configuration` screen UI.
+- Changing the schema of `smtp_email_configs`.
+- Changing other email flows (status notifications, finance approvals, etc.).
