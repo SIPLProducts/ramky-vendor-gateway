@@ -10,7 +10,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Trash2, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Settings as SettingsIcon, Upload } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import {
   useSapApiConfig, useUpdateSapApiConfig, useDeleteSapApiConfig,
   useSapRequestFields, useSapResponseFields, useReplaceSapRequestFields,
@@ -214,6 +215,40 @@ export default function SapApiConfigEdit() {
             <Field label="Extra Headers (JSON)">
               <Textarea rows={6} value={credForm.extra_headers} onChange={(e) => setCredForm((p) => ({ ...p, extra_headers: e.target.value }))} className="font-mono text-xs" />
             </Field>
+            <div>
+              <input
+                id="cred-upload"
+                type="file"
+                accept=".json,application/json"
+                hidden
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 2 * 1024 * 1024) { toast({ title: "File too large (max 2 MB)", variant: "destructive" }); return; }
+                  try {
+                    const obj = JSON.parse(await f.text());
+                    const next = { ...credForm };
+                    if (obj.username) next.username = String(obj.username);
+                    if (obj.password) next.password_encrypted = String(obj.password);
+                    if (obj.token) next.password_encrypted = String(obj.token);
+                    const headers = obj.headers ?? obj.extra_headers ?? (typeof obj === "object" && !obj.username && !obj.password && !obj.token ? obj : {});
+                    next.extra_headers = JSON.stringify(headers, null, 2);
+                    setCredForm(next);
+                    toast({ title: "Credentials file parsed" });
+                  } catch (err: any) {
+                    toast({ title: "Invalid JSON", description: err.message, variant: "destructive" });
+                  } finally {
+                    e.target.value = "";
+                  }
+                }}
+              />
+              <Button variant="outline" size="sm" onClick={() => document.getElementById("cred-upload")?.click()}>
+                <Upload className="h-4 w-4 mr-2" />Upload credentials JSON
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional. Supports keys: <code>username</code>, <code>password</code>, <code>token</code>, <code>headers</code>.
+              </p>
+            </div>
             <div className="flex justify-end"><Button onClick={saveCredentials} disabled={saveCreds.isPending}><Save className="h-4 w-4 mr-2" />Save Credentials</Button></div>
           </CardContent></Card>
         </TabsContent>

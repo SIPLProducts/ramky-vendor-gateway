@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Wand2 } from "lucide-react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { PayloadUploader } from "./PayloadUploader";
 
 export interface ReqField {
   field_name: string;
@@ -19,6 +20,7 @@ interface Props {
 
 export function RequestFieldsEditor({ initial, onChange }: Props) {
   const [rows, setRows] = useState<ReqField[]>(initial);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   useEffect(() => setRows(initial), [initial]);
 
@@ -38,6 +40,18 @@ export function RequestFieldsEditor({ initial, onChange }: Props) {
     onChange(next);
   };
 
+  const applyDetected = (detected: any[], strategy: "replace" | "append") => {
+    if (strategy === "replace") {
+      setRows(detected);
+      onChange(detected);
+      return;
+    }
+    const existing = new Set(rows.map((r) => r.field_name));
+    const merged = [...rows, ...detected.filter((d: ReqField) => !existing.has(d.field_name))];
+    setRows(merged);
+    onChange(merged);
+  };
+
   return (
     <div className="space-y-3">
       <Table>
@@ -52,7 +66,7 @@ export function RequestFieldsEditor({ initial, onChange }: Props) {
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (
-            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No request fields. Click Add to begin.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No request fields. Click Add or Upload payload to begin.</TableCell></TableRow>
           ) : rows.map((r, i) => (
             <TableRow key={i}>
               <TableCell><Input value={r.field_name} onChange={(e) => update(i, { field_name: e.target.value })} placeholder="BPARTNER" /></TableCell>
@@ -64,7 +78,14 @@ export function RequestFieldsEditor({ initial, onChange }: Props) {
           ))}
         </TableBody>
       </Table>
-      <Button variant="outline" size="sm" onClick={add}><Plus className="h-4 w-4 mr-2" />Add field</Button>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={add}><Plus className="h-4 w-4 mr-2" />Add field</Button>
+        <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+          <Wand2 className="h-4 w-4 mr-2" />Upload payload & auto-detect
+        </Button>
+      </div>
+
+      <PayloadUploader open={uploadOpen} onOpenChange={setUploadOpen} mode="request" onApply={applyDetected} />
     </div>
   );
 }
