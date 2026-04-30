@@ -1,3 +1,14 @@
+/**
+ * @deprecated DO NOT USE in the vendor registration flow.
+ *
+ * This hook calls the legacy `ocr-extract` edge function which uses
+ * Gemini 2.5 Flash via the Lovable AI Gateway. All KYC OCR in the vendor
+ * registration flow now goes through `useConfiguredKycApi` →
+ * `kyc-api-execute` → admin-configured providers in
+ * "KYC & Validation API Settings" (e.g. Surepass).
+ *
+ * Kept only for the Demo / Showcase pages until they are migrated.
+ */
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
