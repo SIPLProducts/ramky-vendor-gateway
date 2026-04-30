@@ -44,6 +44,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   };
 
   const handleManualVerify = async () => {
+    setManualApiResult(undefined);
     const r = await verify({
       providerName: 'MSME',
       label: 'MSME',
@@ -64,6 +65,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
         return { ok: true, message: `MSME verified — ${apiName || props.msmeNumber}`, data };
       },
     });
+    setManualApiResult((r as any).apiResult);
     if (r.ok) props.onVerifiedDetails?.(r.data || {});
   };
 
