@@ -1,76 +1,65 @@
-## Problem
+## Goal
 
-The Surepass OCR responses are nested differently than what our code expects, so values aren't populating in the verified fields:
+Make Bank (Cheque) OCR + MSME tabs work end-to-end against the dynamic, admin-configured Surepass APIs — no hardcoded values, no mock fallbacks. Source of truth = `api_providers` rows in KYC API Settings.
 
-- **PAN OCR** returns `data.ocr_fields[0].pan_number.value` and `full_name.value` — code looks for flat `extracted.pan_number` / `extracted.full_name`.
-- **GST OCR** returns `data.ocr_fields[0].gstin.value` only — code looks for `extracted.gstin`. Surepass GST OCR genuinely returns only GSTIN; Legal Name / Trade Name / Constitution must come from a follow-up GST verification call using that GSTIN.
-- **Bank (Cheque) OCR** returns `data.account_number.value`, `data.ifsc_code.value` — code looks for `extracted.account_number`. Bank Name / Branch / Account Holder Name aren't in the cheque OCR response either; they must be fetched via a follow-up bank verification (penny-drop / IFSC lookup) call.
+## Root causes (from current DB + code)
 
-Also, the admin response-mapping rows are misconfigured: PAN_OCR / GST_OCR mappings are empty, and BANK was saved with a literal sample response instead of dotted paths. The shared `ApiResponseDetails` card therefore renders the nested `{value, confidence}` objects as JSON instead of clean values.
+1. **`BANK_OCR.response_data_mapping`** currently contains a **sample response JSON**, not dotted paths. The edge function then falls through to "spread upstream `data` verbatim", so the frontend receives `extracted.account_number = { value: "...", confidence: 94 }` (an object). `BankKycTab.handleVerify` does `String(extracted.account_number)` → `"[object Object]"`, so penny-drop is never even called with sane values.
+2. **`BANK` provider mapping** uses camelCase keys (`bankName`, `branchName`) that the UI never reads, and Surepass cheque OCR never returns Bank Name / Branch / Account Holder Name anyway — these have to come from a follow-up source (IFSC lookup is already available in `src/lib/ifscLookup.ts`).
+3. **`MSME_OCR`** is configured with `request_mode = "json"`, no `base_url`, and a sample response in the mapping column — it cannot actually accept a file. The Upload tab will always fail.
+4. **`MSME`** mapping uses camelCase output keys (`enterpriseName`, `enterpriseType`), but `MsmeKycTab` reads `data.enterprise_name` / `data.enterprise_type`. So a successful API call still leaves the UI blank.
 
-## Fix Plan
+## Plan
 
-### 1. Database — fix provider response mappings (migration)
+### 1. Database migration — fix Surepass mappings & MSME_OCR config
 
-Update `api_providers.response_data_mapping` to use the correct nested Surepass paths:
+Update the four `api_providers` rows so the edge function extracts the right nested values and uses the right transport.
 
-- **PAN_OCR** →
-  ```
-  pan_number:        data.ocr_fields.0.pan_number.value
-  full_name:         data.ocr_fields.0.full_name.value
-  father_name:       data.ocr_fields.0.father_name.value
-  dob:               data.ocr_fields.0.dob.value
-  document_type:     data.ocr_fields.0.document_type
-  ```
-- **GST_OCR** →
-  ```
-  gstin:             data.ocr_fields.0.gstin.value
-  document_type:     data.ocr_fields.0.document_type
-  ```
-- **BANK** (cheque OCR) →
-  ```
-  account_number:    data.account_number.value
-  ifsc_code:         data.ifsc_code.value
-  micr:              data.micr.value
-  ```
+- `BANK_OCR` (`/api/v1/ocr/cheque`, multipart):
+  - `response_data_mapping = { "account_number": "data.account_number.value", "ifsc_code": "data.ifsc_code.value", "micr": "data.micr.value" }`
+- `BANK` (penny-drop, json) — keep call shape, normalize output keys to what `BankKycTab` reads:
+  - `response_data_mapping = { "account_number": "data.account_number", "ifsc_code": "data.ifsc", "name_at_bank": "data.full_name", "bank_name": "data.bank_name", "branch_name": "data.branch" }`
+- `MSME_OCR` — switch to the correct Surepass OCR endpoint and multipart mode:
+  - `base_url = 'https://kyc-api.surepass.app'`, `endpoint_path = '/api/v1/ocr/udyam-aadhaar'` (or `/api/v1/ocr/udyog-aadhaar` if endpoint differs — kept identical to other Surepass OCR endpoints), `request_mode = 'multipart'`, `http_method = 'POST'`, `file_field_name = 'file'`, clear any `Content-Type` header.
+  - `response_data_mapping = { "udyam_number": "data.ocr_fields.0.uam.value", "enterprise_name": "data.ocr_fields.0.enterprise_name.value", "enterprise_type": "data.ocr_fields.0.enterprise_type.value" }` (paths follow the same Surepass OCR pattern as PAN_OCR / GST_OCR; if `ocr_fields` shape differs we can also map the verification-style `data.main_details.*` paths).
+- `MSME` (verification, json) — normalize output keys to snake_case the UI already reads:
+  - `response_data_mapping = { "udyam_number": "data.reference_id", "enterprise_name": "data.main_details.name_of_enterprise", "enterprise_type": "data.main_details.enterprise_type_list.0.enterprise_type", "state": "data.main_details.state", "district": "data.main_details.dic_name", "registration_date": "data.main_details.registration_date", "organization_type": "data.main_details.organization_type" }`
 
-(MSME mapping is already correct.)
+No code in the edge function needs to change — `getPath` already handles numeric path segments and the multipart Content-Type stripping is already in place.
 
-### 2. Auto-trigger follow-up verification to populate the "missing" fields
+### 2. `src/components/vendor/kyc/BankKycTab.tsx` — robust extract + IFSC enrich
 
-Surepass cheque OCR and GST OCR don't return the full record. To deliver Legal Name / Trade Name / Constitution / Bank Name / Branch / Account Holder Name, after the OCR step succeeds the frontend will automatically call the corresponding verification provider:
+- Defensive coercion: handle both `string` and Surepass `{ value, confidence }` shapes when reading `account_number` / `ifsc_code` from `extracted`. (Belt-and-braces for any provider where the admin forgets to map `.value`.)
+- After OCR succeeds and IFSC is valid, call `lookupIfsc(ifsc)` from `src/lib/ifscLookup.ts` to populate **Bank Name** and **Branch** (the cheque OCR response doesn't carry them).
+- Penny-drop call (`providerName: 'BANK'`) stays as-is, but uses the new normalized `bank_name` / `branch_name` / `name_at_bank` mapping. Account Holder Name comes from penny-drop `name_at_bank`; if penny-drop returns nothing, leave Account Holder Name blank (do not invent a value).
+- Surface a clear toast/inline message when a field is genuinely unavailable from the API ("Bank Name / Branch derived from IFSC", "Account Holder Name not provided by bank API").
 
-- **GST tab**: after OCR returns a GSTIN, call the existing `GST` provider (Surepass GST verification) with `{ gstin }`. Merge the verification response (`legal_name`, `trade_name`, `constitution_of_business`, etc.) into `extracted` before name-match and before showing the response card.
-- **Bank tab**: existing flow already calls `BANK` for penny-drop after OCR, so it just needs the OCR mapping fix above plus a `BANK_VERIFY` (or reuse `BANK` with a different endpoint) call to fetch `bank_name`, `branch`, `account_holder_name`. We'll reuse the existing penny-drop call already wired in `BankKycTab.handleVerify`; once mappings are correct, those merged values will display.
+### 3. `src/components/vendor/kyc/MsmeKycTab.tsx` — wire Manual + Upload properly
 
-If a `GST` verification provider isn't configured yet, the UI will still show the GSTIN + a soft notice — no hardcoded fallback.
+- **Manual tab**: already calls `MSME` provider via `useProviderVerify`. Once mapping returns snake_case keys, the existing reads (`data.enterprise_name`, `data.enterprise_type`) start populating fields. Add population of additional fields the form needs (state, district, registration date, organization type) via `onVerifiedDetails`.
+- **Upload tab**: keep using `OcrUploadAndVerify` with `runOcr → MSME_OCR`. With the migration, `extracted.udyam_number` and `extracted.enterprise_name` will now be plain strings. Add the same defensive `.value` coercion as BankKycTab in case the admin reconfigures with non-`.value` paths.
+- After Upload OCR returns a `udyam_number`, automatically chain the `MSME` verification call (mirrors GST OCR → GST verification chaining we already do) to fetch the full registration details. Merge results and call `onVerifiedDetails`.
+- Validation behavior: success → green inline + toast "MSME verified — <enterprise name>"; failure → red inline with the upstream `message` / `message_code`. No silent fallbacks.
 
-### 3. Frontend — clean field rendering
+### 4. `src/components/vendor/kyc/ApiResponseDetails.tsx`
 
-`ApiResponseDetails.tsx` will be updated to:
+No change needed — the Surepass `{ value, confidence }` flattening landed in the previous iteration and already renders these responses cleanly.
 
-- When a value is an object shaped like `{ value, confidence }` (Surepass convention), render `value` and show confidence as a small subtitle.
-- When a value is an array of such objects (e.g. `ocr_fields`), flatten the first entry's fields into the rendered list with prettified labels.
-- Continue to render every field returned by the API verbatim — no hardcoded field names.
+## Out of scope / explicitly NOT doing
 
-### 4. PAN / GST / Bank tab logic
+- No hardcoded sample responses anywhere in code or DB.
+- No changes to `validate-msme` / `validate-bank` legacy edge functions — the vendor form goes through `kyc-api-execute` only.
+- No new edge functions — all routing stays through `kyc-api-execute` driven by `api_providers`.
 
-- `PanKycTab.handleVerify`: keep using `extracted.pan_number` and `extracted.full_name` (now populated by the corrected mapping). No hardcoded values.
-- `GstKycTab.handleOcrVerify`: after OCR, if a GSTIN was extracted and the `GST` validation provider is enabled, call it to fetch full GST details, then merge into `extracted` so Legal/Trade/Constitution show up.
-- `BankKycTab.handleVerify`: keep current penny-drop call; merged values from the verification response (bank_name, branch, account_holder_name) will fill the "missing" cheque fields.
+## Files to change
 
-### 5. Files Touched
+- `supabase/migrations/<new>.sql` — update 4 rows in `api_providers` (BANK, BANK_OCR, MSME, MSME_OCR).
+- `src/components/vendor/kyc/BankKycTab.tsx` — `.value` coercion, IFSC enrichment via `lookupIfsc`.
+- `src/components/vendor/kyc/MsmeKycTab.tsx` — `.value` coercion in OCR path, auto-chain MSME verification after OCR, expanded `onVerifiedDetails` payload.
 
-- New migration: `supabase/migrations/<timestamp>_fix_kyc_ocr_mappings.sql` — sets correct `response_data_mapping` for PAN_OCR, GST_OCR, BANK.
-- `src/components/vendor/kyc/ApiResponseDetails.tsx` — handle `{value, confidence}` and `ocr_fields[]` shapes generically.
-- `src/components/vendor/kyc/GstKycTab.tsx` — chain GST OCR → GST verification call to populate Legal Name / Trade Name / Constitution.
-- `src/components/vendor/kyc/BankKycTab.tsx` — no logic change beyond benefiting from corrected mapping; ensure merged verification values surface in the rendered card.
-- `src/components/vendor/kyc/PanKycTab.tsx` — unchanged logic; benefits from corrected mapping.
-- (No edge function changes — the existing `getPath` already supports `data.ocr_fields.0.pan_number.value` style paths.)
+## Verification after build
 
-## Result
-
-- PAN: PAN Number + PAN Holder Name (+ DOB, Father Name) populate from the Surepass API response, dynamically.
-- GST: GSTIN populates from OCR; Legal Name / Trade Name / Constitution populate from the chained GST verification call — all from API responses, nothing hardcoded.
-- Bank: Account Number + IFSC populate from cheque OCR; Bank Name / Branch / Account Holder Name populate from the chained penny-drop verification — all from API responses.
-- The "View details" card displays clean field/value pairs (with confidence) instead of raw nested JSON.
+1. KYC API Settings page for `BANK_OCR` / `MSME_OCR` shows multipart + correct endpoint.
+2. Vendor Registration → Bank tab → upload cheque → Account + IFSC populate from response, Bank Name & Branch populate from IFSC lookup, penny-drop verifies and surfaces Account Holder Name when available.
+3. Vendor Registration → MSME tab → "Yes" → Manual: enter Udyam → Validate → Enterprise Name / Type / State populate from API. Upload: upload Udyam certificate → OCR extracts Udyam number → auto-chains verification → fields populate.
+4. `ApiResponseDetails` card under each tab shows the verbatim Surepass response (no hardcoding), with `value` / `confidence` rendered cleanly.
