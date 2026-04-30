@@ -151,7 +151,46 @@ export function DocumentVerificationStep({
   onComplete,
   onStageChange,
 }: DocumentVerificationStepProps) {
-  const { extractFromFile } = useOcrExtraction();
+  // OCR is now exclusively driven by the admin-configured providers in
+  // "KYC & Validation API Settings" (see kyc-api-execute edge function).
+  // The Gemini-based useOcrExtraction hook has been removed from this flow.
+  const { callProvider } = useConfiguredKycApi();
+
+  const extractFromFile = useCallback(
+    async (file: File, documentType: OcrDocumentType, _vendorId?: string) => {
+      const cfg = OCR_PROVIDER_BY_KIND[documentType];
+      const r = await callProvider({ providerName: cfg.provider, file });
+      // Surface upstream provider identity + message_code/status_code so it's
+      // obvious the call hit the configured provider (not Gemini).
+      toastKycResult(cfg.label, r);
+      if (!r.found) {
+        return {
+          success: false as const,
+          error: `${cfg.label} provider not configured. Add it in KYC & Validation API Settings.`,
+        };
+      }
+      if (!r.ok || !r.data) {
+        return {
+          success: false as const,
+          error: r.message || `${cfg.label} failed`,
+          extracted: r.data,
+        };
+      }
+      // Normalize PAN OCR shape: Surepass returns full_name, the rest of this
+      // component expects holder_name. Alias without losing the original key.
+      const extracted: Record<string, any> = { ...r.data };
+      if (documentType === "pan") {
+        if (extracted.full_name && !extracted.holder_name) extracted.holder_name = extracted.full_name;
+      }
+      return {
+        success: true as const,
+        extracted,
+        confidence: 1,
+        model: r.provider_name || cfg.provider,
+      };
+    },
+    [callProvider],
+  );
 
   // Stage 1: GST
   const [isGstRegistered, setIsGstRegistered] = useState<boolean | null>(
