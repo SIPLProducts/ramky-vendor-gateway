@@ -32,13 +32,22 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
   }
 
+  // Coerce Surepass `{ value, confidence }` shape to a plain string in case
+  // the admin's response_data_mapping forgets to drill into `.value`.
+  const pick = (v: any): string => {
+    if (v == null) return '';
+    if (typeof v === 'string' || typeof v === 'number') return String(v);
+    if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+    return '';
+  };
+
   const handleManualVerify = async () => {
     const r = await verify({
       providerName: 'MSME',
       label: 'MSME',
       input: { msme: props.msmeNumber, id_number: props.msmeNumber },
       validate: (data) => {
-        const apiName = String(data.enterprise_name || data.legal_name || '').trim();
+        const apiName = pick(data.enterprise_name || data.legal_name).trim();
         if (props.legalName && apiName) {
           const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
           const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -46,7 +55,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
             return { ok: false, message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`, data };
           }
         }
-        const cat = String(data.enterprise_type || '').toLowerCase();
+        const cat = pick(data.enterprise_type).toLowerCase();
         if (cat === 'micro' || cat === 'small' || cat === 'medium') {
           props.onMsmeCategoryChange?.(cat as any);
         }
@@ -68,10 +77,27 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
+  // After OCR extracts the Udyam number, automatically chain a call to the
+  // configured `MSME` verification provider so we can populate the full
+  // registration record (Enterprise Name, Type, State, District, etc.).
+  // All values come from API responses — nothing is hardcoded.
   const handleOcrVerify = async (extracted: Record<string, any>) => {
-    const extractedNum = String(extracted.udyam_number || '').toUpperCase().trim();
+    const extractedNum = pick(extracted.udyam_number).toUpperCase().trim();
     if (extractedNum) props.onMsmeNumberChange(extractedNum);
-    const apiName = String(extracted.enterprise_name || '').trim();
+
+    let merged: Record<string, any> = { ...extracted };
+    if (extractedNum) {
+      const verifyRes = await callProvider({
+        providerName: 'MSME',
+        input: { msme: extractedNum, id_number: extractedNum },
+      });
+      toastKycResult('MSME', verifyRes);
+      if (verifyRes.found && verifyRes.ok && verifyRes.data) {
+        merged = { ...merged, ...verifyRes.data };
+      }
+    }
+
+    const apiName = pick(merged.enterprise_name || merged.legal_name).trim();
     if (props.legalName && apiName) {
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -79,16 +105,16 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
         return {
           ok: false,
           message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`,
-          apiData: extracted,
+          apiData: merged,
         };
       }
     }
-    const cat = String(extracted.enterprise_type || '').toLowerCase();
+    const cat = pick(merged.enterprise_type).toLowerCase();
     if (cat === 'micro' || cat === 'small' || cat === 'medium') {
       props.onMsmeCategoryChange?.(cat as any);
     }
-    props.onVerifiedDetails?.(extracted);
-    return { ok: true, message: `MSME verified — ${apiName || extractedNum || 'see API response below'}`, apiData: extracted };
+    props.onVerifiedDetails?.(merged);
+    return { ok: true, message: `MSME verified — ${apiName || extractedNum || 'see API response below'}`, apiData: merged };
   };
 
   return (
