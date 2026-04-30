@@ -130,7 +130,7 @@ export function BankKycTab(props: BankKycTabProps) {
         onFileChange={props.onCancelledChequeFileChange}
         runOcr={runBankOcr}
         onVerifyExtracted={handleVerify}
-        buildComparisonRows={buildRows}
+        
         onVerified={() => {}}
         vendorId={props.vendorId}
       />
