@@ -160,6 +160,9 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               canVerify={!!props.msmeNumber && props.msmeNumber.length >= 10}
               helperText="Enter your Udyam registration number and click Verify."
             />
+            {manualApiResult && (
+              <ApiResponseDetails result={manualApiResult} title="MSME verification response" />
+            )}
           </TabsContent>
 
           <TabsContent value="upload" className="space-y-3">
