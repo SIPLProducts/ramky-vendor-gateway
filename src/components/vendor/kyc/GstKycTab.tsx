@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Download, FileText, Pencil, Upload } from 'lucide-react';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
-import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
+import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
