@@ -22,11 +22,11 @@ export function PanKycTab(props: PanKycTabProps) {
     props.onStatusChange?.('validating');
     const r = await callProvider({ providerName: 'PAN_OCR', file });
     toastKycResult('PAN OCR', r);
-    if (!r.found) {
+    if (!r.found && !r.message_code) {
       props.onStatusChange?.('failed');
-      return { success: false, error: r.message || 'PAN OCR provider not configured' };
+      return { success: false, error: 'PAN OCR provider not configured. Add it in KYC & Validation API Settings.' };
     }
-    if (!r.ok || !r.data) {
+    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
       props.onStatusChange?.('failed');
       return { success: false, error: r.message || 'PAN OCR failed' };
     }

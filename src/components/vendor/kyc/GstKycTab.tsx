@@ -66,8 +66,12 @@ export function GstKycTab(props: GstKycTabProps) {
   const runGstOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'GST_OCR', file });
     toastKycResult('GST OCR', r);
-    if (!r.found) return { success: false, error: r.message || 'GST OCR provider not configured' };
-    if (!r.ok || !r.data) return { success: false, error: r.message || 'GST OCR failed' };
+    if (!r.found && !r.message_code) {
+      return { success: false, error: 'GST OCR provider not configured. Add it in KYC & Validation API Settings.' };
+    }
+    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
+      return { success: false, error: r.message || 'GST OCR failed' };
+    }
     return { success: true, extracted: r.data };
   };
 

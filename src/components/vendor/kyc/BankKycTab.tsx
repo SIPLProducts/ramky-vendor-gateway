@@ -29,8 +29,12 @@ export function BankKycTab(props: BankKycTabProps) {
   const runBankOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'BANK_OCR', file });
     toastKycResult('Bank OCR', r);
-    if (!r.found) return { success: false, error: r.message || 'Bank OCR provider not configured' };
-    if (!r.ok || !r.data) return { success: false, error: r.message || 'Could not read cheque' };
+    if (!r.found && !r.message_code) {
+      return { success: false, error: 'Bank OCR provider not configured. Add it in KYC & Validation API Settings.' };
+    }
+    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
+      return { success: false, error: r.message || 'Could not read cheque' };
+    }
     return { success: true, extracted: r.data };
   };
 
