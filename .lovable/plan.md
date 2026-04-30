@@ -1,39 +1,43 @@
-## Goal
+I found why you still see the old MSME screen: the visible vendor registration page is using `DocumentVerificationStep.tsx` for Step 1, not the newer `MsmeKycTab.tsx` used elsewhere. The previous changes were applied to the other MSME tab/component and KYC settings, so the Step 1 registration UI kept showing only the old upload-only flow.
 
-In **KYC & Validation API Settings** (`/admin/kyc-api-settings`):
+Plan to fix it immediately after approval:
 
-1. **Remove** the `MSME / Udyam OCR` template (and the existing `MSME_OCR` provider row), since OCR for MSME is no longer needed.
-2. **Add** a clearly-named template for the Udyam manual validation API: **"MSME / Udyam Manual"** under the **Validation APIs** tab — pre-wired to the Surepass `udyog-aadhaar` endpoint with the full response mapping (matching the sample payload you shared).
-3. The existing `MSME` provider row will be **renamed/repointed** to this new template (same `provider_name = 'MSME'` so the vendor form keeps working — only the display name + the complete response mapping change).
+1. Update the actual Step 1 MSME screen
+   - In `src/components/vendor/steps/DocumentVerificationStep.tsx`, change the MSME section so when the user selects Yes, it shows two options:
+     - Manual Entry
+     - Upload
+   - Keep Upload behaving like the existing current upload flow.
+   - Make Manual Entry the default option so the new behavior is visible immediately.
 
-The vendor-side MSME tab already implements **Yes/No → Manual / Upload tabs → Validate button** that triggers the configured `MSME` provider dynamically, so no UI changes are needed there. Only the admin KYC settings screen and the database provider row need updating.
+2. Add manual Udyam validation in Step 1
+   - Add a Udyam Number input with a Validate button.
+   - On Validate, call the configured KYC API provider named `MSME`.
+   - Send payload equivalent to:
+     ```json
+     { "id_number": "UDYAM-GJ-25-000000" }
+     ```
+     while also preserving the existing mapped `msme` variable compatibility.
 
-## Changes
+3. Populate the MSME fields from the API response
+   - Map the configured API response fields into the existing MSME verified panel:
+     - Udyam Number
+     - Enterprise Name
+     - Enterprise Type
+     - Major Activity
+   - Also capture additional fields already configured in the KYC provider mapping where useful, without hardcoding any response values.
+   - Mark MSME as verified after a successful response so the user can proceed to Bank.
 
-### 1. `src/pages/KycApiSettings.tsx`
-- **Remove** the `MSME_OCR` entry from the `TEMPLATES` array (lines 52–60). The "MSME / Udyam OCR" Add button will disappear from the OCR tab.
-- **Replace** the existing `MSME` template (lines 82–84) with a fully-mapped **"MSME / Udyam Manual"** template:
-  - `display_name`: `"MSME / Udyam Manual"`
-  - `endpoint_path`: `/api/v1/corporate/udyog-aadhaar`
-  - `request_body_template`: `{ id_number: "{{msme}}" }`
-  - `response_data_mapping`: full set of dotted paths derived from the sample response (`data.uan`, `data.main_details.name_of_enterprise`, `data.main_details.enterprise_type_list.0.enterprise_type`, `data.main_details.major_activity`, `data.main_details.social_category`, `data.main_details.date_of_commencement`, `data.main_details.date_of_incorporation`, `data.main_details.applied_date`, `data.main_details.registration_date`, `data.main_details.organization_type`, `data.main_details.state`, `data.main_details.dic_name` (district), `data.main_details.city`, `data.main_details.pin`, `data.main_details.flat`, `data.main_details.road`, `data.main_details.village`, `data.main_details.mobile_number`, `data.main_details.email`, `data.main_details.msme_dfo`, `data.nic_code.0.nic_2_digit/4_digit/5_digit`, `data.location_of_plant_details`).
+4. Remove the old MSME OCR dependency from Step 1
+   - Step 1 currently still maps MSME upload to `MSME_OCR`, even though MSME OCR was removed from KYC API settings.
+   - I will update the upload path so it no longer fails because of the removed MSME OCR provider.
+   - If Upload is used, it will keep the current UI behavior but route the Udyam verification through the manual MSME validation provider once a Udyam number is available.
 
-### 2. Database migration
-- **Delete** the existing `MSME_OCR` row from `api_providers` (its credentials cascade-delete).
-- **Update** the existing `MSME` provider row:
-  - `display_name = 'MSME / Udyam Manual'`
-  - `response_data_mapping` set to the same complete map as the new template (so providers already added in the database immediately reflect the corrected mapping — matches what's already mostly there but ensures parity).
+5. Keep registration data saving consistent
+   - Ensure the verified MSME data still flows into `VendorRegistration.tsx` and then into statutory details (`msmeNumber`, `msmeCategory`, certificate file).
+   - Existing GST, PAN, and Bank flows will not be changed.
 
-### 3. No vendor-form changes
-`src/components/vendor/kyc/MsmeKycTab.tsx` already:
-- Shows **Yes / No** radio for "Are you MSME registered?"
-- On **Yes** shows two tabs: **Enter manually** and **Upload certificate**
-- Manual tab has Udyam number input + **Validate** button that calls the dynamic `MSME` provider via `useProviderVerify`
-- Upload tab keeps existing OCR-based flow (uses the `MSME_OCR` provider only if configured — gracefully shows "not configured" if removed)
+Technical files to edit:
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- Potentially `src/pages/VendorRegistration.tsx` only if additional MSME fields need to be persisted from Step 1
 
-`ComplianceStep.tsx` already auto-populates Enterprise name, type, address, contact, NIC, etc. from the dynamic response.
-
-## Result
-
-- Admin's KYC settings screen no longer offers MSME OCR; the Validation APIs tab shows **MSME / Udyam Manual** as the single MSME entry.
-- Vendor's MSME tab continues to work: Yes → Manual → enter Udyam number → Validate → all fields populated from the live Surepass response (no hardcoding).
+No database change should be required because the `MSME` provider and KYC API settings were already updated earlier.
