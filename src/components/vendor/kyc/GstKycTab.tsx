@@ -162,7 +162,7 @@ export function GstKycTab(props: GstKycTabProps) {
               runOcr={runGstOcr}
               skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
-              buildComparisonRows={buildRows}
+              apiLabel="GST OCR"
               onVerified={() => { /* state already updated via props */ }}
               vendorId={props.vendorId}
             />
