@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Pencil, Upload } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
-import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
+import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
