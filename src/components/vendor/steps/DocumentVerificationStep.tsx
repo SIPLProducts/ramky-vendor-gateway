@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles } from "lucide-react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -415,6 +415,84 @@ export function DocumentVerificationStep({
     });
 
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+
+  // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
+  const [msmeMode, setMsmeMode] = useState<"manual" | "upload">("manual");
+  const [msmeManualNumber, setMsmeManualNumber] = useState<string>("");
+  const [msmeManualBusy, setMsmeManualBusy] = useState(false);
+  const [msmeManualError, setMsmeManualError] = useState<string | null>(null);
+
+  const pickValue = (v: any): string => {
+    if (v == null) return "";
+    if (typeof v === "string" || typeof v === "number") return String(v);
+    if (typeof v === "object" && "value" in v) return String((v as any).value ?? "");
+    return "";
+  };
+
+  const handleMsmeManualValidate = async () => {
+    const num = msmeManualNumber.trim().toUpperCase();
+    if (!num) {
+      setMsmeManualError("Please enter your Udyam number.");
+      return;
+    }
+    setMsmeManualError(null);
+    setMsmeManualBusy(true);
+    setMsmeDoc({ status: "verifying", fileName: undefined, fileSize: undefined });
+    try {
+      const r = await callProvider({
+        providerName: "MSME",
+        input: { id_number: num, msme: num },
+      });
+      toastKycResult("MSME", r);
+      if (!r.found) {
+        const msg = "MSME validation provider is not configured. Add it in KYC & Validation API Settings.";
+        setMsmeManualError(msg);
+        setMsmeDoc({ status: "failed", errorMessage: msg });
+        return;
+      }
+      if (!r.ok || !r.data) {
+        const msg = r.message || "Udyam validation failed. Please check the number and try again.";
+        setMsmeManualError(msg);
+        setMsmeDoc({ status: "failed", errorMessage: msg });
+        return;
+      }
+      const d = r.data as Record<string, any>;
+      const ocrShape = {
+        udyam_number: pickValue(d.udyam_number) || num,
+        enterprise_name: pickValue(d.enterprise_name || d.legal_name),
+        enterprise_type: pickValue(d.enterprise_type),
+        major_activity: pickValue(d.major_activity),
+        organization_type: pickValue(d.organization_type),
+        registration_date: pickValue(d.registration_date),
+        social_category: pickValue(d.social_category),
+        state: pickValue(d.state),
+        district: pickValue(d.district),
+        city: pickValue(d.city),
+        pin_code: pickValue(d.pin_code),
+        mobile: pickValue(d.mobile),
+        email: pickValue(d.email),
+        nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
+      };
+      const apiName = ocrShape.enterprise_name;
+      const score = nameMatchScore(effectiveLegalName, apiName);
+      setMsmeDoc({
+        status: "verified",
+        fileName: `Udyam ${ocrShape.udyam_number}`,
+        ocrData: ocrShape,
+        originalOcrData: ocrShape,
+        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number },
+        nameMatchScore: score,
+        verifiedAt: Date.now(),
+      });
+    } catch (e: any) {
+      const msg = e?.message || "Udyam validation failed unexpectedly.";
+      setMsmeManualError(msg);
+      setMsmeDoc({ status: "failed", errorMessage: msg });
+    } finally {
+      setMsmeManualBusy(false);
+    }
+  };
+
   const handleBankUpload = (file: File) =>
     runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
@@ -914,67 +992,224 @@ export function DocumentVerificationStep({
                 )}
 
                 {isMsmeRegistered === true && (
-                  <DocSplitRow
-                    uploadLabel="Udyam Certificate"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    doc={msmeDoc}
-                    onUpload={handleMsmeUpload}
-                    onReset={() => setMsmeDoc(idleDoc)}
-                    busyLabel={
-                      msmeDoc.status === "uploading" ? "Uploading…" :
-                      msmeDoc.status === "ocr" ? "Reading Udyam…" :
-                      msmeDoc.status === "verifying" ? "Verifying…" : ""
-                    }
-                    verifiedFields={
-                      <div className="space-y-3">
-                        <ReviewBanner />
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <EditableOcrField
-                            label="Udyam Number"
-                            value={msmeDoc.ocrData?.udyam_number}
-                            originalValue={msmeDoc.originalOcrData?.udyam_number}
-                            onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
-                            mono
+                  <Tabs value={msmeMode} onValueChange={(v) => setMsmeMode(v as "manual" | "upload")} className="space-y-4">
+                    <TabsList className="grid grid-cols-2 max-w-sm">
+                      <TabsTrigger value="manual">
+                        <Pencil className="h-3.5 w-3.5 mr-2" />
+                        Manual Entry
+                      </TabsTrigger>
+                      <TabsTrigger value="upload">
+                        <Upload className="h-3.5 w-3.5 mr-2" />
+                        Upload
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="manual" className="space-y-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Udyam Number *
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={msmeManualNumber}
+                            onChange={(e) => setMsmeManualNumber(e.target.value.toUpperCase())}
+                            placeholder="UDYAM-XX-00-0000000"
+                            disabled={msmeManualBusy || msmeDoc.status === "verified"}
+                            className="font-mono uppercase"
                           />
-                          <EditableOcrField
-                            label="Enterprise Name"
-                            value={msmeDoc.ocrData?.enterprise_name}
-                            originalValue={msmeDoc.originalOcrData?.enterprise_name}
-                            onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <EditableOcrField
-                            label="Enterprise Type"
-                            value={msmeDoc.ocrData?.enterprise_type}
-                            originalValue={msmeDoc.originalOcrData?.enterprise_type}
-                            onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
-                            placeholder="Micro / Small / Medium"
-                          />
-                          <EditableOcrField
-                            label="Major Activity"
-                            value={msmeDoc.ocrData?.major_activity}
-                            originalValue={msmeDoc.originalOcrData?.major_activity}
-                            onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
-                            placeholder="e.g. Manufacturing, Services, Trading"
-                          />
-                        </div>
-                        {!msmeDoc.ocrData?.major_activity && (
-                          <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                            {msmeDoc.file ? (
-                              <>
-                                <Sparkles className="h-3 w-3 text-primary" />
-                                Reading Major Activity from certificate…
-                              </>
+                          <Button
+                            type="button"
+                            onClick={handleMsmeManualValidate}
+                            disabled={
+                              msmeManualBusy ||
+                              msmeDoc.status === "verified" ||
+                              msmeManualNumber.trim().length < 10
+                            }
+                          >
+                            {msmeManualBusy ? (
+                              <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Validating…</>
                             ) : (
-                              <>Couldn't read Major Activity from the certificate — please enter manually.</>
+                              "Validate"
                             )}
-                          </p>
+                          </Button>
+                        </div>
+                        {msmeManualError && (
+                          <div className="flex items-start gap-2 p-2.5 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-xs">
+                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <span>{msmeManualError}</span>
+                          </div>
+                        )}
+                        {msmeDoc.status === "verified" && (
+                          <div className="space-y-3 pt-2">
+                            <ReviewBanner />
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <EditableOcrField
+                                label="Udyam Number"
+                                value={msmeDoc.ocrData?.udyam_number}
+                                originalValue={msmeDoc.originalOcrData?.udyam_number}
+                                onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
+                                mono
+                              />
+                              <EditableOcrField
+                                label="Enterprise Name"
+                                value={msmeDoc.ocrData?.enterprise_name}
+                                originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                              />
+                              <EditableOcrField
+                                label="Enterprise Type"
+                                value={msmeDoc.ocrData?.enterprise_type}
+                                originalValue={msmeDoc.originalOcrData?.enterprise_type}
+                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
+                                placeholder="Micro / Small / Medium"
+                              />
+                              <EditableOcrField
+                                label="Major Activity"
+                                value={msmeDoc.ocrData?.major_activity}
+                                originalValue={msmeDoc.originalOcrData?.major_activity}
+                                onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
+                                placeholder="e.g. Manufacturing, Services, Trading"
+                              />
+                              <EditableOcrField
+                                label="Organization Type"
+                                value={msmeDoc.ocrData?.organization_type}
+                                originalValue={msmeDoc.originalOcrData?.organization_type}
+                                onChange={(v) => setOcrField(setMsmeDoc, "organization_type", v)}
+                              />
+                              <EditableOcrField
+                                label="Registration Date"
+                                value={msmeDoc.ocrData?.registration_date}
+                                originalValue={msmeDoc.originalOcrData?.registration_date}
+                                onChange={(v) => setOcrField(setMsmeDoc, "registration_date", v)}
+                              />
+                              <EditableOcrField
+                                label="State"
+                                value={msmeDoc.ocrData?.state}
+                                originalValue={msmeDoc.originalOcrData?.state}
+                                onChange={(v) => setOcrField(setMsmeDoc, "state", v)}
+                              />
+                              <EditableOcrField
+                                label="District"
+                                value={msmeDoc.ocrData?.district}
+                                originalValue={msmeDoc.originalOcrData?.district}
+                                onChange={(v) => setOcrField(setMsmeDoc, "district", v)}
+                              />
+                              <EditableOcrField
+                                label="City"
+                                value={msmeDoc.ocrData?.city}
+                                originalValue={msmeDoc.originalOcrData?.city}
+                                onChange={(v) => setOcrField(setMsmeDoc, "city", v)}
+                              />
+                              <EditableOcrField
+                                label="PIN Code"
+                                value={msmeDoc.ocrData?.pin_code}
+                                originalValue={msmeDoc.originalOcrData?.pin_code}
+                                onChange={(v) => setOcrField(setMsmeDoc, "pin_code", v)}
+                              />
+                              <EditableOcrField
+                                label="Mobile"
+                                value={msmeDoc.ocrData?.mobile}
+                                originalValue={msmeDoc.originalOcrData?.mobile}
+                                onChange={(v) => setOcrField(setMsmeDoc, "mobile", v)}
+                              />
+                              <EditableOcrField
+                                label="Email"
+                                value={msmeDoc.ocrData?.email}
+                                originalValue={msmeDoc.originalOcrData?.email}
+                                onChange={(v) => setOcrField(setMsmeDoc, "email", v)}
+                              />
+                              <EditableOcrField
+                                label="Social Category"
+                                value={msmeDoc.ocrData?.social_category}
+                                originalValue={msmeDoc.originalOcrData?.social_category}
+                                onChange={(v) => setOcrField(setMsmeDoc, "social_category", v)}
+                              />
+                              <EditableOcrField
+                                label="NIC Code"
+                                value={msmeDoc.ocrData?.nic_code}
+                                originalValue={msmeDoc.originalOcrData?.nic_code}
+                                onChange={(v) => setOcrField(setMsmeDoc, "nic_code", v)}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setMsmeDoc(idleDoc); setMsmeManualNumber(""); setMsmeManualError(null); }}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                              Re-validate
+                            </Button>
+                          </div>
                         )}
                       </div>
-                    }
-                  />
+                    </TabsContent>
+
+                    <TabsContent value="upload" className="space-y-3">
+                      <DocSplitRow
+                        uploadLabel="Udyam Certificate"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        doc={msmeDoc}
+                        onUpload={handleMsmeUpload}
+                        onReset={() => setMsmeDoc(idleDoc)}
+                        busyLabel={
+                          msmeDoc.status === "uploading" ? "Uploading…" :
+                          msmeDoc.status === "ocr" ? "Reading Udyam…" :
+                          msmeDoc.status === "verifying" ? "Verifying…" : ""
+                        }
+                        verifiedFields={
+                          <div className="space-y-3">
+                            <ReviewBanner />
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <EditableOcrField
+                                label="Udyam Number"
+                                value={msmeDoc.ocrData?.udyam_number}
+                                originalValue={msmeDoc.originalOcrData?.udyam_number}
+                                onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
+                                mono
+                              />
+                              <EditableOcrField
+                                label="Enterprise Name"
+                                value={msmeDoc.ocrData?.enterprise_name}
+                                originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <EditableOcrField
+                                label="Enterprise Type"
+                                value={msmeDoc.ocrData?.enterprise_type}
+                                originalValue={msmeDoc.originalOcrData?.enterprise_type}
+                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
+                                placeholder="Micro / Small / Medium"
+                              />
+                              <EditableOcrField
+                                label="Major Activity"
+                                value={msmeDoc.ocrData?.major_activity}
+                                originalValue={msmeDoc.originalOcrData?.major_activity}
+                                onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
+                                placeholder="e.g. Manufacturing, Services, Trading"
+                              />
+                            </div>
+                            {!msmeDoc.ocrData?.major_activity && (
+                              <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                {msmeDoc.file ? (
+                                  <>
+                                    <Sparkles className="h-3 w-3 text-primary" />
+                                    Reading Major Activity from certificate…
+                                  </>
+                                ) : (
+                                  <>Couldn't read Major Activity from the certificate — please enter manually.</>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        }
+                      />
+                    </TabsContent>
+                  </Tabs>
                 )}
+
 
                 {isMsmeRegistered === true && msmeDoc.status === "verified" && typeof msmeDoc.nameMatchScore === "number" && (
                   <CrossCheckStrip
