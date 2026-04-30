@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { FileUpload } from '@/components/vendor/FileUpload';
-import { OcrComparisonCard } from '@/components/vendor/OcrComparisonCard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Loader2, ScanLine, ShieldCheck, CheckCircle2, XCircle, RotateCw } from 'lucide-react';
 import type { OcrDocumentType } from '@/hooks/useOcrExtraction';
+import type { KycApiResult } from '@/hooks/useConfiguredKycApi';
+import { ApiResponseDetails } from './ApiResponseDetails';
 
+/** Kept for backwards compatibility — most callers no longer pass this. */
 export interface ComparisonRow {
   label: string;
   ocrValue?: string;
@@ -18,24 +20,33 @@ interface OcrUploadAndVerifyProps {
   acceptedFileTypes?: string;
   currentFile?: File | null;
   onFileChange: (file: File | null) => void;
-  /** Required: OCR runner backed by an admin-configured KYC provider. */
-  runOcr: (file: File) => Promise<{ success: boolean; extracted?: Record<string, any>; error?: string }>;
+  /**
+   * Required: OCR runner backed by an admin-configured KYC provider.
+   * Should also pass through the raw `KycApiResult` so the UI can render
+   * exactly what the upstream API returned.
+   */
+  runOcr: (file: File) => Promise<{
+    success: boolean;
+    extracted?: Record<string, any>;
+    error?: string;
+    /** Raw KYC API result so we can show whatever fields the API returned. */
+    apiResult?: KycApiResult;
+  }>;
   /** Run validation API after OCR. Return { ok, message, apiData } */
   onVerifyExtracted: (extracted: Record<string, any>) => Promise<{
     ok: boolean;
     message: string;
     apiData?: Record<string, any>;
+    /** Optional raw KYC API result from the verification step. */
+    apiResult?: KycApiResult;
   }>;
-  /** Build comparison rows once both OCR + API data are present */
-  buildComparisonRows: (
-    extracted: Record<string, any>,
-    apiData?: Record<string, any>,
-  ) => ComparisonRow[];
   /** Called once verification passes — parent should commit verified values to its form */
   onVerified: (verified: { extracted: Record<string, any>; apiData?: Record<string, any> }) => void;
   vendorId?: string;
   /** When OCR result is the same as the validated record, skip the second "Verifying" phase. */
   skipVerifyPhase?: boolean;
+  /** Friendly label shown above the API response card (e.g. "GST OCR"). */
+  apiLabel?: string;
 }
 
 type Phase = 'idle' | 'ocr' | 'verifying' | 'passed' | 'failed';
@@ -48,20 +59,20 @@ export function OcrUploadAndVerify({
   onFileChange,
   runOcr,
   onVerifyExtracted,
-  buildComparisonRows,
   onVerified,
   vendorId,
   skipVerifyPhase,
+  apiLabel,
 }: OcrUploadAndVerifyProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<string>('');
-  const [extracted, setExtracted] = useState<Record<string, any> | undefined>();
-  const [apiData, setApiData] = useState<Record<string, any> | undefined>();
+  const [ocrResult, setOcrResult] = useState<KycApiResult | undefined>();
+  const [verifyResult, setVerifyResult] = useState<KycApiResult | undefined>();
   const [showDetails, setShowDetails] = useState(true);
 
   const runPipeline = async (file: File) => {
-    setExtracted(undefined);
-    setApiData(undefined);
+    setOcrResult(undefined);
+    setVerifyResult(undefined);
     setPhase('ocr');
     setMessage('Reading document via configured OCR provider…');
 
@@ -71,19 +82,20 @@ export function OcrUploadAndVerify({
       return;
     }
     const ocr = await runOcr(file);
+    setOcrResult(ocr.apiResult);
+
     if (!ocr.success || !ocr.extracted) {
       setPhase('failed');
       setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
       return;
     }
-    setExtracted(ocr.extracted);
 
     if (!skipVerifyPhase) {
       setPhase('verifying');
       setMessage('Verifying extracted details with the validation API…');
     }
     const verify = await onVerifyExtracted(ocr.extracted);
-    setApiData(verify.apiData);
+    setVerifyResult(verify.apiResult);
 
     if (verify.ok) {
       setPhase('passed');
@@ -103,8 +115,6 @@ export function OcrUploadAndVerify({
   const handleRetry = async () => {
     if (currentFile) await runPipeline(currentFile);
   };
-
-  const rows = extracted ? buildComparisonRows(extracted, apiData) : [];
 
   return (
     <div className="space-y-3">
@@ -169,8 +179,12 @@ export function OcrUploadAndVerify({
         </Alert>
       )}
 
-      {rows.length > 0 && (phase === 'failed' || (phase === 'passed' && showDetails)) && (
-        <OcrComparisonCard rows={rows} />
+      {/* Show whatever the OCR / verify APIs actually returned — no hardcoded fields. */}
+      {(phase === 'failed' || (phase === 'passed' && showDetails)) && ocrResult && (
+        <ApiResponseDetails result={ocrResult} title={`${apiLabel || 'OCR'} response`} />
+      )}
+      {(phase === 'failed' || (phase === 'passed' && showDetails)) && verifyResult && (
+        <ApiResponseDetails result={verifyResult} title={`${apiLabel || 'Validation'} verification response`} />
       )}
     </div>
   );
