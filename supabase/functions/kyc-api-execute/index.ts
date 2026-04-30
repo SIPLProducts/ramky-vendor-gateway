@@ -101,6 +101,11 @@ serve(async (req) => {
       const blob = new Blob([base64ToUint8(fileBase64)], { type: fileMimeType || "application/octet-stream" });
       fd.append(provider.file_field_name || "file", blob, "upload");
       body = fd;
+      // CRITICAL: never force Content-Type for multipart — fetch must set the
+      // multipart/form-data boundary itself, otherwise Surepass returns HTTP 400.
+      for (const k of Object.keys(headers)) {
+        if (k.toLowerCase() === "content-type") delete headers[k];
+      }
     } else if ((provider.http_method || "POST") !== "GET") {
       const filled = substitute(provider.request_body_template ?? {}, input ?? {});
       headers["Content-Type"] = headers["Content-Type"] || "application/json";
