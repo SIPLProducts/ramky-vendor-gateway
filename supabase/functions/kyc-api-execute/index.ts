@@ -6,8 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function getPath(obj: any, path?: string | null): any {
-  if (!path) return undefined;
+/**
+ * Walk a dotted JSON path. Hardened so a non-string `path` (e.g. when an admin
+ * pasted a sample response into `response_data_mapping` instead of a path) just
+ * returns undefined instead of crashing the whole edge function with
+ * "path.split is not a function".
+ */
+function getPath(obj: any, path?: any): any {
+  if (typeof path !== "string" || path.length === 0) return undefined;
   return path.split(".").reduce((a: any, k: string) => {
     if (a == null) return a;
     const idx: any = /^\d+$/.test(k) ? Number(k) : k;
@@ -41,8 +47,8 @@ serve(async (req) => {
   try {
     const { providerName, input, fileBase64, fileMimeType } = await req.json();
     if (!providerName) {
-      return new Response(JSON.stringify({ found: false, message: "providerName required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ found: false, ok: false, message: "providerName required" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const supa = createClient(
@@ -60,7 +66,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!provider) {
-      return new Response(JSON.stringify({ found: false, message: "No active provider configured" }),
+      return new Response(JSON.stringify({ found: false, ok: false, message: "No active provider configured" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -89,7 +95,7 @@ serve(async (req) => {
     if (provider.request_mode === "multipart") {
       if (!fileBase64) {
         return new Response(JSON.stringify({ found: true, ok: false, message: "File required for multipart provider" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const fd = new FormData();
       const blob = new Blob([base64ToUint8(fileBase64)], { type: fileMimeType || "application/octet-stream" });
@@ -117,10 +123,23 @@ serve(async (req) => {
       ok = ok && parsed.success === true;
     }
 
-    const mapping = (provider.response_data_mapping || {}) as Record<string, string>;
+    // Map response fields. Wrap each entry so one bad mapping value cannot
+    // crash the whole call (the historical "path.split is not a function" bug).
+    const rawMapping = provider.response_data_mapping;
     const data: Record<string, any> = {};
-    for (const [outKey, jsonPath] of Object.entries(mapping)) {
-      data[outKey] = getPath(parsed, jsonPath);
+    if (rawMapping && typeof rawMapping === "object" && !Array.isArray(rawMapping)) {
+      for (const [outKey, jsonPath] of Object.entries(rawMapping as Record<string, any>)) {
+        try {
+          if (typeof jsonPath === "string") {
+            data[outKey] = getPath(parsed, jsonPath);
+          } else {
+            // Misconfigured entry — skip silently but log so admins can find it.
+            console.warn(`[kyc-api-execute] mapping entry "${outKey}" is not a string path:`, jsonPath);
+          }
+        } catch (mapErr) {
+          console.warn(`[kyc-api-execute] mapping entry "${outKey}" failed:`, mapErr);
+        }
+      }
     }
 
     // Default message resolution:
@@ -164,7 +183,14 @@ serve(async (req) => {
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("[kyc-api-execute]", e);
-    return new Response(JSON.stringify({ found: false, ok: false, message: e?.message || "Execution failed" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Return 200 so the client can render the real message instead of a
+    // generic 500 / "provider not configured" toast.
+    return new Response(JSON.stringify({
+      found: true,
+      ok: false,
+      success: false,
+      message: e?.message || "Execution failed",
+      message_code: "edge_function_error",
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
