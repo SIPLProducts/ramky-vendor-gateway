@@ -1,69 +1,51 @@
-## Problem
+## Goal
 
-Uploading a GST PDF in the Vendor Registration form hits `kyc-api-execute`, which returns **HTTP 500** with body:
+Stop showing a hardcoded list of GST fields. Whatever the configured GST OCR API returns — show exactly that, dynamically.
 
-```
-{"found":false,"ok":false,"message":"path.split is not a function"}
-```
+Right now the GST tab uses a fixed `buildRows()` list (GSTIN, Legal Name, Business Name, PAN, Status, etc.) and a fixed `response_data_mapping` in the database. If Surepass returns `ocr_fields: []` and `message_code: no_gstin_detected`, the form shows blank rows + "HTTP 400" and the actual provider message is hidden.
 
-The UI shows the generic "GST OCR provider not configured" toast because the client treats any non-`found` response as "not configured". Two root causes:
+## Changes
 
-### Root cause 1 — Edge function crash on bad mapping
-`supabase/functions/kyc-api-execute/index.ts` `getPath(obj, path)` does `path.split(".")` without checking `typeof path === "string"`. One bad entry in `response_data_mapping` crashes the entire request.
+### 1. Edge function `kyc-api-execute`
+- When the provider has **no `response_data_mapping` configured** (or it's empty), return the **entire upstream response payload** as `data` (flattened in a sensible way) so the UI can display all fields the provider actually returned.
+- Always include the full upstream response under `raw` (already done) so the UI can fall back to it.
+- Keep `message_code`, `status_code`, `success`, `message` surfacing exactly as the upstream API sent them.
 
-### Root cause 2 — Misconfigured providers in DB
-Both `GST_OCR` and `PAN_OCR` have an entire **sample upstream response** saved into `response_data_mapping` instead of a `{ outKey: "json.path" }` map. Example (current GST_OCR):
+### 2. Database — clear the hardcoded GST_OCR mapping
+- Migration: set `response_data_mapping = '{}'` for `GST_OCR` (and optionally PAN/MSME/BANK OCR) so the executor falls back to "return the full provider response".
+- Admins can still add a mapping later from the KYC API Settings screen if they want to rename fields.
 
-```json
-{ "data": { "gstin": "37ABDCS6352G1Z7", "legal_name": "...", ... }, "success": true }
-```
+### 3. GST tab UI — render whatever fields came back
+- Replace the hardcoded `buildRows()` in `GstKycTab.tsx` with a generic renderer that:
+  - Lists every key/value pair from the provider's response `data` (or from `raw` when `data` is empty).
+  - Pretty-prints the field key (e.g. `gstin_status` → `GSTIN Status`).
+  - Skips internal/empty values.
+  - Shows the upstream `status_code`, `success`, `message_code` and `message` at the top of the result card so the vendor sees exactly what the API said.
+- When the upstream response is an error (e.g. `no_gstin_detected`), show the provider's own `message` and `message_code` instead of "HTTP 400".
 
-It should be:
+### 4. Apply the same dynamic display to PAN / MSME / Bank OCR tabs
+- `PanKycTab`, `MsmeKycTab`, `BankKycTab`, and the OCR phase inside `DocumentVerificationStep` will all use the same generic "render raw API response" component so nothing is hardcoded.
 
-```json
-{ "gstin": "data.gstin", "legal_name": "data.legal_name", "pan_number": "data.pan_number", "business_name": "data.business_name", "address": "data.address", "gstin_status": "data.gstin_status" }
-```
+### 5. Reusable component
+- Add `src/components/vendor/kyc/ApiResponseDetails.tsx` that takes a `KycApiResult` and renders:
+  - A header row with `provider_name`, `status_code`, `message_code`, `success`.
+  - A key/value table of every non-empty field from `data` (or `raw.data` if `data` is empty).
+  - The raw JSON in a collapsible `<details>` block for transparency.
 
-Same shape problem for `PAN_OCR` (Surepass nests fields under `data.ocr_fields[0].<field>.value`).
+## Files to change
 
-### Root cause 3 — Client misreads non-500 errors as "not configured"
-`PanKycTab.tsx` (and the GST/MSME/Bank tabs use the same pattern via `useProviderVerify`) treat `!r.found` as "provider not configured". When the edge function returns `found:false` because of a runtime error, the user sees the wrong message and never learns that the upstream call actually returned `success:false` / a real error.
+- `supabase/functions/kyc-api-execute/index.ts`
+- New migration to clear `response_data_mapping` for OCR providers
+- `src/components/vendor/kyc/GstKycTab.tsx`
+- `src/components/vendor/kyc/PanKycTab.tsx`
+- `src/components/vendor/kyc/MsmeKycTab.tsx`
+- `src/components/vendor/kyc/BankKycTab.tsx`
+- `src/components/vendor/kyc/OcrUploadAndVerify.tsx` (use new generic renderer)
+- New `src/components/vendor/kyc/ApiResponseDetails.tsx`
 
-## Fix plan
+## Result
 
-### 1. Harden `supabase/functions/kyc-api-execute/index.ts`
-- `getPath`: return `undefined` immediately when `typeof path !== "string"` or string is empty.
-- Wrap the `response_data_mapping` loop in a try/catch per-key so one bad mapping entry never aborts the whole call. Log the offending key.
-- Distinguish three outcomes in the JSON response:
-  - `found:false` → only when no enabled provider row exists.
-  - `found:true, ok:false` → upstream returned non-success or 4xx/5xx; include `message`, `status_code`, `message_code`, `raw`.
-  - `found:true, ok:true` → success.
-- Catch the top-level `try` and return **HTTP 200** with `found:true, ok:false, message: e.message` so the client can render the real error instead of a generic 500/"not configured".
-
-### 2. Repair provider configs (DB migration)
-Create a migration that **rewrites** `response_data_mapping`, `response_success_path`, `response_message_path` for the four OCR providers:
-
-- `GST_OCR` → maps `data.gstin`, `data.legal_name`, `data.business_name`, `data.pan_number`, `data.address`, `data.gstin_status`, `data.constitution_of_business`, `data.date_of_registration`, `data.taxpayer_type`.
-- `PAN_OCR` → maps `data.ocr_fields.0.pan_number.value` → `pan_number`, `data.ocr_fields.0.full_name.value` → `full_name`, `data.ocr_fields.0.father_name.value` → `father_name`, `data.ocr_fields.0.dob.value` → `dob`.
-- `MSME_OCR` and `BANK_OCR` — inspect existing rows and apply the same correction (script will fall back to no-op if row is absent).
-- Set `response_success_path = "success"`, `response_message_path = "message"` (already matches Surepass).
-
-This migration is idempotent (uses `UPDATE ... WHERE provider_name = ...`).
-
-### 3. Improve client error surfacing
-- `src/components/vendor/kyc/PanKycTab.tsx`, `GstKycTab.tsx`, `MsmeKycTab.tsx`, `BankKycTab.tsx`, and the registration-step shim in `DocumentVerificationStep.tsx`: stop conflating `!found` with "provider not configured". Only show the "Add it in KYC & Validation API Settings" message when `found === false` AND `message_code` is null. Otherwise show the actual `r.message` from the upstream API (e.g. `no_gstin_detected`, `path.split is not a function` while we're debugging).
-- `src/lib/kycToast.ts` already shows `provider · message_code · status` — keep, but make the title use `r.message` when `ok=false` so the toast clearly reads "GST failed — no_gstin_detected · via Surepass · status 200" instead of "provider not configured".
-
-### 4. Verify after deploy
-- Redeploy `kyc-api-execute`.
-- Re-upload SIPL GST Certificate → expect the toast to show `GST OCR success · via Surepass · message_code: success · status 200` and the form to fill GSTIN/Legal Name from `data.gstin` / `data.legal_name`.
-- If Surepass returns `success:false`, the toast will show the upstream `message_code` (e.g. `no_gstin_detected`) instead of "not configured".
-
-## Files touched
-
-- `supabase/functions/kyc-api-execute/index.ts` — guard `getPath`, per-key try/catch, top-level error → HTTP 200 with `ok:false`.
-- New migration — fix `response_data_mapping` for `GST_OCR`, `PAN_OCR`, `MSME_OCR`, `BANK_OCR`.
-- `src/lib/kycToast.ts` — better error title.
-- `src/components/vendor/kyc/{Gst,Pan,Msme,Bank}KycTab.tsx` and `src/components/vendor/steps/DocumentVerificationStep.tsx` — distinguish "not configured" vs "upstream error", show real message.
-
-No schema changes, no new tables, no auth changes.
+- Whatever the configured GST OCR API returns will be shown verbatim under the upload card.
+- No field names are baked into the frontend.
+- If the provider says `no_gstin_detected`, the UI shows that exact message and code — not "HTTP 400".
+- If a different provider is configured later that returns different fields, those fields will automatically appear without code changes.
