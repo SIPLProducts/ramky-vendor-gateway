@@ -50,6 +50,14 @@ const schema = z.object({
   msmeRegistrationDate: z.string().optional(),
   msmeState: z.string().optional(),
   msmeDistrict: z.string().optional(),
+  msmeCity: z.string().optional(),
+  msmePinCode: z.string().optional(),
+  msmeAddress: z.string().optional(),
+  msmeMobile: z.string().optional(),
+  msmeEmail: z.string().optional(),
+  msmeNicCode: z.string().optional(),
+  msmeDateOfIncorporation: z.string().optional(),
+  msmeSocialCategory: z.string().optional(),
   labourPermitNo: z.string().optional(),
   iecNo: z.string().optional(),
   entityType: z.string().min(1, 'Entity type is required'),
@@ -164,6 +172,10 @@ export function ComplianceStep({
   // Populate MSME registration fields from whatever the configured provider returned.
   // Field names follow the dynamic mapping in `api_providers.response_data_mapping`.
   const handleMsmeVerified = (d: Record<string, any>) => {
+    // Mirror Udyam number into the visible MSME number field if missing.
+    const udyam = pickStr(d.udyam_number);
+    if (udyam) setValue('msmeNumber' as any, udyam);
+
     const enterpriseName = pickStr(d.enterprise_name || d.legal_name);
     if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
     const enterpriseType = pickStr(d.enterprise_type);
@@ -172,12 +184,36 @@ export function ComplianceStep({
     if (majorActivity) setValue('msmeMajorActivity' as any, majorActivity);
     const orgType = pickStr(d.organization_type);
     if (orgType) setValue('msmeOrganizationType' as any, orgType);
-    const regDate = pickStr(d.registration_date || d.date_of_incorporation);
+    const regDate = pickStr(d.registration_date);
     if (regDate) setValue('msmeRegistrationDate' as any, regDate);
+    const doi = pickStr(d.date_of_incorporation || d.date_of_commencement);
+    if (doi) setValue('msmeDateOfIncorporation' as any, doi);
     const state = pickStr(d.state);
     if (state) setValue('msmeState' as any, state);
     const district = pickStr(d.district);
     if (district) setValue('msmeDistrict' as any, district);
+    const city = pickStr(d.city);
+    if (city) setValue('msmeCity' as any, city);
+    const pin = pickStr(d.pin_code);
+    if (pin) setValue('msmePinCode' as any, pin);
+
+    // Compose a single-line address from the parts the API returns.
+    const addressParts = [d.flat, d.name_of_building, d.road, d.village, d.block]
+      .map(pickStr)
+      .filter((x) => x && x !== '-');
+    const address = addressParts.join(', ');
+    if (address) setValue('msmeAddress' as any, address);
+
+    const mobile = pickStr(d.mobile);
+    if (mobile) setValue('msmeMobile' as any, mobile);
+    const email = pickStr(d.email);
+    if (email) setValue('msmeEmail' as any, email);
+    const social = pickStr(d.social_category);
+    if (social) setValue('msmeSocialCategory' as any, social);
+
+    // NIC code: prefer the most specific (5-digit), falling back gracefully.
+    const nic = pickStr(d.nic_5_digit) || pickStr(d.nic_4_digit) || pickStr(d.nic_2_digit);
+    if (nic) setValue('msmeNicCode' as any, nic);
   };
 
   const handleBankDetailsChange = (b: {
@@ -423,12 +459,52 @@ export function ComplianceStep({
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
+                <Label htmlFor="msmeDateOfIncorporation">Date of Incorporation</Label>
+                <Input id="msmeDateOfIncorporation" {...register('msmeDateOfIncorporation' as any)} placeholder="YYYY-MM-DD" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeSocialCategory">Social Category</Label>
+                <Input id="msmeSocialCategory" {...register('msmeSocialCategory' as any)} placeholder="General / OBC / SC / ST" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid gap-1.5">
                 <Label htmlFor="msmeState">State</Label>
                 <Input id="msmeState" {...register('msmeState' as any)} placeholder="State" />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="msmeDistrict">District</Label>
                 <Input id="msmeDistrict" {...register('msmeDistrict' as any)} placeholder="District" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeCity">City</Label>
+                <Input id="msmeCity" {...register('msmeCity' as any)} placeholder="City" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-1.5 md:col-span-2">
+                <Label htmlFor="msmeAddress">Registered Address</Label>
+                <Input id="msmeAddress" {...register('msmeAddress' as any)} placeholder="Flat, Building, Road, Village" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmePinCode">PIN Code</Label>
+                <Input id="msmePinCode" {...register('msmePinCode' as any)} placeholder="PIN" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeMobile">Mobile</Label>
+                <Input id="msmeMobile" {...register('msmeMobile' as any)} placeholder="Registered mobile" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeEmail">Email</Label>
+                <Input id="msmeEmail" {...register('msmeEmail' as any)} placeholder="Registered email" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-1 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeNicCode">NIC Code (Activity)</Label>
+                <Input id="msmeNicCode" {...register('msmeNicCode' as any)} placeholder="e.g. 62099 - Other IT services" />
               </div>
             </div>
           </div>
