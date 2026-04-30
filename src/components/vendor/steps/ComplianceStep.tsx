@@ -305,6 +305,7 @@ export function ComplianceStep({
             legalName={legalName}
             msmeCertificateFile={msmeCertificateFile}
             onMsmeCertificateFileChange={setMsmeCertificateFile}
+            onVerifiedDetails={handleMsmeVerified}
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}
           />
