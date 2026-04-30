@@ -8,8 +8,22 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useOcrExtraction, OcrDocumentType } from "@/hooks/useOcrExtraction";
+import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
+import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
+import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
+
+/**
+ * Maps the registration step's document type → the provider_name configured
+ * in KYC & Validation API Settings. Keep these in sync with the templates
+ * defined in src/pages/KycApiSettings.tsx.
+ */
+const OCR_PROVIDER_BY_KIND: Record<OcrDocumentType, { provider: string; label: string }> = {
+  gst: { provider: "GST_OCR", label: "GST OCR" },
+  pan: { provider: "PAN_OCR", label: "PAN OCR" },
+  msme: { provider: "MSME_OCR", label: "MSME OCR" },
+  cheque: { provider: "BANK_OCR", label: "Bank OCR" },
+};
 
 export interface VerifiedDocumentData {
   isGstRegistered?: boolean;
