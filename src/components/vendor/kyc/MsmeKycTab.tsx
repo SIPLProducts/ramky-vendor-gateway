@@ -141,7 +141,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               runOcr={runMsmeOcr}
               skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
-              buildComparisonRows={buildRows}
+              apiLabel="MSME OCR"
               onVerified={() => {}}
               vendorId={props.vendorId}
             />
