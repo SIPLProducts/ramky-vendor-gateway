@@ -163,13 +163,13 @@ export function DocumentVerificationStep({
       // Surface upstream provider identity + message_code/status_code so it's
       // obvious the call hit the configured provider (not Gemini).
       toastKycResult(cfg.label, r);
-      if (!r.found) {
+      if (!r.found && !r.message_code) {
         return {
           success: false as const,
           error: `${cfg.label} provider not configured. Add it in KYC & Validation API Settings.`,
         };
       }
-      if (!r.ok || !r.data) {
+      if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
         return {
           success: false as const,
           error: r.message || `${cfg.label} failed`,

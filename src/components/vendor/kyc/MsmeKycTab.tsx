@@ -59,8 +59,12 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const runMsmeOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'MSME_OCR', file });
     toastKycResult('MSME OCR', r);
-    if (!r.found) return { success: false, error: r.message || 'MSME OCR provider not configured' };
-    if (!r.ok || !r.data) return { success: false, error: r.message || 'MSME OCR failed' };
+    if (!r.found && !r.message_code) {
+      return { success: false, error: 'MSME OCR provider not configured. Add it in KYC & Validation API Settings.' };
+    }
+    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
+      return { success: false, error: r.message || 'MSME OCR failed' };
+    }
     return { success: true, extracted: r.data };
   };
 
