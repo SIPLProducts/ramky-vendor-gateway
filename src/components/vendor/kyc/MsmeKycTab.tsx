@@ -165,9 +165,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               currentFile={props.msmeCertificateFile}
               onFileChange={props.onMsmeCertificateFileChange}
               runOcr={runMsmeOcr}
-              skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
-              apiLabel="MSME OCR"
+              apiLabel="MSME"
               onVerified={() => {}}
               vendorId={props.vendorId}
             />
