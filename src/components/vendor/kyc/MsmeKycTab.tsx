@@ -28,6 +28,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const { state, verify } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
+  const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
 
   if (props.onStatusChange) {
     props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
