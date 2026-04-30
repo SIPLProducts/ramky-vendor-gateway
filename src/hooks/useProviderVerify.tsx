@@ -38,21 +38,21 @@ export function useProviderVerify() {
       if (!r.found) {
         const msg = `${params.providerName} provider is not configured. Ask an admin to add it in KYC & Validation API Settings.`;
         setState({ status: 'failed', message: msg });
-        return { ok: false, message: msg, data: undefined as Record<string, any> | undefined };
+        return { ok: false, message: msg, data: undefined as Record<string, any> | undefined, apiResult: r };
       }
       if (!r.ok || !r.data) {
         const msg = r.message || 'Verification failed';
         setState({ status: 'failed', message: msg, data: r.data });
-        return { ok: false, message: msg, data: r.data };
+        return { ok: false, message: msg, data: r.data, apiResult: r };
       }
 
       const post = params.validate ? await params.validate(r.data) : { ok: true, message: r.message || 'Verified', data: r.data };
       if (!post.ok) {
         setState({ status: 'failed', message: post.message, data: post.data || r.data });
-        return { ok: false, message: post.message, data: post.data || r.data };
+        return { ok: false, message: post.message, data: post.data || r.data, apiResult: r };
       }
       setState({ status: 'passed', message: post.message, data: post.data || r.data });
-      return { ok: true, message: post.message, data: post.data || r.data };
+      return { ok: true, message: post.message, data: post.data || r.data, apiResult: r };
     },
     [callProvider],
   );
