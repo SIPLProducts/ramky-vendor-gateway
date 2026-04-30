@@ -7,6 +7,10 @@ import { Badge } from "@/components/ui/badge";
  * edge function gave us (or fall back to `raw.data` / `raw`) and render
  * every non-empty value. This is what the vendor and admin see after an
  * upload, so it must reflect the upstream provider exactly.
+ *
+ * Surepass-style `{ value, confidence }` objects and `ocr_fields[]` arrays
+ * are flattened generically so users see clean field labels instead of
+ * raw JSON.
  */
 
 interface ApiResponseDetailsProps {
@@ -35,7 +39,68 @@ function prettifyKey(key: string) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function renderValue(value: any): string {
+/** Surepass returns fields as `{ value, confidence }`. Detect that shape. */
+function isValueConfidence(v: any): v is { value: any; confidence?: number } {
+  return (
+    v &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    "value" in v &&
+    Object.keys(v).every((k) => k === "value" || k === "confidence")
+  );
+}
+
+interface FlatRow {
+  key: string;
+  value: any;
+  confidence?: number;
+}
+
+/**
+ * Flatten an arbitrary payload into a list of {key, value, confidence} rows.
+ * - `{ value, confidence }` collapses to its inner value.
+ * - Arrays of objects (e.g. `ocr_fields`) flatten the FIRST entry's fields
+ *   inline (Surepass OCR returns one entry per document).
+ * - Plain nested objects are skipped from the top level (rendered as raw
+ *   JSON only inside the "View raw response" pane).
+ */
+function flatten(payload: Record<string, any>): FlatRow[] {
+  const rows: FlatRow[] = [];
+  for (const [key, raw] of Object.entries(payload)) {
+    if (raw === null || raw === undefined) continue;
+    if (typeof raw === "string" && raw.trim() === "") continue;
+
+    if (isValueConfidence(raw)) {
+      const v = raw.value;
+      if (v === null || v === undefined || (typeof v === "string" && v.trim() === "")) continue;
+      rows.push({ key, value: v, confidence: typeof raw.confidence === "number" ? raw.confidence : undefined });
+      continue;
+    }
+
+    if (Array.isArray(raw)) {
+      // Flatten the first entry's fields (typical Surepass `ocr_fields` array).
+      const first = raw[0];
+      if (first && typeof first === "object" && !Array.isArray(first)) {
+        for (const inner of flatten(first)) rows.push(inner);
+      } else {
+        rows.push({ key, value: raw });
+      }
+      continue;
+    }
+
+    if (typeof raw === "object") {
+      // Generic nested object — flatten one level so its scalar/value-confidence
+      // children still surface.
+      for (const inner of flatten(raw)) rows.push(inner);
+      continue;
+    }
+
+    rows.push({ key, value: raw });
+  }
+  return rows;
+}
+
+function renderScalar(value: any): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") return String(value);
@@ -72,9 +137,7 @@ function pickPayload(result: ApiResponseDetailsProps["result"]): Record<string, 
 export function ApiResponseDetails({ result, title }: ApiResponseDetailsProps) {
   if (!result) return null;
   const payload = pickPayload(result);
-  const entries = Object.entries(payload).filter(
-    ([, v]) => v !== null && v !== undefined && !(typeof v === "string" && v.trim() === ""),
-  );
+  const rows = flatten(payload);
 
   const ok = result.ok && result.success !== false;
   const statusCode = result.status_code ?? result.status;
@@ -104,16 +167,21 @@ export function ApiResponseDetails({ result, title }: ApiResponseDetailsProps) {
         )}
       </div>
 
-      {entries.length > 0 ? (
+      {rows.length > 0 ? (
         <div className="divide-y">
-          {entries.map(([key, value]) => (
+          {rows.map(({ key, value, confidence }, i) => (
             <div
-              key={key}
+              key={`${key}-${i}`}
               className="grid grid-cols-[1fr,2fr] gap-3 px-3 py-2 items-start"
             >
               <span className="text-muted-foreground">{prettifyKey(key)}</span>
-              <span className="break-words font-mono text-[11px] leading-snug">
-                {renderValue(value)}
+              <span className="break-words font-mono text-[11px] leading-snug flex flex-wrap items-baseline gap-2">
+                <span>{renderScalar(value)}</span>
+                {typeof confidence === "number" && confidence > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-sans">
+                    {Math.round(confidence)}% confidence
+                  </span>
+                )}
               </span>
             </div>
           ))}
