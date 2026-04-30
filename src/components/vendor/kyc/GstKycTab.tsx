@@ -86,8 +86,10 @@ export function GstKycTab(props: GstKycTabProps) {
     return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
-  // The Surepass GST OCR endpoint already returns the verified GST record,
-  // so the "verify" phase just runs the name-match check on the same payload.
+  // Surepass GST OCR returns ONLY the GSTIN. To populate Legal Name, Trade
+  // Name and Constitution we automatically chain a call to the configured
+  // `GST` verification provider (Surepass GSTIN verification) using that
+  // GSTIN. All values come from API responses — nothing is hardcoded.
   const handleOcrVerify = async (extracted: Record<string, any>) => {
     const extractedGstin = String(extracted.gstin || '').toUpperCase().trim();
     if (extractedGstin && extractedGstin.length === 15) {
@@ -95,7 +97,21 @@ export function GstKycTab(props: GstKycTabProps) {
     }
     reset();
 
-    const apiName = String(extracted.legal_name || extracted.business_name || '').trim();
+    // Chain: pull full GST record from validation provider so we can show
+    // Legal Name / Trade Name / Constitution etc.
+    let merged: Record<string, any> = { ...extracted };
+    if (extractedGstin && extractedGstin.length === 15) {
+      const verify = await callProvider({
+        providerName: 'GST',
+        input: { gstin: extractedGstin, id_number: extractedGstin },
+      });
+      toastKycResult('GST', verify);
+      if (verify.found && verify.ok && verify.data) {
+        merged = { ...merged, ...verify.data };
+      }
+    }
+
+    const apiName = String(merged.legal_name || merged.business_name || merged.trade_name || '').trim();
     if (props.legalName && apiName) {
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -103,12 +119,12 @@ export function GstKycTab(props: GstKycTabProps) {
         return {
           ok: false,
           message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`,
-          apiData: extracted,
+          apiData: merged,
         };
       }
     }
-    props.onVerifiedDetails?.(extracted);
-    return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin || 'see API response below'}`, apiData: extracted };
+    props.onVerifiedDetails?.(merged);
+    return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin || 'see API response below'}`, apiData: merged };
   };
 
   return (
