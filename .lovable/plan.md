@@ -1,65 +1,73 @@
-## Problem
+## MSME / Udyam Validation — Fix the response → form mapping
 
-The MSME tab itself runs the configured Surepass APIs correctly (no hardcoded responses anywhere — the edge function is fully dynamic). But the user's screenshot shows two real bugs:
+The MSME tab in Vendor Registration already has the correct UI flow:
 
-1. After verification, **Enterprise Type** and **Major Activity** stay empty in the form.
-2. Manual Entry → Validate succeeds (toast says verified), but no extracted details appear and nothing is committed back to the parent form.
+- Yes / No radio for "Are you MSME registered?"
+- When **Yes** → two sub-tabs: **Manual Entry** and **Upload certificate**
+- **Manual** shows Udyam Number input + **Validate** button that dynamically calls the provider configured in **KYC API Settings → MSME** (no hardcoded values)
+- **Upload** runs OCR (if `MSME_OCR` provider is configured) and chains to the MSME validation API
+- API response is shown inline via `ApiResponseDetails`, and on success the form auto-populates an "MSME Certificate Details" card
 
-Root causes found in code:
+What does **not** work today is that the configured `response_data_mapping` for the `MSME` provider points to fields that **do not exist** in the actual Surepass response you shared. Result: the Validate call succeeds, but most fields come back empty so the UI looks broken.
 
-- `ComplianceStep.tsx` wires `onVerifiedDetails={handleGstVerified}` for GST but **does not pass `onVerifiedDetails` for MSME**. So even when `MsmeKycTab` calls `props.onVerifiedDetails?.(merged)`, the parent ignores it and never writes Enterprise Type / Major Activity / State / District into form state.
-- `MsmeKycTab` Manual Entry path uses `ManualEntryAndVerify`, which has no panel to render the API response. The Upload path renders `ApiResponseDetails`, but Manual does not — that's why "details don't replicate" between tabs.
-- `api_providers.response_data_mapping` for `MSME` is missing `major_activity` (and `social_category`, `pin_code`), and for `MSME_OCR` is missing `major_activity` — so even when Surepass returns it, the edge function never surfaces it.
+### Concrete bugs in the current mapping (from `api_providers.MSME`)
 
-## Plan
+| Output key | Current path (wrong) | Correct path for the response you shared |
+|---|---|---|
+| `udyam_number` | `data.reference_id` | `data.uan` |
+| `mobile` | `data.main_details.mobile` | `data.main_details.mobile_number` |
+| `pin_code` | `data.main_details.pin` (already correct) | keep |
+| `enterprise_type` | `…enterprise_type_list.0.enterprise_type` | keep (correct) |
 
-### 1. Database migration — extend dynamic mapping (still no hardcoding)
+Also missing entirely from the mapping (but present in the response and useful):
+`date_of_incorporation`, `date_of_commencement`, `city`, `village`, `road`, `flat`, `applied_date`, `nic_code` (first row), `plant_locations` (array).
 
-Update `api_providers.response_data_mapping` for the existing `MSME` and `MSME_OCR` rows to include all useful Surepass fields. Values remain dotted JSON paths that the edge function walks at runtime.
+### Plan
 
-- `MSME` (Surepass `/corporate/udyog-aadhaar`): add
-  - `major_activity` → `data.main_details.major_activity`
-  - `social_category` → `data.main_details.social_category`
-  - `pin_code` → `data.main_details.pin`
-  - `mobile` → `data.main_details.mobile`
-  - `email` → `data.main_details.email`
-- `MSME_OCR` (Surepass `/ocr/udyam-aadhaar`): add
-  - `major_activity` → `data.ocr_fields.0.major_activity.value`
-  - `organization_type` → `data.ocr_fields.0.organization_type.value`
-  - `date_of_incorporation` → `data.ocr_fields.0.date_of_incorporation.value`
+1. **Migration — fix and extend the `MSME` response mapping** in `api_providers` so every field the user listed populates correctly:
+   ```json
+   {
+     "udyam_number": "data.uan",
+     "enterprise_name": "data.main_details.name_of_enterprise",
+     "enterprise_type": "data.main_details.enterprise_type_list.0.enterprise_type",
+     "major_activity": "data.main_details.major_activity",
+     "social_category": "data.main_details.social_category",
+     "organization_type": "data.main_details.organization_type",
+     "registration_date": "data.main_details.registration_date",
+     "date_of_incorporation": "data.main_details.date_of_incorporation",
+     "date_of_commencement": "data.main_details.date_of_commencement",
+     "applied_date": "data.main_details.applied_date",
+     "state": "data.main_details.state",
+     "district": "data.main_details.dic_name",
+     "city": "data.main_details.city",
+     "village": "data.main_details.village",
+     "road": "data.main_details.road",
+     "flat": "data.main_details.flat",
+     "pin_code": "data.main_details.pin",
+     "mobile": "data.main_details.mobile_number",
+     "email": "data.main_details.email",
+     "msme_dfo": "data.main_details.msme_dfo",
+     "gender": "data.main_details.gender",
+     "nic_2_digit": "data.nic_code.0.nic_2_digit",
+     "nic_4_digit": "data.nic_code.0.nic_4_digit",
+     "nic_5_digit": "data.nic_code.0.nic_5_digit",
+     "plant_locations": "data.location_of_plant_details"
+   }
+   ```
+   Apply with `WHERE provider_name = 'MSME'` (across all tenants, since the row is per-tenant).
 
-### 2. Wire MSME verified details into the form (`ComplianceStep.tsx`)
+2. **`ComplianceStep.tsx` — extend `handleMsmeVerified` and the displayed card** so the new fields populate visible inputs:
+   - Add Zod fields: `msmeUdyamNumber` (auto-fills the existing `msmeNumber` if blank), `msmeDateOfIncorporation`, `msmeCity`, `msmePinCode`, `msmeAddress` (built from `flat + road + village`), `msmeMobile`, `msmeEmail`, `msmeNicCode`.
+   - Update `handleMsmeVerified` to `setValue` for each new key from the merged API result.
+   - Add the corresponding read-only-friendly Inputs to the "MSME Certificate Details" card (grouped: Identity, Classification, Address, Contact).
 
-- Add a `handleMsmeVerified(data)` callback (mirroring `handleGstVerified`) that uses `setValue` to populate:
-  - `msmeEnterpriseName`, `msmeEnterpriseType`, `msmeMajorActivity`, `msmeOrganizationType`, `msmeRegistrationDate`, `msmeState`, `msmeDistrict`.
-  - Defensively unwrap `{ value, confidence }` shapes (already handled by `pickString` pattern used elsewhere).
-- Pass `onVerifiedDetails={handleMsmeVerified}` to `<MsmeKycTab>`.
-- If those form fields don't exist yet on the schema, add them to `useVendorRegistration` defaults (string defaults) — purely additive.
+3. **No edge-function changes needed.** `kyc-api-execute` already resolves dotted paths and array indices (`enterprise_type_list.0.enterprise_type` already works), so fixing the mapping row is sufficient.
 
-### 3. Show "MSME Certificate Details" card after verification (like GST)
+4. **No UI flow changes.** The Yes/No radio, Manual/Upload sub-tabs, dynamic Validate button, inline `ApiResponseDetails` panel, and the "configured-provider" toast are already correct — they were verified in `MsmeKycTab.tsx` and `useProviderVerify.tsx`. The only reason fields appeared blank was the broken mapping.
 
-Below the `KycTabs` block in `ComplianceStep.tsx`, add a conditional card visible when `isMsmeRegistered && statuses.msme === 'passed'` that renders the populated MSME fields with `Input {...register(...)}` so the user can edit before submit. This is what makes Enterprise Type / Major Activity / State / District actually visible on the page (the "fields are empty" symptom in the screenshot).
+### Files touched
 
-### 4. Surface API response details under Manual Entry tab (`MsmeKycTab.tsx`)
+- `supabase/migrations/<new>.sql` — `UPDATE api_providers SET response_data_mapping = '…' WHERE provider_name = 'MSME';`
+- `src/components/vendor/steps/ComplianceStep.tsx` — extend Zod schema, `handleMsmeVerified`, and the MSME details card.
 
-After a successful manual `Validate`, render `ApiResponseDetails` with the raw `KycApiResult` returned by `useProviderVerify`, the same way the Upload tab already does via `OcrUploadAndVerify`. Steps:
-
-- Have `useProviderVerify.verify(...)` return the full `KycApiResult` (it already does internally — just expose it).
-- Store the last result in local state in `MsmeKycTab` and render `<ApiResponseDetails result={lastResult} title="MSME verification response" />` under the manual `<TabsContent>` when `state.status === 'passed' || 'failed'`.
-- This replicates the Upload tab's "View details" experience for Manual Entry.
-
-### 5. Sanity-check the chained call path
-
-`handleOcrVerify` in `MsmeKycTab` already chains OCR → MSME verify and merges results. After the migration in step 1, the merged object will include `major_activity`, etc., so step 2's `onVerifiedDetails` will populate the new card automatically.
-
-## Files to change
-
-- `supabase/migrations/<new>.sql` — extend `response_data_mapping` for `MSME` and `MSME_OCR`.
-- `src/components/vendor/steps/ComplianceStep.tsx` — add `handleMsmeVerified`, pass `onVerifiedDetails`, render new MSME details card.
-- `src/components/vendor/kyc/MsmeKycTab.tsx` — capture and render API response details under Manual Entry.
-- `src/hooks/useVendorRegistration.tsx` — add string fields for `msmeEnterpriseType`, `msmeMajorActivity`, etc. if missing.
-
-## What is intentionally NOT changed
-
-- `supabase/functions/kyc-api-execute/index.ts` — already fully dynamic; the upstream Surepass response drives everything via `response_data_mapping`. No code changes needed.
-- No fallback / mock / static response is added anywhere.
+No changes to `MsmeKycTab.tsx`, `useProviderVerify.tsx`, `kyc-api-execute`, or `MSME_OCR` provider config.
