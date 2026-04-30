@@ -43,6 +43,13 @@ const schema = z.object({
   isMsmeRegistered: z.boolean(),
   msmeNumber: z.string().optional(),
   msmeCategory: z.enum(['micro', 'small', 'medium', '']),
+  msmeEnterpriseName: z.string().optional(),
+  msmeEnterpriseType: z.string().optional(),
+  msmeMajorActivity: z.string().optional(),
+  msmeOrganizationType: z.string().optional(),
+  msmeRegistrationDate: z.string().optional(),
+  msmeState: z.string().optional(),
+  msmeDistrict: z.string().optional(),
   labourPermitNo: z.string().optional(),
   iecNo: z.string().optional(),
   entityType: z.string().min(1, 'Entity type is required'),
@@ -144,6 +151,33 @@ export function ComplianceStep({
     if (d.jurisdiction_centre) setValue('gstJurisdictionCentre', d.jurisdiction_centre);
     if (d.jurisdiction_state || d.state_jurisdiction)
       setValue('gstJurisdictionState', d.jurisdiction_state || d.state_jurisdiction);
+  };
+
+  // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.
+  const pickStr = (v: any): string => {
+    if (v == null) return '';
+    if (typeof v === 'string' || typeof v === 'number') return String(v);
+    if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+    return '';
+  };
+
+  // Populate MSME registration fields from whatever the configured provider returned.
+  // Field names follow the dynamic mapping in `api_providers.response_data_mapping`.
+  const handleMsmeVerified = (d: Record<string, any>) => {
+    const enterpriseName = pickStr(d.enterprise_name || d.legal_name);
+    if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
+    const enterpriseType = pickStr(d.enterprise_type);
+    if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
+    const majorActivity = pickStr(d.major_activity);
+    if (majorActivity) setValue('msmeMajorActivity' as any, majorActivity);
+    const orgType = pickStr(d.organization_type);
+    if (orgType) setValue('msmeOrganizationType' as any, orgType);
+    const regDate = pickStr(d.registration_date || d.date_of_incorporation);
+    if (regDate) setValue('msmeRegistrationDate' as any, regDate);
+    const state = pickStr(d.state);
+    if (state) setValue('msmeState' as any, state);
+    const district = pickStr(d.district);
+    if (district) setValue('msmeDistrict' as any, district);
   };
 
   const handleBankDetailsChange = (b: {
@@ -271,6 +305,7 @@ export function ComplianceStep({
             legalName={legalName}
             msmeCertificateFile={msmeCertificateFile}
             onMsmeCertificateFileChange={setMsmeCertificateFile}
+            onVerifiedDetails={handleMsmeVerified}
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}
           />
@@ -336,23 +371,67 @@ export function ComplianceStep({
 
       {isMsmeRegistered && statuses.msme === 'passed' && (
         <div className="rounded-md border border-border p-4 bg-muted/30">
-          <Label>MSME Category</Label>
-          <Controller
-            name="msmeCategory"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder="Select MSME category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="micro">Micro Enterprise</SelectItem>
-                  <SelectItem value="small">Small Enterprise</SelectItem>
-                  <SelectItem value="medium">Medium Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
+          <h4 className="text-sm font-semibold mb-3 text-foreground">MSME Certificate Details</h4>
+          <p className="text-xs text-muted-foreground mb-4">
+            These fields were auto-populated from the verification result. You may edit if needed.
+          </p>
+          <div className="grid gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeEnterpriseName">Enterprise Name</Label>
+                <Input id="msmeEnterpriseName" {...register('msmeEnterpriseName' as any)} placeholder="As per Udyam record" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>MSME Category</Label>
+                <Controller
+                  name="msmeCategory"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select MSME category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="micro">Micro Enterprise</SelectItem>
+                        <SelectItem value="small">Small Enterprise</SelectItem>
+                        <SelectItem value="medium">Medium Enterprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeEnterpriseType">Enterprise Type</Label>
+                <Input id="msmeEnterpriseType" {...register('msmeEnterpriseType' as any)} placeholder="Micro / Small / Medium" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeMajorActivity">Major Activity</Label>
+                <Input id="msmeMajorActivity" {...register('msmeMajorActivity' as any)} placeholder="Manufacturing / Services / Trading" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeOrganizationType">Organization Type</Label>
+                <Input id="msmeOrganizationType" {...register('msmeOrganizationType' as any)} placeholder="Private Limited / Partnership / Proprietorship" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeRegistrationDate">Registration Date</Label>
+                <Input id="msmeRegistrationDate" {...register('msmeRegistrationDate' as any)} placeholder="DD/MM/YYYY" />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeState">State</Label>
+                <Input id="msmeState" {...register('msmeState' as any)} placeholder="State" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="msmeDistrict">District</Label>
+                <Input id="msmeDistrict" {...register('msmeDistrict' as any)} placeholder="District" />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -5,7 +5,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Pencil, Upload } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
-import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { ApiResponseDetails } from './ApiResponseDetails';
+import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 
@@ -27,6 +28,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const { state, verify } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
+  const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
 
   if (props.onStatusChange) {
     props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
@@ -42,6 +44,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   };
 
   const handleManualVerify = async () => {
+    setManualApiResult(undefined);
     const r = await verify({
       providerName: 'MSME',
       label: 'MSME',
@@ -62,6 +65,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
         return { ok: true, message: `MSME verified — ${apiName || props.msmeNumber}`, data };
       },
     });
+    setManualApiResult((r as any).apiResult);
     if (r.ok) props.onVerifiedDetails?.(r.data || {});
   };
 
@@ -156,6 +160,9 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               canVerify={!!props.msmeNumber && props.msmeNumber.length >= 10}
               helperText="Enter your Udyam registration number and click Verify."
             />
+            {manualApiResult && (
+              <ApiResponseDetails result={manualApiResult} title="MSME verification response" />
+            )}
           </TabsContent>
 
           <TabsContent value="upload" className="space-y-3">
