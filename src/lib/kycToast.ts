@@ -12,7 +12,10 @@ export function toastKycResult(label: string, r: KycApiResult) {
   const code = r.message_code ? `message_code: ${r.message_code}` : null;
   const status = r.status_code != null ? `status ${r.status_code}` : (r.status != null ? `HTTP ${r.status}` : null);
 
-  if (!r.found) {
+  // Only treat as "provider missing" when the edge function explicitly says so
+  // AND there is no upstream message_code (i.e. the request never reached an
+  // upstream API). This prevents real upstream errors from being misreported.
+  if (!r.found && !r.message_code) {
     toast.error(`${label} provider not configured`, {
       description: 'Add it in KYC & Validation API Settings.',
     });
@@ -24,8 +27,10 @@ export function toastKycResult(label: string, r: KycApiResult) {
   if (r.ok && (r.success !== false)) {
     toast.success(`${label} ${r.message_code || 'verified'}`, { description: desc });
   } else {
-    toast.error(`${label} failed`, {
-      description: [r.message, desc].filter(Boolean).join(' — '),
-    });
+    // Surface the actual upstream message in the title so vendors/admins see
+    // the real reason (e.g. "no_gstin_detected", "path.split is not a function")
+    // instead of a generic "failed".
+    const title = r.message ? `${label} failed — ${r.message}` : `${label} failed`;
+    toast.error(title, { description: desc });
   }
 }
