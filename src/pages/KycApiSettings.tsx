@@ -72,7 +72,7 @@ const TEMPLATES: Array<{
     } },
   { provider_name: "MSME", display_name: "MSME / Udyam Manual", category: "VALIDATION",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/corporate/udyog-aadhaar",
-    request_mode: "json", request_body_template: { id_number: "{{msme}}" },
+    request_mode: "json", request_body_template: { id_number: "{{id_number}}" },
     response_data_mapping: {
       udyam_number: "data.uan",
       enterprise_name: "data.main_details.name_of_enterprise",

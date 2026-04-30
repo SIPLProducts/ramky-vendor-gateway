@@ -108,6 +108,18 @@ serve(async (req) => {
       }
     } else if ((provider.http_method || "POST") !== "GET") {
       const filled = substitute(provider.request_body_template ?? {}, input ?? {});
+      // Defensive guard: if the saved template was misconfigured (e.g. literal
+      // `{"id_number": ""}` with no `{{id_number}}` placeholder) but the caller
+      // actually provided values in `input`, merge the input keys in for any
+      // empty string fields. This prevents the upstream API from receiving an
+      // empty identifier and returning a generic "Invalid …" error.
+      if (filled && typeof filled === "object" && !Array.isArray(filled) && input && typeof input === "object") {
+        for (const [k, v] of Object.entries(filled as Record<string, any>)) {
+          if ((v === "" || v == null) && (input as any)[k] != null && (input as any)[k] !== "") {
+            (filled as Record<string, any>)[k] = (input as any)[k];
+          }
+        }
+      }
       headers["Content-Type"] = headers["Content-Type"] || "application/json";
       body = JSON.stringify(filled);
     }
