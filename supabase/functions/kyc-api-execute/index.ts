@@ -123,9 +123,20 @@ serve(async (req) => {
       data[outKey] = getPath(parsed, jsonPath);
     }
 
+    // Default message resolution:
+    //   1) explicit response_message_path mapping
+    //   2) upstream `message` field (Surepass-style)
+    //   3) upstream `message_code` (e.g. "no_gstin_detected")
+    //   4) generic OK / HTTP <status>
+    const upstreamMessage = parsed && typeof parsed === "object" ? parsed.message : undefined;
+    const upstreamMessageCode = parsed && typeof parsed === "object" ? parsed.message_code : undefined;
     const message = provider.response_message_path
-      ? String(getPath(parsed, provider.response_message_path) ?? (ok ? "OK" : `HTTP ${resp.status}`))
-      : (ok ? "OK" : `HTTP ${resp.status}`);
+      ? String(getPath(parsed, provider.response_message_path) ?? upstreamMessage ?? upstreamMessageCode ?? (ok ? "OK" : `HTTP ${resp.status}`))
+      : (typeof upstreamMessage === "string" && upstreamMessage.length > 0)
+        ? upstreamMessage
+        : (typeof upstreamMessageCode === "string" && upstreamMessageCode.length > 0)
+          ? upstreamMessageCode
+          : (ok ? "OK" : `HTTP ${resp.status}`);
 
     // Surface upstream provider identity + raw status flags so the client can
     // prove the call came through the configured provider (not Gemini OCR).
