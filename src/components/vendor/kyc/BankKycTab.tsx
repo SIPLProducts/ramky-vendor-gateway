@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
+import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -22,6 +23,19 @@ interface BankKycTabProps {
   vendorId?: string;
 }
 
+/**
+ * Coerce values that might come back as a Surepass `{ value, confidence }`
+ * object (when the admin's response_data_mapping forgets to drill into `.value`)
+ * into a plain string. Belt-and-braces — the migration already maps `.value`
+ * paths, but this avoids `[object Object]` if config drifts.
+ */
+function pickString(v: any): string {
+  if (v == null) return '';
+  if (typeof v === 'string' || typeof v === 'number') return String(v);
+  if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+  return '';
+}
+
 export function BankKycTab(props: BankKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
 
@@ -38,31 +52,39 @@ export function BankKycTab(props: BankKycTabProps) {
     return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
-  // Verify step: penny-drop via configured BANK validation provider.
+  // Verify step: penny-drop via configured BANK validation provider, then
+  // enrich Bank Name / Branch from the public IFSC lookup since Surepass
+  // cheque OCR doesn't return them.
   const handleVerify = async (extracted: Record<string, any>) => {
-    const account = String(extracted.account_number || '').replace(/\s+/g, '');
-    const ifsc = String(extracted.ifsc_code || '').toUpperCase().trim();
+    const account = pickString(extracted.account_number).replace(/\s+/g, '');
+    const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
     if (!account || account.length < 8) {
       props.onStatusChange?.('failed');
       return { ok: false, message: 'Could not read a valid account number from the cheque.' };
     }
-    if (!ifsc || ifsc.length !== 11) {
+    if (!isValidIfsc(ifsc)) {
       props.onStatusChange?.('failed');
       return { ok: false, message: 'Could not read a valid 11-character IFSC code from the cheque.' };
     }
 
     props.onStatusChange?.('validating');
+
+    // Enrich Bank Name + Branch from public IFSC directory (cheque OCR has neither).
+    const ifscDetails = await lookupIfsc(ifsc);
+    const enrichedBankName = ifscDetails?.bank;
+    const enrichedBranch = ifscDetails?.branch;
+
     props.onBankDetailsChange({
       bankAccountNumber: account,
       ifscCode: ifsc,
-      bankName: extracted.bank_name,
-      branchName: extracted.branch_name,
-      accountHolderName: extracted.account_holder_name,
+      bankName: enrichedBankName,
+      branchName: enrichedBranch,
+      accountHolderName: undefined,
     });
 
     const r = await callProvider({
       providerName: 'BANK',
-      input: { account, ifsc },
+      input: { account, ifsc, id_number: account },
     });
     toastKycResult('Bank', r);
     if (!r.found) {
@@ -74,7 +96,7 @@ export function BankKycTab(props: BankKycTabProps) {
       return { ok: false, message: r.message || 'Bank verification failed', apiData: r.data };
     }
     const apiData = r.data;
-    const apiName = String(apiData.name_at_bank || apiData.accountHolder || '').trim();
+    const apiName = pickString(apiData.name_at_bank).trim();
 
     if (props.legalName && apiName) {
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -91,11 +113,11 @@ export function BankKycTab(props: BankKycTabProps) {
     props.onBankDetailsChange({
       bankAccountNumber: account,
       ifscCode: ifsc,
-      bankName: apiData.bank_name || apiData.bankName || extracted.bank_name,
-      branchName: apiData.branch_name || apiData.branch || extracted.branch_name,
-      accountHolderName: apiName || extracted.account_holder_name,
+      bankName: pickString(apiData.bank_name) || enrichedBankName,
+      branchName: pickString(apiData.branch_name) || enrichedBranch,
+      accountHolderName: apiName || undefined,
     });
-    props.onVerifiedDetails?.(apiData);
+    props.onVerifiedDetails?.({ ...apiData, bank_name_resolved: pickString(apiData.bank_name) || enrichedBankName, branch_name_resolved: pickString(apiData.branch_name) || enrichedBranch });
     props.onStatusChange?.('passed');
     return { ok: true, message: `Bank account verified — ${apiName || account}`, apiData };
   };
@@ -104,7 +126,7 @@ export function BankKycTab(props: BankKycTabProps) {
     <div className="space-y-4">
       <Alert>
         <AlertDescription className="text-sm">
-          Upload a clear image of your cancelled cheque. We'll read the account number and IFSC, then verify them via penny-drop. Manual entry is disabled.
+          Upload a clear image of your cancelled cheque. We'll read the account number and IFSC, derive Bank Name and Branch from the IFSC directory, then verify via penny-drop. Manual entry is disabled.
         </AlertDescription>
       </Alert>
 
@@ -130,7 +152,7 @@ export function BankKycTab(props: BankKycTabProps) {
         onFileChange={props.onCancelledChequeFileChange}
         runOcr={runBankOcr}
         onVerifyExtracted={handleVerify}
-        
+        apiLabel="Bank"
         onVerified={() => {}}
         vendorId={props.vendorId}
       />
