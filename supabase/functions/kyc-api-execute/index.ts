@@ -125,19 +125,43 @@ serve(async (req) => {
 
     // Map response fields. Wrap each entry so one bad mapping value cannot
     // crash the whole call (the historical "path.split is not a function" bug).
+    //
+    // When NO mapping is configured (empty object / null), fall through to a
+    // generic "show whatever the API returned" mode: we expose the upstream
+    // `data` object as-is (or, if the response has no `data` key, the whole
+    // response). This lets the UI render every field the provider sent
+    // without any hardcoded field list.
     const rawMapping = provider.response_data_mapping;
-    const data: Record<string, any> = {};
-    if (rawMapping && typeof rawMapping === "object" && !Array.isArray(rawMapping)) {
+    let data: Record<string, any> = {};
+    const hasMapping =
+      rawMapping &&
+      typeof rawMapping === "object" &&
+      !Array.isArray(rawMapping) &&
+      Object.keys(rawMapping).length > 0;
+
+    if (hasMapping) {
       for (const [outKey, jsonPath] of Object.entries(rawMapping as Record<string, any>)) {
         try {
           if (typeof jsonPath === "string") {
             data[outKey] = getPath(parsed, jsonPath);
           } else {
-            // Misconfigured entry — skip silently but log so admins can find it.
             console.warn(`[kyc-api-execute] mapping entry "${outKey}" is not a string path:`, jsonPath);
           }
         } catch (mapErr) {
           console.warn(`[kyc-api-execute] mapping entry "${outKey}" failed:`, mapErr);
+        }
+      }
+    } else if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      // No mapping — surface upstream payload verbatim so the UI can render
+      // exactly what the configured API returned.
+      const upstreamData = (parsed as any).data;
+      if (upstreamData && typeof upstreamData === "object" && !Array.isArray(upstreamData)) {
+        data = { ...upstreamData };
+      } else {
+        // Strip envelope keys so the rendered card focuses on payload fields.
+        const envelopeKeys = new Set(["status_code", "success", "message", "message_code"]);
+        for (const [k, v] of Object.entries(parsed as Record<string, any>)) {
+          if (!envelopeKeys.has(k)) data[k] = v;
         }
       }
     }
