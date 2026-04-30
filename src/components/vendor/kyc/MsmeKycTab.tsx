@@ -5,7 +5,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Pencil, Upload } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
-import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { ApiResponseDetails } from './ApiResponseDetails';
+import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 
