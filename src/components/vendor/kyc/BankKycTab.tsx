@@ -100,14 +100,6 @@ export function BankKycTab(props: BankKycTabProps) {
     return { ok: true, message: `Bank account verified — ${apiName || account}`, apiData };
   };
 
-  const buildRows = (extracted: Record<string, any>, apiData?: Record<string, any>): ComparisonRow[] => [
-    { label: 'Account Number', ocrValue: extracted.account_number, apiValue: apiData?.account_number },
-    { label: 'IFSC Code', ocrValue: extracted.ifsc_code, apiValue: apiData?.ifsc },
-    { label: 'Bank Name', ocrValue: extracted.bank_name, apiValue: apiData?.bank_name || apiData?.bankName },
-    { label: 'Branch', ocrValue: extracted.branch_name, apiValue: apiData?.branch_name || apiData?.branch },
-    { label: 'Account Holder', ocrValue: extracted.account_holder_name, apiValue: apiData?.name_at_bank || apiData?.accountHolder },
-  ];
-
   return (
     <div className="space-y-4">
       <Alert>
@@ -138,7 +130,7 @@ export function BankKycTab(props: BankKycTabProps) {
         onFileChange={props.onCancelledChequeFileChange}
         runOcr={runBankOcr}
         onVerifyExtracted={handleVerify}
-        buildComparisonRows={buildRows}
+        
         onVerified={() => {}}
         vendorId={props.vendorId}
       />
