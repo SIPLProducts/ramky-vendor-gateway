@@ -1,53 +1,88 @@
 ## Root Cause
 
-The Surepass API is returning `"Invalid UAN."` because the request body it receives has an **empty** `id_number`, even though the UI sends the correct Udyam number.
+The MSME validation **call now succeeds** (`status_code: 200`, `message_code: "success"`) and the upstream Surepass payload contains every field needed (Enterprise Name, Type, NIC Code, Address, Mobile, Email, etc.).
 
-Verified from the database:
+But the response that reaches the UI has:
 
 ```
-provider_name | request_body_template | request_mode
-MSME          | {"id_number": ""}     | json
+"data": { "message_code": true }
 ```
 
-The saved `request_body_template` for the MSME provider is the literal value `{"id_number": ""}` — there is **no `{{id_number}}` (or `{{msme}}`) placeholder**, so the edge function's `substitute()` never injects the Udyam number. Surepass therefore receives `{"id_number": ""}` → returns `verification_failed` / `Invalid UAN.`.
+…so all the form fields stay blank.
 
-The frontend correctly sends `input: { id_number: "UDYAM-AP-04-0057131", msme: "UDYAM-AP-04-0057131" }`, and the edge function works correctly when the template contains `{{id_number}}`. The bug is purely in the stored provider configuration (which was overwritten at some point with a literal empty string instead of the placeholder template).
+Verified the cause in the database:
+
+```
+api_providers.response_data_mapping (for MSME) =
+{
+  "data": { "uan": "UDYAM-AP-04-0057131", "main_details": { ... }, "nic_code": [ ... ] },
+  "message": null, "success": true, "status_code": 200, "message_code": "success"
+}
+```
+
+This column was saved with a **literal sample response object**, not a map of `{ outputKey: "json.path.string" }`. The edge function only treats string values as JSON paths, so virtually nothing gets extracted — and the only string value that exists at the right shape (`"success"`) accidentally surfaces as `message_code: true`.
 
 ## Fix
 
-### 1. Database — correct the saved MSME provider template
-Run a migration to update the existing MSME provider row so its `request_body_template` actually references the variable:
+Two coordinated changes — together they make the fields populate immediately and stay correct even if the mapping is broken again later.
 
-```json
-{ "id_number": "{{id_number}}" }
+### 1. Database — replace the broken MSME mapping with real JSON paths
+Update `api_providers.response_data_mapping` for `provider_name = 'MSME'` to the proper Surepass paths the UI already reads:
+
+```
+udyam_number          → data.uan
+enterprise_name       → data.main_details.name_of_enterprise
+enterprise_type       → data.main_details.enterprise_type_list.0.enterprise_type
+major_activity        → data.main_details.major_activity
+organization_type     → data.main_details.organization_type
+registration_date     → data.main_details.registration_date
+social_category       → data.main_details.social_category
+state                 → data.main_details.state
+district              → data.main_details.dic_name
+city                  → data.main_details.city
+pin_code              → data.main_details.pin
+mobile                → data.main_details.mobile_number
+email                 → data.main_details.email
+nic_5_digit           → data.nic_code.0.nic_5_digit
+nic_4_digit           → data.nic_code.0.nic_4_digit
+nic_2_digit           → data.nic_code.0.nic_2_digit
+date_of_incorporation → data.main_details.date_of_incorporation
+date_of_commencement  → data.main_details.date_of_commencement
+flat                  → data.main_details.flat
+road                  → data.main_details.road
+village               → data.main_details.village
+msme_dfo              → data.main_details.msme_dfo
 ```
 
-This makes substitution work for the payload the frontend already sends (`id_number`).
+These map exactly onto the flat keys the registration UI already reads (`d.udyam_number`, `d.enterprise_name`, `d.mobile`, `d.nic_5_digit`, etc.).
 
-### 2. KYC API Settings — align the seed template with the frontend
-In `src/pages/KycApiSettings.tsx`, the MSME / Udyam Manual seed currently uses `{{msme}}`:
+### 2. Edge function — auto-flatten as a safety net (`kyc-api-execute/index.ts`)
+Harden the response-mapping logic so this class of bug can't blank the form again:
 
-```ts
-request_body_template: { id_number: "{{msme}}" }
-```
+- Detect when `response_data_mapping` exists but contains **no string-valued JSON paths** (i.e. an admin pasted a sample response). Treat that as "no usable mapping".
+- When there is no usable mapping (or every mapped path resolved to `undefined`), auto-flatten the upstream `data` payload:
+  - copy every primitive top-level field of `data`,
+  - promote `data.main_details` keys onto the flat object,
+  - promote the first `data.nic_code[0]` entry onto the flat object,
+  - add convenience aliases: `enterprise_name = name_of_enterprise`, `mobile = mobile_number`, `pin_code = pin`, `district = dic_name`, `enterprise_type = enterprise_type_list[0].enterprise_type`, `udyam_number = uan`.
 
-Change it to `{{id_number}}` so that:
-- it matches the key the vendor registration UI sends (`id_number`)
-- if an admin re-seeds or re-saves the provider, the working template is restored instead of the broken one
-- it stays consistent with the GST / Bank templates which also use the actual input key names
+This guarantees the registration UI's flat-key lookups always find values, regardless of mapping mistakes.
 
-### 3. Edge function — defensive guard (small hardening)
-In `supabase/functions/kyc-api-execute/index.ts`, add a safety check before calling Surepass for `request_mode === "json"`: if the substituted body still contains an empty `id_number` while the caller provided a non-empty one in `input`, fall back to using `input.id_number` directly. This prevents a recurrence if the template is ever saved blank again, and surfaces a clearer error otherwise.
-
-### 4. No UI changes required
-The Step 1 MSME Manual Entry tab, Validate button, response mapping, and field auto-population are already implemented correctly and will start working as soon as the template is fixed.
+### 3. No UI changes required
+The `DocumentVerificationStep.tsx` MSME manual handler already reads the flat keys (`d.udyam_number`, `d.enterprise_name`, `d.enterprise_type`, `d.major_activity`, `d.organization_type`, `d.registration_date`, `d.social_category`, `d.state`, `d.district`, `d.city`, `d.pin_code`, `d.mobile`, `d.email`, `d.nic_5_digit`/`d.nic_4_digit`/`d.nic_2_digit`). Once the mapping returns those keys, every field shown in the screenshot (Enterprise Name, Enterprise Type, Major Activity, Organization Type, Registration Date, State, District, City, PIN Code, Mobile, Email, Social Category, NIC Code) will populate from the API response — and Udyam Number is already filled from the input.
 
 ## Files Touched
-
-- `supabase/migrations/<new>.sql` — UPDATE `api_providers` SET `request_body_template = '{"id_number":"{{id_number}}"}'::jsonb` WHERE `provider_name = 'MSME'`.
-- `src/pages/KycApiSettings.tsx` — change MSME seed template from `{{msme}}` to `{{id_number}}`.
-- `supabase/functions/kyc-api-execute/index.ts` — add fallback so an empty templated `id_number` is replaced by `input.id_number` when present.
+- `supabase/migrations/<new>.sql` — UPDATE `api_providers.response_data_mapping` for `provider_name = 'MSME'`.
+- `supabase/functions/kyc-api-execute/index.ts` — defensive auto-flatten when the mapping is invalid or every path resolves to undefined.
 
 ## Expected Result
-
-After the fix, clicking **Validate** on the MSME tab with `UDYAM-AP-04-0057131` will send `{"id_number":"UDYAM-AP-04-0057131"}` to `https://kyc-api.surepass.app/api/v1/corporate/udyog-aadhaar`, and the populated response (enterprise name, type, NIC code, address, etc.) will fill the MSME fields exactly as it does in Postman.
+Click **Validate** with `UDYAM-AP-04-0057131`. Within ~3-4 seconds the MSME fields populate:
+- Enterprise Name: `M/S SHARVI INFOTECH PRIVATE LIMITED`
+- Enterprise Type: `Micro`
+- Major Activity: `Services`
+- Organization Type: `Private Limited Company`
+- State: `ANDHRA PRADESH`, District: `GUNTUR`, City: `GUNTUR`, PIN: `522213`
+- Mobile: `91*****410`, Email: `arjuna2k22@gmail.com`
+- Social Category: `General`
+- NIC Code: `62013 - Providing software support and maintenance to the clients`
+- Registration Date: `2024-03-25`

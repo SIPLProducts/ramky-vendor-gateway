@@ -156,7 +156,16 @@ serve(async (req) => {
       !Array.isArray(rawMapping) &&
       Object.keys(rawMapping).length > 0;
 
-    if (hasMapping) {
+    // A mapping is "valid" only if it contains at least one string JSON-path
+    // value. If an admin accidentally pasted a sample response (object/array
+    // values) into response_data_mapping, treat it as no mapping and fall
+    // through to the auto-flatten path below — otherwise the UI gets nothing.
+    const mappingHasStringPaths = hasMapping &&
+      Object.values(rawMapping as Record<string, any>).some(
+        (v) => typeof v === "string" && v.length > 0,
+      );
+
+    if (mappingHasStringPaths) {
       for (const [outKey, jsonPath] of Object.entries(rawMapping as Record<string, any>)) {
         try {
           if (typeof jsonPath === "string") {
@@ -168,14 +177,49 @@ serve(async (req) => {
           console.warn(`[kyc-api-execute] mapping entry "${outKey}" failed:`, mapErr);
         }
       }
-    } else if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      // No mapping — surface upstream payload verbatim so the UI can render
-      // exactly what the configured API returned.
+    }
+
+    // Safety net: if no mapping was usable OR every mapped path resolved to
+    // undefined / empty, auto-flatten the upstream `data` object so the UI's
+    // flat-key lookups (e.g. d.enterprise_name, d.mobile, d.nic_5_digit) still
+    // find values. This prevents misconfigured response_data_mapping from
+    // silently blanking the form after a successful API call.
+    const dataIsEmpty = Object.values(data).every((v) => v == null || v === "");
+    if (dataIsEmpty && parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       const upstreamData = (parsed as any).data;
+      const flat: Record<string, any> = {};
       if (upstreamData && typeof upstreamData === "object" && !Array.isArray(upstreamData)) {
-        data = { ...upstreamData };
+        // Top-level primitive fields of upstream `data`.
+        for (const [k, v] of Object.entries(upstreamData as Record<string, any>)) {
+          if (typeof v !== "object" || v === null) flat[k] = v;
+        }
+        // Promote `main_details` keys onto the flat object (Surepass MSME shape).
+        const md = (upstreamData as any).main_details;
+        if (md && typeof md === "object" && !Array.isArray(md)) {
+          for (const [k, v] of Object.entries(md as Record<string, any>)) {
+            if (typeof v !== "object" || v === null) flat[k] = v;
+          }
+          // Convenience aliases used by the registration UI.
+          if (md.name_of_enterprise && !flat.enterprise_name) flat.enterprise_name = md.name_of_enterprise;
+          if (md.mobile_number && !flat.mobile) flat.mobile = md.mobile_number;
+          if (md.pin && !flat.pin_code) flat.pin_code = md.pin;
+          if (md.dic_name && !flat.district) flat.district = md.dic_name;
+          if (Array.isArray(md.enterprise_type_list) && md.enterprise_type_list[0] && !flat.enterprise_type) {
+            flat.enterprise_type = md.enterprise_type_list[0].enterprise_type;
+          }
+        }
+        // Promote first NIC code entry so UI can read nic_5_digit / nic_4_digit / nic_2_digit.
+        const nic = (upstreamData as any).nic_code;
+        if (Array.isArray(nic) && nic[0] && typeof nic[0] === "object") {
+          for (const [k, v] of Object.entries(nic[0] as Record<string, any>)) {
+            if (flat[k] == null && (typeof v !== "object" || v === null)) flat[k] = v;
+          }
+        }
+        // Canonical Udyam number.
+        if ((upstreamData as any).uan && !flat.udyam_number) flat.udyam_number = (upstreamData as any).uan;
+        data = flat;
       } else {
-        // Strip envelope keys so the rendered card focuses on payload fields.
+        // No `data` envelope — strip status keys and use the rest.
         const envelopeKeys = new Set(["status_code", "success", "message", "message_code"]);
         for (const [k, v] of Object.entries(parsed as Record<string, any>)) {
           if (!envelopeKeys.has(k)) data[k] = v;
