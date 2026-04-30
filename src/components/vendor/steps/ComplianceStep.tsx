@@ -153,6 +153,33 @@ export function ComplianceStep({
       setValue('gstJurisdictionState', d.jurisdiction_state || d.state_jurisdiction);
   };
 
+  // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.
+  const pickStr = (v: any): string => {
+    if (v == null) return '';
+    if (typeof v === 'string' || typeof v === 'number') return String(v);
+    if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+    return '';
+  };
+
+  // Populate MSME registration fields from whatever the configured provider returned.
+  // Field names follow the dynamic mapping in `api_providers.response_data_mapping`.
+  const handleMsmeVerified = (d: Record<string, any>) => {
+    const enterpriseName = pickStr(d.enterprise_name || d.legal_name);
+    if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
+    const enterpriseType = pickStr(d.enterprise_type);
+    if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
+    const majorActivity = pickStr(d.major_activity);
+    if (majorActivity) setValue('msmeMajorActivity' as any, majorActivity);
+    const orgType = pickStr(d.organization_type);
+    if (orgType) setValue('msmeOrganizationType' as any, orgType);
+    const regDate = pickStr(d.registration_date || d.date_of_incorporation);
+    if (regDate) setValue('msmeRegistrationDate' as any, regDate);
+    const state = pickStr(d.state);
+    if (state) setValue('msmeState' as any, state);
+    const district = pickStr(d.district);
+    if (district) setValue('msmeDistrict' as any, district);
+  };
+
   const handleBankDetailsChange = (b: {
     bankAccountNumber: string; ifscCode: string;
     bankName?: string; branchName?: string; accountHolderName?: string;
