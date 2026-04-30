@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Pencil, Upload } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
-import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
+import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
@@ -60,20 +60,17 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     const r = await callProvider({ providerName: 'MSME_OCR', file });
     toastKycResult('MSME OCR', r);
     if (!r.found && !r.message_code) {
-      return { success: false, error: 'MSME OCR provider not configured. Add it in KYC & Validation API Settings.' };
+      return { success: false, error: 'MSME OCR provider not configured. Add it in KYC & Validation API Settings.', apiResult: r };
     }
-    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
-      return { success: false, error: r.message || 'MSME OCR failed' };
+    if (!r.ok) {
+      return { success: false, error: r.message || r.message_code || 'MSME OCR failed', apiResult: r };
     }
-    return { success: true, extracted: r.data };
+    return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
   const handleOcrVerify = async (extracted: Record<string, any>) => {
     const extractedNum = String(extracted.udyam_number || '').toUpperCase().trim();
-    if (!extractedNum) {
-      return { ok: false, message: 'Could not read a valid Udyam number from the certificate.' };
-    }
-    props.onMsmeNumberChange(extractedNum);
+    if (extractedNum) props.onMsmeNumberChange(extractedNum);
     const apiName = String(extracted.enterprise_name || '').trim();
     if (props.legalName && apiName) {
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -91,15 +88,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       props.onMsmeCategoryChange?.(cat as any);
     }
     props.onVerifiedDetails?.(extracted);
-    return { ok: true, message: `MSME verified — ${apiName || extractedNum}`, apiData: extracted };
+    return { ok: true, message: `MSME verified — ${apiName || extractedNum || 'see API response below'}`, apiData: extracted };
   };
-
-  const buildRows = (extracted: Record<string, any>): ComparisonRow[] => [
-    { label: 'Udyam Number', ocrValue: extracted.udyam_number },
-    { label: 'Enterprise Name', ocrValue: extracted.enterprise_name },
-    { label: 'Type', ocrValue: extracted.enterprise_type },
-    { label: 'Major Activity', ocrValue: extracted.major_activity },
-  ];
 
   return (
     <div className="space-y-5">
@@ -151,7 +141,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               runOcr={runMsmeOcr}
               skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
-              buildComparisonRows={buildRows}
+              apiLabel="MSME OCR"
               onVerified={() => {}}
               vendorId={props.vendorId}
             />

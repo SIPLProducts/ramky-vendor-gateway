@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock } from 'lucide-react';
-import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
+import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 
@@ -30,12 +30,12 @@ export function BankKycTab(props: BankKycTabProps) {
     const r = await callProvider({ providerName: 'BANK_OCR', file });
     toastKycResult('Bank OCR', r);
     if (!r.found && !r.message_code) {
-      return { success: false, error: 'Bank OCR provider not configured. Add it in KYC & Validation API Settings.' };
+      return { success: false, error: 'Bank OCR provider not configured. Add it in KYC & Validation API Settings.', apiResult: r };
     }
-    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
-      return { success: false, error: r.message || 'Could not read cheque' };
+    if (!r.ok) {
+      return { success: false, error: r.message || r.message_code || 'Could not read cheque', apiResult: r };
     }
-    return { success: true, extracted: r.data };
+    return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
   // Verify step: penny-drop via configured BANK validation provider.

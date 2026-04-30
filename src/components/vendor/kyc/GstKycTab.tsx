@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Download, FileText, Pencil, Upload } from 'lucide-react';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
-import { OcrUploadAndVerify, ComparisonRow } from './OcrUploadAndVerify';
+import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
@@ -63,26 +63,36 @@ export function GstKycTab(props: GstKycTabProps) {
   };
 
   // Run the admin-configured GST_OCR provider as the "OCR" step.
+  // We surface the raw API result so the UI can render exactly what the
+  // configured provider returned (no hardcoded field list).
   const runGstOcr = async (file: File) => {
     const r = await callProvider({ providerName: 'GST_OCR', file });
     toastKycResult('GST OCR', r);
     if (!r.found && !r.message_code) {
-      return { success: false, error: 'GST OCR provider not configured. Add it in KYC & Validation API Settings.' };
+      return {
+        success: false,
+        error: 'GST OCR provider not configured. Add it in KYC & Validation API Settings.',
+        apiResult: r,
+      };
     }
-    if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
-      return { success: false, error: r.message || 'GST OCR failed' };
+    if (!r.ok) {
+      return {
+        success: false,
+        error: r.message || r.message_code || 'GST OCR failed',
+        apiResult: r,
+      };
     }
-    return { success: true, extracted: r.data };
+    // Pass whatever the API returned, even if the mapping yielded only some fields.
+    return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
   // The Surepass GST OCR endpoint already returns the verified GST record,
   // so the "verify" phase just runs the name-match check on the same payload.
   const handleOcrVerify = async (extracted: Record<string, any>) => {
     const extractedGstin = String(extracted.gstin || '').toUpperCase().trim();
-    if (!extractedGstin || extractedGstin.length !== 15) {
-      return { ok: false, message: 'Could not read a valid 15-character GSTIN from the certificate.' };
+    if (extractedGstin && extractedGstin.length === 15) {
+      props.onGstinChange(extractedGstin);
     }
-    props.onGstinChange(extractedGstin);
     reset();
 
     const apiName = String(extracted.legal_name || extracted.business_name || '').trim();
@@ -98,19 +108,8 @@ export function GstKycTab(props: GstKycTabProps) {
       }
     }
     props.onVerifiedDetails?.(extracted);
-    return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin}`, apiData: extracted };
+    return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin || 'see API response below'}`, apiData: extracted };
   };
-
-  const buildRows = (extracted: Record<string, any>): ComparisonRow[] => [
-    { label: 'GSTIN', ocrValue: extracted.gstin },
-    { label: 'Legal Name', ocrValue: extracted.legal_name },
-    { label: 'Business Name', ocrValue: extracted.business_name },
-    { label: 'PAN', ocrValue: extracted.pan_number },
-    { label: 'Status', ocrValue: extracted.gst_status },
-    { label: 'Taxpayer Type', ocrValue: extracted.taxpayer_type },
-    { label: 'Registration Date', ocrValue: extracted.registration_date },
-    { label: 'Address', ocrValue: extracted.address },
-  ];
 
   return (
     <div className="space-y-5">
@@ -163,7 +162,7 @@ export function GstKycTab(props: GstKycTabProps) {
               runOcr={runGstOcr}
               skipVerifyPhase
               onVerifyExtracted={handleOcrVerify}
-              buildComparisonRows={buildRows}
+              apiLabel="GST OCR"
               onVerified={() => { /* state already updated via props */ }}
               vendorId={props.vendorId}
             />
