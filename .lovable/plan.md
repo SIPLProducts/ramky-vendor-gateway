@@ -1,51 +1,37 @@
-## Goal
+## Root cause (confirmed from screenshots + DB)
 
-Stop showing a hardcoded list of GST fields. Whatever the configured GST OCR API returns — show exactly that, dynamically.
+The vendor uploads a PDF → frontend calls `kyc-api-execute` correctly with `fileBase64` + `fileMimeType` → edge function reaches Surepass `https://kyc-api.surepass.app/api/v1/ocr/gst` → **Surepass replies HTTP 400**.
 
-Right now the GST tab uses a fixed `buildRows()` list (GSTIN, Legal Name, Business Name, PAN, Status, etc.) and a fixed `response_data_mapping` in the database. If Surepass returns `ocr_fields: []` and `message_code: no_gstin_detected`, the form shows blank rows + "HTTP 400" and the actual provider message is hidden.
+Why Surepass rejects it:
 
-## Changes
+1. The DB row for `GST_OCR` (and `PAN_OCR`) is `request_mode = "multipart"` **but** also has `request_headers = { "Content-Type": "application/json" }`.
+2. The edge function copies that header in, then builds a `FormData` body. Forcing `Content-Type: application/json` on a multipart request stops `fetch` from writing the required `multipart/form-data; boundary=...` header → Surepass receives a malformed body → **400**.
+3. The edge function then can't parse the (HTML/text) error body, so it returns `raw: null` and a generic `"HTTP 400"` — which is exactly what your screenshot shows. Nothing is hardcoded; the upstream really did fail.
 
-### 1. Edge function `kyc-api-execute`
-- When the provider has **no `response_data_mapping` configured** (or it's empty), return the **entire upstream response payload** as `data` (flattened in a sensible way) so the UI can display all fields the provider actually returned.
-- Always include the full upstream response under `raw` (already done) so the UI can fall back to it.
-- Keep `message_code`, `status_code`, `success`, `message` surfacing exactly as the upstream API sent them.
+So this is **not** a hardcoding problem. It's a config + header-handling bug. The UI is already 100% dynamic.
 
-### 2. Database — clear the hardcoded GST_OCR mapping
-- Migration: set `response_data_mapping = '{}'` for `GST_OCR` (and optionally PAN/MSME/BANK OCR) so the executor falls back to "return the full provider response".
-- Admins can still add a mapping later from the KYC API Settings screen if they want to rename fields.
+## Fix
 
-### 3. GST tab UI — render whatever fields came back
-- Replace the hardcoded `buildRows()` in `GstKycTab.tsx` with a generic renderer that:
-  - Lists every key/value pair from the provider's response `data` (or from `raw` when `data` is empty).
-  - Pretty-prints the field key (e.g. `gstin_status` → `GSTIN Status`).
-  - Skips internal/empty values.
-  - Shows the upstream `status_code`, `success`, `message_code` and `message` at the top of the result card so the vendor sees exactly what the API said.
-- When the upstream response is an error (e.g. `no_gstin_detected`), show the provider's own `message` and `message_code` instead of "HTTP 400".
+### 1. `supabase/functions/kyc-api-execute/index.ts`
+- When `request_mode === "multipart"`, **strip any `Content-Type` header** from the merged headers before fetch (let the runtime set the multipart boundary automatically).
+- Always populate `raw` with the upstream body — if it's not JSON, return the raw text string so the UI can show Surepass's actual error message (instead of `raw: null`).
+- Keep the existing dynamic mapping fallback (no field hardcoding).
 
-### 4. Apply the same dynamic display to PAN / MSME / Bank OCR tabs
-- `PanKycTab`, `MsmeKycTab`, `BankKycTab`, and the OCR phase inside `DocumentVerificationStep` will all use the same generic "render raw API response" component so nothing is hardcoded.
+### 2. Repair the DB rows (migration)
+For OCR providers (`GST_OCR`, `PAN_OCR`, `MSME_OCR`, `BANK_OCR`):
+- Remove `Content-Type` from `request_headers` (multipart sets it itself).
+- Keep `request_mode = 'multipart'`, `file_field_name = 'file'`.
+- Leave `response_data_mapping = '{}'` so the UI keeps showing whatever Surepass returns, field-for-field.
 
-### 5. Reusable component
-- Add `src/components/vendor/kyc/ApiResponseDetails.tsx` that takes a `KycApiResult` and renders:
-  - A header row with `provider_name`, `status_code`, `message_code`, `success`.
-  - A key/value table of every non-empty field from `data` (or `raw.data` if `data` is empty).
-  - The raw JSON in a collapsible `<details>` block for transparency.
+### 3. No code changes to:
+- `useConfiguredKycApi.tsx` — already sends `fileBase64` + `fileMimeType` correctly.
+- `ApiResponseDetails.tsx` — already renders the upstream payload dynamically.
+- KYC tabs — already pass through the raw `apiResult`.
 
-## Files to change
+## Files touched
+- `supabase/functions/kyc-api-execute/index.ts` (multipart header fix + raw text passthrough)
+- New migration: clear bad `Content-Type` from OCR providers' `request_headers`
 
-- `supabase/functions/kyc-api-execute/index.ts`
-- New migration to clear `response_data_mapping` for OCR providers
-- `src/components/vendor/kyc/GstKycTab.tsx`
-- `src/components/vendor/kyc/PanKycTab.tsx`
-- `src/components/vendor/kyc/MsmeKycTab.tsx`
-- `src/components/vendor/kyc/BankKycTab.tsx`
-- `src/components/vendor/kyc/OcrUploadAndVerify.tsx` (use new generic renderer)
-- New `src/components/vendor/kyc/ApiResponseDetails.tsx`
-
-## Result
-
-- Whatever the configured GST OCR API returns will be shown verbatim under the upload card.
-- No field names are baked into the frontend.
-- If the provider says `no_gstin_detected`, the UI shows that exact message and code — not "HTTP 400".
-- If a different provider is configured later that returns different fields, those fields will automatically appear without code changes.
+## How to verify after deploy
+- Re-upload the same GST PDF.
+- `kyc-api-execute` returns 200; `raw` now contains Surepass's real JSON (or its real error message), and the UI's "API response" card shows every field Surepass returned with no hardcoded labels.
