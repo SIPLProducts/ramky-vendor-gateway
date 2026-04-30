@@ -415,6 +415,84 @@ export function DocumentVerificationStep({
     });
 
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+
+  // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
+  const [msmeMode, setMsmeMode] = useState<"manual" | "upload">("manual");
+  const [msmeManualNumber, setMsmeManualNumber] = useState<string>("");
+  const [msmeManualBusy, setMsmeManualBusy] = useState(false);
+  const [msmeManualError, setMsmeManualError] = useState<string | null>(null);
+
+  const pickValue = (v: any): string => {
+    if (v == null) return "";
+    if (typeof v === "string" || typeof v === "number") return String(v);
+    if (typeof v === "object" && "value" in v) return String((v as any).value ?? "");
+    return "";
+  };
+
+  const handleMsmeManualValidate = async () => {
+    const num = msmeManualNumber.trim().toUpperCase();
+    if (!num) {
+      setMsmeManualError("Please enter your Udyam number.");
+      return;
+    }
+    setMsmeManualError(null);
+    setMsmeManualBusy(true);
+    setMsmeDoc({ status: "verifying", fileName: undefined, fileSize: undefined });
+    try {
+      const r = await callProvider({
+        providerName: "MSME",
+        input: { id_number: num, msme: num },
+      });
+      toastKycResult("MSME", r);
+      if (!r.found) {
+        const msg = "MSME validation provider is not configured. Add it in KYC & Validation API Settings.";
+        setMsmeManualError(msg);
+        setMsmeDoc({ status: "failed", errorMessage: msg });
+        return;
+      }
+      if (!r.ok || !r.data) {
+        const msg = r.message || "Udyam validation failed. Please check the number and try again.";
+        setMsmeManualError(msg);
+        setMsmeDoc({ status: "failed", errorMessage: msg });
+        return;
+      }
+      const d = r.data as Record<string, any>;
+      const ocrShape = {
+        udyam_number: pickValue(d.udyam_number) || num,
+        enterprise_name: pickValue(d.enterprise_name || d.legal_name),
+        enterprise_type: pickValue(d.enterprise_type),
+        major_activity: pickValue(d.major_activity),
+        organization_type: pickValue(d.organization_type),
+        registration_date: pickValue(d.registration_date),
+        social_category: pickValue(d.social_category),
+        state: pickValue(d.state),
+        district: pickValue(d.district),
+        city: pickValue(d.city),
+        pin_code: pickValue(d.pin_code),
+        mobile: pickValue(d.mobile),
+        email: pickValue(d.email),
+        nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
+      };
+      const apiName = ocrShape.enterprise_name;
+      const score = nameMatchScore(effectiveLegalName, apiName);
+      setMsmeDoc({
+        status: "verified",
+        fileName: `Udyam ${ocrShape.udyam_number}`,
+        ocrData: ocrShape,
+        originalOcrData: ocrShape,
+        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number },
+        nameMatchScore: score,
+        verifiedAt: Date.now(),
+      });
+    } catch (e: any) {
+      const msg = e?.message || "Udyam validation failed unexpectedly.";
+      setMsmeManualError(msg);
+      setMsmeDoc({ status: "failed", errorMessage: msg });
+    } finally {
+      setMsmeManualBusy(false);
+    }
+  };
+
   const handleBankUpload = (file: File) =>
     runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
