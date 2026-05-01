@@ -1,9 +1,11 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Lock } from 'lucide-react';
+import { CheckCircle2, Lock, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
+import { fuzzyNameMatch } from '@/lib/nameMatch';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -21,6 +23,10 @@ interface BankKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed') => void;
   vendorId?: string;
+  /** Verified GST legal name — used to validate Bank account holder name. */
+  gstLegalName?: string;
+  /** Verified PAN holder name — used to validate Bank account holder name. */
+  panHolderName?: string;
 }
 
 /**
@@ -38,6 +44,9 @@ function pickString(v: any): string {
 
 export function BankKycTab(props: BankKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
+  const [holderName, setHolderName] = useState<string>('');
+  const [holderCheck, setHolderCheck] =
+    useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
 
   // OCR step: read cancelled cheque via configured BANK_OCR provider.
   const runBankOcr = async (file: File) => {
@@ -58,6 +67,8 @@ export function BankKycTab(props: BankKycTabProps) {
   const handleVerify = async (extracted: Record<string, any>) => {
     const account = pickString(extracted.account_number).replace(/\s+/g, '');
     const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
+    setHolderCheck('idle');
+    setHolderName('');
     if (!account || account.length < 8) {
       props.onStatusChange?.('failed');
       return { ok: false, message: 'Could not read a valid account number from the cheque.' };
@@ -97,11 +108,40 @@ export function BankKycTab(props: BankKycTabProps) {
     }
     const apiData = r.data;
     const apiName = pickString(apiData.name_at_bank).trim();
+    setHolderName(apiName);
 
-    if (props.legalName && apiName) {
+    // Compare account holder name against verified GST + PAN names. Both
+    // values come from official registries and are higher-trust than the
+    // user's typed legalName.
+    const gstOk = fuzzyNameMatch(apiName, props.gstLegalName);
+    const panOk = fuzzyNameMatch(apiName, props.panHolderName);
+
+    let nameMessage = '';
+    if (apiName && (props.gstLegalName || props.panHolderName)) {
+      if (gstOk && panOk) {
+        setHolderCheck('gst+pan');
+        nameMessage = 'Account Holder Name verified with GST Legal Name and PAN Holder Name.';
+      } else if (gstOk) {
+        setHolderCheck('gst');
+        nameMessage = 'Account Holder Name matched with GST Legal Name.';
+      } else if (panOk) {
+        setHolderCheck('pan');
+        nameMessage = 'Account Holder Name matched with PAN Holder Name.';
+      } else {
+        setHolderCheck('failed');
+        props.onStatusChange?.('failed');
+        return {
+          ok: false,
+          message: `Account Holder Name does not match with GST and PAN details. Bank: "${apiName}".`,
+          apiData,
+        };
+      }
+    } else if (props.legalName && apiName) {
+      // Fallback to typed legal name if neither GST nor PAN names are present.
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+        setHolderCheck('failed');
         props.onStatusChange?.('failed');
         return {
           ok: false,
@@ -110,6 +150,7 @@ export function BankKycTab(props: BankKycTabProps) {
         };
       }
     }
+
     props.onBankDetailsChange({
       bankAccountNumber: account,
       ifscCode: ifsc,
@@ -119,7 +160,11 @@ export function BankKycTab(props: BankKycTabProps) {
     });
     props.onVerifiedDetails?.({ ...apiData, bank_name_resolved: pickString(apiData.bank_name) || enrichedBankName, branch_name_resolved: pickString(apiData.branch_name) || enrichedBranch });
     props.onStatusChange?.('passed');
-    return { ok: true, message: `Bank account verified — ${apiName || account}`, apiData };
+    return {
+      ok: true,
+      message: nameMessage || `Bank account verified — ${apiName || account}`,
+      apiData,
+    };
   };
 
   return (
@@ -156,6 +201,36 @@ export function BankKycTab(props: BankKycTabProps) {
         onVerified={() => {}}
         vendorId={props.vendorId}
       />
+
+      {holderCheck !== 'idle' && holderName && (
+        <div
+          className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
+            holderCheck === 'failed'
+              ? 'border-destructive/30 bg-destructive/5'
+              : 'border-success/30 bg-success/5'
+          }`}
+        >
+          {holderCheck === 'failed' ? (
+            <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
+          )}
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex flex-wrap gap-x-2 items-baseline">
+              <span className="text-xs text-muted-foreground">Account Holder Name:</span>
+              <span className="font-medium break-words">{holderName}</span>
+            </div>
+            <div className={holderCheck === 'failed' ? 'text-destructive' : 'text-success'}>
+              {holderCheck === 'gst+pan' &&
+                'Account Holder Name verified with GST Legal Name and PAN Holder Name.'}
+              {holderCheck === 'gst' && 'Account Holder Name matched with GST Legal Name.'}
+              {holderCheck === 'pan' && 'Account Holder Name matched with PAN Holder Name.'}
+              {holderCheck === 'failed' &&
+                'Account Holder Name does not match with GST and PAN details.'}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

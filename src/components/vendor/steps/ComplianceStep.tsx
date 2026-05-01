@@ -119,6 +119,13 @@ export function ComplianceStep({
   const [statuses, setStatuses] = useState<Record<'gst' | 'pan' | 'msme' | 'bank', KycStatus>>({
     gst: 'idle', pan: 'idle', msme: 'idle', bank: 'idle',
   });
+
+  // Cross-tab verified values: GST is the source of truth for PAN number +
+  // legal name; PAN tab then yields the holder name used to validate MSME
+  // enterprise name and Bank account holder name.
+  const [gstLegalName, setGstLegalName] = useState<string | undefined>();
+  const [gstPanNumber, setGstPanNumber] = useState<string | undefined>();
+  const [panHolderName, setPanHolderName] = useState<string | undefined>();
   const setStatus = (k: keyof typeof statuses, s: KycStatus) =>
     setStatuses((prev) => (prev[k] === s ? prev : { ...prev, [k]: s }));
 
@@ -159,6 +166,34 @@ export function ComplianceStep({
     if (d.jurisdiction_centre) setValue('gstJurisdictionCentre', d.jurisdiction_centre);
     if (d.jurisdiction_state || d.state_jurisdiction)
       setValue('gstJurisdictionState', d.jurisdiction_state || d.state_jurisdiction);
+
+    // Capture PAN + legal name from GST registry — these become the
+    // source-of-truth values that PAN/MSME/Bank tabs validate against.
+    const pickStr = (v: any): string => {
+      if (v == null) return '';
+      if (typeof v === 'string' || typeof v === 'number') return String(v);
+      if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+      return '';
+    };
+    const panFromGst = pickStr(d.pan_number).toUpperCase().trim();
+    if (panFromGst && panFromGst.length === 10) {
+      setGstPanNumber(panFromGst);
+      // Pre-fill the PAN field so the PAN tab already shows the registry value.
+      setValue('pan', panFromGst);
+    }
+    const legalFromGst = pickStr(d.legal_name || d.business_name || d.trade_name).trim();
+    if (legalFromGst) setGstLegalName(legalFromGst);
+  };
+
+  const handlePanVerified = (d: Record<string, any>) => {
+    const pickStr = (v: any): string => {
+      if (v == null) return '';
+      if (typeof v === 'string' || typeof v === 'number') return String(v);
+      if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+      return '';
+    };
+    const name = pickStr(d.full_name || d.holder_name || d.name).trim();
+    if (name) setPanHolderName(name);
   };
 
   // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.
@@ -327,8 +362,12 @@ export function ComplianceStep({
             legalName={legalName}
             panCardFile={panCardFile}
             onPanCardFileChange={setPanCardFile}
+            onVerifiedDetails={handlePanVerified}
             onStatusChange={(s) => setStatus('pan', s)}
             vendorId={vendorId}
+            gstPanNumber={gstPanNumber}
+            gstLegalName={gstLegalName}
+            gstVerified={statuses.gst === 'passed'}
           />
         }
         msme={
@@ -344,6 +383,7 @@ export function ComplianceStep({
             onVerifiedDetails={handleMsmeVerified}
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}
+            panHolderName={panHolderName}
           />
         }
         bank={
@@ -356,6 +396,8 @@ export function ComplianceStep({
             onCancelledChequeFileChange={setCancelledChequeFile}
             onStatusChange={(s) => setStatus('bank', s)}
             vendorId={vendorId}
+            gstLegalName={gstLegalName}
+            panHolderName={panHolderName}
           />
         }
       />
@@ -367,6 +409,22 @@ export function ComplianceStep({
             These fields were auto-populated from the verification result. You may edit if needed.
           </p>
           <div className="grid gap-4">
+            {(gstPanNumber || gstLegalName) && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {gstPanNumber && (
+                  <div className="grid gap-1.5">
+                    <Label>GST PAN Number</Label>
+                    <Input value={gstPanNumber} readOnly className="font-mono bg-success/5 border-success/30" />
+                  </div>
+                )}
+                {gstLegalName && (
+                  <div className="grid gap-1.5">
+                    <Label>Legal Name (per GST)</Label>
+                    <Input value={gstLegalName} readOnly className="bg-success/5 border-success/30" />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="gstConstitutionOfBusiness">Constitution of Business</Label>
