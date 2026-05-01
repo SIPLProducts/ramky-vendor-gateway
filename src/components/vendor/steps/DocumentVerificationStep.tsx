@@ -12,6 +12,7 @@ import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
 import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
+import { fuzzyNameMatch } from "@/lib/nameMatch";
 
 /**
  * Maps the registration step's document type → the provider_name configured
