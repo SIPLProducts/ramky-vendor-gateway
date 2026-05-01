@@ -22,6 +22,8 @@ interface MsmeKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed' | 'na') => void;
   vendorId?: string;
+  /** Verified PAN holder name from the PAN tab — used to validate enterprise name. */
+  panHolderName?: string;
 }
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
