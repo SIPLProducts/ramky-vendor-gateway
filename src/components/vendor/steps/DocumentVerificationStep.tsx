@@ -15,6 +15,7 @@ import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
 import { fuzzyNameMatch } from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
+import { mergeOcrExtracted } from "@/lib/kycExtract";
 
 /**
  * Maps the registration step's document type → the provider_name configured
@@ -196,18 +197,35 @@ export function DocumentVerificationStep({
           error: `${cfg.label} provider not configured. Add it in KYC & Validation API Settings.`,
         };
       }
-      if (!r.ok || !r.data || Object.keys(r.data).length === 0) {
+      // Merge mapped `data` with `raw.data` so a misconfigured
+      // `response_data_mapping` (e.g. admin pasted the sample response instead
+      // of dotted JSON paths) doesn't blank out the extracted fields. Also
+      // unwraps Surepass `{ value, confidence }` objects to plain strings.
+      const merged = mergeOcrExtracted(r.data, r.raw);
+      const hasAnyValue = Object.values(merged).some(
+        (v) => v != null && v !== "" && typeof v !== "boolean",
+      );
+      if (!r.ok || !hasAnyValue) {
         return {
           success: false as const,
           error: r.message || `${cfg.label} failed`,
-          extracted: r.data,
+          extracted: merged,
         };
       }
       // Normalize PAN OCR shape: Surepass returns full_name, the rest of this
       // component expects holder_name. Alias without losing the original key.
-      const extracted: Record<string, any> = { ...r.data };
+      const extracted: Record<string, any> = { ...merged };
       if (documentType === "pan") {
         if (extracted.full_name && !extracted.holder_name) extracted.holder_name = extracted.full_name;
+      }
+      if (
+        documentType === "cheque" &&
+        (!("account_number" in (r.data || {})) || !("ifsc_code" in (r.data || {})))
+      ) {
+        console.warn(
+          "[BANK_OCR] response_data_mapping missing fields — recovered from raw.data",
+          { mappedKeys: Object.keys(r.data || {}), recoveredKeys: Object.keys(extracted) },
+        );
       }
       return {
         success: true as const,
