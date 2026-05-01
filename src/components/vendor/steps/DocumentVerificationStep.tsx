@@ -1702,6 +1702,7 @@ export function DocumentVerificationStep({
                 onReset={() => setBankDoc(idleDoc)}
                 busyLabel={
                   bankDoc.status === "uploading" ? "Uploading…" :
+                  bankDoc.status === "preparing" ? "Preparing document for OCR…" :
                   bankDoc.status === "ocr" ? "Reading cheque…" :
                   bankDoc.status === "verifying" ? "Penny-drop verification…" : ""
                 }
