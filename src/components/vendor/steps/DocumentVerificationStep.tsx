@@ -370,10 +370,64 @@ export function DocumentVerificationStep({
         registeredName: ocr.enterprise_name,
       };
     }
+    // Bank (cheque) → call configured BANK provider (Surepass penny-drop)
+    const ocrAccountRaw = String(ocr.account_number || "").replace(/\s+/g, "");
+    const ocrIfscRaw = String(ocr.ifsc_code || "").toUpperCase().trim();
+    if (!/^\d{8,18}$/.test(ocrAccountRaw)) {
+      return { ok: false as const, message: "Could not read a valid account number from the cheque. Please upload a clearer scan." };
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ocrIfscRaw)) {
+      return { ok: false as const, message: "Could not read a valid 11-character IFSC from the cheque. Please upload a clearer scan." };
+    }
+    const r = await callProvider({
+      providerName: "BANK",
+      input: { account: ocrAccountRaw, ifsc: ocrIfscRaw, id_number: ocrAccountRaw },
+    });
+    toastKycResult("Bank", r);
+    if (!r.found) {
+      return { ok: false as const, message: "Bank validation provider is not configured. Add it in KYC & Validation API Settings." };
+    }
+    if (!r.ok || !r.data) {
+      return { ok: false as const, message: r.message || "Bank verification failed. Please check the details or try again." };
+    }
+    const d = r.data as Record<string, any>;
+    if (d.account_exists === false) {
+      return { ok: false as const, message: "Bank account not found at the bank. Please check the cheque details." };
+    }
+    const apiAccount = String(d.account_number || "").replace(/\s+/g, "");
+    const apiIfsc = String(d.ifsc || "").toUpperCase().trim();
+    if (apiAccount && apiAccount !== ocrAccountRaw) {
+      return { ok: false as const, message: `Bank details mismatch: cheque shows account ending "${ocrAccountRaw.slice(-4)}" but registry returned "${apiAccount.slice(-4)}".` };
+    }
+    if (apiIfsc && apiIfsc !== ocrIfscRaw) {
+      return { ok: false as const, message: `IFSC mismatch: cheque shows "${ocrIfscRaw}" but registry returned "${apiIfsc}".` };
+    }
+    const nameAtBank = String(d.name_at_bank || "").trim();
+    const normalized: Record<string, any> = {
+      account_number: apiAccount || ocrAccountRaw,
+      ifsc_code: apiIfsc || ocrIfscRaw,
+      bank_name: d.bank_name,
+      branch_name: d.branch_name,
+      account_holder_name: nameAtBank || ocr.account_holder_name,
+      branch_address: d.branch_address,
+      branch_city: d.branch_city,
+      branch_state: d.branch_state,
+      micr: d.micr,
+    };
     return {
       ok: true as const,
-      apiData: { accountHolderName: ocr.account_holder_name, bankName: ocr.bank_name, ifsc: ocr.ifsc_code, accountNumber: ocr.account_number, simulated: true },
-      registeredName: ocr.account_holder_name,
+      apiData: {
+        accountHolderName: nameAtBank,
+        bankName: d.bank_name,
+        branchName: d.branch_name,
+        ifsc: apiIfsc || ocrIfscRaw,
+        accountNumber: apiAccount || ocrAccountRaw,
+        bankAddress: d.branch_address,
+        accountExists: d.account_exists,
+        impsRefNo: d.imps_ref_no,
+      },
+      normalized,
+      registeredName: nameAtBank || ocr.account_holder_name,
     };
   };
 
