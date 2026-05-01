@@ -14,6 +14,7 @@ import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
 import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
 import { fuzzyNameMatch } from "@/lib/nameMatch";
+import { normalizeUploadToImage } from "@/lib/pdfToImage";
 
 /**
  * Maps the registration step's document type → the provider_name configured
@@ -76,7 +77,7 @@ interface DocumentVerificationStepProps {
   onStageChange?: (data: VerifiedDocumentData) => void;
 }
 
-type DocStatus = "idle" | "uploading" | "ocr" | "verifying" | "verified" | "failed";
+type DocStatus = "idle" | "uploading" | "preparing" | "ocr" | "verifying" | "verified" | "failed";
 type StageStatus = "pending" | "in-progress" | "verified" | "failed";
 
 interface DocState {
@@ -161,7 +162,31 @@ export function DocumentVerificationStep({
   const extractFromFile = useCallback(
     async (file: File, documentType: OcrDocumentType, _vendorId?: string) => {
       const cfg = OCR_PROVIDER_BY_KIND[documentType];
-      const r = await callProvider({ providerName: cfg.provider, file });
+      // Defensive: if any caller hands us a PDF, convert to a single stitched
+      // JPEG before sending to the configured OCR provider. Surepass and
+      // most OCR providers only reliably read images.
+      let fileForOcr = file;
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      if (isPdf) {
+        try {
+          fileForOcr = await normalizeUploadToImage(file);
+        } catch (err) {
+          console.warn("[KYC] PDF→image conversion failed", err);
+          return {
+            success: false as const,
+            error:
+              "Could not convert your PDF to an image for OCR. Please upload a JPG/PNG instead, or a clearer/smaller PDF.",
+          };
+        }
+        if (fileForOcr === file || !fileForOcr.type?.startsWith("image/")) {
+          return {
+            success: false as const,
+            error:
+              "Could not convert your PDF to an image for OCR. Please upload a JPG/PNG instead, or a clearer/smaller PDF.",
+          };
+        }
+      }
+      const r = await callProvider({ providerName: cfg.provider, file: fileForOcr });
       // Surface upstream provider identity + message_code/status_code so it's
       // obvious the call hit the configured provider (not Gemini).
       toastKycResult(cfg.label, r);
@@ -634,6 +659,10 @@ export function DocumentVerificationStep({
       return;
     }
     setDoc({ status: "uploading", fileName: file.name, fileSize: file.size });
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (isPdf) {
+      setDoc({ status: "preparing", fileName: file.name, fileSize: file.size });
+    }
     setDoc({ status: "ocr", fileName: file.name, fileSize: file.size });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
@@ -1160,6 +1189,7 @@ export function DocumentVerificationStep({
                       onReset={() => setGstDoc(idleDoc)}
                       busyLabel={
                         gstDoc.status === "uploading" ? "Uploading…" :
+                        gstDoc.status === "preparing" ? "Preparing document for OCR…" :
                         gstDoc.status === "ocr" ? "Reading certificate…" :
                         gstDoc.status === "verifying" ? "Verifying…" : ""
                       }
@@ -1265,6 +1295,7 @@ export function DocumentVerificationStep({
                 onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
                 busyLabel={
                   panDoc.status === "uploading" ? "Uploading…" :
+                  panDoc.status === "preparing" ? "Preparing document for OCR…" :
                   panDoc.status === "ocr" ? "Reading PAN…" :
                   panDoc.status === "verifying" ? "Verifying…" : ""
                 }
@@ -1576,6 +1607,7 @@ export function DocumentVerificationStep({
                         onReset={() => setMsmeDoc(idleDoc)}
                         busyLabel={
                           msmeDoc.status === "uploading" ? "Uploading…" :
+                          msmeDoc.status === "preparing" ? "Preparing document for OCR…" :
                           msmeDoc.status === "ocr" ? "Reading Udyam…" :
                           msmeDoc.status === "verifying" ? "Verifying…" : ""
                         }
@@ -1670,6 +1702,7 @@ export function DocumentVerificationStep({
                 onReset={() => setBankDoc(idleDoc)}
                 busyLabel={
                   bankDoc.status === "uploading" ? "Uploading…" :
+                  bankDoc.status === "preparing" ? "Preparing document for OCR…" :
                   bankDoc.status === "ocr" ? "Reading cheque…" :
                   bankDoc.status === "verifying" ? "Penny-drop verification…" : ""
                 }
@@ -1897,7 +1930,7 @@ interface DocSplitRowProps {
 }
 function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, verifiedFields }: DocSplitRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const isBusy = doc.status === "uploading" || doc.status === "ocr" || doc.status === "verifying";
+  const isBusy = doc.status === "uploading" || doc.status === "preparing" || doc.status === "ocr" || doc.status === "verifying";
   const isVerified = doc.status === "verified";
   const isFailed = doc.status === "failed";
 
