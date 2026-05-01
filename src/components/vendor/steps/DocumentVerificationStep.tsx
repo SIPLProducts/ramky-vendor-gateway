@@ -497,7 +497,40 @@ export function DocumentVerificationStep({
     if (apiIfsc && apiIfsc !== ocrIfscRaw) {
       return { ok: false as const, message: `IFSC mismatch: cheque shows "${ocrIfscRaw}" but registry returned "${apiIfsc}".` };
     }
-    const nameAtBank = String(d.name_at_bank || "").trim();
+    // Account holder name comes back as either `full_name` or `name_at_bank`
+    // depending on the upstream provider. Accept both.
+    const nameAtBank = String(d.full_name || d.name_at_bank || "").trim();
+
+    // Compare account holder name against verified GST Legal Name + PAN Holder
+    // Name (both higher-trust than the user's typed legalName).
+    const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+    const panHolderName = String(
+      panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
+    ).trim();
+    let holderNameStatus: "gst+pan" | "gst" | "pan" | "none" | "skipped" = "skipped";
+    let holderNameMessage = "";
+    if (nameAtBank && (gstLegalName || panHolderName)) {
+      const gstOk = gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
+      const panOk = panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
+      if (gstOk && panOk) {
+        holderNameStatus = "gst+pan";
+        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
+      } else if (gstOk) {
+        holderNameStatus = "gst";
+        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
+      } else if (panOk) {
+        holderNameStatus = "pan";
+        holderNameMessage = "Account Holder Name matched with PAN Holder Name.";
+      } else {
+        holderNameStatus = "none";
+        return {
+          ok: false as const,
+          message:
+            "Account Holder Name does not match with GST Legal Name and PAN Holder Name.",
+        };
+      }
+    }
+
     const normalized: Record<string, any> = {
       account_number: apiAccount || ocrAccountRaw,
       ifsc_code: apiIfsc || ocrIfscRaw,
@@ -520,6 +553,8 @@ export function DocumentVerificationStep({
         bankAddress: d.branch_address,
         accountExists: d.account_exists,
         impsRefNo: d.imps_ref_no,
+        holderNameStatus,
+        holderNameMessage,
       },
       normalized,
       registeredName: nameAtBank || ocr.account_holder_name,
