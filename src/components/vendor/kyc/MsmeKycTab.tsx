@@ -10,6 +10,10 @@ import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKyc
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch } from '@/lib/nameMatch';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MsmeKycTabProps {
   isMsmeRegistered: boolean;
@@ -25,6 +29,8 @@ interface MsmeKycTabProps {
   vendorId?: string;
   /** Verified PAN holder name from the PAN tab — used to validate enterprise name. */
   panHolderName?: string;
+  /** Verified GST legal name from the GST tab — used to validate enterprise name. */
+  gstLegalName?: string;
 }
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
@@ -32,21 +38,46 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const { state, verify } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
-  // Captured enterprise name from the registry + result of comparing it to PAN holder.
   const [enterpriseName, setEnterpriseName] = useState<string>('');
-  const [enterpriseCheck, setEnterpriseCheck] = useState<'idle' | 'passed' | 'failed'>('idle');
+  const [enterpriseCheck, setEnterpriseCheck] =
+    useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
+  const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
     props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
   }
 
-  // Coerce Surepass `{ value, confidence }` shape to a plain string in case
-  // the admin's response_data_mapping forgets to drill into `.value`.
+  // Coerce Surepass `{ value, confidence }` shape to a plain string.
   const pick = (v: any): string => {
     if (v == null) return '';
     if (typeof v === 'string' || typeof v === 'number') return String(v);
     if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
     return '';
+  };
+
+  // Cross-tab name check: enterprise name must match GST Legal Name OR PAN
+  // Holder Name. Returns the resolved status + a user-facing message.
+  const checkEnterpriseName = (apiName: string): {
+    status: 'gst+pan' | 'gst' | 'pan' | 'failed' | 'skipped';
+    message: string;
+  } => {
+    const gst = props.gstLegalName?.trim();
+    const pan = props.panHolderName?.trim();
+    if (!apiName || (!gst && !pan)) return { status: 'skipped', message: '' };
+    const gstOk = gst ? fuzzyNameMatch(apiName, gst) : false;
+    const panOk = pan ? fuzzyNameMatch(apiName, pan) : false;
+    if (gstOk && panOk) {
+      return {
+        status: 'gst+pan',
+        message: 'Enterprise Name verified with GST Legal Name and PAN Holder Name.',
+      };
+    }
+    if (gstOk) return { status: 'gst', message: 'Enterprise Name matched with GST Legal Name.' };
+    if (panOk) return { status: 'pan', message: 'Enterprise Name matched with PAN Holder Name.' };
+    return {
+      status: 'failed',
+      message: 'Enterprise Name does not match with GST Legal Name and PAN Holder Name.',
+    };
   };
 
   const handleManualVerify = async () => {
@@ -62,26 +93,20 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
           data.name_of_enterprise || data.enterprise_name || data.legal_name,
         ).trim();
         setEnterpriseName(apiName);
-        if (props.panHolderName && apiName) {
-          const ok = fuzzyNameMatch(apiName, props.panHolderName);
-          setEnterpriseCheck(ok ? 'passed' : 'failed');
-          if (!ok) {
-            return {
-              ok: false,
-              message: `Enterprise Name does not match with PAN holder name (PAN: "${props.panHolderName}", MSME: "${apiName}").`,
-              data,
-            };
-          }
+        const check = checkEnterpriseName(apiName);
+        if (check.status === 'failed') {
+          setEnterpriseCheck('failed');
+          setMismatchOpen(true);
+          return { ok: false, message: check.message, data };
         }
+        if (check.status !== 'skipped') setEnterpriseCheck(check.status);
         const cat = pick(data.enterprise_type).toLowerCase();
         if (cat === 'micro' || cat === 'small' || cat === 'medium') {
           props.onMsmeCategoryChange?.(cat as any);
         }
         return {
           ok: true,
-          message: props.panHolderName
-            ? 'Enterprise Name verified with PAN holder name.'
-            : `MSME verified — ${apiName || props.msmeNumber}`,
+          message: check.message || `MSME verified — ${apiName || props.msmeNumber}`,
           data,
         };
       },
@@ -102,10 +127,6 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
-  // After OCR extracts the Udyam number, automatically chain a call to the
-  // configured `MSME` verification provider so we can populate the full
-  // registration record. The enterprise name from that record is then
-  // compared against the PAN holder name (verified earlier in the PAN tab).
   const handleOcrVerify = async (extracted: Record<string, any>) => {
     const extractedNum = pick(extracted.udyam_number).toUpperCase().trim();
     if (extractedNum) props.onMsmeNumberChange(extractedNum);
@@ -129,17 +150,14 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     ).trim();
     setEnterpriseName(apiName);
 
-    if (props.panHolderName && apiName) {
-      const ok = fuzzyNameMatch(apiName, props.panHolderName);
-      setEnterpriseCheck(ok ? 'passed' : 'failed');
-      if (!ok) {
-        return {
-          ok: false,
-          message: `Enterprise Name does not match with PAN holder name (PAN: "${props.panHolderName}", MSME: "${apiName}").`,
-          apiData: merged,
-        };
-      }
+    const check = checkEnterpriseName(apiName);
+    if (check.status === 'failed') {
+      setEnterpriseCheck('failed');
+      setMismatchOpen(true);
+      return { ok: false, message: check.message, apiData: merged };
     }
+    if (check.status !== 'skipped') setEnterpriseCheck(check.status);
+
     const cat = pick(merged.enterprise_type).toLowerCase();
     if (cat === 'micro' || cat === 'small' || cat === 'medium') {
       props.onMsmeCategoryChange?.(cat as any);
@@ -147,12 +165,20 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     props.onVerifiedDetails?.(merged);
     return {
       ok: true,
-      message: props.panHolderName
-        ? 'Enterprise Name verified with PAN holder name.'
-        : `MSME verified — ${apiName || extractedNum || 'see API response below'}`,
+      message: check.message || `MSME verified — ${apiName || extractedNum || 'see API response below'}`,
       apiData: merged,
     };
   };
+
+  const checkMessage = (() => {
+    if (enterpriseCheck === 'gst+pan')
+      return 'Enterprise Name verified with GST Legal Name and PAN Holder Name.';
+    if (enterpriseCheck === 'gst') return 'Enterprise Name matched with GST Legal Name.';
+    if (enterpriseCheck === 'pan') return 'Enterprise Name matched with PAN Holder Name.';
+    if (enterpriseCheck === 'failed')
+      return 'Enterprise Name does not match with GST Legal Name and PAN Holder Name.';
+    return '';
+  })();
 
   return (
     <div className="space-y-5">
@@ -217,29 +243,44 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       {props.isMsmeRegistered && enterpriseCheck !== 'idle' && enterpriseName && (
         <div
           className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
-            enterpriseCheck === 'passed'
-              ? 'border-success/30 bg-success/5'
-              : 'border-destructive/30 bg-destructive/5'
+            enterpriseCheck === 'failed'
+              ? 'border-destructive/30 bg-destructive/5'
+              : 'border-success/30 bg-success/5'
           }`}
         >
-          {enterpriseCheck === 'passed' ? (
-            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
-          ) : (
+          {enterpriseCheck === 'failed' ? (
             <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
           )}
           <div className="space-y-0.5 min-w-0">
             <div className="flex flex-wrap gap-x-2 items-baseline">
               <span className="text-xs text-muted-foreground">Enterprise Name:</span>
               <span className="font-medium break-words">{enterpriseName}</span>
             </div>
-            <div className={enterpriseCheck === 'passed' ? 'text-success' : 'text-destructive'}>
-              {enterpriseCheck === 'passed'
-                ? 'Enterprise Name verified with PAN holder name.'
-                : `Enterprise Name does not match with PAN holder name${props.panHolderName ? ` ("${props.panHolderName}")` : ''}.`}
+            <div className={enterpriseCheck === 'failed' ? 'text-destructive' : 'text-success'}>
+              {checkMessage}
             </div>
           </div>
         </div>
       )}
+
+      <AlertDialog open={mismatchOpen} onOpenChange={setMismatchOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enterprise Name mismatch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enterprise Name does not match with GST Legal Name and PAN Holder Name.
+              Please re-check your MSME / Udyam certificate and resolve the mismatch
+              before continuing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setMismatchOpen(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+

@@ -107,7 +107,7 @@ export function BankKycTab(props: BankKycTabProps) {
       return { ok: false, message: r.message || 'Bank verification failed', apiData: r.data };
     }
     const apiData = r.data;
-    const apiName = pickString(apiData.name_at_bank).trim();
+    const apiName = (pickString(apiData.full_name) || pickString(apiData.name_at_bank)).trim();
     setHolderName(apiName);
 
     // Compare account holder name against verified GST + PAN names. Both
@@ -132,7 +132,7 @@ export function BankKycTab(props: BankKycTabProps) {
         props.onStatusChange?.('failed');
         return {
           ok: false,
-          message: `Account Holder Name does not match with GST and PAN details. Bank: "${apiName}".`,
+          message: 'Account Holder Name does not match with GST Legal Name and PAN Holder Name.',
           apiData,
         };
       }
@@ -226,7 +226,7 @@ export function BankKycTab(props: BankKycTabProps) {
               {holderCheck === 'gst' && 'Account Holder Name matched with GST Legal Name.'}
               {holderCheck === 'pan' && 'Account Holder Name matched with PAN Holder Name.'}
               {holderCheck === 'failed' &&
-                'Account Holder Name does not match with GST and PAN details.'}
+                'Account Holder Name does not match with GST Legal Name and PAN Holder Name.'}
             </div>
           </div>
         </div>

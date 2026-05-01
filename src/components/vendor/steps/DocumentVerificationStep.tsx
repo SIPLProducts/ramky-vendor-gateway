@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
@@ -299,6 +300,15 @@ export function DocumentVerificationStep({
   const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
   const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
 
+  // Cross-tab name-mismatch popup. Used for MSME (Enterprise Name vs
+  // GST/PAN) and Bank (Account Holder Name vs GST/PAN). The dialog also
+  // forces the user back onto the offending tab so they cannot proceed.
+  const [mismatchDialog, setMismatchDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: "",
+    message: "",
+  });
+
   // ---------- Verification ----------
   // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
   // Other kinds still use a lightweight simulation pending real provider wiring.
@@ -437,6 +447,27 @@ export function DocumentVerificationStep({
         mobile: pickStr(registry.mobile) || ocr.mobile,
         email: pickStr(registry.email) || ocr.email,
       };
+      // Cross-check: Enterprise Name MUST match GST Legal Name OR PAN Holder Name.
+      // If neither matches (and at least one reference is present), block the
+      // step. The exact message is rendered both in the inline error banner
+      // and via the modal popup raised in `runDocFlow`.
+      const msmeName = String(normalized.enterprise_name || "").trim();
+      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      const panHolderName = String(
+        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
+      ).trim();
+      if (msmeName && (gstLegalName || panHolderName)) {
+        const gstOk = gstLegalName ? fuzzyNameMatch(msmeName, gstLegalName) : false;
+        const panOk = panHolderName ? fuzzyNameMatch(msmeName, panHolderName) : false;
+        if (!gstOk && !panOk) {
+          return {
+            ok: false as const,
+            message:
+              "Enterprise Name does not match with GST Legal Name and PAN Holder Name.",
+            isNameMismatch: true,
+          } as any;
+        }
+      }
       return {
         ok: true as const,
         apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number },
@@ -476,7 +507,40 @@ export function DocumentVerificationStep({
     if (apiIfsc && apiIfsc !== ocrIfscRaw) {
       return { ok: false as const, message: `IFSC mismatch: cheque shows "${ocrIfscRaw}" but registry returned "${apiIfsc}".` };
     }
-    const nameAtBank = String(d.name_at_bank || "").trim();
+    // Account holder name comes back as either `full_name` or `name_at_bank`
+    // depending on the upstream provider. Accept both.
+    const nameAtBank = String(d.full_name || d.name_at_bank || "").trim();
+
+    // Compare account holder name against verified GST Legal Name + PAN Holder
+    // Name (both higher-trust than the user's typed legalName).
+    const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+    const panHolderName = String(
+      panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
+    ).trim();
+    let holderNameStatus: "gst+pan" | "gst" | "pan" | "none" | "skipped" = "skipped";
+    let holderNameMessage = "";
+    if (nameAtBank && (gstLegalName || panHolderName)) {
+      const gstOk = gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
+      const panOk = panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
+      if (gstOk && panOk) {
+        holderNameStatus = "gst+pan";
+        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
+      } else if (gstOk) {
+        holderNameStatus = "gst";
+        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
+      } else if (panOk) {
+        holderNameStatus = "pan";
+        holderNameMessage = "Account Holder Name matched with PAN Holder Name.";
+      } else {
+        holderNameStatus = "none";
+        return {
+          ok: false as const,
+          message:
+            "Account Holder Name does not match with GST Legal Name and PAN Holder Name.",
+        };
+      }
+    }
+
     const normalized: Record<string, any> = {
       account_number: apiAccount || ocrAccountRaw,
       ifsc_code: apiIfsc || ocrIfscRaw,
@@ -499,6 +563,8 @@ export function DocumentVerificationStep({
         bankAddress: d.branch_address,
         accountExists: d.account_exists,
         impsRefNo: d.imps_ref_no,
+        holderNameStatus,
+        holderNameMessage,
       },
       normalized,
       registeredName: nameAtBank || ocr.account_holder_name,
@@ -531,7 +597,17 @@ export function DocumentVerificationStep({
     setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: (v as any).message || "Verification failed" });
+      const msg = (v as any).message || "Verification failed";
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
+      // Surface a hard popup for cross-tab name mismatches and force the
+      // user back onto the offending tab so they cannot navigate forward.
+      if (kind === "msme" && (v as any).isNameMismatch) {
+        setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
+        setActiveTab("msme");
+      } else if (kind === "cheque" && /Account Holder Name does not match/i.test(msg)) {
+        setMismatchDialog({ open: true, title: "Account Holder Name mismatch", message: msg });
+        setActiveTab("bank");
+      }
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
@@ -662,6 +738,23 @@ export function DocumentVerificationStep({
         nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
       };
       const apiName = ocrShape.enterprise_name;
+      // Cross-tab gate: enterprise name must match GST Legal Name OR PAN Holder Name.
+      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      const panHolderName = String(
+        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
+      ).trim();
+      if (apiName && (gstLegalName || panHolderName)) {
+        const gstOk = gstLegalName ? fuzzyNameMatch(apiName, gstLegalName) : false;
+        const panOk = panHolderName ? fuzzyNameMatch(apiName, panHolderName) : false;
+        if (!gstOk && !panOk) {
+          const msg = "Enterprise Name does not match with GST Legal Name and PAN Holder Name.";
+          setMsmeManualError(msg);
+          setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
+          setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
+          setActiveTab("msme");
+          return;
+        }
+      }
       const score = nameMatchScore(effectiveLegalName, apiName);
       setMsmeDoc({
         status: "verified",
@@ -1571,6 +1664,12 @@ export function DocumentVerificationStep({
                           verifiedLabel="Name matches bank record"
                           onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
                         />
+                        {bankDoc.apiData?.holderNameMessage && (
+                          <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>{bankDoc.apiData.holderNameMessage}</span>
+                          </p>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
@@ -1605,6 +1704,25 @@ export function DocumentVerificationStep({
           </TabsContent>
         </Tabs>
       </TooltipProvider>
+
+      <AlertDialog
+        open={mismatchDialog.open}
+        onOpenChange={(o) => setMismatchDialog((d) => ({ ...d, open: o }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{mismatchDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>{mismatchDialog.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => setMismatchDialog((d) => ({ ...d, open: false }))}
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }
