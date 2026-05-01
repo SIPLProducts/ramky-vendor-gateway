@@ -1189,6 +1189,7 @@ export function DocumentVerificationStep({
                       onReset={() => setGstDoc(idleDoc)}
                       busyLabel={
                         gstDoc.status === "uploading" ? "Uploading…" :
+                        gstDoc.status === "preparing" ? "Preparing document for OCR…" :
                         gstDoc.status === "ocr" ? "Reading certificate…" :
                         gstDoc.status === "verifying" ? "Verifying…" : ""
                       }
