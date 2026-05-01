@@ -403,7 +403,7 @@ export function DocumentVerificationStep({
     setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: "Verification failed" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: (v as any).message || "Verification failed" });
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
@@ -411,13 +411,19 @@ export function DocumentVerificationStep({
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, ocrModel: ocrRes.model, errorMessage: extraErr });
       return;
     }
+    // Merge normalized API fields over OCR so missing/incorrect OCR values are
+    // auto-filled from the registry response (GST flow). For other kinds,
+    // `normalized` is undefined and we keep the OCR data as-is.
+    const merged = (v as any).normalized
+      ? { ...ocrRes.extracted, ...(v as any).normalized }
+      : ocrRes.extracted;
     const score = nameMatchScore(afterVerifiedOcrName(), v.registeredName);
     setDoc({
       status: "verified",
       fileName: file.name,
       fileSize: file.size,
       file,
-      ocrData: ocrRes.extracted,
+      ocrData: merged,
       originalOcrData: ocrRes.extracted,
       apiData: v.apiData,
       nameMatchScore: score,
