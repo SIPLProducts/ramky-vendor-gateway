@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Pencil, Upload } from 'lucide-react';
+import { CheckCircle2, Pencil, Upload, XCircle } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { ApiResponseDetails } from './ApiResponseDetails';
 import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
+import { fuzzyNameMatch } from '@/lib/nameMatch';
 
 interface MsmeKycTabProps {
   isMsmeRegistered: boolean;
