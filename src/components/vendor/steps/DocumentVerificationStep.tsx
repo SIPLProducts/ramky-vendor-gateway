@@ -1117,24 +1117,73 @@ export function DocumentVerificationStep({
                   panDoc.status === "verifying" ? "Verifying…" : ""
                 }
                 verifiedFields={
-                  <div className="space-y-3">
-                    <ReviewBanner />
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <EditableOcrField
-                        label="PAN Number"
-                        value={panDoc.ocrData?.pan_number}
-                        originalValue={panDoc.originalOcrData?.pan_number}
-                        onChange={(v) => setOcrField(setPanDoc, "pan_number", v.toUpperCase())}
-                        mono
-                      />
-                      <EditableOcrField
-                        label="Holder Name"
-                        value={panDoc.ocrData?.holder_name}
-                        originalValue={panDoc.originalOcrData?.holder_name}
-                        onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
-                      />
-                    </div>
-                  </div>
+                  (() => {
+                    const panApi = panDoc.apiData?.normalized || {};
+                    return (
+                      <div className="space-y-3">
+                        <ReviewBanner />
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <EditableOcrField
+                            label="PAN Number"
+                            value={panDoc.ocrData?.pan_number}
+                            originalValue={panDoc.originalOcrData?.pan_number}
+                            onChange={(v) => setOcrField(setPanDoc, "pan_number", v.toUpperCase())}
+                            mono
+                            verifiedValue={panApi.pan_number}
+                            verifiedLabel="PAN is verified"
+                          />
+                          <EditableOcrField
+                            label="Holder Name"
+                            value={panDoc.ocrData?.holder_name}
+                            originalValue={panDoc.originalOcrData?.holder_name}
+                            onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
+                            verifiedValue={panApi.holder_name || panApi.full_name}
+                            verifiedLabel="Name matches PAN registry"
+                          />
+                          {panApi.dob && (
+                            <EditableOcrField
+                              label="Date of Birth"
+                              value={panDoc.ocrData?.dob || panApi.dob}
+                              originalValue={panApi.dob}
+                              onChange={(v) => setOcrField(setPanDoc, "dob", v)}
+                              verifiedValue={panApi.dob}
+                              verifiedLabel="DOB verified from registry"
+                            />
+                          )}
+                          {panApi.category && (
+                            <EditableOcrField
+                              label="Category"
+                              value={panDoc.ocrData?.category || panApi.category}
+                              originalValue={panApi.category}
+                              onChange={(v) => setOcrField(setPanDoc, "category", v)}
+                              verifiedValue={panApi.category}
+                              verifiedLabel="Verified from registry"
+                            />
+                          )}
+                          {panApi.status && (
+                            <EditableOcrField
+                              label="PAN Status"
+                              value={panDoc.ocrData?.status || panApi.status}
+                              originalValue={panApi.status}
+                              onChange={(v) => setOcrField(setPanDoc, "status", v)}
+                              verifiedValue={panApi.status}
+                              verifiedLabel="Active per registry"
+                            />
+                          )}
+                          {panApi.aadhaar_linked != null && (
+                            <EditableOcrField
+                              label="Aadhaar Linked"
+                              value={panDoc.ocrData?.aadhaar_linked != null ? String(panDoc.ocrData.aadhaar_linked) : String(panApi.aadhaar_linked)}
+                              originalValue={String(panApi.aadhaar_linked)}
+                              onChange={(v) => setOcrField(setPanDoc, "aadhaar_linked", v)}
+                              verifiedValue={String(panApi.aadhaar_linked)}
+                              verifiedLabel="Verified from registry"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()
                 }
               />
               {panCrossCheckError && (
