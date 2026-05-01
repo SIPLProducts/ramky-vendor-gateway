@@ -56,7 +56,7 @@ export function GstKycTab(props: GstKycTabProps) {
             return { ok: false, message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`, data };
           }
         }
-        return { ok: true, message: `GSTIN verified — ${apiName || props.gstin}`, data };
+        return { ok: true, message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`, data };
       },
     });
     if (r.ok) props.onVerifiedDetails?.(r.data || {});
@@ -86,31 +86,56 @@ export function GstKycTab(props: GstKycTabProps) {
     return { success: true, extracted: r.data || {}, apiResult: r };
   };
 
-  // Surepass GST OCR returns ONLY the GSTIN. To populate Legal Name, Trade
-  // Name and Constitution we automatically chain a call to the configured
-  // `GST` verification provider (Surepass GSTIN verification) using that
-  // GSTIN. All values come from API responses — nothing is hardcoded.
+  // After OCR completes, automatically chain to the GST verification API.
+  // Compare the OCR-extracted GSTIN with the verified GSTIN and decide:
+  //  - match    -> success "GSTIN is verified"
+  //  - mismatch -> failure with both values shown
+  //  - OCR blank, API ok -> success "GSTIN populated from registry"
+  // Always merge API response over OCR so any fields OCR missed get filled.
   const handleOcrVerify = async (extracted: Record<string, any>) => {
-    const extractedGstin = String(extracted.gstin || '').toUpperCase().trim();
-    if (extractedGstin && extractedGstin.length === 15) {
-      props.onGstinChange(extractedGstin);
-    }
+    const ocrGstin = String(extracted.gstin || '').toUpperCase().trim();
     reset();
 
-    // Chain: pull full GST record from validation provider so we can show
-    // Legal Name / Trade Name / Constitution etc.
-    let merged: Record<string, any> = { ...extracted };
-    if (extractedGstin && extractedGstin.length === 15) {
-      const verify = await callProvider({
-        providerName: 'GST',
-        input: { gstin: extractedGstin, id_number: extractedGstin },
-      });
-      toastKycResult('GST', verify);
-      if (verify.found && verify.ok && verify.data) {
-        merged = { ...merged, ...verify.data };
-      }
+    // We need a GSTIN to verify against. If OCR didn't read one, we can't
+    // chain — surface that clearly to the user.
+    if (!ocrGstin || ocrGstin.length !== 15) {
+      return {
+        ok: false,
+        message: 'Could not read a valid 15-character GSTIN from the certificate. Please upload a clearer scan.',
+        apiData: extracted,
+      };
     }
 
+    // Tentatively reflect OCR value in the form so the user sees what was read.
+    props.onGstinChange(ocrGstin);
+
+    const verify = await callProvider({
+      providerName: 'GST',
+      input: { gstin: ocrGstin, id_number: ocrGstin },
+    });
+    toastKycResult('GST', verify);
+
+    if (!verify.found) {
+      return { ok: false, message: 'GST validation provider not configured. Add it in KYC & Validation API Settings.', apiResult: verify };
+    }
+    if (!verify.ok || !verify.data) {
+      return { ok: false, message: verify.message || 'GST verification failed', apiData: verify.data, apiResult: verify };
+    }
+
+    const apiGstin = String(verify.data.gstin || '').toUpperCase().trim();
+    const merged: Record<string, any> = { ...extracted, ...verify.data };
+
+    // Mismatch between what OCR read and what the registry actually has.
+    if (apiGstin && ocrGstin !== apiGstin) {
+      return {
+        ok: false,
+        message: `GSTIN mismatch: OCR read "${ocrGstin}" but the registry shows "${apiGstin}". Please re-upload a clearer certificate.`,
+        apiData: merged,
+        apiResult: verify,
+      };
+    }
+
+    // Optional secondary check: legal name fuzzy match if user already typed one.
     const apiName = String(merged.legal_name || merged.business_name || merged.trade_name || '').trim();
     if (props.legalName && apiName) {
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -120,11 +145,21 @@ export function GstKycTab(props: GstKycTabProps) {
           ok: false,
           message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`,
           apiData: merged,
+          apiResult: verify,
         };
       }
     }
+
+    // Commit the registry GSTIN to the form (covers OCR misreads of single chars)
+    // and pass the merged record up so missing fields auto-populate.
+    if (apiGstin) props.onGstinChange(apiGstin);
     props.onVerifiedDetails?.(merged);
-    return { ok: true, message: `GSTIN verified — ${apiName || extractedGstin || 'see API response below'}`, apiData: merged };
+    return {
+      ok: true,
+      message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
+      apiData: merged,
+      apiResult: verify,
+    };
   };
 
   return (

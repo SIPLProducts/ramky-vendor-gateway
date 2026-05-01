@@ -1,88 +1,87 @@
-## Root Cause
+# Fix GST OCR → Verification chain with match check + auto-fill
 
-The MSME validation **call now succeeds** (`status_code: 200`, `message_code: "success"`) and the upstream Surepass payload contains every field needed (Enterprise Name, Type, NIC Code, Address, Mobile, Email, etc.).
+## Problems found in current state
 
-But the response that reaches the UI has:
+1. **GST provider misconfigured in DB**
+   - `request_body_template` is `{"id_number": "37ABDCS6352G1Z7"}` — a hardcoded sample value, no `{{id_number}}` placeholder. Every call sends the same GSTIN.
+   - `response_data_mapping` is a literal copy of a sample response object instead of JSON-path strings — same bug we just fixed for MSME. Fields don't populate even though the API succeeds.
 
-```
-"data": { "message_code": true }
-```
+2. **No OCR ↔ Verification match comparison**
+   - `GstKycTab.handleOcrVerify` already chains `GST_OCR` → `GST` and merges responses, but it does NOT compare the OCR-extracted GSTIN against the GSTIN returned by the verification API.
+   - On mismatch, the user sees a generic "verified" instead of an error.
+   - On missing OCR fields, the merge happens but there's no explicit "populated from registry" indication.
 
-…so all the form fields stay blank.
+3. **Success indicator is generic**
+   - Current success Alert says whatever message we return. We need it to clearly read **"GSTIN is verified"** with the green check (the CheckCircle2 icon already exists in `OcrUploadAndVerify`).
 
-Verified the cause in the database:
+## Fix plan
 
-```
-api_providers.response_data_mapping (for MSME) =
-{
-  "data": { "uan": "UDYAM-AP-04-0057131", "main_details": { ... }, "nic_code": [ ... ] },
-  "message": null, "success": true, "status_code": 200, "message_code": "success"
-}
-```
+### 1. Database migration — fix GST provider config
 
-This column was saved with a **literal sample response object**, not a map of `{ outputKey: "json.path.string" }`. The edge function only treats string values as JSON paths, so virtually nothing gets extracted — and the only string value that exists at the right shape (`"success"`) accidentally surfaces as `message_code: true`.
-
-## Fix
-
-Two coordinated changes — together they make the fields populate immediately and stay correct even if the mapping is broken again later.
-
-### 1. Database — replace the broken MSME mapping with real JSON paths
-Update `api_providers.response_data_mapping` for `provider_name = 'MSME'` to the proper Surepass paths the UI already reads:
-
-```
-udyam_number          → data.uan
-enterprise_name       → data.main_details.name_of_enterprise
-enterprise_type       → data.main_details.enterprise_type_list.0.enterprise_type
-major_activity        → data.main_details.major_activity
-organization_type     → data.main_details.organization_type
-registration_date     → data.main_details.registration_date
-social_category       → data.main_details.social_category
-state                 → data.main_details.state
-district              → data.main_details.dic_name
-city                  → data.main_details.city
-pin_code              → data.main_details.pin
-mobile                → data.main_details.mobile_number
-email                 → data.main_details.email
-nic_5_digit           → data.nic_code.0.nic_5_digit
-nic_4_digit           → data.nic_code.0.nic_4_digit
-nic_2_digit           → data.nic_code.0.nic_2_digit
-date_of_incorporation → data.main_details.date_of_incorporation
-date_of_commencement  → data.main_details.date_of_commencement
-flat                  → data.main_details.flat
-road                  → data.main_details.road
-village               → data.main_details.village
-msme_dfo              → data.main_details.msme_dfo
+```sql
+UPDATE api_providers SET
+  request_body_template = '{"id_number": "{{id_number}}"}'::jsonb,
+  response_data_mapping = '{
+    "gstin": "data.gstin",
+    "pan_number": "data.pan_number",
+    "legal_name": "data.legal_name",
+    "business_name": "data.business_name",
+    "trade_name": "data.business_name",
+    "constitution_of_business": "data.constitution_of_business",
+    "taxpayer_type": "data.taxpayer_type",
+    "gstin_status": "data.gstin_status",
+    "date_of_registration": "data.date_of_registration",
+    "address": "data.address",
+    "state_jurisdiction": "data.state_jurisdiction",
+    "center_jurisdiction": "data.center_jurisdiction",
+    "nature_of_core_business_activity_description":
+      "data.nature_of_core_business_activity_description"
+  }'::jsonb
+WHERE provider_name = 'GST';
 ```
 
-These map exactly onto the flat keys the registration UI already reads (`d.udyam_number`, `d.enterprise_name`, `d.mobile`, `d.nic_5_digit`, etc.).
+The edge function's existing auto-flatten safety net will still cover any drift, but with proper paths the response cleanly populates the form.
 
-### 2. Edge function — auto-flatten as a safety net (`kyc-api-execute/index.ts`)
-Harden the response-mapping logic so this class of bug can't blank the form again:
+### 2. `KycApiSettings.tsx` seed template — sync the same fix
 
-- Detect when `response_data_mapping` exists but contains **no string-valued JSON paths** (i.e. an admin pasted a sample response). Treat that as "no usable mapping".
-- When there is no usable mapping (or every mapped path resolved to `undefined`), auto-flatten the upstream `data` payload:
-  - copy every primitive top-level field of `data`,
-  - promote `data.main_details` keys onto the flat object,
-  - promote the first `data.nic_code[0]` entry onto the flat object,
-  - add convenience aliases: `enterprise_name = name_of_enterprise`, `mobile = mobile_number`, `pin_code = pin`, `district = dic_name`, `enterprise_type = enterprise_type_list[0].enterprise_type`, `udyam_number = uan`.
+Update the seed `GST` template (`request_body_template` + `response_data_mapping`) so a future "reset to defaults" doesn't re-introduce the broken sample.
 
-This guarantees the registration UI's flat-key lookups always find values, regardless of mapping mistakes.
+### 3. `GstKycTab.tsx` — add match comparison + populate-from-API + clear success message
 
-### 3. No UI changes required
-The `DocumentVerificationStep.tsx` MSME manual handler already reads the flat keys (`d.udyam_number`, `d.enterprise_name`, `d.enterprise_type`, `d.major_activity`, `d.organization_type`, `d.registration_date`, `d.social_category`, `d.state`, `d.district`, `d.city`, `d.pin_code`, `d.mobile`, `d.email`, `d.nic_5_digit`/`d.nic_4_digit`/`d.nic_2_digit`). Once the mapping returns those keys, every field shown in the screenshot (Enterprise Name, Enterprise Type, Major Activity, Organization Type, Registration Date, State, District, City, PIN Code, Mobile, Email, Social Category, NIC Code) will populate from the API response — and Udyam Number is already filled from the input.
+In `handleOcrVerify(extracted)`:
 
-## Files Touched
-- `supabase/migrations/<new>.sql` — UPDATE `api_providers.response_data_mapping` for `provider_name = 'MSME'`.
-- `supabase/functions/kyc-api-execute/index.ts` — defensive auto-flatten when the mapping is invalid or every path resolves to undefined.
+- Capture `ocrGstin = extracted.gstin?.toUpperCase().trim()`.
+- After chaining the `GST` verification call, capture `apiGstin = verify.data.gstin?.toUpperCase().trim()`.
+- **Match cases:**
+  - Both present and equal → success: `"GSTIN is verified"` (clean, exact wording the user asked for).
+  - OCR missing GSTIN, API returned one → success: `"GSTIN populated and verified from registry"`.
+  - Both present and different → fail: `"GSTIN mismatch: OCR read ${ocrGstin} but registry shows ${apiGstin}"`.
+  - API call failed → fail: surface upstream message.
+- After a successful verify, ensure `props.onGstinChange(apiGstin)` runs so the form field reflects the registry value (covers OCR misreads of single chars).
+- Continue passing the merged record (`{ ...extracted, ...verify.data }`) into `props.onVerifiedDetails` so legal name, trade name, constitution, address, etc. fill any blanks in the form.
+- Keep existing legal-name fuzzy match as a secondary check; only run when the user already typed a legal name.
 
-## Expected Result
-Click **Validate** with `UDYAM-AP-04-0057131`. Within ~3-4 seconds the MSME fields populate:
-- Enterprise Name: `M/S SHARVI INFOTECH PRIVATE LIMITED`
-- Enterprise Type: `Micro`
-- Major Activity: `Services`
-- Organization Type: `Private Limited Company`
-- State: `ANDHRA PRADESH`, District: `GUNTUR`, City: `GUNTUR`, PIN: `522213`
-- Mobile: `91*****410`, Email: `arjuna2k22@gmail.com`
-- Social Category: `General`
-- NIC Code: `62013 - Providing software support and maintenance to the clients`
-- Registration Date: `2024-03-25`
+For the manual-entry path (`handleManualVerify`), no behavior change needed — it already verifies the typed GSTIN; we'll just standardise its success line to `"GSTIN is verified — ${legalName}"`.
+
+### 4. `OcrUploadAndVerify.tsx` — no structural changes
+
+The component already renders:
+- Green `CheckCircle2` Alert on success ✓ (this is the green tick the user asked for)
+- Red `XCircle` Alert on failure with Retry ✓
+- API response details panel below ✓
+
+We're just feeding it cleaner messages from `GstKycTab`.
+
+## Files to change
+
+- New SQL migration — fix `GST` provider `request_body_template` and `response_data_mapping`.
+- `src/pages/KycApiSettings.tsx` — sync seed template for `GST`.
+- `src/components/vendor/kyc/GstKycTab.tsx` — match comparison logic, set GSTIN from API on success, standardise success/failure messages.
+
+## Validation after deploy
+
+1. **Manual entry** `37ABDCS6352G1Z7` → green "GSTIN is verified — SHARVI INFOTECH PRIVATE LIMITED" + all fields (legal name, trade name, constitution, PAN, address) populated.
+2. **Upload certificate** whose OCR cleanly reads the GSTIN → green "GSTIN is verified", missing fields filled from registry.
+3. **Upload certificate** where OCR misreads a character (e.g. `O` vs `0`) but registry returns the correct one → red mismatch alert showing both values.
+4. **Upload certificate** where OCR fails to read the GSTIN at all → if registry call still works via any fallback, message reads "GSTIN populated and verified from registry"; otherwise red error with retry.
+5. The seed template in KYC API Settings UI now shows `{{id_number}}` placeholder instead of the hardcoded sample.
