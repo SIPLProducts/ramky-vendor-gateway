@@ -698,14 +698,17 @@ export function DocumentVerificationStep({
       if (kind === "msme" && (v as any).isNameMismatch) {
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
-      } else if (kind === "cheque" && /Account Holder Name does not match/i.test(msg)) {
-        setMismatchDialog({ open: true, title: "Account Holder Name mismatch", message: msg });
-        setActiveTab("bank");
-      } else if (kind === "cheque" && /temporarily unavailable|rate limit/i.test(msg)) {
-        setMismatchDialog({ open: true, title: "Bank verification temporarily unavailable", message: msg });
-        setActiveTab("bank");
       } else if (kind === "cheque") {
-        setMismatchDialog({ open: true, title: "Bank verification failed", message: msg });
+        // Title is derived from structured upstream code/reason — body is the
+        // raw upstream message verbatim. No hardcoded copy.
+        const code = (v as any).messageCode || (v as any).reason;
+        let title = "Bank verification failed";
+        if (code === "bank_rate_limited" || code === "rate_limited") {
+          title = "Bank verification rate limited";
+        } else if (/Account Holder Name does not match/i.test(msg)) {
+          title = "Account Holder Name mismatch";
+        }
+        setMismatchDialog({ open: true, title, message: msg });
         setActiveTab("bank");
       }
       return;
