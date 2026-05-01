@@ -1664,6 +1664,12 @@ export function DocumentVerificationStep({
                           verifiedLabel="Name matches bank record"
                           onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
                         />
+                        {bankDoc.apiData?.holderNameMessage && (
+                          <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>{bankDoc.apiData.holderNameMessage}</span>
+                          </p>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
