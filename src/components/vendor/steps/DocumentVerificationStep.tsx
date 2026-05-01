@@ -77,7 +77,7 @@ interface DocumentVerificationStepProps {
   onStageChange?: (data: VerifiedDocumentData) => void;
 }
 
-type DocStatus = "idle" | "uploading" | "ocr" | "verifying" | "verified" | "failed";
+type DocStatus = "idle" | "uploading" | "preparing" | "ocr" | "verifying" | "verified" | "failed";
 type StageStatus = "pending" | "in-progress" | "verified" | "failed";
 
 interface DocState {
