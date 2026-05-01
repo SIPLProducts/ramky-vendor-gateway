@@ -688,6 +688,12 @@ export function DocumentVerificationStep({
       } else if (kind === "cheque" && /Account Holder Name does not match/i.test(msg)) {
         setMismatchDialog({ open: true, title: "Account Holder Name mismatch", message: msg });
         setActiveTab("bank");
+      } else if (kind === "cheque" && /temporarily unavailable|rate limit/i.test(msg)) {
+        setMismatchDialog({ open: true, title: "Bank verification temporarily unavailable", message: msg });
+        setActiveTab("bank");
+      } else if (kind === "cheque") {
+        setMismatchDialog({ open: true, title: "Bank verification failed", message: msg });
+        setActiveTab("bank");
       }
       return;
     }
