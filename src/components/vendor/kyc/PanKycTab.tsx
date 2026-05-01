@@ -4,6 +4,7 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch, panMatch } from '@/lib/nameMatch';
+import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { useState } from 'react';
 
 interface PanKycTabProps {

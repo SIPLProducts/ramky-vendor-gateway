@@ -8,6 +8,7 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { ApiResponseDetails } from './ApiResponseDetails';
 import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
+import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch } from '@/lib/nameMatch';
 import {
