@@ -1364,6 +1364,8 @@ export function DocumentVerificationStep({
                         label="Account Number"
                         value={bankDoc.ocrData?.account_number}
                         originalValue={bankDoc.originalOcrData?.account_number}
+                        verifiedValue={bankDoc.apiData?.normalized?.account_number}
+                        verifiedLabel="Account Number is verified"
                         onChange={(v) => setOcrField(setBankDoc, "account_number", v)}
                         mono
                       />
@@ -1371,6 +1373,8 @@ export function DocumentVerificationStep({
                         label="IFSC Code"
                         value={bankDoc.ocrData?.ifsc_code}
                         originalValue={bankDoc.originalOcrData?.ifsc_code}
+                        verifiedValue={bankDoc.apiData?.normalized?.ifsc_code}
+                        verifiedLabel="IFSC is verified"
                         onChange={(v) => setOcrField(setBankDoc, "ifsc_code", v.toUpperCase())}
                         mono
                       />
@@ -1378,6 +1382,8 @@ export function DocumentVerificationStep({
                         label="Bank Name"
                         value={bankDoc.ocrData?.bank_name}
                         originalValue={bankDoc.originalOcrData?.bank_name}
+                        verifiedValue={bankDoc.apiData?.normalized?.bank_name}
+                        verifiedLabel="Bank Name is verified"
                         onChange={(v) => setOcrField(setBankDoc, "bank_name", v)}
                       />
                       <div>
@@ -1385,6 +1391,8 @@ export function DocumentVerificationStep({
                           label="Branch"
                           value={bankDoc.ocrData?.branch_name}
                           originalValue={bankDoc.originalOcrData?.branch_name}
+                          verifiedValue={bankDoc.apiData?.normalized?.branch_name}
+                          verifiedLabel="Branch is verified"
                           onChange={(v) => { setOcrField(setBankDoc, "branch_name", v); setBankBranchAutoFilled(false); }}
                         />
                         {bankBranchAutoFilled && bankDoc.ocrData?.branch_name && (
@@ -1398,6 +1406,8 @@ export function DocumentVerificationStep({
                           label="Account Holder Name"
                           value={bankDoc.ocrData?.account_holder_name}
                           originalValue={bankDoc.originalOcrData?.account_holder_name}
+                          verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
+                          verifiedLabel="Name matches bank record"
                           onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
                         />
                       </div>
