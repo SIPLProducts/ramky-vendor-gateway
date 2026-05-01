@@ -107,7 +107,7 @@ export function BankKycTab(props: BankKycTabProps) {
       return { ok: false, message: r.message || 'Bank verification failed', apiData: r.data };
     }
     const apiData = r.data;
-    const apiName = pickString(apiData.name_at_bank).trim();
+    const apiName = (pickString(apiData.full_name) || pickString(apiData.name_at_bank)).trim();
     setHolderName(apiName);
 
     // Compare account holder name against verified GST + PAN names. Both
