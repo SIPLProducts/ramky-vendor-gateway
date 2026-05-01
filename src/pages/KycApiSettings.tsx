@@ -52,12 +52,12 @@ const TEMPLATES: Array<{
   { provider_name: "BANK_OCR", display_name: "Cancelled Cheque OCR", category: "OCR",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/ocr/cheque",
     request_mode: "multipart", file_field_name: "file", request_body_template: {},
+    // Surepass cheque OCR returns each field as { value, confidence } —
+    // mappings must drill into `.value` so the edge function returns plain strings.
     response_data_mapping: {
-      account_number: "data.account_number",
-      ifsc_code: "data.ifsc_code",
-      bank_name: "data.bank_name",
-      branch_name: "data.branch_name",
-      account_holder_name: "data.account_holder_name",
+      account_number: "data.account_number.value",
+      ifsc_code: "data.ifsc_code.value",
+      micr: "data.micr.value",
     } },
   { provider_name: "GST", display_name: "GSTIN Validation", category: "VALIDATION",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/corporate/gstin",
