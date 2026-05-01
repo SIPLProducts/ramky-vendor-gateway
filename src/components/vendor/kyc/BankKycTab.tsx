@@ -226,7 +226,7 @@ export function BankKycTab(props: BankKycTabProps) {
               {holderCheck === 'gst' && 'Account Holder Name matched with GST Legal Name.'}
               {holderCheck === 'pan' && 'Account Holder Name matched with PAN Holder Name.'}
               {holderCheck === 'failed' &&
-                'Account Holder Name does not match with GST and PAN details.'}
+                'Account Holder Name does not match with GST Legal Name and PAN Holder Name.'}
             </div>
           </div>
         </div>
