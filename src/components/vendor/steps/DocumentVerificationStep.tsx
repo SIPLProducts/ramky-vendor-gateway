@@ -162,7 +162,31 @@ export function DocumentVerificationStep({
   const extractFromFile = useCallback(
     async (file: File, documentType: OcrDocumentType, _vendorId?: string) => {
       const cfg = OCR_PROVIDER_BY_KIND[documentType];
-      const r = await callProvider({ providerName: cfg.provider, file });
+      // Defensive: if any caller hands us a PDF, convert to a single stitched
+      // JPEG before sending to the configured OCR provider. Surepass and
+      // most OCR providers only reliably read images.
+      let fileForOcr = file;
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      if (isPdf) {
+        try {
+          fileForOcr = await normalizeUploadToImage(file);
+        } catch (err) {
+          console.warn("[KYC] PDF→image conversion failed", err);
+          return {
+            success: false as const,
+            error:
+              "Could not convert your PDF to an image for OCR. Please upload a JPG/PNG instead, or a clearer/smaller PDF.",
+          };
+        }
+        if (fileForOcr === file || !fileForOcr.type?.startsWith("image/")) {
+          return {
+            success: false as const,
+            error:
+              "Could not convert your PDF to an image for OCR. Please upload a JPG/PNG instead, or a clearer/smaller PDF.",
+          };
+        }
+      }
+      const r = await callProvider({ providerName: cfg.provider, file: fileForOcr });
       // Surface upstream provider identity + message_code/status_code so it's
       // obvious the call hit the configured provider (not Gemini).
       toastKycResult(cfg.label, r);
