@@ -1477,6 +1477,7 @@ export function DocumentVerificationStep({
                               </p>
                             )}
                           </div>
+                          ); })()
                         }
                       />
                     </TabsContent>
