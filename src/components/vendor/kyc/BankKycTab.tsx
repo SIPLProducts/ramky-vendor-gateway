@@ -1,9 +1,11 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Lock } from 'lucide-react';
+import { CheckCircle2, Lock, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
+import { fuzzyNameMatch } from '@/lib/nameMatch';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -21,6 +23,10 @@ interface BankKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed') => void;
   vendorId?: string;
+  /** Verified GST legal name — used to validate Bank account holder name. */
+  gstLegalName?: string;
+  /** Verified PAN holder name — used to validate Bank account holder name. */
+  panHolderName?: string;
 }
 
 /**
