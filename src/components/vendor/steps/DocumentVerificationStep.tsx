@@ -1888,9 +1888,21 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
       )}
 
       {isFailed && doc.errorMessage && (
-        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{doc.errorMessage}</span>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{doc.errorMessage}</span>
+          </div>
+          {/rate limit/i.test(doc.errorMessage) && (
+            <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
+              <span>
+                The document service is temporarily throttled by the upstream provider. Please wait
+                ~30 seconds and click <strong>Replace</strong> to retry. Your previously verified
+                tabs (GST / PAN / MSME) remain intact.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
