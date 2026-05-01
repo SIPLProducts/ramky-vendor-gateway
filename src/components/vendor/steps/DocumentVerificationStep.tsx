@@ -479,7 +479,9 @@ export function DocumentVerificationStep({
       file,
       ocrData: merged,
       originalOcrData: ocrRes.extracted,
-      apiData: v.apiData,
+      // Attach the normalized snake_case registry payload so verified panels
+      // can compare each field against what the validation API returned.
+      apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
       nameMatchScore: score,
       verifiedAt: Date.now(),
       ocrModel: ocrRes.model,
