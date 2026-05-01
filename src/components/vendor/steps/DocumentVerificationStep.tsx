@@ -587,7 +587,17 @@ export function DocumentVerificationStep({
     setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: (v as any).message || "Verification failed" });
+      const msg = (v as any).message || "Verification failed";
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
+      // Surface a hard popup for cross-tab name mismatches and force the
+      // user back onto the offending tab so they cannot navigate forward.
+      if (kind === "msme" && (v as any).isNameMismatch) {
+        setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
+        setActiveTab("msme");
+      } else if (kind === "cheque" && /Account Holder Name does not match/i.test(msg)) {
+        setMismatchDialog({ open: true, title: "Account Holder Name mismatch", message: msg });
+        setActiveTab("bank");
+      }
       return;
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
