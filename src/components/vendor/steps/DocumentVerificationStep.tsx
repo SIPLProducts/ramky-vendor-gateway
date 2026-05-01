@@ -1953,6 +1953,13 @@ function InlineFilePicker({
  * OCR mis-reads inline. Shows an "Edited" pill when the value differs from
  * the OCR'd original, plus a "Reset to OCR" link to revert.
  */
+function normalizeForCompare(v: string) {
+  // ISO date → keep as-is; otherwise upper + collapse spaces
+  const t = v.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  return t.toUpperCase().replace(/\s+/g, " ");
+}
+
 function EditableOcrField({
   label,
   value,
@@ -1960,6 +1967,8 @@ function EditableOcrField({
   onChange,
   mono,
   placeholder,
+  verifiedValue,
+  verifiedLabel,
 }: {
   label: string;
   value?: string;
@@ -1967,10 +1976,18 @@ function EditableOcrField({
   onChange: (v: string) => void;
   mono?: boolean;
   placeholder?: string;
+  /** Value returned by the validation API for this field (registry/penny-drop). */
+  verifiedValue?: string;
+  /** Label shown next to the green tick when the value matches the API. */
+  verifiedLabel?: string;
 }) {
   const current = value ?? "";
   const original = originalValue ?? "";
   const isEdited = current.trim() !== original.trim() && original.length > 0;
+  const apiVal = (verifiedValue ?? "").toString();
+  const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
+  const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
+  const mismatchApi = hasApi && !matchesApi;
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -2000,8 +2017,32 @@ function EditableOcrField({
           "mt-1 bg-muted/40 border-border/60",
           mono && "font-mono text-sm tracking-wide",
           isEdited && "border-warning/40 bg-warning/5",
+          matchesApi && "border-success/40 bg-success/5",
+          mismatchApi && "border-warning/50 bg-warning/5",
         )}
       />
+      {matchesApi && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
+          <CheckCircle2 className="h-3 w-3" />
+          {verifiedLabel || `${label} is verified`}
+        </p>
+      )}
+      {mismatchApi && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span className="truncate">
+            Doesn't match registry value:&nbsp;
+            <span className="font-medium">{apiVal}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(apiVal)}
+            className="ml-1 text-[11px] text-primary hover:underline shrink-0"
+          >
+            Use registry value
+          </button>
+        </p>
+      )}
     </div>
   );
 }
