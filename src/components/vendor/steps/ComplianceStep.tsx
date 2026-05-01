@@ -362,8 +362,12 @@ export function ComplianceStep({
             legalName={legalName}
             panCardFile={panCardFile}
             onPanCardFileChange={setPanCardFile}
+            onVerifiedDetails={handlePanVerified}
             onStatusChange={(s) => setStatus('pan', s)}
             vendorId={vendorId}
+            gstPanNumber={gstPanNumber}
+            gstLegalName={gstLegalName}
+            gstVerified={statuses.gst === 'passed'}
           />
         }
         msme={
@@ -379,6 +383,7 @@ export function ComplianceStep({
             onVerifiedDetails={handleMsmeVerified}
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}
+            panHolderName={panHolderName}
           />
         }
         bank={
@@ -391,6 +396,8 @@ export function ComplianceStep({
             onCancelledChequeFileChange={setCancelledChequeFile}
             onStatusChange={(s) => setStatus('bank', s)}
             vendorId={vendorId}
+            gstLegalName={gstLegalName}
+            panHolderName={panHolderName}
           />
         }
       />
