@@ -119,6 +119,13 @@ export function ComplianceStep({
   const [statuses, setStatuses] = useState<Record<'gst' | 'pan' | 'msme' | 'bank', KycStatus>>({
     gst: 'idle', pan: 'idle', msme: 'idle', bank: 'idle',
   });
+
+  // Cross-tab verified values: GST is the source of truth for PAN number +
+  // legal name; PAN tab then yields the holder name used to validate MSME
+  // enterprise name and Bank account holder name.
+  const [gstLegalName, setGstLegalName] = useState<string | undefined>();
+  const [gstPanNumber, setGstPanNumber] = useState<string | undefined>();
+  const [panHolderName, setPanHolderName] = useState<string | undefined>();
   const setStatus = (k: keyof typeof statuses, s: KycStatus) =>
     setStatuses((prev) => (prev[k] === s ? prev : { ...prev, [k]: s }));
 
