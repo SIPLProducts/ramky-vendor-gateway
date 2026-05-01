@@ -83,7 +83,7 @@ export function GstKycTab(props: GstKycTabProps) {
       };
     }
     // Pass whatever the API returned, even if the mapping yielded only some fields.
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
   // After OCR completes, automatically chain to the GST verification API.

@@ -124,7 +124,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     if (!r.ok) {
       return { success: false, error: r.message || r.message_code || 'MSME OCR failed', apiResult: r };
     }
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
   const handleOcrVerify = async (extracted: Record<string, any>) => {

@@ -59,7 +59,7 @@ export function PanKycTab(props: PanKycTabProps) {
       props.onStatusChange?.('failed');
       return { success: false, error: r.message || r.message_code || 'PAN OCR failed', apiResult: r };
     }
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
   // OCR is the only API call. Validation is done by comparing the extracted
