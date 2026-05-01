@@ -560,21 +560,34 @@ export function DocumentVerificationStep({
     }
     toastKycResult("Bank", r);
 
+    // Always prefer the upstream message verbatim — never hardcode UI copy
+    // for provider-side failures. Surepass returns a meaningful `message`
+    // for both success and error cases; surface it as-is.
+    const upstreamMsg =
+      (typeof (r as any)?.message === "string" && (r as any).message) ||
+      ((r as any)?.raw && typeof (r as any).raw.message === "string" && (r as any).raw.message) ||
+      "";
+    const upstreamCode =
+      (r as any)?.message_code ||
+      ((r as any)?.raw && (r as any).raw.message_code) ||
+      undefined;
+
     // Hard-fail on persistent rate limit. Vendor must re-upload and try again
     // — they should NOT be allowed to continue without a real penny-drop.
     if (isRateLimited(r)) {
       return {
         ok: false as const,
-        message:
-          "Bank verification is temporarily unavailable due to upstream rate limits. Please wait a moment and re-upload the cancelled cheque to try again.",
+        message: upstreamMsg || "Bank verification rate limited by provider. Please try again shortly.",
+        messageCode: upstreamCode,
+        reason: "rate_limited" as const,
       };
     }
 
     if (!r.found) {
-      return { ok: false as const, message: "Bank validation provider is not configured. Add it in KYC & Validation API Settings." };
+      return { ok: false as const, message: upstreamMsg || "Bank validation provider is not configured. Add it in KYC & Validation API Settings." };
     }
     if (!r.ok || !r.data) {
-      return { ok: false as const, message: r.message || "Bank verification failed. Please check the details or try again." };
+      return { ok: false as const, message: upstreamMsg || "Bank verification failed. Please check the details or try again.", messageCode: upstreamCode };
     }
     const d = r.data as Record<string, any>;
     if (d.account_exists === false) {
