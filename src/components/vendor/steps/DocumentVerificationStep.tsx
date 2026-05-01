@@ -1930,7 +1930,7 @@ interface DocSplitRowProps {
 }
 function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, verifiedFields }: DocSplitRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const isBusy = doc.status === "uploading" || doc.status === "ocr" || doc.status === "verifying";
+  const isBusy = doc.status === "uploading" || doc.status === "preparing" || doc.status === "ocr" || doc.status === "verifying";
   const isVerified = doc.status === "verified";
   const isFailed = doc.status === "failed";
 
