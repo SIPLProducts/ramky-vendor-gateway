@@ -114,6 +114,7 @@ export function KycLiveTestPanel() {
             panCardFile={panCardFile}
             onPanCardFileChange={setPanCardFile}
             onStatusChange={(s) => setStatus('pan', s)}
+            gstVerified={false}
           />
         }
         msme={
