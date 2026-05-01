@@ -59,7 +59,14 @@ export function BankKycTab(props: BankKycTabProps) {
     if (!r.ok) {
       return { success: false, error: r.message || r.message_code || 'Could not read cheque', apiResult: r };
     }
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    const extracted = mergeOcrExtracted(r.data, r.raw);
+    if (!('account_number' in (r.data || {})) || !('ifsc_code' in (r.data || {}))) {
+      console.warn('[BANK_OCR] response_data_mapping is missing fields; falling back to raw.data', {
+        mappedKeys: Object.keys(r.data || {}),
+        recoveredKeys: Object.keys(extracted),
+      });
+    }
+    return { success: true, extracted, apiResult: r };
   };
 
   // Verify step: penny-drop via configured BANK validation provider, then
