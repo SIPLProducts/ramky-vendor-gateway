@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil } from "lucide-react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -479,7 +479,9 @@ export function DocumentVerificationStep({
       file,
       ocrData: merged,
       originalOcrData: ocrRes.extracted,
-      apiData: v.apiData,
+      // Attach the normalized snake_case registry payload so verified panels
+      // can compare each field against what the validation API returned.
+      apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
       nameMatchScore: score,
       verifiedAt: Date.now(),
       ocrModel: ocrRes.model,
@@ -941,6 +943,7 @@ export function DocumentVerificationStep({
                         <GstVerifiedDetails
                           ocr={gstDoc.ocrData}
                           original={gstDoc.originalOcrData}
+                          verifiedApi={gstDoc.apiData?.normalized}
                           onChangeField={(k, v) => setOcrField(setGstDoc, k, v)}
                           editablePrincipalPlace={editablePrincipalPlace}
                           onChangePrincipalPlace={setEditablePrincipalPlace}
@@ -1361,6 +1364,8 @@ export function DocumentVerificationStep({
                         label="Account Number"
                         value={bankDoc.ocrData?.account_number}
                         originalValue={bankDoc.originalOcrData?.account_number}
+                        verifiedValue={bankDoc.apiData?.normalized?.account_number}
+                        verifiedLabel="Account Number is verified"
                         onChange={(v) => setOcrField(setBankDoc, "account_number", v)}
                         mono
                       />
@@ -1368,6 +1373,8 @@ export function DocumentVerificationStep({
                         label="IFSC Code"
                         value={bankDoc.ocrData?.ifsc_code}
                         originalValue={bankDoc.originalOcrData?.ifsc_code}
+                        verifiedValue={bankDoc.apiData?.normalized?.ifsc_code}
+                        verifiedLabel="IFSC is verified"
                         onChange={(v) => setOcrField(setBankDoc, "ifsc_code", v.toUpperCase())}
                         mono
                       />
@@ -1375,6 +1382,8 @@ export function DocumentVerificationStep({
                         label="Bank Name"
                         value={bankDoc.ocrData?.bank_name}
                         originalValue={bankDoc.originalOcrData?.bank_name}
+                        verifiedValue={bankDoc.apiData?.normalized?.bank_name}
+                        verifiedLabel="Bank Name is verified"
                         onChange={(v) => setOcrField(setBankDoc, "bank_name", v)}
                       />
                       <div>
@@ -1382,6 +1391,8 @@ export function DocumentVerificationStep({
                           label="Branch"
                           value={bankDoc.ocrData?.branch_name}
                           originalValue={bankDoc.originalOcrData?.branch_name}
+                          verifiedValue={bankDoc.apiData?.normalized?.branch_name}
+                          verifiedLabel="Branch is verified"
                           onChange={(v) => { setOcrField(setBankDoc, "branch_name", v); setBankBranchAutoFilled(false); }}
                         />
                         {bankBranchAutoFilled && bankDoc.ocrData?.branch_name && (
@@ -1395,6 +1406,8 @@ export function DocumentVerificationStep({
                           label="Account Holder Name"
                           value={bankDoc.ocrData?.account_holder_name}
                           originalValue={bankDoc.originalOcrData?.account_holder_name}
+                          verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
+                          verifiedLabel="Name matches bank record"
                           onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
                         />
                       </div>
@@ -1737,12 +1750,15 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 function GstVerifiedDetails({
   ocr,
   original,
+  verifiedApi,
   onChangeField,
   editablePrincipalPlace,
   onChangePrincipalPlace,
 }: {
   ocr?: Record<string, any>;
   original?: Record<string, any>;
+  /** Snake-case registry payload from the GST validation API. */
+  verifiedApi?: Record<string, any>;
   onChangeField: (key: string, value: any) => void;
   editablePrincipalPlace: string;
   onChangePrincipalPlace: (v: string) => void;
@@ -1753,6 +1769,11 @@ function GstVerifiedDetails({
   const hasAdditional = additionalPlaces.some((s) => typeof s === "string" && s.trim().length > 0);
   const hasJurisdiction = !!(ocr.jurisdiction_centre || ocr.jurisdiction_state);
   const hasRegistrationSection = !!(ocr.gst_status || ocr.registration_date || ocr.taxpayer_type || businessNature.length);
+  const api = verifiedApi || {};
+  const apiGstStatus = String(api.gst_status || "").trim();
+  const statusVerified =
+    !!apiGstStatus && !!ocr.gst_status &&
+    apiGstStatus.toUpperCase() === String(ocr.gst_status).toUpperCase();
   return (
     <div className="space-y-5">
       <ReviewBanner />
@@ -1765,18 +1786,24 @@ function GstVerifiedDetails({
             label="Legal Name"
             value={ocr.legal_name}
             originalValue={original?.legal_name}
+            verifiedValue={api.legal_name}
+            verifiedLabel="Legal Name is verified"
             onChange={(v) => onChangeField("legal_name", v)}
           />
           <EditableOcrField
             label="Trade Name"
             value={ocr.trade_name}
             originalValue={original?.trade_name}
+            verifiedValue={api.trade_name}
+            verifiedLabel="Trade Name is verified"
             onChange={(v) => onChangeField("trade_name", v)}
           />
           <EditableOcrField
             label="GSTIN"
             value={ocr.gstin}
             originalValue={original?.gstin}
+            verifiedValue={api.gstin}
+            verifiedLabel="GSTIN is verified"
             onChange={(v) => onChangeField("gstin", v.toUpperCase())}
             mono
           />
@@ -1784,6 +1811,8 @@ function GstVerifiedDetails({
             label="Constitution"
             value={ocr.constitution_of_business}
             originalValue={original?.constitution_of_business}
+            verifiedValue={api.constitution_of_business}
+            verifiedLabel="Verified from registry"
             onChange={(v) => onChangeField("constitution_of_business", v)}
           />
         </div>
@@ -1797,8 +1826,14 @@ function GstVerifiedDetails({
             {ocr.gst_status && (
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">GST Status</Label>
-                <div className="mt-1 h-10 flex items-center rounded-md border border-border/60 bg-muted/40 px-3">
+                <div className="mt-1 h-10 flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3">
                   <GstStatusPill status={ocr.gst_status} />
+                  {statusVerified && (
+                    <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-success">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {apiGstStatus} per registry
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -1807,6 +1842,8 @@ function GstVerifiedDetails({
                 label="Registration Date"
                 value={ocr.registration_date}
                 originalValue={original?.registration_date}
+                verifiedValue={api.registration_date}
+                verifiedLabel="Verified from registry"
                 onChange={(v) => onChangeField("registration_date", v)}
               />
             )}
@@ -1815,6 +1852,8 @@ function GstVerifiedDetails({
                 label="Taxpayer Type"
                 value={ocr.taxpayer_type}
                 originalValue={original?.taxpayer_type}
+                verifiedValue={api.taxpayer_type}
+                verifiedLabel="Verified from registry"
                 onChange={(v) => onChangeField("taxpayer_type", v)}
               />
             )}
@@ -1845,6 +1884,13 @@ function GstVerifiedDetails({
               placeholder="As per GST certificate"
               className="mt-1"
             />
+            {api.address && editablePrincipalPlace.trim().length > 0 &&
+              normalizeForCompare(editablePrincipalPlace) === normalizeForCompare(String(api.address)) && (
+                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Matches registry address
+                </p>
+              )}
           </div>
           {hasAdditional && (
             <div className="md:col-span-2">
@@ -1867,6 +1913,8 @@ function GstVerifiedDetails({
                 label="Centre Jurisdiction"
                 value={ocr.jurisdiction_centre}
                 originalValue={original?.jurisdiction_centre}
+                verifiedValue={api.jurisdiction_centre}
+                verifiedLabel="Verified from registry"
                 onChange={(v) => onChangeField("jurisdiction_centre", v)}
               />
             )}
@@ -1875,6 +1923,8 @@ function GstVerifiedDetails({
                 label="State Jurisdiction"
                 value={ocr.jurisdiction_state}
                 originalValue={original?.jurisdiction_state}
+                verifiedValue={api.jurisdiction_state}
+                verifiedLabel="Verified from registry"
                 onChange={(v) => onChangeField("jurisdiction_state", v)}
               />
             )}
@@ -1953,6 +2003,13 @@ function InlineFilePicker({
  * OCR mis-reads inline. Shows an "Edited" pill when the value differs from
  * the OCR'd original, plus a "Reset to OCR" link to revert.
  */
+function normalizeForCompare(v: string) {
+  // ISO date → keep as-is; otherwise upper + collapse spaces
+  const t = v.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  return t.toUpperCase().replace(/\s+/g, " ");
+}
+
 function EditableOcrField({
   label,
   value,
@@ -1960,6 +2017,8 @@ function EditableOcrField({
   onChange,
   mono,
   placeholder,
+  verifiedValue,
+  verifiedLabel,
 }: {
   label: string;
   value?: string;
@@ -1967,10 +2026,18 @@ function EditableOcrField({
   onChange: (v: string) => void;
   mono?: boolean;
   placeholder?: string;
+  /** Value returned by the validation API for this field (registry/penny-drop). */
+  verifiedValue?: string;
+  /** Label shown next to the green tick when the value matches the API. */
+  verifiedLabel?: string;
 }) {
   const current = value ?? "";
   const original = originalValue ?? "";
   const isEdited = current.trim() !== original.trim() && original.length > 0;
+  const apiVal = (verifiedValue ?? "").toString();
+  const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
+  const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
+  const mismatchApi = hasApi && !matchesApi;
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -2000,8 +2067,32 @@ function EditableOcrField({
           "mt-1 bg-muted/40 border-border/60",
           mono && "font-mono text-sm tracking-wide",
           isEdited && "border-warning/40 bg-warning/5",
+          matchesApi && "border-success/40 bg-success/5",
+          mismatchApi && "border-warning/50 bg-warning/5",
         )}
       />
+      {matchesApi && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
+          <CheckCircle2 className="h-3 w-3" />
+          {verifiedLabel || `${label} is verified`}
+        </p>
+      )}
+      {mismatchApi && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span className="truncate">
+            Doesn't match registry value:&nbsp;
+            <span className="font-medium">{apiVal}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(apiVal)}
+            className="ml-1 text-[11px] text-primary hover:underline shrink-0"
+          >
+            Use registry value
+          </button>
+        </p>
+      )}
     </div>
   );
 }
