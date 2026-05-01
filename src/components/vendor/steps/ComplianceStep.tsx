@@ -166,6 +166,34 @@ export function ComplianceStep({
     if (d.jurisdiction_centre) setValue('gstJurisdictionCentre', d.jurisdiction_centre);
     if (d.jurisdiction_state || d.state_jurisdiction)
       setValue('gstJurisdictionState', d.jurisdiction_state || d.state_jurisdiction);
+
+    // Capture PAN + legal name from GST registry — these become the
+    // source-of-truth values that PAN/MSME/Bank tabs validate against.
+    const pickStr = (v: any): string => {
+      if (v == null) return '';
+      if (typeof v === 'string' || typeof v === 'number') return String(v);
+      if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+      return '';
+    };
+    const panFromGst = pickStr(d.pan_number).toUpperCase().trim();
+    if (panFromGst && panFromGst.length === 10) {
+      setGstPanNumber(panFromGst);
+      // Pre-fill the PAN field so the PAN tab already shows the registry value.
+      setValue('pan', panFromGst);
+    }
+    const legalFromGst = pickStr(d.legal_name || d.business_name || d.trade_name).trim();
+    if (legalFromGst) setGstLegalName(legalFromGst);
+  };
+
+  const handlePanVerified = (d: Record<string, any>) => {
+    const pickStr = (v: any): string => {
+      if (v == null) return '';
+      if (typeof v === 'string' || typeof v === 'number') return String(v);
+      if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+      return '';
+    };
+    const name = pickStr(d.full_name || d.holder_name || d.name).trim();
+    if (name) setPanHolderName(name);
   };
 
   // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.
