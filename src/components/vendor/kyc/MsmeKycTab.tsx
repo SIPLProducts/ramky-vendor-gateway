@@ -10,6 +10,10 @@ import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKyc
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch } from '@/lib/nameMatch';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MsmeKycTabProps {
   isMsmeRegistered: boolean;
@@ -25,6 +29,8 @@ interface MsmeKycTabProps {
   vendorId?: string;
   /** Verified PAN holder name from the PAN tab — used to validate enterprise name. */
   panHolderName?: string;
+  /** Verified GST legal name from the GST tab — used to validate enterprise name. */
+  gstLegalName?: string;
 }
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
