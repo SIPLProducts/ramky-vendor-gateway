@@ -1837,15 +1837,29 @@ export function DocumentVerificationStep({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{mismatchDialog.title}</AlertDialogTitle>
-            <AlertDialogDescription>{mismatchDialog.message}</AlertDialogDescription>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center">{mismatchDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">{mismatchDialog.message}</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={() => setMismatchDialog((d) => ({ ...d, open: false }))}
-            >
-              OK
-            </AlertDialogAction>
+          <AlertDialogFooter className="sm:justify-center">
+            {/Account Holder Name|Bank verification/i.test(mismatchDialog.title) ? (
+              <AlertDialogAction
+                onClick={() => {
+                  setBankDoc(idleDoc);
+                  setMismatchDialog((d) => ({ ...d, open: false }));
+                }}
+              >
+                Re-upload cheque
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => setMismatchDialog((d) => ({ ...d, open: false }))}
+              >
+                OK
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
