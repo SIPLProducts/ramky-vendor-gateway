@@ -132,7 +132,7 @@ export function BankKycTab(props: BankKycTabProps) {
         props.onStatusChange?.('failed');
         return {
           ok: false,
-          message: `Account Holder Name does not match with GST and PAN details. Bank: "${apiName}".`,
+          message: 'Account Holder Name does not match with GST Legal Name and PAN Holder Name.',
           apiData,
         };
       }
