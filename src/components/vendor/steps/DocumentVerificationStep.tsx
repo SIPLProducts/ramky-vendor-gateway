@@ -400,26 +400,46 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "msme") {
+      const ocrUdyam = String(ocr.udyam_number || "").toUpperCase().trim();
+      // Try to call the configured MSME registry — if not configured or it
+      // fails, fall back to the OCR data so the existing flow still works.
+      let registry: Record<string, any> = {};
+      if (ocrUdyam) {
+        const r = await callProvider({
+          providerName: "MSME",
+          input: { id_number: ocrUdyam, msme: ocrUdyam },
+        });
+        toastKycResult("MSME", r);
+        if (r.found && r.ok && r.data) {
+          registry = r.data as Record<string, any>;
+        }
+      }
+      const pickStr = (v: any): string => {
+        if (v == null) return "";
+        if (typeof v === "string" || typeof v === "number") return String(v);
+        if (typeof v === "object" && "value" in v) return String((v as any).value ?? "");
+        return "";
+      };
       const normalized: Record<string, any> = {
-        udyam_number: ocr.udyam_number,
-        enterprise_name: ocr.enterprise_name,
-        enterprise_type: ocr.enterprise_type,
-        major_activity: ocr.major_activity,
-        organization_type: ocr.organization_type,
-        registration_date: ocr.registration_date,
-        social_category: ocr.social_category,
-        state: ocr.state,
-        district: ocr.district,
-        city: ocr.city,
-        pin_code: ocr.pin_code,
-        mobile: ocr.mobile,
-        email: ocr.email,
+        udyam_number: pickStr(registry.udyam_number) || ocrUdyam || ocr.udyam_number,
+        enterprise_name: pickStr(registry.enterprise_name) || ocr.enterprise_name,
+        enterprise_type: pickStr(registry.enterprise_type) || ocr.enterprise_type,
+        major_activity: pickStr(registry.major_activity) || ocr.major_activity,
+        organization_type: pickStr(registry.organization_type) || ocr.organization_type,
+        registration_date: pickStr(registry.registration_date) || ocr.registration_date,
+        social_category: pickStr(registry.social_category) || ocr.social_category,
+        state: pickStr(registry.state) || ocr.state,
+        district: pickStr(registry.district) || ocr.district,
+        city: pickStr(registry.city) || ocr.city,
+        pin_code: pickStr(registry.pin_code) || ocr.pin_code,
+        mobile: pickStr(registry.mobile) || ocr.mobile,
+        email: pickStr(registry.email) || ocr.email,
       };
       return {
         ok: true as const,
-        apiData: { name: ocr.enterprise_name, enterpriseName: ocr.enterprise_name, udyamNumber: ocr.udyam_number },
+        apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number },
         normalized,
-        registeredName: ocr.enterprise_name,
+        registeredName: normalized.enterprise_name,
       };
     }
     // Bank (cheque) → call configured BANK provider (Surepass penny-drop)
