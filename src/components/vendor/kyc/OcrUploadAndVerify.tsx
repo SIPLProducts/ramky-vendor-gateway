@@ -6,6 +6,7 @@ import { Loader2, ScanLine, ShieldCheck, CheckCircle2, XCircle, RotateCw } from 
 import type { OcrDocumentType } from '@/hooks/useOcrExtraction';
 import type { KycApiResult } from '@/hooks/useConfiguredKycApi';
 import { ApiResponseDetails } from './ApiResponseDetails';
+import { normalizeUploadToImage } from '@/lib/pdfToImage';
 
 /** Kept for backwards compatibility — most callers no longer pass this. */
 export interface ComparisonRow {
@@ -49,7 +50,7 @@ interface OcrUploadAndVerifyProps {
   apiLabel?: string;
 }
 
-type Phase = 'idle' | 'ocr' | 'verifying' | 'passed' | 'failed';
+type Phase = 'idle' | 'preparing' | 'ocr' | 'verifying' | 'passed' | 'failed';
 
 export function OcrUploadAndVerify({
   documentType,
@@ -73,15 +74,27 @@ export function OcrUploadAndVerify({
   const runPipeline = async (file: File) => {
     setOcrResult(undefined);
     setVerifyResult(undefined);
-    setPhase('ocr');
-    setMessage('Reading document via configured OCR provider…');
 
     if (!runOcr) {
       setPhase('failed');
       setMessage('OCR provider not configured. Add it in KYC & Validation API Settings.');
       return;
     }
-    const ocr = await runOcr(file);
+
+    // PDFs (single or multi-page) are silently rasterised + stitched into a
+    // single JPEG before being handed to the OCR provider. Images pass through
+    // unchanged. This guarantees every page's content reaches the OCR engine.
+    let normalized = file;
+    const needsConversion = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (needsConversion) {
+      setPhase('preparing');
+      setMessage('Preparing document for OCR…');
+      normalized = await normalizeUploadToImage(file);
+    }
+
+    setPhase('ocr');
+    setMessage('Reading document via configured OCR provider…');
+    const ocr = await runOcr(normalized);
     setOcrResult(ocr.apiResult);
 
     if (!ocr.success || !ocr.extracted) {
@@ -126,6 +139,16 @@ export function OcrUploadAndVerify({
         currentFile={currentFile}
         vendorId={vendorId}
       />
+
+      {phase === 'preparing' && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <ScanLine className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-primary flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {message}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {phase === 'ocr' && (
         <Alert className="border-primary/30 bg-primary/5">
