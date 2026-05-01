@@ -51,24 +51,39 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
 
   const handleManualVerify = async () => {
     setManualApiResult(undefined);
+    setEnterpriseCheck('idle');
+    setEnterpriseName('');
     const r = await verify({
       providerName: 'MSME',
       label: 'MSME',
       input: { msme: props.msmeNumber, id_number: props.msmeNumber },
       validate: (data) => {
-        const apiName = pick(data.enterprise_name || data.legal_name).trim();
-        if (props.legalName && apiName) {
-          const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-          const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-          if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
-            return { ok: false, message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`, data };
+        const apiName = pick(
+          data.name_of_enterprise || data.enterprise_name || data.legal_name,
+        ).trim();
+        setEnterpriseName(apiName);
+        if (props.panHolderName && apiName) {
+          const ok = fuzzyNameMatch(apiName, props.panHolderName);
+          setEnterpriseCheck(ok ? 'passed' : 'failed');
+          if (!ok) {
+            return {
+              ok: false,
+              message: `Enterprise Name does not match with PAN holder name (PAN: "${props.panHolderName}", MSME: "${apiName}").`,
+              data,
+            };
           }
         }
         const cat = pick(data.enterprise_type).toLowerCase();
         if (cat === 'micro' || cat === 'small' || cat === 'medium') {
           props.onMsmeCategoryChange?.(cat as any);
         }
-        return { ok: true, message: `MSME verified — ${apiName || props.msmeNumber}`, data };
+        return {
+          ok: true,
+          message: props.panHolderName
+            ? 'Enterprise Name verified with PAN holder name.'
+            : `MSME verified — ${apiName || props.msmeNumber}`,
+          data,
+        };
       },
     });
     setManualApiResult((r as any).apiResult);
@@ -89,11 +104,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
 
   // After OCR extracts the Udyam number, automatically chain a call to the
   // configured `MSME` verification provider so we can populate the full
-  // registration record (Enterprise Name, Type, State, District, etc.).
-  // All values come from API responses — nothing is hardcoded.
+  // registration record. The enterprise name from that record is then
+  // compared against the PAN holder name (verified earlier in the PAN tab).
   const handleOcrVerify = async (extracted: Record<string, any>) => {
     const extractedNum = pick(extracted.udyam_number).toUpperCase().trim();
     if (extractedNum) props.onMsmeNumberChange(extractedNum);
+    setEnterpriseCheck('idle');
+    setEnterpriseName('');
 
     let merged: Record<string, any> = { ...extracted };
     if (extractedNum) {
@@ -107,14 +124,18 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       }
     }
 
-    const apiName = pick(merged.enterprise_name || merged.legal_name).trim();
-    if (props.legalName && apiName) {
-      const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-      const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-      if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+    const apiName = pick(
+      merged.name_of_enterprise || merged.enterprise_name || merged.legal_name,
+    ).trim();
+    setEnterpriseName(apiName);
+
+    if (props.panHolderName && apiName) {
+      const ok = fuzzyNameMatch(apiName, props.panHolderName);
+      setEnterpriseCheck(ok ? 'passed' : 'failed');
+      if (!ok) {
         return {
           ok: false,
-          message: `Name mismatch: MSME is registered to "${apiName}" but you entered "${props.legalName}".`,
+          message: `Enterprise Name does not match with PAN holder name (PAN: "${props.panHolderName}", MSME: "${apiName}").`,
           apiData: merged,
         };
       }
@@ -124,7 +145,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       props.onMsmeCategoryChange?.(cat as any);
     }
     props.onVerifiedDetails?.(merged);
-    return { ok: true, message: `MSME verified — ${apiName || extractedNum || 'see API response below'}`, apiData: merged };
+    return {
+      ok: true,
+      message: props.panHolderName
+        ? 'Enterprise Name verified with PAN holder name.'
+        : `MSME verified — ${apiName || extractedNum || 'see API response below'}`,
+      apiData: merged,
+    };
   };
 
   return (
