@@ -8,6 +8,7 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { ApiResponseDetails } from './ApiResponseDetails';
 import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
+import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch } from '@/lib/nameMatch';
 import {
@@ -124,7 +125,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     if (!r.ok) {
       return { success: false, error: r.message || r.message_code || 'MSME OCR failed', apiResult: r };
     }
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
   const handleOcrVerify = async (extracted: Record<string, any>) => {

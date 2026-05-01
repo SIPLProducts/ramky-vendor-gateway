@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Download, FileText, Pencil, Upload } from 'lucide-react';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
+import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
@@ -83,7 +84,7 @@ export function GstKycTab(props: GstKycTabProps) {
       };
     }
     // Pass whatever the API returned, even if the mapping yielded only some fields.
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
   // After OCR completes, automatically chain to the GST verification API.

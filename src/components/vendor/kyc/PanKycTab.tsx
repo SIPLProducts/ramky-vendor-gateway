@@ -4,6 +4,7 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch, panMatch } from '@/lib/nameMatch';
+import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { useState } from 'react';
 
 interface PanKycTabProps {
@@ -59,7 +60,7 @@ export function PanKycTab(props: PanKycTabProps) {
       props.onStatusChange?.('failed');
       return { success: false, error: r.message || r.message_code || 'PAN OCR failed', apiResult: r };
     }
-    return { success: true, extracted: r.data || {}, apiResult: r };
+    return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
   // OCR is the only API call. Validation is done by comparing the extracted
