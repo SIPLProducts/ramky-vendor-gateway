@@ -298,14 +298,66 @@ export function DocumentVerificationStep({
   const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
   const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
 
-  // ---------- Verification (dummy / simulated) ----------
+  // ---------- Verification ----------
+  // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
+  // Other kinds still use a lightweight simulation pending real provider wiring.
   const verifyApi = async (kind: OcrDocumentType, ocr: Record<string, any>) => {
-    await new Promise((r) => setTimeout(r, 400));
     if (kind === "gst") {
+      const ocrGstin = String(ocr.gstin || "").toUpperCase().trim();
+      if (!ocrGstin || ocrGstin.length !== 15) {
+        return {
+          ok: false as const,
+          message: "Could not read a valid 15-character GSTIN from the certificate. Please upload a clearer scan.",
+        };
+      }
+      const r = await callProvider({
+        providerName: "GST",
+        input: { id_number: ocrGstin, gstin: ocrGstin },
+      });
+      toastKycResult("GST", r);
+      if (!r.found) {
+        return { ok: false as const, message: "GST validation provider is not configured. Add it in KYC & Validation API Settings." };
+      }
+      if (!r.ok || !r.data) {
+        return { ok: false as const, message: r.message || "GST verification failed" };
+      }
+      const apiGstin = String(r.data.gstin || "").toUpperCase().trim();
+      if (apiGstin && apiGstin !== ocrGstin) {
+        return {
+          ok: false as const,
+          message: `GSTIN mismatch: OCR read "${ocrGstin}" but the registry shows "${apiGstin}". Please re-upload a clearer certificate.`,
+        };
+      }
+      const d = r.data as Record<string, any>;
+      // Normalize API field names to the keys the UI reads from `ocrData`.
+      const normalized: Record<string, any> = {
+        gstin: apiGstin || ocrGstin,
+        legal_name: d.legal_name,
+        trade_name: d.trade_name || d.business_name,
+        constitution_of_business: d.constitution_of_business,
+        principal_place_of_business: d.address,
+        address: d.address,
+        gst_status: d.gstin_status || d.gst_status,
+        registration_date: d.date_of_registration || d.registration_date,
+        taxpayer_type: d.taxpayer_type,
+        business_nature: Array.isArray(d.nature_bus_activities)
+          ? d.nature_bus_activities
+          : (d.nature_of_core_business_activity_description ? [d.nature_of_core_business_activity_description] : undefined),
+        jurisdiction_centre: d.center_jurisdiction || d.jurisdiction_centre,
+        jurisdiction_state: d.state_jurisdiction || d.jurisdiction_state,
+        pan_number: d.pan_number,
+      };
       return {
         ok: true as const,
-        apiData: { legalName: ocr.legal_name, tradeName: ocr.trade_name, gstin: ocr.gstin, status: "Active", simulated: true },
-        registeredName: ocr.legal_name,
+        apiData: {
+          legalName: d.legal_name,
+          tradeName: d.trade_name || d.business_name,
+          gstin: apiGstin || ocrGstin,
+          status: d.gstin_status,
+          panNumber: d.pan_number,
+        },
+        normalized,
+        registeredName: d.legal_name,
       };
     }
     if (kind === "pan") {
