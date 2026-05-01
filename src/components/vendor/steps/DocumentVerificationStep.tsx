@@ -1422,6 +1422,7 @@ export function DocumentVerificationStep({
                           msmeDoc.status === "verifying" ? "Verifying…" : ""
                         }
                         verifiedFields={
+                          (() => { const m = msmeDoc.apiData?.normalized || {}; return (
                           <div className="space-y-3">
                             <ReviewBanner />
                             <div className="grid md:grid-cols-2 gap-3">
@@ -1431,12 +1432,16 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.udyam_number}
                                 onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
                                 mono
+                                verifiedValue={m.udyam_number}
+                                verifiedLabel="Udyam Number is verified"
                               />
                               <EditableOcrField
                                 label="Enterprise Name"
                                 value={msmeDoc.ocrData?.enterprise_name}
                                 originalValue={msmeDoc.originalOcrData?.enterprise_name}
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                                verifiedValue={m.enterprise_name}
+                                verifiedLabel="Enterprise Name matches registry"
                               />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1446,6 +1451,8 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.enterprise_type}
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                                 placeholder="Micro / Small / Medium"
+                                verifiedValue={m.enterprise_type}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Major Activity"
@@ -1453,6 +1460,8 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.major_activity}
                                 onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
                                 placeholder="e.g. Manufacturing, Services, Trading"
+                                verifiedValue={m.major_activity}
+                                verifiedLabel="Verified from registry"
                               />
                             </div>
                             {!msmeDoc.ocrData?.major_activity && (
