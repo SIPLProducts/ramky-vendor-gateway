@@ -213,6 +213,33 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
           </TabsContent>
         </Tabs>
       )}
+
+      {props.isMsmeRegistered && enterpriseCheck !== 'idle' && enterpriseName && (
+        <div
+          className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
+            enterpriseCheck === 'passed'
+              ? 'border-success/30 bg-success/5'
+              : 'border-destructive/30 bg-destructive/5'
+          }`}
+        >
+          {enterpriseCheck === 'passed' ? (
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
+          ) : (
+            <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          )}
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex flex-wrap gap-x-2 items-baseline">
+              <span className="text-xs text-muted-foreground">Enterprise Name:</span>
+              <span className="font-medium break-words">{enterpriseName}</span>
+            </div>
+            <div className={enterpriseCheck === 'passed' ? 'text-success' : 'text-destructive'}>
+              {enterpriseCheck === 'passed'
+                ? 'Enterprise Name verified with PAN holder name.'
+                : `Enterprise Name does not match with PAN holder name${props.panHolderName ? ` ("${props.panHolderName}")` : ''}.`}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
