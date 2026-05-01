@@ -14,6 +14,7 @@ import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
 import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
 import { fuzzyNameMatch } from "@/lib/nameMatch";
+import { normalizeUploadToImage } from "@/lib/pdfToImage";
 
 /**
  * Maps the registration step's document type → the provider_name configured
