@@ -361,42 +361,43 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "pan") {
+      // PAN is NOT validated against its own registry. We compare the OCR'd
+      // PAN number + holder name against the values returned by the GST
+      // registry (verified in the previous stage). GST is the source of truth.
       const ocrPan = String(ocr.pan_number || "").toUpperCase().trim();
+      const ocrName = String(ocr.full_name || ocr.holder_name || ocr.name || "").trim();
       if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(ocrPan)) {
         return { ok: false as const, message: "Could not read a valid 10-character PAN. Please upload a clearer scan." };
       }
-      const r = await callProvider({ providerName: "PAN", input: { id_number: ocrPan } });
-      toastKycResult("PAN", r);
-      if (!r.found) {
-        return { ok: false as const, message: "PAN validation provider is not configured. Add it in KYC & Validation API Settings." };
+      const gstPan = String(gstDoc.ocrData?.pan_number || "").toUpperCase().trim();
+      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      if (!gstPan || !gstLegalName) {
+        return {
+          ok: false as const,
+          message: "Please verify GST first — PAN is validated against the PAN number and legal name returned by the GST registry.",
+        };
       }
-      if (!r.ok || !r.data) {
-        return { ok: false as const, message: r.message || "PAN verification failed. Please check the details or try again." };
+      const panOk = ocrPan === gstPan;
+      const nameOk = fuzzyNameMatch(ocrName, gstLegalName);
+      if (!panOk || !nameOk) {
+        return { ok: false as const, message: "PAN details do not match with GST data." };
       }
-      const d = r.data as Record<string, any>;
-      const apiPan = String(d.pan_number || "").toUpperCase().trim();
-      if (apiPan && apiPan !== ocrPan) {
-        return { ok: false as const, message: `PAN mismatch: card shows "${ocrPan}" but registry returned "${apiPan}".` };
-      }
-      const fullName = String(d.full_name || "").trim();
       const normalized: Record<string, any> = {
-        pan_number: apiPan || ocrPan,
-        holder_name: fullName || ocr.holder_name,
-        full_name: fullName,
-        dob: d.dob,
-        category: d.category,
-        status: d.status,
-        aadhaar_linked: d.aadhaar_linked,
-        gender: d.gender,
-        email: d.email,
-        phone_number: d.phone_number,
-        address: d.address,
+        pan_number: ocrPan,
+        holder_name: ocrName || gstLegalName,
+        full_name: ocrName || gstLegalName,
       };
       return {
         ok: true as const,
-        apiData: { name: fullName, pan: apiPan || ocrPan, dob: d.dob, category: d.category, status: d.status, aadhaarLinked: d.aadhaar_linked },
+        apiData: {
+          name: gstLegalName,
+          pan: gstPan,
+          source: "GST registry",
+          panMatchMessage: "PAN Number verified with GST PAN Number.",
+          nameMatchMessage: "PAN Holder Name verified with GST Legal Name.",
+        },
         normalized,
-        registeredName: fullName || ocr.holder_name,
+        registeredName: gstLegalName,
       };
     }
     if (kind === "msme") {
