@@ -361,13 +361,85 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "pan") {
-      return { ok: true as const, apiData: { name: ocr.holder_name, pan: ocr.pan_number, simulated: true }, registeredName: ocr.holder_name };
-    }
-    if (kind === "msme") {
+      const ocrPan = String(ocr.pan_number || "").toUpperCase().trim();
+      if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(ocrPan)) {
+        return { ok: false as const, message: "Could not read a valid 10-character PAN. Please upload a clearer scan." };
+      }
+      const r = await callProvider({ providerName: "PAN", input: { id_number: ocrPan } });
+      toastKycResult("PAN", r);
+      if (!r.found) {
+        return { ok: false as const, message: "PAN validation provider is not configured. Add it in KYC & Validation API Settings." };
+      }
+      if (!r.ok || !r.data) {
+        return { ok: false as const, message: r.message || "PAN verification failed. Please check the details or try again." };
+      }
+      const d = r.data as Record<string, any>;
+      const apiPan = String(d.pan_number || "").toUpperCase().trim();
+      if (apiPan && apiPan !== ocrPan) {
+        return { ok: false as const, message: `PAN mismatch: card shows "${ocrPan}" but registry returned "${apiPan}".` };
+      }
+      const fullName = String(d.full_name || "").trim();
+      const normalized: Record<string, any> = {
+        pan_number: apiPan || ocrPan,
+        holder_name: fullName || ocr.holder_name,
+        full_name: fullName,
+        dob: d.dob,
+        category: d.category,
+        status: d.status,
+        aadhaar_linked: d.aadhaar_linked,
+        gender: d.gender,
+        email: d.email,
+        phone_number: d.phone_number,
+        address: d.address,
+      };
       return {
         ok: true as const,
-        apiData: { name: ocr.enterprise_name, enterpriseName: ocr.enterprise_name, udyamNumber: ocr.udyam_number, simulated: true },
-        registeredName: ocr.enterprise_name,
+        apiData: { name: fullName, pan: apiPan || ocrPan, dob: d.dob, category: d.category, status: d.status, aadhaarLinked: d.aadhaar_linked },
+        normalized,
+        registeredName: fullName || ocr.holder_name,
+      };
+    }
+    if (kind === "msme") {
+      const ocrUdyam = String(ocr.udyam_number || "").toUpperCase().trim();
+      // Try to call the configured MSME registry — if not configured or it
+      // fails, fall back to the OCR data so the existing flow still works.
+      let registry: Record<string, any> = {};
+      if (ocrUdyam) {
+        const r = await callProvider({
+          providerName: "MSME",
+          input: { id_number: ocrUdyam, msme: ocrUdyam },
+        });
+        toastKycResult("MSME", r);
+        if (r.found && r.ok && r.data) {
+          registry = r.data as Record<string, any>;
+        }
+      }
+      const pickStr = (v: any): string => {
+        if (v == null) return "";
+        if (typeof v === "string" || typeof v === "number") return String(v);
+        if (typeof v === "object" && "value" in v) return String((v as any).value ?? "");
+        return "";
+      };
+      const normalized: Record<string, any> = {
+        udyam_number: pickStr(registry.udyam_number) || ocrUdyam || ocr.udyam_number,
+        enterprise_name: pickStr(registry.enterprise_name) || ocr.enterprise_name,
+        enterprise_type: pickStr(registry.enterprise_type) || ocr.enterprise_type,
+        major_activity: pickStr(registry.major_activity) || ocr.major_activity,
+        organization_type: pickStr(registry.organization_type) || ocr.organization_type,
+        registration_date: pickStr(registry.registration_date) || ocr.registration_date,
+        social_category: pickStr(registry.social_category) || ocr.social_category,
+        state: pickStr(registry.state) || ocr.state,
+        district: pickStr(registry.district) || ocr.district,
+        city: pickStr(registry.city) || ocr.city,
+        pin_code: pickStr(registry.pin_code) || ocr.pin_code,
+        mobile: pickStr(registry.mobile) || ocr.mobile,
+        email: pickStr(registry.email) || ocr.email,
+      };
+      return {
+        ok: true as const,
+        apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number },
+        normalized,
+        registeredName: normalized.enterprise_name,
       };
     }
     // Bank (cheque) → call configured BANK provider (Surepass penny-drop)
@@ -594,7 +666,7 @@ export function DocumentVerificationStep({
         fileName: `Udyam ${ocrShape.udyam_number}`,
         ocrData: ocrShape,
         originalOcrData: ocrShape,
-        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number },
+        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number, normalized: { ...ocrShape } },
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
@@ -1045,24 +1117,73 @@ export function DocumentVerificationStep({
                   panDoc.status === "verifying" ? "Verifying…" : ""
                 }
                 verifiedFields={
-                  <div className="space-y-3">
-                    <ReviewBanner />
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <EditableOcrField
-                        label="PAN Number"
-                        value={panDoc.ocrData?.pan_number}
-                        originalValue={panDoc.originalOcrData?.pan_number}
-                        onChange={(v) => setOcrField(setPanDoc, "pan_number", v.toUpperCase())}
-                        mono
-                      />
-                      <EditableOcrField
-                        label="Holder Name"
-                        value={panDoc.ocrData?.holder_name}
-                        originalValue={panDoc.originalOcrData?.holder_name}
-                        onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
-                      />
-                    </div>
-                  </div>
+                  (() => {
+                    const panApi = panDoc.apiData?.normalized || {};
+                    return (
+                      <div className="space-y-3">
+                        <ReviewBanner />
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <EditableOcrField
+                            label="PAN Number"
+                            value={panDoc.ocrData?.pan_number}
+                            originalValue={panDoc.originalOcrData?.pan_number}
+                            onChange={(v) => setOcrField(setPanDoc, "pan_number", v.toUpperCase())}
+                            mono
+                            verifiedValue={panApi.pan_number}
+                            verifiedLabel="PAN is verified"
+                          />
+                          <EditableOcrField
+                            label="Holder Name"
+                            value={panDoc.ocrData?.holder_name}
+                            originalValue={panDoc.originalOcrData?.holder_name}
+                            onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
+                            verifiedValue={panApi.holder_name || panApi.full_name}
+                            verifiedLabel="Name matches PAN registry"
+                          />
+                          {panApi.dob && (
+                            <EditableOcrField
+                              label="Date of Birth"
+                              value={panDoc.ocrData?.dob || panApi.dob}
+                              originalValue={panApi.dob}
+                              onChange={(v) => setOcrField(setPanDoc, "dob", v)}
+                              verifiedValue={panApi.dob}
+                              verifiedLabel="DOB verified from registry"
+                            />
+                          )}
+                          {panApi.category && (
+                            <EditableOcrField
+                              label="Category"
+                              value={panDoc.ocrData?.category || panApi.category}
+                              originalValue={panApi.category}
+                              onChange={(v) => setOcrField(setPanDoc, "category", v)}
+                              verifiedValue={panApi.category}
+                              verifiedLabel="Verified from registry"
+                            />
+                          )}
+                          {panApi.status && (
+                            <EditableOcrField
+                              label="PAN Status"
+                              value={panDoc.ocrData?.status || panApi.status}
+                              originalValue={panApi.status}
+                              onChange={(v) => setOcrField(setPanDoc, "status", v)}
+                              verifiedValue={panApi.status}
+                              verifiedLabel="Active per registry"
+                            />
+                          )}
+                          {panApi.aadhaar_linked != null && (
+                            <EditableOcrField
+                              label="Aadhaar Linked"
+                              value={panDoc.ocrData?.aadhaar_linked != null ? String(panDoc.ocrData.aadhaar_linked) : String(panApi.aadhaar_linked)}
+                              originalValue={String(panApi.aadhaar_linked)}
+                              onChange={(v) => setOcrField(setPanDoc, "aadhaar_linked", v)}
+                              verifiedValue={String(panApi.aadhaar_linked)}
+                              verifiedLabel="Verified from registry"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()
                 }
               />
               {panCrossCheckError && (
@@ -1158,18 +1279,23 @@ export function DocumentVerificationStep({
                           <div className="space-y-3 pt-2">
                             <ReviewBanner />
                             <div className="grid md:grid-cols-2 gap-3">
+                              {(() => { const m = msmeDoc.apiData?.normalized || {}; return (<>
                               <EditableOcrField
                                 label="Udyam Number"
                                 value={msmeDoc.ocrData?.udyam_number}
                                 originalValue={msmeDoc.originalOcrData?.udyam_number}
                                 onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
                                 mono
+                                verifiedValue={m.udyam_number}
+                                verifiedLabel="Udyam Number is verified"
                               />
                               <EditableOcrField
                                 label="Enterprise Name"
                                 value={msmeDoc.ocrData?.enterprise_name}
                                 originalValue={msmeDoc.originalOcrData?.enterprise_name}
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                                verifiedValue={m.enterprise_name}
+                                verifiedLabel="Enterprise Name matches registry"
                               />
                               <EditableOcrField
                                 label="Enterprise Type"
@@ -1177,6 +1303,8 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.enterprise_type}
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                                 placeholder="Micro / Small / Medium"
+                                verifiedValue={m.enterprise_type}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Major Activity"
@@ -1184,60 +1312,80 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.major_activity}
                                 onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
                                 placeholder="e.g. Manufacturing, Services, Trading"
+                                verifiedValue={m.major_activity}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Organization Type"
                                 value={msmeDoc.ocrData?.organization_type}
                                 originalValue={msmeDoc.originalOcrData?.organization_type}
                                 onChange={(v) => setOcrField(setMsmeDoc, "organization_type", v)}
+                                verifiedValue={m.organization_type}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Registration Date"
                                 value={msmeDoc.ocrData?.registration_date}
                                 originalValue={msmeDoc.originalOcrData?.registration_date}
                                 onChange={(v) => setOcrField(setMsmeDoc, "registration_date", v)}
+                                verifiedValue={m.registration_date}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="State"
                                 value={msmeDoc.ocrData?.state}
                                 originalValue={msmeDoc.originalOcrData?.state}
                                 onChange={(v) => setOcrField(setMsmeDoc, "state", v)}
+                                verifiedValue={m.state}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="District"
                                 value={msmeDoc.ocrData?.district}
                                 originalValue={msmeDoc.originalOcrData?.district}
                                 onChange={(v) => setOcrField(setMsmeDoc, "district", v)}
+                                verifiedValue={m.district}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="City"
                                 value={msmeDoc.ocrData?.city}
                                 originalValue={msmeDoc.originalOcrData?.city}
                                 onChange={(v) => setOcrField(setMsmeDoc, "city", v)}
+                                verifiedValue={m.city}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="PIN Code"
                                 value={msmeDoc.ocrData?.pin_code}
                                 originalValue={msmeDoc.originalOcrData?.pin_code}
                                 onChange={(v) => setOcrField(setMsmeDoc, "pin_code", v)}
+                                verifiedValue={m.pin_code}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Mobile"
                                 value={msmeDoc.ocrData?.mobile}
                                 originalValue={msmeDoc.originalOcrData?.mobile}
                                 onChange={(v) => setOcrField(setMsmeDoc, "mobile", v)}
+                                verifiedValue={m.mobile}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Email"
                                 value={msmeDoc.ocrData?.email}
                                 originalValue={msmeDoc.originalOcrData?.email}
                                 onChange={(v) => setOcrField(setMsmeDoc, "email", v)}
+                                verifiedValue={m.email}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Social Category"
                                 value={msmeDoc.ocrData?.social_category}
                                 originalValue={msmeDoc.originalOcrData?.social_category}
                                 onChange={(v) => setOcrField(setMsmeDoc, "social_category", v)}
+                                verifiedValue={m.social_category}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="NIC Code"
@@ -1245,6 +1393,7 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.nic_code}
                                 onChange={(v) => setOcrField(setMsmeDoc, "nic_code", v)}
                               />
+                              </>); })()}
                             </div>
                             <Button
                               type="button"
@@ -1273,6 +1422,7 @@ export function DocumentVerificationStep({
                           msmeDoc.status === "verifying" ? "Verifying…" : ""
                         }
                         verifiedFields={
+                          (() => { const m = msmeDoc.apiData?.normalized || {}; return (
                           <div className="space-y-3">
                             <ReviewBanner />
                             <div className="grid md:grid-cols-2 gap-3">
@@ -1282,12 +1432,16 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.udyam_number}
                                 onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
                                 mono
+                                verifiedValue={m.udyam_number}
+                                verifiedLabel="Udyam Number is verified"
                               />
                               <EditableOcrField
                                 label="Enterprise Name"
                                 value={msmeDoc.ocrData?.enterprise_name}
                                 originalValue={msmeDoc.originalOcrData?.enterprise_name}
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                                verifiedValue={m.enterprise_name}
+                                verifiedLabel="Enterprise Name matches registry"
                               />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1297,6 +1451,8 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.enterprise_type}
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                                 placeholder="Micro / Small / Medium"
+                                verifiedValue={m.enterprise_type}
+                                verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
                                 label="Major Activity"
@@ -1304,6 +1460,8 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.major_activity}
                                 onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
                                 placeholder="e.g. Manufacturing, Services, Trading"
+                                verifiedValue={m.major_activity}
+                                verifiedLabel="Verified from registry"
                               />
                             </div>
                             {!msmeDoc.ocrData?.major_activity && (
@@ -1319,6 +1477,7 @@ export function DocumentVerificationStep({
                               </p>
                             )}
                           </div>
+                          ); })()
                         }
                       />
                     </TabsContent>

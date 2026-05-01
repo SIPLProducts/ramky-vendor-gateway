@@ -116,6 +116,21 @@ const TEMPLATES: Array<{
       branch_name: "data.ifsc_details.branch",
       name_at_bank: "data.full_name",
     } },
+  { provider_name: "PAN", display_name: "PAN Comprehensive Validation", category: "VALIDATION",
+    base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/pan/pan-comprehensive",
+    request_mode: "json", request_body_template: { id_number: "{{id_number}}" },
+    response_data_mapping: {
+      pan_number: "data.pan_number",
+      full_name: "data.full_name",
+      category: "data.category",
+      status: "data.status",
+      dob: "data.dob",
+      aadhaar_linked: "data.aadhaar_linked",
+      gender: "data.gender",
+      email: "data.email",
+      phone_number: "data.phone_number",
+      address: "data.address.full",
+    } },
 ];
 
 export default function KycApiSettings() {
