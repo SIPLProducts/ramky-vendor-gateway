@@ -560,21 +560,34 @@ export function DocumentVerificationStep({
     }
     toastKycResult("Bank", r);
 
+    // Always prefer the upstream message verbatim — never hardcode UI copy
+    // for provider-side failures. Surepass returns a meaningful `message`
+    // for both success and error cases; surface it as-is.
+    const upstreamMsg =
+      (typeof (r as any)?.message === "string" && (r as any).message) ||
+      ((r as any)?.raw && typeof (r as any).raw.message === "string" && (r as any).raw.message) ||
+      "";
+    const upstreamCode =
+      (r as any)?.message_code ||
+      ((r as any)?.raw && (r as any).raw.message_code) ||
+      undefined;
+
     // Hard-fail on persistent rate limit. Vendor must re-upload and try again
     // — they should NOT be allowed to continue without a real penny-drop.
     if (isRateLimited(r)) {
       return {
         ok: false as const,
-        message:
-          "Bank verification is temporarily unavailable due to upstream rate limits. Please wait a moment and re-upload the cancelled cheque to try again.",
+        message: upstreamMsg || "Bank verification rate limited by provider. Please try again shortly.",
+        messageCode: upstreamCode,
+        reason: "rate_limited" as const,
       };
     }
 
     if (!r.found) {
-      return { ok: false as const, message: "Bank validation provider is not configured. Add it in KYC & Validation API Settings." };
+      return { ok: false as const, message: upstreamMsg || "Bank validation provider is not configured. Add it in KYC & Validation API Settings." };
     }
     if (!r.ok || !r.data) {
-      return { ok: false as const, message: r.message || "Bank verification failed. Please check the details or try again." };
+      return { ok: false as const, message: upstreamMsg || "Bank verification failed. Please check the details or try again.", messageCode: upstreamCode };
     }
     const d = r.data as Record<string, any>;
     if (d.account_exists === false) {
@@ -685,14 +698,17 @@ export function DocumentVerificationStep({
       if (kind === "msme" && (v as any).isNameMismatch) {
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
-      } else if (kind === "cheque" && /Account Holder Name does not match/i.test(msg)) {
-        setMismatchDialog({ open: true, title: "Account Holder Name mismatch", message: msg });
-        setActiveTab("bank");
-      } else if (kind === "cheque" && /temporarily unavailable|rate limit/i.test(msg)) {
-        setMismatchDialog({ open: true, title: "Bank verification temporarily unavailable", message: msg });
-        setActiveTab("bank");
       } else if (kind === "cheque") {
-        setMismatchDialog({ open: true, title: "Bank verification failed", message: msg });
+        // Title is derived from structured upstream code/reason — body is the
+        // raw upstream message verbatim. No hardcoded copy.
+        const code = (v as any).messageCode || (v as any).reason;
+        let title = "Bank verification failed";
+        if (code === "bank_rate_limited" || code === "rate_limited") {
+          title = "Bank verification rate limited";
+        } else if (/Account Holder Name does not match/i.test(msg)) {
+          title = "Account Holder Name mismatch";
+        }
+        setMismatchDialog({ open: true, title, message: msg });
         setActiveTab("bank");
       }
       return;
@@ -2016,21 +2032,9 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
       )}
 
       {isFailed && doc.errorMessage && (
-        <div className="space-y-2">
-          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>{doc.errorMessage}</span>
-          </div>
-          {/rate limit|too many requests|throttl/i.test(doc.errorMessage) && (
-            <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
-              <span>
-                The verification service is temporarily throttled by the upstream provider. We
-                already retried automatically. Please wait ~60 seconds and click <strong>Replace</strong> with
-                the same cheque to try again. Your previously verified tabs (GST / PAN / MSME) remain intact.
-              </span>
-            </div>
-          )}
+        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{doc.errorMessage}</span>
         </div>
       )}
 

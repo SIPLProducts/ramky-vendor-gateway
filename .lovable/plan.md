@@ -1,75 +1,101 @@
 ## Problem
 
-Today, when Surepass returns `429 / bank_rate_limited` for the penny-drop, the cheque step "soft-passes" — it shows a green banner ("Penny-drop name verification was skipped…") and lets the vendor click Continue. That's exactly what the screenshot shows: Account Holder Name is blank, but the step is treated as verified.
+The bank verification dialog and inline banner show **hardcoded** strings instead of the actual upstream message returned by Surepass.
 
-You want the opposite for both the rate-limit case **and** the name-mismatch case: stop, popup, disable Continue, allow re-upload.
+For the rate-limit case from your payload:
+- Upstream returned: `"Transaction rate limit exceeded. Please try again later."`
+- UI shows: `"Bank verification is temporarily unavailable due to upstream rate limits. Please wait a moment and re-upload the cancelled cheque to try again."`
 
-## Changes (only `src/components/vendor/steps/DocumentVerificationStep.tsx`)
+Same problem will affect any other upstream failure (account not found, IFSC mismatch upstream, etc.) — wherever we wrote our own copy instead of forwarding `r.message` / `r.message_code`.
 
-### 1. Remove the rate-limit soft-pass
+You want: whatever the API returns (success or failure) is what the user sees. No hardcoded strings.
 
-In the `bank` branch of the verification function (~lines 537–591):
+## Root cause (in `src/components/vendor/steps/DocumentVerificationStep.tsx`)
 
-- Keep the existing 15s / 30s retry with backoff for `bank_rate_limited`.
-- If we're still rate-limited after retries, **return `{ ok: false, message, reason: 'rate_limited' }`** instead of returning a soft-pass `{ ok: true, … pennyDropSkipped: true }`. This marks `bankDoc.status = 'failed'`, so `stage4Done` stays `false` and the outer Continue button (already gated on `allDone`) becomes disabled automatically.
-- Drop the `holderNameStatus: "skipped"` / `pennyDropSkipped` paths entirely so the UI never shows "Penny-drop name verification was skipped".
+Three places overwrite the upstream message:
 
-### 2. Strict name-match logic with the three required messages
+1. **Lines 565–571** — rate-limit branch returns a hardcoded "temporarily unavailable…" string instead of `r.message` (the upstream "Transaction rate limit exceeded. Please try again later.").
+2. **Line 569 + lines 691–696** — dialog title/body are derived from this hardcoded string, so even though the dialog box is fine the *content* is wrong.
+3. **Lines 2024–2033** — the secondary warning panel under the file pill prints a fixed paragraph ("The verification service is temporarily throttled…") whenever the error text matches `/rate limit/`. This duplicates and contradicts the API message.
 
-In the same branch (~lines 611–643), replace the current logic with:
+The bank-name-mismatch path (line 615–618) is also a hardcoded sentence — fine when there is no upstream message, but if the API ever returns a more specific reason we should prefer it.
+
+## Changes
+
+All edits in `src/components/vendor/steps/DocumentVerificationStep.tsx`. No other files touched.
+
+### 1. Pass the upstream message through (lines ~561–578)
+
+Replace the hardcoded rate-limit string and the generic failure fallback with the actual `r.message` / `r.raw.message`:
 
 ```text
-nameAtBank = data.full_name || data.name_at_bank
-            || raw.data.full_name           // fallback for nested provider shape
-gstLegal   = gstDoc.ocrData.legal_name
-panHolder  = panDoc.ocrData.holder_name || panDoc.ocrData.full_name
+const upstreamMsg =
+  (typeof r?.message === "string" && r.message) ||
+  (r?.raw && typeof r.raw.message === "string" && r.raw.message) ||
+  "";
 
-gstOk = fuzzyNameMatch(nameAtBank, gstLegal)
-panOk = fuzzyNameMatch(nameAtBank, panHolder)
+if (isRateLimited(r)) {
+  return {
+    ok: false,
+    message: upstreamMsg || "Bank verification rate limited by provider. Please try again shortly.",
+    messageCode: r.message_code,           // e.g. "bank_rate_limited"
+    reason: "rate_limited",
+  };
+}
 
-if (gstOk && panOk) → ok=true,  message: "Account Holder Name verified with GST Legal Name and PAN Holder Name."
-else if (gstOk)    → ok=true,  message: "Account Holder Name matched with GST Legal Name."
-else               → ok=false, reason='name_mismatch',
-                     message: "Account Holder Name does not match with GST and PAN details."
+if (!r.found) {
+  return { ok: false, message: upstreamMsg || "Bank validation provider is not configured." };
+}
+if (!r.ok || !r.data) {
+  return {
+    ok: false,
+    message: upstreamMsg || "Bank verification failed.",
+    messageCode: r.message_code,
+  };
+}
 ```
 
-Note: the existing PAN-only success message is removed per spec — only GST+PAN, GST-only, or fail.
+The fallback strings stay only as a last resort if the upstream returns no message at all — they will not be used in your current scenario because Surepass always returns `message`.
 
-### 3. Popup dialog on bank failures
+### 2. Drive the dialog title from `message_code`, body from `message` (lines ~688–697)
 
-The file already imports `AlertDialog`. Add a single dialog driven by new local state in `DocumentVerificationStep`:
+Stop pattern-matching on the user-facing string. Use the structured `messageCode`/`reason` returned from step 1:
 
-```ts
-const [bankErrorDialog, setBankErrorDialog] = useState<{
-  open: boolean;
-  title: string;
-  message: string;
-  reason: 'rate_limited' | 'name_mismatch' | 'generic';
-} | null>(null);
+```text
+} else if (kind === "cheque") {
+  const code = (v as any).messageCode || (v as any).reason;
+  let title = "Bank verification failed";
+  if (code === "bank_rate_limited" || code === "rate_limited")
+    title = "Bank verification rate limited";
+  else if (/Account Holder Name does not match/i.test(msg))
+    title = "Account Holder Name mismatch";
+
+  setMismatchDialog({ open: true, title, message: msg }); // msg is the upstream text
+  setActiveTab("bank");
+}
 ```
 
-In `handleBankUpload` (or the bank `runDocFlow` callback), when the bank verifier returns `ok: false`, open the dialog with an error-tinted icon (`AlertCircle` in `text-destructive`) and the message returned. Titles:
+Result for your payload: dialog title = "Bank verification rate limited", body = "Transaction rate limit exceeded. Please try again later." — exactly what the API returned.
 
-- `rate_limited` → "Bank verification temporarily unavailable"
-- `name_mismatch` → "Account Holder Name mismatch"
-- `generic` → "Bank verification failed"
+### 3. Remove the duplicate hardcoded warning paragraph (lines 2024–2033)
 
-Dialog body shows the message; the single action button is "Re-upload cheque" which closes the dialog and resets `bankDoc` to `idleDoc` so the upload control is shown again. The user can then upload a new cheque and the flow re-runs.
+Delete the secondary `/rate limit/` warning block under the file pill. The `doc.errorMessage` line above it already shows the upstream message; the second paragraph just repeats hardcoded copy that contradicts it. After removal, only the API's own message is shown.
 
-### 4. Disable Continue in the bank section
+### 4. Forward `messageCode` on the verify return type
 
-`stage4Done` already drives the outer Continue (form-level submit gated on `allDone`). With change #1/#2, a failed bank verification keeps `stage4Done = false`, so Continue is naturally disabled. No additional gating is needed at the form level.
-
-For clarity in the Bank stage panel, also surface a small inline destructive banner under the Account Holder Name field when `bankDoc.status === 'failed'` showing the same message — so the state is visible even after the dialog is dismissed.
-
-### 5. Remove the misleading inline success banner when name is empty
-
-The current UI shows "Account active · Penny-drop successful" + the green skipped-message under the empty Account Holder Name field. Once #1 lands, those branches no longer fire, so that misleading state goes away on its own.
+Add `messageCode?: string` and `reason?: string` to the `ok: false` return shape so the dialog logic in step 2 can read them. Pure type addition, no runtime change.
 
 ## Acceptance
 
-- Upload cheque → upstream returns `bank_rate_limited` (after retries): popup appears with the rate-limit message, Continue is disabled, user can re-upload.
-- Upload cheque → penny-drop succeeds, name matches both GST + PAN: green inline message "Account Holder Name verified with GST Legal Name and PAN Holder Name.", Continue enabled.
-- Upload cheque → penny-drop succeeds, name matches only GST: green inline message "Account Holder Name matched with GST Legal Name.", Continue enabled.
-- Upload cheque → penny-drop succeeds, name matches neither: popup with "Account Holder Name does not match with GST and PAN details.", Continue disabled, re-upload allowed.
-- No more "Penny-drop name verification was skipped" message anywhere.
+Given your payload (`bank_rate_limited` / `"Transaction rate limit exceeded. Please try again later."`):
+
+- Dialog title: "Bank verification rate limited"
+- Dialog body: "Transaction rate limit exceeded. Please try again later." (verbatim from API)
+- Inline banner under the cheque pill: "Transaction rate limit exceeded. Please try again later." (single banner, no extra hardcoded paragraph)
+- Continue button stays disabled, "Re-upload cheque" still works.
+
+For any other future upstream message (e.g. `"Account does not exist"`, `"Invalid IFSC"`), the same passthrough applies — whatever the API says is what the user sees, no code change needed.
+
+## Files
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` (only file modified)
