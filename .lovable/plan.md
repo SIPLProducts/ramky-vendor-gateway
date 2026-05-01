@@ -1,90 +1,102 @@
 ## Goal
 
-After the OCR + validation API chain runs (GST and Bank), show a green tick and a small confirmation message **directly under each individual field** in the verified panel — e.g. "GSTIN is verified", "Legal Name matches registry", "Account Number is verified" — driven by comparing the captured/edited value against the validation API response.
+1. Add a **PAN Validation** API (Surepass `pan-comprehensive`) as a first-class provider — like GST, BANK, MSME — so it shows up as a one-click template in **KYC & Validation API Settings**, gets seeded in `api_providers`, and is automatically called after the PAN OCR step.
+2. After the PAN validation API returns, render the registry fields (PAN Number, Holder Name, DOB, Category, Status, Aadhaar Linked) under the OCR fields with green ticks — same pattern already used for GST and Bank.
+3. After the **MSME** validation API returns (already wired), wire green-tick "verified" indicators on each MSME field (Udyam Number, Enterprise Name, Enterprise Type, Major Activity, Organization Type, State, District, City, Pin Code, Registration Date) — same pattern as GST/Bank.
 
-This adds field-level proof on top of the existing top-level success banner, exactly as shown in the reference screenshot (Identity, Registration sections of the GST verified panel).
+No DB schema change is needed — `api_providers` already supports a new row. Just one data migration to seed the PAN row, plus frontend wiring.
 
-## Scope
+## Scope of changes
 
-1. **GST verified panel** (`GstVerifiedDetails` in `src/components/vendor/steps/DocumentVerificationStep.tsx`) — Identity + Registration + Place of Business + Jurisdiction sections.
-2. **Bank verified panel** (the bank `verifiedFields` block in the same file) — Account Number, IFSC, Bank Name, Branch, Account Holder Name.
+### A. Seed the PAN validation provider (database)
 
-No backend / edge-function / DB changes are needed — the data already arrives via the existing `GST` and `BANK` validation API responses.
+Insert a new row into `api_providers` (idempotent — only if `provider_name='PAN'` doesn't already exist):
 
-## How it will work
+- `provider_name`: `PAN`
+- `display_name`: `PAN Comprehensive Validation`
+- `category`: `VALIDATION`
+- `base_url`: `https://kyc-api.surepass.app`
+- `endpoint_path`: `/api/v1/pan/pan-comprehensive`
+- `http_method`: `POST`, `request_mode`: `json`
+- `auth_type`: `BEARER_TOKEN`, header `Authorization: Bearer {{token}}`
+- `request_body_template`: `{ "id_number": "{{id_number}}" }`
+- `response_data_mapping`:
+  - `pan_number` → `data.pan_number`
+  - `full_name` → `data.full_name`
+  - `category` → `data.category`
+  - `status` → `data.status`
+  - `dob` → `data.dob`
+  - `aadhaar_linked` → `data.aadhaar_linked`
+  - `gender` → `data.gender`
+  - `email` → `data.email`
+  - `phone_number` → `data.phone_number`
+  - `address` → `data.address.full`
 
-### 1. Pass the API response down to the verified panels
+The user will need to add their Surepass API token for this provider in **KYC API Settings** the same way they did for GST/BANK/MSME.
 
-Both panels already have the validation API result available in state:
-- GST: `gstDoc.apiData` (registry response merged into `ocrData` after verification).
-- Bank: `bankDoc.apiData` (penny-drop response).
+### B. Add PAN to the templates list in KYC API Settings page
 
-We will pass `apiData` (the registry/penny-drop response) as a new `verifiedApi?: Record<string, any>` prop into `GstVerifiedDetails` and into the bank `verifiedFields` JSX.
+`src/pages/KycApiSettings.tsx` — append a new entry to the `TEMPLATES` array so the "Add from template" buttons include **PAN Comprehensive Validation** alongside GST/MSME/BANK. Same fields as the seeded row above.
 
-### 2. New `EditableOcrField` "verified" affordance
+### C. Wire the PAN validation call in `DocumentVerificationStep.tsx`
 
-Extend `EditableOcrField` with two optional props:
-- `verifiedValue?: string` — the value returned by the validation API for this field.
-- `verifiedLabel?: string` — short label shown next to the tick (e.g. "GSTIN is verified", "matches registry").
+In `verifyApi` for `kind === "pan"` (currently a stub returning `simulated: true`), replace with a real call to the configured `PAN` provider:
 
-Behavior:
-- If `verifiedValue` is present and `normalize(current) === normalize(verifiedValue)` → show a green check icon + small green text **below the input** ("✓ <label>").
-- If `verifiedValue` is present but does not match → show a small amber warning row ("⚠ Doesn't match registry value: <verifiedValue>") with a one-click "Use registry value" button that calls `onChange(verifiedValue)`.
-- If `verifiedValue` is missing → render nothing extra (today's behavior).
+1. Build `id_number` from the OCR-extracted `pan_number`. If it's not a 10-char alphanumeric (`^[A-Z]{5}\d{4}[A-Z]$`), short-circuit with a friendly error.
+2. `callProvider({ providerName: "PAN", input: { id_number } })`.
+3. If provider not found → "PAN validation provider is not configured. Add it in KYC & Validation API Settings."
+4. If `!ok` → return mapped error message.
+5. On success, build a `normalized` snake_case payload with `pan_number`, `holder_name` (from `full_name`), `dob`, `category`, `status`, `aadhaar_linked`, `address`. Return `{ ok, apiData: { name, pan, dob, category, status, ...}, normalized, registeredName: full_name }`.
+6. The existing `runDocFlow` already merges `normalized` over OCR data and stores the registry payload in `apiData.normalized` — the verified-fields renderer can just consume it.
 
-Normalization: trim, uppercase, collapse whitespace; for dates compare ISO `YYYY-MM-DD` form.
+Name-mismatch behavior already exists via `nameMatchScore(effectiveLegalName, registeredName)` and the existing `CrossCheckStrip`.
 
-### 3. Wire each field
+### D. Add field-level green ticks to PAN verified panel
 
-**GST panel — `GstVerifiedDetails`** (Identity + Registration):
+In `DocumentVerificationStep.tsx` PAN `verifiedFields` block (lines ~1050-1064), extend the existing fields and add the new registry-only fields, each using `EditableOcrField` with `verifiedValue` / `verifiedLabel` props (already supported from the previous GST/Bank work):
 
-| UI Field            | Compared against API field                        | Verified label              |
-|---------------------|---------------------------------------------------|-----------------------------|
-| Legal Name          | `legal_name` / `business_name`                    | "Legal Name is verified"    |
-| Trade Name          | `trade_name`                                      | "Trade Name is verified"    |
-| GSTIN               | `gstin`                                           | "GSTIN is verified"         |
-| Constitution        | `constitution_of_business`                        | "Verified from registry"    |
-| GST Status pill     | `gstin_status` (already shown via `GstStatusPill`)| Add tick + "Active per registry" beside the pill when the API status is `Active` |
-| Registration Date   | `date_of_registration`                            | "Verified from registry"    |
-| Taxpayer Type       | `taxpayer_type`                                   | "Verified from registry"    |
-| Centre Jurisdiction | `center_jurisdiction`                             | "Verified from registry"    |
-| State Jurisdiction  | `state_jurisdiction`                              | "Verified from registry"    |
-| Principal Place     | `address`                                         | "Matches registry address"  |
+| UI Field        | Compared against `panDoc.apiData.normalized` field | Verified label                |
+|-----------------|----------------------------------------------------|-------------------------------|
+| PAN Number      | `pan_number`                                       | "PAN is verified"             |
+| Holder Name     | `holder_name`                                      | "Name matches PAN registry"   |
+| Date of Birth   | `dob`                                              | "DOB verified from registry"  |
+| Category        | `category` (e.g. `company`, `individual`)          | "Verified from registry"      |
+| PAN Status      | `status` (e.g. `valid`)                            | "Active per registry"         |
+| Aadhaar Linked  | `aadhaar_linked`                                   | "Verified from registry"      |
 
-**Bank panel** (`bankDoc.apiData` from the `BANK` provider):
+Only render registry-only fields (DOB, Category, Status, Aadhaar Linked) when present in the API response — they're not OCR fields, so they show as read-only displays with the green tick.
 
-| UI Field             | Compared against API field        | Verified label                   |
-|----------------------|------------------------------------|----------------------------------|
-| Account Number       | `account_number`                  | "Account Number is verified"     |
-| IFSC Code            | `ifsc` / `ifsc_details.ifsc`      | "IFSC is verified"               |
-| Bank Name            | `ifsc_details.bank_name` / `bank_name` | "Bank Name is verified"     |
-| Branch               | `ifsc_details.branch` / `branch_name`  | "Branch is verified"        |
-| Account Holder Name  | `full_name` / `name_at_bank`      | "Name matches bank record"       |
+### E. Add field-level green ticks to MSME verified panel
 
-The existing top-level success banner stays — these are field-level confirmations that match the screenshot the user shared.
+In the MSME verified-fields block of `DocumentVerificationStep.tsx`, pass `verifiedValue` / `verifiedLabel` to each `EditableOcrField` against `msmeDoc.apiData.normalized` (need to add `normalized` mapping in the `verifyApi` MSME branch — currently it returns `apiData` only without `normalized`). Mapping:
 
-### 4. Behavior on user edit
+| UI Field          | API field             | Verified label                  |
+|-------------------|-----------------------|----------------------------------|
+| Udyam Number      | `udyam_number`        | "Udyam Number is verified"       |
+| Enterprise Name   | `enterprise_name`     | "Enterprise Name matches registry" |
+| Enterprise Type   | `enterprise_type`     | "Verified from registry"         |
+| Major Activity    | `major_activity`      | "Verified from registry"         |
+| Organization Type | `organization_type`   | "Verified from registry"         |
+| State             | `state`               | "Verified from registry"         |
+| District          | `district`            | "Verified from registry"         |
+| City              | `city`                | "Verified from registry"         |
+| Pin Code          | `pin_code`            | "Verified from registry"         |
+| Registration Date | `registration_date`   | "Verified from registry"         |
 
-If the user edits an already-verified field so it diverges from the registry value, the green tick disappears and the amber mismatch helper appears, offering "Use registry value". This keeps it honest — only true matches show the tick.
-
-## Visual style
-
-- Tick: existing `CheckCircle2` icon, `text-success` token.
-- Helper text: 11px, `text-success` for verified, `text-warning` for mismatch.
-- Placement: directly under the input, left-aligned, no extra spacing on idle fields.
+Update `verifyApi`'s MSME branch (currently returns only `apiData`) to also return a `normalized` object with the snake_case fields above so `runDocFlow` stores it under `apiData.normalized`. The same change should also be applied to the **manual MSME entry** flow (`handleMsmeManualValidate`) — store the API response on `msmeDoc.apiData.normalized` so the verified panel ticks work whether the user came in via Upload or Manual.
 
 ## Files to change
 
+- **DB seed** (one migration / insert): add the `PAN` row to `public.api_providers` (idempotent on `provider_name`).
+- `src/pages/KycApiSettings.tsx` — add PAN entry to `TEMPLATES`.
 - `src/components/vendor/steps/DocumentVerificationStep.tsx`
-  - Extend `EditableOcrField` with `verifiedValue` / `verifiedLabel` props + render logic.
-  - Pass `verifiedApi` into `GstVerifiedDetails` and wire each field.
-  - Wire each bank `EditableOcrField` with the corresponding registry value.
-  - Add a small "Active per registry" tick next to the existing `GstStatusPill` when the API confirms status.
-
-No new files, no DB migrations, no edge function changes.
+  - Replace stub PAN `verifyApi` branch with real `callProvider("PAN", …)` + normalization.
+  - Add registry-tick wiring to PAN `verifiedFields` (PAN, Holder Name, DOB, Category, Status, Aadhaar Linked).
+  - Add `normalized` to MSME `verifyApi` branch and to `handleMsmeManualValidate`'s state update.
+  - Add `verifiedValue` / `verifiedLabel` props to MSME `EditableOcrField`s.
 
 ## Out of scope
 
-- Changing the OCR or validation API contracts.
-- Reworking the top-level success/failure banner (kept as-is).
-- The "Are you GST registered? = No" self-declaration branch (no API to verify against).
+- Rewriting the PAN/MSME flows beyond field-level ticks.
+- Changing the existing PAN ↔ GSTIN cross-check strip.
+- Auth token management — the user adds the Surepass token from the API Settings page as today.
