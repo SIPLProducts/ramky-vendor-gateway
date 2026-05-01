@@ -437,6 +437,27 @@ export function DocumentVerificationStep({
         mobile: pickStr(registry.mobile) || ocr.mobile,
         email: pickStr(registry.email) || ocr.email,
       };
+      // Cross-check: Enterprise Name MUST match GST Legal Name OR PAN Holder Name.
+      // If neither matches (and at least one reference is present), block the
+      // step. The exact message is rendered both in the inline error banner
+      // and via the modal popup raised in `runDocFlow`.
+      const msmeName = String(normalized.enterprise_name || "").trim();
+      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      const panHolderName = String(
+        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
+      ).trim();
+      if (msmeName && (gstLegalName || panHolderName)) {
+        const gstOk = gstLegalName ? fuzzyNameMatch(msmeName, gstLegalName) : false;
+        const panOk = panHolderName ? fuzzyNameMatch(msmeName, panHolderName) : false;
+        if (!gstOk && !panOk) {
+          return {
+            ok: false as const,
+            message:
+              "Enterprise Name does not match with GST Legal Name and PAN Holder Name.",
+            isNameMismatch: true,
+          } as any;
+        }
+      }
       return {
         ok: true as const,
         apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number },
