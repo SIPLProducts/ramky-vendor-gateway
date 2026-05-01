@@ -201,6 +201,36 @@ export function BankKycTab(props: BankKycTabProps) {
         onVerified={() => {}}
         vendorId={props.vendorId}
       />
+
+      {holderCheck !== 'idle' && holderName && (
+        <div
+          className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
+            holderCheck === 'failed'
+              ? 'border-destructive/30 bg-destructive/5'
+              : 'border-success/30 bg-success/5'
+          }`}
+        >
+          {holderCheck === 'failed' ? (
+            <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
+          )}
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex flex-wrap gap-x-2 items-baseline">
+              <span className="text-xs text-muted-foreground">Account Holder Name:</span>
+              <span className="font-medium break-words">{holderName}</span>
+            </div>
+            <div className={holderCheck === 'failed' ? 'text-destructive' : 'text-success'}>
+              {holderCheck === 'gst+pan' &&
+                'Account Holder Name verified with GST Legal Name and PAN Holder Name.'}
+              {holderCheck === 'gst' && 'Account Holder Name matched with GST Legal Name.'}
+              {holderCheck === 'pan' && 'Account Holder Name matched with PAN Holder Name.'}
+              {holderCheck === 'failed' &&
+                'Account Holder Name does not match with GST and PAN details.'}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
