@@ -32,6 +32,9 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const { state, verify } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
+  // Captured enterprise name from the registry + result of comparing it to PAN holder.
+  const [enterpriseName, setEnterpriseName] = useState<string>('');
+  const [enterpriseCheck, setEnterpriseCheck] = useState<'idle' | 'passed' | 'failed'>('idle');
 
   if (props.onStatusChange) {
     props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
