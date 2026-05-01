@@ -1944,13 +1944,13 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{doc.errorMessage}</span>
           </div>
-          {/rate limit/i.test(doc.errorMessage) && (
+          {/rate limit|too many requests|throttl/i.test(doc.errorMessage) && (
             <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
               <span>
-                The document service is temporarily throttled by the upstream provider. Please wait
-                ~30 seconds and click <strong>Replace</strong> to retry. Your previously verified
-                tabs (GST / PAN / MSME) remain intact.
+                The verification service is temporarily throttled by the upstream provider. We
+                already retried automatically. Please wait ~60 seconds and click <strong>Replace</strong> with
+                the same cheque to try again. Your previously verified tabs (GST / PAN / MSME) remain intact.
               </span>
             </div>
           )}
