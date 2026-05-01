@@ -1607,6 +1607,7 @@ export function DocumentVerificationStep({
                         onReset={() => setMsmeDoc(idleDoc)}
                         busyLabel={
                           msmeDoc.status === "uploading" ? "Uploading…" :
+                          msmeDoc.status === "preparing" ? "Preparing document for OCR…" :
                           msmeDoc.status === "ocr" ? "Reading Udyam…" :
                           msmeDoc.status === "verifying" ? "Verifying…" : ""
                         }
