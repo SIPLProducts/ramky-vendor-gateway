@@ -1,59 +1,75 @@
-I found the issue: the registration page is still using its own `DocumentVerificationStep.tsx` OCR flow, not the `BankKycTab.tsx` flow that was fixed earlier.
+## Problem
 
-Your screenshot shows `BANK_OCR` returns success with these fields:
+Today, when Surepass returns `429 / bank_rate_limited` for the penny-drop, the cheque step "soft-passes" — it shows a green banner ("Penny-drop name verification was skipped…") and lets the vendor click Continue. That's exactly what the screenshot shows: Account Holder Name is blank, but the step is treated as verified.
 
-```text
-raw.data.account_number.value = 1714348594
-raw.data.ifsc_code.value = KKBK0007746
-```
+You want the opposite for both the rate-limit case **and** the name-mismatch case: stop, popup, disable Continue, allow re-upload.
 
-But in `DocumentVerificationStep.tsx`, the extracted OCR object is built only from `r.data`. If the saved response mapping is incomplete or points to `data.account_number` instead of `data.account_number.value`, the code reads the account as an object / missing value, fails this check:
+## Changes (only `src/components/vendor/steps/DocumentVerificationStep.tsx`)
 
-```text
-/^\d{8,18}$/.test(ocrAccountRaw)
-```
+### 1. Remove the rate-limit soft-pass
 
-Because it fails before verification, the `BANK` penny-drop API is never called.
+In the `bank` branch of the verification function (~lines 537–591):
 
-Plan to fix:
+- Keep the existing 15s / 30s retry with backoff for `bank_rate_limited`.
+- If we're still rate-limited after retries, **return `{ ok: false, message, reason: 'rate_limited' }`** instead of returning a soft-pass `{ ok: true, … pennyDropSkipped: true }`. This marks `bankDoc.status = 'failed'`, so `stage4Done` stays `false` and the outer Continue button (already gated on `allDone`) becomes disabled automatically.
+- Drop the `holderNameStatus: "skipped"` / `pennyDropSkipped` paths entirely so the UI never shows "Penny-drop name verification was skipped".
 
-1. Reuse the OCR fallback helper in the main registration flow
-   - Import `mergeOcrExtracted` into `DocumentVerificationStep.tsx`.
-   - After each OCR provider call, merge `r.data` with `r.raw.data` so Surepass `{ value, confidence }` fields become plain strings.
-   - This makes `account_number` and `ifsc_code` available as real values even when the admin mapping is imperfect.
+### 2. Strict name-match logic with the three required messages
 
-2. Make bank verification read nested values defensively
-   - Add a local value picker for `DocumentVerificationStep.tsx` that can read:
-     - plain strings/numbers
-     - `{ value, confidence }` objects
-   - Use it for bank account number and IFSC before validation.
-   - This prevents `[object Object]` from causing the account regex failure.
-
-3. Keep the penny-drop call from being skipped
-   - Ensure the bank flow only stops before `BANK` verification when the OCR truly does not contain account number / IFSC anywhere.
-   - If the raw OCR response contains valid account and IFSC, proceed to:
+In the same branch (~lines 611–643), replace the current logic with:
 
 ```text
-callProvider({ providerName: "BANK", input: { account, ifsc, id_number: account } })
+nameAtBank = data.full_name || data.name_at_bank
+            || raw.data.full_name           // fallback for nested provider shape
+gstLegal   = gstDoc.ocrData.legal_name
+panHolder  = panDoc.ocrData.holder_name || panDoc.ocrData.full_name
+
+gstOk = fuzzyNameMatch(nameAtBank, gstLegal)
+panOk = fuzzyNameMatch(nameAtBank, panHolder)
+
+if (gstOk && panOk) → ok=true,  message: "Account Holder Name verified with GST Legal Name and PAN Holder Name."
+else if (gstOk)    → ok=true,  message: "Account Holder Name matched with GST Legal Name."
+else               → ok=false, reason='name_mismatch',
+                     message: "Account Holder Name does not match with GST and PAN details."
 ```
 
-4. Improve the failure message for real OCR failures
-   - If both mapped and raw OCR payloads are missing valid fields, show a clearer message that says the cheque OCR did not return account/IFSC, instead of implying the bank API was attempted.
+Note: the existing PAN-only success message is removed per spec — only GST+PAN, GST-only, or fail.
 
-5. Optional configuration cleanup
-   - Update the `BANK_OCR` template mapping in `KycApiSettings.tsx` to use Surepass value paths:
+### 3. Popup dialog on bank failures
 
-```text
-account_number: data.account_number.value
-ifsc_code: data.ifsc_code.value
-micr: data.micr.value
+The file already imports `AlertDialog`. Add a single dialog driven by new local state in `DocumentVerificationStep`:
+
+```ts
+const [bankErrorDialog, setBankErrorDialog] = useState<{
+  open: boolean;
+  title: string;
+  message: string;
+  reason: 'rate_limited' | 'name_mismatch' | 'generic';
+} | null>(null);
 ```
 
-This prevents newly created provider configs from saving object-valued mappings.
+In `handleBankUpload` (or the bank `runDocFlow` callback), when the bank verifier returns `ok: false`, open the dialog with an error-tinted icon (`AlertCircle` in `text-destructive`) and the message returned. Titles:
 
-Expected result after implementation:
-- Upload cheque.
-- `BANK_OCR` succeeds and extracts plain `1714348594` and `KKBK0007746`.
-- The flow proceeds to the `BANK` penny-drop verification API.
-- You should see two backend function calls in Network: first `BANK_OCR`, then `BANK`.
-- The bank tab no longer fails immediately with “Could not read a valid account number” when the OCR response already contains the account number.
+- `rate_limited` → "Bank verification temporarily unavailable"
+- `name_mismatch` → "Account Holder Name mismatch"
+- `generic` → "Bank verification failed"
+
+Dialog body shows the message; the single action button is "Re-upload cheque" which closes the dialog and resets `bankDoc` to `idleDoc` so the upload control is shown again. The user can then upload a new cheque and the flow re-runs.
+
+### 4. Disable Continue in the bank section
+
+`stage4Done` already drives the outer Continue (form-level submit gated on `allDone`). With change #1/#2, a failed bank verification keeps `stage4Done = false`, so Continue is naturally disabled. No additional gating is needed at the form level.
+
+For clarity in the Bank stage panel, also surface a small inline destructive banner under the Account Holder Name field when `bankDoc.status === 'failed'` showing the same message — so the state is visible even after the dialog is dismissed.
+
+### 5. Remove the misleading inline success banner when name is empty
+
+The current UI shows "Account active · Penny-drop successful" + the green skipped-message under the empty Account Holder Name field. Once #1 lands, those branches no longer fire, so that misleading state goes away on its own.
+
+## Acceptance
+
+- Upload cheque → upstream returns `bank_rate_limited` (after retries): popup appears with the rate-limit message, Continue is disabled, user can re-upload.
+- Upload cheque → penny-drop succeeds, name matches both GST + PAN: green inline message "Account Holder Name verified with GST Legal Name and PAN Holder Name.", Continue enabled.
+- Upload cheque → penny-drop succeeds, name matches only GST: green inline message "Account Holder Name matched with GST Legal Name.", Continue enabled.
+- Upload cheque → penny-drop succeeds, name matches neither: popup with "Account Holder Name does not match with GST and PAN details.", Continue disabled, re-upload allowed.
+- No more "Penny-drop name verification was skipped" message anywhere.

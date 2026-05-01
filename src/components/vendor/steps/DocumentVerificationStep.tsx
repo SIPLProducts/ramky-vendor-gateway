@@ -560,33 +560,13 @@ export function DocumentVerificationStep({
     }
     toastKycResult("Bank", r);
 
-    // Soft-pass on persistent rate limit: trust OCR + IFSC directory and
-    // mark the bank step as verified so the vendor isn't blocked. The
-    // back-office can re-run penny-drop later from the vendor record.
+    // Hard-fail on persistent rate limit. Vendor must re-upload and try again
+    // — they should NOT be allowed to continue without a real penny-drop.
     if (isRateLimited(r)) {
-      const ifscDetails = await lookupIfsc(ocrIfscRaw).catch(() => null);
-      const normalized: Record<string, any> = {
-        account_number: ocrAccountRaw,
-        ifsc_code: ocrIfscRaw,
-        bank_name: ifscDetails?.bank,
-        branch_name: ifscDetails?.branch,
-        account_holder_name: ocr.account_holder_name,
-      };
       return {
-        ok: true as const,
-        apiData: {
-          accountNumber: ocrAccountRaw,
-          ifsc: ocrIfscRaw,
-          bankName: ifscDetails?.bank,
-          branchName: ifscDetails?.branch,
-          accountHolderName: ocr.account_holder_name,
-          holderNameStatus: "skipped",
-          holderNameMessage:
-            "Account number and IFSC verified from cancelled cheque. Penny-drop name verification was skipped due to a temporary upstream rate limit and will be re-run by the back-office team.",
-          pennyDropSkipped: true,
-        },
-        normalized,
-        registeredName: ocr.account_holder_name,
+        ok: false as const,
+        message:
+          "Bank verification is temporarily unavailable due to upstream rate limits. Please wait a moment and re-upload the cancelled cheque to try again.",
       };
     }
 
@@ -609,37 +589,33 @@ export function DocumentVerificationStep({
       return { ok: false as const, message: `IFSC mismatch: cheque shows "${ocrIfscRaw}" but registry returned "${apiIfsc}".` };
     }
     // Account holder name comes back as either `full_name` or `name_at_bank`
-    // depending on the upstream provider. Accept both.
-    const nameAtBank = String(d.full_name || d.name_at_bank || "").trim();
+    // depending on the upstream provider. Also fall back to raw.data.full_name
+    // for nested provider shapes (e.g. Surepass).
+    const rawData = (r.raw && typeof r.raw === "object" && (r.raw as any).data) || {};
+    const nameAtBank = String(
+      d.full_name || d.name_at_bank || rawData.full_name || "",
+    ).trim();
 
-    // Compare account holder name against verified GST Legal Name + PAN Holder
-    // Name (both higher-trust than the user's typed legalName).
+    // Strict name-match: GST+PAN, GST-only, or fail. PAN-only no longer passes.
     const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
     const panHolderName = String(
       panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
     ).trim();
-    let holderNameStatus: "gst+pan" | "gst" | "pan" | "none" | "skipped" = "skipped";
+    let holderNameStatus: "gst+pan" | "gst" | "none" = "none";
     let holderNameMessage = "";
-    if (nameAtBank && (gstLegalName || panHolderName)) {
-      const gstOk = gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
-      const panOk = panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
-      if (gstOk && panOk) {
-        holderNameStatus = "gst+pan";
-        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
-      } else if (gstOk) {
-        holderNameStatus = "gst";
-        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
-      } else if (panOk) {
-        holderNameStatus = "pan";
-        holderNameMessage = "Account Holder Name matched with PAN Holder Name.";
-      } else {
-        holderNameStatus = "none";
-        return {
-          ok: false as const,
-          message:
-            "Account Holder Name does not match with GST Legal Name and PAN Holder Name.",
-        };
-      }
+    const gstOk = nameAtBank && gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
+    const panOk = nameAtBank && panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
+    if (gstOk && panOk) {
+      holderNameStatus = "gst+pan";
+      holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
+    } else if (gstOk) {
+      holderNameStatus = "gst";
+      holderNameMessage = "Account Holder Name matched with GST Legal Name.";
+    } else {
+      return {
+        ok: false as const,
+        message: "Account Holder Name does not match with GST and PAN details.",
+      };
     }
 
     const normalized: Record<string, any> = {
@@ -711,6 +687,12 @@ export function DocumentVerificationStep({
         setActiveTab("msme");
       } else if (kind === "cheque" && /Account Holder Name does not match/i.test(msg)) {
         setMismatchDialog({ open: true, title: "Account Holder Name mismatch", message: msg });
+        setActiveTab("bank");
+      } else if (kind === "cheque" && /temporarily unavailable|rate limit/i.test(msg)) {
+        setMismatchDialog({ open: true, title: "Bank verification temporarily unavailable", message: msg });
+        setActiveTab("bank");
+      } else if (kind === "cheque") {
+        setMismatchDialog({ open: true, title: "Bank verification failed", message: msg });
         setActiveTab("bank");
       }
       return;
@@ -1855,15 +1837,29 @@ export function DocumentVerificationStep({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{mismatchDialog.title}</AlertDialogTitle>
-            <AlertDialogDescription>{mismatchDialog.message}</AlertDialogDescription>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center">{mismatchDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">{mismatchDialog.message}</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={() => setMismatchDialog((d) => ({ ...d, open: false }))}
-            >
-              OK
-            </AlertDialogAction>
+          <AlertDialogFooter className="sm:justify-center">
+            {/Account Holder Name|Bank verification/i.test(mismatchDialog.title) ? (
+              <AlertDialogAction
+                onClick={() => {
+                  setBankDoc(idleDoc);
+                  setMismatchDialog((d) => ({ ...d, open: false }));
+                }}
+              >
+                Re-upload cheque
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => setMismatchDialog((d) => ({ ...d, open: false }))}
+              >
+                OK
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
