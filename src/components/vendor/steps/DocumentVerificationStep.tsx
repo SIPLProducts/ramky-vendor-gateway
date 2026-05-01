@@ -2094,6 +2094,15 @@ function GstVerifiedDetails({
             verifiedLabel="Verified from registry"
             onChange={(v) => onChangeField("constitution_of_business", v)}
           />
+          <EditableOcrField
+            label="PAN Number (from GST)"
+            value={ocr.pan_number}
+            originalValue={original?.pan_number}
+            verifiedValue={api.pan_number}
+            verifiedLabel="PAN derived from GSTIN — verified"
+            onChange={(v) => onChangeField("pan_number", v.toUpperCase())}
+            mono
+          />
         </div>
       </div>
 
