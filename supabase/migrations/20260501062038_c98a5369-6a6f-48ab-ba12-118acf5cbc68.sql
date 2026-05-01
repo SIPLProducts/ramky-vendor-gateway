@@ -1,0 +1,1 @@
+UPDATE public.api_providers SET endpoint_path = '/api/v1/corporate/gstin' WHERE provider_name = 'GST' AND endpoint_path <> '/api/v1/corporate/gstin';
