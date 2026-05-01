@@ -1,104 +1,90 @@
-## Why bank verification is not firing today
+## Goal
 
-Two issues in the current setup:
+After the OCR + validation API chain runs (GST and Bank), show a green tick and a small confirmation message **directly under each individual field** in the verified panel — e.g. "GSTIN is verified", "Legal Name matches registry", "Account Number is verified" — driven by comparing the captured/edited value against the validation API response.
 
-1. In `DocumentVerificationStep.tsx`, the `cheque` branch of `verifyApi` is still simulated — it just echoes the OCR data back as `apiData` with `simulated: true` and never calls the configured `BANK` provider. So after cheque OCR succeeds, no `/api/v1/bank-verification/` call is made.
-2. The `BANK` provider row in `api_providers` is misconfigured:
-   - `request_body_template` has hardcoded values (`id_number: "1714348594"`, `ifsc: "KKBK0007746"`) instead of placeholders.
-   - `response_data_mapping` was saved as a literal example response object instead of JSON paths, so even if the call ran, no fields would be extracted.
+This adds field-level proof on top of the existing top-level success banner, exactly as shown in the reference screenshot (Identity, Registration sections of the GST verified panel).
 
-## Plan
+## Scope
 
-### 1. Fix the `BANK` provider configuration in `api_providers`
+1. **GST verified panel** (`GstVerifiedDetails` in `src/components/vendor/steps/DocumentVerificationStep.tsx`) — Identity + Registration + Place of Business + Jurisdiction sections.
+2. **Bank verified panel** (the bank `verifiedFields` block in the same file) — Account Number, IFSC, Bank Name, Branch, Account Holder Name.
 
-Update the row where `provider_name = 'BANK'`:
+No backend / edge-function / DB changes are needed — the data already arrives via the existing `GST` and `BANK` validation API responses.
 
-- `endpoint_path`: `/api/v1/bank-verification/` (already correct)
-- `http_method`: `POST` (already correct)
-- `request_mode`: `json` (already correct)
-- `request_headers`: `{ "Content-Type": "application/json" }` (already correct)
-- `request_body_template` →
-  ```json
-  { "id_number": "{{account}}", "ifsc": "{{ifsc}}", "ifsc_details": true }
-  ```
-- `response_success_path`: `success`
-- `response_success_value`: `true`
-- `response_message_path`: `message`
-- `response_data_mapping` → real JSON paths:
-  ```json
-  {
-    "account_number": "data.account_number",
-    "account_exists": "data.account_exists",
-    "name_at_bank": "data.full_name",
-    "imps_ref_no": "data.imps_ref_no",
-    "remarks": "data.remarks",
-    "status": "data.status",
-    "ifsc": "data.ifsc_details.ifsc",
-    "micr": "data.ifsc_details.micr",
-    "bank_name": "data.ifsc_details.bank_name",
-    "branch_name": "data.ifsc_details.branch",
-    "branch_address": "data.ifsc_details.address",
-    "branch_city": "data.ifsc_details.city",
-    "branch_district": "data.ifsc_details.district",
-    "branch_state": "data.ifsc_details.state",
-    "branch_centre": "data.ifsc_details.centre",
-    "branch_contact": "data.ifsc_details.contact"
-  }
-  ```
+## How it will work
 
-### 2. Replace the simulated bank branch in `verifyApi`
+### 1. Pass the API response down to the verified panels
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`, change the `cheque` branch of `verifyApi` to actually call the configured `BANK` provider:
+Both panels already have the validation API result available in state:
+- GST: `gstDoc.apiData` (registry response merged into `ocrData` after verification).
+- Bank: `bankDoc.apiData` (penny-drop response).
 
-- Read `account_number` and `ifsc_code` from OCR.
-- Validate locally first:
-  - Account number must be 8–18 digits.
-  - IFSC must match `^[A-Z]{4}0[A-Z0-9]{6}$`.
-  - On failure → return `ok:false` with a clear message; the existing `runDocFlow` already surfaces that as the error message under the card.
-- Call `callProvider({ providerName: "BANK", input: { account, ifsc } })` (matches the `{{account}}` / `{{ifsc}}` placeholders).
-- Surface results via `toastKycResult("Bank", r)` like the GST flow.
-- On `!r.found` → "Bank validation provider is not configured."
-- On `!r.ok || !r.data` → "Bank verification failed. Please check the details or try again." (with upstream message if present).
+We will pass `apiData` (the registry/penny-drop response) as a new `verifiedApi?: Record<string, any>` prop into `GstVerifiedDetails` and into the bank `verifiedFields` JSX.
 
-### 3. Compare OCR vs API and decide pass/fail
+### 2. New `EditableOcrField` "verified" affordance
 
-After a successful API response:
+Extend `EditableOcrField` with two optional props:
+- `verifiedValue?: string` — the value returned by the validation API for this field.
+- `verifiedLabel?: string` — short label shown next to the tick (e.g. "GSTIN is verified", "matches registry").
 
-- Compare normalized `account_number` (digits only) — must match OCR.
-- Compare normalized `ifsc` (upper-cased) — must match OCR.
-- If `account_exists` is `false` → fail with "Bank account not found at the bank."
-- If account or IFSC mismatch → return `ok:false` with a precise message, e.g.:
-  - `Bank details mismatch: cheque shows account "XXXX1234" but registry returned "XXXX5678".`
-  - `IFSC mismatch: cheque shows "KKBK0007746" but registry returned "KKBK0007999".`
-- If everything matches → success. The existing `name_at_bank` from the API is also used to compute `nameMatchScore` against the vendor's legal name (already wired through `runDocFlow`'s `afterVerifiedOcrName`).
+Behavior:
+- If `verifiedValue` is present and `normalize(current) === normalize(verifiedValue)` → show a green check icon + small green text **below the input** ("✓ <label>").
+- If `verifiedValue` is present but does not match → show a small amber warning row ("⚠ Doesn't match registry value: <verifiedValue>") with a one-click "Use registry value" button that calls `onChange(verifiedValue)`.
+- If `verifiedValue` is missing → render nothing extra (today's behavior).
 
-### 4. Auto-fill missing fields from the API response
+Normalization: trim, uppercase, collapse whitespace; for dates compare ISO `YYYY-MM-DD` form.
 
-Return a `normalized` object from the bank branch (same pattern already used by GST), so `runDocFlow` will merge it into `ocrData`:
+### 3. Wire each field
 
-```text
-normalized = {
-  account_number, ifsc_code, bank_name, branch_name,
-  account_holder_name: name_at_bank,
-  branch_address, branch_city, branch_state, micr
-}
-```
+**GST panel — `GstVerifiedDetails`** (Identity + Registration):
 
-This way, if cheque OCR misses Bank Name, Branch, or Account Holder Name, they get populated automatically from the API response — no manual entry needed.
+| UI Field            | Compared against API field                        | Verified label              |
+|---------------------|---------------------------------------------------|-----------------------------|
+| Legal Name          | `legal_name` / `business_name`                    | "Legal Name is verified"    |
+| Trade Name          | `trade_name`                                      | "Trade Name is verified"    |
+| GSTIN               | `gstin`                                           | "GSTIN is verified"         |
+| Constitution        | `constitution_of_business`                        | "Verified from registry"    |
+| GST Status pill     | `gstin_status` (already shown via `GstStatusPill`)| Add tick + "Active per registry" beside the pill when the API status is `Active` |
+| Registration Date   | `date_of_registration`                            | "Verified from registry"    |
+| Taxpayer Type       | `taxpayer_type`                                   | "Verified from registry"    |
+| Centre Jurisdiction | `center_jurisdiction`                             | "Verified from registry"    |
+| State Jurisdiction  | `state_jurisdiction`                              | "Verified from registry"    |
+| Principal Place     | `address`                                         | "Matches registry address"  |
 
-The existing `setBankDoc` post-processing that calls Razorpay's IFSC lookup will still run as a fallback, but the API's `ifsc_details` will normally cover everything first.
+**Bank panel** (`bankDoc.apiData` from the `BANK` provider):
 
-### 5. Verification status UI
+| UI Field             | Compared against API field        | Verified label                   |
+|----------------------|------------------------------------|----------------------------------|
+| Account Number       | `account_number`                  | "Account Number is verified"     |
+| IFSC Code            | `ifsc` / `ifsc_details.ifsc`      | "IFSC is verified"               |
+| Bank Name            | `ifsc_details.bank_name` / `bank_name` | "Bank Name is verified"     |
+| Branch               | `ifsc_details.branch` / `branch_name`  | "Branch is verified"        |
+| Account Holder Name  | `full_name` / `name_at_bank`      | "Name matches bank record"       |
 
-The card already renders status-driven UI from `bankDoc.status`. With this change:
+The existing top-level success banner stays — these are field-level confirmations that match the screenshot the user shared.
 
-- On success: card shows the existing green "Verified" header plus a small success line under the fields — "Bank details are verified" with the existing `BadgeCheck` indicator and (when available) `— {name_at_bank}`.
-- On any failure: the existing red error block under the card displays the specific mismatch / not-found / network-failure message produced above.
-- The bank tab is only marked verified after the API call passes (already gated by `bankDoc.status === "verified"`).
+### 4. Behavior on user edit
 
-### 6. Files / data touched
+If the user edits an already-verified field so it diverges from the registry value, the green tick disappears and the amber mismatch helper appears, offering "Use registry value". This keeps it honest — only true matches show the tick.
 
-- DB: `UPDATE public.api_providers ... WHERE provider_name = 'BANK'` to fix template + mapping (data update, not schema).
-- Frontend: `src/components/vendor/steps/DocumentVerificationStep.tsx` — replace the simulated `cheque` branch in `verifyApi`, add the comparison + small success label.
+## Visual style
 
-No new secrets, no new tables, no edge-function changes. The existing `kyc-api-execute` edge function and `useConfiguredKycApi` hook already handle JSON payload substitution and bearer-token auth from the provider row.
+- Tick: existing `CheckCircle2` icon, `text-success` token.
+- Helper text: 11px, `text-success` for verified, `text-warning` for mismatch.
+- Placement: directly under the input, left-aligned, no extra spacing on idle fields.
+
+## Files to change
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+  - Extend `EditableOcrField` with `verifiedValue` / `verifiedLabel` props + render logic.
+  - Pass `verifiedApi` into `GstVerifiedDetails` and wire each field.
+  - Wire each bank `EditableOcrField` with the corresponding registry value.
+  - Add a small "Active per registry" tick next to the existing `GstStatusPill` when the API confirms status.
+
+No new files, no DB migrations, no edge function changes.
+
+## Out of scope
+
+- Changing the OCR or validation API contracts.
+- Reworking the top-level success/failure banner (kept as-is).
+- The "Are you GST registered? = No" self-declaration branch (no API to verify against).
