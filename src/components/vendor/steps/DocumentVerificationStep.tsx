@@ -1290,8 +1290,14 @@ export function DocumentVerificationStep({
               {panCrossCheckError && (
                 <CrossCheckStrip ok={false} text={panCrossCheckError} className="mt-3" />
               )}
-              {panDoc.status === "verified" && !panCrossCheckError && isGstRegistered === true && (
-                <CrossCheckStrip ok={true} text="PAN matches PAN derived from GSTIN" className="mt-3" />
+              {panDoc.status === "verified" && !panCrossCheckError && panDoc.apiData?.panMatchMessage && (
+                <CrossCheckStrip ok={true} text={panDoc.apiData.panMatchMessage} className="mt-3" />
+              )}
+              {panDoc.status === "verified" && !panCrossCheckError && panDoc.apiData?.nameMatchMessage && (
+                <CrossCheckStrip ok={true} text={panDoc.apiData.nameMatchMessage} className="mt-2" />
+              )}
+              {panDoc.status === "verified" && !panCrossCheckError && !panDoc.apiData?.panMatchMessage && isGstRegistered === true && (
+                <CrossCheckStrip ok={true} text="PAN Number verified with GST PAN Number." className="mt-3" />
               )}
               {panDoc.status === "verified" && typeof panDoc.nameMatchScore === "number" && (
                 <CrossCheckStrip
