@@ -56,7 +56,7 @@ export function GstKycTab(props: GstKycTabProps) {
             return { ok: false, message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`, data };
           }
         }
-        return { ok: true, message: `GSTIN verified — ${apiName || props.gstin}`, data };
+        return { ok: true, message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`, data };
       },
     });
     if (r.ok) props.onVerifiedDetails?.(r.data || {});
