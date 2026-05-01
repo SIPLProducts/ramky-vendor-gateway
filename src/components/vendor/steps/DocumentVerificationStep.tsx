@@ -1698,6 +1698,25 @@ export function DocumentVerificationStep({
           </TabsContent>
         </Tabs>
       </TooltipProvider>
+
+      <AlertDialog
+        open={mismatchDialog.open}
+        onOpenChange={(o) => setMismatchDialog((d) => ({ ...d, open: o }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{mismatchDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>{mismatchDialog.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => setMismatchDialog((d) => ({ ...d, open: false }))}
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }
