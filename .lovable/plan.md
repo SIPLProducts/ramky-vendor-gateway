@@ -1,47 +1,52 @@
-# Fix: Active KYC tab not visually highlighted
-
 ## Problem
-On the Document Verification step, when the user moves to a tab like **2. PAN**, the tab does not look "selected". As shown in the screenshot, all four tabs (GST, PAN, MSME, Bank) appear visually identical — there is no clear active highlight, only a tiny status icon difference.
 
-Root cause is in `src/components/vendor/steps/DocumentVerificationStep.tsx` (lines 1128–1160):
+The Bank OCR provider (Surepass cheque OCR) successfully reads the cheque — the network response in the screenshot clearly shows:
 
-- `TabsList` uses `bg-muted/60` (very light grey).
-- `TabsTrigger` only sets `data-[state=active]:bg-background data-[state=active]:shadow-enterprise-sm`.
-- `bg-background` is white and `bg-muted/60` is near-white, so the active pill is barely distinguishable. There is no border, no primary color, no text emphasis, and no number-badge differentiation.
+```
+raw.data.account_number = { value: "1714348594", confidence: 94 }
+raw.data.ifsc_code      = { value: "KKBK0007746", confidence: 98 }
+```
+
+But the UI shows **"Could not read a valid account number from the cheque"** and the bank validation (penny-drop) API is never called.
+
+### Root cause
+
+The admin-configured `response_data_mapping` for the BANK_OCR provider does not map `account_number` / `ifsc_code` into the normalized `data` object. The edge function returns:
+
+- `data = { message: true, message_code: true }`  ← only generic status fields
+- `raw = { data: { account_number: {...}, ifsc_code: {...}, ... } }`  ← actual values
+
+`runBankOcr` in `BankKycTab.tsx` returns `r.data` as `extracted`, so `handleVerify` sees `extracted.account_number === undefined`, fails the length check, marks the step Failed, and never reaches the BANK validation call.
+
+The same risk applies to other docs (GST/PAN/MSME) when their mapping is incomplete or upstream payload shape shifts.
 
 ## Fix
 
-Update only the tab-trigger / tab-list styling in `DocumentVerificationStep.tsx`. No logic changes.
+Make the OCR consumers resilient to mapping gaps by **falling back to `raw.data`** when the normalized `data` is missing the expected fields. This keeps the configured mapping as the primary source but recovers automatically when fields are unmapped.
 
-1. **Tab list container** — keep the soft grey track but tighten contrast:
-   - Replace `bg-muted/60` with `bg-muted` and add `border border-border rounded-lg`.
+### Changes
 
-2. **Tab trigger (active state)** — make selection unmistakable, SAP Fiori style:
-   - White background (`bg-background`)
-   - Primary-colored bottom accent + ring: `ring-1 ring-primary/30`
-   - Text turns primary and bold: `data-[state=active]:text-primary data-[state=active]:font-semibold`
-   - Stronger shadow: `shadow-enterprise-sm`
-   - Slight scale/elevation feel via `rounded-md`
+1. **`src/components/vendor/kyc/BankKycTab.tsx` — `runBankOcr`**
+   - Merge fields from `r.raw?.data` into the extracted payload as a fallback (only for keys not already present in `r.data`).
+   - Specifically ensure `account_number`, `ifsc_code`, `micr`, `name_at_bank`, `full_name` are pulled from `raw.data` if absent.
+   - Continue to handle `{ value, confidence }` shapes via existing `pickString` helper in `handleVerify`.
 
-3. **Tab trigger (inactive state)** — muted text so the contrast with active is obvious:
-   - `text-muted-foreground hover:text-foreground hover:bg-background/60`
+2. **`src/lib/kycExtract.ts` (new tiny helper)**
+   - Export `mergeExtracted(data, raw)` that returns `{ ...rawData, ...data }` (data wins, raw fills gaps), unwrapping top-level `{ value }` objects so downstream code sees plain strings.
+   - Reuse in PAN/GST/MSME OCR runners (`PanKycTab`, `GstKycTab`, `MsmeKycTab`) so the same gap-filling protects every tab.
 
-4. **Step number chip** — render the "1.", "2.", "3.", "4." as a small circular badge that turns primary-filled when active, grey when inactive. This gives a second visual cue that matches the existing step-indicator language used elsewhere in registration.
+3. **Defensive logging**
+   - In `runBankOcr`, when falling back to `raw.data`, `console.warn` once with the provider name + missing key list, so admins can see in the console that their mapping is incomplete and fix it in KYC API Settings.
 
-5. **Disabled (locked) tabs** — keep them visibly de-emphasized: `opacity-50 cursor-not-allowed` and a small lock icon (already present via `StatusChip locked`).
+### Out of scope
 
-6. **Mobile** — keep `grid-cols-4`; reduce horizontal padding on the trigger so the number badge + label + status chip fit on narrow widths without wrapping.
+- Changing the admin-configured `response_data_mapping` rows in the database — that's a config issue per tenant. The frontend fallback unblocks all current tenants regardless of their mapping.
+- Edge function changes — `kyc-api-execute` already returns both `data` and `raw`, which is exactly what we need.
 
-## Files to change
+## Expected result
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` (only the `TabsList` + `TabsTrigger` block around lines 1128–1160, plus a tiny inline `StepNumberBadge` helper just above it).
-
-No other components, hooks, edge functions, or DB changes are needed. The PDF→image OCR pipeline already in place is untouched.
-
-## Visual outcome
-
-```text
-Before:  [ 1. GST ✓ ] [ 2. PAN ⏱ ] [ 3. MSME 🔒 ] [ 4. Bank ✓ ]   <- all look the same
-After:   [ 1 GST ✓ ] [▌2 PAN ⏱▐] [ 3 MSME 🔒 ] [ 4 Bank ✓ ]
-                       ^ white card, primary ring, primary bold text, lifted shadow
-```
+After the fix, uploading the same cheque will:
+1. OCR returns `account_number=1714348594`, `ifsc=KKBK0007746` (from `raw.data` fallback).
+2. UI proceeds to `verifying` phase and calls the BANK penny-drop provider.
+3. Bank Name / Branch are enriched via Razorpay IFSC lookup as before.
+4. Holder-name match against GST + PAN runs as before.
