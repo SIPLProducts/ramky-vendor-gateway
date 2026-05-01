@@ -361,12 +361,64 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "pan") {
-      return { ok: true as const, apiData: { name: ocr.holder_name, pan: ocr.pan_number, simulated: true }, registeredName: ocr.holder_name };
-    }
-    if (kind === "msme") {
+      const ocrPan = String(ocr.pan_number || "").toUpperCase().trim();
+      if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(ocrPan)) {
+        return { ok: false as const, message: "Could not read a valid 10-character PAN. Please upload a clearer scan." };
+      }
+      const r = await callProvider({ providerName: "PAN", input: { id_number: ocrPan } });
+      toastKycResult("PAN", r);
+      if (!r.found) {
+        return { ok: false as const, message: "PAN validation provider is not configured. Add it in KYC & Validation API Settings." };
+      }
+      if (!r.ok || !r.data) {
+        return { ok: false as const, message: r.message || "PAN verification failed. Please check the details or try again." };
+      }
+      const d = r.data as Record<string, any>;
+      const apiPan = String(d.pan_number || "").toUpperCase().trim();
+      if (apiPan && apiPan !== ocrPan) {
+        return { ok: false as const, message: `PAN mismatch: card shows "${ocrPan}" but registry returned "${apiPan}".` };
+      }
+      const fullName = String(d.full_name || "").trim();
+      const normalized: Record<string, any> = {
+        pan_number: apiPan || ocrPan,
+        holder_name: fullName || ocr.holder_name,
+        full_name: fullName,
+        dob: d.dob,
+        category: d.category,
+        status: d.status,
+        aadhaar_linked: d.aadhaar_linked,
+        gender: d.gender,
+        email: d.email,
+        phone_number: d.phone_number,
+        address: d.address,
+      };
       return {
         ok: true as const,
-        apiData: { name: ocr.enterprise_name, enterpriseName: ocr.enterprise_name, udyamNumber: ocr.udyam_number, simulated: true },
+        apiData: { name: fullName, pan: apiPan || ocrPan, dob: d.dob, category: d.category, status: d.status, aadhaarLinked: d.aadhaar_linked },
+        normalized,
+        registeredName: fullName || ocr.holder_name,
+      };
+    }
+    if (kind === "msme") {
+      const normalized: Record<string, any> = {
+        udyam_number: ocr.udyam_number,
+        enterprise_name: ocr.enterprise_name,
+        enterprise_type: ocr.enterprise_type,
+        major_activity: ocr.major_activity,
+        organization_type: ocr.organization_type,
+        registration_date: ocr.registration_date,
+        social_category: ocr.social_category,
+        state: ocr.state,
+        district: ocr.district,
+        city: ocr.city,
+        pin_code: ocr.pin_code,
+        mobile: ocr.mobile,
+        email: ocr.email,
+      };
+      return {
+        ok: true as const,
+        apiData: { name: ocr.enterprise_name, enterpriseName: ocr.enterprise_name, udyamNumber: ocr.udyam_number },
+        normalized,
         registeredName: ocr.enterprise_name,
       };
     }
