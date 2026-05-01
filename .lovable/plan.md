@@ -1,52 +1,59 @@
-## Problem
+I found the issue: the registration page is still using its own `DocumentVerificationStep.tsx` OCR flow, not the `BankKycTab.tsx` flow that was fixed earlier.
 
-The Bank OCR provider (Surepass cheque OCR) successfully reads the cheque — the network response in the screenshot clearly shows:
+Your screenshot shows `BANK_OCR` returns success with these fields:
 
+```text
+raw.data.account_number.value = 1714348594
+raw.data.ifsc_code.value = KKBK0007746
 ```
-raw.data.account_number = { value: "1714348594", confidence: 94 }
-raw.data.ifsc_code      = { value: "KKBK0007746", confidence: 98 }
+
+But in `DocumentVerificationStep.tsx`, the extracted OCR object is built only from `r.data`. If the saved response mapping is incomplete or points to `data.account_number` instead of `data.account_number.value`, the code reads the account as an object / missing value, fails this check:
+
+```text
+/^\d{8,18}$/.test(ocrAccountRaw)
 ```
 
-But the UI shows **"Could not read a valid account number from the cheque"** and the bank validation (penny-drop) API is never called.
+Because it fails before verification, the `BANK` penny-drop API is never called.
 
-### Root cause
+Plan to fix:
 
-The admin-configured `response_data_mapping` for the BANK_OCR provider does not map `account_number` / `ifsc_code` into the normalized `data` object. The edge function returns:
+1. Reuse the OCR fallback helper in the main registration flow
+   - Import `mergeOcrExtracted` into `DocumentVerificationStep.tsx`.
+   - After each OCR provider call, merge `r.data` with `r.raw.data` so Surepass `{ value, confidence }` fields become plain strings.
+   - This makes `account_number` and `ifsc_code` available as real values even when the admin mapping is imperfect.
 
-- `data = { message: true, message_code: true }`  ← only generic status fields
-- `raw = { data: { account_number: {...}, ifsc_code: {...}, ... } }`  ← actual values
+2. Make bank verification read nested values defensively
+   - Add a local value picker for `DocumentVerificationStep.tsx` that can read:
+     - plain strings/numbers
+     - `{ value, confidence }` objects
+   - Use it for bank account number and IFSC before validation.
+   - This prevents `[object Object]` from causing the account regex failure.
 
-`runBankOcr` in `BankKycTab.tsx` returns `r.data` as `extracted`, so `handleVerify` sees `extracted.account_number === undefined`, fails the length check, marks the step Failed, and never reaches the BANK validation call.
+3. Keep the penny-drop call from being skipped
+   - Ensure the bank flow only stops before `BANK` verification when the OCR truly does not contain account number / IFSC anywhere.
+   - If the raw OCR response contains valid account and IFSC, proceed to:
 
-The same risk applies to other docs (GST/PAN/MSME) when their mapping is incomplete or upstream payload shape shifts.
+```text
+callProvider({ providerName: "BANK", input: { account, ifsc, id_number: account } })
+```
 
-## Fix
+4. Improve the failure message for real OCR failures
+   - If both mapped and raw OCR payloads are missing valid fields, show a clearer message that says the cheque OCR did not return account/IFSC, instead of implying the bank API was attempted.
 
-Make the OCR consumers resilient to mapping gaps by **falling back to `raw.data`** when the normalized `data` is missing the expected fields. This keeps the configured mapping as the primary source but recovers automatically when fields are unmapped.
+5. Optional configuration cleanup
+   - Update the `BANK_OCR` template mapping in `KycApiSettings.tsx` to use Surepass value paths:
 
-### Changes
+```text
+account_number: data.account_number.value
+ifsc_code: data.ifsc_code.value
+micr: data.micr.value
+```
 
-1. **`src/components/vendor/kyc/BankKycTab.tsx` — `runBankOcr`**
-   - Merge fields from `r.raw?.data` into the extracted payload as a fallback (only for keys not already present in `r.data`).
-   - Specifically ensure `account_number`, `ifsc_code`, `micr`, `name_at_bank`, `full_name` are pulled from `raw.data` if absent.
-   - Continue to handle `{ value, confidence }` shapes via existing `pickString` helper in `handleVerify`.
+This prevents newly created provider configs from saving object-valued mappings.
 
-2. **`src/lib/kycExtract.ts` (new tiny helper)**
-   - Export `mergeExtracted(data, raw)` that returns `{ ...rawData, ...data }` (data wins, raw fills gaps), unwrapping top-level `{ value }` objects so downstream code sees plain strings.
-   - Reuse in PAN/GST/MSME OCR runners (`PanKycTab`, `GstKycTab`, `MsmeKycTab`) so the same gap-filling protects every tab.
-
-3. **Defensive logging**
-   - In `runBankOcr`, when falling back to `raw.data`, `console.warn` once with the provider name + missing key list, so admins can see in the console that their mapping is incomplete and fix it in KYC API Settings.
-
-### Out of scope
-
-- Changing the admin-configured `response_data_mapping` rows in the database — that's a config issue per tenant. The frontend fallback unblocks all current tenants regardless of their mapping.
-- Edge function changes — `kyc-api-execute` already returns both `data` and `raw`, which is exactly what we need.
-
-## Expected result
-
-After the fix, uploading the same cheque will:
-1. OCR returns `account_number=1714348594`, `ifsc=KKBK0007746` (from `raw.data` fallback).
-2. UI proceeds to `verifying` phase and calls the BANK penny-drop provider.
-3. Bank Name / Branch are enriched via Razorpay IFSC lookup as before.
-4. Holder-name match against GST + PAN runs as before.
+Expected result after implementation:
+- Upload cheque.
+- `BANK_OCR` succeeds and extracts plain `1714348594` and `KKBK0007746`.
+- The flow proceeds to the `BANK` penny-drop verification API.
+- You should see two backend function calls in Network: first `BANK_OCR`, then `BANK`.
+- The bank tab no longer fails immediately with “Could not read a valid account number” when the OCR response already contains the account number.
