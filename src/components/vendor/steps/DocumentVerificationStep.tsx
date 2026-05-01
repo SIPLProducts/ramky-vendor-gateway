@@ -1126,7 +1126,7 @@ export function DocumentVerificationStep({
 
       <TooltipProvider delayDuration={150}>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="w-full">
-          <TabsList className="grid grid-cols-4 w-full h-auto p-1 bg-muted/60">
+          <TabsList className="grid grid-cols-4 w-full h-auto p-1 gap-1 bg-muted border border-border rounded-lg">
             {([
               { key: "gst", label: "GST", num: 1 },
               { key: "pan", label: "PAN", num: 2 },
@@ -1135,17 +1135,40 @@ export function DocumentVerificationStep({
             ] as { key: TabKey; label: string; num: number }[]).map((t) => {
               const unlocked = tabUnlock[t.key];
               const status = tabStatus[t.key];
+              const isActive = activeTab === t.key;
               const trigger = (
                 <TabsTrigger
                   key={t.key}
                   value={t.key}
                   disabled={!unlocked}
-                  className="flex items-center justify-center gap-2 py-2.5 min-w-0 data-[state=active]:bg-background data-[state=active]:shadow-enterprise-sm"
+                  className={cn(
+                    "group relative flex items-center justify-center gap-1.5 sm:gap-2 px-2 py-2.5 min-w-0 rounded-md transition-all",
+                    "text-muted-foreground hover:text-foreground hover:bg-background/60",
+                    "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:font-semibold",
+                    "data-[state=active]:shadow-enterprise-sm data-[state=active]:ring-1 data-[state=active]:ring-primary/30",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+                  )}
                 >
-                  <span className="text-xs sm:text-sm font-medium">
-                    {t.num}. {t.label}
+                  <span
+                    className={cn(
+                      "inline-flex items-center justify-center h-5 w-5 shrink-0 rounded-full text-[10px] font-semibold border transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border group-hover:border-foreground/30",
+                    )}
+                  >
+                    {t.num}
+                  </span>
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    {t.label}
                   </span>
                   <StatusChip status={status} locked={!unlocked} />
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary"
+                    />
+                  )}
                 </TabsTrigger>
               );
               return unlocked ? trigger : (

@@ -1,53 +1,47 @@
-## Plan: Ensure GST/PAN/MSME/Bank uploads send JPEG/PNG to OCR, not PDF
+# Fix: Active KYC tab not visually highlighted
 
-### Problem to fix
-The screenshot shows the request payload for `kyc-api-execute` still contains:
+## Problem
+On the Document Verification step, when the user moves to a tab like **2. PAN**, the tab does not look "selected". As shown in the screenshot, all four tabs (GST, PAN, MSME, Bank) appear visually identical — there is no clear active highlight, only a tiny status icon difference.
+
+Root cause is in `src/components/vendor/steps/DocumentVerificationStep.tsx` (lines 1128–1160):
+
+- `TabsList` uses `bg-muted/60` (very light grey).
+- `TabsTrigger` only sets `data-[state=active]:bg-background data-[state=active]:shadow-enterprise-sm`.
+- `bg-background` is white and `bg-muted/60` is near-white, so the active pill is barely distinguishable. There is no border, no primary color, no text emphasis, and no number-badge differentiation.
+
+## Fix
+
+Update only the tab-trigger / tab-list styling in `DocumentVerificationStep.tsx`. No logic changes.
+
+1. **Tab list container** — keep the soft grey track but tighten contrast:
+   - Replace `bg-muted/60` with `bg-muted` and add `border border-border rounded-lg`.
+
+2. **Tab trigger (active state)** — make selection unmistakable, SAP Fiori style:
+   - White background (`bg-background`)
+   - Primary-colored bottom accent + ring: `ring-1 ring-primary/30`
+   - Text turns primary and bold: `data-[state=active]:text-primary data-[state=active]:font-semibold`
+   - Stronger shadow: `shadow-enterprise-sm`
+   - Slight scale/elevation feel via `rounded-md`
+
+3. **Tab trigger (inactive state)** — muted text so the contrast with active is obvious:
+   - `text-muted-foreground hover:text-foreground hover:bg-background/60`
+
+4. **Step number chip** — render the "1.", "2.", "3.", "4." as a small circular badge that turns primary-filled when active, grey when inactive. This gives a second visual cue that matches the existing step-indicator language used elsewhere in registration.
+
+5. **Disabled (locked) tabs** — keep them visibly de-emphasized: `opacity-50 cursor-not-allowed` and a small lock icon (already present via `StatusChip locked`).
+
+6. **Mobile** — keep `grid-cols-4`; reduce horizontal padding on the trigger so the number badge + label + status chip fit on narrow widths without wrapping.
+
+## Files to change
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` (only the `TabsList` + `TabsTrigger` block around lines 1128–1160, plus a tiny inline `StepNumberBadge` helper just above it).
+
+No other components, hooks, edge functions, or DB changes are needed. The PDF→image OCR pipeline already in place is untouched.
+
+## Visual outcome
 
 ```text
-fileMimeType: "application/pdf"
-providerName: "GST_OCR"
+Before:  [ 1. GST ✓ ] [ 2. PAN ⏱ ] [ 3. MSME 🔒 ] [ 4. Bank ✓ ]   <- all look the same
+After:   [ 1 GST ✓ ] [▌2 PAN ⏱▐] [ 3 MSME 🔒 ] [ 4 Bank ✓ ]
+                       ^ white card, primary ring, primary bold text, lifted shadow
 ```
-
-That means the current screen is using the older `DocumentVerificationStep.tsx` upload flow, which calls the OCR provider directly with the original PDF. The PDF-to-JPEG conversion was added only to `OcrUploadAndVerify.tsx`, so it does not cover this specific registration page.
-
-### Implementation steps
-1. **Apply the existing PDF converter to the active registration upload flow**
-   - Import `normalizeUploadToImage` into `src/components/vendor/steps/DocumentVerificationStep.tsx`.
-   - In `runDocFlow`, before calling OCR, detect if the selected file is PDF.
-   - If PDF, convert all pages into one stitched JPEG using the existing `src/lib/pdfToImage.ts` utility.
-   - Send the converted JPEG file to `extractFromFile` / `callProvider` for OCR.
-   - Keep the original uploaded PDF in the UI and draft data for audit/storage purposes.
-
-2. **Make the UI status clear while conversion happens**
-   - Add a new document status such as `preparing`.
-   - Show a message like `Preparing document for OCR…` before `Reading certificate…`.
-   - Include `preparing` as a busy state in the file pill so the user sees progress instead of an immediate failure.
-
-3. **Add a defensive conversion inside the OCR helper**
-   - Update `extractFromFile` so even if any direct caller sends a PDF, it normalizes the file to image before calling the configured OCR provider.
-   - This prevents future regressions where another upload path bypasses `runDocFlow`.
-
-4. **Improve conversion failure behavior**
-   - If PDF conversion fails, show a clear user-facing error instead of silently sending the original PDF to OCR.
-   - This is important because the requirement is that PDFs must not be sent as PDF to OCR.
-   - The error will ask the user to retry with an image or a smaller/clearer PDF.
-
-5. **Verify expected payload behavior**
-   - After implementation, uploading a PDF GST certificate should result in the OCR request showing:
-
-```text
-providerName: "GST_OCR"
-fileMimeType: "image/jpeg"
-```
-
-   - JPG/JPEG/PNG uploads should continue to pass through as image files unchanged.
-   - The original filename and audit file shown in the UI can still remain `SIPL GST Certificate.pdf`; only the OCR payload changes to JPEG.
-
-### Files to modify
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-- Possibly `src/lib/pdfToImage.ts` to expose a stricter conversion helper that reports whether conversion succeeded, instead of silently falling back to the original PDF.
-
-### Out of scope
-- No backend/database changes.
-- No changes to the configured OCR provider templates.
-- No change to original document storage/audit behavior.
