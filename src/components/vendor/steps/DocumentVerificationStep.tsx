@@ -519,8 +519,15 @@ export function DocumentVerificationStep({
       };
     }
     // Bank (cheque) → call configured BANK provider (Surepass penny-drop)
-    const ocrAccountRaw = String(ocr.account_number || "").replace(/\s+/g, "");
-    const ocrIfscRaw = String(ocr.ifsc_code || "").toUpperCase().trim();
+    // Defensive unwrap in case OCR mapping ever returns {value,confidence}.
+    const pickStr = (v: any): string => {
+      if (v == null) return "";
+      if (typeof v === "string" || typeof v === "number") return String(v);
+      if (typeof v === "object" && "value" in v) return String((v as any).value ?? "");
+      return "";
+    };
+    const ocrAccountRaw = pickStr(ocr.account_number).replace(/\s+/g, "");
+    const ocrIfscRaw = pickStr(ocr.ifsc_code).toUpperCase().trim();
     if (!/^\d{8,18}$/.test(ocrAccountRaw)) {
       return { ok: false as const, message: "Could not read a valid account number from the cheque. Please upload a clearer scan." };
     }
