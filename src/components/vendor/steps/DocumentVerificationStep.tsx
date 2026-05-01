@@ -299,6 +299,15 @@ export function DocumentVerificationStep({
   const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
   const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
 
+  // Cross-tab name-mismatch popup. Used for MSME (Enterprise Name vs
+  // GST/PAN) and Bank (Account Holder Name vs GST/PAN). The dialog also
+  // forces the user back onto the offending tab so they cannot proceed.
+  const [mismatchDialog, setMismatchDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: "",
+    message: "",
+  });
+
   // ---------- Verification ----------
   // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
   // Other kinds still use a lightweight simulation pending real provider wiring.
