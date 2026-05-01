@@ -1295,6 +1295,7 @@ export function DocumentVerificationStep({
                 onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
                 busyLabel={
                   panDoc.status === "uploading" ? "Uploading…" :
+                  panDoc.status === "preparing" ? "Preparing document for OCR…" :
                   panDoc.status === "ocr" ? "Reading PAN…" :
                   panDoc.status === "verifying" ? "Verifying…" : ""
                 }
