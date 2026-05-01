@@ -409,6 +409,22 @@ export function ComplianceStep({
             These fields were auto-populated from the verification result. You may edit if needed.
           </p>
           <div className="grid gap-4">
+            {(gstPanNumber || gstLegalName) && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {gstPanNumber && (
+                  <div className="grid gap-1.5">
+                    <Label>GST PAN Number</Label>
+                    <Input value={gstPanNumber} readOnly className="font-mono bg-success/5 border-success/30" />
+                  </div>
+                )}
+                {gstLegalName && (
+                  <div className="grid gap-1.5">
+                    <Label>Legal Name (per GST)</Label>
+                    <Input value={gstLegalName} readOnly className="bg-success/5 border-success/30" />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="gstConstitutionOfBusiness">Constitution of Business</Label>
