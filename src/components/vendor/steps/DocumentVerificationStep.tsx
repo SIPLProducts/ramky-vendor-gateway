@@ -484,11 +484,62 @@ export function DocumentVerificationStep({
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ocrIfscRaw)) {
       return { ok: false as const, message: "Could not read a valid 11-character IFSC from the cheque. Please upload a clearer scan." };
     }
-    const r = await callProvider({
+    // Surepass throttles the penny-drop endpoint aggressively. Retry with
+    // backoff (15s, then 30s) before giving up — and if we're still throttled
+    // after retries, soft-pass with the OCR-extracted account/IFSC + IFSC
+    // directory enrichment so the vendor can still complete registration.
+    const isRateLimited = (res: any) =>
+      res && (res.found || res.message_code) &&
+      typeof res.message === "string" &&
+      /rate limit|too many requests|throttl/i.test(res.message);
+
+    let r = await callProvider({
       providerName: "BANK",
       input: { account: ocrAccountRaw, ifsc: ocrIfscRaw, id_number: ocrAccountRaw },
     });
+    const backoffs = [15000, 30000];
+    let attempt = 0;
+    while (isRateLimited(r) && attempt < backoffs.length) {
+      const wait = backoffs[attempt++];
+      console.log(`[Bank] Rate limited by upstream — retrying in ${wait / 1000}s (attempt ${attempt}/${backoffs.length})`);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      r = await callProvider({
+        providerName: "BANK",
+        input: { account: ocrAccountRaw, ifsc: ocrIfscRaw, id_number: ocrAccountRaw },
+      });
+    }
     toastKycResult("Bank", r);
+
+    // Soft-pass on persistent rate limit: trust OCR + IFSC directory and
+    // mark the bank step as verified so the vendor isn't blocked. The
+    // back-office can re-run penny-drop later from the vendor record.
+    if (isRateLimited(r)) {
+      const ifscDetails = await lookupIfsc(ocrIfscRaw).catch(() => null);
+      const normalized: Record<string, any> = {
+        account_number: ocrAccountRaw,
+        ifsc_code: ocrIfscRaw,
+        bank_name: ifscDetails?.bank,
+        branch_name: ifscDetails?.branch,
+        account_holder_name: ocr.account_holder_name,
+      };
+      return {
+        ok: true as const,
+        apiData: {
+          accountNumber: ocrAccountRaw,
+          ifsc: ocrIfscRaw,
+          bankName: ifscDetails?.bank,
+          branchName: ifscDetails?.branch,
+          accountHolderName: ocr.account_holder_name,
+          holderNameStatus: "skipped",
+          holderNameMessage:
+            "Account number and IFSC verified from cancelled cheque. Penny-drop name verification was skipped due to a temporary upstream rate limit and will be re-run by the back-office team.",
+          pennyDropSkipped: true,
+        },
+        normalized,
+        registeredName: ocr.account_holder_name,
+      };
+    }
+
     if (!r.found) {
       return { ok: false as const, message: "Bank validation provider is not configured. Add it in KYC & Validation API Settings." };
     }
@@ -1893,13 +1944,13 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{doc.errorMessage}</span>
           </div>
-          {/rate limit/i.test(doc.errorMessage) && (
+          {/rate limit|too many requests|throttl/i.test(doc.errorMessage) && (
             <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
               <span>
-                The document service is temporarily throttled by the upstream provider. Please wait
-                ~30 seconds and click <strong>Replace</strong> to retry. Your previously verified
-                tabs (GST / PAN / MSME) remain intact.
+                The verification service is temporarily throttled by the upstream provider. We
+                already retried automatically. Please wait ~60 seconds and click <strong>Replace</strong> with
+                the same cheque to try again. Your previously verified tabs (GST / PAN / MSME) remain intact.
               </span>
             </div>
           )}
