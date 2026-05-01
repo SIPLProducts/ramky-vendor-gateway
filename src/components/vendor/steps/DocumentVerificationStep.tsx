@@ -659,6 +659,10 @@ export function DocumentVerificationStep({
       return;
     }
     setDoc({ status: "uploading", fileName: file.name, fileSize: file.size });
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (isPdf) {
+      setDoc({ status: "preparing", fileName: file.name, fileSize: file.size });
+    }
     setDoc({ status: "ocr", fileName: file.name, fileSize: file.size });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
