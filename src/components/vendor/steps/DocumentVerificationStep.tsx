@@ -667,11 +667,17 @@ export function DocumentVerificationStep({
   const handlePanUpload = (file: File) =>
     runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
-        const panFromGst = String(gstDoc.ocrData.gstin).slice(2, 12).toUpperCase();
+        // Prefer the canonical PAN returned by the GST validation API; fall
+        // back to slicing the GSTIN (chars 3-12) only if the API didn't
+        // return one (legacy / unmapped responses).
+        const apiPan = String(gstDoc.ocrData.pan_number || "").toUpperCase().trim();
+        const slicedPan = String(gstDoc.ocrData.gstin).slice(2, 12).toUpperCase();
+        const panFromGst = apiPan || slicedPan;
         const panOcr = String(ocr.pan_number || "").toUpperCase();
         if (panFromGst.length === 10 && panOcr && panFromGst !== panOcr) {
-          setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`);
-          return `PAN on card (${panOcr}) does not match PAN derived from GSTIN (${panFromGst}).`;
+          const src = apiPan ? "GST registry" : "GSTIN";
+          setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN from ${src} (${panFromGst}).`);
+          return `PAN on card (${panOcr}) does not match PAN from ${src} (${panFromGst}).`;
         }
       }
       setPanCrossCheckError(null);
@@ -1284,8 +1290,14 @@ export function DocumentVerificationStep({
               {panCrossCheckError && (
                 <CrossCheckStrip ok={false} text={panCrossCheckError} className="mt-3" />
               )}
-              {panDoc.status === "verified" && !panCrossCheckError && isGstRegistered === true && (
-                <CrossCheckStrip ok={true} text="PAN matches PAN derived from GSTIN" className="mt-3" />
+              {panDoc.status === "verified" && !panCrossCheckError && panDoc.apiData?.panMatchMessage && (
+                <CrossCheckStrip ok={true} text={panDoc.apiData.panMatchMessage} className="mt-3" />
+              )}
+              {panDoc.status === "verified" && !panCrossCheckError && panDoc.apiData?.nameMatchMessage && (
+                <CrossCheckStrip ok={true} text={panDoc.apiData.nameMatchMessage} className="mt-2" />
+              )}
+              {panDoc.status === "verified" && !panCrossCheckError && !panDoc.apiData?.panMatchMessage && isGstRegistered === true && (
+                <CrossCheckStrip ok={true} text="PAN Number verified with GST PAN Number." className="mt-3" />
               )}
               {panDoc.status === "verified" && typeof panDoc.nameMatchScore === "number" && (
                 <CrossCheckStrip
@@ -1876,9 +1888,21 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
       )}
 
       {isFailed && doc.errorMessage && (
-        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{doc.errorMessage}</span>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{doc.errorMessage}</span>
+          </div>
+          {/rate limit/i.test(doc.errorMessage) && (
+            <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
+              <span>
+                The document service is temporarily throttled by the upstream provider. Please wait
+                ~30 seconds and click <strong>Replace</strong> to retry. Your previously verified
+                tabs (GST / PAN / MSME) remain intact.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -2093,6 +2117,15 @@ function GstVerifiedDetails({
             verifiedValue={api.constitution_of_business}
             verifiedLabel="Verified from registry"
             onChange={(v) => onChangeField("constitution_of_business", v)}
+          />
+          <EditableOcrField
+            label="PAN Number (from GST)"
+            value={ocr.pan_number}
+            originalValue={original?.pan_number}
+            verifiedValue={api.pan_number}
+            verifiedLabel="PAN derived from GSTIN — verified"
+            onChange={(v) => onChangeField("pan_number", v.toUpperCase())}
+            mono
           />
         </div>
       </div>
