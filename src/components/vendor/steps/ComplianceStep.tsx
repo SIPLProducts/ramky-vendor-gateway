@@ -384,6 +384,7 @@ export function ComplianceStep({
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}
             panHolderName={panHolderName}
+            gstLegalName={gstLegalName}
           />
         }
         bank={
