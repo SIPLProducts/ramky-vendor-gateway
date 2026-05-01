@@ -666,7 +666,7 @@ export function DocumentVerificationStep({
         fileName: `Udyam ${ocrShape.udyam_number}`,
         ocrData: ocrShape,
         originalOcrData: ocrShape,
-        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number },
+        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number, normalized: { ...ocrShape } },
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
