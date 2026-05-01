@@ -44,6 +44,9 @@ function pickString(v: any): string {
 
 export function BankKycTab(props: BankKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
+  const [holderName, setHolderName] = useState<string>('');
+  const [holderCheck, setHolderCheck] =
+    useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
 
   // OCR step: read cancelled cheque via configured BANK_OCR provider.
   const runBankOcr = async (file: File) => {
@@ -64,6 +67,8 @@ export function BankKycTab(props: BankKycTabProps) {
   const handleVerify = async (extracted: Record<string, any>) => {
     const account = pickString(extracted.account_number).replace(/\s+/g, '');
     const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
+    setHolderCheck('idle');
+    setHolderName('');
     if (!account || account.length < 8) {
       props.onStatusChange?.('failed');
       return { ok: false, message: 'Could not read a valid account number from the cheque.' };
@@ -103,11 +108,40 @@ export function BankKycTab(props: BankKycTabProps) {
     }
     const apiData = r.data;
     const apiName = pickString(apiData.name_at_bank).trim();
+    setHolderName(apiName);
 
-    if (props.legalName && apiName) {
+    // Compare account holder name against verified GST + PAN names. Both
+    // values come from official registries and are higher-trust than the
+    // user's typed legalName.
+    const gstOk = fuzzyNameMatch(apiName, props.gstLegalName);
+    const panOk = fuzzyNameMatch(apiName, props.panHolderName);
+
+    let nameMessage = '';
+    if (apiName && (props.gstLegalName || props.panHolderName)) {
+      if (gstOk && panOk) {
+        setHolderCheck('gst+pan');
+        nameMessage = 'Account Holder Name verified with GST Legal Name and PAN Holder Name.';
+      } else if (gstOk) {
+        setHolderCheck('gst');
+        nameMessage = 'Account Holder Name matched with GST Legal Name.';
+      } else if (panOk) {
+        setHolderCheck('pan');
+        nameMessage = 'Account Holder Name matched with PAN Holder Name.';
+      } else {
+        setHolderCheck('failed');
+        props.onStatusChange?.('failed');
+        return {
+          ok: false,
+          message: `Account Holder Name does not match with GST and PAN details. Bank: "${apiName}".`,
+          apiData,
+        };
+      }
+    } else if (props.legalName && apiName) {
+      // Fallback to typed legal name if neither GST nor PAN names are present.
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
+        setHolderCheck('failed');
         props.onStatusChange?.('failed');
         return {
           ok: false,
@@ -116,6 +150,7 @@ export function BankKycTab(props: BankKycTabProps) {
         };
       }
     }
+
     props.onBankDetailsChange({
       bankAccountNumber: account,
       ifscCode: ifsc,
@@ -125,7 +160,11 @@ export function BankKycTab(props: BankKycTabProps) {
     });
     props.onVerifiedDetails?.({ ...apiData, bank_name_resolved: pickString(apiData.bank_name) || enrichedBankName, branch_name_resolved: pickString(apiData.branch_name) || enrichedBranch });
     props.onStatusChange?.('passed');
-    return { ok: true, message: `Bank account verified — ${apiName || account}`, apiData };
+    return {
+      ok: true,
+      message: nameMessage || `Bank account verified — ${apiName || account}`,
+      apiData,
+    };
   };
 
   return (
