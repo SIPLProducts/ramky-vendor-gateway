@@ -174,8 +174,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const checkMessage = (() => {
     if (enterpriseCheck === 'gst+pan')
       return 'Enterprise Name verified with GST Legal Name and PAN Holder Name.';
-    if (enterpriseCheck === 'gst') return 'Enterprise Name matched with GST Legal Name.';
-    if (enterpriseCheck === 'pan') return 'Enterprise Name matched with PAN Holder Name.';
+    if (enterpriseCheck === 'gst') return 'Enterprise Name verified with GST Legal Name.';
+    if (enterpriseCheck === 'pan') return 'Enterprise Name verified with PAN Holder Name.';
     if (enterpriseCheck === 'failed')
       return 'Enterprise Name does not match with GST Legal Name and PAN Holder Name.';
     return '';
