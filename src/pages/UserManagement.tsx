@@ -59,6 +59,27 @@ export default function UserManagement() {
   const [editingCustomRole, setEditingCustomRole] = useState<CustomRoleData | null>(null);
   const [customRoleDialogOpen, setCustomRoleDialogOpen] = useState(false);
   const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
+  const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async () => {
+    if (!deleteUser) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: deleteUser.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: 'User deleted', description: deleteUser.email });
+      setDeleteUser(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err.message ?? String(err), variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
