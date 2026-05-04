@@ -18,6 +18,11 @@ import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleD
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
 import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2 } from 'lucide-react';
 import RolePermissions from '@/pages/RolePermissions';
 
 interface UserRow {
@@ -54,6 +59,27 @@ export default function UserManagement() {
   const [editingCustomRole, setEditingCustomRole] = useState<CustomRoleData | null>(null);
   const [customRoleDialogOpen, setCustomRoleDialogOpen] = useState(false);
   const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
+  const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async () => {
+    if (!deleteUser) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: deleteUser.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: 'User deleted', description: deleteUser.email });
+      setDeleteUser(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err.message ?? String(err), variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -435,6 +461,16 @@ export default function UserManagement() {
                               <Button variant="ghost" size="sm" onClick={() => setTenantDialog(u)}>
                                 <Building2 className="h-4 w-4 mr-1" /> Tenant
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                disabled={u.id === user?.id}
+                                title={u.id === user?.id ? 'Cannot delete own account' : 'Delete user'}
+                                onClick={() => setDeleteUser(u)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" /> Delete
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -587,6 +623,29 @@ export default function UserManagement() {
           {permsRole && <CustomRolePermissionsMatrix customRoleId={permsRole.id} />}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteUser} onOpenChange={(o) => !o && !deleting && setDeleteUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deleteUser?.email}</strong> and remove all role,
+              tenant and custom-role assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteUser(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

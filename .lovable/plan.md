@@ -1,36 +1,43 @@
-## Goal
+# Add Delete User to User Management
 
-Update the MSME tab validation to compare `name_of_enterprise` (from MSME API/OCR) against **both GST Legal Name AND PAN Holder Name** (full or partial via existing fuzzy matcher), with simplified messages. Keep the existing inline banner + AlertDialog UI shown in the screenshot.
+Add a Delete action to each row on the Users tab (`/admin/users`) that fully removes the user from auth and all related tables. Deletion requires admin privileges, so it must run through a new edge function (the client cannot call `auth.admin.deleteUser`).
 
-## Required messages
+## 1. New edge function: `admin-delete-user`
 
-- Match against both:
-  - "Enterprise Name verified with GST Legal Name and PAN Holder Name."
-- Match against only one (GST or PAN):
-  - "Enterprise Name verified with GST Legal Name." (GST only)
-  - "Enterprise Name verified with PAN Holder Name." (PAN only)
-- Mismatch (neither matches):
-  - "Enterprise Name does not match with GST Legal Name and PAN Holder Name."
-  - Stop the process: dialog opens, inline banner shows error, MSME tab status stays `failed`, registration cannot advance.
+Mirrors `admin-create-user` for auth + permission checks.
 
-## File to change
+- Accept POST with body `{ user_id: string }`.
+- Verify caller via `Authorization` bearer; load `user_roles` and require `admin` or `sharvi_admin`.
+- Block self-deletion: if `user_id === callerId` → 400 "You cannot delete your own account".
+- Using the service-role client, in this order:
+  1. `user_custom_roles` delete by `user_id`
+  2. `user_tenants` delete by `user_id`
+  3. `user_roles` delete by `user_id`
+  4. `profiles` delete by `id` (in case no FK cascade)
+  5. `admin.auth.admin.deleteUser(user_id)`
+- Insert `audit_logs` row: `action: 'user_deleted'`, `user_id: callerId`, `details: { target_user_id, target_email }` (fetch email from `profiles` before delete for the audit detail).
+- Return `{ ok: true }`. Standard CORS headers, same shape as `admin-create-user`.
 
-### `src/components/vendor/kyc/MsmeKycTab.tsx`
+No `supabase/config.toml` change needed (default JWT verification settings are fine; function reads its own auth header).
 
-- Keep `enterpriseCheck` state values: `'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'`.
-- Update `checkEnterpriseName(apiName)` to return the new message strings:
-  - both → status `'gst+pan'`, message "Enterprise Name verified with GST Legal Name and PAN Holder Name."
-  - GST only → status `'gst'`, message "Enterprise Name verified with GST Legal Name."
-  - PAN only → status `'pan'`, message "Enterprise Name verified with PAN Holder Name."
-  - neither → status `'failed'`, message "Enterprise Name does not match with GST Legal Name and PAN Holder Name."
-  - `skipped` (no apiName, or neither GST nor PAN available) → unchanged.
-- Update the `checkMessage` derivation block to return the same new strings per status.
-- Update the `AlertDialog` description to: "Enterprise Name does not match with GST Legal Name and PAN Holder Name. Please re-check your MSME / Udyam certificate and resolve the mismatch before continuing." Title and single OK action stay as in screenshot.
-- `handleManualVerify` and `handleOcrVerify` flows stay the same: on `'failed'` open the dialog and return `{ ok: false }` (which keeps the step blocked); on any match status return `{ ok: true, message: <new string> }`.
+## 2. UI changes in `src/pages/UserManagement.tsx`
+
+In the Users table actions cell (around line 428–438), add a third ghost button:
+
+- `<Button variant="ghost" size="sm" className="text-destructive" disabled={u.id === user?.id} title={u.id === user?.id ? 'Cannot delete own account' : 'Delete user'} onClick={() => setDeleteUser(u)}><Trash2 className="h-4 w-4 mr-1" /> Delete</Button>`
+- `Trash2` is already imported.
+
+Add state: `const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);` and `const [deleting, setDeleting] = useState(false);`.
+
+Add an `AlertDialog` (import from `@/components/ui/alert-dialog`) at the bottom of the component:
+
+- Title: "Delete user?"
+- Description: ``This will permanently delete `${deleteUser?.email}` and remove all role, tenant and custom-role assignments. This action cannot be undone.``
+- Cancel + Delete actions. Delete button uses destructive styling and shows a spinner while `deleting`.
+- On confirm: call `supabase.functions.invoke('admin-delete-user', { body: { user_id: deleteUser.id } })`. On success, toast "User deleted", close dialog, `await loadData()`. On error, toast the message; keep dialog open.
 
 ## Out of scope
 
-- No changes to GST, PAN, or Bank tabs.
-- No changes to `DocumentVerificationStep.tsx`, edge functions, or DB.
-- `fuzzyNameMatch` already handles full/partial matching — no matcher change.
-- `ComplianceStep.tsx` already passes both `panHolderName` and `gstLegalName` into `MsmeKycTab` — no wiring change needed.
+- No DB migrations (existing tables already support these deletes; nothing schema-level changes).
+- No changes to `CreateUserDialog`, custom-roles tab, role-permissions tab, or approval-matrix tab.
+- No bulk delete; single-user only for now.
