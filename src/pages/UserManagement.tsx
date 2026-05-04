@@ -461,6 +461,16 @@ export default function UserManagement() {
                               <Button variant="ghost" size="sm" onClick={() => setTenantDialog(u)}>
                                 <Building2 className="h-4 w-4 mr-1" /> Tenant
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                disabled={u.id === user?.id}
+                                title={u.id === user?.id ? 'Cannot delete own account' : 'Delete user'}
+                                onClick={() => setDeleteUser(u)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" /> Delete
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
