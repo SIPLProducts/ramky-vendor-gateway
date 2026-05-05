@@ -1,11 +1,11 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, Lock, XCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Lock, XCircle, AlertTriangle } from 'lucide-react';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { fuzzyNameMatch, panMatch } from '@/lib/nameMatch';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 interface PanKycTabProps {
   pan: string;
@@ -16,17 +16,13 @@ interface PanKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed') => void;
   vendorId?: string;
-  /** Whether the vendor selected GST = "Yes" in the GST tab. */
-  gstRegistered?: boolean;
   /** PAN number derived from the verified GSTIN (source of truth). */
   gstPanNumber?: string;
   /** Legal name from the verified GST registry record. */
   gstLegalName?: string;
-  /** Whether GST verification has passed. */
+  /** Whether GST verification has passed. PAN cannot be validated otherwise. */
   gstVerified: boolean;
 }
-
-const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
 function pickStr(v: any): string {
   if (v == null) return '';
@@ -42,27 +38,13 @@ export function PanKycTab(props: PanKycTabProps) {
   const [panCheck, setPanCheck] = useState<'idle' | 'passed' | 'failed'>('idle');
   const [nameCheck, setNameCheck] = useState<'idle' | 'passed' | 'failed'>('idle');
 
-  const gstRegistered = props.gstRegistered !== false; // default true to preserve old behavior
-
-  // When GST is registered + verified, auto-populate PAN from GST registry data
-  // and mark this tab as passed without requiring a PAN card upload.
-  const autoNotifiedRef = useRef<string>('');
-  useEffect(() => {
-    if (!gstRegistered) return;
-    if (!props.gstVerified) return;
-    const gPan = (props.gstPanNumber || '').toUpperCase().trim();
-    if (!gPan || gPan.length !== 10) return;
-
-    const key = `${gPan}|${props.gstLegalName || ''}`;
-    if (autoNotifiedRef.current === key) return;
-    autoNotifiedRef.current = key;
-
-    if (props.pan !== gPan) props.onPanChange(gPan);
-    props.onVerifiedDetails?.({ pan_number: gPan, full_name: props.gstLegalName || '' });
-    props.onStatusChange?.('passed');
-  }, [gstRegistered, props.gstVerified, props.gstPanNumber, props.gstLegalName]);
-
   const runPanOcr = async (file: File) => {
+    if (!props.gstVerified) {
+      return {
+        success: false,
+        error: 'Please verify GST first — PAN is validated against GST records.',
+      };
+    }
     props.onStatusChange?.('validating');
     const r = await callProvider({ providerName: 'PAN_OCR', file });
     toastKycResult('PAN OCR', r);
@@ -81,6 +63,8 @@ export function PanKycTab(props: PanKycTabProps) {
     return { success: true, extracted: mergeOcrExtracted(r.data, r.raw), apiResult: r };
   };
 
+  // OCR is the only API call. Validation is done by comparing the extracted
+  // PAN number + holder name against the GST tab's verified registry data.
   const handleVerify = async (extracted: Record<string, any>) => {
     const extractedPan = pickStr(extracted.pan_number).toUpperCase().trim();
     const extractedName = pickStr(extracted.full_name || extracted.holder_name || extracted.name).trim();
@@ -91,112 +75,47 @@ export function PanKycTab(props: PanKycTabProps) {
       props.onPanChange(extractedPan);
     }
 
-    if (gstRegistered) {
-      // GST cross-check path (vendor said Yes to GST)
-      const panOk = panMatch(extractedPan, props.gstPanNumber);
-      const nameOk = fuzzyNameMatch(extractedName, props.gstLegalName);
-      setPanCheck(panOk ? 'passed' : 'failed');
-      setNameCheck(nameOk ? 'passed' : 'failed');
-      props.onVerifiedDetails?.(extracted);
-
-      if (panOk && nameOk) {
-        props.onStatusChange?.('passed');
-        return {
-          ok: true,
-          message: 'PAN Number verified with GST PAN Number. PAN Holder Name verified with GST Legal Name.',
-          apiData: extracted,
-        };
-      }
-      props.onStatusChange?.('failed');
-      return {
-        ok: false,
-        message: 'PAN details do not match with GST data.',
-        apiData: extracted,
-      };
-    }
-
-    // Non-GST path: validate PAN format + name match against the typed legal name.
-    const panFormatOk = PAN_REGEX.test(extractedPan);
-    const nameOk = props.legalName
-      ? fuzzyNameMatch(extractedName, props.legalName)
-      : !!extractedName;
-    setPanCheck(panFormatOk ? 'passed' : 'failed');
+    const panOk = panMatch(extractedPan, props.gstPanNumber);
+    const nameOk = fuzzyNameMatch(extractedName, props.gstLegalName);
+    setPanCheck(panOk ? 'passed' : 'failed');
     setNameCheck(nameOk ? 'passed' : 'failed');
+
     props.onVerifiedDetails?.(extracted);
 
-    if (panFormatOk && nameOk) {
+    if (panOk && nameOk) {
       props.onStatusChange?.('passed');
       return {
         ok: true,
-        message: 'PAN verified successfully.',
+        message: 'PAN Number verified with GST PAN Number. PAN Holder Name verified with GST Legal Name.',
         apiData: extracted,
       };
     }
     props.onStatusChange?.('failed');
     return {
       ok: false,
-      message: !panFormatOk
-        ? 'Invalid PAN number format extracted from card.'
-        : `PAN holder name does not match the legal name${props.legalName ? ` ("${props.legalName}")` : ''}.`,
+      message: 'PAN details do not match with GST data.',
       apiData: extracted,
     };
   };
 
   const showFieldChecks = ocrPan || ocrName;
 
-  // ---- GST = Yes branch ----
-  if (gstRegistered) {
-    if (!props.gstVerified) {
-      return (
-        <div className="space-y-4">
-          <Alert className="border-warning/40 bg-warning/10">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            <AlertDescription className="text-warning-foreground text-sm">
-              Please complete <strong>GST verification</strong> first. PAN details will be auto-filled from the GST registry — no upload required.
-            </AlertDescription>
-          </Alert>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        <Alert className="border-success/40 bg-success/10">
-          <ShieldCheck className="h-4 w-4 text-success" />
-          <AlertDescription className="text-sm">
-            PAN details have been auto-fetched from your verified GST record. No PAN card upload is required.
-          </AlertDescription>
-        </Alert>
-
-        <div className="rounded-md border border-success/30 bg-success/5 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm">
-            <Lock className="h-4 w-4 text-success" />
-            <span className="text-muted-foreground">PAN Number:</span>
-            <span className="font-mono font-medium">{props.gstPanNumber || props.pan}</span>
-            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-success/20 text-success font-medium">
-              Auto-verified from GST
-            </span>
-          </div>
-          {props.gstLegalName && (
-            <div className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              <span className="text-muted-foreground">PAN Holder Name:</span>
-              <span className="font-medium">{props.gstLegalName}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ---- GST = No branch (upload required) ----
   return (
     <div className="space-y-4">
       <Alert>
         <AlertDescription className="text-sm">
-          Since you are not GST registered, please upload your PAN card. We'll read it via OCR and verify the PAN number and holder name.
+          Upload your PAN card. We'll read it via OCR and verify the PAN number and holder name against your verified GST record.
         </AlertDescription>
       </Alert>
+
+      {!props.gstVerified && (
+        <Alert className="border-warning/40 bg-warning/10">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-warning-foreground text-sm">
+            Please complete <strong>GST verification</strong> first. PAN is validated against the PAN number and legal name returned by the GST registry.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {props.pan && (
         <div className="flex items-center gap-2 p-3 rounded-md border border-success/30 bg-success/5 text-sm">
@@ -226,8 +145,8 @@ export function PanKycTab(props: PanKycTabProps) {
               label="PAN Number"
               value={ocrPan}
               status={panCheck}
-              passedMsg="PAN Number format is valid."
-              failedMsg="Invalid PAN number format."
+              passedMsg="PAN Number verified with GST PAN Number."
+              failedMsg={`PAN details do not match with GST data${props.gstPanNumber ? ` (GST PAN: ${props.gstPanNumber})` : ''}.`}
             />
           )}
           {ocrName && (
@@ -235,8 +154,8 @@ export function PanKycTab(props: PanKycTabProps) {
               label="PAN Holder Name"
               value={ocrName}
               status={nameCheck}
-              passedMsg="PAN Holder Name matches the legal name."
-              failedMsg={`PAN Holder Name does not match the legal name${props.legalName ? ` ("${props.legalName}")` : ''}.`}
+              passedMsg="PAN Holder Name verified with GST Legal Name."
+              failedMsg={`PAN Holder Name does not match GST Legal Name${props.gstLegalName ? ` ("${props.gstLegalName}")` : ''}.`}
             />
           )}
         </div>
