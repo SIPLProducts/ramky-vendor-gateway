@@ -2060,6 +2060,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_my_smtp_configured: { Args: never; Returns: boolean }
       claim_invitation: {
         Args: { _token: string; _vendor_id?: string }
         Returns: {
