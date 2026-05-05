@@ -289,7 +289,7 @@ const handler = async (req: Request): Promise<Response> => {
     const adminClient = createClient(supabaseUrl, serviceKey);
     const { data: smtpCfg, error: smtpCfgErr } = await adminClient
       .from("smtp_email_configs")
-      .select("smtp_host, smtp_port, encryption, smtp_username, app_password, user_email, from_name, reply_to, is_active")
+      .select("smtp_host, smtp_port, encryption, smtp_username, app_password, user_email, from_name, is_active")
       .ilike("user_email", senderEmail)
       .eq("is_active", true)
       .maybeSingle();
@@ -323,7 +323,6 @@ const handler = async (req: Request): Promise<Response> => {
           password: smtpCfg.app_password,
           from_email: smtpCfg.user_email,
           from_name: smtpCfg.from_name ?? undefined,
-          reply_to: smtpCfg.reply_to ?? undefined,
         },
       }),
     });
