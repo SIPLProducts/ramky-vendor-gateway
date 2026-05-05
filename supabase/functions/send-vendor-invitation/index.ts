@@ -305,28 +305,41 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Resolve sender display name
-    let senderName = (smtpCfg.from_name ?? "").toString().trim();
-    if (!senderName) {
-      try {
-        const { data: prof } = await adminClient
-          .from("profiles")
-          .select("full_name")
-          .ilike("email", senderEmail)
-          .maybeSingle();
-        if (prof?.full_name) senderName = String(prof.full_name).trim();
-      } catch (e) {
-        console.error("profile lookup failed", e);
-      }
+    // Resolve sender display name — prefer the actual person's name over the SMTP mailbox display name
+    let senderName = "";
+    try {
+      const { data: prof } = await adminClient
+        .from("profiles")
+        .select("full_name")
+        .ilike("email", senderEmail)
+        .maybeSingle();
+      if (prof?.full_name) senderName = String(prof.full_name).trim();
+    } catch (e) {
+      console.error("profile lookup failed", e);
     }
+
     if (!senderName) {
       const local = senderEmail.split("@")[0] || "";
       senderName = local
         .split(/[._-]+/)
         .filter(Boolean)
         .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-        .join(" ") || "Procurement Team";
+        .join(" ");
     }
+
+    if (!senderName) {
+      const fromName = (smtpCfg.from_name ?? "").toString().trim();
+      const generic = /(portal|team|vendor|support|noreply|no-reply|admin|info)/i;
+      if (
+        fromName &&
+        !generic.test(fromName) &&
+        fromName.toLowerCase() !== companyName.toLowerCase()
+      ) {
+        senderName = fromName;
+      }
+    }
+
+    if (!senderName) senderName = "Procurement Team";
 
     const finalHtml = emailHtml.replace("Procurement Team", senderName);
 
