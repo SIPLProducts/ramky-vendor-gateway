@@ -47,20 +47,20 @@ export function PanKycTab(props: PanKycTabProps) {
   // When GST is registered + verified, auto-populate PAN from GST registry data
   // and mark this tab as passed without requiring a PAN card upload.
   const autoNotifiedRef = useRef<string>('');
+  const effectivePan = ((props.gstPanNumber || props.pan || '').toUpperCase().trim());
   useEffect(() => {
     if (!gstRegistered) return;
     if (!props.gstVerified) return;
-    const gPan = (props.gstPanNumber || '').toUpperCase().trim();
-    if (!gPan || gPan.length !== 10) return;
+    if (!effectivePan || effectivePan.length !== 10) return;
 
-    const key = `${gPan}|${props.gstLegalName || ''}`;
+    const key = `${effectivePan}|${props.gstLegalName || ''}`;
     if (autoNotifiedRef.current === key) return;
     autoNotifiedRef.current = key;
 
-    if (props.pan !== gPan) props.onPanChange(gPan);
-    props.onVerifiedDetails?.({ pan_number: gPan, full_name: props.gstLegalName || '' });
+    if (props.pan !== effectivePan) props.onPanChange(effectivePan);
+    props.onVerifiedDetails?.({ pan_number: effectivePan, full_name: props.gstLegalName || '' });
     props.onStatusChange?.('passed');
-  }, [gstRegistered, props.gstVerified, props.gstPanNumber, props.gstLegalName]);
+  }, [gstRegistered, props.gstVerified, effectivePan, props.gstLegalName]);
 
   const runPanOcr = async (file: File) => {
     props.onStatusChange?.('validating');
