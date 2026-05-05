@@ -172,7 +172,7 @@ export function PanKycTab(props: PanKycTabProps) {
           <div className="flex items-center gap-2 text-sm">
             <Lock className="h-4 w-4 text-success" />
             <span className="text-muted-foreground">PAN Number:</span>
-            <span className="font-mono font-medium">{props.gstPanNumber || props.pan}</span>
+            <span className="font-mono font-medium">{effectivePan || '—'}</span>
             <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-success/20 text-success font-medium">
               Auto-verified from GST
             </span>
