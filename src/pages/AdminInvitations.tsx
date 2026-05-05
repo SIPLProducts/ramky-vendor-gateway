@@ -123,17 +123,13 @@ export default function AdminInvitations() {
   // Create invitation mutation
   const createInvitation = useMutation<any, Error, { email: string; vendorName: string; phoneNumber: string; expiryDays: number; tenantId: string | null }>({
     mutationFn: async ({ email, vendorName, phoneNumber, expiryDays, tenantId }) => {
-      // Pre-validate: sender must have an active SMTP config before we persist anything
+      // Pre-validate via SECURITY DEFINER RPC (bypasses RLS, returns boolean only)
       if (!user?.email) {
         throw new Error('You are not configured in Email Configuration');
       }
-      const { data: smtpCfg } = await supabase
-        .from('smtp_email_configs')
-        .select('id, is_active, app_password')
-        .ilike('user_email', user.email)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (!smtpCfg || !smtpCfg.app_password) {
+      const { data: isConfigured, error: cfgErr } = await supabase.rpc('check_my_smtp_configured');
+      if (cfgErr) throw cfgErr;
+      if (!isConfigured) {
         throw new Error('You are not configured in Email Configuration');
       }
 
