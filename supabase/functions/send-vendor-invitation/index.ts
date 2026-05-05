@@ -305,6 +305,31 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Resolve sender display name
+    let senderName = (smtpCfg.from_name ?? "").toString().trim();
+    if (!senderName) {
+      try {
+        const { data: prof } = await adminClient
+          .from("profiles")
+          .select("full_name")
+          .ilike("email", senderEmail)
+          .maybeSingle();
+        if (prof?.full_name) senderName = String(prof.full_name).trim();
+      } catch (e) {
+        console.error("profile lookup failed", e);
+      }
+    }
+    if (!senderName) {
+      const local = senderEmail.split("@")[0] || "";
+      senderName = local
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(" ") || "Procurement Team";
+    }
+
+    const finalHtml = emailHtml.replace("Procurement Team", senderName);
+
     const smtpResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
       method: "POST",
       headers: {
@@ -314,7 +339,7 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         to: email,
         subject: `Vendor Registration Invitation - ${companyName}`,
-        html: emailHtml,
+        html: finalHtml,
         suppressReplyTo: true,
         smtp: {
           host: smtpCfg.smtp_host,
