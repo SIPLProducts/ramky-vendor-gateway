@@ -16,6 +16,7 @@ interface SmtpRequest {
   cc?: string | string[];
   bcc?: string | string[];
   replyTo?: string;
+  suppressReplyTo?: boolean;
   // Optional inline overrides (otherwise loaded from portal_config)
   smtp?: {
     host?: string;
@@ -83,7 +84,9 @@ const handler = async (req: Request): Promise<Response> => {
     const password = String(smtp.password ?? stored.smtp_password ?? "");
     const fromEmail = String(smtp.from_email ?? stored.smtp_from_email ?? username).trim();
     const fromName = String(smtp.from_name ?? stored.smtp_from_name ?? "").trim();
-    const replyTo = String(smtp.reply_to ?? body.replyTo ?? stored.smtp_reply_to ?? "").trim();
+    const replyTo = body.suppressReplyTo
+      ? ""
+      : String(smtp.reply_to ?? body.replyTo ?? stored.smtp_reply_to ?? "").trim();
 
     if (!host || !username || !password || !fromEmail) {
       return new Response(
