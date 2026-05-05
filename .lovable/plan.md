@@ -1,33 +1,31 @@
-Remove the Reply-To header from the vendor registration invitation email.
+## Problem
+In `src/pages/AdminInvitations.tsx`, the "New Invitation" flow inserts the vendor row into `vendor_invitations` first, then calls `send-vendor-invitation`. If the logged-in user is not configured in Email Configuration, the email step fails but the invitation row is already persisted — leaving an unsendable invitation in the list.
 
-## Change
+## Fix
+Pre-validate the sender's SMTP config before any DB insert. Only insert + send if a valid active config exists for the logged-in user.
 
-**File:** `supabase/functions/send-vendor-invitation/index.ts`
+### Changes to `src/pages/AdminInvitations.tsx`
+In `createInvitation.mutationFn`, before generating the token / inserting the row:
 
-In the call to `send-smtp-email` (around the `smtp: { ... }` payload), drop the `reply_to` field so no Reply-To header is set on outgoing invitation emails:
+1. Query `smtp_email_configs` for the current `user.email`:
+   ```ts
+   const { data: cfg } = await supabase
+     .from('smtp_email_configs')
+     .select('id, is_active, app_password')
+     .ilike('user_email', user!.email!)
+     .eq('is_active', true)
+     .maybeSingle();
+   if (!cfg || !cfg.app_password) {
+     throw new Error('You are not configured in Email Configuration');
+   }
+   ```
+2. Only after this passes, proceed with the existing token generation + `vendor_invitations` insert + `send-vendor-invitation` invoke.
+3. In `onError`, detect the "not configured" message and show the existing red "Email Not Configured" toast (instead of generic Error).
 
-```ts
-smtp: {
-  host: smtpCfg.smtp_host,
-  port: smtpCfg.smtp_port,
-  encryption: smtpCfg.encryption,
-  username: smtpCfg.smtp_username,
-  password: smtpCfg.app_password,
-  from_email: smtpCfg.user_email,
-  from_name: smtpCfg.from_name ?? undefined,
-  // reply_to intentionally omitted for vendor invitations
-},
-```
+### Out of scope
+- No edge function changes (server-side check already exists as a safety net).
+- No DB / RLS changes.
+- "Send Email" action on existing rows already behaves correctly (it only sends, doesn't insert) — no change needed there.
 
-Also remove `reply_to` from the `.select(...)` list in the `smtp_email_configs` lookup since it is no longer used here.
-
-## Scope
-
-- Only the vendor invitation email is changed.
-- Other emails (status notifications, finance approval, etc.) keep their existing Reply-To behavior.
-- No DB, RLS, or UI changes.
-- After edit, redeploy `send-vendor-invitation`.
-
-## Result
-
-Future invitation emails will show only `From:` (the configured sender) and `To:` (the vendor) — no `Reply-To:` line like `bala@sharviinfotech.com` shown in the screenshot.
+### Result
+If the logged-in user has no active SMTP config, the dialog shows "Email Not Configured" and **no row is written** to `vendor_invitations`.
