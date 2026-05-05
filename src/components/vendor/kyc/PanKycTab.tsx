@@ -47,20 +47,20 @@ export function PanKycTab(props: PanKycTabProps) {
   // When GST is registered + verified, auto-populate PAN from GST registry data
   // and mark this tab as passed without requiring a PAN card upload.
   const autoNotifiedRef = useRef<string>('');
-  const effectivePan = ((props.gstPanNumber || props.pan || '').toUpperCase().trim());
   useEffect(() => {
     if (!gstRegistered) return;
     if (!props.gstVerified) return;
-    if (!effectivePan || effectivePan.length !== 10) return;
+    const gPan = (props.gstPanNumber || '').toUpperCase().trim();
+    if (!gPan || gPan.length !== 10) return;
 
-    const key = `${effectivePan}|${props.gstLegalName || ''}`;
+    const key = `${gPan}|${props.gstLegalName || ''}`;
     if (autoNotifiedRef.current === key) return;
     autoNotifiedRef.current = key;
 
-    if (props.pan !== effectivePan) props.onPanChange(effectivePan);
-    props.onVerifiedDetails?.({ pan_number: effectivePan, full_name: props.gstLegalName || '' });
+    if (props.pan !== gPan) props.onPanChange(gPan);
+    props.onVerifiedDetails?.({ pan_number: gPan, full_name: props.gstLegalName || '' });
     props.onStatusChange?.('passed');
-  }, [gstRegistered, props.gstVerified, effectivePan, props.gstLegalName]);
+  }, [gstRegistered, props.gstVerified, props.gstPanNumber, props.gstLegalName]);
 
   const runPanOcr = async (file: File) => {
     props.onStatusChange?.('validating');
@@ -172,7 +172,7 @@ export function PanKycTab(props: PanKycTabProps) {
           <div className="flex items-center gap-2 text-sm">
             <Lock className="h-4 w-4 text-success" />
             <span className="text-muted-foreground">PAN Number:</span>
-            <span className="font-mono font-medium">{effectivePan || '—'}</span>
+            <span className="font-mono font-medium">{props.gstPanNumber || props.pan}</span>
             <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-success/20 text-success font-medium">
               Auto-verified from GST
             </span>
