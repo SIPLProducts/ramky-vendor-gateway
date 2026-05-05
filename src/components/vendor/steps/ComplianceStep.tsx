@@ -175,8 +175,14 @@ export function ComplianceStep({
       if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
       return '';
     };
-    const panFromGst = pickStr(d.pan_number).toUpperCase().trim();
-    if (panFromGst && panFromGst.length === 10) {
+    let panFromGst = pickStr(d.pan_number).toUpperCase().trim();
+    // Fallback: derive PAN from positions 3-12 of the verified GSTIN.
+    if (!panFromGst || panFromGst.length !== 10) {
+      const gstinStr = pickStr(d.gstin).toUpperCase().trim();
+      if (gstinStr.length === 15) panFromGst = gstinStr.slice(2, 12);
+    }
+    const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    if (panFromGst && PAN_RE.test(panFromGst)) {
       setGstPanNumber(panFromGst);
       // Pre-fill the PAN field so the PAN tab already shows the registry value.
       setValue('pan', panFromGst);
