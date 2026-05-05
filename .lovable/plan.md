@@ -1,24 +1,34 @@
-## Issue
-The signature shows "Ramky Vendor Portal" because the SMTP config's `from_name` (used as the email sender display name, e.g. "Ramky Vendor Portal") is currently the first choice for the signature. We need the signature to be the actual person who sent the invite, not the mailbox display name.
+## Goal
 
-## Fix
-In `supabase/functions/send-vendor-invitation/index.ts`, change the `senderName` resolution priority to favor the human's name over the SMTP `from_name`:
+In the vendor registration Compliance step, make the PAN tab behave based on the GST tab selection:
 
-1. `profiles.full_name` for the user matching `senderEmail` (looked up via admin client) — primary
-2. Title-cased local-part of `senderEmail` (e.g. `suresh.mareddy@…` → "Suresh Mareddy") — fallback
-3. `smtp_email_configs.from_name` — only if it doesn't look like a generic brand/portal name (skip if it contains "portal", "team", "vendor", "support", "noreply", or matches the tenant `companyName`)
-4. Final fallback: "Procurement Team"
+- **GST = "Yes" + GST verified** → PAN tab is auto-populated from GST registry data (PAN number + holder name from GST). No PAN card upload required. Tab is automatically marked verified.
+- **GST = "No"** → PAN tab shows the existing PAN card upload + OCR flow as the only way to validate PAN.
 
-Then keep the existing `emailHtml.replace("Procurement Team", senderName)` so the signature line renders the resolved person name.
+## Files to change
 
-## Deploy
-Redeploy `send-vendor-invitation`.
+### 1. `src/components/vendor/kyc/PanKycTab.tsx`
 
-## Result
-Signature will read e.g.:
-```
-Respectfully,
-Suresh Mareddy
-Ramky Energy & Environment
-```
-instead of "Ramky Vendor Portal".
+Add a new mode driven by GST state:
+
+- Accept new prop `gstRegistered: boolean` (already have `gstVerified`, `gstPanNumber`, `gstLegalName`).
+- **When `gstRegistered === true`:**
+  - Hide the OCR upload UI entirely.
+  - If `gstVerified` and `gstPanNumber` is present:
+    - Render a read-only summary card showing the PAN number and legal name sourced from GST (badge: "Auto-verified from GST").
+    - Call `onPanChange(gstPanNumber)` once.
+    - Call `onStatusChange('passed')` and `onVerifiedDetails({ pan_number: gstPanNumber, full_name: gstLegalName })` so MSME/Bank tabs receive `panHolderName`.
+  - If GST not yet verified: show an info alert "Verify GST first — PAN will be auto-filled from the GST registry." Status stays `idle`.
+- **When `gstRegistered === false`:**
+  - Keep the current OCR upload flow as-is, but skip the GST cross-check (since there is no GST data). Validate the PAN purely against the typed `legalName` (fuzzy name match) and a valid 10-char PAN regex. Mark `passed` when both checks succeed.
+
+### 2. `src/components/vendor/steps/ComplianceStep.tsx`
+
+- Pass `gstRegistered={isGstRegistered}` to `<PanKycTab />`.
+- Keep existing behaviour where verified GST sets `gstPanNumber`, `gstLegalName`, and pre-fills the `pan` form field.
+- Step validity (`isStepValid`) already requires `statuses.pan === 'passed'`; no change needed since the PAN tab will now auto-mark itself passed when GST is verified.
+
+## Out of scope
+
+- No changes to GST tab, MSME tab, Bank tab, or backend.
+- No DB / edge function changes.

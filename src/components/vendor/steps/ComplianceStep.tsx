@@ -365,6 +365,7 @@ export function ComplianceStep({
             onVerifiedDetails={handlePanVerified}
             onStatusChange={(s) => setStatus('pan', s)}
             vendorId={vendorId}
+            gstRegistered={isGstRegistered}
             gstPanNumber={gstPanNumber}
             gstLegalName={gstLegalName}
             gstVerified={statuses.gst === 'passed'}
