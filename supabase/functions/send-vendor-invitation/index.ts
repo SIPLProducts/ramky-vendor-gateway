@@ -328,15 +328,6 @@ const handler = async (req: Request): Promise<Response> => {
         .join(" ") || "Procurement Team";
     }
 
-    const smtpResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({
-        to: email,
-        subject: `Vendor Registration Invitation - ${companyName}`,
     const finalHtml = emailHtml.replace("Procurement Team", senderName);
 
     const smtpResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
