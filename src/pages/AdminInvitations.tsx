@@ -235,9 +235,11 @@ export default function AdminInvitations() {
       }
     },
     onError: (error: any) => {
+      const msg = error?.message || 'Failed to create invitation';
+      const isNotConfigured = msg.includes('You are not configured in Email Configuration');
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to create invitation',
+        title: isNotConfigured ? 'Email Not Configured' : 'Error',
+        description: msg,
         variant: 'destructive',
       });
     },
