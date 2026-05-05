@@ -1,34 +1,26 @@
-I found the source of the visible `reply-to: bala@sharviinfotech.com` header in the vendor registration email flow.
+## Plan: Show sender's name instead of "Procurement Team"
 
-## Plan
+### Change
+In `supabase/functions/send-vendor-invitation/index.ts`, replace the hardcoded `"Procurement Team"` signature in the email HTML with the actual name of the user who is sending the invitation.
 
-1. Update the vendor invitation email sender
-   - In `send-vendor-invitation`, keep using the configured user email as the `From` address.
-   - Explicitly prevent any `reply_to` / `Reply-To` value from being passed when sending vendor registration invitations.
+### How sender name will be resolved (priority order)
+1. `from_name` from the matched `smtp_email_configs` row (already fetched in the function).
+2. If empty, look up `profiles.full_name` (or equivalent) for the user matching `senderEmail` via the admin Supabase client.
+3. If still empty, fall back to the part of `senderEmail` before `@` (title-cased).
+4. Final fallback: `"Procurement Team"` (only if nothing else available).
 
-2. Update the shared SMTP sender to respect “no reply-to”
-   - Adjust `send-smtp-email` so that if an email request explicitly says not to use Reply-To, it will not fall back to the global Reply-To setting from Email Configuration.
-   - This avoids the global `smtp_reply_to` / configured Reply-To value being added automatically to vendor registration emails.
+### Edits
+- After the `smtp_email_configs` lookup, compute `senderName` using the priority above.
+- Replace the `<span style="...">Procurement Team</span>` line in the email HTML template with `${senderName}`.
+- Keep all other styling, layout, and the "Respectfully," line unchanged.
 
-3. Keep other email behavior unchanged
-   - Other SMTP emails can continue using their configured Reply-To if needed.
-   - Only vendor registration invitation emails will suppress the Reply-To header.
+### Deploy
+- Redeploy `send-vendor-invitation` so the next invitation email shows e.g. `Suresh Mareddy` instead of `Procurement Team`.
 
-4. Deploy updated backend functions
-   - Redeploy the affected backend functions so the next vendor registration email no longer shows a Reply-To line in Gmail’s message details.
-
-## Expected result
-
-New vendor registration invitation emails should show:
-
-```text
-from: Ramky Vendor Portal <suresh.mareddy@ramky.com>
-to: recipient@example.com
-subject: Vendor Registration Invitation - ...
+### Result
+The signature block in the vendor invitation email will read:
 ```
-
-and should no longer show:
-
-```text
-reply-to: bala@sharviinfotech.com
+Respectfully,
+<Sender's Name>
+Ramky Infrastructure Limited
 ```
