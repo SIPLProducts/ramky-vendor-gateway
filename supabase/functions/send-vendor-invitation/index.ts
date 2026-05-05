@@ -315,6 +315,7 @@ const handler = async (req: Request): Promise<Response> => {
         to: email,
         subject: `Vendor Registration Invitation - ${companyName}`,
         html: emailHtml,
+        suppressReplyTo: true,
         smtp: {
           host: smtpCfg.smtp_host,
           port: smtpCfg.smtp_port,
