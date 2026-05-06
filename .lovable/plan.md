@@ -1,16 +1,28 @@
-## Fix Buyer ↔ SCM tab — enable dropdowns globally and fix data source
+## Remove redundant "My Approvals" screen
 
-The dropdowns currently disable themselves when "All Tenants (Global)" is selected, which is why they appear greyed out. They also filter the user list down to a tenant, so users created without a tenant assignment never appear. Fixes:
+The generic **My Approvals** page is no longer needed — its purpose is fully covered by the new stage-specific approval screens (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office), which each show the approver their pending vendors filtered by stage.
 
-### Changes in `src/components/admin/BuyerScmMapping.tsx`
+### Changes
 
-1. **Remove `disabled={!tenantId}`** from both `<Select>` components and the Save button so the dropdowns are always usable.
-2. **Always show all users** that have the `SCM Manager` / `Buyer` custom role (assigned via the Users tab → Change Role dialog), regardless of tenant scope. When a tenant is selected we still narrow the list, but when "All Tenants (Global)" is chosen we show every matching user.
-3. When saving without a tenant selected, prompt the admin to pick a tenant in the scope selector first (toast already exists; keep it).
-4. Update the empty-state hint to: "No users with SCM Manager / Buyer role. Assign the role in the Users tab."
+1. **Delete files**
+   - `src/pages/MyApprovals.tsx`
+   - `src/hooks/useMyApprovals.tsx`
+
+2. **`src/App.tsx`**
+   - Remove `import MyApprovals` and the `/admin/my-approvals` route.
+
+3. **`src/components/layout/Sidebar.tsx`**
+   - Remove the `{ label: 'My Approvals', href: '/admin/my-approvals', ... }` nav entry.
+
+4. **`src/hooks/useScreenPermissions.tsx`**
+   - Remove the block that auto-grants the `my_approvals` screen key to anyone listed in `approval_matrix_approvers`. Stage screens have their own permission keys.
+
+5. **`src/hooks/useVendors.tsx`**
+   - Remove the leftover `queryClient.invalidateQueries({ queryKey: ['my-approvals'] })` call (dead query key).
+
+6. **Database cleanup (migration)**
+   - Delete the `my_approvals` rows from `role_screen_permissions` and `custom_role_screen_permissions` so the key no longer appears anywhere.
 
 ### Result
 
-- Selecting "All Tenants (Global)" now lists every SCM Manager and every Buyer from the Users tab in the dropdowns.
-- Selecting a specific tenant filters to users belonging to that tenant.
-- Save still requires a tenant context (mapping is per-tenant) and shows a clear toast if none is chosen.
+Approvers will use the dedicated stage screens from the sidebar (SCM Manager Approval, SCM Head Approval, Finance 1/2 Approval, CEO Approval). The "My Approvals" entry disappears from the sidebar and the route returns NotFound.
