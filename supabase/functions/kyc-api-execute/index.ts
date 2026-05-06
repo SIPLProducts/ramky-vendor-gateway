@@ -204,8 +204,10 @@ serve(async (req) => {
           if (md.mobile_number && !flat.mobile) flat.mobile = md.mobile_number;
           if (md.pin && !flat.pin_code) flat.pin_code = md.pin;
           if (md.dic_name && !flat.district) flat.district = md.dic_name;
-          if (Array.isArray(md.enterprise_type_list) && md.enterprise_type_list[0] && !flat.enterprise_type) {
-            flat.enterprise_type = md.enterprise_type_list[0].enterprise_type;
+          if (Array.isArray(md.enterprise_type_list) && md.enterprise_type_list[0]) {
+            const et0 = md.enterprise_type_list[0];
+            if (et0.enterprise_type && !flat.enterprise_type) flat.enterprise_type = et0.enterprise_type;
+            if (et0.classification_year && !flat.classification_year) flat.classification_year = et0.classification_year;
           }
         }
         // Promote first NIC code entry so UI can read nic_5_digit / nic_4_digit / nic_2_digit.

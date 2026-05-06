@@ -45,6 +45,7 @@ const schema = z.object({
   msmeCategory: z.enum(['micro', 'small', 'medium', '']),
   msmeEnterpriseName: z.string().optional(),
   msmeEnterpriseType: z.string().optional(),
+  msmeClassificationYear: z.string().optional(),
   msmeMajorActivity: z.string().optional(),
   msmeOrganizationType: z.string().optional(),
   msmeRegistrationDate: z.string().optional(),
@@ -215,6 +216,8 @@ export function ComplianceStep({
     if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
     const enterpriseType = pickStr(d.enterprise_type);
     if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
+    const classificationYear = pickStr(d.classification_year);
+    if (classificationYear) setValue('msmeClassificationYear' as any, classificationYear);
     const majorActivity = pickStr(d.major_activity);
     if (majorActivity) setValue('msmeMajorActivity' as any, majorActivity);
     const orgType = pickStr(d.organization_type);
@@ -502,15 +505,26 @@ export function ComplianceStep({
                 <Input id="msmeEnterpriseType" {...register('msmeEnterpriseType' as any)} placeholder="Micro / Small / Medium" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="msmeMajorActivity">Major Activity</Label>
-                <Input id="msmeMajorActivity" {...register('msmeMajorActivity' as any)} placeholder="Manufacturing / Services / Trading" />
+                <Label htmlFor="msmeClassificationYear">Current Year</Label>
+                <Input
+                  id="msmeClassificationYear"
+                  {...register('msmeClassificationYear' as any)}
+                  placeholder="e.g. 2026-27"
+                  readOnly
+                />
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
+                <Label htmlFor="msmeMajorActivity">Major Activity</Label>
+                <Input id="msmeMajorActivity" {...register('msmeMajorActivity' as any)} placeholder="Manufacturing / Services / Trading" />
+              </div>
+              <div className="grid gap-1.5">
                 <Label htmlFor="msmeOrganizationType">Organization Type</Label>
                 <Input id="msmeOrganizationType" {...register('msmeOrganizationType' as any)} placeholder="Private Limited / Partnership / Proprietorship" />
               </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="msmeRegistrationDate">Registration Date</Label>
                 <Input id="msmeRegistrationDate" {...register('msmeRegistrationDate' as any)} placeholder="DD/MM/YYYY" />
