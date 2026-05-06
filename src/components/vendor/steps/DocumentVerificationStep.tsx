@@ -479,6 +479,7 @@ export function DocumentVerificationStep({
         udyam_number: pickStr(registry.udyam_number) || ocrUdyam || ocr.udyam_number,
         enterprise_name: pickStr(registry.enterprise_name) || ocr.enterprise_name,
         enterprise_type: pickStr(registry.enterprise_type) || ocr.enterprise_type,
+        classification_year: pickStr(registry.classification_year) || ocr.classification_year,
         major_activity: pickStr(registry.major_activity) || ocr.major_activity,
         organization_type: pickStr(registry.organization_type) || ocr.organization_type,
         registration_date: pickStr(registry.registration_date) || ocr.registration_date,
@@ -834,6 +835,7 @@ export function DocumentVerificationStep({
         udyam_number: pickValue(d.udyam_number) || num,
         enterprise_name: pickValue(d.enterprise_name || d.legal_name),
         enterprise_type: pickValue(d.enterprise_type),
+        classification_year: pickValue(d.classification_year),
         major_activity: pickValue(d.major_activity),
         organization_type: pickValue(d.organization_type),
         registration_date: pickValue(d.registration_date),
@@ -1542,6 +1544,15 @@ export function DocumentVerificationStep({
                                 verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
+                                label="Current Year"
+                                value={msmeDoc.ocrData?.classification_year}
+                                originalValue={msmeDoc.originalOcrData?.classification_year}
+                                onChange={(v) => setOcrField(setMsmeDoc, "classification_year", v)}
+                                placeholder="e.g. 2026-27"
+                                verifiedValue={m.classification_year}
+                                verifiedLabel="Verified from registry"
+                              />
+                              <EditableOcrField
                                 label="Major Activity"
                                 value={msmeDoc.ocrData?.major_activity}
                                 originalValue={msmeDoc.originalOcrData?.major_activity}
@@ -1688,6 +1699,15 @@ export function DocumentVerificationStep({
                                 onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
                                 placeholder="Micro / Small / Medium"
                                 verifiedValue={m.enterprise_type}
+                                verifiedLabel="Verified from registry"
+                              />
+                              <EditableOcrField
+                                label="Current Year"
+                                value={msmeDoc.ocrData?.classification_year}
+                                originalValue={msmeDoc.originalOcrData?.classification_year}
+                                onChange={(v) => setOcrField(setMsmeDoc, "classification_year", v)}
+                                placeholder="e.g. 2026-27"
+                                verifiedValue={m.classification_year}
                                 verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
