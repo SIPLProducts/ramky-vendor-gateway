@@ -45,6 +45,7 @@ const schema = z.object({
   msmeCategory: z.enum(['micro', 'small', 'medium', '']),
   msmeEnterpriseName: z.string().optional(),
   msmeEnterpriseType: z.string().optional(),
+  msmeClassificationYear: z.string().optional(),
   msmeMajorActivity: z.string().optional(),
   msmeOrganizationType: z.string().optional(),
   msmeRegistrationDate: z.string().optional(),
