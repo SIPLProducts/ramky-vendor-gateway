@@ -99,12 +99,14 @@ Deno.serve(async (req) => {
     const stillPending = (remainingProgress ?? []).filter((p) => p.status === 'pending');
 
     if (stillPending.length === 0) {
+      // All approval levels (SCM Manager → SCM Head → Finance 1 → Finance 2 → optional CEO Office)
+      // have been approved. Hand the vendor to the SAP Sync queue.
       await admin.from('vendors').update({
-        status: 'finance_review',
+        status: 'pending_sap_sync',
         purchase_reviewed_by: userId,
         purchase_reviewed_at: new Date().toISOString(),
       }).eq('id', progress.vendor_id);
-      return new Response(JSON.stringify({ ok: true, vendor_status: 'finance_review' }), {
+      return new Response(JSON.stringify({ ok: true, vendor_status: 'pending_sap_sync' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
