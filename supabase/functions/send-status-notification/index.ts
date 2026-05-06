@@ -59,11 +59,22 @@ const statusMessages: Record<string, { subject: string; body: string }> = {
   },
 };
 
-function generateEmailHtml(vendorName: string, status: string, comments?: string): string {
+function escapeHtml(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: string): string {
   const statusInfo = statusMessages[status] || {
     subject: 'Status Update',
     body: 'Your vendor registration status has been updated.',
   };
+  const vendorName = escapeHtml(vendorNameRaw);
+  const comments = commentsRaw ? escapeHtml(commentsRaw) : '';
 
   return `
 <!DOCTYPE html>
