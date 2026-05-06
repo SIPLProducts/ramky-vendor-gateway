@@ -423,13 +423,19 @@ export default function UserManagement() {
                           <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
-                            {u.role ? <Badge variant="secondary">{u.role}</Badge> : <span className="text-muted-foreground">—</span>}
+                            {u.customRoles.length > 0 ? (
+                              <Badge variant="secondary" className="bg-primary/10">{u.customRoles[0].name}</Badge>
+                            ) : u.role ? (
+                              <Badge variant="secondary">{u.role}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {u.customRoles.length === 0
+                              {u.customRoles.length <= 1
                                 ? <span className="text-muted-foreground text-xs">—</span>
-                                : u.customRoles.map((c) => (
+                                : u.customRoles.slice(1).map((c) => (
                                     <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
                                   ))}
                             </div>

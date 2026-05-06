@@ -70,6 +70,10 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
 
   const handleSubmit = async () => {
+    if (!fullName.trim()) {
+      toast({ title: 'Full name required', description: 'Please enter the user\'s full name', variant: 'destructive' });
+      return;
+    }
     if (!email || !password || !selectedRole) {
       toast({ title: 'Missing fields', description: 'Email, password and role are required', variant: 'destructive' });
       return;
@@ -118,8 +122,8 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Full Name</Label>
-            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Doe" />
+            <Label>Full Name *</Label>
+            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Doe" required />
           </div>
           <div className="space-y-2">
             <Label>Email *</Label>
