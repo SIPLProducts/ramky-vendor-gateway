@@ -207,7 +207,7 @@ const handler = async (req: Request): Promise<Response> => {
 
                     <p style="margin:0; font-size:14px; line-height:1.7; color:#2d3748;">
                       Respectfully,<br>
-                      <span style="font-family:Georgia,'Times New Roman',serif; font-style:italic; color:#1e3a5f;">Procurement Team</span><br>
+                      <span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; font-weight:600; color:#1e3a5f; text-transform:capitalize;">Procurement Team</span><br>
                       <span style="color:#718096; font-size:13px;">${companyName}</span>
                     </p>
                   </td>
