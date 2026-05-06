@@ -36,7 +36,7 @@ import SharviAdminConsole from "./pages/SharviAdminConsole";
 import FormBuilder from "./pages/FormBuilder";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
-import MyApprovals from "./pages/MyApprovals";
+
 import EmailConfiguration from "./pages/EmailConfiguration";
 import ScmManagerApproval from "./pages/approvals/ScmManagerApproval";
 import ScmHeadApproval from "./pages/approvals/ScmHeadApproval";
@@ -90,7 +90,7 @@ const App = () => (
                 <Route path="/compliance/scheduled" element={<ScheduledChecks />} />
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
                 <Route path="/admin/form-builder" element={<FormBuilder />} />
-                <Route path="/admin/my-approvals" element={<MyApprovals />} />
+                
                 <Route path="/approvals/scm-manager" element={<ScmManagerApproval />} />
                 <Route path="/approvals/scm-head" element={<ScmHeadApproval />} />
                 <Route path="/approvals/finance-1" element={<Finance1Approval />} />

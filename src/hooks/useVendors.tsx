@@ -749,7 +749,7 @@ export function useScmMatrixAction() {
       queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-progress'] });
       queryClient.invalidateQueries({ queryKey: ['vendor-approval-trail'] });
-      queryClient.invalidateQueries({ queryKey: ['my-approvals'] });
+      
       toast({
         title: variables.action === 'approve' ? '✅ Approved' : 'Rejected',
         description:

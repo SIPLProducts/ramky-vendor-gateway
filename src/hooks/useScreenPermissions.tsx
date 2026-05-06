@@ -46,20 +46,6 @@ export function useScreenPermissions() {
         });
       }
 
-      // 3. Anyone assigned as an approver in the matrix can see "My Approvals"
-      //    Match by user_id OR by approver_email (case-insensitive) for free-text approvers
-      const email = (user.email ?? '').toLowerCase();
-      const { data: apprRows } = await supabase
-        .from('approval_matrix_approvers')
-        .select('id')
-        .or(
-          email
-            ? `user_id.eq.${user.id},approver_email.ilike.${email}`
-            : `user_id.eq.${user.id}`
-        )
-        .limit(1);
-      if (apprRows && apprRows.length > 0) merged.add('my_approvals');
-
       if (!cancelled) {
         setAllowed(merged);
         setLoading(false);

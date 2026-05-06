@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
   { label: 'Form Builder', href: '/admin/form-builder', icon: Layers, screenKey: 'form_builder' },
   { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
   { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
-  { label: 'My Approvals', href: '/admin/my-approvals', icon: Inbox, screenKey: 'my_approvals' },
+  
   { label: 'SCM Manager Approval', href: '/approvals/scm-manager', icon: ShoppingCart, screenKey: 'scm_manager_approval' },
   { label: 'SCM Head Approval', href: '/approvals/scm-head', icon: ShieldCheck, screenKey: 'scm_head_approval' },
   { label: 'Finance 1 Approval', href: '/approvals/finance-1', icon: IndianRupee, screenKey: 'finance1_approval' },
