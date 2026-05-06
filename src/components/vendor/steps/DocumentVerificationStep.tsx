@@ -1544,6 +1544,15 @@ export function DocumentVerificationStep({
                                 verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
+                                label="Current Year"
+                                value={msmeDoc.ocrData?.classification_year}
+                                originalValue={msmeDoc.originalOcrData?.classification_year}
+                                onChange={(v) => setOcrField(setMsmeDoc, "classification_year", v)}
+                                placeholder="e.g. 2026-27"
+                                verifiedValue={m.classification_year}
+                                verifiedLabel="Verified from registry"
+                              />
+                              <EditableOcrField
                                 label="Major Activity"
                                 value={msmeDoc.ocrData?.major_activity}
                                 originalValue={msmeDoc.originalOcrData?.major_activity}
