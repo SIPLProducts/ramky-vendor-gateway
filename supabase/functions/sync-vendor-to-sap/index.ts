@@ -129,6 +129,9 @@ function fail(message: string, extra: Record<string, any> = {}) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance']);
+  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+
   try {
     const { vendorId } = await req.json();
     if (!vendorId) throw new Error("vendorId is required");
