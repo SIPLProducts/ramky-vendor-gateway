@@ -564,6 +564,7 @@ export function ApprovalMatrixConfig() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-24">Level #</TableHead>
+                  <TableHead className="w-44">Stage</TableHead>
                   <TableHead className="w-64">Approver Name</TableHead>
                   <TableHead className="w-72">Email</TableHead>
                   <TableHead className="w-32">Mode</TableHead>
@@ -574,12 +575,12 @@ export function ApprovalMatrixConfig() {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                      <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                       No approvers configured for this tenant. Click <strong>+ Add Row</strong> to start.
                     </TableCell>
                   </TableRow>
@@ -603,6 +604,22 @@ export function ApprovalMatrixConfig() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={r.stage}
+                            onValueChange={(v) => updateRowStage(r.rowKey, v as Stage)}
+                          >
+                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(STAGE_LABELS) as Stage[]).map((s) => (
+                                <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {r.stage === 'CEO_OFFICE' && (
+                            <p className="text-[10px] text-muted-foreground mt-1">Runs only for MSME vendors</p>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input
