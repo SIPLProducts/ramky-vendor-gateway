@@ -215,6 +215,8 @@ export function ComplianceStep({
     if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
     const enterpriseType = pickStr(d.enterprise_type);
     if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
+    const classificationYear = pickStr(d.classification_year);
+    if (classificationYear) setValue('msmeClassificationYear' as any, classificationYear);
     const majorActivity = pickStr(d.major_activity);
     if (majorActivity) setValue('msmeMajorActivity' as any, majorActivity);
     const orgType = pickStr(d.organization_type);
