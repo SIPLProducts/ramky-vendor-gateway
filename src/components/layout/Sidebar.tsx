@@ -94,6 +94,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
   const location = useLocation();
   const navigate = useNavigate();
   const { can, loading: permsLoading } = useScreenPermissions();
+  const { customRoles } = useAuth();
+  const displayRole = customRoles[0]?.name ?? roleLabels[userRole];
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   const filteredItems = permsLoading ? [] : navItems.filter((item) => can(item.screenKey));
