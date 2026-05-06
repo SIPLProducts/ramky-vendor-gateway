@@ -1,44 +1,55 @@
-# Fix: Custom role "SAP Team" not respected
+# Root cause (verified against the database)
 
-## Root cause
+I queried Sunil's account directly:
 
-When a user is created with a custom role, the system stores **`approver`** in `user_roles` as a placeholder, then attaches the custom role (e.g. SAP Team) via `user_custom_roles`. Three problems flow from that:
+- `user_roles.role` = `approver` (placeholder assigned when the user was created with a custom role)
+- `user_custom_roles` has SAP Team assigned
+- `custom_roles` row for SAP Team has `tenant_id = NULL` (global)
+- `custom_role_screen_permissions` for SAP Team has Dashboard, SAP Sync, Help & Support ticked
 
-1. **Sidebar shows "Approver"** — `Sidebar.tsx` renders `roleLabels[userRole]`, which only knows built-in roles, so the custom-role name is never used.
-2. **Wrong screens are visible** — `useScreenPermissions` merges built-in role permissions **AND** custom role permissions. Because the user's built-in role is `approver`, every screen ticked for `approver` in the Role & Screen Permissions matrix is granted on top of the SAP Team permissions. That's why "SCM Approval", "All Vendors", etc. appear even though SAP Team only has Dashboard + SAP Sync ticked.
-3. **"SAP Team" missing from Role Permissions matrix** — The row exists in `custom_roles` (id `e37fc0a5…`), but the matrix table scrolls horizontally past several built-ins; with 7 built-ins + 9 custom columns it gets pushed off-screen. It is loaded but not visible without scrolling, and the column header layout doesn't make custom roles easy to find.
+So the data is correct. The problem is **RLS on `custom_roles`**:
 
-## Changes
+```
+Users read own tenant custom roles:
+  has_role(auth.uid(), 'sharvi_admin') OR has_role(auth.uid(), 'admin')
+  OR (tenant_id IS NOT NULL AND user_belongs_to_tenant(auth.uid(), tenant_id))
+```
 
-### 1. Sidebar — show custom role name when present
-`src/components/layout/Sidebar.tsx`
-- Accept an optional `customRoleName` prop (or read `customRoles[0]?.name` directly via `useAuth`).
-- When the user has a custom role, render that name instead of `roleLabels[userRole]` in both the collapsed footer (line 266) and dropdown header (line 293).
+Sunil is not an admin and the SAP Team row has `tenant_id = NULL`, so this policy **hides the row from him**. Both places that need it use `custom_roles!inner(...)` joins:
 
-`src/components/layout/AppLayout.tsx`
-- Pass the first custom role name to `<Sidebar>` (and to `MobileBottomNav` / `MobileHeader` if they show role labels).
+1. `useAuth.loadRoles` — join is filtered out → `customRoles` is `[]` → sidebar shows the fallback `roleLabels[userRole]` = "Approver", and `hasCustomRole` is false everywhere.
+2. `useScreenPermissions` — `custom_role_screen_permissions ... custom_roles!inner(is_active)` is filtered out → none of SAP Team's 3 screens are merged. Because `customRoles` is empty, the `skipBuiltIn` guard from the previous fix doesn't trigger, so built-in `approver` permissions (SCM Approval, All Vendors, Vendor Invitations, Help & Support, etc.) leak in instead.
 
-### 2. Stop built-in `approver` perms from leaking to custom-role users
-`src/hooks/useScreenPermissions.tsx`
-- When the user has at least one active custom role AND their built-in role is the placeholder `approver`, skip step 1 (built-in role permission lookup) entirely. The custom role becomes the sole source of allowed screens. The "My Approvals" rule (step 3) stays unchanged so genuine approvers still see that screen.
-- Result: a SAP Team user sees only the screens ticked under SAP Team's custom-role permissions — exactly what the matrix shows.
+That single RLS gap explains both symptoms — wrong sidebar label *and* wrong screens — and it affects every user assigned a global custom role (Buyer, SCM Manager, SCM Head, Finance 1/2, CEO Office, SAP Team, Admin, Finance Approval).
 
-### 3. Role Permissions matrix — make custom roles easy to find
-`src/pages/RolePermissions.tsx`
-- Group columns: render Built-in roles first (already done), then a visually separated block of Custom roles with a sticky sub-header label.
-- Add a small "Jump to" pill bar above the table listing each custom role name; clicking scrolls the table horizontally to that column.
-- No data change — all 9 custom roles (including SAP Team) are already loaded; this just helps users find them.
+# Fix
 
-### 4. (Optional polish) Users page
-`src/pages/UserManagement.tsx`
-- Already updated to show the custom role name as the primary badge — verify it picks up SAP Team correctly after the changes above.
+## 1. Add a SELECT policy on `public.custom_roles` for normal users
 
-## Why not add `sap_team` to the `app_role` enum?
+Migration: add a policy allowing any authenticated user to read **active** custom roles. Role names/IDs are not sensitive, and users already need them to know what they were assigned. Keep the existing policies untouched.
 
-It would require rewriting dozens of RLS policies and `has_role(...)` checks. The custom-roles system already exists for exactly this purpose; the bugs above are what stopped it from working end-to-end.
+```sql
+CREATE POLICY "Authenticated can read active custom roles"
+ON public.custom_roles
+FOR SELECT
+TO authenticated
+USING (is_active = true);
+```
 
-## Verification after deploy
+This unblocks the `!inner` joins in both hooks. No client code changes are needed for the core fix — the existing logic already does the right thing once it can see the row.
 
-1. Log in as the SAP Team user → sidebar footer shows "SAP Team" (not "Approver").
-2. Sidebar shows only Dashboard + SAP Sync (the two screens currently ticked for SAP Team in the matrix).
-3. Open Role Permissions → SAP Team column is visible (scroll/jump-to) and toggling its checkboxes adds/removes screens for that user on next login.
+## 2. Small client cleanup (defensive)
+
+`src/hooks/useScreenPermissions.tsx` — drop the `!inner(is_active)` join and instead filter by an explicit `custom_roles.is_active` check after a separate fetch. This way a future RLS tweak can't silently strip permissions again. Same idea for `useAuth.loadRoles` — fetch assignments first, then look up names with a plain `select('id,name').in('id', ids).eq('is_active', true)`.
+
+## 3. Verify
+
+After deploy, log in as Sunil:
+
+1. Sidebar footer shows **SAP Team** (not Approver).
+2. Sidebar items: only Dashboard, SAP Sync, Help & Support — nothing else.
+3. Other custom-role users (Buyer, SCM Manager, etc.) similarly see only the screens ticked for their role in the matrix.
+
+# Why not change the enum or the placeholder role?
+
+The custom-roles system is already the intended mechanism. The bug is purely an RLS visibility gap on the global (`tenant_id IS NULL`) rows; fixing it end-to-end is a one-line policy plus a small defensive refactor.
