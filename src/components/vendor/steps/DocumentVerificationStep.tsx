@@ -479,6 +479,7 @@ export function DocumentVerificationStep({
         udyam_number: pickStr(registry.udyam_number) || ocrUdyam || ocr.udyam_number,
         enterprise_name: pickStr(registry.enterprise_name) || ocr.enterprise_name,
         enterprise_type: pickStr(registry.enterprise_type) || ocr.enterprise_type,
+        classification_year: pickStr(registry.classification_year) || ocr.classification_year,
         major_activity: pickStr(registry.major_activity) || ocr.major_activity,
         organization_type: pickStr(registry.organization_type) || ocr.organization_type,
         registration_date: pickStr(registry.registration_date) || ocr.registration_date,
