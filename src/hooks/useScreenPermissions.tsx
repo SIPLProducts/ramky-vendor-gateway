@@ -14,8 +14,19 @@ export function useScreenPermissions() {
       setLoading(true);
       const merged = new Set<string>();
 
-      // 1. Built-in role permissions
-      if (userRole) {
+      // 2. Custom roles assigned to this user (load first so we know whether to skip approver placeholder perms)
+      const { data: assigns, error: aErr } = await supabase
+        .from('user_custom_roles')
+        .select('custom_role_id')
+        .eq('user_id', user.id);
+      if (aErr) console.error(aErr);
+      const roleIds = (assigns ?? []).map((a) => a.custom_role_id);
+
+      // 1. Built-in role permissions — skip when user has custom roles AND built-in role is the
+      //    'approver' placeholder (assigned automatically when creating a user with a custom role).
+      //    Otherwise approver's matrix permissions would leak on top of the custom role.
+      const skipBuiltIn = userRole === 'approver' && roleIds.length > 0;
+      if (userRole && !skipBuiltIn) {
         const { data, error } = await supabase
           .from('role_screen_permissions')
           .select('screen_key, can_access')
@@ -23,14 +34,6 @@ export function useScreenPermissions() {
         if (error) console.error(error);
         else (data ?? []).filter((r) => r.can_access).forEach((r) => merged.add(r.screen_key));
       }
-
-      // 2. Custom roles assigned to this user
-      const { data: assigns, error: aErr } = await supabase
-        .from('user_custom_roles')
-        .select('custom_role_id')
-        .eq('user_id', user.id);
-      if (aErr) console.error(aErr);
-      const roleIds = (assigns ?? []).map((a) => a.custom_role_id);
 
       if (roleIds.length > 0) {
         const { data: perms, error: pErr } = await supabase

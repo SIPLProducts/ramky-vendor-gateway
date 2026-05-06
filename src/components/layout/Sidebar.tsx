@@ -41,6 +41,7 @@ import {
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Shield } from 'lucide-react';
 import { useScreenPermissions } from '@/hooks/useScreenPermissions';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | 'customer_admin' | 'approver';
@@ -93,6 +94,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
   const location = useLocation();
   const navigate = useNavigate();
   const { can, loading: permsLoading } = useScreenPermissions();
+  const { customRoles } = useAuth();
+  const displayRole = customRoles[0]?.name ?? roleLabels[userRole];
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   const filteredItems = permsLoading ? [] : navItems.filter((item) => can(item.screenKey));
@@ -263,7 +266,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                     <>
                       <div className="flex-1 text-left min-w-0">
                         <p className="text-sm font-medium text-sidebar-foreground truncate">{userName}</p>
-                        <p className="text-xs text-sidebar-foreground/60 truncate">{roleLabels[userRole]}</p>
+                        <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
                       </div>
                       <Bell className="h-4 w-4 text-sidebar-foreground/60" />
                     </>
@@ -290,7 +293,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
             <DropdownMenuLabel>
               <div>
                 <p className="font-medium">{userName}</p>
-                <p className="text-xs text-muted-foreground font-normal">{roleLabels[userRole]}</p>
+                <p className="text-xs text-muted-foreground font-normal">{displayRole}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
