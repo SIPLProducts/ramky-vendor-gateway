@@ -21,6 +21,16 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Allow either: (a) a Supabase scheduler/cron call carrying CRON_SECRET, or
+  // (b) an authenticated admin/finance user triggering "Run Now" from the UI.
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const provided = req.headers.get("x-cron-secret");
+  const cronAuthorized = !!cronSecret && provided === cronSecret;
+  if (!cronAuthorized) {
+    const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance']);
+    if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
