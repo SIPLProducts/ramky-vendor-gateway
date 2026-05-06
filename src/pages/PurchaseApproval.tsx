@@ -437,10 +437,6 @@ export default function PurchaseApproval() {
               </TabsContent>
             </Tabs>
           )}
-          <DialogFooter className="gap-2 mt-6">
-            <Button variant="destructive" className="rounded-xl" onClick={() => handleAction(selectedVendor!, 'reject')}><XCircle className="h-4 w-4 mr-2" />Reject</Button>
-            <Button className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500" onClick={() => handleAction(selectedVendor!, 'approve')}><CheckCircle className="h-4 w-4 mr-2" />Approve</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
