@@ -171,6 +171,8 @@ export function ApprovalMatrixConfig() {
           approval_mode: (l.approval_mode as 'ANY' | 'ALL') ?? 'ANY',
           approver_name: '',
           approver_email: '',
+          stage: ((l as any).stage as Stage) ?? 'SCM_MANAGER',
+          requires_msme: !!(l as any).requires_msme,
         });
       } else {
         approvers.forEach((a) => {
@@ -183,6 +185,8 @@ export function ApprovalMatrixConfig() {
             approval_mode: (l.approval_mode as 'ANY' | 'ALL') ?? 'ANY',
             approver_name: a.approver_name ?? prof?.full_name ?? '',
             approver_email: a.approver_email ?? prof?.email ?? '',
+            stage: ((l as any).stage as Stage) ?? 'SCM_MANAGER',
+            requires_msme: !!(l as any).requires_msme,
           });
         });
       }
@@ -211,8 +215,18 @@ export function ApprovalMatrixConfig() {
         approval_mode: 'ANY',
         approver_name: '',
         approver_email: '',
+        stage: 'SCM_MANAGER',
+        requires_msme: false,
       },
     ]);
+  };
+
+  const updateRowStage = (key: string, stage: Stage) => {
+    setRows((prev) => prev.map((r) =>
+      r.rowKey === key
+        ? { ...r, stage, requires_msme: stage === 'CEO_OFFICE' }
+        : r
+    ));
   };
 
   const updateRow = (key: string, patch: Partial<Row>) => {
