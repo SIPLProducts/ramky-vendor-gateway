@@ -41,6 +41,7 @@ import {
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { Shield } from 'lucide-react';
 import { useScreenPermissions } from '@/hooks/useScreenPermissions';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | 'customer_admin' | 'approver';
