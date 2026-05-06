@@ -163,10 +163,10 @@ export function BuyerScmMapping({ tenantId }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
             <div>
               <label className="text-xs text-muted-foreground">SCM Manager</label>
-              <Select value={scmId} onValueChange={setScmId} disabled={!tenantId}>
+              <Select value={scmId} onValueChange={setScmId}>
                 <SelectTrigger><SelectValue placeholder="Select SCM Manager" /></SelectTrigger>
                 <SelectContent>
-                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No SCM Managers in this tenant</div>}
+                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with SCM Manager role. Assign it in the Users tab.</div>}
                   {scmUsers.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                   ))}
@@ -175,17 +175,17 @@ export function BuyerScmMapping({ tenantId }: Props) {
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Buyer</label>
-              <Select value={buyerId} onValueChange={setBuyerId} disabled={!tenantId}>
+              <Select value={buyerId} onValueChange={setBuyerId}>
                 <SelectTrigger><SelectValue placeholder="Select Buyer" /></SelectTrigger>
                 <SelectContent>
-                  {buyerUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No Buyers in this tenant</div>}
+                  {buyerUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with Buyer role. Assign it in the Users tab.</div>}
                   {buyerUsers.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleSave} disabled={saving || !tenantId}>
+            <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               Save Mapping
             </Button>

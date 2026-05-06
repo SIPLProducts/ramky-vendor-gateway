@@ -1,47 +1,16 @@
-## Add "Buyer ↔ SCM Mapping" Tab in User Management
+## Fix Buyer ↔ SCM tab — enable dropdowns globally and fix data source
 
-A new tab will sit beside **Approval Matrix** in `/admin/users`, letting admins map Buyers to SCM Managers so each Buyer sees only their related vendors and each SCM Manager sees only their assigned Buyers.
+The dropdowns currently disable themselves when "All Tenants (Global)" is selected, which is why they appear greyed out. They also filter the user list down to a tenant, so users created without a tenant assignment never appear. Fixes:
 
-### 1. Database (new migration)
+### Changes in `src/components/admin/BuyerScmMapping.tsx`
 
-Create `public.buyer_scm_mappings`:
-- `id uuid pk default gen_random_uuid()`
-- `tenant_id uuid not null references tenants(id) on delete cascade`
-- `buyer_user_id uuid not null` (profile id)
-- `scm_manager_user_id uuid not null` (profile id)
-- `created_at timestamptz default now()`
-- `created_by uuid`
-- Unique `(tenant_id, buyer_user_id, scm_manager_user_id)`
+1. **Remove `disabled={!tenantId}`** from both `<Select>` components and the Save button so the dropdowns are always usable.
+2. **Always show all users** that have the `SCM Manager` / `Buyer` custom role (assigned via the Users tab → Change Role dialog), regardless of tenant scope. When a tenant is selected we still narrow the list, but when "All Tenants (Global)" is chosen we show every matching user.
+3. When saving without a tenant selected, prompt the admin to pick a tenant in the scope selector first (toast already exists; keep it).
+4. Update the empty-state hint to: "No users with SCM Manager / Buyer role. Assign the role in the Users tab."
 
-RLS: enable; policies allow `admin / sharvi_admin / customer_admin` (using existing `has_role`) to select/insert/delete mappings within their tenant scope. SCM Managers and Buyers can `select` rows where they are the `scm_manager_user_id` / `buyer_user_id` (so the app can filter their vendor list).
+### Result
 
-### 2. New component `src/components/admin/BuyerScmMapping.tsx`
-
-Inputs:
-- Pulls users via `profiles` joined with `user_custom_roles` + `custom_roles`:
-  - **SCM Manager dropdown** = users assigned the custom role `SCM Manager`
-  - **Buyer dropdown** = users assigned the custom role `Buyer`
-- Tenant scope inherited from existing `scopeTenantId` prop (filter to users in that tenant via `user_tenants`).
-
-UI layout:
-- Card 1 — "Add Mapping": two `<Select>` fields (SCM Manager, Buyer) + **Save** button. Inserts into `buyer_scm_mappings`. Toast on success/duplicate.
-- Card 2 — "Existing Mappings": `<Table>` columns `SCM Manager | Buyer | Created At | Actions (Delete)`. Loaded via join query. Delete button removes row.
-
-### 3. Wire into `UserManagement.tsx`
-
-- Add `<TabsTrigger value="buyer-scm">` after the Approval Matrix trigger with `Link2` icon.
-- Add matching `<TabsContent value="buyer-scm">` rendering `<BuyerScmMapping tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId} />`.
-
-### 4. Downstream filtering (consumed by existing screens, no UI work in this plan)
-
-The mapping table is the source of truth that:
-- `VendorList` / `My Approvals` for Buyers → show only vendors created_by themselves (already the case) plus any from their mapped SCM Managers' queue.
-- SCM Manager approval screens → show vendors whose buyer is in their mapped buyer list.
-
-This filtering wiring will be a follow-up; this plan only delivers the tab + storage as the user requested.
-
-### Files
-
-- create `supabase/migrations/<ts>_buyer_scm_mappings.sql`
-- create `src/components/admin/BuyerScmMapping.tsx`
-- edit `src/pages/UserManagement.tsx` (add tab trigger + content)
+- Selecting "All Tenants (Global)" now lists every SCM Manager and every Buyer from the Users tab in the dropdowns.
+- Selecting a specific tenant filters to users belonging to that tenant.
+- Save still requires a tenant context (mapping is per-tenant) and shows a clear toast if none is chosen.
