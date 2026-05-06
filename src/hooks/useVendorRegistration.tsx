@@ -94,25 +94,28 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Check if vendor can edit their registration
   const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
 
-  // Upload document to Supabase Storage
+  // Upload document to Supabase Storage. Path convention:
+  //   {vendorId}/{documentType}/{filename}
+  // Matches storage RLS which checks the vendor row by the first folder.
   const uploadDocument = async (file: File, vendorIdForUpload: string, documentType: DocumentType): Promise<DocumentUploadResult | null> => {
     if (!file) return null;
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${vendorIdForUpload}/${documentType}_${Date.now()}.${fileExt}`;
+    // Sanitize filename, keep extension; prefix timestamp for uniqueness
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${vendorIdForUpload}/${documentType}/${Date.now()}_${safeName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('vendor-documents')
-      .upload(fileName, file, { upsert: true });
+      .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
       console.error(`Failed to upload ${documentType}:`, uploadError);
-      return null;
+      throw new Error(`Failed to upload ${documentType}: ${uploadError.message}`);
     }
 
     return {
       documentType,
-      filePath: fileName,
+      filePath,
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
@@ -134,6 +137,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
     if (error) {
       console.error(`Failed to save document metadata for ${doc.documentType}:`, error);
+      throw new Error(`Failed to save document metadata for ${doc.documentType}: ${error.message}`);
     }
   };
 

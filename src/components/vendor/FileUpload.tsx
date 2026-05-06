@@ -58,57 +58,21 @@ export function FileUpload({
     return null;
   };
 
-  const uploadToStorage = async (file: File) => {
-    if (!vendorId) {
-      // If no vendorId, just store locally for now
-      onFileSelect(file);
-      setIsUploaded(true);
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
-    setUploadError(null);
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${vendorId}/${documentType}_${Date.now()}.${fileExt}`;
-
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => Math.min(prev + 10, 90));
-      }, 100);
-
-      const { error } = await supabase.storage
-        .from('vendor-documents')
-        .upload(fileName, file, { upsert: true });
-
-      clearInterval(progressInterval);
-
-      if (error) throw error;
-
-      setUploadProgress(100);
-      setIsUploaded(true);
-      onFileSelect(file);
-    } catch (error: any) {
-      setUploadError(error.message || 'Failed to upload file');
-      onFileSelect(null);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleFileChange = async (file: File | null) => {
+  // Note: this component no longer uploads directly to storage. The actual
+  // upload happens in `useVendorRegistration.uploadAllDocuments` after the
+  // vendor row exists, so the storage path can be `{vendorId}/{type}/{name}`
+  // and storage RLS works correctly. Here we just validate and hand the
+  // selected File to the parent.
+  const handleFileChange = (file: File | null) => {
     if (!file) return;
-
     const error = validateFile(file);
     if (error) {
       setUploadError(error);
       return;
     }
-
     setUploadError(null);
-    await uploadToStorage(file);
+    setIsUploaded(true);
+    onFileSelect(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
