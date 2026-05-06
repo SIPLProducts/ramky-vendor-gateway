@@ -349,6 +349,7 @@ export default function UserManagement() {
           <TabsTrigger value="custom-roles"><ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles</TabsTrigger>
           <TabsTrigger value="role-permissions"><Settings className="h-4 w-4 mr-2" /> Role Permissions</TabsTrigger>
           <TabsTrigger value="approval-matrix"><GitBranch className="h-4 w-4 mr-2" /> Approval Matrix</TabsTrigger>
+          <TabsTrigger value="buyer-scm"><Link2 className="h-4 w-4 mr-2" /> Buyer ↔ SCM</TabsTrigger>
         </TabsList>
 
         {/* USERS TAB */}
