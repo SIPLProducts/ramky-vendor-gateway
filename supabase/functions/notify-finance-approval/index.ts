@@ -29,6 +29,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase', 'vendor']);
+  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+
   try {
     const { vendorId, vendorName, vendorEmail, validationResults }: NotifyFinanceRequest = await req.json();
     console.log(`[Finance Notification] Processing for vendor: ${vendorId} - ${vendorName}`);
