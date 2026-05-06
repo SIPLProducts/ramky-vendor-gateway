@@ -835,6 +835,7 @@ export function DocumentVerificationStep({
         udyam_number: pickValue(d.udyam_number) || num,
         enterprise_name: pickValue(d.enterprise_name || d.legal_name),
         enterprise_type: pickValue(d.enterprise_type),
+        classification_year: pickValue(d.classification_year),
         major_activity: pickValue(d.major_activity),
         organization_type: pickValue(d.organization_type),
         registration_date: pickValue(d.registration_date),
