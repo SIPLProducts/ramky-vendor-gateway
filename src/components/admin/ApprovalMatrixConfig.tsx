@@ -296,12 +296,14 @@ export function ApprovalMatrixConfig() {
       for (const [levelNumber, group] of grouped) {
         const first = group[0];
         let levelId = first.level_id;
-        const levelPayload = {
+        const levelPayload: any = {
           tenant_id: tenantId,
           level_number: levelNumber,
-          level_name: `Level ${levelNumber}`,
+          level_name: `Level ${levelNumber} · ${STAGE_LABELS[first.stage]}`,
           designation: null,
           approval_mode: first.approval_mode,
+          stage: first.stage,
+          requires_msme: first.stage === 'CEO_OFFICE' ? true : !!first.requires_msme,
         };
         if (levelId) {
           const { error } = await supabase.from('approval_matrix_levels').update(levelPayload).eq('id', levelId);
