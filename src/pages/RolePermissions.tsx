@@ -219,6 +219,7 @@ export default function RolePermissions({ tenantId = null, tenantLabel = 'All Te
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
