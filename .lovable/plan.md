@@ -1,47 +1,33 @@
-## Goal
+## Issue 1 — Uploaded documents not showing in "View Details"
 
-When a vendor finishes and submits their registration, send a confirmation email to the person who originally invited them (e.g., Suresh Marreddy), letting them know the vendor has submitted the application.
+### Root cause
+There's a path mismatch between the **upload code** and the **storage RLS policy**:
 
-## Current State
+- Upload code (`FileUpload.tsx` line 75 and `useVendorRegistration.tsx` line 102) writes files under `{vendorId}/...`
+- Storage policy (`20260106174157...sql`) requires `auth.uid()::text = (storage.foldername(name))[1]` — i.e. the first folder must equal the **logged-in user's UID**, not the vendor row id.
 
-- `submitVendorMutation` in `src/hooks/useVendorRegistration.tsx` already calls an edge function `notify-vendor-submission` after submit — but **no such edge function exists** in `supabase/functions/`. So the call silently fails (caught/logged).
-- `vendor_invitations` table tracks `created_by` (auth user id of the inviter) and is linked to the vendor via `vendors.invitation_id`.
-- An SMTP sender pipeline already exists via `send-smtp-email` (used by `send-vendor-invitation`).
+Result: every storage upload from a real submission is rejected by RLS. The error is only `console.error`-logged (`useVendorRegistration` line 109) and the form continues. For seeded mock vendors the metadata rows were inserted via SQL, so the View Details panel can list them — but for any actual submission, both the storage object **and** the metadata row are missing (confirmed: `storage.objects` for bucket `vendor-documents` is empty; `vendor_documents` count for every real `SHARVI INFOTECH` vendor row is 0).
 
-## Plan
+A secondary contributor: `FileUpload.uploadToStorage` uploads immediately when `vendorId` is passed (already wrong path), and `useVendorRegistration.uploadAllDocuments` re-uploads on save (also wrong path). Neither surfaces failures to the user.
 
-### 1. Create new edge function `supabase/functions/notify-vendor-submission/index.ts`
+### Fix
+1. **Change the storage path convention to `{vendorId}/{documentType}/{filename}`** and update the storage RLS policy so authenticated users with `vendor`, `purchase`, `finance`, `scm_*`, `admin`, or `sharvi_admin` roles can read, and the owning vendor (matched via the `vendors` table) can write — instead of comparing folder name to `auth.uid()`.
+   - New migration: drop the four `auth.uid() = foldername[1]` policies; recreate them with:
+     - INSERT/UPDATE/DELETE allowed when `EXISTS (SELECT 1 FROM vendors v WHERE v.id::text = (storage.foldername(name))[1] AND (v.user_id = auth.uid() OR v.primary_email = auth.email()))`.
+     - SELECT allowed for the vendor owner OR any user with an approver/admin role (`has_role` for `purchase`, `finance`, `admin`, `sharvi_admin`, `scm_manager`, `scm_head`, `finance_1`, `finance_2`, `ceo_office`, `sap_team`).
+2. **Stop double-uploading** in `FileUpload.tsx` — make it a pure file picker (validate + preview + call `onFileSelect`); let `useVendorRegistration.uploadAllDocuments` be the single source of truth for storage writes.
+3. **Surface failures**: in `uploadDocument` / `saveDocumentMetadata`, throw on error so `saveVendorMutation` toasts a real error instead of silently dropping the file.
+4. **Backfill check**: leave existing seeded `vendor_documents` rows alone (they still resolve to non-existent objects, but won't break the list view).
 
-Responsibilities:
-- Accept `{ vendorId }`.
-- Use service-role Supabase client to:
-  1. Load the vendor row (legal_name, primary_contact_name, primary_email, submitted_at, invitation_id).
-  2. Resolve the inviter:
-     - If `vendor.invitation_id` exists, look up `vendor_invitations.created_by`.
-     - Then fetch `profiles` row for `created_by` to get `full_name` + `email`.
-     - Fallback: if no inviter found, log and exit (200, skipped).
-  3. Compose a clean HTML email (same enterprise styling as the invitation email — sans-serif stack, blue accent header, white card, footer "Sharvi Vendor Portal", support contact `support@sharviinfotech.com`).
-     - Subject: `Vendor "<Legal Name>" has submitted their application`
-     - Body: greets inviter by first name, confirms submission, shows vendor name + primary contact + submitted timestamp, and notes that the application is now in Purchase/SCM review.
-  4. Send via the existing `send-smtp-email` edge function (invoke with service-role client) so the message goes out from the configured SMTP sender.
-  5. Insert an `audit_logs` row `action: 'vendor_submission_notified'` with recipient + vendor id (best-effort).
-- Standard CORS headers, OPTIONS handling, JSON response `{ success, sentTo }` or `{ success: false, error }`.
-- `verify_jwt = false` (called server-to-server from the client mutation right after submit; it loads its own data via service role so it doesn't need the user JWT).
+### Out of scope
+Re-uploading any documents the user already attempted to submit before this fix — those bytes never reached storage and must be re-uploaded after the fix ships.
 
-### 2. No changes needed in `useVendorRegistration.tsx`
+## Issue 2 — Remove Approve/Reject from "View Details" dialog
 
-It already invokes `notify-vendor-submission` after a successful submit and swallows errors so the user flow isn't blocked.
+In `src/pages/PurchaseApproval.tsx` (the SCM Approval page in the screenshot), remove the `DialogFooter` block at lines 440-443 that renders the two buttons inside the Vendor Details dialog. The Approve/Reject actions remain available on the vendor row in the list, so functionality isn't lost.
 
-### 3. (Optional, but included) Re-submit path
-
-Also fire the same notify call inside `resubmitVendorMutation` so the inviter is informed when an edited application is re-submitted. Subject prefix becomes "Vendor "<Legal Name>" has resubmitted their application". Pass `{ vendorId, resubmission: true }` and branch the subject/body in the edge function.
-
-## Files
-
-- **New:** `supabase/functions/notify-vendor-submission/index.ts`
-- **Edit:** `src/hooks/useVendorRegistration.tsx` — add the same notify call inside `resubmitVendorMutation` (best-effort, non-blocking).
-
-## Out of scope
-
-- Adding a UI toggle to enable/disable this notification.
-- Notifying anyone other than the original inviter (e.g. multi-recipient CC). Can be added later if needed.
+## Files changed
+- `supabase/migrations/<new>.sql` — new storage policies for `vendor-documents`
+- `src/components/vendor/FileUpload.tsx` — remove inline storage upload
+- `src/hooks/useVendorRegistration.tsx` — throw on upload/metadata errors; standardize path to `{vendorId}/{documentType}/{filename}`
+- `src/pages/PurchaseApproval.tsx` — remove Approve/Reject buttons from details dialog footer
