@@ -38,6 +38,11 @@ import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import MyApprovals from "./pages/MyApprovals";
 import EmailConfiguration from "./pages/EmailConfiguration";
+import ScmManagerApproval from "./pages/approvals/ScmManagerApproval";
+import ScmHeadApproval from "./pages/approvals/ScmHeadApproval";
+import Finance1Approval from "./pages/approvals/Finance1Approval";
+import Finance2Approval from "./pages/approvals/Finance2Approval";
+import CeoApproval from "./pages/approvals/CeoApproval";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +91,11 @@ const App = () => (
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
                 <Route path="/admin/form-builder" element={<FormBuilder />} />
                 <Route path="/admin/my-approvals" element={<MyApprovals />} />
+                <Route path="/approvals/scm-manager" element={<ScmManagerApproval />} />
+                <Route path="/approvals/scm-head" element={<ScmHeadApproval />} />
+                <Route path="/approvals/finance-1" element={<Finance1Approval />} />
+                <Route path="/approvals/finance-2" element={<Finance2Approval />} />
+                <Route path="/approvals/ceo" element={<CeoApproval />} />
                 <Route path="/admin/email-config" element={<EmailConfiguration />} />
               </Route>
             </Route>

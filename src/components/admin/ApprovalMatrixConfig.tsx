@@ -23,6 +23,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useTenants, useTenantUserCounts } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
 
+type Stage = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
+
+const STAGE_LABELS: Record<Stage, string> = {
+  SCM_MANAGER: 'SCM Manager',
+  SCM_HEAD: 'SCM Head',
+  FINANCE_1: 'Finance 1',
+  FINANCE_2: 'Finance 2',
+  CEO_OFFICE: 'CEO Office',
+};
+
 interface Row {
   rowKey: string;
   level_id?: string;
@@ -31,6 +41,8 @@ interface Row {
   approval_mode: 'ANY' | 'ALL';
   approver_name: string;
   approver_email: string;
+  stage: Stage;
+  requires_msme: boolean;
 }
 
 interface RowError {
@@ -159,6 +171,8 @@ export function ApprovalMatrixConfig() {
           approval_mode: (l.approval_mode as 'ANY' | 'ALL') ?? 'ANY',
           approver_name: '',
           approver_email: '',
+          stage: ((l as any).stage as Stage) ?? 'SCM_MANAGER',
+          requires_msme: !!(l as any).requires_msme,
         });
       } else {
         approvers.forEach((a) => {
@@ -171,6 +185,8 @@ export function ApprovalMatrixConfig() {
             approval_mode: (l.approval_mode as 'ANY' | 'ALL') ?? 'ANY',
             approver_name: a.approver_name ?? prof?.full_name ?? '',
             approver_email: a.approver_email ?? prof?.email ?? '',
+            stage: ((l as any).stage as Stage) ?? 'SCM_MANAGER',
+            requires_msme: !!(l as any).requires_msme,
           });
         });
       }
@@ -199,8 +215,18 @@ export function ApprovalMatrixConfig() {
         approval_mode: 'ANY',
         approver_name: '',
         approver_email: '',
+        stage: 'SCM_MANAGER',
+        requires_msme: false,
       },
     ]);
+  };
+
+  const updateRowStage = (key: string, stage: Stage) => {
+    setRows((prev) => prev.map((r) =>
+      r.rowKey === key
+        ? { ...r, stage, requires_msme: stage === 'CEO_OFFICE' }
+        : r
+    ));
   };
 
   const updateRow = (key: string, patch: Partial<Row>) => {
@@ -270,12 +296,14 @@ export function ApprovalMatrixConfig() {
       for (const [levelNumber, group] of grouped) {
         const first = group[0];
         let levelId = first.level_id;
-        const levelPayload = {
+        const levelPayload: any = {
           tenant_id: tenantId,
           level_number: levelNumber,
-          level_name: `Level ${levelNumber}`,
+          level_name: `Level ${levelNumber} · ${STAGE_LABELS[first.stage]}`,
           designation: null,
           approval_mode: first.approval_mode,
+          stage: first.stage,
+          requires_msme: first.stage === 'CEO_OFFICE' ? true : !!first.requires_msme,
         };
         if (levelId) {
           const { error } = await supabase.from('approval_matrix_levels').update(levelPayload).eq('id', levelId);
@@ -536,6 +564,7 @@ export function ApprovalMatrixConfig() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-24">Level #</TableHead>
+                  <TableHead className="w-44">Stage</TableHead>
                   <TableHead className="w-64">Approver Name</TableHead>
                   <TableHead className="w-72">Email</TableHead>
                   <TableHead className="w-32">Mode</TableHead>
@@ -546,12 +575,12 @@ export function ApprovalMatrixConfig() {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                      <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                       No approvers configured for this tenant. Click <strong>+ Add Row</strong> to start.
                     </TableCell>
                   </TableRow>
@@ -575,6 +604,22 @@ export function ApprovalMatrixConfig() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={r.stage}
+                            onValueChange={(v) => updateRowStage(r.rowKey, v as Stage)}
+                          >
+                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(STAGE_LABELS) as Stage[]).map((s) => (
+                                <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {r.stage === 'CEO_OFFICE' && (
+                            <p className="text-[10px] text-muted-foreground mt-1">Runs only for MSME vendors</p>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input
