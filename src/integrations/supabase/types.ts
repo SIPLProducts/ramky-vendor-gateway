@@ -203,6 +203,8 @@ export type Database = {
           is_active: boolean
           level_name: string
           level_number: number
+          requires_msme: boolean
+          stage: string
           tenant_id: string
           updated_at: string
         }
@@ -214,6 +216,8 @@ export type Database = {
           is_active?: boolean
           level_name: string
           level_number: number
+          requires_msme?: boolean
+          stage?: string
           tenant_id: string
           updated_at?: string
         }
@@ -225,6 +229,8 @@ export type Database = {
           is_active?: boolean
           level_name?: string
           level_number?: number
+          requires_msme?: boolean
+          stage?: string
           tenant_id?: string
           updated_at?: string
         }
