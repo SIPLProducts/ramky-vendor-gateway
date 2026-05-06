@@ -518,12 +518,12 @@ export function ComplianceStep({
                 <Label htmlFor="msmeMajorActivity">Major Activity</Label>
                 <Input id="msmeMajorActivity" {...register('msmeMajorActivity' as any)} placeholder="Manufacturing / Services / Trading" />
               </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="msmeOrganizationType">Organization Type</Label>
                 <Input id="msmeOrganizationType" {...register('msmeOrganizationType' as any)} placeholder="Private Limited / Partnership / Proprietorship" />
               </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="msmeRegistrationDate">Registration Date</Label>
                 <Input id="msmeRegistrationDate" {...register('msmeRegistrationDate' as any)} placeholder="DD/MM/YYYY" />
