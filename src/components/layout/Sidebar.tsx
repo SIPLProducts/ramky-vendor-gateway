@@ -293,7 +293,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
             <DropdownMenuLabel>
               <div>
                 <p className="font-medium">{userName}</p>
-                <p className="text-xs text-muted-foreground font-normal">{roleLabels[userRole]}</p>
+                <p className="text-xs text-muted-foreground font-normal">{displayRole}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
