@@ -45,6 +45,12 @@ export default function RolePermissions({ tenantId = null, tenantLabel = 'All Te
   const [loading, setLoading] = useState(true);
   const [matrix, setMatrix] = useState<Matrix>({});
   const [customRoles, setCustomRoles] = useState<CustomRoleCol[]>([]);
+  const colRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+
+  const scrollToCol = (key: string) => {
+    const el = colRefs.current[key];
+    if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  };
 
   const load = async () => {
     setLoading(true);
