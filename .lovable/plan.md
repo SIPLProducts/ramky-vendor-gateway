@@ -1,33 +1,35 @@
-## Issue 1 — Uploaded documents not showing in "View Details"
+## Goal
+When a user is created with a custom role (e.g. "SAP Team"), the Users list should show **SAP Team** as their role — not the internal `approver` placeholder. Also make Full Name mandatory in the Create User dialog and ensure all 11 system roles exist as selectable custom roles.
 
-### Root cause
-There's a path mismatch between the **upload code** and the **storage RLS policy**:
+## Background
+- Built-in `app_role` enum is fixed to: `vendor, finance, purchase, approver, customer_admin, admin, sharvi_admin`. Adding new enum values would require rewriting dozens of RLS policies.
+- Custom roles (in `custom_roles` table) already power screen permissions via `custom_role_screen_permissions` and `useScreenPermissions`. This is the right place for Buyer / SCM / Finance 1/2 / CEO Office / SAP Team.
+- `CreateUserDialog` currently stores built-in role = `approver` whenever a custom role is selected — that's why the Users table shows "approver" for your SAP Team user.
+- Existing custom roles in DB: Admin, Buyer, Finance Approval, SAP Team, SCM Head, SCM Manager. **Missing:** Finance 1, Finance 2, CEO Office.
 
-- Upload code (`FileUpload.tsx` line 75 and `useVendorRegistration.tsx` line 102) writes files under `{vendorId}/...`
-- Storage policy (`20260106174157...sql`) requires `auth.uid()::text = (storage.foldername(name))[1]` — i.e. the first folder must equal the **logged-in user's UID**, not the vendor row id.
+## Changes
 
-Result: every storage upload from a real submission is rejected by RLS. The error is only `console.error`-logged (`useVendorRegistration` line 109) and the form continues. For seeded mock vendors the metadata rows were inserted via SQL, so the View Details panel can list them — but for any actual submission, both the storage object **and** the metadata row are missing (confirmed: `storage.objects` for bucket `vendor-documents` is empty; `vendor_documents` count for every real `SHARVI INFOTECH` vendor row is 0).
+### 1. Seed missing custom roles (data insert)
+Insert three rows into `custom_roles` (global, `tenant_id = NULL`, `is_active = true`):
+- Finance 1
+- Finance 2
+- CEO Office
 
-A secondary contributor: `FileUpload.uploadToStorage` uploads immediately when `vendorId` is passed (already wrong path), and `useVendorRegistration.uploadAllDocuments` re-uploads on save (also wrong path). Neither surfaces failures to the user.
+(Sharvi Admin / Vendor / Admin are already covered — Sharvi Admin and Vendor are built-in; an "Admin" custom role already exists.)
 
-### Fix
-1. **Change the storage path convention to `{vendorId}/{documentType}/{filename}`** and update the storage RLS policy so authenticated users with `vendor`, `purchase`, `finance`, `scm_*`, `admin`, or `sharvi_admin` roles can read, and the owning vendor (matched via the `vendors` table) can write — instead of comparing folder name to `auth.uid()`.
-   - New migration: drop the four `auth.uid() = foldername[1]` policies; recreate them with:
-     - INSERT/UPDATE/DELETE allowed when `EXISTS (SELECT 1 FROM vendors v WHERE v.id::text = (storage.foldername(name))[1] AND (v.user_id = auth.uid() OR v.primary_email = auth.email()))`.
-     - SELECT allowed for the vendor owner OR any user with an approver/admin role (`has_role` for `purchase`, `finance`, `admin`, `sharvi_admin`, `scm_manager`, `scm_head`, `finance_1`, `finance_2`, `ceo_office`, `sap_team`).
-2. **Stop double-uploading** in `FileUpload.tsx` — make it a pure file picker (validate + preview + call `onFileSelect`); let `useVendorRegistration.uploadAllDocuments` be the single source of truth for storage writes.
-3. **Surface failures**: in `uploadDocument` / `saveDocumentMetadata`, throw on error so `saveVendorMutation` toasts a real error instead of silently dropping the file.
-4. **Backfill check**: leave existing seeded `vendor_documents` rows alone (they still resolve to non-existent objects, but won't break the list view).
+### 2. `src/pages/UserManagement.tsx` — show custom role in Users table
+- In the **Role** column, if `u.customRoles.length > 0`, render the first custom role name as the primary badge (instead of the built-in `approver` placeholder). Fall back to the built-in role badge only when no custom role is assigned.
+- Remove the now-redundant **Custom Roles** column (or keep it for users with multiple custom roles — show only extras beyond the first).
+- Update the role-filter dropdown and stats cards to include custom-role names alongside built-in roles, so filtering/counting works for "SAP Team", "Buyer", etc.
 
-### Out of scope
-Re-uploading any documents the user already attempted to submit before this fix — those bytes never reached storage and must be re-uploaded after the fix ships.
+### 3. `src/components/admin/CreateUserDialog.tsx` — Full Name required
+- Add `*` to the Full Name label.
+- In `handleSubmit`, reject submission when `fullName.trim()` is empty with a toast: "Full name is required".
+- Keep the placeholder; mark the field visually required.
 
-## Issue 2 — Remove Approve/Reject from "View Details" dialog
+### 4. (Optional polish) `src/components/admin/ChangeRoleDialog.tsx`
+- Same display improvement: when a custom role is assigned, surface that as the user's effective role label in the dialog header.
 
-In `src/pages/PurchaseApproval.tsx` (the SCM Approval page in the screenshot), remove the `DialogFooter` block at lines 440-443 that renders the two buttons inside the Vendor Details dialog. The Approve/Reject actions remain available on the vendor row in the list, so functionality isn't lost.
-
-## Files changed
-- `supabase/migrations/<new>.sql` — new storage policies for `vendor-documents`
-- `src/components/vendor/FileUpload.tsx` — remove inline storage upload
-- `src/hooks/useVendorRegistration.tsx` — throw on upload/metadata errors; standardize path to `{vendorId}/{documentType}/{filename}`
-- `src/pages/PurchaseApproval.tsx` — remove Approve/Reject buttons from details dialog footer
+## Notes
+- No enum migration, no RLS changes — built-in role stays `approver` under the hood (purely a placeholder that grants no screen access; the custom role drives all permissions, as already designed).
+- After approval I'll insert the 3 missing custom roles, then make the UI edits above.
