@@ -1,0 +1,240 @@
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Trash2, Link2, Plus, Loader2 } from 'lucide-react';
+
+interface Props { tenantId: string | null; }
+interface UserOpt { id: string; full_name: string | null; email: string; }
+interface MappingRow {
+  id: string;
+  buyer_user_id: string;
+  scm_manager_user_id: string;
+  created_at: string;
+  buyer?: UserOpt;
+  scm?: UserOpt;
+}
+
+const SCM_ROLE = 'SCM Manager';
+const BUYER_ROLE = 'Buyer';
+
+export function BuyerScmMapping({ tenantId }: Props) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [scmUsers, setScmUsers] = useState<UserOpt[]>([]);
+  const [buyerUsers, setBuyerUsers] = useState<UserOpt[]>([]);
+  const [mappings, setMappings] = useState<MappingRow[]>([]);
+  const [scmId, setScmId] = useState('');
+  const [buyerId, setBuyerId] = useState('');
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [rolesRes, profilesRes, userTenantsRes, mappingsRes] = await Promise.all([
+        supabase.from('custom_roles').select('id,name').in('name', [SCM_ROLE, BUYER_ROLE]),
+        supabase.from('profiles').select('id, full_name, email'),
+        supabase.from('user_tenants').select('user_id, tenant_id'),
+        tenantId
+          ? supabase.from('buyer_scm_mappings').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })
+          : supabase.from('buyer_scm_mappings').select('*').order('created_at', { ascending: false }),
+      ]);
+      if (rolesRes.error) throw rolesRes.error;
+      if (profilesRes.error) throw profilesRes.error;
+      if (userTenantsRes.error) throw userTenantsRes.error;
+      if (mappingsRes.error) throw mappingsRes.error;
+
+      const scmRoleId = rolesRes.data?.find((r) => r.name === SCM_ROLE)?.id;
+      const buyerRoleId = rolesRes.data?.find((r) => r.name === BUYER_ROLE)?.id;
+
+      const ucrRes = await supabase
+        .from('user_custom_roles')
+        .select('user_id, custom_role_id')
+        .in('custom_role_id', [scmRoleId, buyerRoleId].filter(Boolean) as string[]);
+      if (ucrRes.error) throw ucrRes.error;
+
+      const profileMap = new Map<string, UserOpt>(
+        (profilesRes.data ?? []).map((p) => [p.id, p as UserOpt])
+      );
+      const tenantUserSet = tenantId
+        ? new Set((userTenantsRes.data ?? []).filter((ut) => ut.tenant_id === tenantId).map((ut) => ut.user_id))
+        : null;
+
+      const scmIds = new Set<string>();
+      const buyerIds = new Set<string>();
+      (ucrRes.data ?? []).forEach((r) => {
+        if (r.custom_role_id === scmRoleId) scmIds.add(r.user_id);
+        if (r.custom_role_id === buyerRoleId) buyerIds.add(r.user_id);
+      });
+
+      const filterByTenant = (id: string) => !tenantUserSet || tenantUserSet.has(id);
+      const toOpts = (ids: Set<string>) =>
+        Array.from(ids)
+          .filter(filterByTenant)
+          .map((id) => profileMap.get(id))
+          .filter((u): u is UserOpt => !!u)
+          .sort((a, b) => (a.full_name ?? a.email).localeCompare(b.full_name ?? b.email));
+
+      setScmUsers(toOpts(scmIds));
+      setBuyerUsers(toOpts(buyerIds));
+
+      const enriched: MappingRow[] = (mappingsRes.data ?? []).map((m: any) => ({
+        ...m,
+        buyer: profileMap.get(m.buyer_user_id),
+        scm: profileMap.get(m.scm_manager_user_id),
+      }));
+      setMappings(enriched);
+    } catch (err: any) {
+      toast({ title: 'Failed to load mappings', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); /* eslint-disable-next-line */ }, [tenantId]);
+
+  const handleSave = async () => {
+    if (!tenantId) {
+      toast({ title: 'Select a tenant', description: 'Mappings must be scoped to a tenant.', variant: 'destructive' });
+      return;
+    }
+    if (!scmId || !buyerId) {
+      toast({ title: 'Both fields required', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('buyer_scm_mappings').insert({
+        tenant_id: tenantId,
+        buyer_user_id: buyerId,
+        scm_manager_user_id: scmId,
+        created_by: user?.id,
+      });
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'Mapping already exists', variant: 'destructive' });
+        } else throw error;
+      } else {
+        toast({ title: 'Mapping saved' });
+        setScmId(''); setBuyerId('');
+        await loadData();
+      }
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this mapping?')) return;
+    const { error } = await supabase.from('buyer_scm_mappings').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Mapping removed' });
+    await loadData();
+  };
+
+  const label = (u?: UserOpt) => (u ? (u.full_name || u.email) : '—');
+
+  return (
+    <div className="space-y-6">
+      {!tenantId && (
+        <div className="text-sm text-muted-foreground">
+          Select a specific tenant in the scope above to add new mappings. Showing mappings across all tenants.
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM Manager Mapping
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="text-xs text-muted-foreground">SCM Manager</label>
+              <Select value={scmId} onValueChange={setScmId} disabled={!tenantId}>
+                <SelectTrigger><SelectValue placeholder="Select SCM Manager" /></SelectTrigger>
+                <SelectContent>
+                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No SCM Managers in this tenant</div>}
+                  {scmUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Buyer</label>
+              <Select value={buyerId} onValueChange={setBuyerId} disabled={!tenantId}>
+                <SelectTrigger><SelectValue placeholder="Select Buyer" /></SelectTrigger>
+                <SelectContent>
+                  {buyerUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No Buyers in this tenant</div>}
+                  {buyerUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleSave} disabled={saving || !tenantId}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Save Mapping
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>Existing Mappings</span>
+            <Badge variant="outline">{mappings.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          ) : mappings.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No mappings yet.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SCM Manager</TableHead>
+                  <TableHead>Buyer</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mappings.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>{label(m.scm)}</TableCell>
+                    <TableCell>{label(m.buyer)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(m.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(m.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
