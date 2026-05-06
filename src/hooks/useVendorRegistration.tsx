@@ -692,6 +692,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         },
       });
 
+      // Notify the inviter that the vendor has resubmitted (best-effort)
+      try {
+        await supabase.functions.invoke('notify-vendor-submission', {
+          body: { vendorId, resubmission: true },
+        });
+      } catch (notifyError) {
+        console.error('[Vendor] Failed to send resubmission notification:', notifyError);
+      }
+
       setVendorStatus('validation_pending');
       await refetchVendor();
       return data;
