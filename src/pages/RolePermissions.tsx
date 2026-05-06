@@ -168,13 +168,32 @@ export default function RolePermissions({ tenantId = null, tenantLabel = 'All Te
           {loading ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="text-left p-3 sticky left-0 bg-card border-b font-medium text-sm">Screen</th>
-                    {allColumns.map((c) => (
-                      <th key={c.key} className="p-3 border-b text-center text-xs font-medium capitalize">
+            <>
+              {customRoles.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Jump to custom role:</span>
+                  {customRoles.map((cr) => (
+                    <button
+                      key={cr.id}
+                      onClick={() => scrollToCol(`custom:${cr.id}`)}
+                      className="text-xs px-2 py-1 rounded-full border bg-primary/5 hover:bg-primary/10 text-primary"
+                    >
+                      {cr.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-3 sticky left-0 bg-card border-b font-medium text-sm">Screen</th>
+                      {allColumns.map((c) => (
+                        <th
+                          key={c.key}
+                          ref={(el) => { colRefs.current[c.key] = el; }}
+                          className="p-3 border-b text-center text-xs font-medium capitalize"
+                        >
                         <div className="flex flex-col items-center gap-1">
                           <span>{c.label}</span>
                           {c.isCustom && <span className="text-[9px] text-primary font-normal normal-case">custom</span>}
