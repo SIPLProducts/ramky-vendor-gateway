@@ -23,6 +23,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useTenants, useTenantUserCounts } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
 
+type Stage = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
+
+const STAGE_LABELS: Record<Stage, string> = {
+  SCM_MANAGER: 'SCM Manager',
+  SCM_HEAD: 'SCM Head',
+  FINANCE_1: 'Finance 1',
+  FINANCE_2: 'Finance 2',
+  CEO_OFFICE: 'CEO Office',
+};
+
 interface Row {
   rowKey: string;
   level_id?: string;
@@ -31,6 +41,8 @@ interface Row {
   approval_mode: 'ANY' | 'ALL';
   approver_name: string;
   approver_email: string;
+  stage: Stage;
+  requires_msme: boolean;
 }
 
 interface RowError {
