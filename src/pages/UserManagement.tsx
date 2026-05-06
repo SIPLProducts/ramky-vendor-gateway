@@ -580,6 +580,11 @@ export default function UserManagement() {
         <TabsContent value="approval-matrix">
           <ApprovalMatrixConfig />
         </TabsContent>
+
+        {/* BUYER ↔ SCM MAPPING TAB */}
+        <TabsContent value="buyer-scm">
+          <BuyerScmMapping tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId} />
+        </TabsContent>
       </Tabs>
 
       {/* Dialogs */}
