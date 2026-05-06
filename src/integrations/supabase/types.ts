@@ -373,6 +373,41 @@ export type Database = {
           },
         ]
       }
+      buyer_scm_mappings: {
+        Row: {
+          buyer_user_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          scm_manager_user_id: string
+          tenant_id: string
+        }
+        Insert: {
+          buyer_user_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          scm_manager_user_id: string
+          tenant_id: string
+        }
+        Update: {
+          buyer_user_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          scm_manager_user_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_scm_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_role_screen_permissions: {
         Row: {
           can_access: boolean
