@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,16 @@ interface ScheduledCheckResult {
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Allow either: (a) a Supabase scheduler/cron call carrying CRON_SECRET, or
+  // (b) an authenticated admin/finance user triggering "Run Now" from the UI.
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const provided = req.headers.get("x-cron-secret");
+  const cronAuthorized = !!cronSecret && provided === cronSecret;
+  if (!cronAuthorized) {
+    const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance']);
+    if (!auth.ok) return authErrorResponse(auth, corsHeaders);
   }
 
   try {
