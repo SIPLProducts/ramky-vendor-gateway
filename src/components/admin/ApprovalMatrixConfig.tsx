@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,10 @@ const STAGE_LABELS: Record<Stage, string> = {
   FINANCE_2: 'Finance 2',
   CEO_OFFICE: 'CEO Office',
 };
+
+const STAGE_ORDER: Stage[] = ['SCM_MANAGER', 'SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'];
+const SINGLE_APPROVER_STAGES: Stage[] = ['SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'];
+const isSingleApproverStage = (s: Stage) => SINGLE_APPROVER_STAGES.includes(s);
 
 interface Row {
   rowKey: string;
@@ -69,6 +74,7 @@ export function ApprovalMatrixConfig() {
   const [tenantId, setTenantId] = useState<string>('');
   const [pendingTenantId, setPendingTenantId] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
+  const [activeStage, setActiveStage] = useState<Stage>('SCM_MANAGER');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingWrite, setTestingWrite] = useState(false);
@@ -135,12 +141,11 @@ export function ApprovalMatrixConfig() {
 
   const loadMatrix = async (tid: string) => {
     setLoading(true);
-    console.log('[ApprovalMatrix] loading matrix for tenant', tid);
     const { data: lvls } = await supabase
       .from('approval_matrix_levels')
       .select('*')
       .eq('tenant_id', tid)
-      .order('level_number', { ascending: false });
+      .order('level_number', { ascending: true });
 
     const levelIds = (lvls ?? []).map((l) => l.id);
     let appr: any[] = [];
@@ -152,7 +157,6 @@ export function ApprovalMatrixConfig() {
       appr = data ?? [];
     }
 
-    // Hydrate name/email even for legacy rows that only have user_id
     const legacyUserIds = appr.filter((a) => a.user_id && (!a.approver_name || !a.approver_email)).map((a) => a.user_id);
     let profileMap = new Map<string, { full_name: string | null; email: string }>();
     if (legacyUserIds.length > 0) {
@@ -163,6 +167,7 @@ export function ApprovalMatrixConfig() {
     const flat: Row[] = [];
     (lvls ?? []).forEach((l) => {
       const approvers = appr.filter((a) => a.level_id === l.id);
+      const stage = ((l as any).stage as Stage) ?? 'SCM_MANAGER';
       if (approvers.length === 0) {
         flat.push({
           rowKey: newRowKey(),
@@ -171,7 +176,7 @@ export function ApprovalMatrixConfig() {
           approval_mode: (l.approval_mode as 'ANY' | 'ALL') ?? 'ANY',
           approver_name: '',
           approver_email: '',
-          stage: ((l as any).stage as Stage) ?? 'SCM_MANAGER',
+          stage,
           requires_msme: !!(l as any).requires_msme,
         });
       } else {
@@ -185,7 +190,7 @@ export function ApprovalMatrixConfig() {
             approval_mode: (l.approval_mode as 'ANY' | 'ALL') ?? 'ANY',
             approver_name: a.approver_name ?? prof?.full_name ?? '',
             approver_email: a.approver_email ?? prof?.email ?? '',
-            stage: ((l as any).stage as Stage) ?? 'SCM_MANAGER',
+            stage,
             requires_msme: !!(l as any).requires_msme,
           });
         });
@@ -194,19 +199,37 @@ export function ApprovalMatrixConfig() {
     setRows(flat);
     setSavedSnapshot(JSON.stringify(flat.map(({ rowKey, ...r }) => r)));
     setLoading(false);
-    console.log('[ApprovalMatrix] hydrated', flat.length, 'rows');
   };
 
-  const levelNumbers = useMemo(() => {
-    const set = new Set(rows.map((r) => r.level_number));
-    const max = rows.length === 0 ? 0 : Math.max(...rows.map((r) => r.level_number));
-    const arr = Array.from(set).sort((a, b) => b - a);
-    if (!arr.includes(max + 1)) arr.unshift(max + 1);
+  // Rows for the active stage tab only
+  const stageRows = useMemo(() => rows.filter((r) => r.stage === activeStage), [rows, activeStage]);
+
+  // Level numbers available within SCM_MANAGER tab (multi-level)
+  const scmManagerLevels = useMemo(() => {
+    const scm = rows.filter((r) => r.stage === 'SCM_MANAGER');
+    const set = new Set(scm.map((r) => r.level_number));
+    const max = scm.length === 0 ? 0 : Math.max(...scm.map((r) => r.level_number));
+    const arr = Array.from(set).sort((a, b) => a - b);
+    if (!arr.includes(max + 1)) arr.push(max + 1);
     return arr;
   }, [rows]);
 
+  const stageCounts = useMemo(() => {
+    const c: Record<Stage, number> = { SCM_MANAGER: 0, SCM_HEAD: 0, FINANCE_1: 0, FINANCE_2: 0, CEO_OFFICE: 0 };
+    rows.forEach((r) => { c[r.stage] = (c[r.stage] ?? 0) + 1; });
+    return c;
+  }, [rows]);
+
   const addRow = () => {
-    const nextLevel = rows.length === 0 ? 1 : Math.max(...rows.map((r) => r.level_number));
+    if (isSingleApproverStage(activeStage) && stageRows.length >= 1) {
+      toast({ title: 'Only one approver allowed', description: `${STAGE_LABELS[activeStage]} accepts a single approver.`, variant: 'destructive' });
+      return;
+    }
+    let nextLevel = 1;
+    if (activeStage === 'SCM_MANAGER') {
+      const scm = rows.filter((r) => r.stage === 'SCM_MANAGER');
+      nextLevel = scm.length === 0 ? 1 : Math.max(...scm.map((r) => r.level_number));
+    }
     setRows((prev) => [
       ...prev,
       {
@@ -215,18 +238,10 @@ export function ApprovalMatrixConfig() {
         approval_mode: 'ANY',
         approver_name: '',
         approver_email: '',
-        stage: 'SCM_MANAGER',
-        requires_msme: false,
+        stage: activeStage,
+        requires_msme: activeStage === 'CEO_OFFICE',
       },
     ]);
-  };
-
-  const updateRowStage = (key: string, stage: Stage) => {
-    setRows((prev) => prev.map((r) =>
-      r.rowKey === key
-        ? { ...r, stage, requires_msme: stage === 'CEO_OFFICE' }
-        : r
-    ));
   };
 
   const updateRow = (key: string, patch: Partial<Row>) => {
@@ -234,47 +249,34 @@ export function ApprovalMatrixConfig() {
   };
 
   const updateLevelMode = (level_number: number, mode: 'ANY' | 'ALL') => {
-    setRows((prev) => prev.map((r) => (r.level_number === level_number ? { ...r, approval_mode: mode } : r)));
+    setRows((prev) => prev.map((r) =>
+      r.stage === 'SCM_MANAGER' && r.level_number === level_number ? { ...r, approval_mode: mode } : r
+    ));
   };
 
   const removeRow = (key: string) => setRows((prev) => prev.filter((r) => r.rowKey !== key));
-
-  const grouped = useMemo(() => {
-    const map = new Map<number, Row[]>();
-    rows.forEach((r) => {
-      const arr = map.get(r.level_number) ?? [];
-      arr.push(r);
-      map.set(r.level_number, arr);
-    });
-    return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
-  }, [rows]);
 
   const rowErrors = useMemo<RowError[]>(() => {
     const errs: RowError[] = [];
     const seenEmailPerLevel = new Map<string, number>();
     rows.forEach((r, idx) => {
       const rowNum = idx + 1;
-      if (!r.level_number || r.level_number < 1) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `Row ${rowNum} · Invalid Level #` });
-      }
       const name = r.approver_name.trim();
-      if (!name) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `Row ${rowNum} · Name required` });
-      } else if (name.length > 100) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `Row ${rowNum} · Name too long (max 100)` });
-      }
+      if (!name) errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `${STAGE_LABELS[r.stage]} · Name required` });
+      else if (name.length > 100) errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `${STAGE_LABELS[r.stage]} · Name too long` });
       const email = r.approver_email.trim();
-      if (!email) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `Row ${rowNum} · Email required` });
-      } else if (email.length > 255 || !EMAIL_RE.test(email)) {
-        errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `Row ${rowNum} · Invalid email` });
-      } else {
-        const key = `${r.level_number}::${email.toLowerCase()}`;
-        if (seenEmailPerLevel.has(key)) {
-          errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `Row ${rowNum} · Duplicate email at Level ${r.level_number}` });
-        }
+      if (!email) errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `${STAGE_LABELS[r.stage]} · Email required` });
+      else if (email.length > 255 || !EMAIL_RE.test(email)) errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `${STAGE_LABELS[r.stage]} · Invalid email` });
+      else {
+        const key = `${r.stage}::${r.level_number}::${email.toLowerCase()}`;
+        if (seenEmailPerLevel.has(key)) errs.push({ rowKey: r.rowKey, level_number: r.level_number, message: `${STAGE_LABELS[r.stage]} · Duplicate email` });
         seenEmailPerLevel.set(key, rowNum);
       }
+    });
+    // Single-approver enforcement
+    SINGLE_APPROVER_STAGES.forEach((s) => {
+      const count = rows.filter((r) => r.stage === s).length;
+      if (count > 1) errs.push({ rowKey: '', level_number: 0, message: `${STAGE_LABELS[s]} can only have one approver (currently ${count})` });
     });
     return errs;
   }, [rows]);
@@ -283,27 +285,52 @@ export function ApprovalMatrixConfig() {
   const canSave = !!tenantId && rows.length > 0 && rowErrors.length === 0 && !saving;
   const totalApprovers = rows.filter((r) => r.approver_email.trim() && r.approver_name.trim()).length;
 
+  // Build canonical save plan: SCM_MANAGER rows first (1..N preserving user level ordering), then SCM_HEAD, FINANCE_1, FINANCE_2, CEO_OFFICE
+  const buildSavePlan = () => {
+    const plan: { level_number: number; stage: Stage; approval_mode: 'ANY' | 'ALL'; rows: Row[] }[] = [];
+    // SCM_MANAGER: group by user-chosen level_number, sort ascending
+    const scmRows = rows.filter((r) => r.stage === 'SCM_MANAGER');
+    const scmGroups = new Map<number, Row[]>();
+    scmRows.forEach((r) => {
+      const arr = scmGroups.get(r.level_number) ?? [];
+      arr.push(r); scmGroups.set(r.level_number, arr);
+    });
+    const scmSortedKeys = [...scmGroups.keys()].sort((a, b) => a - b);
+    let counter = 1;
+    scmSortedKeys.forEach((k) => {
+      const group = scmGroups.get(k)!;
+      plan.push({ level_number: counter++, stage: 'SCM_MANAGER', approval_mode: group[0].approval_mode, rows: group });
+    });
+    // Other stages — single approver each
+    (['SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'] as Stage[]).forEach((s) => {
+      const r = rows.filter((x) => x.stage === s);
+      if (r.length > 0) plan.push({ level_number: counter++, stage: s, approval_mode: 'ANY', rows: r });
+    });
+    return plan;
+  };
+
+  const savePlan = useMemo(buildSavePlan, [rows]);
+
   const saveAll = async () => {
     if (!canSave) {
-      toast({ title: 'Cannot save', description: 'Fix the highlighted rows first.', variant: 'destructive' });
+      toast({ title: 'Cannot save', description: 'Fix the highlighted issues first.', variant: 'destructive' });
       return;
     }
     setSaving(true);
-    console.log('[ApprovalMatrix] saving', rows.length, 'rows across', grouped.length, 'levels');
     try {
       const keptLevelIds: string[] = [];
       let savedApprovers = 0;
-      for (const [levelNumber, group] of grouped) {
-        const first = group[0];
+      for (const grp of savePlan) {
+        const first = grp.rows[0];
         let levelId = first.level_id;
         const levelPayload: any = {
           tenant_id: tenantId,
-          level_number: levelNumber,
-          level_name: `Level ${levelNumber} · ${STAGE_LABELS[first.stage]}`,
+          level_number: grp.level_number,
+          level_name: `Level ${grp.level_number} · ${STAGE_LABELS[grp.stage]}`,
           designation: null,
-          approval_mode: first.approval_mode,
-          stage: first.stage,
-          requires_msme: first.stage === 'CEO_OFFICE' ? true : !!first.requires_msme,
+          approval_mode: grp.approval_mode,
+          stage: grp.stage,
+          requires_msme: grp.stage === 'CEO_OFFICE',
         };
         if (levelId) {
           const { error } = await supabase.from('approval_matrix_levels').update(levelPayload).eq('id', levelId);
@@ -320,7 +347,7 @@ export function ApprovalMatrixConfig() {
         keptLevelIds.push(levelId!);
 
         await supabase.from('approval_matrix_approvers').delete().eq('level_id', levelId);
-        const approverRows = group.map((r) => ({
+        const approverRows = grp.rows.map((r) => ({
           level_id: levelId!,
           user_id: null,
           approver_name: r.approver_name.trim(),
@@ -347,20 +374,15 @@ export function ApprovalMatrixConfig() {
       await supabase.from('audit_logs').insert({
         action: 'approval_matrix_saved',
         user_id: user?.id,
-        details: { tenant_id: tenantId, level_count: grouped.length, row_count: rows.length },
+        details: { tenant_id: tenantId, level_count: savePlan.length, row_count: rows.length },
       });
 
-      console.log('[ApprovalMatrix] done — saved', grouped.length, 'levels and', savedApprovers, 'approvers');
-      setLastSaveResult({ levels: grouped.length, approvers: savedApprovers, at: Date.now() });
-      toast({ title: 'Approval matrix saved', description: `${grouped.length} level(s), ${savedApprovers} approver(s)` });
+      setLastSaveResult({ levels: savePlan.length, approvers: savedApprovers, at: Date.now() });
+      toast({ title: 'Approval matrix saved', description: `${savePlan.length} level(s), ${savedApprovers} approver(s)` });
       await Promise.all([loadMatrix(tenantId), loadDbState(tenantId)]);
     } catch (e: any) {
       console.error('[ApprovalMatrix] Save failed:', e);
-      toast({
-        title: 'Save failed',
-        description: e?.message ?? 'Unknown error — check browser console for details.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Save failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -377,40 +399,136 @@ export function ApprovalMatrixConfig() {
         designation: null,
         approval_mode: 'ANY',
       };
-      const { data, error } = await supabase
-        .from('approval_matrix_levels')
-        .insert(sentinel)
-        .select('id')
-        .single();
+      const { data, error } = await supabase.from('approval_matrix_levels').insert(sentinel).select('id').single();
       if (error) throw error;
-      const id = data.id;
-      const { error: delErr } = await supabase.from('approval_matrix_levels').delete().eq('id', id);
+      const { error: delErr } = await supabase.from('approval_matrix_levels').delete().eq('id', data.id);
       if (delErr) throw delErr;
       toast({ title: 'Write access OK', description: 'Insert + delete succeeded for this tenant.' });
     } catch (e: any) {
-      toast({
-        title: 'Write access FAILED',
-        description: e?.message ?? 'Check console for full error.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Write access FAILED', description: e?.message ?? 'Check console', variant: 'destructive' });
     } finally {
       setTestingWrite(false);
     }
   };
 
   const handleTenantChange = (next: string) => {
-    if (isDirty && next !== tenantId) {
-      setPendingTenantId(next);
-    } else {
-      setTenantId(next);
-    }
+    if (isDirty && next !== tenantId) setPendingTenantId(next);
+    else setTenantId(next);
   };
 
   const confirmTenantSwitch = () => {
-    if (pendingTenantId) {
-      setTenantId(pendingTenantId);
-      setPendingTenantId(null);
-    }
+    if (pendingTenantId) { setTenantId(pendingTenantId); setPendingTenantId(null); }
+  };
+
+  const renderRowsTable = () => {
+    const showStageColumn = false; // stage is fixed by the active tab
+    const showLevelColumn = activeStage === 'SCM_MANAGER';
+    const showModeColumn = activeStage === 'SCM_MANAGER';
+    const single = isSingleApproverStage(activeStage);
+    const canAdd = !single || stageRows.length === 0;
+
+    return (
+      <div className="border rounded-md overflow-x-auto">
+        <Table className="min-w-[600px]">
+          <TableHeader>
+            <TableRow>
+              {showLevelColumn && <TableHead className="w-24">Level #</TableHead>}
+              <TableHead className="w-64">Approver Name</TableHead>
+              <TableHead className="w-72">Email</TableHead>
+              {showModeColumn && <TableHead className="w-32">Mode</TableHead>}
+              <TableHead className="w-12"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+              ))
+            ) : stageRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                  No approver configured for {STAGE_LABELS[activeStage]}. Click <strong>+ Add Approver</strong> to start.
+                </TableCell>
+              </TableRow>
+            ) : (
+              stageRows.map((r) => {
+                const hasError = errorRowKeys.has(r.rowKey);
+                const nameInvalid = !r.approver_name.trim();
+                const emailVal = r.approver_email.trim();
+                const emailInvalid = !emailVal || !EMAIL_RE.test(emailVal);
+                return (
+                  <TableRow key={r.rowKey} className={cn(hasError && 'bg-destructive/5')}>
+                    {showLevelColumn && (
+                      <TableCell>
+                        <Select
+                          value={String(r.level_number)}
+                          onValueChange={(v) => updateRow(r.rowKey, { level_number: Number(v) })}
+                        >
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {scmManagerLevels.map((n) => (
+                              <SelectItem key={n} value={String(n)}>L{n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Input
+                        value={r.approver_name}
+                        maxLength={100}
+                        placeholder="e.g. Jane Doe"
+                        className={cn('h-8', nameInvalid && 'border-destructive')}
+                        onChange={(e) => updateRow(r.rowKey, { approver_name: e.target.value })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="email"
+                        value={r.approver_email}
+                        maxLength={255}
+                        placeholder="e.g. jane@company.com"
+                        className={cn('h-8', emailInvalid && 'border-destructive')}
+                        onChange={(e) => updateRow(r.rowKey, { approver_email: e.target.value })}
+                      />
+                    </TableCell>
+                    {showModeColumn && (
+                      <TableCell>
+                        <Select
+                          value={r.approval_mode}
+                          onValueChange={(v) => updateLevelMode(r.level_number, v as 'ANY' | 'ALL')}
+                        >
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ANY">ANY one</SelectItem>
+                            <SelectItem value="ALL">ALL must</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => removeRow(r.rowKey)} className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+        <div className="flex items-center justify-between p-3 border-t bg-muted/20">
+          <div className="text-xs text-muted-foreground">
+            {single
+              ? 'Only one approver allowed for this stage.'
+              : 'You can add multiple levels (L1, L2, L3…) and multiple approvers per level. Lower level acts first.'}
+          </div>
+          <Button size="sm" variant="outline" onClick={addRow} disabled={!canAdd}>
+            <Plus className="h-4 w-4 mr-1" /> Add Approver
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -434,21 +552,10 @@ export function ApprovalMatrixConfig() {
           </Select>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
-          {isDirty && !loading && (
-            <Badge variant="destructive" className="animate-pulse">Unsaved changes</Badge>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={testWriteAccess}
-            disabled={!tenantId || testingWrite}
-            title="Insert + delete a sentinel row to verify RLS / network"
-          >
+          {isDirty && !loading && <Badge variant="destructive" className="animate-pulse">Unsaved changes</Badge>}
+          <Button variant="outline" size="sm" onClick={testWriteAccess} disabled={!tenantId || testingWrite}>
             {testingWrite ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-1" />}
             Test write access
-          </Button>
-          <Button variant="outline" onClick={addRow} disabled={!tenantId}>
-            <Plus className="h-4 w-4 mr-1" /> Add Row
           </Button>
           <Button onClick={saveAll} disabled={!canSave} variant={isDirty ? 'default' : 'secondary'}>
             <Save className="h-4 w-4 mr-1" /> {saving ? 'Saving...' : 'Save All'}
@@ -478,7 +585,6 @@ export function ApprovalMatrixConfig() {
         </div>
       )}
 
-      {/* Save success banner */}
       {lastSaveResult && (
         <div className="flex items-center gap-2 p-3 rounded-md border border-green-500/40 bg-green-500/10 text-sm">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -495,33 +601,25 @@ export function ApprovalMatrixConfig() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               {rowErrors.length === 0 && rows.length > 0 ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  Diagnostics — all rows valid
-                </>
+                <><CheckCircle2 className="h-4 w-4 text-green-600" /> Diagnostics — all rows valid</>
               ) : (
-                <>
-                  <AlertTriangle className={cn('h-4 w-4', rowErrors.length > 0 ? 'text-destructive' : 'text-muted-foreground')} />
-                  Diagnostics
-                </>
+                <><AlertTriangle className={cn('h-4 w-4', rowErrors.length > 0 ? 'text-destructive' : 'text-muted-foreground')} /> Diagnostics</>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-2">
             <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
               <span>Rows: <strong className="text-foreground">{rows.length}</strong></span>
-              <span>Levels: <strong className="text-foreground">{grouped.length}</strong></span>
+              <span>Levels: <strong className="text-foreground">{savePlan.length}</strong></span>
               <span>Approvers: <strong className="text-foreground">{totalApprovers}</strong></span>
               <span>Issues: <strong className={cn(rowErrors.length > 0 ? 'text-destructive' : 'text-foreground')}>{rowErrors.length}</strong></span>
             </div>
             {rowErrors.length > 0 ? (
               <ul className="text-xs space-y-1 mt-2 max-h-32 overflow-auto">
-                {rowErrors.map((e, i) => (
-                  <li key={i} className="text-destructive">• {e.message}</li>
-                ))}
+                {rowErrors.map((e, i) => <li key={i} className="text-destructive">• {e.message}</li>)}
               </ul>
             ) : rows.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Add at least one row to begin.</p>
+              <p className="text-xs text-muted-foreground">Add at least one approver to begin.</p>
             ) : (
               <p className="text-xs text-muted-foreground">Ready to save. Click <strong>Save All</strong> to persist.</p>
             )}
@@ -530,7 +628,7 @@ export function ApprovalMatrixConfig() {
       )}
 
       {/* Chain preview */}
-      {grouped.length > 0 && (
+      {savePlan.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Approval Chain (Vendor Submitted → SAP Sync)</CardTitle>
@@ -539,11 +637,9 @@ export function ApprovalMatrixConfig() {
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge variant="outline">Vendor Submitted</Badge>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              {[...grouped].reverse().map(([num, group]) => (
-                <span key={num} className="flex items-center gap-2">
-                  <Badge>
-                    Level {num} · {group.length} approver{group.length > 1 ? 's' : ''}
-                  </Badge>
+              {savePlan.map((g) => (
+                <span key={g.level_number} className="flex items-center gap-2">
+                  <Badge>L{g.level_number} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}</Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </span>
               ))}
@@ -553,122 +649,34 @@ export function ApprovalMatrixConfig() {
         </Card>
       )}
 
-      {/* Table */}
+      {/* Stage tabs */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Approvers (one row per person · group rows by Level # for co-approvers)</CardTitle>
+          <CardTitle className="text-base">Approvers by Stage</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-md overflow-x-auto">
-            <Table className="min-w-[800px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-24">Level #</TableHead>
-                  <TableHead className="w-44">Stage</TableHead>
-                  <TableHead className="w-64">Approver Name</TableHead>
-                  <TableHead className="w-72">Email</TableHead>
-                  <TableHead className="w-32">Mode</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                      No approvers configured for this tenant. Click <strong>+ Add Row</strong> to start.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((r) => {
-                    const hasError = errorRowKeys.has(r.rowKey);
-                    const nameInvalid = !r.approver_name.trim();
-                    const emailVal = r.approver_email.trim();
-                    const emailInvalid = !emailVal || !EMAIL_RE.test(emailVal);
-                    return (
-                      <TableRow key={r.rowKey} className={cn(hasError && 'bg-destructive/5')}>
-                        <TableCell>
-                          <Select
-                            value={String(r.level_number)}
-                            onValueChange={(v) => updateRow(r.rowKey, { level_number: Number(v) })}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {levelNumbers.map((n) => (
-                                <SelectItem key={n} value={String(n)}>L{n}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={r.stage}
-                            onValueChange={(v) => updateRowStage(r.rowKey, v as Stage)}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {(Object.keys(STAGE_LABELS) as Stage[]).map((s) => (
-                                <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {r.stage === 'CEO_OFFICE' && (
-                            <p className="text-[10px] text-muted-foreground mt-1">Runs only for MSME vendors</p>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={r.approver_name}
-                            maxLength={100}
-                            placeholder="e.g. Jane Doe"
-                            className={cn('h-8', nameInvalid && 'border-destructive')}
-                            onChange={(e) => updateRow(r.rowKey, { approver_name: e.target.value })}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="email"
-                            value={r.approver_email}
-                            maxLength={255}
-                            placeholder="e.g. jane@company.com"
-                            className={cn('h-8', emailInvalid && 'border-destructive')}
-                            onChange={(e) => updateRow(r.rowKey, { approver_email: e.target.value })}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={r.approval_mode}
-                            onValueChange={(v) => updateLevelMode(r.level_number, v as 'ANY' | 'ALL')}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ANY">ANY one</SelectItem>
-                              <SelectItem value="ALL">ALL must</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeRow(r.rowKey)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+          <Tabs value={activeStage} onValueChange={(v) => setActiveStage(v as Stage)}>
+            <TabsList className="grid grid-cols-5 w-full">
+              {STAGE_ORDER.map((s) => (
+                <TabsTrigger key={s} value={s} className="text-xs">
+                  {STAGE_LABELS[s]}
+                  {stageCounts[s] > 0 && (
+                    <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">{stageCounts[s]}</Badge>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {STAGE_ORDER.map((s) => (
+              <TabsContent key={s} value={s} className="mt-4">
+                {s === 'CEO_OFFICE' && (
+                  <div className="mb-3 text-xs text-muted-foreground p-2 rounded bg-muted/40 border">
+                    CEO Office runs <strong>only for MSME-registered vendors</strong>.
+                  </div>
                 )}
-              </TableBody>
-            </Table>
-          </div>
+                {renderRowsTable()}
+              </TabsContent>
+            ))}
+          </Tabs>
         </CardContent>
       </Card>
 
