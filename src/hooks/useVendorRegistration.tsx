@@ -289,6 +289,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       ifsc_code: formData.bank.ifscCode,
       micr_code: formData.bank.micrCode || null,
       bank_address: formData.bank.bankAddress || null,
+      // Secondary Bank (optional)
+      bank_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.bankName || null) : null,
+      branch_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.branchName || null) : null,
+      account_number_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.accountNumber || null) : null,
+      ifsc_code_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.ifscCode || null) : null,
+      account_holder_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.accountHolderName || null) : null,
+      account_type_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.accountType || null) : null,
+      bank_address_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.bankAddress || null) : null,
+      micr_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.micrCode || null) : null,
       // Financial
       turnover_year1: formData.financial.turnoverYear1
         ? parseFloat(formData.financial.turnoverYear1.replace(/,/g, ''))
