@@ -617,19 +617,28 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       if (updateError) throw updateError;
 
-      // Initialise approval matrix progress (best-effort)
+      // Initialise approval matrix progress
       try {
-        const { data: routeData } = await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendor.id } });
-        const msg = (routeData as { message?: string } | null)?.message ?? '';
-        if (/no matrix/i.test(msg) || /skipping/i.test(msg)) {
+        const { data: routeData, error: routeErr } = await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendor.id } });
+        if (routeErr) {
+          console.error('route-vendor-approval error:', routeErr);
           toast({
-            title: 'Approval matrix not configured',
-            description: 'Your submission was received, but no SCM approval matrix is configured for this buyer company. An admin must set it up before approvers can act.',
+            title: 'Approval routing failed',
+            description: routeErr.message || 'Could not seed approval workflow. Please contact admin.',
             variant: 'destructive',
           });
+        } else {
+          const msg = (routeData as { message?: string } | null)?.message ?? '';
+          if (/no matrix/i.test(msg) || /skipping/i.test(msg)) {
+            toast({
+              title: 'Approval matrix not configured',
+              description: 'Your submission was received, but no SCM approval matrix is configured for this buyer company. An admin must set it up before approvers can act.',
+              variant: 'destructive',
+            });
+          }
         }
       } catch (e) {
-        console.warn('route-vendor-approval failed (non-blocking):', e);
+        console.error('route-vendor-approval threw:', e);
       }
 
       // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
