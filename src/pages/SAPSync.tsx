@@ -672,6 +672,14 @@ export default function SAPSync() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SapFieldsDialog
+        open={showSapFieldsDialog}
+        onOpenChange={(o) => { setShowSapFieldsDialog(o); if (!o) setPendingSyncVendor(null); }}
+        vendor={pendingSyncVendor}
+        onConfirm={handleConfirmSync}
+        isSubmitting={!!syncingVendorId}
+      />
     </div>
   );
 }
