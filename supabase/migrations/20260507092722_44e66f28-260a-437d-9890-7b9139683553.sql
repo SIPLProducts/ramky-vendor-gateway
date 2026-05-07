@@ -1,0 +1,11 @@
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'scm_manager_review';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'scm_manager_rejected';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'scm_head_review';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'scm_head_rejected';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'finance_1_review';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'finance_1_rejected';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'finance_2_review';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'finance_2_rejected';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'ceo_office_review';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'ceo_office_rejected';
+ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'pending_sap_sync';
