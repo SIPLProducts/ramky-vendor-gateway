@@ -296,8 +296,12 @@ serve(async (req) => {
       }
     }
 
-    const payload = [buildPayload(vendor)];
-    console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl);
+    const row = buildPayload(vendor);
+    const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
+    (row as any).UPLOAD = uploads;
+    if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
+    const payload = [row];
+    console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl, "uploads:", uploads.length);
 
     let sapResponse: any[] | null = null;
     let httpStatus = 0;
