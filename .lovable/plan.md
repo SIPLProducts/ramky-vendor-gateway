@@ -1,57 +1,69 @@
-## Add Optional Second Bank + Documents Tab in Approval View
+## Add UPLOAD array (file_name + base64 + path) to SAP sync payload
 
-Three coordinated changes: (1) optional second bank in registration with same OCR + penny-drop verification, (2) ensure all bank fields + uploaded cheque persist to DB, (3) add a Documents tab inside a "View" popup on stage approval screens.
+### Background — what already exists
 
----
+- All vendor uploads (PAN, GST cert, GST self-declaration, MSME cert, cancelled cheque #1, cancelled cheque #2, financial docs, dealership certificate, etc.) are uploaded to the `vendor-documents` Supabase Storage bucket and indexed in `public.vendor_documents` (vendor_id, document_type, file_name, file_path, mime_type, …) — see `src/hooks/useVendorRegistration.tsx` (`uploadAllDocuments` / `saveDocumentMetadata`).
+- The Approval screen "View" dialog already has a **Documents** tab that lists every row from `vendor_documents` with preview + download (added in the previous round via `StageApprovalView.tsx` + `VendorDocuments.tsx`). Nothing to redo there — only verifying the new `cancelled_cheque_2` and any other types render with friendly labels.
 
-### 1. Database migration
+So the only missing piece is: **the SAP BP-create payload does not yet send the uploaded files**. Right now `buildPayload(vendor)` in `supabase/functions/sync-vendor-to-sap/index.ts` returns a single object with no `UPLOAD` key.
 
-Add to `public.vendors` (all nullable):
-- `bank_name_2`, `branch_name_2`, `account_number_2`, `ifsc_code_2`
-- `account_holder_name_2`, `account_type_2`, `bank_address_2`, `micr_2`
+### Change 1 — extend SAP payload with `UPLOAD` array
 
-Allow `'cancelled_cheque_2'` as a `vendor_documents.document_type` value (no schema change — it's free-text; just used as a new constant).
+In `supabase/functions/sync-vendor-to-sap/index.ts`:
 
-### 2. Vendor Registration — Bank tab (`DocumentVerificationStep.tsx`)
+1. After loading the vendor, query `vendor_documents` for that `vendor_id`.
+2. For each row, download the binary from Storage:
+   ```ts
+   const { data: blob } = await supabase.storage
+     .from('vendor-documents')
+     .download(file_path);
+   ```
+   Convert the blob to base64 (chunked to avoid stack overflow on large files).
+3. Map each `document_type` to the SAP-friendly **FILE_NAME** the user requested:
 
-- Keep the existing cheque uploader as **Primary Bank Account** (mandatory, unchanged).
-- Below it add a button **"+ Add Another Bank Account"** that reveals a second uploader section (`bankDoc2` state, `bankAccountType2`, `bankBranchAddress2`).
-- The second uploader reuses `runDocFlow('cheque', file, setBankDoc2, …)` so OCR auto-fill, penny-drop, IFSC enrichment, and GST/PAN name match run identically.
-- A "Remove" button next to the second section clears `bankDoc2` and reverts it to optional/hidden.
-- `allDone` requires primary verified; if secondary is added it must also be verified before submission. Primary alone is sufficient when secondary is not added.
-- Tab status pill shows combined progress.
+   | document_type           | FILE_NAME (sent to SAP) |
+   |-------------------------|-------------------------|
+   | pan_card                | pan                     |
+   | gst_certificate         | gst                     |
+   | gst_self_declaration    | gst_self_declaration    |
+   | msme_certificate        | msme                    |
+   | cancelled_cheque        | bank_cheque1            |
+   | cancelled_cheque_2      | bank_cheque2            |
+   | financial_docs          | financials              |
+   | dealership_certificate  | dealership              |
+   | iec_certificate         | iec                     |
+   | swift_iban_proof        | swift_iban              |
+   | incorporation_certificate | incorporation         |
+   | other                   | other                   |
 
-### 3. Persistence (`useVendorRegistration.tsx` + types)
+   (Unknown types fall back to `document_type` itself.)
+4. Build each entry as:
+   ```json
+   { "FILE_NAME": "pan", "FILE": "<base64>", "FILE_PATH": "<vendor_documents.file_path>" }
+   ```
+5. Add `UPLOAD: [...]` to the row returned by `buildPayload`. Empty array if vendor has no docs.
 
-- Extend `BankDetails` in `src/types/vendor.ts` with optional `secondary` block (same fields as primary + `enabled` flag).
-- On save: when secondary present, write `bank_name_2`, `account_number_2`, `ifsc_code_2`, `account_holder_name_2`, `branch_name_2`, `account_type_2`, `bank_address_2`, `micr_2` to `vendors`.
-- Upload the secondary cheque file with `document_type: 'cancelled_cheque_2'` to bucket `vendor-documents`, recorded in `vendor_documents`.
-- On load, hydrate `formData.bank.secondary` from the new columns + matching document.
-- Audit confirmed: all other registration form fields (org, address, contact, statutory, financial, infra, QHSE) already persist via existing column mappings — no additional change needed beyond the new bank columns.
+Guardrails:
+- Skip files larger than ~10 MB and log a warning (base64 + Edge Function memory limit).
+- Wrap document fetch in try/catch per file so one bad file doesn't break the whole sync; failed files are omitted and reported in the response message.
+- Keep `payload` as `[ row ]` (array-of-one) — existing SAP contract.
 
-### 4. Approval screens — add View popup with Documents tab
+### Change 2 — pass `vendor` row + supabase client into builder
 
-Currently `StageApprovalView.tsx` (used by SCM Manager / SCM Head / Finance 1 / Finance 2 / CEO Office screens) has Approve / Reject buttons but no "View".
+`buildPayload` becomes `async buildPayload(vendor, supabase)` (or a separate `buildUploads(...)` helper called inside `serve`). Same call site, just `await`ed.
 
-- Add a **View** button per row that opens a wide dialog (`max-w-5xl`) with tabs:
-  - **Overview** — vendor name, PAN, GSTIN, status, submitted-at.
-  - **Bank Details** — primary + secondary bank rows when present.
-  - **Documents** — reuses `<VendorDocuments vendorId={…} />` (already supports listing, preview via signed URL, and download).
-- `VendorDocuments.tsx`: extend `documentTypeLabels` with `cancelled_cheque_2: 'Cancelled Cheque (Secondary)'`, `gst_self_declaration`, `iec_certificate`, `swift_iban_proof`, `dealership_certificate` so all uploaded types render with friendly labels.
-- Approver verification action (mark-as-verified) is out of scope of this round; download + view fulfills the verification need. (Can be added later as a per-document checkbox if you need an explicit audit trail.)
+### Change 3 — minor: friendly labels (sanity check)
+
+`src/components/vendor/VendorDocuments.tsx` already has labels for all current document types. No code change needed unless we discover a missing key during testing.
 
 ### Out of scope
 
-- Mapping secondary bank into SAP sync payload (existing sync untouched; can be wired once SAP field IDs confirmed).
-- More than 2 bank accounts.
-- Per-document approver "verified ✓" status.
+- Re-uploading docs from the approval screen (the dialog only views/downloads).
+- Streaming very large files — keeping the 10 MB cap is consistent with existing upload limits.
+- Changing storage layout or adding a second storage bucket.
 
 ### Files touched
 
-- New migration: `supabase/migrations/<ts>_add_secondary_bank_columns.sql`
-- `src/types/vendor.ts`
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-- `src/components/vendor/steps/ReviewStep.tsx` (show secondary bank in summary)
-- `src/components/vendor/VendorDocuments.tsx` (extra labels)
-- `src/components/approvals/StageApprovalView.tsx` (View button + tabs dialog)
+- `supabase/functions/sync-vendor-to-sap/index.ts` — add `UPLOAD` array with FILE_NAME + base64 + FILE_PATH.
+
+That's it — registration-side persistence and approval-side viewing are already wired up from the previous round; this round just makes those same files flow into the SAP payload as the user specified.

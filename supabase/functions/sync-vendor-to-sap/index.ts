@@ -69,6 +69,72 @@ function resolveRegion(state: string | null | undefined): string {
 
 const trunc = (v: any, n: number) => (v == null ? "" : String(v)).slice(0, n);
 
+// Map internal document_type to SAP-friendly file name label
+const DOC_NAME_MAP: Record<string, string> = {
+  pan_card: "pan",
+  gst_certificate: "gst",
+  gst_self_declaration: "gst_self_declaration",
+  msme_certificate: "msme",
+  cancelled_cheque: "bank_cheque1",
+  cancelled_cheque_2: "bank_cheque2",
+  financial_docs: "financials",
+  dealership_certificate: "dealership",
+  iec_certificate: "iec",
+  swift_iban_proof: "swift_iban",
+  incorporation_certificate: "incorporation",
+  other: "other",
+};
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB cap per file
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + chunk)) as any);
+  }
+  return btoa(binary);
+}
+
+async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
+  const uploads: any[] = [];
+  const skipped: string[] = [];
+  const { data: docs, error } = await supabase
+    .from("vendor_documents")
+    .select("document_type, file_name, file_path, file_size")
+    .eq("vendor_id", vendorId);
+  if (error) {
+    console.error("Failed to load vendor_documents:", error.message);
+    return { uploads, skipped };
+  }
+  for (const d of docs || []) {
+    try {
+      if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+        skipped.push(`${d.file_name} (>10MB)`);
+        continue;
+      }
+      const { data: blob, error: dlErr } = await supabase.storage
+        .from("vendor-documents")
+        .download(d.file_path);
+      if (dlErr || !blob) {
+        skipped.push(`${d.file_name} (download failed)`);
+        continue;
+      }
+      const base64 = await blobToBase64(blob);
+      uploads.push({
+        FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
+        FILE: base64,
+        FILE_PATH: d.file_path,
+      });
+    } catch (e: any) {
+      console.error(`Upload build failed for ${d.file_name}:`, e?.message);
+      skipped.push(d.file_name);
+    }
+  }
+  return { uploads, skipped };
+}
+
 function buildPayload(vendor: any) {
   const legalName = vendor.legal_name || "";
   const tradeName = vendor.trade_name || "";
