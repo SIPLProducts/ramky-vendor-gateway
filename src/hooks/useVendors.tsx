@@ -582,13 +582,13 @@ export function useVendorStats() {
         total: data.length,
         pendingFinance: data.filter(v => v.status === 'finance_review').length,
         pendingPurchase: data.filter(v => v.status === 'purchase_review').length,
-        pendingSAPSync: data.filter(v => v.status === 'purchase_approved').length,
+        pendingSAPSync: data.filter(v => ['pending_sap_sync', 'purchase_approved'].includes(v.status)).length,
         approved: data.filter(v => v.status === 'sap_synced').length,
         validationFailed: data.filter(v => v.status === 'validation_failed').length,
         draft: data.filter(v => v.status === 'draft').length,
         submitted: data.filter(v => v.status === 'submitted').length,
         pendingVerification: data.filter(v => ['submitted', 'validation_pending'].includes(v.status)).length,
-        activeVendors: data.filter(v => ['sap_synced', 'purchase_approved', 'finance_approved'].includes(v.status)).length,
+        activeVendors: data.filter(v => ['sap_synced', 'pending_sap_sync', 'purchase_approved', 'finance_approved'].includes(v.status)).length,
         byCompany: data.reduce((acc, v) => {
           const tenantId = v.tenant_id || 'unassigned';
           if (!acc[tenantId]) {
@@ -598,7 +598,7 @@ export function useVendorStats() {
           if (['finance_review', 'purchase_review', 'validation_pending'].includes(v.status)) {
             acc[tenantId].pending++;
           }
-          if (['sap_synced', 'purchase_approved', 'finance_approved'].includes(v.status)) {
+          if (['sap_synced', 'pending_sap_sync', 'purchase_approved', 'finance_approved'].includes(v.status)) {
             acc[tenantId].approved++;
           }
           if (['finance_rejected', 'purchase_rejected', 'validation_failed'].includes(v.status)) {
