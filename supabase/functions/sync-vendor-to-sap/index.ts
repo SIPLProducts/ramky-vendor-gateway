@@ -135,14 +135,33 @@ async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uplo
   return { uploads, skipped };
 }
 
-function buildPayload(vendor: any) {
+type SapDefaults = {
+  partn_cat: string; partn_grp: string; title: string; taxtype: string;
+  bukrs: string; akont: string; zuawa: string; fdgrv: string;
+  vkorg: string; waers: string; kalsk: string; cdi: string;
+  webre: string; lebre: string; ven_class: string;
+};
+
+const FALLBACK_DEFAULTS: SapDefaults = {
+  partn_cat: "2", partn_grp: "ZDOM", title: "0003", taxtype: "IN3",
+  bukrs: "1000", akont: "155000005", zuawa: "014", fdgrv: "A1",
+  vkorg: "1000", waers: "INR", kalsk: "L1", cdi: "X",
+  webre: "X", lebre: "X", ven_class: "",
+};
+
+function buildPayload(vendor: any, defaults: SapDefaults) {
   const legalName = vendor.legal_name || "";
   const tradeName = vendor.trade_name || "";
+  const relativeName = vendor.relative_name || "";
+  const accountHolder = vendor.account_holder_name || "";
   const region = resolveRegion(vendor.registered_state);
+  const isMsme = !!vendor.msme_number;
 
   const row: Record<string, any> = {
-    bpartner: "", partn_cat: "2", partn_grp: "ZDOM", title: "",
-    name1: trunc(legalName, 40), name2: trunc(tradeName, 40), name3: "",
+    bpartner: "", partn_cat: defaults.partn_cat, partn_grp: defaults.partn_grp, title: defaults.title,
+    name1: trunc(legalName, 40),
+    name2: trunc(relativeName, 40),
+    name3: "",
     sterm1: trunc(legalName, 20), sterm2: trunc((tradeName.split(" ")[0] || ""), 20),
     street: trunc(vendor.registered_address, 60),
     house_no: trunc(vendor.registered_address_line2, 10),
@@ -156,22 +175,24 @@ function buildPayload(vendor: any) {
     tel_number: trunc(vendor.registered_phone, 30),
     mob_number: trunc(vendor.primary_phone, 30),
     smtp_addr: trunc(vendor.primary_email, 241),
-    taxtype: "IN3", taxnumxl: trunc(vendor.gstin, 20),
-    legaform: "", legaenty: "", bp_type: "", due_digi: "", idtype: "", idnum: "",
+    taxtype: defaults.taxtype, taxnumxl: trunc(vendor.gstin, 20),
+    legaform: "", legaenty: "", bp_type: "", due_digi: "",
+    idtype: isMsme ? "ZMSMEN" : "",
+    idnum: isMsme ? trunc(vendor.msme_number, 20) : "",
     bankdetailid: "0001", bank_ctry: "IN",
     bank_key: trunc(vendor.ifsc_code, 15), bank_acct: trunc(vendor.account_number, 18),
     ctrl_key: "",
-    accountholder: trunc(legalName, 60),
-    bankaccountname: trunc(vendor.bank_name, 60),
-    pernr: "", bukrs: "1000", akont: "155000005", zuawa: "014",
-    cdi: "X", fdgrv: "A1", xzver: "",
-    msme: vendor.msme_number ? "MIC" : "",
+    accountholder: trunc(accountHolder, 60),
+    bankaccountname: trunc(accountHolder, 60),
+    pernr: "", bukrs: defaults.bukrs, akont: defaults.akont, zuawa: defaults.zuawa,
+    cdi: defaults.cdi, fdgrv: defaults.fdgrv, xzver: "",
+    msme: isMsme ? "MIC" : "",
     j_1iexcd: "", j_1iexrn: "", j_1iexrg: "", j_1iexdi: "", j_1iexco: "",
     j_1iexcicu: "", j_1icstno: "", j_1ilstno: "",
     j_1ipanno: trunc(vendor.pan, 10), j_1isern: "",
     witht: "", wt_withcd: "", wt_subjct: "", qsrec: "", qland: "",
-    vkorg: "1000", waers: "INR", zterm: "",
-    inco1: "", inco2: "", kalsk: "L1", webre: "X", lebre: "X", ven_class: "",
+    vkorg: defaults.vkorg, waers: defaults.waers, zterm: "",
+    inco1: "", inco2: "", kalsk: defaults.kalsk, webre: defaults.webre, lebre: defaults.lebre, ven_class: defaults.ven_class,
     zvkorg: "", vtweg: "", spart: "", bzirk: "", kdgrp: "", vkbur: "", vkgrp: "",
     zwaers: "", kurst: "", konda: "", kalks: "", pltyp: "", versg: "", lprio: "",
     kzazu: "", vsbed: "", untto: "", uebto: "", zinco1: "", zinco2: "", zzterm: "",
@@ -195,7 +216,7 @@ function fail(message: string, extra: Record<string, any> = {}) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance']);
+  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'SAP Team']);
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
@@ -296,7 +317,36 @@ serve(async (req) => {
       }
     }
 
-    const row = buildPayload(vendor);
+    // Load tenant SAP defaults (fall back to constants if missing)
+    let defaults: SapDefaults = { ...FALLBACK_DEFAULTS };
+    if (vendor.tenant_id) {
+      const { data: defRow } = await supabase
+        .from("sap_default_fields")
+        .select("*")
+        .eq("tenant_id", vendor.tenant_id)
+        .maybeSingle();
+      if (defRow) {
+        defaults = {
+          partn_cat: defRow.partn_cat ?? defaults.partn_cat,
+          partn_grp: defRow.partn_grp ?? defaults.partn_grp,
+          title: defRow.title ?? defaults.title,
+          taxtype: defRow.taxtype ?? defaults.taxtype,
+          bukrs: defRow.bukrs ?? defaults.bukrs,
+          akont: defRow.akont ?? defaults.akont,
+          zuawa: defRow.zuawa ?? defaults.zuawa,
+          fdgrv: defRow.fdgrv ?? defaults.fdgrv,
+          vkorg: defRow.vkorg ?? defaults.vkorg,
+          waers: defRow.waers ?? defaults.waers,
+          kalsk: defRow.kalsk ?? defaults.kalsk,
+          cdi: defRow.cdi ?? defaults.cdi,
+          webre: defRow.webre ?? defaults.webre,
+          lebre: defRow.lebre ?? defaults.lebre,
+          ven_class: defRow.ven_class ?? defaults.ven_class,
+        };
+      }
+    }
+
+    const row = buildPayload(vendor, defaults);
 
     // Merge user-supplied SAP field overrides from the pre-sync confirmation popup.
     const ALLOWED_OVERRIDES = [
@@ -312,13 +362,20 @@ serve(async (req) => {
       }
     }
 
-    // CLASSIFY block
-    const classify = overrides?.classify || {};
+    // CLASSIFY block — start with vendor-derived defaults, then apply overrides
+    const classifyOverride = overrides?.classify || {};
+    const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
+    const classifyDefaults = {
+      MGV: classifyOverride.MGV || (productCats[0] ? String(productCats[0]) : ""),
+      CATV: classifyOverride.CATV || vendor.organization_type || vendor.entity_type || "",
+      LOCV: classifyOverride.LOCV || vendor.registered_state || "",
+      IDS: classifyOverride.IDS || "",
+    };
     const classifyBlock: Record<string, any[]> = {};
-    if (classify.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classify.MGV) }];
-    if (classify.CATV) classifyBlock.CAT_VENDOR = [{ CATV: String(classify.CATV) }];
-    if (classify.LOCV) classifyBlock.LOCATION_VENDOR = [{ LOCV: String(classify.LOCV) }];
-    if (classify.IDS) classifyBlock.IDENTIFICATION_SOURCE = [{ IDS: String(classify.IDS) }];
+    if (classifyDefaults.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classifyDefaults.MGV) }];
+    if (classifyDefaults.CATV) classifyBlock.CAT_VENDOR = [{ CATV: String(classifyDefaults.CATV) }];
+    if (classifyDefaults.LOCV) classifyBlock.LOCATION_VENDOR = [{ LOCV: String(classifyDefaults.LOCV) }];
+    if (classifyDefaults.IDS) classifyBlock.IDENTIFICATION_SOURCE = [{ IDS: String(classifyDefaults.IDS) }];
     if (Object.keys(classifyBlock).length) (row as any).CLASSIFY = classifyBlock;
 
     // Mirror vendors[] sub-array as required by SAP payload spec

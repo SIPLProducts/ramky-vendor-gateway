@@ -7,10 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// native scroll div used instead of Radix ScrollArea
 import { Separator } from '@/components/ui/separator';
 import { Server, Loader2, Building2, Briefcase, ShoppingCart } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
+import { supabase } from '@/integrations/supabase/client';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
@@ -33,10 +33,24 @@ function isMsme(v: any): boolean {
 }
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
-  const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor));
+  const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
 
   useEffect(() => {
-    if (open) setForm(buildDefaults(vendor));
+    if (!open) return;
+    let cancelled = false;
+    const tenantId = (vendor as any)?.tenant_id;
+    setForm(buildDefaults(vendor, null));
+    if (tenantId) {
+      (async () => {
+        const { data } = await supabase
+          .from('sap_default_fields' as any)
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        if (!cancelled) setForm(buildDefaults(vendor, data));
+      })();
+    }
+    return () => { cancelled = true; };
   }, [open, vendor]);
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
@@ -119,27 +133,28 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   );
 }
 
-function buildDefaults(vendor: VendorRow | null): SapFieldOverrides {
+function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): SapFieldOverrides {
   const msme = isMsme(vendor);
+  const d = tenantDefaults || {};
   return {
-    partn_cat: '2',
-    partn_grp: 'ZDOM',
-    title: '0003',
-    taxtype: 'IN3',
+    partn_cat: d.partn_cat ?? '2',
+    partn_grp: d.partn_grp ?? 'ZDOM',
+    title: d.title ?? '0003',
+    taxtype: d.taxtype ?? 'IN3',
     msme: msme ? 'MIC' : '',
     idtype: msme ? 'ZMSMEN' : '',
     idnum: (vendor as any)?.msme_number || '',
-    bukrs: '1000',
-    akont: '155000005',
-    zuawa: '014',
-    cdi: 'X',
-    fdgrv: 'A1',
-    vkorg: '1000',
-    waers: 'INR',
-    kalsk: 'L1',
-    webre: 'X',
-    lebre: 'X',
-    ven_class: '',
+    bukrs: d.bukrs ?? '1000',
+    akont: d.akont ?? '155000005',
+    zuawa: d.zuawa ?? '014',
+    cdi: d.cdi ?? 'X',
+    fdgrv: d.fdgrv ?? 'A1',
+    vkorg: d.vkorg ?? '1000',
+    waers: d.waers ?? 'INR',
+    kalsk: d.kalsk ?? 'L1',
+    webre: d.webre ?? 'X',
+    lebre: d.lebre ?? 'X',
+    ven_class: d.ven_class ?? '',
     classify: {
       MGV: '',
       CATV: '',

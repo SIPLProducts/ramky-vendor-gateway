@@ -35,7 +35,18 @@ export async function requireAuthenticatedUser(
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id);
-  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+  const baseRoles = (roleRows ?? []).map((r: { role: string }) => r.role);
+
+  // Also load custom-role names so allowlists can match them transparently.
+  const { data: customRows } = await adminClient
+    .from("user_custom_roles")
+    .select("custom_roles(name)")
+    .eq("user_id", user.id);
+  const customRoleNames = (customRows ?? [])
+    .map((r: any) => r?.custom_roles?.name)
+    .filter((n: any) => typeof n === "string" && n.length > 0);
+
+  const roles = [...baseRoles, ...customRoleNames];
 
   if (allowedRoles && allowedRoles.length > 0) {
     const ok = roles.some((r) => allowedRoles.includes(r));
