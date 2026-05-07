@@ -60,13 +60,25 @@ type VendorStatus =
   | 'submitted'
   | 'validation_pending'
   | 'validation_failed'
+  | 'scm_manager_review'
+  | 'scm_manager_rejected'
+  | 'scm_head_review'
+  | 'scm_head_rejected'
+  | 'finance_1_review'
+  | 'finance_1_rejected'
+  | 'finance_2_review'
+  | 'finance_2_rejected'
+  | 'ceo_office_review'
+  | 'ceo_office_rejected'
+  | 'pending_sap_sync'
+  | 'sap_synced'
+  // legacy values still in DB
   | 'finance_review'
   | 'finance_approved'
   | 'finance_rejected'
   | 'purchase_review'
   | 'purchase_approved'
-  | 'purchase_rejected'
-  | 'sap_synced';
+  | 'purchase_rejected';
 
 export default function VendorList() {
   const [searchTerm, setSearchTerm] = useState('');
