@@ -1,40 +1,32 @@
-## Why Finance 1 isn't seeing the vendor
+## Why CEO Office shows "No pending approvals"
 
-The vendor `a0a0b224... (Pending SAP Sync)` was submitted on **2026-04-22**, when the approval matrix only had **SCM_MANAGER** and **SCM_HEAD** levels configured. The Finance 1, Finance 2 and CEO Office levels were added later (2026-05-07).
+The vendor's chain is correct — Finance 2 is approved and the CEO Office row (`level_id = 393b9f91…`, tenant `6fd07201` = Ramky Infrastructure Limited) is `pending`. The screen is empty because that level is configured with **only one approver: `ceo@ramky.com`** (no `user_id`).
 
-At submit time, `route-vendor-approval` snapshots the matrix and inserts one `vendor_approval_progress` row per active level. For this vendor it created only two rows:
+You're logged in as **`sureshkumar.b@sharviinfotech.com`** (auth user `b1cdabde…`). That email is set up as a CEO Office approver on a different tenant (`b514cc90…`), but **not on Ramky Infrastructure Limited's CEO Office level**, so `list-pending-approvals-by-stage` returns 0 for you.
 
-```
-level 1  SCM_MANAGER  approved  2026-05-07 09:58
-level 2  SCM_HEAD     approved  2026-05-07 09:59
-```
-
-When SCM Head approved, `process-approval-action` saw zero remaining pending rows, so it correctly (per its rules) jumped the vendor to `pending_sap_sync`. Finance 1, Finance 2 and CEO Office were never inserted into its chain, so they will never see it.
-
-New vendors submitted after the matrix change (e.g. `e159c529...`, `6d652397...`) already have all 5 stages in `vendor_approval_progress` and will flow correctly.
+There's a separate stale duplicate level `78027683…` on tenant `77062586…` (also pointing at `ceo@ramky.com`) that no vendor uses — leftover from an earlier matrix edit.
 
 ## Fix
 
-### 1. Backfill the missing chain for vendor `a0a0b224...`
+1. **Migration** — make Suresh the CEO Office approver on Ramky Infrastructure (tenant `6fd07201`):
+   ```sql
+   UPDATE approval_matrix_approvers
+   SET approver_email = 'sureshkumar.b@sharviinfotech.com',
+       approver_name  = 'suresh',
+       user_id        = 'b1cdabde-9fd7-4c96-89c6-4c559385202d'
+   WHERE level_id = '393b9f91-28ed-4639-832e-ba4afa8fab2a'
+     AND approver_email = 'ceo@ramky.com';
+   ```
+   After this, `/approvals/ceo` will list the SHARVI vendor (`a0a0b224…`) for Suresh, and approving it will flip the vendor to `pending_sap_sync`.
 
-One-time migration that, for this vendor:
-- Inserts `pending` progress rows for FINANCE_1 (level 3), FINANCE_2 (level 4), and CEO_OFFICE (level 5, since vendor `is_msme_registered = true`), pointing at the active matrix level ids for tenant `6fd07201-...`.
-- Resets `vendors.status` from `pending_sap_sync` back to `finance_1_review` so it appears in the Finance 1 inbox.
-- Adds an `audit_logs` entry noting the backfill.
+2. **Cleanup migration (optional but recommended)** — delete the orphan duplicate level so Approval Matrix admin doesn't show two CEO Office levels:
+   ```sql
+   DELETE FROM approval_matrix_approvers WHERE level_id = '78027683-0bdc-4e63-a0c4-be8575bc3baa';
+   DELETE FROM approval_matrix_levels    WHERE id       = '78027683-0bdc-4e63-a0c4-be8575bc3baa';
+   ```
 
-### 2. Generalize: backfill any other vendor with the same gap
+3. **UX safeguard** — in `src/components/approvals/StageApprovalView.tsx`, when the list is empty show a small note: *"You are not configured as a CEO Office approver for some tenants. Vendors waiting on other approvers won't appear here."* This stops repeat confusion when the same symptom occurs because of approver-assignment, not workflow bugs.
 
-In the same migration, for every vendor whose current `vendor_approval_progress` is missing one or more active stages (excluding MSME-only stages when the vendor is non-MSME) and whose status is not `sap_synced` / rejected, insert the missing pending rows and set the vendor status back to the earliest still-pending stage.
+No edge-function or workflow code changes are required — `process-approval-action` and `route-vendor-approval` are working correctly; this is purely an approver-configuration data issue.
 
-Vendors that are already `sap_synced` (e.g. `67e5dc0a...`) are left untouched — they have already been pushed to SAP and re-opening them would be wrong.
-
-### 3. Prevent recurrence
-
-Update `supabase/functions/process-approval-action/index.ts` so that, before declaring "all approvals done → pending_sap_sync", it re-reads the current active matrix for the tenant and inserts any missing downstream stage rows (filtered by MSME) for this vendor. This way, if the matrix grows after a vendor is already in flight, the chain auto-extends instead of short-circuiting to SAP sync.
-
-No UI changes are required — the existing Finance 1 / Finance 2 / CEO Office tabs will pick the vendor up automatically once the progress rows exist.
-
-## Files touched
-
-- New SQL migration (backfill + status reset for affected vendors)
-- `supabase/functions/process-approval-action/index.ts` (auto-extend chain on approval)
+Approve to apply.
