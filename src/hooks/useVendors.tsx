@@ -476,14 +476,14 @@ export function useSAPSync() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ vendorId }: { vendorId: string }) => {
+    mutationFn: async ({ vendorId, overrides }: { vendorId: string; overrides?: Record<string, any> }) => {
       console.log('Calling SAP sync edge function for vendor:', vendorId);
 
       // Call SAP sync edge function (which calls Cloudflare Worker)
       const { data: sapResult, error: sapError } = await supabase.functions.invoke(
         'sync-vendor-to-sap',
         {
-          body: { vendorId },
+          body: { vendorId, overrides },
         }
       );
 
