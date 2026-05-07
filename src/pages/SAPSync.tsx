@@ -561,13 +561,13 @@ export default function SAPSync() {
             </Button>
             <Button
               className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
-              onClick={() => handleSyncToSAP()}
+              onClick={() => { if (selectedVendor) { setShowDetails(false); openSapFieldsDialog(selectedVendor); } }}
               disabled={sapSync.isPending}
             >
               {sapSync.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
               ) : (
-                <><Server className="h-4 w-4 mr-2" />Sync to SAP</>
+                <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
               )}
             </Button>
           </DialogFooter>
