@@ -1,56 +1,56 @@
-## Root cause
+## Goal
 
-RLS on `vendor_approval_progress` only lets the SCM Head see THEIR own row. So when the client tries to fetch the full approval chain to detect "is L2 still pending?", it gets back only the L1 row → `blockedByPrevious` is always `false` → buttons stay enabled.
+Replace the legacy 5-step tracker (Submitted → Document Verification → Finance Review → Purchase Approval → SAP Sync) with the real workflow:
 
-Previous attempts tried to fix this with a new RLS policy (declined twice). This plan avoids any DB/RLS migration entirely.
-
-## Approach — move the check to a service-role edge function
-
-Compute the pending list (and the `blockedByPrevious` flag) in a new edge function that uses the service role key, so it can read every row in `vendor_approval_progress` regardless of RLS. The client just renders the result.
-
-### 1. New edge function: `list-pending-approvals-by-stage`
-
-`supabase/functions/list-pending-approvals-by-stage/index.ts`
-
-- Accepts `{ stage }` in the body.
-- Authenticates the caller via `requireAuthenticatedUser` (already used by other functions).
-- Uses service-role client to:
-  1. Look up `approval_matrix_approvers` rows for the caller (by `user_id` OR `lower(approver_email) = lower(jwt email)`) joined to `approval_matrix_levels` filtered by `stage` → list of `level_id`s the caller owns at this stage.
-  2. Read all `vendor_approval_progress` rows where `level_id IN (...)` and `status = 'pending'`.
-  3. For each such row, read the **entire** progress chain for that `vendor_id` and compute `blockedByPrevious = chain.some(r => r.level_number < current.level_number && r.status !== 'approved')`.
-  4. Join vendor info (`legal_name`, `trade_name`, `submitted_at`, `is_msme_registered`) and level info (`level_name`, `approval_mode`).
-- Returns `{ items: StageApprovalItem[] }` matching the existing client shape.
-
-No `supabase/config.toml` change needed (defaults are fine; this function requires JWT like the others — that is acceptable since the client passes the user session).
-
-### 2. Update `src/hooks/usePendingApprovalsByStage.tsx`
-
-Replace the multi-step client queries with a single call:
-
-```ts
-const { data, error } = await supabase.functions.invoke(
-  'list-pending-approvals-by-stage',
-  { body: { stage } }
-);
-setItems(data?.items ?? []);
+```text
+Submitted → Document Verification → SCM Manager Approval → SCM Head Approval
+         → Finance 1 Approval → Finance 2 Approval → SAP Sync
 ```
 
-Keep the same `StageApprovalItem` type and `refresh` API so `StageApprovalView` and all stage pages (`ScmHeadApproval`, `ScmManagerApproval`, `Finance1Approval`, `Finance2Approval`, `CeoApproval`) continue to work without changes.
+…and make the vendor's status badge change as the request advances through each stage (e.g. "SCM Head Review", "Finance 1 Review") instead of staying stuck on "Purchase Review".
 
-### 3. Verification
+## Changes
 
-After deploy I'll:
-- Query the DB to confirm an existing pending vendor has both an L2 (SCM_MANAGER, status=pending) and L1 (SCM_HEAD, status=pending) row.
-- Invoke the new edge function as the SCM Head and verify the returned item has `blockedByPrevious: true`.
-- Confirm in the UI that the warning shows and Approve/Reject are disabled until L2 approves; once L2 approves, refresh shows the buttons enabled for L1.
+### 1. New vendor status values
+Add canonical workflow statuses on `public.vendors.status`:
+- `scm_manager_review`
+- `scm_head_review`
+- `finance_1_review`
+- `finance_2_review`
+- `ceo_office_review` (only for MSME vendors)
+- `pending_sap_sync` (already exists in code)
 
-## Why this works where prior attempts failed
+Keep legacy values (`purchase_review`, `finance_review`, …) readable for old rows but stop writing them.
 
-- No RLS / migration changes — bypasses the user's repeated decline of the migration tool.
-- The service role can read the whole chain so the "previous approver pending" check is reliable.
-- Pure additive change: one new edge function + one hook rewrite. No other files touched.
+Backfill: any vendor currently in `purchase_review` / `finance_review` whose `vendor_approval_progress` has a pending row → set status to match that pending stage.
 
-## Files
+### 2. `process-approval-action` edge function
+After approving/rejecting a row in `vendor_approval_progress`, look up the **next** pending row's `approval_matrix_levels.stage` and update `vendors.status` to the matching review value above. If none pending → `pending_sap_sync`. On reject → `<stage>_rejected` (e.g. `scm_head_rejected`).
 
-- **add** `supabase/functions/list-pending-approvals-by-stage/index.ts`
-- **edit** `src/hooks/usePendingApprovalsByStage.tsx`
+### 3. `route-vendor-approval` edge function
+After creating progress rows, set `vendors.status` to the first pending stage (typically `scm_manager_review`).
+
+### 4. `useVendorRegistration.tsx`
+On submission set initial status to `scm_manager_review` (replace the two `purchase_review` writes at lines 613 and 996/1000).
+
+### 5. `RegistrationStatusTracker.tsx`
+Replace the 5-step array with the 7-step flow above. Update `getActiveStepIndex` to map each new status to its step. Rejection at any stage marks that step `failed`.
+
+### 6. `VendorList.tsx` status badge
+Extend `VendorStatus` union and `getStatusBadge` config map with labels:
+- SCM Manager Review, SCM Head Review, Finance 1 Review, Finance 2 Review, CEO Office Review
+- …Approved / …Rejected variants
+- Add the same options to the status filter `<Select>`.
+
+### 7. Other consumers
+Quick sweep of `useRealtimeUpdates`, `Dashboard`, `EnterpriseStepIndicator`, `SuccessScreen`, `EmailNotificationDemo` to surface the new labels (they currently key off the old statuses).
+
+## Verification
+
+1. Submit a fresh vendor → status badge shows **SCM Manager Review**, tracker highlights step 3.
+2. SCM Manager approves → badge flips to **SCM Head Review**, tracker advances to step 4; SCM Head's Approve/Reject buttons enable.
+3. Continue through Finance 1, Finance 2, (CEO Office if MSME) → badge updates each time.
+4. Final approval → status `pending_sap_sync`, tracker on step 7; after SAP sync → `sap_synced`.
+5. Reject at any stage → badge shows `<stage> Rejected`, tracker marks that step failed.
+
+No UI rewrite of approval pages needed — they already read from `vendor_approval_progress` via the new edge function.

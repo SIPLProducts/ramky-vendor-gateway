@@ -610,7 +610,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         .from('vendors')
         .update({
           ...verificationStatuses,
-          status: 'purchase_review' as const, // Goes to Purchase/SCM approval matrix first
+          status: 'scm_manager_review' as const, // Goes to SCM Manager approval first
           submitted_at: new Date().toISOString(),
         })
         .eq('id', vendor.id);

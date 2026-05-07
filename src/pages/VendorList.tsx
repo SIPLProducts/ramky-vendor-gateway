@@ -60,13 +60,25 @@ type VendorStatus =
   | 'submitted'
   | 'validation_pending'
   | 'validation_failed'
+  | 'scm_manager_review'
+  | 'scm_manager_rejected'
+  | 'scm_head_review'
+  | 'scm_head_rejected'
+  | 'finance_1_review'
+  | 'finance_1_rejected'
+  | 'finance_2_review'
+  | 'finance_2_rejected'
+  | 'ceo_office_review'
+  | 'ceo_office_rejected'
+  | 'pending_sap_sync'
+  | 'sap_synced'
+  // legacy values still in DB
   | 'finance_review'
   | 'finance_approved'
   | 'finance_rejected'
   | 'purchase_review'
   | 'purchase_approved'
-  | 'purchase_rejected'
-  | 'sap_synced';
+  | 'purchase_rejected';
 
 export default function VendorList() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -149,13 +161,25 @@ export default function VendorList() {
       submitted: { label: 'Submitted', variant: 'secondary' },
       validation_pending: { label: 'Validating', variant: 'outline' },
       validation_failed: { label: 'Validation Failed', variant: 'destructive' },
+      scm_manager_review: { label: 'SCM Manager Review', variant: 'outline' },
+      scm_manager_rejected: { label: 'SCM Manager Rejected', variant: 'destructive' },
+      scm_head_review: { label: 'SCM Head Review', variant: 'outline' },
+      scm_head_rejected: { label: 'SCM Head Rejected', variant: 'destructive' },
+      finance_1_review: { label: 'Finance 1 Review', variant: 'outline' },
+      finance_1_rejected: { label: 'Finance 1 Rejected', variant: 'destructive' },
+      finance_2_review: { label: 'Finance 2 Review', variant: 'outline' },
+      finance_2_rejected: { label: 'Finance 2 Rejected', variant: 'destructive' },
+      ceo_office_review: { label: 'CEO Office Review', variant: 'outline' },
+      ceo_office_rejected: { label: 'CEO Office Rejected', variant: 'destructive' },
+      pending_sap_sync: { label: 'Pending SAP Sync', variant: 'default' },
+      sap_synced: { label: 'SAP Synced', variant: 'default' },
+      // legacy
       finance_review: { label: 'Finance Review', variant: 'outline' },
       finance_approved: { label: 'Finance Approved', variant: 'default' },
       finance_rejected: { label: 'Finance Rejected', variant: 'destructive' },
       purchase_review: { label: 'Purchase Review', variant: 'outline' },
       purchase_approved: { label: 'Purchase Approved', variant: 'default' },
       purchase_rejected: { label: 'Purchase Rejected', variant: 'destructive' },
-      sap_synced: { label: 'SAP Synced', variant: 'default' },
     };
     const { label, variant } = config[status] || { label: status, variant: 'secondary' };
     return <Badge variant={variant}>{label}</Badge>;
@@ -268,13 +292,17 @@ export default function VendorList() {
                 <SelectItem value="submitted">Submitted</SelectItem>
                 <SelectItem value="validation_pending">Validation Pending</SelectItem>
                 <SelectItem value="validation_failed">Validation Failed</SelectItem>
-                <SelectItem value="finance_review">Finance Review</SelectItem>
-                <SelectItem value="finance_approved">Finance Approved</SelectItem>
-                <SelectItem value="finance_rejected">Finance Rejected</SelectItem>
-                <SelectItem value="purchase_review">Purchase Review</SelectItem>
-                <SelectItem value="purchase_approved">Purchase Approved</SelectItem>
-                <SelectItem value="purchase_rejected">Purchase Rejected</SelectItem>
+                <SelectItem value="scm_manager_review">SCM Manager Review</SelectItem>
+                <SelectItem value="scm_head_review">SCM Head Review</SelectItem>
+                <SelectItem value="finance_1_review">Finance 1 Review</SelectItem>
+                <SelectItem value="finance_2_review">Finance 2 Review</SelectItem>
+                <SelectItem value="ceo_office_review">CEO Office Review</SelectItem>
+                <SelectItem value="pending_sap_sync">Pending SAP Sync</SelectItem>
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
+                <SelectItem value="scm_manager_rejected">SCM Manager Rejected</SelectItem>
+                <SelectItem value="scm_head_rejected">SCM Head Rejected</SelectItem>
+                <SelectItem value="finance_1_rejected">Finance 1 Rejected</SelectItem>
+                <SelectItem value="finance_2_rejected">Finance 2 Rejected</SelectItem>
               </SelectContent>
             </Select>
             <Select value={buyerCompanyFilter} onValueChange={handleBuyerCompanyFilterChange}>
