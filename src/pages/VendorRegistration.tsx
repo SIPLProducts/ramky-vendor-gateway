@@ -497,6 +497,20 @@ export default function VendorRegistration() {
         accountType: (data.bank?.accountType as BankDetails['accountType']) || prev.bank.accountType || 'current',
         bankAddress: data.bank?.bankAddress || prev.bank.bankAddress,
         cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
+        secondary: data.bank2
+          ? {
+              enabled: true,
+              accountNumber: data.bank2.accountNumber || '',
+              ifscCode: data.bank2.ifsc || '',
+              bankName: data.bank2.bankName || '',
+              branchName: data.bank2.branchName || '',
+              accountHolderName: data.bank2.accountHolderName || '',
+              accountType: (data.bank2.accountType as BankDetails['accountType']) || 'current',
+              bankAddress: data.bank2.bankAddress || '',
+              micrCode: prev.bank.secondary?.micrCode || '',
+              cancelledChequeFile: data.cancelledChequeFile2 ?? prev.bank.secondary?.cancelledChequeFile ?? null,
+            }
+          : prev.bank.secondary,
       },
     };
   };
