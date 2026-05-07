@@ -112,13 +112,55 @@ Deno.serve(async (req) => {
     // For ALL mode we'd need to check sibling approvers — current schema has one row per level so single approval = level done.
 
     // Re-check remaining pending levels AFTER this approval.
-    // If none remain pending -> all SCM matrix levels are approved -> hand off to Finance review.
-    // Otherwise, advance to the next pending level (no vendor status change).
-    const { data: remainingProgress } = await admin
+    let { data: remainingProgress } = await admin
       .from('vendor_approval_progress')
       .select('id, level_number, level_id, status')
       .eq('vendor_id', progress.vendor_id);
-    const stillPending = (remainingProgress ?? []).filter((p) => p.status === 'pending');
+    let stillPending = (remainingProgress ?? []).filter((p) => p.status === 'pending');
+
+    // AUTO-EXTEND: if no rows remain pending, check whether the matrix has grown
+    // (new downstream stages added after this vendor was originally routed).
+    // If yes, insert pending rows for the missing stages so the chain continues
+    // instead of short-circuiting to SAP sync.
+    if (stillPending.length === 0 && level?.tenant_id) {
+      const { data: vendorRow } = await admin
+        .from('vendors').select('is_msme_registered').eq('id', progress.vendor_id).single();
+      const isMsme = !!vendorRow?.is_msme_registered;
+
+      const { data: activeLevels } = await admin
+        .from('approval_matrix_levels')
+        .select('id, level_number, stage, requires_msme')
+        .eq('tenant_id', level.tenant_id)
+        .eq('is_active', true);
+
+      const STAGE_ORDER: Record<string, number> = {
+        SCM_MANAGER: 1, SCM_HEAD: 2, FINANCE_1: 3, FINANCE_2: 4, CEO_OFFICE: 5,
+      };
+      const eligible = (activeLevels ?? [])
+        .filter((l: any) => !(l.requires_msme && !isMsme))
+        .sort((a: any, b: any) => (STAGE_ORDER[a.stage] ?? 99) - (STAGE_ORDER[b.stage] ?? 99)
+          || (a.level_number ?? 0) - (b.level_number ?? 0));
+
+      const existingLevelIds = new Set((remainingProgress ?? []).map((p: any) => p.level_id));
+      const maxNum = (remainingProgress ?? []).reduce((m: number, p: any) => Math.max(m, p.level_number ?? 0), 0);
+
+      const toAdd = eligible.filter((l: any) => !existingLevelIds.has(l.id));
+      if (toAdd.length > 0) {
+        const newRows = toAdd.map((l: any, idx: number) => ({
+          vendor_id: progress.vendor_id,
+          level_id: l.id,
+          level_number: maxNum + idx + 1,
+          status: 'pending',
+        }));
+        await admin.from('vendor_approval_progress').insert(newRows);
+        const { data: refreshed } = await admin
+          .from('vendor_approval_progress')
+          .select('id, level_number, level_id, status')
+          .eq('vendor_id', progress.vendor_id);
+        remainingProgress = refreshed ?? [];
+        stillPending = remainingProgress.filter((p: any) => p.status === 'pending');
+      }
+    }
 
     if (stillPending.length === 0) {
       await admin.from('vendors').update({
