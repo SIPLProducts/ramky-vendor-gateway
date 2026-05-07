@@ -345,6 +345,33 @@ export function DocumentVerificationStep({
   const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
   const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
 
+  // Stage 4b: Optional Secondary Bank
+  const [bank2Enabled, setBank2Enabled] = useState<boolean>(!!initialData?.bank2);
+  const [bankDoc2, setBankDoc2] = useState<DocState>(() => {
+    if (!initialData?.bank2) return idleDoc;
+    const data = {
+      account_number: initialData.bank2.accountNumber,
+      ifsc_code: initialData.bank2.ifsc,
+      bank_name: initialData.bank2.bankName,
+      branch_name: initialData.bank2.branchName,
+      account_holder_name: initialData.bank2.accountHolderName,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.bank2.apiName },
+    };
+  });
+  const [bankAccountType2, setBankAccountType2] = useState<string>(
+    initialData?.bank2?.accountType || "current",
+  );
+  const [bankBranchAddress2, setBankBranchAddress2] = useState<string>(
+    initialData?.bank2?.bankAddress || "",
+  );
+  const [bankBranchAutoFilled2, setBankBranchAutoFilled2] = useState(false);
+  const bankAddressTouchedRef2 = useRef(!!initialData?.bank2?.bankAddress);
+
   // Cross-tab name-mismatch popup. Used for MSME (Enterprise Name vs
   // GST/PAN) and Bank (Account Holder Name vs GST/PAN). The dialog also
   // forces the user back onto the offending tab so they cannot proceed.
