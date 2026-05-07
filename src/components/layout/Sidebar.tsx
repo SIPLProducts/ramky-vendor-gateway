@@ -72,8 +72,6 @@ const navItems: NavItem[] = [
   { label: 'Finance 2 Approval', href: '/approvals/finance-2', icon: IndianRupee, screenKey: 'finance2_approval' },
   { label: 'CEO Office Approval', href: '/approvals/ceo', icon: Crown, screenKey: 'ceo_approval' },
 
-  { label: 'SCM Approval', href: '/purchase/approval', icon: ShoppingCart, screenKey: 'purchase_approval' },
-  { label: 'Finance Review', href: '/finance/review', icon: IndianRupee, screenKey: 'finance_review' },
   { label: 'SAP Sync', href: '/sap/sync', icon: RefreshCw, screenKey: 'sap_sync' },
   { label: 'SAP API Settings', href: '/sap/api-settings', icon: Settings, screenKey: 'sap_api_settings' },
   { label: 'KYC API Settings', href: '/admin/kyc-api-settings', icon: ShieldCheck, screenKey: 'kyc_api_settings' },

@@ -1,31 +1,32 @@
 ## Issue
 
-Saving the Approval Matrix fails with:
-`duplicate key value violates unique constraint "approval_matrix_levels_tenant_id_level_number_key"`
+The 5 new approval tabs (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office) are coded and routed, but in `role_screen_permissions` every role has `can_access = false` for `scm_manager_approval / scm_head_approval / finance1_approval / finance2_approval / ceo_approval`, so the sidebar filter (`useScreenPermissions`) hides them. The legacy "SCM Approval" and "Finance Review" items are still showing instead.
 
-## Cause
+You also asked to confirm: SCM Manager step supports multiple levels (L2…Ln), and only after the **last** SCM Manager approves does the vendor move to SCM Head. That already works in `route-vendor-approval` (it orders eligible levels by stage, then by `level_number`, so all `SCM_MANAGER` rows run before `SCM_HEAD`) and in `process-approval-action` (advances to the next pending row by lowest `level_number`).
 
-In `src/components/admin/ApprovalMatrixConfig.tsx` (`saveAll`, lines 296–319), when a row has no `level_id` (e.g. you clicked **Add Row** for Level 5, or the row was loaded from the previous draft), the code calls a plain `INSERT` for `(tenant_id, level_number)`. But the L5 · CEO Office row I seeded earlier already exists in the database for that tenant, so the unique key `(tenant_id, level_number)` blows up.
+## Changes
 
-## Fix
+### 1. Grant screen access to the 5 new approval pages
+Update `role_screen_permissions` so:
+- `scm_manager_approval`, `scm_head_approval`, `finance1_approval`, `finance2_approval`, `ceo_approval` → `can_access = true` for `purchase`, `finance`, `approver`, `admin`, `sharvi_admin`, `customer_admin`.
+- (Vendor stays false.)
 
-Change the new-level path from `insert` to `upsert` keyed on `(tenant_id, level_number)`:
+Edge functions already gate the actual data per user via `approval_matrix_approvers`, so showing the pages to these roles is safe — non-approvers just see an empty list.
 
-```ts
-const { data, error } = await supabase
-  .from('approval_matrix_levels')
-  .upsert(levelPayload, { onConflict: 'tenant_id,level_number' })
-  .select('id')
-  .single();
-```
+### 2. Hide legacy sidebar items
+In `src/components/layout/Sidebar.tsx`, remove the two legacy entries (lines 75–76):
+- "SCM Approval" → `/purchase/approval`
+- "Finance Review" → `/finance/review`
 
-This way, if a level with that `(tenant_id, level_number)` already exists, its fields (stage, mode, msme flag, etc.) are updated and the existing `id` is returned — and the existing approvers under it get cleaned + re-inserted by the next block, exactly like the update branch already does.
+Keep the routes mounted in `App.tsx` so any deep links still work, but they no longer clutter the sidebar.
 
-No schema changes, no other files touched.
+### 3. No backend changes
+- `route-vendor-approval` already supports L2…Ln SCM Managers in order before SCM Head.
+- `process-approval-action` already advances to the next pending level only after the current one is approved.
+- "Previous approver hasn't approved yet" disabled-button + message already implemented in `StageApprovalView`.
 
 ## Verification
 
-1. Reload `/admin/users` → Approval Matrix → Ramky Infrastructure Limited.
-2. Click **Save All** with the same 5 rows shown in the screenshot → no error, toast shows "5 level(s), 5 approver(s)".
-3. Re-open: rows persist, "Currently in database" shows 5 levels.
-4. Edit Level 5 stage / approver → save again → no error.
+1. Reload the app → sidebar shows: SCM Manager Approval, SCM Head Approval, Finance 1 Approval, Finance 2 Approval, CEO Office Approval (legacy "SCM Approval" / "Finance Review" gone).
+2. Configure 3 SCM Manager levels (L2, L3, L4) in Approval Matrix. Submit a vendor → only the L2 approver sees it on SCM Manager page; SCM Head page shows it as blocked. After L2 approves, L3 sees it; after L3, L4; after L4, vendor moves to SCM Head.
+3. SCM Head, Finance 1, Finance 2, CEO Office continue to be single-approver pages.
