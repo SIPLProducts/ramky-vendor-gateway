@@ -292,13 +292,17 @@ export default function VendorList() {
                 <SelectItem value="submitted">Submitted</SelectItem>
                 <SelectItem value="validation_pending">Validation Pending</SelectItem>
                 <SelectItem value="validation_failed">Validation Failed</SelectItem>
-                <SelectItem value="finance_review">Finance Review</SelectItem>
-                <SelectItem value="finance_approved">Finance Approved</SelectItem>
-                <SelectItem value="finance_rejected">Finance Rejected</SelectItem>
-                <SelectItem value="purchase_review">Purchase Review</SelectItem>
-                <SelectItem value="purchase_approved">Purchase Approved</SelectItem>
-                <SelectItem value="purchase_rejected">Purchase Rejected</SelectItem>
+                <SelectItem value="scm_manager_review">SCM Manager Review</SelectItem>
+                <SelectItem value="scm_head_review">SCM Head Review</SelectItem>
+                <SelectItem value="finance_1_review">Finance 1 Review</SelectItem>
+                <SelectItem value="finance_2_review">Finance 2 Review</SelectItem>
+                <SelectItem value="ceo_office_review">CEO Office Review</SelectItem>
+                <SelectItem value="pending_sap_sync">Pending SAP Sync</SelectItem>
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
+                <SelectItem value="scm_manager_rejected">SCM Manager Rejected</SelectItem>
+                <SelectItem value="scm_head_rejected">SCM Head Rejected</SelectItem>
+                <SelectItem value="finance_1_rejected">Finance 1 Rejected</SelectItem>
+                <SelectItem value="finance_2_rejected">Finance 2 Rejected</SelectItem>
               </SelectContent>
             </Select>
             <Select value={buyerCompanyFilter} onValueChange={handleBuyerCompanyFilterChange}>
