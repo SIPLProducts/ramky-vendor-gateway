@@ -1954,6 +1954,148 @@ export function DocumentVerificationStep({
               {bankDoc.status === "verified" && (
                 <CrossCheckStrip ok={true} text="Account active · Penny-drop successful" className="mt-3" />
               )}
+
+              {/* ---------- Optional Secondary Bank Account ---------- */}
+              <div className="mt-6 pt-5 border-t border-border/60">
+                {!bank2Enabled ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBank2Enabled(true)}
+                    className="gap-1.5"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    Add another bank account (optional)
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <Landmark className="h-4 w-4 text-primary" />
+                        Secondary Bank Account
+                        <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setBank2Enabled(false);
+                          setBankDoc2(idleDoc);
+                          setBankBranchAddress2("");
+                          setBankAccountType2("current");
+                          bankAddressTouchedRef2.current = false;
+                        }}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <DocSplitRow
+                      uploadLabel="Cancelled Cheque (Secondary)"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      doc={bankDoc2}
+                      onUpload={handleBankUpload2}
+                      onReset={() => setBankDoc2(idleDoc)}
+                      busyLabel={
+                        bankDoc2.status === "uploading" ? "Uploading…" :
+                        bankDoc2.status === "preparing" ? "Preparing document for OCR…" :
+                        bankDoc2.status === "ocr" ? "Reading cheque…" :
+                        bankDoc2.status === "verifying" ? "Penny-drop verification…" : ""
+                      }
+                      verifiedFields={
+                        <div className="space-y-3">
+                          <div className="grid md:grid-cols-2 gap-3">
+                            <EditableOcrField
+                              label="Account Number"
+                              value={bankDoc2.ocrData?.account_number}
+                              originalValue={bankDoc2.originalOcrData?.account_number}
+                              verifiedValue={bankDoc2.apiData?.normalized?.account_number}
+                              verifiedLabel="Account Number is verified"
+                              onChange={(v) => setOcrField(setBankDoc2, "account_number", v)}
+                              mono
+                            />
+                            <EditableOcrField
+                              label="IFSC Code"
+                              value={bankDoc2.ocrData?.ifsc_code}
+                              originalValue={bankDoc2.originalOcrData?.ifsc_code}
+                              verifiedValue={bankDoc2.apiData?.normalized?.ifsc_code}
+                              verifiedLabel="IFSC is verified"
+                              onChange={(v) => setOcrField(setBankDoc2, "ifsc_code", v.toUpperCase())}
+                              mono
+                            />
+                            <EditableOcrField
+                              label="Bank Name"
+                              value={bankDoc2.ocrData?.bank_name}
+                              originalValue={bankDoc2.originalOcrData?.bank_name}
+                              verifiedValue={bankDoc2.apiData?.normalized?.bank_name}
+                              verifiedLabel="Bank Name is verified"
+                              onChange={(v) => setOcrField(setBankDoc2, "bank_name", v)}
+                            />
+                            <div>
+                              <EditableOcrField
+                                label="Branch"
+                                value={bankDoc2.ocrData?.branch_name}
+                                originalValue={bankDoc2.originalOcrData?.branch_name}
+                                verifiedValue={bankDoc2.apiData?.normalized?.branch_name}
+                                verifiedLabel="Branch is verified"
+                                onChange={(v) => { setOcrField(setBankDoc2, "branch_name", v); setBankBranchAutoFilled2(false); }}
+                              />
+                              {bankBranchAutoFilled2 && bankDoc2.ocrData?.branch_name && (
+                                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                                  <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
+                                </p>
+                              )}
+                            </div>
+                            <div className="md:col-span-2">
+                              <EditableOcrField
+                                label="Account Holder Name"
+                                value={bankDoc2.ocrData?.account_holder_name}
+                                originalValue={bankDoc2.originalOcrData?.account_holder_name}
+                                verifiedValue={bankDoc2.apiData?.normalized?.account_holder_name}
+                                verifiedLabel="Name matches bank record"
+                                onChange={(v) => setOcrField(setBankDoc2, "account_holder_name", v)}
+                              />
+                              {bankDoc2.apiData?.holderNameMessage && (
+                                <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                                  <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                  <span>{bankDoc2.apiData.holderNameMessage}</span>
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
+                              <select
+                                value={bankAccountType2}
+                                onChange={(e) => setBankAccountType2(e.target.value)}
+                                className="mt-1 w-full h-10 rounded-md border border-border/60 bg-muted/40 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="current">Current Account</option>
+                                <option value="savings">Savings Account</option>
+                                <option value="cash_credit">Cash Credit</option>
+                                <option value="others">Others</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-muted-foreground">Bank Address</Label>
+                              <Input
+                                value={bankBranchAddress2}
+                                onChange={(e) => { bankAddressTouchedRef2.current = true; setBankBranchAddress2(e.target.value); }}
+                                placeholder="Branch address (optional)"
+                                className="mt-1 bg-muted/40 border-border/60"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    />
+                    {bankDoc2.status === "verified" && (
+                      <CrossCheckStrip ok={true} text="Secondary account active · Penny-drop successful" className="mt-3" />
+                    )}
+                  </div>
+                )}
+              </div>
             </StageShell>
           </TabsContent>
         </Tabs>
