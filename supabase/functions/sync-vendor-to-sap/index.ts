@@ -135,14 +135,33 @@ async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uplo
   return { uploads, skipped };
 }
 
-function buildPayload(vendor: any) {
+type SapDefaults = {
+  partn_cat: string; partn_grp: string; title: string; taxtype: string;
+  bukrs: string; akont: string; zuawa: string; fdgrv: string;
+  vkorg: string; waers: string; kalsk: string; cdi: string;
+  webre: string; lebre: string; ven_class: string;
+};
+
+const FALLBACK_DEFAULTS: SapDefaults = {
+  partn_cat: "2", partn_grp: "ZDOM", title: "0003", taxtype: "IN3",
+  bukrs: "1000", akont: "155000005", zuawa: "014", fdgrv: "A1",
+  vkorg: "1000", waers: "INR", kalsk: "L1", cdi: "X",
+  webre: "X", lebre: "X", ven_class: "",
+};
+
+function buildPayload(vendor: any, defaults: SapDefaults) {
   const legalName = vendor.legal_name || "";
   const tradeName = vendor.trade_name || "";
+  const relativeName = vendor.relative_name || "";
+  const accountHolder = vendor.account_holder_name || "";
   const region = resolveRegion(vendor.registered_state);
+  const isMsme = !!vendor.msme_number;
 
   const row: Record<string, any> = {
-    bpartner: "", partn_cat: "2", partn_grp: "ZDOM", title: "",
-    name1: trunc(legalName, 40), name2: trunc(tradeName, 40), name3: "",
+    bpartner: "", partn_cat: defaults.partn_cat, partn_grp: defaults.partn_grp, title: defaults.title,
+    name1: trunc(legalName, 40),
+    name2: trunc(relativeName, 40),
+    name3: "",
     sterm1: trunc(legalName, 20), sterm2: trunc((tradeName.split(" ")[0] || ""), 20),
     street: trunc(vendor.registered_address, 60),
     house_no: trunc(vendor.registered_address_line2, 10),
@@ -156,22 +175,24 @@ function buildPayload(vendor: any) {
     tel_number: trunc(vendor.registered_phone, 30),
     mob_number: trunc(vendor.primary_phone, 30),
     smtp_addr: trunc(vendor.primary_email, 241),
-    taxtype: "IN3", taxnumxl: trunc(vendor.gstin, 20),
-    legaform: "", legaenty: "", bp_type: "", due_digi: "", idtype: "", idnum: "",
+    taxtype: defaults.taxtype, taxnumxl: trunc(vendor.gstin, 20),
+    legaform: "", legaenty: "", bp_type: "", due_digi: "",
+    idtype: isMsme ? "ZMSMEN" : "",
+    idnum: isMsme ? trunc(vendor.msme_number, 20) : "",
     bankdetailid: "0001", bank_ctry: "IN",
     bank_key: trunc(vendor.ifsc_code, 15), bank_acct: trunc(vendor.account_number, 18),
     ctrl_key: "",
-    accountholder: trunc(legalName, 60),
-    bankaccountname: trunc(vendor.bank_name, 60),
-    pernr: "", bukrs: "1000", akont: "155000005", zuawa: "014",
-    cdi: "X", fdgrv: "A1", xzver: "",
-    msme: vendor.msme_number ? "MIC" : "",
+    accountholder: trunc(accountHolder, 60),
+    bankaccountname: trunc(accountHolder, 60),
+    pernr: "", bukrs: defaults.bukrs, akont: defaults.akont, zuawa: defaults.zuawa,
+    cdi: defaults.cdi, fdgrv: defaults.fdgrv, xzver: "",
+    msme: isMsme ? "MIC" : "",
     j_1iexcd: "", j_1iexrn: "", j_1iexrg: "", j_1iexdi: "", j_1iexco: "",
     j_1iexcicu: "", j_1icstno: "", j_1ilstno: "",
     j_1ipanno: trunc(vendor.pan, 10), j_1isern: "",
     witht: "", wt_withcd: "", wt_subjct: "", qsrec: "", qland: "",
-    vkorg: "1000", waers: "INR", zterm: "",
-    inco1: "", inco2: "", kalsk: "L1", webre: "X", lebre: "X", ven_class: "",
+    vkorg: defaults.vkorg, waers: defaults.waers, zterm: "",
+    inco1: "", inco2: "", kalsk: defaults.kalsk, webre: defaults.webre, lebre: defaults.lebre, ven_class: defaults.ven_class,
     zvkorg: "", vtweg: "", spart: "", bzirk: "", kdgrp: "", vkbur: "", vkgrp: "",
     zwaers: "", kurst: "", konda: "", kalks: "", pltyp: "", versg: "", lprio: "",
     kzazu: "", vsbed: "", untto: "", uebto: "", zinco1: "", zinco2: "", zzterm: "",
