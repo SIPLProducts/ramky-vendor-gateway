@@ -1594,13 +1594,18 @@ export type Database = {
       }
       vendors: {
         Row: {
+          account_holder_name_2: string | null
           account_number: string | null
+          account_number_2: string | null
           account_type: string | null
+          account_type_2: string | null
           authorized_distributor_address: string | null
           authorized_distributor_name: string | null
           bank_address: string | null
+          bank_address_2: string | null
           bank_branch_name: string | null
           bank_name: string | null
+          bank_name_2: string | null
           bank_verification_status: string | null
           branch_address: string | null
           branch_address_line2: string | null
@@ -1615,6 +1620,7 @@ export type Database = {
           branch_country: string | null
           branch_email: string | null
           branch_name: string | null
+          branch_name_2: string | null
           branch_pincode: string | null
           branch_state: string | null
           branch_website: string | null
@@ -1656,6 +1662,7 @@ export type Database = {
           id: string
           iec_no: string | null
           ifsc_code: string | null
+          ifsc_code_2: string | null
           industry_type: string | null
           inspection_testing: string | null
           invitation_id: string | null
@@ -1680,6 +1687,7 @@ export type Database = {
           manufacturing_pincode: string | null
           manufacturing_state: string | null
           memberships: Json | null
+          micr_2: string | null
           micr_code: string | null
           msme_category: string | null
           msme_number: string | null
@@ -1756,13 +1764,18 @@ export type Database = {
           water_supply: string | null
         }
         Insert: {
+          account_holder_name_2?: string | null
           account_number?: string | null
+          account_number_2?: string | null
           account_type?: string | null
+          account_type_2?: string | null
           authorized_distributor_address?: string | null
           authorized_distributor_name?: string | null
           bank_address?: string | null
+          bank_address_2?: string | null
           bank_branch_name?: string | null
           bank_name?: string | null
+          bank_name_2?: string | null
           bank_verification_status?: string | null
           branch_address?: string | null
           branch_address_line2?: string | null
@@ -1777,6 +1790,7 @@ export type Database = {
           branch_country?: string | null
           branch_email?: string | null
           branch_name?: string | null
+          branch_name_2?: string | null
           branch_pincode?: string | null
           branch_state?: string | null
           branch_website?: string | null
@@ -1818,6 +1832,7 @@ export type Database = {
           id?: string
           iec_no?: string | null
           ifsc_code?: string | null
+          ifsc_code_2?: string | null
           industry_type?: string | null
           inspection_testing?: string | null
           invitation_id?: string | null
@@ -1842,6 +1857,7 @@ export type Database = {
           manufacturing_pincode?: string | null
           manufacturing_state?: string | null
           memberships?: Json | null
+          micr_2?: string | null
           micr_code?: string | null
           msme_category?: string | null
           msme_number?: string | null
@@ -1918,13 +1934,18 @@ export type Database = {
           water_supply?: string | null
         }
         Update: {
+          account_holder_name_2?: string | null
           account_number?: string | null
+          account_number_2?: string | null
           account_type?: string | null
+          account_type_2?: string | null
           authorized_distributor_address?: string | null
           authorized_distributor_name?: string | null
           bank_address?: string | null
+          bank_address_2?: string | null
           bank_branch_name?: string | null
           bank_name?: string | null
+          bank_name_2?: string | null
           bank_verification_status?: string | null
           branch_address?: string | null
           branch_address_line2?: string | null
@@ -1939,6 +1960,7 @@ export type Database = {
           branch_country?: string | null
           branch_email?: string | null
           branch_name?: string | null
+          branch_name_2?: string | null
           branch_pincode?: string | null
           branch_state?: string | null
           branch_website?: string | null
@@ -1980,6 +2002,7 @@ export type Database = {
           id?: string
           iec_no?: string | null
           ifsc_code?: string | null
+          ifsc_code_2?: string | null
           industry_type?: string | null
           inspection_testing?: string | null
           invitation_id?: string | null
@@ -2004,6 +2027,7 @@ export type Database = {
           manufacturing_pincode?: string | null
           manufacturing_state?: string | null
           memberships?: Json | null
+          micr_2?: string | null
           micr_code?: string | null
           msme_category?: string | null
           msme_number?: string | null

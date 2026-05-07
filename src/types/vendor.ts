@@ -152,6 +152,19 @@ export interface StatutoryDetails {
 }
 
 // Step 5: Bank Details
+export interface SecondaryBankDetails {
+  enabled: boolean;
+  bankName: string;
+  branchName: string;
+  accountNumber: string;
+  accountType: 'current' | 'savings' | 'cash_credit' | 'others';
+  ifscCode: string;
+  micrCode: string;
+  bankAddress: string;
+  accountHolderName: string;
+  cancelledChequeFile: File | null;
+}
+
 export interface BankDetails {
   bankName: string;
   branchName: string;
@@ -163,6 +176,8 @@ export interface BankDetails {
   micrCode: string;
   bankAddress: string;
   cancelledChequeFile: File | null;
+  /** Optional secondary bank account — same verification flow */
+  secondary?: SecondaryBankDetails;
 }
 
 // Step 6: Financial Information

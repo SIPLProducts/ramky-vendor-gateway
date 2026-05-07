@@ -353,6 +353,17 @@ export default function VendorRegistration() {
               gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
               msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
               bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
+              bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
+                ? {
+                    accountNumber: existingFormData.bank.secondary.accountNumber,
+                    ifsc: existingFormData.bank.secondary.ifscCode || '',
+                    bankName: existingFormData.bank.secondary.bankName || '',
+                    branchName: existingFormData.bank.secondary.branchName || '',
+                    accountHolderName: existingFormData.bank.secondary.accountHolderName || '',
+                    accountType: existingFormData.bank.secondary.accountType || 'current',
+                    bankAddress: existingFormData.bank.secondary.bankAddress || '',
+                  }
+                : undefined,
             });
           }
           if (existingFormData.organization?.legalName) filledSteps.push(2);
@@ -497,6 +508,20 @@ export default function VendorRegistration() {
         accountType: (data.bank?.accountType as BankDetails['accountType']) || prev.bank.accountType || 'current',
         bankAddress: data.bank?.bankAddress || prev.bank.bankAddress,
         cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
+        secondary: data.bank2
+          ? {
+              enabled: true,
+              accountNumber: data.bank2.accountNumber || '',
+              ifscCode: data.bank2.ifsc || '',
+              bankName: data.bank2.bankName || '',
+              branchName: data.bank2.branchName || '',
+              accountHolderName: data.bank2.accountHolderName || '',
+              accountType: (data.bank2.accountType as BankDetails['accountType']) || 'current',
+              bankAddress: data.bank2.bankAddress || '',
+              micrCode: prev.bank.secondary?.micrCode || '',
+              cancelledChequeFile: data.cancelledChequeFile2 ?? prev.bank.secondary?.cancelledChequeFile ?? null,
+            }
+          : prev.bank.secondary,
       },
     };
   };

@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
@@ -149,6 +149,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       { file: formData.statutory.panCardFile, type: 'pan_card' },
       { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
       { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
+      { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
       { file: formData.financial.financialDocsFile, type: 'financial_docs' },
       { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
     ];
@@ -288,6 +289,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       ifsc_code: formData.bank.ifscCode,
       micr_code: formData.bank.micrCode || null,
       bank_address: formData.bank.bankAddress || null,
+      // Secondary Bank (optional)
+      bank_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.bankName || null) : null,
+      branch_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.branchName || null) : null,
+      account_number_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.accountNumber || null) : null,
+      ifsc_code_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.ifscCode || null) : null,
+      account_holder_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.accountHolderName || null) : null,
+      account_type_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.accountType || null) : null,
+      bank_address_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.bankAddress || null) : null,
+      micr_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.micrCode || null) : null,
       // Financial
       turnover_year1: formData.financial.turnoverYear1
         ? parseFloat(formData.financial.turnoverYear1.replace(/,/g, ''))
@@ -462,6 +472,20 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         micrCode: vendor.micr_code || '',
         bankAddress: vendor.bank_address || '',
         cancelledChequeFile: null,
+        secondary: vendor.account_number_2
+          ? {
+              enabled: true,
+              bankName: vendor.bank_name_2 || '',
+              branchName: vendor.branch_name_2 || '',
+              accountNumber: vendor.account_number_2 || '',
+              accountType: (vendor.account_type_2 as 'current' | 'savings' | 'cash_credit' | 'others') || 'current',
+              ifscCode: vendor.ifsc_code_2 || '',
+              micrCode: vendor.micr_2 || '',
+              bankAddress: vendor.bank_address_2 || '',
+              accountHolderName: vendor.account_holder_name_2 || '',
+              cancelledChequeFile: null,
+            }
+          : undefined,
       },
       financial: {
         turnoverYear1: vendor.turnover_year1?.toString() || '',

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil } from "lucide-react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,11 +56,13 @@ export interface VerifiedDocumentData {
   isMsmeRegistered?: boolean;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
+  bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
   panCardFile?: File | null;
   msmeCertificateFile?: File | null;
   cancelledChequeFile?: File | null;
+  cancelledChequeFile2?: File | null;
   // Authoritative completion status from the child
   step1Status?: {
     stage1Done: boolean;
@@ -342,6 +344,33 @@ export function DocumentVerificationStep({
   );
   const [bankBranchAutoFilled, setBankBranchAutoFilled] = useState(false);
   const bankAddressTouchedRef = useRef(!!initialData?.bank?.bankAddress);
+
+  // Stage 4b: Optional Secondary Bank
+  const [bank2Enabled, setBank2Enabled] = useState<boolean>(!!initialData?.bank2);
+  const [bankDoc2, setBankDoc2] = useState<DocState>(() => {
+    if (!initialData?.bank2) return idleDoc;
+    const data = {
+      account_number: initialData.bank2.accountNumber,
+      ifsc_code: initialData.bank2.ifsc,
+      bank_name: initialData.bank2.bankName,
+      branch_name: initialData.bank2.branchName,
+      account_holder_name: initialData.bank2.accountHolderName,
+    };
+    return {
+      status: "verified",
+      ocrData: data,
+      originalOcrData: data,
+      apiData: { name: initialData.bank2.apiName },
+    };
+  });
+  const [bankAccountType2, setBankAccountType2] = useState<string>(
+    initialData?.bank2?.accountType || "current",
+  );
+  const [bankBranchAddress2, setBankBranchAddress2] = useState<string>(
+    initialData?.bank2?.bankAddress || "",
+  );
+  const [bankBranchAutoFilled2, setBankBranchAutoFilled2] = useState(false);
+  const bankAddressTouchedRef2 = useRef(!!initialData?.bank2?.bankAddress);
 
   // Cross-tab name-mismatch popup. Used for MSME (Enterprise Name vs
   // GST/PAN) and Bank (Account Holder Name vs GST/PAN). The dialog also
@@ -934,6 +963,54 @@ export function DocumentVerificationStep({
     return () => clearTimeout(t);
   }, [bankDoc.ocrData?.ifsc_code, bankDoc.ocrData?.branch_name]);
 
+  // ----- Secondary bank: same upload flow + IFSC enrichment -----
+  const handleBankUpload2 = (file: File) =>
+    runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
+      setBankDoc2((prev) => {
+        const ifsc = prev.ocrData?.ifsc_code;
+        const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
+        if (!isValidIfsc(ifsc) || hasBranch) return prev;
+        lookupIfsc(ifsc).then((info) => {
+          if (!info) return;
+          setBankDoc2((curr) => {
+            const next = { ...(curr.ocrData || {}) };
+            let touched = false;
+            if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+            if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+            if (touched) setBankBranchAutoFilled2(true);
+            return { ...curr, ocrData: next };
+          });
+          if (info.address && !bankAddressTouchedRef2.current) {
+            setBankBranchAddress2(info.address);
+          }
+        });
+        return prev;
+      });
+    });
+
+  useEffect(() => {
+    if (!bank2Enabled) return;
+    const ifsc = bankDoc2.ocrData?.ifsc_code;
+    const hasBranch = !!(bankDoc2.ocrData?.branch_name && String(bankDoc2.ocrData.branch_name).trim());
+    if (!isValidIfsc(ifsc) || hasBranch) return;
+    const t = setTimeout(async () => {
+      const info = await lookupIfsc(ifsc!);
+      if (!info) return;
+      setBankDoc2((curr) => {
+        const next = { ...(curr.ocrData || {}) };
+        let touched = false;
+        if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+        if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+        if (touched) setBankBranchAutoFilled2(true);
+        return { ...curr, ocrData: next };
+      });
+      if (info.address && !bankAddressTouchedRef2.current) {
+        setBankBranchAddress2(info.address);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [bank2Enabled, bankDoc2.ocrData?.ifsc_code, bankDoc2.ocrData?.branch_name]);
+
   // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
   useEffect(() => {
     if (panDoc.status !== "verified" || isGstRegistered !== true) {
@@ -1013,7 +1090,9 @@ export function DocumentVerificationStep({
         : false;
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
   const stage3Done = isMsmeRegistered === false || (isMsmeRegistered === true && msmeDoc.status === "verified");
-  const stage4Done = bankDoc.status === "verified";
+  const stage4Done =
+    bankDoc.status === "verified" &&
+    (!bank2Enabled || bankDoc2.status === "verified");
   const allDone = stage1Done && stage2Done && stage3Done && stage4Done;
   const completedCount = [stage1Done, stage2Done, stage3Done, stage4Done].filter(Boolean).length;
 
@@ -1074,15 +1153,28 @@ export function DocumentVerificationStep({
         bankAddress: bankBranchAddress,
       };
     }
+    if (bank2Enabled && bankDoc2.status === "verified" && bankDoc2.ocrData) {
+      out.bank2 = {
+        accountNumber: bankDoc2.ocrData.account_number,
+        ifsc: bankDoc2.ocrData.ifsc_code,
+        bankName: bankDoc2.ocrData.bank_name,
+        branchName: bankDoc2.ocrData.branch_name,
+        accountHolderName: bankDoc2.ocrData.account_holder_name,
+        apiName: bankDoc2.apiData?.accountHolderName || bankDoc2.apiData?.name,
+        accountType: bankAccountType2,
+        bankAddress: bankBranchAddress2,
+      };
+    }
     // Lift uploaded files so the parent can persist them in the draft
     out.gstCertificateFile = gstDoc.file ?? null;
     out.panCardFile = panDoc.file ?? null;
     out.msmeCertificateFile = msmeDoc.file ?? null;
     out.cancelledChequeFile = bankDoc.file ?? null;
+    out.cancelledChequeFile2 = bank2Enabled ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, bankAccountType, bankBranchAddress, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
@@ -1862,6 +1954,148 @@ export function DocumentVerificationStep({
               {bankDoc.status === "verified" && (
                 <CrossCheckStrip ok={true} text="Account active · Penny-drop successful" className="mt-3" />
               )}
+
+              {/* ---------- Optional Secondary Bank Account ---------- */}
+              <div className="mt-6 pt-5 border-t border-border/60">
+                {!bank2Enabled ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBank2Enabled(true)}
+                    className="gap-1.5"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    Add another bank account (optional)
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <Landmark className="h-4 w-4 text-primary" />
+                        Secondary Bank Account
+                        <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setBank2Enabled(false);
+                          setBankDoc2(idleDoc);
+                          setBankBranchAddress2("");
+                          setBankAccountType2("current");
+                          bankAddressTouchedRef2.current = false;
+                        }}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <DocSplitRow
+                      uploadLabel="Cancelled Cheque (Secondary)"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      doc={bankDoc2}
+                      onUpload={handleBankUpload2}
+                      onReset={() => setBankDoc2(idleDoc)}
+                      busyLabel={
+                        bankDoc2.status === "uploading" ? "Uploading…" :
+                        bankDoc2.status === "preparing" ? "Preparing document for OCR…" :
+                        bankDoc2.status === "ocr" ? "Reading cheque…" :
+                        bankDoc2.status === "verifying" ? "Penny-drop verification…" : ""
+                      }
+                      verifiedFields={
+                        <div className="space-y-3">
+                          <div className="grid md:grid-cols-2 gap-3">
+                            <EditableOcrField
+                              label="Account Number"
+                              value={bankDoc2.ocrData?.account_number}
+                              originalValue={bankDoc2.originalOcrData?.account_number}
+                              verifiedValue={bankDoc2.apiData?.normalized?.account_number}
+                              verifiedLabel="Account Number is verified"
+                              onChange={(v) => setOcrField(setBankDoc2, "account_number", v)}
+                              mono
+                            />
+                            <EditableOcrField
+                              label="IFSC Code"
+                              value={bankDoc2.ocrData?.ifsc_code}
+                              originalValue={bankDoc2.originalOcrData?.ifsc_code}
+                              verifiedValue={bankDoc2.apiData?.normalized?.ifsc_code}
+                              verifiedLabel="IFSC is verified"
+                              onChange={(v) => setOcrField(setBankDoc2, "ifsc_code", v.toUpperCase())}
+                              mono
+                            />
+                            <EditableOcrField
+                              label="Bank Name"
+                              value={bankDoc2.ocrData?.bank_name}
+                              originalValue={bankDoc2.originalOcrData?.bank_name}
+                              verifiedValue={bankDoc2.apiData?.normalized?.bank_name}
+                              verifiedLabel="Bank Name is verified"
+                              onChange={(v) => setOcrField(setBankDoc2, "bank_name", v)}
+                            />
+                            <div>
+                              <EditableOcrField
+                                label="Branch"
+                                value={bankDoc2.ocrData?.branch_name}
+                                originalValue={bankDoc2.originalOcrData?.branch_name}
+                                verifiedValue={bankDoc2.apiData?.normalized?.branch_name}
+                                verifiedLabel="Branch is verified"
+                                onChange={(v) => { setOcrField(setBankDoc2, "branch_name", v); setBankBranchAutoFilled2(false); }}
+                              />
+                              {bankBranchAutoFilled2 && bankDoc2.ocrData?.branch_name && (
+                                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                                  <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
+                                </p>
+                              )}
+                            </div>
+                            <div className="md:col-span-2">
+                              <EditableOcrField
+                                label="Account Holder Name"
+                                value={bankDoc2.ocrData?.account_holder_name}
+                                originalValue={bankDoc2.originalOcrData?.account_holder_name}
+                                verifiedValue={bankDoc2.apiData?.normalized?.account_holder_name}
+                                verifiedLabel="Name matches bank record"
+                                onChange={(v) => setOcrField(setBankDoc2, "account_holder_name", v)}
+                              />
+                              {bankDoc2.apiData?.holderNameMessage && (
+                                <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                                  <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                  <span>{bankDoc2.apiData.holderNameMessage}</span>
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
+                              <select
+                                value={bankAccountType2}
+                                onChange={(e) => setBankAccountType2(e.target.value)}
+                                className="mt-1 w-full h-10 rounded-md border border-border/60 bg-muted/40 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="current">Current Account</option>
+                                <option value="savings">Savings Account</option>
+                                <option value="cash_credit">Cash Credit</option>
+                                <option value="others">Others</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-muted-foreground">Bank Address</Label>
+                              <Input
+                                value={bankBranchAddress2}
+                                onChange={(e) => { bankAddressTouchedRef2.current = true; setBankBranchAddress2(e.target.value); }}
+                                placeholder="Branch address (optional)"
+                                className="mt-1 bg-muted/40 border-border/60"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    />
+                    {bankDoc2.status === "verified" && (
+                      <CrossCheckStrip ok={true} text="Secondary account active · Penny-drop successful" className="mt-3" />
+                    )}
+                  </div>
+                )}
+              </div>
             </StageShell>
           </TabsContent>
         </Tabs>
