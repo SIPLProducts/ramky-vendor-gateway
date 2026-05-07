@@ -311,7 +311,7 @@ export function ApprovalMatrixConfig() {
         } else {
           const { data, error } = await supabase
             .from('approval_matrix_levels')
-            .insert(levelPayload)
+            .upsert(levelPayload, { onConflict: 'tenant_id,level_number' })
             .select('id')
             .single();
           if (error) throw error;
