@@ -980,6 +980,69 @@ export type Database = {
           },
         ]
       }
+      sap_default_fields: {
+        Row: {
+          akont: string
+          bukrs: string
+          cdi: string
+          created_at: string
+          fdgrv: string
+          kalsk: string
+          lebre: string
+          partn_cat: string
+          partn_grp: string
+          taxtype: string
+          tenant_id: string
+          title: string
+          updated_at: string
+          ven_class: string
+          vkorg: string
+          waers: string
+          webre: string
+          zuawa: string
+        }
+        Insert: {
+          akont?: string
+          bukrs?: string
+          cdi?: string
+          created_at?: string
+          fdgrv?: string
+          kalsk?: string
+          lebre?: string
+          partn_cat?: string
+          partn_grp?: string
+          taxtype?: string
+          tenant_id: string
+          title?: string
+          updated_at?: string
+          ven_class?: string
+          vkorg?: string
+          waers?: string
+          webre?: string
+          zuawa?: string
+        }
+        Update: {
+          akont?: string
+          bukrs?: string
+          cdi?: string
+          created_at?: string
+          fdgrv?: string
+          kalsk?: string
+          lebre?: string
+          partn_cat?: string
+          partn_grp?: string
+          taxtype?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          ven_class?: string
+          vkorg?: string
+          waers?: string
+          webre?: string
+          zuawa?: string
+        }
+        Relationships: []
+      }
       scheduled_validations: {
         Row: {
           created_at: string
@@ -1594,6 +1657,7 @@ export type Database = {
       }
       vendors: {
         Row: {
+          account_holder_name: string | null
           account_holder_name_2: string | null
           account_number: string | null
           account_number_2: string | null
@@ -1738,6 +1802,7 @@ export type Database = {
           registered_pincode: string | null
           registered_state: string | null
           registered_website: string | null
+          relative_name: string | null
           safety_issues: string | null
           same_as_registered: boolean | null
           sap_synced_at: string | null
@@ -1764,6 +1829,7 @@ export type Database = {
           water_supply: string | null
         }
         Insert: {
+          account_holder_name?: string | null
           account_holder_name_2?: string | null
           account_number?: string | null
           account_number_2?: string | null
@@ -1908,6 +1974,7 @@ export type Database = {
           registered_pincode?: string | null
           registered_state?: string | null
           registered_website?: string | null
+          relative_name?: string | null
           safety_issues?: string | null
           same_as_registered?: boolean | null
           sap_synced_at?: string | null
@@ -1934,6 +2001,7 @@ export type Database = {
           water_supply?: string | null
         }
         Update: {
+          account_holder_name?: string | null
           account_holder_name_2?: string | null
           account_number?: string | null
           account_number_2?: string | null
@@ -2078,6 +2146,7 @@ export type Database = {
           registered_pincode?: string | null
           registered_state?: string | null
           registered_website?: string | null
+          relative_name?: string | null
           safety_issues?: string | null
           same_as_registered?: boolean | null
           sap_synced_at?: string | null
