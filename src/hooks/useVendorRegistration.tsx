@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
