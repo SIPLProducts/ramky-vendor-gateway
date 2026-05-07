@@ -110,7 +110,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <TextField label="Identification Source" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
             </Section>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="gap-2 mt-4 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl" disabled={isSubmitting}>
