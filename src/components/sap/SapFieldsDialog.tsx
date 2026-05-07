@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 // native scroll div used instead of Radix ScrollArea
 import { Separator } from '@/components/ui/separator';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, Tags } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 
 export type SapFieldOverrides = {
@@ -51,7 +51,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-5 w-5 text-primary" />
-            SAP Field Confirmation — {vendor?.legal_name}
+            SAP Field Confirmation
           </DialogTitle>
           <DialogDescription>
             Review and confirm SAP-specific fields before pushing this vendor to S/4HANA.
@@ -65,13 +65,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
               <TextField label="Vendor Account Group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
-              <SelectField label="Title" value={form.title} onChange={v => set('title', v)}
-                options={[['', '-'], ['0001', 'Mr.'], ['0002', 'Mrs.'], ['0003', 'Ms.']]} />
-              <TextField label="GST Category" value={form.taxtype} onChange={v => set('taxtype', v)} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
-              <TextField label="MSME Reg Type (idtype)" value={form.idtype} onChange={v => set('idtype', v)} />
-              <TextField label="MSME ID Number (idnum)" value={form.idnum} onChange={v => set('idnum', v)} className="md:col-span-2" />
             </Section>
 
             <Separator />
@@ -100,15 +95,6 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={v => set('lebre', v ? 'X' : '')} />
             </Section>
 
-            <Separator />
-
-            {/* Classification */}
-            <Section icon={<Tags className="h-4 w-4" />} title="Classification (optional)">
-              <TextField label="Material Group" value={form.classify.MGV} onChange={v => setClassify('MGV', v)} />
-              <TextField label="Category" value={form.classify.CATV} onChange={v => setClassify('CATV', v)} />
-              <TextField label="Location" value={form.classify.LOCV} onChange={v => setClassify('LOCV', v)} />
-              <TextField label="Identification Source" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
-            </Section>
           </div>
         </div>
 
