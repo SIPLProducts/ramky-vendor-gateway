@@ -1,45 +1,40 @@
-# Fix: Submitted vendor not reaching SCM Manager Approval
+## Problem
 
-## Root cause
+When the approval matrix has SCM Manager at L2 and SCM Head at L1 (matrix level numbers), the SCM Head currently sees vendors as actionable even though SCM Manager hasn't approved yet (see screenshot — 3 vendors pending for SCM Head). The Approve/Reject buttons should be disabled and a message shown until the prior approver acts.
 
-When a vendor submits the registration, `useVendorRegistration` calls the `route-vendor-approval` edge function, which is what creates the `vendor_approval_progress` rows that drive every approval inbox (SCM Manager, SCM Head, Finance 1/2, CEO Office).
+## Root Cause
 
-That edge function currently requires one of these roles:
-`['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase']`
+Two issues:
 
-But the user submitting the form has role `vendor` (confirmed from DB for the latest stuck submission `e159c529…`, submitted 2026-05-07). The call returns **403 Forbidden**, the catch block swallows it as "non-blocking", and **no progress rows are created** — so the vendor never appears in any approver's inbox even though `vendors.status = purchase_review`.
+1. **Stale data ordering for older vendors.** The router `route-vendor-approval` now renumbers eligible levels in canonical order (SCM_MANAGER → SCM_HEAD → Finance 1 → Finance 2 → CEO Office). New vendor `e159c529…` is correctly ordered (SCM_MANAGER level_number=1, SCM_HEAD=2). But the older vendors `6d652397…` and `a0a0b224…` were routed with the legacy logic where SCM_HEAD got level_number=1 and SCM_MANAGER got level_number=2 — so the SCM Head sees them as the active step.
 
-Confirmed in DB:
-- Vendor `e159c529…` (status=`purchase_review`, submitted today) → `vendor_approval_progress` rows = **0**
-- Older vendor `6d652397…` → has 2 progress rows (SCM_HEAD L1, SCM_MANAGER L2, both `pending`) and DOES show in the screenshot
-
-## Secondary issue: incomplete approval matrix
-
-For tenant `Ramky Infrastructure Limited` only **2 levels** are configured:
-- L1 · SCM Head (brijesh.kabra@ramky.com)
-- L2 · SCM Manager (soumendukumar.sengupta@ramky.com)
-
-There are **no levels for FINANCE_1, FINANCE_2, or CEO_OFFICE**, so even after SCM approvals the workflow you described (Finance 1 → Finance 2 → CEO Office for MSME → SAP Sync) cannot run. Those must be added in **User Management → Approval Matrix**.
+2. **No client-side safeguard.** `usePendingApprovalsByStage` selects the active level as the lowest pending level_number; if the data ordering is wrong, the wrong stage becomes "active" with full Approve/Reject buttons. There is no defensive gating in `StageApprovalView`.
 
 ## Plan
 
-### 1. Fix `route-vendor-approval` authorization
-File: `supabase/functions/route-vendor-approval/index.ts`
+### 1. Backfill stale progress rows
 
-Add `'vendor'` to the `allowedRoles` list in `requireAuthenticatedUser(...)`, since a vendor legitimately calls this function once for their own submission. (The function already validates `vendor_id` and uses the service role to write progress, so widening the role allowlist is safe — it only seeds the matrix; it doesn't grant approval ability.)
+For the two stuck vendors (`6d652397-9400-4efb-9045-d57fae133518` and `a0a0b224-d741-4911-8b89-ee36e5e0003b`), invoke the already-fixed `route-vendor-approval` edge function. It deletes existing progress rows and re-inserts them in canonical order (SCM_MANAGER first, then SCM_HEAD). After the backfill, SCM Head's queue will be empty until SCM Manager approves.
 
-### 2. Surface failures instead of swallowing them
-File: `src/hooks/useVendorRegistration.tsx` (around line 622)
+### 2. Add defensive gating in the approver UI
 
-- Capture the `error` returned by `supabase.functions.invoke('route-vendor-approval', …)` and show a destructive toast when it fails (currently only the success message is inspected; HTTP 403/500 errors fall into the silent `catch` only when the SDK throws).
-- Log the response body so this kind of regression is visible in the browser console next time.
+Even with correct data, add a safety net so a misordered matrix never lets a later approver act prematurely.
 
-### 3. Backfill the stuck vendor
-After deploy, re-invoke `route-vendor-approval` for vendor `e159c529-3753-4c9c-9e17-534c7975a15d` (one-shot via Supabase RPC/edge invocation in the migration / via a small script) so it appears in the SCM Manager inbox without the vendor having to resubmit.
+- **`src/hooks/usePendingApprovalsByStage.tsx`** — return one extra field per item, `blockedByPrevious: boolean`, computed by checking if any lower-numbered progress row for the same vendor is still `pending` or `rejected`. Continue to include the item in the list (don't filter it out) so the SCM Head can see what's coming.
 
-### 4. Tell the user about the missing matrix levels
-Not a code change — confirm in the response that to get the full chain (SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office for MSME → SAP Sync), an admin must add FINANCE_1, FINANCE_2, and CEO_OFFICE levels (with `requires_msme = true` on CEO_OFFICE) in **User Management → Approval Matrix** for the Ramky tenant. The routing function already filters CEO_OFFICE out for non-MSME vendors, so the MSME-Yes/No branching will work automatically once the levels exist.
+- **`src/components/approvals/StageApprovalView.tsx`**:
+  - When `blockedByPrevious` is true:
+    - Disable both **Approve** and **Reject** buttons
+    - Show an inline alert under the row (or in the action column) with the text: **"The previous approver has not approved yet."**
+    - Keep **View** enabled so the approver can still inspect the vendor and documents
+  - When false, behave exactly as today.
 
-## Out of scope
-- Changing the approval matrix data itself (admin task in UI).
-- Changes to SAP Sync screen (it already reads vendors with `status = approved` after Finance 2 / CEO Office completes — will work once the chain runs).
+### 3. Verify in DB after backfill
+
+Re-query `vendor_approval_progress` to confirm SCM_MANAGER rows have `level_number = 1` and SCM_HEAD rows have `level_number = 2` for both backfilled vendors. Confirm the SCM Head queue is empty.
+
+## Technical Details
+
+- The hook already fetches all progress rows per vendor (`allProgress`), so adding `blockedByPrevious` is a one-line derivation: `blockedByPrevious = some progress row with level_number < this.level_number AND status !== 'approved'`.
+- No schema changes, no edge function changes, no migration required.
+- The approval router already produces correct ordering for newly submitted vendors — no further fix needed there.

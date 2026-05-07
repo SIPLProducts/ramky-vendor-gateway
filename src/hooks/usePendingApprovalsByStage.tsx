@@ -14,6 +14,7 @@ export interface StageApprovalItem {
   levelName: string;
   approvalMode: string;
   stage: ApprovalStage;
+  blockedByPrevious: boolean;
 }
 
 /**
