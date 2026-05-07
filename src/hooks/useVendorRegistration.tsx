@@ -487,7 +487,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
             }
           : undefined,
       },
-      // _close_bank_
       financial: {
         turnoverYear1: vendor.turnover_year1?.toString() || '',
         turnoverYear2: vendor.turnover_year2?.toString() || '',
