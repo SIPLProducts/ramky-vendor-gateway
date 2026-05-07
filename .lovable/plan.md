@@ -1,32 +1,50 @@
-## Issue
+## Goal
 
-The 5 new approval tabs (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office) are coded and routed, but in `role_screen_permissions` every role has `can_access = false` for `scm_manager_approval / scm_head_approval / finance1_approval / finance2_approval / ceo_approval`, so the sidebar filter (`useScreenPermissions`) hides them. The legacy "SCM Approval" and "Finance Review" items are still showing instead.
+Reorganize `ApprovalMatrixConfig` so each approval stage has its own tab, and enforce that only **SCM Manager** can have multiple levels / multiple approvers. **SCM Head, Finance 1, Finance 2, CEO Office** are locked to exactly one approver each.
 
-You also asked to confirm: SCM Manager step supports multiple levels (L2…Ln), and only after the **last** SCM Manager approves does the vendor move to SCM Head. That already works in `route-vendor-approval` (it orders eligible levels by stage, then by `level_number`, so all `SCM_MANAGER` rows run before `SCM_HEAD`) and in `process-approval-action` (advances to the next pending row by lowest `level_number`).
+## Changes (single file: `src/components/admin/ApprovalMatrixConfig.tsx`)
 
-## Changes
+### 1. Add 5 stage tabs
+Wrap the existing rows table in `<Tabs>` with tab values: `SCM_MANAGER`, `SCM_HEAD`, `FINANCE_1`, `FINANCE_2`, `CEO_OFFICE`. Active tab filters `rows` to that stage. The Chain Preview, Diagnostics, DB strip, and Save All button stay above the tabs and continue to operate on the full row set (so one Save persists everything).
 
-### 1. Grant screen access to the 5 new approval pages
-Update `role_screen_permissions` so:
-- `scm_manager_approval`, `scm_head_approval`, `finance1_approval`, `finance2_approval`, `ceo_approval` → `can_access = true` for `purchase`, `finance`, `approver`, `admin`, `sharvi_admin`, `customer_admin`.
-- (Vendor stays false.)
+### 2. Single-approver stages (SCM Head / Finance 1 / Finance 2 / CEO Office)
+For these tabs:
+- Hide the **Stage** column (stage is fixed by the tab) and the **Level #** selector (auto-assigned).
+- Hide the **+ Add Row** button when a row already exists; show "Only one approver allowed for this stage" helper text.
+- On save, force `level_number` to the canonical slot per stage so ordering stays consistent:
+  - `SCM_HEAD` → highest SCM_MANAGER level + 1 (so it runs after all SCM Managers; existing edge function already orders by `STAGE_ORDER` so any number works, but we keep numbering tidy)
+  - `FINANCE_1`, `FINANCE_2`, `CEO_OFFICE` → next sequential numbers
+- Validation: reject save if any of these stages has >1 row.
 
-Edge functions already gate the actual data per user via `approval_matrix_approvers`, so showing the pages to these roles is safe — non-approvers just see an empty list.
+### 3. SCM Manager tab (multi-level, multi-approver)
+- Keep current UI: Level # selector, + Add Row, Mode (ANY/ALL), free assignment of multiple approvers per level. Stage column hidden (fixed to SCM_MANAGER by the tab).
+- These rows occupy `level_number` 1..N (lowest = first to act).
 
-### 2. Hide legacy sidebar items
-In `src/components/layout/Sidebar.tsx`, remove the two legacy entries (lines 75–76):
-- "SCM Approval" → `/purchase/approval`
-- "Finance Review" → `/finance/review`
+### 4. Auto-assignment of level_number on save
+Compute final `level_number` per stage in canonical order before persisting:
+```
+1..N      → SCM_MANAGER rows (preserves user-chosen ordering within tab)
+N+1       → SCM_HEAD
+N+2       → FINANCE_1
+N+3       → FINANCE_2
+N+4       → CEO_OFFICE (only if present)
+```
+This matches `route-vendor-approval`'s `STAGE_ORDER` and the "lowest pending = active" logic in `process-approval-action`, so no backend changes are needed.
 
-Keep the routes mounted in `App.tsx` so any deep links still work, but they no longer clutter the sidebar.
+### 5. Tab badges
+Each tab shows a small count badge: number of approvers configured for that stage. Tabs for stages with errors get a red dot.
 
-### 3. No backend changes
-- `route-vendor-approval` already supports L2…Ln SCM Managers in order before SCM Head.
-- `process-approval-action` already advances to the next pending level only after the current one is approved.
-- "Previous approver hasn't approved yet" disabled-button + message already implemented in `StageApprovalView`.
+## Out of scope / no changes
+
+- Edge functions (`route-vendor-approval`, `process-approval-action`, `list-pending-approvals-by-stage`) already handle multi-level SCM Manager correctly.
+- Database schema unchanged (`approval_matrix_levels.stage` already exists).
+- Sidebar / approval pages unchanged (already split per stage).
 
 ## Verification
 
-1. Reload the app → sidebar shows: SCM Manager Approval, SCM Head Approval, Finance 1 Approval, Finance 2 Approval, CEO Office Approval (legacy "SCM Approval" / "Finance Review" gone).
-2. Configure 3 SCM Manager levels (L2, L3, L4) in Approval Matrix. Submit a vendor → only the L2 approver sees it on SCM Manager page; SCM Head page shows it as blocked. After L2 approves, L3 sees it; after L3, L4; after L4, vendor moves to SCM Head.
-3. SCM Head, Finance 1, Finance 2, CEO Office continue to be single-approver pages.
+1. Open Approval Matrix → see 5 tabs.
+2. SCM Manager tab: add L2, L3 with multiple approvers — allowed.
+3. SCM Head tab: add 1 approver — "+ Add Row" hides; try to add a second is blocked.
+4. Same for Finance 1, Finance 2, CEO Office.
+5. Save All → DB shows correctly numbered levels (SCM Managers first, then Head, F1, F2, CEO last). Reload: rows reappear in the right tabs.
+6. Submit a vendor → routes through SCM Managers in order, then SCM Head, F1, F2, (CEO if MSME), then SAP Sync.
