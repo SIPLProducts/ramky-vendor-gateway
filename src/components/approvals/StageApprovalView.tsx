@@ -133,7 +133,10 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   ))
                 ) : items.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No pending approvals
+                    <div>No pending approvals</div>
+                    <div className="text-xs mt-2">
+                      Only vendors whose approval matrix lists you as an approver for this stage appear here.
+                    </div>
                   </TableCell></TableRow>
                 ) : (
                   items.map((it) => (
