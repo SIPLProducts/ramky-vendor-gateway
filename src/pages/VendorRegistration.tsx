@@ -353,6 +353,17 @@ export default function VendorRegistration() {
               gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
               msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
               bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
+              bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
+                ? {
+                    accountNumber: existingFormData.bank.secondary.accountNumber,
+                    ifsc: existingFormData.bank.secondary.ifscCode || '',
+                    bankName: existingFormData.bank.secondary.bankName || '',
+                    branchName: existingFormData.bank.secondary.branchName || '',
+                    accountHolderName: existingFormData.bank.secondary.accountHolderName || '',
+                    accountType: existingFormData.bank.secondary.accountType || 'current',
+                    bankAddress: existingFormData.bank.secondary.bankAddress || '',
+                  }
+                : undefined,
             });
           }
           if (existingFormData.organization?.legalName) filledSteps.push(2);
