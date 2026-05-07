@@ -297,6 +297,58 @@ serve(async (req) => {
     }
 
     const row = buildPayload(vendor);
+
+    // Merge user-supplied SAP field overrides from the pre-sync confirmation popup.
+    const ALLOWED_OVERRIDES = [
+      "partn_cat","partn_grp","title","taxtype","msme","idtype","idnum",
+      "bukrs","akont","zuawa","cdi","fdgrv",
+      "vkorg","waers","kalsk","webre","lebre","ven_class",
+    ];
+    if (overrides && typeof overrides === "object") {
+      for (const k of ALLOWED_OVERRIDES) {
+        if (overrides[k] !== undefined && overrides[k] !== null) {
+          (row as any)[k] = overrides[k];
+        }
+      }
+    }
+
+    // CLASSIFY block
+    const classify = overrides?.classify || {};
+    const classifyBlock: Record<string, any[]> = {};
+    if (classify.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classify.MGV) }];
+    if (classify.CATV) classifyBlock.CAT_VENDOR = [{ CATV: String(classify.CATV) }];
+    if (classify.LOCV) classifyBlock.LOCATION_VENDOR = [{ LOCV: String(classify.LOCV) }];
+    if (classify.IDS) classifyBlock.IDENTIFICATION_SOURCE = [{ IDS: String(classify.IDS) }];
+    if (Object.keys(classifyBlock).length) (row as any).CLASSIFY = classifyBlock;
+
+    // Mirror vendors[] sub-array as required by SAP payload spec
+    (row as any).customers = [{
+      kunnr: "", idtype: "", idnum: "", idinstitute: "", identrydate: "",
+      bukrs: "", zterm: "",
+    }];
+    (row as any).vendors = [{
+      lifnr: "",
+      partn_cat: row.partn_cat,
+      name2: row.name2, name3: row.name3,
+      sterm1: row.sterm1, sterm2: row.sterm2,
+      street: row.street, house_no: row.house_no,
+      str_suppl1: row.str_suppl1, str_suppl2: row.str_suppl2, str_suppl3: row.str_suppl3,
+      location: row.location, district: row.district,
+      postl_cod1: row.postl_cod1, city: row.city, country: row.country,
+      region: row.region, langu: row.langu,
+      tel_number: row.tel_number, mob_number: row.mob_number, smtp_addr: row.smtp_addr,
+      taxtype: row.taxtype, taxnumxl: row.taxnumxl,
+      nodel: "", bp_type: "", due_digi: "",
+      idtype: "", idnum: "", j_1ipanno: row.j_1ipanno,
+      ven_class: row.ven_class, cent_post_block: "", cent_pur_block: "", ktokk: "",
+      pernr: "", bukrs: row.bukrs, akont: row.akont, zuawa: row.zuawa,
+      cdi: row.cdi, msme: row.msme, comp_block: "",
+      witht: "", wt_withcd: "", wt_subjct: "", qsrec: "", qland: "",
+      vkorg: row.vkorg, waers: row.waers, zterm: "",
+      inco1: "", inco2: "", kalsk: row.kalsk, webre: row.webre,
+      block_func: "", pur_block: "",
+    }];
+
     const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
     (row as any).UPLOAD = uploads;
     if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
