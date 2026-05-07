@@ -199,7 +199,7 @@ serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendorId } = await req.json();
+    const { vendorId, overrides } = await req.json();
     if (!vendorId) throw new Error("vendorId is required");
 
     const supabase = createClient(
