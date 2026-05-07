@@ -472,7 +472,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         micrCode: vendor.micr_code || '',
         bankAddress: vendor.bank_address || '',
         cancelledChequeFile: null,
+        secondary: vendor.account_number_2
+          ? {
+              enabled: true,
+              bankName: vendor.bank_name_2 || '',
+              branchName: vendor.branch_name_2 || '',
+              accountNumber: vendor.account_number_2 || '',
+              accountType: (vendor.account_type_2 as 'current' | 'savings' | 'cash_credit' | 'others') || 'current',
+              ifscCode: vendor.ifsc_code_2 || '',
+              micrCode: vendor.micr_2 || '',
+              bankAddress: vendor.bank_address_2 || '',
+              accountHolderName: vendor.account_holder_name_2 || '',
+              cancelledChequeFile: null,
+            }
+          : undefined,
       },
+      // _close_bank_
       financial: {
         turnoverYear1: vendor.turnover_year1?.toString() || '',
         turnoverYear2: vendor.turnover_year2?.toString() || '',
