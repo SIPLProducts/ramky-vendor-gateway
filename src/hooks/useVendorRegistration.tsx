@@ -149,6 +149,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       { file: formData.statutory.panCardFile, type: 'pan_card' },
       { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
       { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
+      { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
       { file: formData.financial.financialDocsFile, type: 'financial_docs' },
       { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
     ];
