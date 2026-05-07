@@ -138,7 +138,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                 ) : (
                   items.map((it) => (
                     <TableRow key={it.progressId}>
-                      <TableCell className="font-medium">{it.vendorName}</TableCell>
+                      <TableCell className="font-medium">
+                        {it.vendorName}
+                        {it.blockedByPrevious && (
+                          <div className="text-xs text-amber-600 mt-1">
+                            The previous approver has not approved yet.
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell><Badge variant="outline">{it.levelName}</Badge></TableCell>
                       <TableCell>
                         {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
@@ -151,10 +158,23 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                           <Button size="sm" variant="outline" onClick={() => openView(it.vendorId)}>
                             <Eye className="h-4 w-4 mr-1" /> View
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setActionItem({ item: it, action: 'approve' })}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={it.blockedByPrevious}
+                            title={it.blockedByPrevious ? 'The previous approver has not approved yet.' : undefined}
+                            onClick={() => setActionItem({ item: it, action: 'approve' })}
+                          >
                             <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                           </Button>
-                          <Button size="sm" variant="outline" className="text-destructive" onClick={() => setActionItem({ item: it, action: 'reject' })}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive"
+                            disabled={it.blockedByPrevious}
+                            title={it.blockedByPrevious ? 'The previous approver has not approved yet.' : undefined}
+                            onClick={() => setActionItem({ item: it, action: 'reject' })}
+                          >
                             <XCircle className="h-4 w-4 mr-1" /> Reject
                           </Button>
                         </div>
