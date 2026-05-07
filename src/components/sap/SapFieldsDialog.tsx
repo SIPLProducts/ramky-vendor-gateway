@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// native scroll div used instead of Radix ScrollArea
 import { Separator } from '@/components/ui/separator';
 import { Server, Loader2, Building2, Briefcase, ShoppingCart, Tags } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
@@ -58,7 +58,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 max-h-[60vh] pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
           <div className="space-y-6 py-2">
             {/* Vendor Header */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
@@ -110,7 +110,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <TextField label="Identification Source" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
             </Section>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="gap-2 mt-4 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl" disabled={isSubmitting}>
