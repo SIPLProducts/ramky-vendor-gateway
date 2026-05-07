@@ -1090,7 +1090,9 @@ export function DocumentVerificationStep({
         : false;
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
   const stage3Done = isMsmeRegistered === false || (isMsmeRegistered === true && msmeDoc.status === "verified");
-  const stage4Done = bankDoc.status === "verified";
+  const stage4Done =
+    bankDoc.status === "verified" &&
+    (!bank2Enabled || bankDoc2.status === "verified");
   const allDone = stage1Done && stage2Done && stage3Done && stage4Done;
   const completedCount = [stage1Done, stage2Done, stage3Done, stage4Done].filter(Boolean).length;
 
