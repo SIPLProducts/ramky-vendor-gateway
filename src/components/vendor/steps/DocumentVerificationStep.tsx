@@ -963,6 +963,54 @@ export function DocumentVerificationStep({
     return () => clearTimeout(t);
   }, [bankDoc.ocrData?.ifsc_code, bankDoc.ocrData?.branch_name]);
 
+  // ----- Secondary bank: same upload flow + IFSC enrichment -----
+  const handleBankUpload2 = (file: File) =>
+    runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
+      setBankDoc2((prev) => {
+        const ifsc = prev.ocrData?.ifsc_code;
+        const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
+        if (!isValidIfsc(ifsc) || hasBranch) return prev;
+        lookupIfsc(ifsc).then((info) => {
+          if (!info) return;
+          setBankDoc2((curr) => {
+            const next = { ...(curr.ocrData || {}) };
+            let touched = false;
+            if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+            if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+            if (touched) setBankBranchAutoFilled2(true);
+            return { ...curr, ocrData: next };
+          });
+          if (info.address && !bankAddressTouchedRef2.current) {
+            setBankBranchAddress2(info.address);
+          }
+        });
+        return prev;
+      });
+    });
+
+  useEffect(() => {
+    if (!bank2Enabled) return;
+    const ifsc = bankDoc2.ocrData?.ifsc_code;
+    const hasBranch = !!(bankDoc2.ocrData?.branch_name && String(bankDoc2.ocrData.branch_name).trim());
+    if (!isValidIfsc(ifsc) || hasBranch) return;
+    const t = setTimeout(async () => {
+      const info = await lookupIfsc(ifsc!);
+      if (!info) return;
+      setBankDoc2((curr) => {
+        const next = { ...(curr.ocrData || {}) };
+        let touched = false;
+        if (info.branch && !next.branch_name) { next.branch_name = info.branch; touched = true; }
+        if (info.bank && !next.bank_name) { next.bank_name = info.bank; }
+        if (touched) setBankBranchAutoFilled2(true);
+        return { ...curr, ocrData: next };
+      });
+      if (info.address && !bankAddressTouchedRef2.current) {
+        setBankBranchAddress2(info.address);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [bank2Enabled, bankDoc2.ocrData?.ifsc_code, bankDoc2.ocrData?.branch_name]);
+
   // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
   useEffect(() => {
     if (panDoc.status !== "verified" || isGstRegistered !== true) {
