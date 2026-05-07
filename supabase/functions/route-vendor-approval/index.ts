@@ -19,7 +19,7 @@ const STAGE_ORDER: Record<string, number> = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase']);
+  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase', 'vendor']);
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {

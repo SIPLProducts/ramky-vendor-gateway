@@ -1,69 +1,45 @@
-## Add UPLOAD array (file_name + base64 + path) to SAP sync payload
+# Fix: Submitted vendor not reaching SCM Manager Approval
 
-### Background — what already exists
+## Root cause
 
-- All vendor uploads (PAN, GST cert, GST self-declaration, MSME cert, cancelled cheque #1, cancelled cheque #2, financial docs, dealership certificate, etc.) are uploaded to the `vendor-documents` Supabase Storage bucket and indexed in `public.vendor_documents` (vendor_id, document_type, file_name, file_path, mime_type, …) — see `src/hooks/useVendorRegistration.tsx` (`uploadAllDocuments` / `saveDocumentMetadata`).
-- The Approval screen "View" dialog already has a **Documents** tab that lists every row from `vendor_documents` with preview + download (added in the previous round via `StageApprovalView.tsx` + `VendorDocuments.tsx`). Nothing to redo there — only verifying the new `cancelled_cheque_2` and any other types render with friendly labels.
+When a vendor submits the registration, `useVendorRegistration` calls the `route-vendor-approval` edge function, which is what creates the `vendor_approval_progress` rows that drive every approval inbox (SCM Manager, SCM Head, Finance 1/2, CEO Office).
 
-So the only missing piece is: **the SAP BP-create payload does not yet send the uploaded files**. Right now `buildPayload(vendor)` in `supabase/functions/sync-vendor-to-sap/index.ts` returns a single object with no `UPLOAD` key.
+That edge function currently requires one of these roles:
+`['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase']`
 
-### Change 1 — extend SAP payload with `UPLOAD` array
+But the user submitting the form has role `vendor` (confirmed from DB for the latest stuck submission `e159c529…`, submitted 2026-05-07). The call returns **403 Forbidden**, the catch block swallows it as "non-blocking", and **no progress rows are created** — so the vendor never appears in any approver's inbox even though `vendors.status = purchase_review`.
 
-In `supabase/functions/sync-vendor-to-sap/index.ts`:
+Confirmed in DB:
+- Vendor `e159c529…` (status=`purchase_review`, submitted today) → `vendor_approval_progress` rows = **0**
+- Older vendor `6d652397…` → has 2 progress rows (SCM_HEAD L1, SCM_MANAGER L2, both `pending`) and DOES show in the screenshot
 
-1. After loading the vendor, query `vendor_documents` for that `vendor_id`.
-2. For each row, download the binary from Storage:
-   ```ts
-   const { data: blob } = await supabase.storage
-     .from('vendor-documents')
-     .download(file_path);
-   ```
-   Convert the blob to base64 (chunked to avoid stack overflow on large files).
-3. Map each `document_type` to the SAP-friendly **FILE_NAME** the user requested:
+## Secondary issue: incomplete approval matrix
 
-   | document_type           | FILE_NAME (sent to SAP) |
-   |-------------------------|-------------------------|
-   | pan_card                | pan                     |
-   | gst_certificate         | gst                     |
-   | gst_self_declaration    | gst_self_declaration    |
-   | msme_certificate        | msme                    |
-   | cancelled_cheque        | bank_cheque1            |
-   | cancelled_cheque_2      | bank_cheque2            |
-   | financial_docs          | financials              |
-   | dealership_certificate  | dealership              |
-   | iec_certificate         | iec                     |
-   | swift_iban_proof        | swift_iban              |
-   | incorporation_certificate | incorporation         |
-   | other                   | other                   |
+For tenant `Ramky Infrastructure Limited` only **2 levels** are configured:
+- L1 · SCM Head (brijesh.kabra@ramky.com)
+- L2 · SCM Manager (soumendukumar.sengupta@ramky.com)
 
-   (Unknown types fall back to `document_type` itself.)
-4. Build each entry as:
-   ```json
-   { "FILE_NAME": "pan", "FILE": "<base64>", "FILE_PATH": "<vendor_documents.file_path>" }
-   ```
-5. Add `UPLOAD: [...]` to the row returned by `buildPayload`. Empty array if vendor has no docs.
+There are **no levels for FINANCE_1, FINANCE_2, or CEO_OFFICE**, so even after SCM approvals the workflow you described (Finance 1 → Finance 2 → CEO Office for MSME → SAP Sync) cannot run. Those must be added in **User Management → Approval Matrix**.
 
-Guardrails:
-- Skip files larger than ~10 MB and log a warning (base64 + Edge Function memory limit).
-- Wrap document fetch in try/catch per file so one bad file doesn't break the whole sync; failed files are omitted and reported in the response message.
-- Keep `payload` as `[ row ]` (array-of-one) — existing SAP contract.
+## Plan
 
-### Change 2 — pass `vendor` row + supabase client into builder
+### 1. Fix `route-vendor-approval` authorization
+File: `supabase/functions/route-vendor-approval/index.ts`
 
-`buildPayload` becomes `async buildPayload(vendor, supabase)` (or a separate `buildUploads(...)` helper called inside `serve`). Same call site, just `await`ed.
+Add `'vendor'` to the `allowedRoles` list in `requireAuthenticatedUser(...)`, since a vendor legitimately calls this function once for their own submission. (The function already validates `vendor_id` and uses the service role to write progress, so widening the role allowlist is safe — it only seeds the matrix; it doesn't grant approval ability.)
 
-### Change 3 — minor: friendly labels (sanity check)
+### 2. Surface failures instead of swallowing them
+File: `src/hooks/useVendorRegistration.tsx` (around line 622)
 
-`src/components/vendor/VendorDocuments.tsx` already has labels for all current document types. No code change needed unless we discover a missing key during testing.
+- Capture the `error` returned by `supabase.functions.invoke('route-vendor-approval', …)` and show a destructive toast when it fails (currently only the success message is inspected; HTTP 403/500 errors fall into the silent `catch` only when the SDK throws).
+- Log the response body so this kind of regression is visible in the browser console next time.
 
-### Out of scope
+### 3. Backfill the stuck vendor
+After deploy, re-invoke `route-vendor-approval` for vendor `e159c529-3753-4c9c-9e17-534c7975a15d` (one-shot via Supabase RPC/edge invocation in the migration / via a small script) so it appears in the SCM Manager inbox without the vendor having to resubmit.
 
-- Re-uploading docs from the approval screen (the dialog only views/downloads).
-- Streaming very large files — keeping the 10 MB cap is consistent with existing upload limits.
-- Changing storage layout or adding a second storage bucket.
+### 4. Tell the user about the missing matrix levels
+Not a code change — confirm in the response that to get the full chain (SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office for MSME → SAP Sync), an admin must add FINANCE_1, FINANCE_2, and CEO_OFFICE levels (with `requires_msme = true` on CEO_OFFICE) in **User Management → Approval Matrix** for the Ramky tenant. The routing function already filters CEO_OFFICE out for non-MSME vendors, so the MSME-Yes/No branching will work automatically once the levels exist.
 
-### Files touched
-
-- `supabase/functions/sync-vendor-to-sap/index.ts` — add `UPLOAD` array with FILE_NAME + base64 + FILE_PATH.
-
-That's it — registration-side persistence and approval-side viewing are already wired up from the previous round; this round just makes those same files flow into the SAP payload as the user specified.
+## Out of scope
+- Changing the approval matrix data itself (admin task in UI).
+- Changes to SAP Sync screen (it already reads vendors with `status = approved` after Finance 2 / CEO Office completes — will work once the chain runs).
