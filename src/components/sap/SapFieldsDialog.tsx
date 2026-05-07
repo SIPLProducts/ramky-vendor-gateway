@@ -133,27 +133,28 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   );
 }
 
-function buildDefaults(vendor: VendorRow | null): SapFieldOverrides {
+function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): SapFieldOverrides {
   const msme = isMsme(vendor);
+  const d = tenantDefaults || {};
   return {
-    partn_cat: '2',
-    partn_grp: 'ZDOM',
-    title: '0003',
-    taxtype: 'IN3',
+    partn_cat: d.partn_cat ?? '2',
+    partn_grp: d.partn_grp ?? 'ZDOM',
+    title: d.title ?? '0003',
+    taxtype: d.taxtype ?? 'IN3',
     msme: msme ? 'MIC' : '',
     idtype: msme ? 'ZMSMEN' : '',
     idnum: (vendor as any)?.msme_number || '',
-    bukrs: '1000',
-    akont: '155000005',
-    zuawa: '014',
-    cdi: 'X',
-    fdgrv: 'A1',
-    vkorg: '1000',
-    waers: 'INR',
-    kalsk: 'L1',
-    webre: 'X',
-    lebre: 'X',
-    ven_class: '',
+    bukrs: d.bukrs ?? '1000',
+    akont: d.akont ?? '155000005',
+    zuawa: d.zuawa ?? '014',
+    cdi: d.cdi ?? 'X',
+    fdgrv: d.fdgrv ?? 'A1',
+    vkorg: d.vkorg ?? '1000',
+    waers: d.waers ?? 'INR',
+    kalsk: d.kalsk ?? 'L1',
+    webre: d.webre ?? 'X',
+    lebre: d.lebre ?? 'X',
+    ven_class: d.ven_class ?? '',
     classify: {
       MGV: '',
       CATV: '',
