@@ -246,7 +246,7 @@ export default function SAPSync() {
                     <div>
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
-                        <Badge className="bg-green-100 text-green-700 border-green-200">Purchase Approved</Badge>
+                        <Badge className="bg-green-100 text-green-700 border-green-200">{getApprovalLabel(vendor)}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -262,22 +262,16 @@ export default function SAPSync() {
                     </Button>
                     <Button
                       className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
-                      onClick={() => handleSyncToSAP(vendor)}
+                      onClick={() => openSapFieldsDialog(vendor)}
                       disabled={syncingVendorId === vendor.id}
                     >
                       {syncingVendorId === vendor.id ? (
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
                       ) : (
-                        <><Server className="h-4 w-4 mr-2" />Sync</>
+                        <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
                       )}
                     </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
 
       {/* Vendor Details Dialog with Sync Button */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
