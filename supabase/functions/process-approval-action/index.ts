@@ -116,13 +116,11 @@ Deno.serve(async (req) => {
     // Otherwise, advance to the next pending level (no vendor status change).
     const { data: remainingProgress } = await admin
       .from('vendor_approval_progress')
-      .select('level_number, status')
+      .select('id, level_number, level_id, status')
       .eq('vendor_id', progress.vendor_id);
     const stillPending = (remainingProgress ?? []).filter((p) => p.status === 'pending');
 
     if (stillPending.length === 0) {
-      // All approval levels (SCM Manager → SCM Head → Finance 1 → Finance 2 → optional CEO Office)
-      // have been approved. Hand the vendor to the SAP Sync queue.
       await admin.from('vendors').update({
         status: 'pending_sap_sync',
         purchase_reviewed_by: userId,
@@ -133,8 +131,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const nextLevel = stillPending.reduce((min, p) => Math.min(min, p.level_number), Infinity);
-    return new Response(JSON.stringify({ ok: true, advanced_to_level: nextLevel }), {
+    const nextRow = stillPending.reduce((min, p) => (p.level_number < min.level_number ? p : min), stillPending[0]);
+    const { data: nextLvl } = await admin
+      .from('approval_matrix_levels')
+      .select('stage').eq('id', nextRow.level_id).single();
+    const nextStatus = STAGE_TO_REVIEW[nextLvl?.stage ?? ''] ?? 'purchase_review';
+    await admin.from('vendors').update({ status: nextStatus }).eq('id', progress.vendor_id);
+
+    return new Response(JSON.stringify({ ok: true, vendor_status: nextStatus, advanced_to_level: nextRow.level_number }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
