@@ -37,9 +37,14 @@ interface VendorDocumentsProps {
 
 const documentTypeLabels: Record<string, string> = {
   gst_certificate: 'GST Certificate',
+  gst_self_declaration: 'GST Self-Declaration',
   pan_card: 'PAN Card',
   msme_certificate: 'MSME Certificate',
-  cancelled_cheque: 'Cancelled Cheque',
+  cancelled_cheque: 'Cancelled Cheque (Primary Bank)',
+  cancelled_cheque_2: 'Cancelled Cheque (Secondary Bank)',
+  iec_certificate: 'IEC Certificate',
+  swift_iban_proof: 'SWIFT/IBAN Proof',
+  dealership_certificate: 'Dealership Certificate',
   financial_docs: 'Financial Documents',
   incorporation_certificate: 'Incorporation Certificate',
   other: 'Other Document',
