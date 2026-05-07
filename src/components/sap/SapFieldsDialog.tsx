@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// native scroll div used instead of Radix ScrollArea
 import { Separator } from '@/components/ui/separator';
 import { Server, Loader2, Building2, Briefcase, ShoppingCart, Tags } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
