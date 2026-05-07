@@ -627,27 +627,42 @@ export function ApprovalMatrixConfig() {
         </Card>
       )}
 
-      {/* Chain preview */}
-      {savePlan.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Approval Chain (Vendor Submitted → SAP Sync)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="outline">Vendor Submitted</Badge>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              {savePlan.map((g) => (
-                <span key={g.level_number} className="flex items-center gap-2">
-                  <Badge>L{g.level_number} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}</Badge>
+      {/* Chain preview — canonical stage order */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Approval Chain (Vendor Submitted → SAP Sync)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="outline">Vendor Submitted</Badge>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            {STAGE_ORDER.flatMap((stage) => {
+              const groupsForStage = savePlan.filter((g) => g.stage === stage);
+              const isCeo = stage === 'CEO_OFFICE';
+              if (groupsForStage.length === 0) {
+                return [(
+                  <span key={stage} className="flex items-center gap-2">
+                    <Badge variant="outline" className="opacity-50">
+                      {STAGE_LABELS[stage]} · not configured{isCeo ? ' (MSME only)' : ''}
+                    </Badge>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                )];
+              }
+              return groupsForStage.map((g) => (
+                <span key={`${stage}-${g.level_number}`} className="flex items-center gap-2">
+                  <Badge>
+                    L{g.level_number} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
+                    {isCeo ? ' (MSME only)' : ''}
+                  </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </span>
-              ))}
-              <Badge variant="secondary">SAP Sync</Badge>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              ));
+            })}
+            <Badge variant="secondary">SAP Sync</Badge>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stage tabs */}
       <Card>
