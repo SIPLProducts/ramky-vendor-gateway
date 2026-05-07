@@ -1,40 +1,56 @@
-## Problem
+## Root cause
 
-When the approval matrix has SCM Manager at L2 and SCM Head at L1 (matrix level numbers), the SCM Head currently sees vendors as actionable even though SCM Manager hasn't approved yet (see screenshot — 3 vendors pending for SCM Head). The Approve/Reject buttons should be disabled and a message shown until the prior approver acts.
+RLS on `vendor_approval_progress` only lets the SCM Head see THEIR own row. So when the client tries to fetch the full approval chain to detect "is L2 still pending?", it gets back only the L1 row → `blockedByPrevious` is always `false` → buttons stay enabled.
 
-## Root Cause
+Previous attempts tried to fix this with a new RLS policy (declined twice). This plan avoids any DB/RLS migration entirely.
 
-Two issues:
+## Approach — move the check to a service-role edge function
 
-1. **Stale data ordering for older vendors.** The router `route-vendor-approval` now renumbers eligible levels in canonical order (SCM_MANAGER → SCM_HEAD → Finance 1 → Finance 2 → CEO Office). New vendor `e159c529…` is correctly ordered (SCM_MANAGER level_number=1, SCM_HEAD=2). But the older vendors `6d652397…` and `a0a0b224…` were routed with the legacy logic where SCM_HEAD got level_number=1 and SCM_MANAGER got level_number=2 — so the SCM Head sees them as the active step.
+Compute the pending list (and the `blockedByPrevious` flag) in a new edge function that uses the service role key, so it can read every row in `vendor_approval_progress` regardless of RLS. The client just renders the result.
 
-2. **No client-side safeguard.** `usePendingApprovalsByStage` selects the active level as the lowest pending level_number; if the data ordering is wrong, the wrong stage becomes "active" with full Approve/Reject buttons. There is no defensive gating in `StageApprovalView`.
+### 1. New edge function: `list-pending-approvals-by-stage`
 
-## Plan
+`supabase/functions/list-pending-approvals-by-stage/index.ts`
 
-### 1. Backfill stale progress rows
+- Accepts `{ stage }` in the body.
+- Authenticates the caller via `requireAuthenticatedUser` (already used by other functions).
+- Uses service-role client to:
+  1. Look up `approval_matrix_approvers` rows for the caller (by `user_id` OR `lower(approver_email) = lower(jwt email)`) joined to `approval_matrix_levels` filtered by `stage` → list of `level_id`s the caller owns at this stage.
+  2. Read all `vendor_approval_progress` rows where `level_id IN (...)` and `status = 'pending'`.
+  3. For each such row, read the **entire** progress chain for that `vendor_id` and compute `blockedByPrevious = chain.some(r => r.level_number < current.level_number && r.status !== 'approved')`.
+  4. Join vendor info (`legal_name`, `trade_name`, `submitted_at`, `is_msme_registered`) and level info (`level_name`, `approval_mode`).
+- Returns `{ items: StageApprovalItem[] }` matching the existing client shape.
 
-For the two stuck vendors (`6d652397-9400-4efb-9045-d57fae133518` and `a0a0b224-d741-4911-8b89-ee36e5e0003b`), invoke the already-fixed `route-vendor-approval` edge function. It deletes existing progress rows and re-inserts them in canonical order (SCM_MANAGER first, then SCM_HEAD). After the backfill, SCM Head's queue will be empty until SCM Manager approves.
+No `supabase/config.toml` change needed (defaults are fine; this function requires JWT like the others — that is acceptable since the client passes the user session).
 
-### 2. Add defensive gating in the approver UI
+### 2. Update `src/hooks/usePendingApprovalsByStage.tsx`
 
-Even with correct data, add a safety net so a misordered matrix never lets a later approver act prematurely.
+Replace the multi-step client queries with a single call:
 
-- **`src/hooks/usePendingApprovalsByStage.tsx`** — return one extra field per item, `blockedByPrevious: boolean`, computed by checking if any lower-numbered progress row for the same vendor is still `pending` or `rejected`. Continue to include the item in the list (don't filter it out) so the SCM Head can see what's coming.
+```ts
+const { data, error } = await supabase.functions.invoke(
+  'list-pending-approvals-by-stage',
+  { body: { stage } }
+);
+setItems(data?.items ?? []);
+```
 
-- **`src/components/approvals/StageApprovalView.tsx`**:
-  - When `blockedByPrevious` is true:
-    - Disable both **Approve** and **Reject** buttons
-    - Show an inline alert under the row (or in the action column) with the text: **"The previous approver has not approved yet."**
-    - Keep **View** enabled so the approver can still inspect the vendor and documents
-  - When false, behave exactly as today.
+Keep the same `StageApprovalItem` type and `refresh` API so `StageApprovalView` and all stage pages (`ScmHeadApproval`, `ScmManagerApproval`, `Finance1Approval`, `Finance2Approval`, `CeoApproval`) continue to work without changes.
 
-### 3. Verify in DB after backfill
+### 3. Verification
 
-Re-query `vendor_approval_progress` to confirm SCM_MANAGER rows have `level_number = 1` and SCM_HEAD rows have `level_number = 2` for both backfilled vendors. Confirm the SCM Head queue is empty.
+After deploy I'll:
+- Query the DB to confirm an existing pending vendor has both an L2 (SCM_MANAGER, status=pending) and L1 (SCM_HEAD, status=pending) row.
+- Invoke the new edge function as the SCM Head and verify the returned item has `blockedByPrevious: true`.
+- Confirm in the UI that the warning shows and Approve/Reject are disabled until L2 approves; once L2 approves, refresh shows the buttons enabled for L1.
 
-## Technical Details
+## Why this works where prior attempts failed
 
-- The hook already fetches all progress rows per vendor (`allProgress`), so adding `blockedByPrevious` is a one-line derivation: `blockedByPrevious = some progress row with level_number < this.level_number AND status !== 'approved'`.
-- No schema changes, no edge function changes, no migration required.
-- The approval router already produces correct ordering for newly submitted vendors — no further fix needed there.
+- No RLS / migration changes — bypasses the user's repeated decline of the migration tool.
+- The service role can read the whole chain so the "previous approver pending" check is reliable.
+- Pure additive change: one new edge function + one hook rewrite. No other files touched.
+
+## Files
+
+- **add** `supabase/functions/list-pending-approvals-by-stage/index.ts`
+- **edit** `src/hooks/usePendingApprovalsByStage.tsx`
