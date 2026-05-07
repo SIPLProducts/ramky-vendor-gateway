@@ -71,13 +71,35 @@ Deno.serve(async (req) => {
       .from('approval_matrix_levels')
       .select('approval_mode, level_number, tenant_id').eq('id', progress.level_id).single();
 
+    // Stage -> vendor.status mapping
+    const STAGE_TO_REVIEW: Record<string, string> = {
+      SCM_MANAGER: 'scm_manager_review',
+      SCM_HEAD: 'scm_head_review',
+      FINANCE_1: 'finance_1_review',
+      FINANCE_2: 'finance_2_review',
+      CEO_OFFICE: 'ceo_office_review',
+    };
+    const STAGE_TO_REJECT: Record<string, string> = {
+      SCM_MANAGER: 'scm_manager_rejected',
+      SCM_HEAD: 'scm_head_rejected',
+      FINANCE_1: 'finance_1_rejected',
+      FINANCE_2: 'finance_2_rejected',
+      CEO_OFFICE: 'ceo_office_rejected',
+    };
+
+    // Look up the current level's stage
+    const { data: curLevel } = await admin
+      .from('approval_matrix_levels')
+      .select('stage').eq('id', progress.level_id).single();
+    const curStage = curLevel?.stage ?? 'SCM_MANAGER';
+
     if (action === 'reject') {
       await admin.from('vendor_approval_progress').update({
         status: 'rejected', acted_by: userId, acted_at: new Date().toISOString(), comments,
       }).eq('id', progress_id);
-      // Reject at any Purchase/SCM matrix level -> purchase_rejected
-      await admin.from('vendors').update({ status: 'purchase_rejected' }).eq('id', progress.vendor_id);
-      return new Response(JSON.stringify({ ok: true, vendor_status: 'purchase_rejected' }), {
+      const rejectStatus = STAGE_TO_REJECT[curStage] ?? 'purchase_rejected';
+      await admin.from('vendors').update({ status: rejectStatus }).eq('id', progress.vendor_id);
+      return new Response(JSON.stringify({ ok: true, vendor_status: rejectStatus }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
