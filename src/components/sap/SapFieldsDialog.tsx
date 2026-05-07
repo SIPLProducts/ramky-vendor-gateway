@@ -33,10 +33,24 @@ function isMsme(v: any): boolean {
 }
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
-  const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor));
+  const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
 
   useEffect(() => {
-    if (open) setForm(buildDefaults(vendor));
+    if (!open) return;
+    let cancelled = false;
+    const tenantId = (vendor as any)?.tenant_id;
+    setForm(buildDefaults(vendor, null));
+    if (tenantId) {
+      (async () => {
+        const { data } = await supabase
+          .from('sap_default_fields' as any)
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        if (!cancelled) setForm(buildDefaults(vendor, data));
+      })();
+    }
+    return () => { cancelled = true; };
   }, [open, vendor]);
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
