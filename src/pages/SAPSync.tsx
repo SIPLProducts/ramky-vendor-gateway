@@ -49,11 +49,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
+import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
+
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showSapFieldsDialog, setShowSapFieldsDialog] = useState(false);
+  const [pendingSyncVendor, setPendingSyncVendor] = useState<VendorRow | null>(null);
   const [sapSyncResult, setSapSyncResult] = useState<any>(null);
   const [showSapResultDialog, setShowSapResultDialog] = useState(false);
   const [syncingVendorId, setSyncingVendorId] = useState<string | null>(null);
@@ -77,19 +81,30 @@ export default function SAPSync() {
     return company ? `${company.name} (${company.code})` : 'Unassigned';
   };
 
-  const handleSyncToSAP = async (vendorToSync?: VendorRow) => {
-    const vendor = vendorToSync || selectedVendor;
-    if (!vendor) return;
+  const isVendorMsme = (v: VendorRow | null) => {
+    const x = v as any;
+    return !!(x?.msme_number) || x?.msme_verification_status === 'passed';
+  };
 
+  const getApprovalLabel = (v: VendorRow) => isVendorMsme(v) ? 'CEO Office Approved' : 'Finance 2 Approved';
+
+  const openSapFieldsDialog = (vendor: VendorRow) => {
+    setPendingSyncVendor(vendor);
+    setShowSapFieldsDialog(true);
+  };
+
+  const handleConfirmSync = async (overrides: SapFieldOverrides) => {
+    const vendor = pendingSyncVendor;
+    if (!vendor) return;
     setSyncingVendorId(vendor.id);
     try {
-      const result = await sapSync.mutateAsync({ vendorId: vendor.id });
+      const result = await sapSync.mutateAsync({ vendorId: vendor.id, overrides });
       setSapSyncResult(result.sapResponse);
       setSelectedVendor(vendor);
+      setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
     } catch (error: any) {
       console.error('SAP sync failed:', error);
-      // Still surface SAP's response (error messages from S/4HANA) in the dialog
       const fallbackResponse = error?.sapResponse ?? [
         { MSGTYP: 'E', MSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
       ];
@@ -99,6 +114,7 @@ export default function SAPSync() {
         sapResponse: fallbackResponse,
       });
       setSelectedVendor(vendor);
+      setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
     } finally {
       setSyncingVendorId(null);
