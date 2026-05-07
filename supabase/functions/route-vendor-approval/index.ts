@@ -96,7 +96,19 @@ Deno.serve(async (req) => {
     const { error: insErr } = await supabase.from('vendor_approval_progress').insert(rows);
     if (insErr) throw insErr;
 
-    return new Response(JSON.stringify({ ok: true, levels_created: rows.length, msme: isMsme }), {
+    // Set vendor.status to first pending stage
+    const STAGE_TO_REVIEW: Record<string, string> = {
+      SCM_MANAGER: 'scm_manager_review',
+      SCM_HEAD: 'scm_head_review',
+      FINANCE_1: 'finance_1_review',
+      FINANCE_2: 'finance_2_review',
+      CEO_OFFICE: 'ceo_office_review',
+    };
+    const firstStage = eligible[0]?.stage ?? 'SCM_MANAGER';
+    const initialStatus = STAGE_TO_REVIEW[firstStage] ?? 'scm_manager_review';
+    await supabase.from('vendors').update({ status: initialStatus }).eq('id', vendor_id);
+
+    return new Response(JSON.stringify({ ok: true, levels_created: rows.length, msme: isMsme, vendor_status: initialStatus }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
