@@ -272,6 +272,12 @@ export default function SAPSync() {
                       )}
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Vendor Details Dialog with Sync Button */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
