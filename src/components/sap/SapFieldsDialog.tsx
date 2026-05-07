@@ -58,7 +58,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 max-h-[60vh] pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
           <div className="space-y-6 py-2">
             {/* Vendor Header */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
