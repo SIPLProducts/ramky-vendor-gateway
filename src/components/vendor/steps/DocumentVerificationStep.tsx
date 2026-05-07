@@ -56,11 +56,13 @@ export interface VerifiedDocumentData {
   isMsmeRegistered?: boolean;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
+  bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
   panCardFile?: File | null;
   msmeCertificateFile?: File | null;
   cancelledChequeFile?: File | null;
+  cancelledChequeFile2?: File | null;
   // Authoritative completion status from the child
   step1Status?: {
     stage1Done: boolean;
