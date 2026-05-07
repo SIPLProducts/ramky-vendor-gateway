@@ -161,13 +161,25 @@ export default function VendorList() {
       submitted: { label: 'Submitted', variant: 'secondary' },
       validation_pending: { label: 'Validating', variant: 'outline' },
       validation_failed: { label: 'Validation Failed', variant: 'destructive' },
+      scm_manager_review: { label: 'SCM Manager Review', variant: 'outline' },
+      scm_manager_rejected: { label: 'SCM Manager Rejected', variant: 'destructive' },
+      scm_head_review: { label: 'SCM Head Review', variant: 'outline' },
+      scm_head_rejected: { label: 'SCM Head Rejected', variant: 'destructive' },
+      finance_1_review: { label: 'Finance 1 Review', variant: 'outline' },
+      finance_1_rejected: { label: 'Finance 1 Rejected', variant: 'destructive' },
+      finance_2_review: { label: 'Finance 2 Review', variant: 'outline' },
+      finance_2_rejected: { label: 'Finance 2 Rejected', variant: 'destructive' },
+      ceo_office_review: { label: 'CEO Office Review', variant: 'outline' },
+      ceo_office_rejected: { label: 'CEO Office Rejected', variant: 'destructive' },
+      pending_sap_sync: { label: 'Pending SAP Sync', variant: 'default' },
+      sap_synced: { label: 'SAP Synced', variant: 'default' },
+      // legacy
       finance_review: { label: 'Finance Review', variant: 'outline' },
       finance_approved: { label: 'Finance Approved', variant: 'default' },
       finance_rejected: { label: 'Finance Rejected', variant: 'destructive' },
       purchase_review: { label: 'Purchase Review', variant: 'outline' },
       purchase_approved: { label: 'Purchase Approved', variant: 'default' },
       purchase_rejected: { label: 'Purchase Rejected', variant: 'destructive' },
-      sap_synced: { label: 'SAP Synced', variant: 'default' },
     };
     const { label, variant } = config[status] || { label: status, variant: 'secondary' };
     return <Badge variant={variant}>{label}</Badge>;
