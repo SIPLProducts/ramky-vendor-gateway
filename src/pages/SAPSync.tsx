@@ -58,7 +58,7 @@ export default function SAPSync() {
   const [showSapResultDialog, setShowSapResultDialog] = useState(false);
   const [syncingVendorId, setSyncingVendorId] = useState<string | null>(null);
 
-  const { data: approvedVendors, isLoading, refetch } = useVendors(['purchase_approved']);
+  const { data: approvedVendors, isLoading, refetch } = useVendors(['pending_sap_sync', 'purchase_approved']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const sapSync = useSAPSync();
 
