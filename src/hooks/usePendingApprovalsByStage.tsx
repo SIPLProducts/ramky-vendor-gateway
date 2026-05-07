@@ -14,6 +14,7 @@ export interface StageApprovalItem {
   levelName: string;
   approvalMode: string;
   stage: ApprovalStage;
+  blockedByPrevious: boolean;
 }
 
 /**
@@ -69,25 +70,27 @@ export function usePendingApprovalsByStage(stage: ApprovalStage) {
       .select('vendor_id, level_number, status')
       .in('vendor_id', vendorIds);
 
-    const activeLevelByVendor = new Map<string, number>();
+    // Build a map: vendor_id -> list of all progress rows (level_number + status)
+    const allByVendor = new Map<string, { level_number: number; status: string }[]>();
     (allProgress ?? []).forEach((p) => {
-      if (p.status === 'pending') {
-        const cur = activeLevelByVendor.get(p.vendor_id);
-        if (cur === undefined || p.level_number < cur) activeLevelByVendor.set(p.vendor_id, p.level_number);
-      }
+      const arr = allByVendor.get(p.vendor_id) ?? [];
+      arr.push({ level_number: p.level_number, status: p.status });
+      allByVendor.set(p.vendor_id, arr);
     });
-    const activeProgress = progress.filter((p) => activeLevelByVendor.get(p.vendor_id) === p.level_number);
-    if (activeProgress.length === 0) { setItems([]); setLoading(false); return; }
 
     const { data: vendors } = await supabase
       .from('vendors')
       .select('id, legal_name, trade_name, submitted_at, is_msme_registered')
-      .in('id', activeProgress.map((p) => p.vendor_id));
+      .in('id', progress.map((p) => p.vendor_id));
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
-    setItems(activeProgress.map((p) => {
+    setItems(progress.map((p) => {
       const v: any = vMap.get(p.vendor_id);
       const lvl = levelMeta.get(p.level_id);
+      const all = allByVendor.get(p.vendor_id) ?? [];
+      const blockedByPrevious = all.some(
+        (r) => r.level_number < p.level_number && r.status !== 'approved'
+      );
       return {
         progressId: p.id,
         vendorId: p.vendor_id,
@@ -98,6 +101,7 @@ export function usePendingApprovalsByStage(stage: ApprovalStage) {
         levelName: lvl?.level_name ?? '—',
         approvalMode: lvl?.approval_mode ?? 'ANY',
         stage,
+        blockedByPrevious,
       };
     }));
     setLoading(false);
