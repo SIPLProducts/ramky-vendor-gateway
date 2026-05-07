@@ -1,0 +1,9 @@
+ALTER TABLE public.vendors
+  ADD COLUMN IF NOT EXISTS bank_name_2 TEXT,
+  ADD COLUMN IF NOT EXISTS branch_name_2 TEXT,
+  ADD COLUMN IF NOT EXISTS account_number_2 TEXT,
+  ADD COLUMN IF NOT EXISTS ifsc_code_2 TEXT,
+  ADD COLUMN IF NOT EXISTS account_holder_name_2 TEXT,
+  ADD COLUMN IF NOT EXISTS account_type_2 TEXT,
+  ADD COLUMN IF NOT EXISTS bank_address_2 TEXT,
+  ADD COLUMN IF NOT EXISTS micr_2 TEXT;
