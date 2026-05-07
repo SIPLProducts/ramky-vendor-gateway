@@ -1,32 +1,27 @@
-## Why CEO Office shows "No pending approvals"
+## Problem
 
-The vendor's chain is correct — Finance 2 is approved and the CEO Office row (`level_id = 393b9f91…`, tenant `6fd07201` = Ramky Infrastructure Limited) is `pending`. The screen is empty because that level is configured with **only one approver: `ceo@ramky.com`** (no `user_id`).
+After CEO Office approval, the vendor's status is set to `pending_sap_sync` (by `process-approval-action`). The "All Vendors" list correctly shows the vendor with the **Pending SAP Sync** badge (visible in screenshot — vendor `a0a0b224…`). But the **SAP Sync** screen shows "No vendors pending SAP sync".
 
-You're logged in as **`sureshkumar.b@sharviinfotech.com`** (auth user `b1cdabde…`). That email is set up as a CEO Office approver on a different tenant (`b514cc90…`), but **not on Ramky Infrastructure Limited's CEO Office level**, so `list-pending-approvals-by-stage` returns 0 for you.
+Root cause: `src/pages/SAPSync.tsx` line 61 queries:
+```ts
+useVendors(['purchase_approved'])
+```
+while the workflow now uses `pending_sap_sync` as the ready-for-sync status. The two values don't match, so the list is always empty.
 
-There's a separate stale duplicate level `78027683…` on tenant `77062586…` (also pointing at `ceo@ramky.com`) that no vendor uses — leftover from an earlier matrix edit.
+The dashboard counters in `src/hooks/useVendors.tsx` (lines 585, 591, 601) have the same stale assumption.
 
 ## Fix
 
-1. **Migration** — make Suresh the CEO Office approver on Ramky Infrastructure (tenant `6fd07201`):
-   ```sql
-   UPDATE approval_matrix_approvers
-   SET approver_email = 'sureshkumar.b@sharviinfotech.com',
-       approver_name  = 'suresh',
-       user_id        = 'b1cdabde-9fd7-4c96-89c6-4c559385202d'
-   WHERE level_id = '393b9f91-28ed-4639-832e-ba4afa8fab2a'
-     AND approver_email = 'ceo@ramky.com';
-   ```
-   After this, `/approvals/ceo` will list the SHARVI vendor (`a0a0b224…`) for Suresh, and approving it will flip the vendor to `pending_sap_sync`.
-
-2. **Cleanup migration (optional but recommended)** — delete the orphan duplicate level so Approval Matrix admin doesn't show two CEO Office levels:
-   ```sql
-   DELETE FROM approval_matrix_approvers WHERE level_id = '78027683-0bdc-4e63-a0c4-be8575bc3baa';
-   DELETE FROM approval_matrix_levels    WHERE id       = '78027683-0bdc-4e63-a0c4-be8575bc3baa';
+1. **`src/pages/SAPSync.tsx`** — change the status filter to include both values so historical and current records both show:
+   ```ts
+   useVendors(['pending_sap_sync', 'purchase_approved'])
    ```
 
-3. **UX safeguard** — in `src/components/approvals/StageApprovalView.tsx`, when the list is empty show a small note: *"You are not configured as a CEO Office approver for some tenants. Vendors waiting on other approvers won't appear here."* This stops repeat confusion when the same symptom occurs because of approver-assignment, not workflow bugs.
+2. **`src/hooks/useVendors.tsx`** — update the three dashboard aggregations to also count `pending_sap_sync`:
+   - `pendingSAPSync` count (line 585)
+   - `activeVendors` set (line 591)
+   - status-grouping logic (line 601)
 
-No edge-function or workflow code changes are required — `process-approval-action` and `route-vendor-approval` are working correctly; this is purely an approver-configuration data issue.
+3. **Verification** — after the change, reload `/sap/sync`. The SHARVI vendor (`a0a0b224…`) currently in `pending_sap_sync` will appear in the Ready-for-Sync list and the counter will read 1. After clicking Sync, status becomes `sap_synced` and it disappears from the list as expected.
 
-Approve to apply.
+No database changes, no edge-function changes — purely a client-side filter fix.
