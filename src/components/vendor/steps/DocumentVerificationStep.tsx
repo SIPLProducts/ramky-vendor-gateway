@@ -1153,15 +1153,28 @@ export function DocumentVerificationStep({
         bankAddress: bankBranchAddress,
       };
     }
+    if (bank2Enabled && bankDoc2.status === "verified" && bankDoc2.ocrData) {
+      out.bank2 = {
+        accountNumber: bankDoc2.ocrData.account_number,
+        ifsc: bankDoc2.ocrData.ifsc_code,
+        bankName: bankDoc2.ocrData.bank_name,
+        branchName: bankDoc2.ocrData.branch_name,
+        accountHolderName: bankDoc2.ocrData.account_holder_name,
+        apiName: bankDoc2.apiData?.accountHolderName || bankDoc2.apiData?.name,
+        accountType: bankAccountType2,
+        bankAddress: bankBranchAddress2,
+      };
+    }
     // Lift uploaded files so the parent can persist them in the draft
     out.gstCertificateFile = gstDoc.file ?? null;
     out.panCardFile = panDoc.file ?? null;
     out.msmeCertificateFile = msmeDoc.file ?? null;
     out.cancelledChequeFile = bankDoc.file ?? null;
+    out.cancelledChequeFile2 = bank2Enabled ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, bankAccountType, bankBranchAddress, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
