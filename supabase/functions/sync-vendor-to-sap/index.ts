@@ -317,7 +317,36 @@ serve(async (req) => {
       }
     }
 
-    const row = buildPayload(vendor);
+    // Load tenant SAP defaults (fall back to constants if missing)
+    let defaults: SapDefaults = { ...FALLBACK_DEFAULTS };
+    if (vendor.tenant_id) {
+      const { data: defRow } = await supabase
+        .from("sap_default_fields")
+        .select("*")
+        .eq("tenant_id", vendor.tenant_id)
+        .maybeSingle();
+      if (defRow) {
+        defaults = {
+          partn_cat: defRow.partn_cat ?? defaults.partn_cat,
+          partn_grp: defRow.partn_grp ?? defaults.partn_grp,
+          title: defRow.title ?? defaults.title,
+          taxtype: defRow.taxtype ?? defaults.taxtype,
+          bukrs: defRow.bukrs ?? defaults.bukrs,
+          akont: defRow.akont ?? defaults.akont,
+          zuawa: defRow.zuawa ?? defaults.zuawa,
+          fdgrv: defRow.fdgrv ?? defaults.fdgrv,
+          vkorg: defRow.vkorg ?? defaults.vkorg,
+          waers: defRow.waers ?? defaults.waers,
+          kalsk: defRow.kalsk ?? defaults.kalsk,
+          cdi: defRow.cdi ?? defaults.cdi,
+          webre: defRow.webre ?? defaults.webre,
+          lebre: defRow.lebre ?? defaults.lebre,
+          ven_class: defRow.ven_class ?? defaults.ven_class,
+        };
+      }
+    }
+
+    const row = buildPayload(vendor, defaults);
 
     // Merge user-supplied SAP field overrides from the pre-sync confirmation popup.
     const ALLOWED_OVERRIDES = [
@@ -333,13 +362,20 @@ serve(async (req) => {
       }
     }
 
-    // CLASSIFY block
-    const classify = overrides?.classify || {};
+    // CLASSIFY block — start with vendor-derived defaults, then apply overrides
+    const classifyOverride = overrides?.classify || {};
+    const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
+    const classifyDefaults = {
+      MGV: classifyOverride.MGV || (productCats[0] ? String(productCats[0]) : ""),
+      CATV: classifyOverride.CATV || vendor.organization_type || vendor.entity_type || "",
+      LOCV: classifyOverride.LOCV || vendor.registered_state || "",
+      IDS: classifyOverride.IDS || "",
+    };
     const classifyBlock: Record<string, any[]> = {};
-    if (classify.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classify.MGV) }];
-    if (classify.CATV) classifyBlock.CAT_VENDOR = [{ CATV: String(classify.CATV) }];
-    if (classify.LOCV) classifyBlock.LOCATION_VENDOR = [{ LOCV: String(classify.LOCV) }];
-    if (classify.IDS) classifyBlock.IDENTIFICATION_SOURCE = [{ IDS: String(classify.IDS) }];
+    if (classifyDefaults.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classifyDefaults.MGV) }];
+    if (classifyDefaults.CATV) classifyBlock.CAT_VENDOR = [{ CATV: String(classifyDefaults.CATV) }];
+    if (classifyDefaults.LOCV) classifyBlock.LOCATION_VENDOR = [{ LOCV: String(classifyDefaults.LOCV) }];
+    if (classifyDefaults.IDS) classifyBlock.IDENTIFICATION_SOURCE = [{ IDS: String(classifyDefaults.IDS) }];
     if (Object.keys(classifyBlock).length) (row as any).CLASSIFY = classifyBlock;
 
     // Mirror vendors[] sub-array as required by SAP payload spec
