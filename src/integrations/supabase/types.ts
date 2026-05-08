@@ -1043,6 +1043,36 @@ export type Database = {
         }
         Relationships: []
       }
+      sap_payload_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          template: Json
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          template: Json
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          template?: Json
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scheduled_validations: {
         Row: {
           created_at: string
