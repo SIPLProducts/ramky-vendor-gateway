@@ -371,7 +371,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
           <div className="md:col-span-2 mt-2">
             <h4 className="text-sm font-semibold text-primary mb-3 flex items-center gap-2">
               <Award className="h-4 w-4" />
-              SAP Classification
+              Classification
             </h4>
             <div className="grid md:grid-cols-2 gap-5">
               <div className="grid gap-1.5">
@@ -386,7 +386,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                       </SelectTrigger>
                       <SelectContent>
                         {PRODUCT_CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                          <SelectItem key={c} value={c}>{c.toUpperCase()}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
