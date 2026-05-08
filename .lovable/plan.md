@@ -1,53 +1,52 @@
-## Problem
+# Add SAP Classification Fields to Organization Profile
 
-Looking at the request body sent to `sync-vendor-to-sap`:
+Add a new "SAP Classification" sub-section inside the Organization Profile card on the vendor registration form (`OrganizationStep.tsx`), with the four fields shown in image 2. These values flow through to the SAP `CLASSIFY` block when the vendor is synced.
 
+## New fields
+
+| UI Label | Internal name | Type | Example | Maps to SAP |
+|---|---|---|---|---|
+| Material Group for Vendors | `materialGroupVendor` | Select (multi or single) — sourced from existing `PRODUCT_CATEGORIES` | Cement | `CLASSIFY.MAT_GRP_VENDOR[].MGV` |
+| Vendor Category | `vendorCategory` | Select — `TRADER`, `MANUFACTURER`, `SERVICE PROVIDER`, `DISTRIBUTOR`, `CONTRACTOR` | TRADER | `CLASSIFY.CAT_VENDOR[].CATV` |
+| Vendor Location | `vendorLocation` | Select — `INDIAN_STATES` (uppercased on save) | ANDHRA PRADESH | `CLASSIFY.LOCATION_VENDOR[].LOCV` |
+| Vendor Identification Source | `identificationSource` | Select — `PRINT MEDIA`, `ONLINE`, `REFERENCE`, `TRADE FAIR`, `EXISTING VENDOR`, `OTHER` | PRINT MEDIA | `CLASSIFY.IDENTIFICATION_SOURCE[].IDS` |
+
+All four fields are required.
+
+## Changes
+
+### 1. Database migration
+Add nullable columns to `public.vendors`:
+- `material_group_vendor text`
+- `vendor_category text`
+- `vendor_location text`
+- `identification_source text`
+
+### 2. `src/types/vendor.ts`
+Extend `OrganizationDetails` with the four new fields and export two new constant arrays: `VENDOR_CATEGORIES` and `IDENTIFICATION_SOURCES`.
+
+### 3. `src/components/vendor/steps/OrganizationStep.tsx`
+- Extend the zod schema and default values with the four fields (all required).
+- Render a new "SAP Classification" block inside the Organization Profile card (after State), with a 2-column grid containing the four selects.
+- Material Group options reuse `PRODUCT_CATEGORIES`; Location options reuse `INDIAN_STATES`.
+- Include them in the submit payload.
+
+### 4. `src/hooks/useVendorRegistration.tsx`
+Persist the four new fields to the `vendors` row when the Organization step is saved (snake_case mapping).
+
+### 5. `supabase/functions/sync-vendor-to-sap/index.ts`
+In the CLASSIFY block, prefer the new dedicated columns over the previous fallbacks:
 ```
-"classify": { "MGV": "", "CATV": "", "LOCV": "Andhra Pradesh", "IDS": "" }
+MGV  ← vendor.material_group_vendor || productCats[0]
+CATV ← vendor.vendor_category       || vendor.organization_type
+LOCV ← vendor.vendor_location       || vendor.registered_state
+IDS  ← vendor.identification_source || ""
 ```
+Add `IDENTIFICATION_SOURCE` to the CLASSIFY block when `IDS` is present. `overrides.classify.*` from `SapFieldsDialog` continues to win over both.
 
-…three of the four CLASSIFY values are empty even though the vendor (`SHARVI INFOTECH PRIVATE LIMITED`) has `product_categories = [Cables & Wires, Cement, Conductors]` and `organization_type = Private Limited` in the DB. Reasons:
+### 6. (No change) `SapFieldsDialog.tsx`
+Already shows nothing for CLASSIFY in the visible UI — the values now flow automatically from the registration form.
 
-1. `SapFieldsDialog` builds `classify` defaults with hard-coded empty strings for `MGV`, `CATV`, `IDS` — it never reads the vendor's own data or the new dedicated columns (`material_group_vendor`, `vendor_category`, `identification_source`).
-2. The dialog has **no UI** to view or edit MGV / CATV / IDS, so the user cannot fix the blanks before syncing.
-3. `LOCV` is sent as `"Andhra Pradesh"` (mixed case). The SAP spec example uses uppercase (`"ANDHRA PRADESH"`).
-4. The edge function does fall back to vendor columns when the override is empty, but the request body the user sees is what the dialog produced — so the experience looks "hardcoded".
-
-## Plan (UI-only)
-
-**File: `src/components/sap/SapFieldsDialog.tsx`**
-
-1. Pre-fill CLASSIFY defaults from vendor data (no longer blank):
-   - `MGV` ← `vendor.material_group_vendor` || first item of `vendor.product_categories` || `''`
-   - `CATV` ← `vendor.vendor_category` || `vendor.organization_type` || `''`
-   - `LOCV` ← `vendor.vendor_location` || `vendor.registered_state` || `''`
-   - `IDS` ← `vendor.identification_source` || `''`
-   - All four uppercased before being placed in the form (SAP spec convention).
-
-2. Add a new "SAP Classification" section in the dialog with four editable fields:
-   - **Material Group for Vendors (MGV)** — Select sourced from `PRODUCT_CATEGORIES`
-   - **Vendor Category (CATV)** — Select sourced from `VENDOR_CATEGORIES`
-   - **Vendor Location (LOCV)** — Select sourced from `INDIAN_STATES`
-   - **Vendor Identification Source (IDS)** — Select sourced from `IDENTIFICATION_SOURCES`
-   - Free-text fallback if value isn't in the option list (so admins can override).
-
-3. Add editable inputs for `title` and `taxtype` in the Vendor Header section (currently held in state but not exposed in the UI).
-
-4. Normalize all classify values to upper-case in `onConfirm` so the payload matches SAP spec exactly (`"ANDHRA PRADESH"`, `"CEMENT"`, etc.).
-
-**No edge-function or DB changes** — the existing `sync-vendor-to-sap` already passes overrides into the SAP payload's CLASSIFY block, so populating them correctly from the dialog fixes the user-visible request body and the resulting SAP call.
-
-## Result
-
-After this change, the request payload to `sync-vendor-to-sap` for this vendor will look like:
-
-```json
-"classify": {
-  "MGV": "CABLES & WIRES",
-  "CATV": "PRIVATE LIMITED",
-  "LOCV": "ANDHRA PRADESH",
-  "IDS": ""
-}
-```
-
-…and the user can change any of those four values in the dialog before pressing "Sync to SAP".
+## Out of scope
+- Editing existing vendors' classification through a separate admin screen.
+- Backfilling historic vendors (existing rows will fall back to organization_type / state until re-saved).
