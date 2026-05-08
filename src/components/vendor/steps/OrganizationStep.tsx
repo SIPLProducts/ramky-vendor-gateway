@@ -152,6 +152,10 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
       productCategories: values.productCategories,
       productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
       state: values.state,
+      materialGroupVendor: values.materialGroupVendor,
+      vendorCategory: values.vendorCategory,
+      vendorLocation: values.vendorLocation,
+      identificationSource: values.identificationSource,
     };
     const statutory: StatutoryDetails = {
       ...statutoryData,
