@@ -206,6 +206,10 @@ export default function SapApiSettings() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="template">
+          <SapPayloadTemplateEditor />
+        </TabsContent>
+
         <TabsContent value="guide">
           <SapConnectivityGuide />
         </TabsContent>
