@@ -477,13 +477,18 @@ export function useSAPSync() {
 
   return useMutation({
     mutationFn: async ({ vendorId, overrides }: { vendorId: string; overrides?: Record<string, any> }) => {
-      console.log('Calling SAP sync edge function for vendor:', vendorId);
+      console.log('Building SAP payload client-side for vendor:', vendorId);
 
-      // Call SAP sync edge function (which calls Cloudflare Worker)
+      // Build the full SAP payload on the client so it appears in the browser Network tab
+      const { buildSapPayload } = await import('@/lib/sapPayloadBuilder');
+      const { payload: sapPayload, uploadsCount, skipped } = await buildSapPayload(vendorId, overrides || {});
+      console.log('SAP payload built:', { topLevelKeys: Object.keys(sapPayload[0] || {}).length, uploadsCount, skipped });
+
+      // Send fully resolved payload to edge function
       const { data: sapResult, error: sapError } = await supabase.functions.invoke(
         'sync-vendor-to-sap',
         {
-          body: { vendorId, overrides },
+          body: { vendorId, overrides, sapPayload },
         }
       );
 

@@ -211,7 +211,7 @@ serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendorId, overrides } = await req.json();
+    const { vendorId, overrides, sapPayload: clientPayload } = await req.json();
     if (!vendorId) throw new Error("vendorId is required");
 
     const supabase = createClient(
@@ -275,66 +275,75 @@ serve(async (req) => {
       if (!targetUrl) return fail("SAP direct URL is not configured (base_url + endpoint_path).");
     }
 
-    // Load tenant defaults from sap_default_fields, merge into overrides for any blanks
-    const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
-    if (vendor.tenant_id) {
-      const { data: defRow } = await supabase
-        .from("sap_default_fields").select("*").eq("tenant_id", vendor.tenant_id).maybeSingle();
-      if (defRow) {
-        for (const k of ["partn_cat","partn_grp","title","taxtype","bukrs","akont","zuawa","fdgrv","vkorg","waers","kalsk","cdi","webre","lebre","ven_class"]) {
-          if (mergedOverrides[k] === undefined || mergedOverrides[k] === null || mergedOverrides[k] === "") {
-            if (defRow[k] !== undefined && defRow[k] !== null) mergedOverrides[k] = defRow[k];
+    let payload: any[];
+    let row: any;
+
+    if (Array.isArray(clientPayload) && clientPayload.length > 0 && typeof clientPayload[0] === "object") {
+      // Client supplied a fully-resolved SAP payload — use it as-is.
+      payload = clientPayload;
+      row = clientPayload[0];
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
+    } else {
+      // Legacy path: resolve template server-side.
+      const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
+      if (vendor.tenant_id) {
+        const { data: defRow } = await supabase
+          .from("sap_default_fields").select("*").eq("tenant_id", vendor.tenant_id).maybeSingle();
+        if (defRow) {
+          for (const k of ["partn_cat","partn_grp","title","taxtype","bukrs","akont","zuawa","fdgrv","vkorg","waers","kalsk","cdi","webre","lebre","ven_class"]) {
+            if (mergedOverrides[k] === undefined || mergedOverrides[k] === null || mergedOverrides[k] === "") {
+              if (defRow[k] !== undefined && defRow[k] !== null) mergedOverrides[k] = defRow[k];
+            }
           }
         }
       }
+
+      const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
+      const ovClassify = (overrides && overrides.classify) || {};
+      const classifyCtx = {
+        MGV: ovClassify.MGV || vendor.material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
+        CATV: ovClassify.CATV || vendor.vendor_category || vendor.organization_type || vendor.entity_type || "",
+        LOCV: ovClassify.LOCV || vendor.vendor_location || vendor.registered_state || "",
+        IDS: ovClassify.IDS || vendor.identification_source || "",
+      };
+
+      const isMsme = !!vendor.msme_number;
+
+      let template: any = null;
+      if (vendor.tenant_id) {
+        const { data: tplRow } = await supabase
+          .from("sap_payload_templates").select("template")
+          .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
+        if (tplRow?.template) template = tplRow.template;
+      }
+      if (!template) {
+        const { data: tplRow } = await supabase
+          .from("sap_payload_templates").select("template")
+          .is("tenant_id", null).eq("is_active", true).maybeSingle();
+        if (tplRow?.template) template = tplRow.template;
+      }
+      if (!template) {
+        return fail("No SAP payload template configured. Please seed sap_payload_templates with a default row.");
+      }
+
+      const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
+
+      const ctx: ResolverCtx = {
+        vendor,
+        override: mergedOverrides,
+        classify: classifyCtx,
+        uploads,
+        isMsme,
+      };
+
+      row = resolveTemplate(template, ctx);
+      payload = [row];
+
+      if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
     }
 
-    // Build classify ctx, merging override.classify with vendor's dedicated columns
-    const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
-    const ovClassify = (overrides && overrides.classify) || {};
-    const classifyCtx = {
-      MGV: ovClassify.MGV || vendor.material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
-      CATV: ovClassify.CATV || vendor.vendor_category || vendor.organization_type || vendor.entity_type || "",
-      LOCV: ovClassify.LOCV || vendor.vendor_location || vendor.registered_state || "",
-      IDS: ovClassify.IDS || vendor.identification_source || "",
-    };
-
-    const isMsme = !!vendor.msme_number;
-
-    // Load template: tenant-specific first, fallback to global
-    let template: any = null;
-    if (vendor.tenant_id) {
-      const { data: tplRow } = await supabase
-        .from("sap_payload_templates").select("template")
-        .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
-      if (tplRow?.template) template = tplRow.template;
-    }
-    if (!template) {
-      const { data: tplRow } = await supabase
-        .from("sap_payload_templates").select("template")
-        .is("tenant_id", null).eq("is_active", true).maybeSingle();
-      if (tplRow?.template) template = tplRow.template;
-    }
-    if (!template) {
-      return fail("No SAP payload template configured. Please seed sap_payload_templates with a default row.");
-    }
-
-    const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
-
-    const ctx: ResolverCtx = {
-      vendor,
-      override: mergedOverrides,
-      classify: classifyCtx,
-      uploads,
-      isMsme,
-    };
-
-    const row = resolveTemplate(template, ctx);
-    const payload = [row];
-
-    if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
     console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl,
-      "uploads:", uploads.length, "topLevelKeys:", Object.keys(row).length);
+      "topLevelKeys:", Object.keys(row).length);
 
     let sapResponse: any[] | null = null;
     let httpStatus = 0;
