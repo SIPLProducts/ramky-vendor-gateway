@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart, Tag } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
+import { PRODUCT_CATEGORIES, VENDOR_CATEGORIES, IDENTIFICATION_SOURCES, INDIAN_STATES } from '@/types/vendor';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
