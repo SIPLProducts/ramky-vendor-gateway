@@ -366,10 +366,10 @@ serve(async (req) => {
     const classifyOverride = overrides?.classify || {};
     const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
     const classifyDefaults = {
-      MGV: classifyOverride.MGV || (productCats[0] ? String(productCats[0]) : ""),
-      CATV: classifyOverride.CATV || vendor.organization_type || vendor.entity_type || "",
-      LOCV: classifyOverride.LOCV || vendor.registered_state || "",
-      IDS: classifyOverride.IDS || "",
+      MGV: classifyOverride.MGV || vendor.material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
+      CATV: classifyOverride.CATV || vendor.vendor_category || vendor.organization_type || vendor.entity_type || "",
+      LOCV: classifyOverride.LOCV || vendor.vendor_location || vendor.registered_state || "",
+      IDS: classifyOverride.IDS || vendor.identification_source || "",
     };
     const classifyBlock: Record<string, any[]> = {};
     if (classifyDefaults.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classifyDefaults.MGV) }];

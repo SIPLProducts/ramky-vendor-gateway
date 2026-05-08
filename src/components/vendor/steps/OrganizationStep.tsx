@@ -28,6 +28,8 @@ import {
   CERTIFICATION_OPTIONS,
   OPERATIONAL_NETWORKS,
   INDIAN_STATES,
+  VENDOR_CATEGORIES,
+  IDENTIFICATION_SOURCES,
 } from '@/types/vendor';
 
 const schema = z.object({
@@ -40,6 +42,11 @@ const schema = z.object({
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
+  // SAP Classification
+  materialGroupVendor: z.string().min(1, 'Material Group for Vendors is required'),
+  vendorCategory: z.string().min(1, 'Vendor Category is required'),
+  vendorLocation: z.string().min(1, 'Vendor Location is required'),
+  identificationSource: z.string().min(1, 'Identification Source is required'),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
@@ -112,6 +119,10 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
       ...data,
       state: data?.state || '',
       productCategoriesOther: data?.productCategoriesOther || '',
+      materialGroupVendor: data?.materialGroupVendor || '',
+      vendorCategory: data?.vendorCategory || '',
+      vendorLocation: data?.vendorLocation || '',
+      identificationSource: data?.identificationSource || '',
       entityType: statutoryData?.entityType || '',
       firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
       pfNumber: statutoryData?.pfNumber || '',
@@ -141,6 +152,10 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
       productCategories: values.productCategories,
       productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
       state: values.state,
+      materialGroupVendor: values.materialGroupVendor,
+      vendorCategory: values.vendorCategory,
+      vendorLocation: values.vendorLocation,
+      identificationSource: values.identificationSource,
     };
     const statutory: StatutoryDetails = {
       ...statutoryData,
@@ -350,6 +365,107 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
             {errors.state && (
               <p className="text-xs text-destructive">{errors.state.message as string}</p>
             )}
+          </div>
+
+          {/* SAP Classification */}
+          <div className="md:col-span-2 mt-2">
+            <h4 className="text-sm font-semibold text-primary mb-3 flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              SAP Classification
+            </h4>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="grid gap-1.5">
+                <Label>Material Group for Vendors *</Label>
+                <Controller
+                  name="materialGroupVendor"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.materialGroupVendor ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Select material group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRODUCT_CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.materialGroupVendor && (
+                  <p className="text-xs text-destructive">{errors.materialGroupVendor.message as string}</p>
+                )}
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>Vendor Category *</Label>
+                <Controller
+                  name="vendorCategory"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.vendorCategory ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Select vendor category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VENDOR_CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.vendorCategory && (
+                  <p className="text-xs text-destructive">{errors.vendorCategory.message as string}</p>
+                )}
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>Vendor Location *</Label>
+                <Controller
+                  name="vendorLocation"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.vendorLocation ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INDIAN_STATES.map((s) => (
+                          <SelectItem key={s} value={s.toUpperCase()}>{s.toUpperCase()}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.vendorLocation && (
+                  <p className="text-xs text-destructive">{errors.vendorLocation.message as string}</p>
+                )}
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>Vendor Identification Source *</Label>
+                <Controller
+                  name="identificationSource"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.identificationSource ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Select identification source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IDENTIFICATION_SOURCES.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.identificationSource && (
+                  <p className="text-xs text-destructive">{errors.identificationSource.message as string}</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

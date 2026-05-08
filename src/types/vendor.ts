@@ -34,7 +34,29 @@ export interface OrganizationDetails {
   productCategories: string[];
   productCategoriesOther?: string;
   state: string;
+  // SAP Classification
+  materialGroupVendor?: string;
+  vendorCategory?: string;
+  vendorLocation?: string;
+  identificationSource?: string;
 }
+
+export const VENDOR_CATEGORIES = [
+  'TRADER',
+  'MANUFACTURER',
+  'SERVICE PROVIDER',
+  'DISTRIBUTOR',
+  'CONTRACTOR',
+] as const;
+
+export const IDENTIFICATION_SOURCES = [
+  'PRINT MEDIA',
+  'ONLINE',
+  'REFERENCE',
+  'TRADE FAIR',
+  'EXISTING VENDOR',
+  'OTHER',
+] as const;
 
 // Step 2: Address Information
 export interface AddressDetails {

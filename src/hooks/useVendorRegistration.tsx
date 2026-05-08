@@ -177,6 +177,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       ownership_type: formData.organization.ownershipType || null,
       product_categories: formData.organization.productCategories,
       state: formData.organization.state || null,
+      material_group_vendor: formData.organization.materialGroupVendor || null,
+      vendor_category: formData.organization.vendorCategory || null,
+      vendor_location: formData.organization.vendorLocation || null,
+      identification_source: formData.organization.identificationSource || null,
       // Registered Address
       registered_address: formData.address.registeredAddress,
       registered_address_line2: formData.address.registeredAddressLine2 || null,
@@ -365,6 +369,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         productCategories: vendor.product_categories || [],
         productCategoriesOther: (vendor as VendorRecord & { product_categories_other?: string }).product_categories_other || '',
         state: (vendor as VendorRecord & { state?: string }).state || '',
+        materialGroupVendor: (vendor as any).material_group_vendor || '',
+        vendorCategory: (vendor as any).vendor_category || '',
+        vendorLocation: (vendor as any).vendor_location || '',
+        identificationSource: (vendor as any).identification_source || '',
       },
       address: {
         registeredAddress: vendor.registered_address || '',
