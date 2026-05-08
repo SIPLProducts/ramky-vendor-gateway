@@ -11,6 +11,7 @@ import {
   Activity, Download, Upload, Plus, FileText, Link2, Trash2, Pencil,
 } from "lucide-react";
 import { SapConnectivityGuide } from "@/components/sap/SapConnectivityGuide";
+import { SapPayloadTemplateEditor } from "@/components/sap/SapPayloadTemplateEditor";
 import { AddSapApiConfigDialog } from "@/components/sap/AddSapApiConfigDialog";
 import {
   useSapApiConfigs, useDeleteSapApiConfig, useTestSapConnection, useCreateSapApiConfig,
