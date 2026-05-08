@@ -28,6 +28,8 @@ import {
   CERTIFICATION_OPTIONS,
   OPERATIONAL_NETWORKS,
   INDIAN_STATES,
+  VENDOR_CATEGORIES,
+  IDENTIFICATION_SOURCES,
 } from '@/types/vendor';
 
 const schema = z.object({
