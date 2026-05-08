@@ -8,56 +8,20 @@ const corsHeaders = {
 };
 
 // Indian state -> SAP T005S numeric region code for country IN.
-// SAP S/4HANA India localization uses numeric codes (Maharashtra=13 etc.),
-// not 2-letter alpha codes. Keys are normalized (lowercased, trimmed) at lookup time.
 const stateToRegion: Record<string, string> = {
-  "andhra pradesh": "01",
-  "arunachal pradesh": "02",
-  "assam": "03",
-  "bihar": "04",
-  "goa": "05",
-  "gujarat": "06",
-  "haryana": "07",
-  "himachal pradesh": "08",
-  "jammu and kashmir": "09",
-  "jammu & kashmir": "09",
-  "j&k": "09",
-  "karnataka": "10",
-  "kerala": "11",
-  "madhya pradesh": "12",
-  "maharashtra": "13",
-  "manipur": "14",
-  "meghalaya": "15",
-  "mizoram": "16",
-  "nagaland": "17",
-  "odisha": "18",
-  "orissa": "18",
-  "punjab": "19",
-  "rajasthan": "20",
-  "sikkim": "21",
-  "tamil nadu": "22",
-  "tripura": "23",
-  "uttar pradesh": "24",
-  "west bengal": "25",
-  "andaman and nicobar islands": "26",
-  "andaman & nicobar": "26",
-  "chandigarh": "27",
-  "dadra and nagar haveli": "28",
-  "dadra & nagar haveli": "28",
-  "dadra and nagar haveli and daman and diu": "28",
-  "daman and diu": "29",
-  "daman & diu": "29",
-  "delhi": "30",
-  "nct of delhi": "30",
-  "lakshadweep": "31",
-  "puducherry": "32",
-  "pondicherry": "32",
-  "chhattisgarh": "33",
-  "chattisgarh": "33",
-  "jharkhand": "34",
-  "uttarakhand": "35",
-  "uttaranchal": "35",
-  "telangana": "36",
+  "andhra pradesh": "01", "arunachal pradesh": "02", "assam": "03", "bihar": "04",
+  "goa": "05", "gujarat": "06", "haryana": "07", "himachal pradesh": "08",
+  "jammu and kashmir": "09", "jammu & kashmir": "09", "j&k": "09",
+  "karnataka": "10", "kerala": "11", "madhya pradesh": "12", "maharashtra": "13",
+  "manipur": "14", "meghalaya": "15", "mizoram": "16", "nagaland": "17",
+  "odisha": "18", "orissa": "18", "punjab": "19", "rajasthan": "20",
+  "sikkim": "21", "tamil nadu": "22", "tripura": "23", "uttar pradesh": "24",
+  "west bengal": "25", "andaman and nicobar islands": "26", "andaman & nicobar": "26",
+  "chandigarh": "27", "dadra and nagar haveli": "28", "dadra & nagar haveli": "28",
+  "dadra and nagar haveli and daman and diu": "28", "daman and diu": "29",
+  "daman & diu": "29", "delhi": "30", "nct of delhi": "30", "lakshadweep": "31",
+  "puducherry": "32", "pondicherry": "32", "chhattisgarh": "33", "chattisgarh": "33",
+  "jharkhand": "34", "uttarakhand": "35", "uttaranchal": "35", "telangana": "36",
   "ladakh": "37",
 };
 
@@ -67,25 +31,15 @@ function resolveRegion(state: string | null | undefined): string {
   return stateToRegion[key] || "";
 }
 
-const trunc = (v: any, n: number) => (v == null ? "" : String(v)).slice(0, n);
-
 // Map internal document_type to SAP-friendly file name label
 const DOC_NAME_MAP: Record<string, string> = {
-  pan_card: "pan",
-  gst_certificate: "gst",
-  gst_self_declaration: "gst_self_declaration",
-  msme_certificate: "msme",
-  cancelled_cheque: "bank_cheque1",
-  cancelled_cheque_2: "bank_cheque2",
-  financial_docs: "financials",
-  dealership_certificate: "dealership",
-  iec_certificate: "iec",
-  swift_iban_proof: "swift_iban",
-  incorporation_certificate: "incorporation",
-  other: "other",
+  pan_card: "pan", gst_certificate: "gst", gst_self_declaration: "gst_self_declaration",
+  msme_certificate: "msme", cancelled_cheque: "bank_cheque1", cancelled_cheque_2: "bank_cheque2",
+  financial_docs: "financials", dealership_certificate: "dealership", iec_certificate: "iec",
+  swift_iban_proof: "swift_iban", incorporation_certificate: "incorporation", other: "other",
 };
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB cap per file
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = new Uint8Array(await blob.arrayBuffer());
@@ -115,12 +69,8 @@ async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uplo
         continue;
       }
       const { data: blob, error: dlErr } = await supabase.storage
-        .from("vendor-documents")
-        .download(d.file_path);
-      if (dlErr || !blob) {
-        skipped.push(`${d.file_name} (download failed)`);
-        continue;
-      }
+        .from("vendor-documents").download(d.file_path);
+      if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
       const base64 = await blobToBase64(blob);
       uploads.push({
         FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
@@ -135,80 +85,121 @@ async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uplo
   return { uploads, skipped };
 }
 
-type SapDefaults = {
-  partn_cat: string; partn_grp: string; title: string; taxtype: string;
-  bukrs: string; akont: string; zuawa: string; fdgrv: string;
-  vkorg: string; waers: string; kalsk: string; cdi: string;
-  webre: string; lebre: string; ven_class: string;
+// ---------- Template resolver ----------
+type ResolverCtx = {
+  vendor: Record<string, any>;
+  override: Record<string, any>;
+  classify: Record<string, any>;
+  uploads: any[];
+  isMsme: boolean;
 };
 
-const FALLBACK_DEFAULTS: SapDefaults = {
-  partn_cat: "2", partn_grp: "ZDOM", title: "0003", taxtype: "IN3",
-  bukrs: "1000", akont: "155000005", zuawa: "014", fdgrv: "A1",
-  vkorg: "1000", waers: "INR", kalsk: "L1", cdi: "X",
-  webre: "X", lebre: "X", ven_class: "",
-};
-
-function buildPayload(vendor: any, defaults: SapDefaults) {
-  const legalName = vendor.legal_name || "";
-  const tradeName = vendor.trade_name || "";
-  const relativeName = vendor.relative_name || "";
-  const accountHolder = vendor.account_holder_name || "";
-  const region = resolveRegion(vendor.registered_state);
-  const isMsme = !!vendor.msme_number;
-
-  const row: Record<string, any> = {
-    bpartner: "", partn_cat: defaults.partn_cat, partn_grp: defaults.partn_grp, title: defaults.title,
-    name1: trunc(legalName, 40),
-    name2: trunc(relativeName, 40),
-    name3: "",
-    sterm1: trunc(legalName, 20), sterm2: trunc((tradeName.split(" ")[0] || ""), 20),
-    street: trunc(vendor.registered_address, 60),
-    house_no: trunc(vendor.registered_address_line2, 10),
-    str_suppl1: trunc(vendor.registered_address_line3 || vendor.registered_address_line2, 40),
-    str_suppl2: "", str_suppl3: "",
-    location: trunc(vendor.registered_city, 40),
-    district: trunc(vendor.registered_city, 40),
-    postl_cod1: trunc(vendor.registered_pincode, 10),
-    city: trunc(vendor.registered_city, 40),
-    country: "IN", region: trunc(region, 3), langu: "EN",
-    tel_number: trunc(vendor.registered_phone, 30),
-    mob_number: trunc(vendor.primary_phone, 30),
-    smtp_addr: trunc(vendor.primary_email, 241),
-    taxtype: defaults.taxtype, taxnumxl: trunc(vendor.gstin, 20),
-    legaform: "", legaenty: "", bp_type: "", due_digi: "",
-    idtype: isMsme ? "ZMSMEN" : "",
-    idnum: isMsme ? trunc(vendor.msme_number, 20) : "",
-    bankdetailid: "0001", bank_ctry: "IN",
-    bank_key: trunc(vendor.ifsc_code, 15), bank_acct: trunc(vendor.account_number, 18),
-    ctrl_key: "",
-    accountholder: trunc(accountHolder, 60),
-    bankaccountname: trunc(accountHolder, 60),
-    pernr: "", bukrs: defaults.bukrs, akont: defaults.akont, zuawa: defaults.zuawa,
-    cdi: defaults.cdi, fdgrv: defaults.fdgrv, xzver: "",
-    msme: isMsme ? "MIC" : "",
-    j_1iexcd: "", j_1iexrn: "", j_1iexrg: "", j_1iexdi: "", j_1iexco: "",
-    j_1iexcicu: "", j_1icstno: "", j_1ilstno: "",
-    j_1ipanno: trunc(vendor.pan, 10), j_1isern: "",
-    witht: "", wt_withcd: "", wt_subjct: "", qsrec: "", qland: "",
-    vkorg: defaults.vkorg, waers: defaults.waers, zterm: "",
-    inco1: "", inco2: "", kalsk: defaults.kalsk, webre: defaults.webre, lebre: defaults.lebre, ven_class: defaults.ven_class,
-    zvkorg: "", vtweg: "", spart: "", bzirk: "", kdgrp: "", vkbur: "", vkgrp: "",
-    zwaers: "", kurst: "", konda: "", kalks: "", pltyp: "", versg: "", lprio: "",
-    kzazu: "", vsbed: "", untto: "", uebto: "", zinco1: "", zinco2: "", zzterm: "",
-    kkber: "", ktgrd: "",
-    taxkd01: "", taxkd02: "", taxkd03: "", taxkd04: "", taxkd05: "", taxkd06: "", taxkd07: "",
-  };
-  return row;
+function getPath(obj: any, path: string): any {
+  if (!obj) return undefined;
+  return path.split(".").reduce((acc, k) => (acc == null ? acc : acc[k]), obj);
 }
 
+function applyFilter(value: any, filter: string): any {
+  const [name, arg] = filter.split(":");
+  switch (name) {
+    case "trunc": {
+      const n = parseInt(arg || "0", 10);
+      if (value == null) return "";
+      return String(value).slice(0, n);
+    }
+    case "upper": return value == null ? "" : String(value).toUpperCase();
+    case "lower": return value == null ? "" : String(value).toLowerCase();
+    case "default":
+      return (value === undefined || value === null || value === "") ? (arg ?? "") : value;
+    case "msme_flag":
+      // If override is empty string, infer from isMsme via ctx (handled in resolveExpr)
+      return value;
+    case "msme_idtype": return value;
+    case "msme_idnum": return value;
+    default: return value;
+  }
+}
+
+function resolveExpr(expr: string, ctx: ResolverCtx): any {
+  // expr like: vendor.legal_name|trunc:40  OR  region(vendor.registered_state)  OR  uploads
+  // Split filters
+  const parts = expr.split("|").map(s => s.trim());
+  const head = parts[0];
+  const filters = parts.slice(1);
+
+  let value: any;
+
+  // Function-style helpers
+  const fnMatch = head.match(/^(\w+)\((.*)\)$/);
+  if (fnMatch) {
+    const fn = fnMatch[1];
+    const innerPath = fnMatch[2].trim();
+    const inner = innerPath ? getPath(ctx, innerPath) : undefined;
+    if (fn === "region") value = resolveRegion(inner);
+    else value = "";
+  } else if (head === "uploads") {
+    value = ctx.uploads;
+  } else if (head === "vendor.trade_name_first_word") {
+    const t = ctx.vendor?.trade_name || "";
+    value = String(t).split(" ")[0] || "";
+  } else if (head === "vendor.registered_address_line3_or_2") {
+    value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
+  } else {
+    value = getPath(ctx, head);
+  }
+
+  // Apply filters
+  for (const f of filters) {
+    const [name] = f.split(":");
+    if (name === "msme_flag") {
+      // value is the override value; if blank, infer
+      if (value === undefined || value === null || value === "") {
+        value = ctx.isMsme ? "MIC" : "";
+      }
+    } else if (name === "msme_idtype") {
+      if (value === undefined || value === null || value === "") {
+        value = ctx.isMsme ? "ZMSMEN" : "";
+      }
+    } else if (name === "msme_idnum") {
+      if (value === undefined || value === null || value === "") {
+        value = ctx.isMsme ? String(ctx.vendor?.msme_number || "").slice(0, 20) : "";
+      }
+    } else {
+      value = applyFilter(value, f);
+    }
+  }
+
+  if (value === undefined || value === null) value = "";
+  return value;
+}
+
+function resolveTemplate(node: any, ctx: ResolverCtx): any {
+  if (node == null) return node;
+  if (typeof node === "string") {
+    // Whole-string placeholder e.g. "{{uploads}}" -> raw value (could be array)
+    const whole = node.match(/^\s*\{\{\s*(.+?)\s*\}\}\s*$/);
+    if (whole) return resolveExpr(whole[1], ctx);
+    // Inline interpolation
+    return node.replace(/\{\{\s*(.+?)\s*\}\}/g, (_m, expr) => {
+      const v = resolveExpr(expr, ctx);
+      return v == null ? "" : String(v);
+    });
+  }
+  if (Array.isArray(node)) return node.map(n => resolveTemplate(n, ctx));
+  if (typeof node === "object") {
+    const out: Record<string, any> = {};
+    for (const k of Object.keys(node)) out[k] = resolveTemplate(node[k], ctx);
+    return out;
+  }
+  return node;
+}
+
+// ---------- response helpers ----------
 function ok(body: any) {
   return new Response(JSON.stringify(body), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
   });
 }
-
 function fail(message: string, extra: Record<string, any> = {}) {
   return ok({ success: false, message, sapResponse: [], ...extra });
 }
@@ -228,24 +219,19 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1) Load vendor
     const { data: vendor, error: vendorError } = await supabase
       .from("vendors").select("*").eq("id", vendorId).single();
     if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
 
-    // Pre-validate: vendor's registered_state must map to an SAP region code.
     if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
       return fail(
         `Cannot sync to SAP: vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for country IN. Please correct the vendor's Registered State and retry.`,
       );
     }
 
-    // 2) Resolve SAP API config from app DB (preferred) — Business Partner Create.
-    //    Match by api_type='sync' or by name containing 'business partner' / 'bp'.
+    // Resolve SAP API config (proxy/middleware)
     const { data: configs } = await supabase
-      .from("sap_api_configs")
-      .select("*")
-      .eq("is_active", true)
+      .from("sap_api_configs").select("*").eq("is_active", true)
       .order("created_at", { ascending: false });
 
     const config = (configs || []).find((c: any) => {
@@ -254,18 +240,13 @@ serve(async (req) => {
              (c.endpoint_path || "").toLowerCase().includes("/vendor/bp/create");
     }) || (configs || [])[0];
 
-    // Fallback to legacy runtime secrets if no config exists at all.
     const envMiddlewareUrl = Deno.env.get("SAP_MIDDLEWARE_URL");
     const envMiddlewareKey = Deno.env.get("SAP_MIDDLEWARE_KEY");
 
-    // Normalize the middleware URL: strip whitespace and any trailing endpoint paths
-    // so that pasting "https://x.ngrok.dev  /sap/bp/create" still works.
     function normalizeMiddlewareBase(raw: string): string {
       if (!raw) return "";
       let v = String(raw).replace(/\s+/g, "").trim();
-      // remove trailing slashes
       v = v.replace(/\/+$/, "");
-      // strip known endpoint suffixes if user pasted full URL
       v = v.replace(/\/sap\/bp\/create$/i, "");
       v = v.replace(/\/sap\/proxy$/i, "");
       v = v.replace(/\/health$/i, "");
@@ -280,137 +261,80 @@ serve(async (req) => {
 
     let targetUrl = "";
     let useMiddleware = false;
-
     if (connectionMode === "proxy") {
-      if (!middlewareUrl) {
-        return fail(
-          "SAP middleware URL is not configured. Open SAP API Settings → Business Partner config and set 'Node.js Middleware URL' (e.g. your ngrok https URL) and 'Proxy Secret / Password'.",
-        );
-      }
-      if (!middlewareKey) {
-        return fail(
-          "Proxy Secret / Password is not set in SAP API Settings. Open the Business Partner config, paste the same value as MIDDLEWARE_SHARED_SECRET from middleware/.env into 'Proxy Secret / Password', save, and try again.",
-        );
-      }
-      if (!/^https?:\/\//i.test(middlewareUrl)) {
-        return fail(
-          `The saved Node.js Middleware URL is invalid: "${rawMiddlewareUrl}". It must start with http:// or https:// and contain no spaces. Open SAP API Settings → Business Partner config and re-enter just the base URL (e.g. https://abc123.ngrok-free.app).`,
-        );
-      }
-      try {
-        // sanity check
-        new URL(middlewareUrl);
-      } catch {
-        return fail(
-          `The saved Node.js Middleware URL could not be parsed: "${rawMiddlewareUrl}". Re-enter just the public base URL (e.g. https://abc123.ngrok-free.app) without any trailing path or spaces.`,
-        );
-      }
+      if (!middlewareUrl) return fail("SAP middleware URL is not configured. Open SAP API Settings → Business Partner config and set 'Node.js Middleware URL'.");
+      if (!middlewareKey) return fail("Proxy Secret / Password is not set in SAP API Settings.");
+      if (!/^https?:\/\//i.test(middlewareUrl)) return fail(`The saved Node.js Middleware URL is invalid: "${rawMiddlewareUrl}".`);
+      try { new URL(middlewareUrl); } catch { return fail(`The saved Node.js Middleware URL could not be parsed: "${rawMiddlewareUrl}".`); }
       useMiddleware = true;
       targetUrl = `${middlewareUrl}/sap/bp/create`;
     } else {
-      // direct mode — only sensible if Edge Function can actually reach SAP
       const directBase = config?.base_url || "";
       const directPath = config?.endpoint_path || "";
       targetUrl = `${directBase.replace(/\/$/, "")}${directPath}`;
-      if (!targetUrl) {
-        return fail("SAP direct URL is not configured (base_url + endpoint_path).");
-      }
+      if (!targetUrl) return fail("SAP direct URL is not configured (base_url + endpoint_path).");
     }
 
-    // Load tenant SAP defaults (fall back to constants if missing)
-    let defaults: SapDefaults = { ...FALLBACK_DEFAULTS };
+    // Load tenant defaults from sap_default_fields, merge into overrides for any blanks
+    const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
     if (vendor.tenant_id) {
       const { data: defRow } = await supabase
-        .from("sap_default_fields")
-        .select("*")
-        .eq("tenant_id", vendor.tenant_id)
-        .maybeSingle();
+        .from("sap_default_fields").select("*").eq("tenant_id", vendor.tenant_id).maybeSingle();
       if (defRow) {
-        defaults = {
-          partn_cat: defRow.partn_cat ?? defaults.partn_cat,
-          partn_grp: defRow.partn_grp ?? defaults.partn_grp,
-          title: defRow.title ?? defaults.title,
-          taxtype: defRow.taxtype ?? defaults.taxtype,
-          bukrs: defRow.bukrs ?? defaults.bukrs,
-          akont: defRow.akont ?? defaults.akont,
-          zuawa: defRow.zuawa ?? defaults.zuawa,
-          fdgrv: defRow.fdgrv ?? defaults.fdgrv,
-          vkorg: defRow.vkorg ?? defaults.vkorg,
-          waers: defRow.waers ?? defaults.waers,
-          kalsk: defRow.kalsk ?? defaults.kalsk,
-          cdi: defRow.cdi ?? defaults.cdi,
-          webre: defRow.webre ?? defaults.webre,
-          lebre: defRow.lebre ?? defaults.lebre,
-          ven_class: defRow.ven_class ?? defaults.ven_class,
-        };
-      }
-    }
-
-    const row = buildPayload(vendor, defaults);
-
-    // Merge user-supplied SAP field overrides from the pre-sync confirmation popup.
-    const ALLOWED_OVERRIDES = [
-      "partn_cat","partn_grp","title","taxtype","msme","idtype","idnum",
-      "bukrs","akont","zuawa","cdi","fdgrv",
-      "vkorg","waers","kalsk","webre","lebre","ven_class",
-    ];
-    if (overrides && typeof overrides === "object") {
-      for (const k of ALLOWED_OVERRIDES) {
-        if (overrides[k] !== undefined && overrides[k] !== null) {
-          (row as any)[k] = overrides[k];
+        for (const k of ["partn_cat","partn_grp","title","taxtype","bukrs","akont","zuawa","fdgrv","vkorg","waers","kalsk","cdi","webre","lebre","ven_class"]) {
+          if (mergedOverrides[k] === undefined || mergedOverrides[k] === null || mergedOverrides[k] === "") {
+            if (defRow[k] !== undefined && defRow[k] !== null) mergedOverrides[k] = defRow[k];
+          }
         }
       }
     }
 
-    // CLASSIFY block — start with vendor-derived defaults, then apply overrides
-    const classifyOverride = overrides?.classify || {};
+    // Build classify ctx, merging override.classify with vendor's dedicated columns
     const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
-    const classifyDefaults = {
-      MGV: classifyOverride.MGV || vendor.material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
-      CATV: classifyOverride.CATV || vendor.vendor_category || vendor.organization_type || vendor.entity_type || "",
-      LOCV: classifyOverride.LOCV || vendor.vendor_location || vendor.registered_state || "",
-      IDS: classifyOverride.IDS || vendor.identification_source || "",
+    const ovClassify = (overrides && overrides.classify) || {};
+    const classifyCtx = {
+      MGV: ovClassify.MGV || vendor.material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
+      CATV: ovClassify.CATV || vendor.vendor_category || vendor.organization_type || vendor.entity_type || "",
+      LOCV: ovClassify.LOCV || vendor.vendor_location || vendor.registered_state || "",
+      IDS: ovClassify.IDS || vendor.identification_source || "",
     };
-    const classifyBlock: Record<string, any[]> = {};
-    if (classifyDefaults.MGV) classifyBlock.MAT_GRP_VENDOR = [{ MGV: String(classifyDefaults.MGV) }];
-    if (classifyDefaults.CATV) classifyBlock.CAT_VENDOR = [{ CATV: String(classifyDefaults.CATV) }];
-    if (classifyDefaults.LOCV) classifyBlock.LOCATION_VENDOR = [{ LOCV: String(classifyDefaults.LOCV) }];
-    if (classifyDefaults.IDS) classifyBlock.IDENTIFICATION_SOURCE = [{ IDS: String(classifyDefaults.IDS) }];
-    if (Object.keys(classifyBlock).length) (row as any).CLASSIFY = classifyBlock;
 
-    // Mirror vendors[] sub-array as required by SAP payload spec
-    (row as any).customers = [{
-      kunnr: "", idtype: "", idnum: "", idinstitute: "", identrydate: "",
-      bukrs: "", zterm: "",
-    }];
-    (row as any).vendors = [{
-      lifnr: "",
-      partn_cat: row.partn_cat,
-      name2: row.name2, name3: row.name3,
-      sterm1: row.sterm1, sterm2: row.sterm2,
-      street: row.street, house_no: row.house_no,
-      str_suppl1: row.str_suppl1, str_suppl2: row.str_suppl2, str_suppl3: row.str_suppl3,
-      location: row.location, district: row.district,
-      postl_cod1: row.postl_cod1, city: row.city, country: row.country,
-      region: row.region, langu: row.langu,
-      tel_number: row.tel_number, mob_number: row.mob_number, smtp_addr: row.smtp_addr,
-      taxtype: row.taxtype, taxnumxl: row.taxnumxl,
-      nodel: "", bp_type: "", due_digi: "",
-      idtype: "", idnum: "", j_1ipanno: row.j_1ipanno,
-      ven_class: row.ven_class, cent_post_block: "", cent_pur_block: "", ktokk: "",
-      pernr: "", bukrs: row.bukrs, akont: row.akont, zuawa: row.zuawa,
-      cdi: row.cdi, msme: row.msme, comp_block: "",
-      witht: "", wt_withcd: "", wt_subjct: "", qsrec: "", qland: "",
-      vkorg: row.vkorg, waers: row.waers, zterm: "",
-      inco1: "", inco2: "", kalsk: row.kalsk, webre: row.webre,
-      block_func: "", pur_block: "",
-    }];
+    const isMsme = !!vendor.msme_number;
+
+    // Load template: tenant-specific first, fallback to global
+    let template: any = null;
+    if (vendor.tenant_id) {
+      const { data: tplRow } = await supabase
+        .from("sap_payload_templates").select("template")
+        .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
+      if (tplRow?.template) template = tplRow.template;
+    }
+    if (!template) {
+      const { data: tplRow } = await supabase
+        .from("sap_payload_templates").select("template")
+        .is("tenant_id", null).eq("is_active", true).maybeSingle();
+      if (tplRow?.template) template = tplRow.template;
+    }
+    if (!template) {
+      return fail("No SAP payload template configured. Please seed sap_payload_templates with a default row.");
+    }
 
     const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
-    (row as any).UPLOAD = uploads;
-    if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
+
+    const ctx: ResolverCtx = {
+      vendor,
+      override: mergedOverrides,
+      classify: classifyCtx,
+      uploads,
+      isMsme,
+    };
+
+    const row = resolveTemplate(template, ctx);
     const payload = [row];
-    console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl, "uploads:", uploads.length);
+
+    if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
+    console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl,
+      "uploads:", uploads.length, "topLevelKeys:", Object.keys(row).length);
 
     let sapResponse: any[] | null = null;
     let httpStatus = 0;
@@ -426,12 +350,8 @@ serve(async (req) => {
       if (useMiddleware) {
         if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
       } else {
-        // direct mode auth from saved credentials
         const { data: creds } = await supabase
-          .from("sap_api_credentials")
-          .select("*")
-          .eq("config_id", config?.id)
-          .maybeSingle();
+          .from("sap_api_credentials").select("*").eq("config_id", config?.id).maybeSingle();
         if (config?.auth_type === "Basic" && creds?.username) {
           headers["Authorization"] = `Basic ${btoa(`${creds.username}:${creds.password_encrypted ?? ""}`)}`;
         } else if (config?.auth_type === "Bearer" && creds?.password_encrypted) {
@@ -440,10 +360,7 @@ serve(async (req) => {
       }
 
       const res = await fetch(targetUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-        signal: controller.signal,
+        method: "POST", headers, body: JSON.stringify(payload), signal: controller.signal,
       });
       clearTimeout(timer);
       httpStatus = res.status;
@@ -454,52 +371,38 @@ serve(async (req) => {
         const parsed = JSON.parse(text);
         upstreamWrapper = useMiddleware ? parsed : null;
         const raw = useMiddleware && parsed && typeof parsed === "object" && "sapResponse" in parsed
-          ? parsed.sapResponse
-          : parsed;
+          ? parsed.sapResponse : parsed;
         sapResponse = Array.isArray(raw) ? raw : (raw == null ? [] : [raw]);
       } catch {
-        // Non-JSON body
-        if (httpStatus >= 400) {
-          networkError = `Middleware/SAP HTTP ${httpStatus}: ${text.slice(0, 200) || "(empty body)"}`;
-        } else {
-          networkError = `Invalid JSON from SAP (HTTP ${httpStatus}): ${text.slice(0, 200)}`;
-        }
+        if (httpStatus >= 400) networkError = `Middleware/SAP HTTP ${httpStatus}: ${text.slice(0, 200) || "(empty body)"}`;
+        else networkError = `Invalid JSON from SAP (HTTP ${httpStatus}): ${text.slice(0, 200)}`;
       }
 
-      // Friendly mapping for middleware error wrappers
       if (useMiddleware && upstreamWrapper && upstreamWrapper.ok === false) {
         const upstreamErr = String(upstreamWrapper.error || "").toLowerCase();
         if (httpStatus === 401 || upstreamErr.includes("unauthorized")) {
-          networkError =
-            "Middleware rejected the request (401 Unauthorized). The 'Proxy Secret / Password' in SAP API Settings does not match MIDDLEWARE_SHARED_SECRET in middleware/.env.";
+          networkError = "Middleware rejected the request (401 Unauthorized). The 'Proxy Secret / Password' in SAP API Settings does not match MIDDLEWARE_SHARED_SECRET in middleware/.env.";
         } else if (upstreamErr.includes("missing sap_bp_api_url") || upstreamErr.includes("sap_bp_username") || upstreamErr.includes("sap_bp_password")) {
-          networkError =
-            "Middleware is reachable but its .env is incomplete. Set SAP_BP_API_URL / SAP_BP_USERNAME / SAP_BP_PASSWORD in middleware/.env and restart it.";
+          networkError = "Middleware is reachable but its .env is incomplete. Set SAP_BP_API_URL / SAP_BP_USERNAME / SAP_BP_PASSWORD in middleware/.env and restart it.";
         } else if (upstreamErr.includes("timed out") || upstreamErr.includes("timeout")) {
-          networkError =
-            "Middleware is reachable, but SAP timed out. The middleware machine cannot reach SAP at 10.200.1.2 — check VPN / firewall.";
+          networkError = "Middleware is reachable, but SAP timed out.";
         } else {
           networkError = `Middleware error: ${upstreamWrapper.error || `HTTP ${httpStatus}`}`;
         }
       } else if (httpStatus === 401 && useMiddleware && !networkError) {
-        networkError =
-          "Middleware rejected the request (401). Set the 'Proxy Secret / Password' in SAP API Settings to the same value as MIDDLEWARE_SHARED_SECRET in middleware/.env.";
+        networkError = "Middleware rejected the request (401).";
       }
     } catch (e: any) {
       const raw = e?.message || "Network error reaching SAP";
       if (useMiddleware) {
-        networkError =
-          `Could not reach the middleware at ${targetUrl}. Make sure 'node server.js' is running and the URL in SAP API Settings is publicly reachable (e.g. https ngrok URL). Underlying error: ${raw}`;
+        networkError = `Could not reach the middleware at ${targetUrl}. Underlying error: ${raw}`;
       } else {
-        networkError =
-          `Could not reach SAP directly at ${targetUrl}. Lovable Cloud cannot reach private IPs — switch the SAP API config to 'proxy' mode and set the Node.js Middleware URL. Underlying error: ${raw}`;
+        networkError = `Could not reach SAP directly at ${targetUrl}. Underlying error: ${raw}`;
       }
       console.error("SAP fetch error:", raw);
     }
 
-    if (networkError) {
-      return fail(networkError, { sapResponse: sapResponse ?? [] });
-    }
+    if (networkError) return fail(networkError, { sapResponse: sapResponse ?? [] });
 
     const successItem = (sapResponse || []).find(
       (it: any) => it?.MSGTYP === "S" && typeof it?.MSG === "string" && it.MSG.toLowerCase().includes("business partner created"),
@@ -507,29 +410,16 @@ serve(async (req) => {
     const sapVendorCode = successItem?.BP_LIFNR || (sapResponse || []).find((i: any) => i?.BP_LIFNR)?.BP_LIFNR || null;
 
     if (successItem && sapVendorCode) {
-      await supabase
-        .from("vendors")
-        .update({
-          sap_vendor_code: sapVendorCode,
-          sap_synced_at: new Date().toISOString(),
-          status: "sap_synced",
-        })
-        .eq("id", vendorId);
-
-      return ok({
-        success: true,
-        sapVendorCode,
-        message: "Vendor successfully synced to SAP",
-        sapResponse,
-      });
+      await supabase.from("vendors").update({
+        sap_vendor_code: sapVendorCode,
+        sap_synced_at: new Date().toISOString(),
+        status: "sap_synced",
+      }).eq("id", vendorId);
+      return ok({ success: true, sapVendorCode, message: "Vendor successfully synced to SAP", sapResponse });
     }
 
     const errorItem = (sapResponse || []).find((it: any) => it?.MSGTYP === "E");
-    return ok({
-      success: false,
-      message: errorItem?.MSG || "SAP did not confirm Business Partner creation",
-      sapResponse: sapResponse || [],
-    });
+    return ok({ success: false, message: errorItem?.MSG || "SAP did not confirm Business Partner creation", sapResponse: sapResponse || [] });
   } catch (error: any) {
     console.error("sync-vendor-to-sap error:", error);
     return ok({ success: false, message: error.message || "Unexpected error", sapResponse: [] });
