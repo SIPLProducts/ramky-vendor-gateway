@@ -80,8 +80,12 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
               <TextField label="Vendor Account Group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
+              <SelectField label="Title" value={form.title} onChange={v => set('title', v)}
+                options={[['0001', 'Company'], ['0002', 'Mr.'], ['0003', 'Ms.']]} />
+              <TextField label="Tax Type (GST Category)" value={form.taxtype} onChange={v => set('taxtype', v)} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
+              <TextField label="MSME ID Number" value={form.idnum} onChange={v => set('idnum', v)} />
             </Section>
 
             <Separator />
@@ -108,6 +112,24 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={v => set('webre', v ? 'X' : '')} />
               <CheckboxField label="Service-Based Invoice Verification" checked={form.lebre === 'X'}
                 onChange={v => set('lebre', v ? 'X' : '')} />
+            </Section>
+
+            <Separator />
+
+            {/* SAP Classification */}
+            <Section icon={<Tag className="h-4 w-4" />} title="SAP Classification">
+              <ComboField label="Material Group for Vendors (MGV)" value={form.classify.MGV}
+                onChange={v => setClassify('MGV', v.toUpperCase())}
+                options={PRODUCT_CATEGORIES.map(o => o.toUpperCase())} />
+              <ComboField label="Vendor Category (CATV)" value={form.classify.CATV}
+                onChange={v => setClassify('CATV', v.toUpperCase())}
+                options={VENDOR_CATEGORIES.map(o => o.toUpperCase())} />
+              <ComboField label="Vendor Location (LOCV)" value={form.classify.LOCV}
+                onChange={v => setClassify('LOCV', v.toUpperCase())}
+                options={INDIAN_STATES.map(o => o.toUpperCase())} />
+              <ComboField label="Vendor Identification Source (IDS)" value={form.classify.IDS}
+                onChange={v => setClassify('IDS', v.toUpperCase())}
+                options={IDENTIFICATION_SOURCES.map(o => o.toUpperCase())} />
             </Section>
 
           </div>
