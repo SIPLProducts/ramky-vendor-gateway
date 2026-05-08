@@ -369,6 +369,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         productCategories: vendor.product_categories || [],
         productCategoriesOther: (vendor as VendorRecord & { product_categories_other?: string }).product_categories_other || '',
         state: (vendor as VendorRecord & { state?: string }).state || '',
+        materialGroupVendor: (vendor as any).material_group_vendor || '',
+        vendorCategory: (vendor as any).vendor_category || '',
+        vendorLocation: (vendor as any).vendor_location || '',
+        identificationSource: (vendor as any).identification_source || '',
       },
       address: {
         registeredAddress: vendor.registered_address || '',
