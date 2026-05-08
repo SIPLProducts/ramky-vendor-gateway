@@ -42,6 +42,11 @@ const schema = z.object({
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
+  // SAP Classification
+  materialGroupVendor: z.string().min(1, 'Material Group for Vendors is required'),
+  vendorCategory: z.string().min(1, 'Vendor Category is required'),
+  vendorLocation: z.string().min(1, 'Vendor Location is required'),
+  identificationSource: z.string().min(1, 'Identification Source is required'),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
