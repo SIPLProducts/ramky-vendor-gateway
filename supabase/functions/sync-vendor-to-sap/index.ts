@@ -211,7 +211,7 @@ serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendorId, overrides } = await req.json();
+    const { vendorId, overrides, sapPayload: clientPayload } = await req.json();
     if (!vendorId) throw new Error("vendorId is required");
 
     const supabase = createClient(
