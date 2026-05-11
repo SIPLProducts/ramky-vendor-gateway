@@ -53,9 +53,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
-    const status = !props.isMsmeRegistered
-      ? (props.msmeSelfDeclarationFile ? 'passed' : 'na')
-      : (state.status as any);
+    const status = !props.isMsmeRegistered ? 'na' : (state.status as any);
     props.onStatusChange(status);
   }
 
