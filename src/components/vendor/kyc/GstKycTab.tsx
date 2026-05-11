@@ -248,7 +248,7 @@ export function GstKycTab(props: GstKycTabProps) {
 
           <FileUpload
             label="Signed GST Self-Declaration *"
-            accept=".pdf,.jpg,.jpeg,.png"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
             documentType="gst_self_declaration"
             onFileSelect={props.onGstSelfDeclarationFileChange}
             currentFile={props.gstSelfDeclarationFile}
