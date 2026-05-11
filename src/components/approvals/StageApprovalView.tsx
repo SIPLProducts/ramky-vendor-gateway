@@ -7,12 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye, FolderOpen, Landmark, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
-import { VendorDocuments } from '@/components/vendor/VendorDocuments';
+import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 
 interface Props {
   stage: ApprovalStage;
@@ -23,29 +22,6 @@ interface Props {
   extraPanel?: (item: StageApprovalItem) => ReactNode;
 }
 
-interface VendorDetails {
-  id: string;
-  legal_name?: string;
-  trade_name?: string;
-  pan?: string;
-  gstin?: string;
-  status?: string;
-  submitted_at?: string;
-  bank_name?: string;
-  bank_branch_name?: string;
-  account_number?: string;
-  ifsc_code?: string;
-  account_type?: string;
-  bank_address?: string;
-  bank_name_2?: string;
-  branch_name_2?: string;
-  account_number_2?: string;
-  ifsc_code_2?: string;
-  account_holder_name_2?: string;
-  account_type_2?: string;
-  bank_address_2?: string;
-}
-
 export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -53,26 +29,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [actionItem, setActionItem] = useState<{ item: StageApprovalItem; action: 'approve' | 'reject' } | null>(null);
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [viewVendor, setViewVendor] = useState<VendorDetails | null>(null);
-  const [viewLoading, setViewLoading] = useState(false);
+  const [viewVendorId, setViewVendorId] = useState<string | null>(null);
 
-  const openView = async (vendorId: string) => {
-    setViewLoading(true);
-    setViewVendor({ id: vendorId });
-    try {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('id, legal_name, trade_name, pan, gstin, status, submitted_at, bank_name, bank_branch_name, account_number, ifsc_code, account_type, bank_address, bank_name_2, branch_name_2, account_number_2, ifsc_code_2, account_holder_name_2, account_type_2, bank_address_2')
-        .eq('id', vendorId)
-        .maybeSingle();
-      if (error) throw error;
-      setViewVendor(data as VendorDetails);
-    } catch (err: any) {
-      toast({ title: 'Failed to load vendor', description: err.message, variant: 'destructive' });
-    } finally {
-      setViewLoading(false);
-    }
-  };
 
   const submit = async () => {
     if (!actionItem) return;
