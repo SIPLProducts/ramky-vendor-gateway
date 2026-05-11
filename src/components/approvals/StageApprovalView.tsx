@@ -177,68 +177,12 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         </DialogContent>
       </Dialog>
 
-      {/* View Vendor Details Dialog with Documents tab */}
-      <Dialog open={!!viewVendor} onOpenChange={(o) => { if (!o) setViewVendor(null); }}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{viewVendor?.legal_name || 'Vendor Details'}</DialogTitle>
-          </DialogHeader>
-          {viewLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : viewVendor && (
-            <Tabs defaultValue="overview">
-              <TabsList>
-                <TabsTrigger value="overview"><Info className="h-4 w-4 mr-2" />Overview</TabsTrigger>
-                <TabsTrigger value="bank"><Landmark className="h-4 w-4 mr-2" />Bank Details</TabsTrigger>
-                <TabsTrigger value="documents"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
-              </TabsList>
-              <TabsContent value="overview" className="mt-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="text-muted-foreground">Legal Name:</span> <span className="font-medium">{viewVendor.legal_name || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Trade Name:</span> <span className="font-medium">{viewVendor.trade_name || '—'}</span></div>
-                  <div><span className="text-muted-foreground">PAN:</span> <span className="font-mono">{viewVendor.pan || '—'}</span></div>
-                  <div><span className="text-muted-foreground">GSTIN:</span> <span className="font-mono">{viewVendor.gstin || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Status:</span> <Badge variant="outline">{viewVendor.status}</Badge></div>
-                  <div><span className="text-muted-foreground">Submitted:</span> <span>{viewVendor.submitted_at ? new Date(viewVendor.submitted_at).toLocaleString() : '—'}</span></div>
-                </div>
-              </TabsContent>
-              <TabsContent value="bank" className="mt-4 space-y-4">
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Primary Bank Account</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                    <div><span className="text-muted-foreground">Bank:</span> <span className="font-medium">{viewVendor.bank_name || '—'}</span></div>
-                    <div><span className="text-muted-foreground">Branch:</span> <span className="font-medium">{viewVendor.bank_branch_name || '—'}</span></div>
-                    <div><span className="text-muted-foreground">Account No:</span> <span className="font-mono">{viewVendor.account_number || '—'}</span></div>
-                    <div><span className="text-muted-foreground">IFSC:</span> <span className="font-mono">{viewVendor.ifsc_code || '—'}</span></div>
-                    <div><span className="text-muted-foreground">Type:</span> <span>{viewVendor.account_type || '—'}</span></div>
-                    <div className="col-span-2"><span className="text-muted-foreground">Address:</span> <span>{viewVendor.bank_address || '—'}</span></div>
-                  </CardContent>
-                </Card>
-                {viewVendor.account_number_2 && (
-                  <Card>
-                    <CardHeader><CardTitle className="text-base">Secondary Bank Account</CardTitle></CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                      <div><span className="text-muted-foreground">Bank:</span> <span className="font-medium">{viewVendor.bank_name_2 || '—'}</span></div>
-                      <div><span className="text-muted-foreground">Branch:</span> <span className="font-medium">{viewVendor.branch_name_2 || '—'}</span></div>
-                      <div><span className="text-muted-foreground">Account No:</span> <span className="font-mono">{viewVendor.account_number_2}</span></div>
-                      <div><span className="text-muted-foreground">IFSC:</span> <span className="font-mono">{viewVendor.ifsc_code_2 || '—'}</span></div>
-                      <div><span className="text-muted-foreground">Holder:</span> <span>{viewVendor.account_holder_name_2 || '—'}</span></div>
-                      <div><span className="text-muted-foreground">Type:</span> <span>{viewVendor.account_type_2 || '—'}</span></div>
-                      <div className="col-span-2"><span className="text-muted-foreground">Address:</span> <span>{viewVendor.bank_address_2 || '—'}</span></div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-              <TabsContent value="documents" className="mt-4">
-                <VendorDocuments vendorId={viewVendor.id} />
-              </TabsContent>
-            </Tabs>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewVendor(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* View Vendor Details — same popup as SAP Sync (All Details / Documents / Validations) */}
+      <VendorReviewDialog
+        vendorId={viewVendorId}
+        open={!!viewVendorId}
+        onOpenChange={(o) => { if (!o) setViewVendorId(null); }}
+      />
     </div>
   );
 }
