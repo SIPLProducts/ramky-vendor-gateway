@@ -1,41 +1,40 @@
 ## Problem
 
-The MSME self-declaration flow was added earlier to `MsmeKycTab.tsx`, but the screen the user is actually on (Document Verification step) uses **`DocumentVerificationStep.tsx`** instead. That file currently just renders a "Skipped — not MSME registered" line when "No, skip" is chosen — no download/upload/reason fields appear.
+In the Document Verification step (GST tab), after uploading a GST certificate, the **Principal Place of Business** field sometimes shows the address read by OCR from the certificate scan (e.g. `-, 15-80, -, SELAPADU, CHEBROLU, Guntur, Andhra Pradesh, 522213`) instead of the address returned by the GST registry validation API (e.g. `Ground Floor, 11, Revathi, 2nd Cross, George Garden, RVCE Post, Mysore Road, Bengaluru Urban, Karnataka, 560059`).
+
+The registry response is the authoritative source of truth — it must always win over the OCR value (or any stale value persisted from a previous upload/navigation).
+
+## Root cause
+
+In `src/components/vendor/steps/DocumentVerificationStep.tsx`:
+
+1. Line 273-275 initializes `editablePrincipalPlace` from previously persisted `initialData.gst.principalPlaceOfBusiness || address` once at mount.
+2. After `handleGstUpload` runs, line 798-799 only sets the field **if `!editablePrincipalPlace`**:
+   ```ts
+   if (principal && !editablePrincipalPlace) setEditablePrincipalPlace(principal);
+   ```
+   So if the field already had a value (from a previous upload, or from the OCR's `principal_place_of_business` that was hydrated before the API merge), the new registry address never overwrites it.
+3. The OCR extracted from the certificate image and the GST registry address can legitimately differ (e.g. OCR misreads, additional places, or the user uploaded the wrong cert). When they differ, the registry value should be the displayed/saved value.
 
 ## Fix
 
-Mirror the existing GST self-declaration block (already present at lines 1357–1378 of `DocumentVerificationStep.tsx`) inside the MSME tab's `isMsmeRegistered === false` branch.
+In `src/components/vendor/steps/DocumentVerificationStep.tsx`:
 
-### Changes (single file: `src/components/vendor/steps/DocumentVerificationStep.tsx`)
-
-1. **State** (next to existing `gstDeclarationFile` / `gstDeclarationReason` around line 275):
+1. **`handleGstUpload` (~line 795-802)**: after `runDocFlow` resolves, always overwrite `editablePrincipalPlace` with the API-normalized address when present:
    ```ts
-   const [msmeDeclarationFile, setMsmeDeclarationFile] = useState<File | null>(initialData?.msmeSelfDeclarationFile ?? null);
-   const [msmeDeclarationReason, setMsmeDeclarationReason] = useState<string>(initialData?.msmeDeclarationReason ?? "");
+   const apiAddress = prev.apiData?.normalized?.principal_place_of_business
+                    || prev.apiData?.normalized?.address;
+   if (apiAddress) setEditablePrincipalPlace(apiAddress);
+   else if (!editablePrincipalPlace) setEditablePrincipalPlace(prev.ocrData?.principal_place_of_business || prev.ocrData?.address || "");
    ```
+   This guarantees the registry value always replaces the OCR-derived value once verification succeeds.
 
-2. **Props type** (around line 56–63): add optional `msmeSelfDeclarationFile?: File | null` and `msmeDeclarationReason?: string` to `initialData`.
+2. **Verified panel (~line 2604-2625)**: keep the field editable but show a small "Auto-filled from registry" hint when the current value matches `api.address`, so the vendor understands the source. (The existing "Matches registry address" success line already covers this — no UI change needed beyond making sure the auto-fill happens.)
 
-3. **Replace the "Skipped" block** (lines 1552–1557) with a download-template + InlineFilePicker + reason field, styled exactly like the GST block:
-   - Card row: `FileText` icon, "MSME Self-Declaration", "Download, sign, then upload"
-   - `<a href="/templates/msme-self-declaration.html" download>` Template link
-   - `InlineFilePicker` bound to `msmeDeclarationFile` / `setMsmeDeclarationFile`
-   - `FormField` for `msmeDeclarationReason` (placeholder: "e.g. Turnover below MSME threshold limit")
-
-4. **Gate** (`stage3Done`, line 1092): require declaration file when not registered.
-   ```ts
-   const stage3Done =
-     (isMsmeRegistered === false && !!msmeDeclarationFile) ||
-     (isMsmeRegistered === true && msmeDoc.status === "verified");
-   ```
-
-5. **Persist in `out` payload** (around line 1133): when `isMsmeRegistered === false`, also write `msmeDeclarationReason` and `msmeSelfDeclarationFile` so the parent saves them (the existing upload pipeline already handles `msme_self_declaration` document type from the previous change).
-
-6. **Effect deps**: add `msmeDeclarationFile`, `msmeDeclarationReason` to the dep array on line 1177.
-
-No other files change. The `public/templates/msme-self-declaration.html` template and the `msme_self_declaration` upload type added previously are reused.
+3. **Persistence (~line 1113-1114)**: no change. The `out` payload already prefers `editablePrincipalPlace` when present, and we are now setting it from the registry.
 
 ## Out of scope
 
-- No changes to the parent `VendorRegistration.tsx` wiring beyond what already exists (already supports `msmeSelfDeclarationFile` / `msmeDeclarationReason` from the prior loop).
+- No changes to the GST_OCR / GST validation providers or to `kyc-api-execute`.
+- No changes to `ComplianceStep.tsx` or `ReviewStep.tsx` — they read the value already saved by this step.
 - No DB schema changes.
