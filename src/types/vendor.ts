@@ -156,6 +156,8 @@ export interface StatutoryDetails {
   isMsmeRegistered: boolean;
   msmeNumber: string;
   msmeCategory: 'micro' | 'small' | 'medium' | '';
+  msmeDeclarationReason?: string;
+  msmeSelfDeclarationFile?: File | null;
   labourPermitNo: string;
   iecNo: string;
   swiftIbanCode: string;
