@@ -116,7 +116,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => openView(it.vendorId)}>
+                          <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
                             <Eye className="h-4 w-4 mr-1" /> View
                           </Button>
                           <Button
