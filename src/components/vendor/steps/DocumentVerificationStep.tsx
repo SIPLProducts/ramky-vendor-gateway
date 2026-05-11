@@ -1089,6 +1089,117 @@ export function DocumentVerificationStep({
     });
   };
 
+  // Submit manual bank details from the popup → re-verify via configured BANK provider.
+  const handleBankPopupSubmit = async () => {
+    const account = bankPopup.account.replace(/\s+/g, "");
+    const ifsc = bankPopup.ifsc.toUpperCase().trim();
+    if (account.length < 8 || !/^\d+$/.test(account)) {
+      setBankPopup((p) => ({ ...p, error: "Enter a valid account number (8+ digits)." }));
+      return;
+    }
+    if (!isValidIfsc(ifsc)) {
+      setBankPopup((p) => ({ ...p, error: "Enter a valid 11-character IFSC code." }));
+      return;
+    }
+    setBankPopup((p) => ({ ...p, submitting: true, error: "" }));
+    const target = bankPopup.target;
+    const setDoc = target === "secondary" ? setBankDoc2 : setBankDoc;
+    setDoc((prev) => ({
+      ...prev,
+      status: "verifying",
+      ocrData: { ...(prev.ocrData || {}), account_number: account, ifsc_code: ifsc },
+    }));
+    try {
+      const r = await callProvider({
+        providerName: "BANK",
+        input: { account, ifsc, id_number: account },
+      });
+      toastKycResult("Bank", r);
+      if (!r.found || !r.ok || !r.data) {
+        setBankPopup((p) => ({
+          ...p,
+          submitting: false,
+          error: r.message || "Bank verification failed. Please re-check the details and try again.",
+        }));
+        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: r.message || "Bank verification failed" }));
+        return;
+      }
+      const d = r.data as Record<string, any>;
+      const apiAccount = String(d.account_number || account).replace(/\s+/g, "");
+      const apiIfsc = String(d.ifsc || ifsc).toUpperCase().trim();
+      const rawData = (r.raw && typeof r.raw === "object" && (r.raw as any).data) || {};
+      const nameAtBank = String(d.full_name || d.name_at_bank || rawData.full_name || "").trim();
+
+      // IFSC enrichment for bank/branch/address
+      const ifscInfo = await lookupIfsc(apiIfsc);
+      const bankName = String(d.bank_name || ifscInfo?.bank || "").trim();
+      const branchName = String(d.branch_name || ifscInfo?.branch || "").trim();
+      const branchAddress = String(d.branch_address || ifscInfo?.address || "").trim();
+
+      // Same name-match rules as the cheque flow.
+      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
+      let holderNameStatus: "gst+pan" | "gst" | "none" = "none";
+      let holderNameMessage = "";
+      const gstOk = nameAtBank && gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
+      const panOk = nameAtBank && panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
+      if (gstOk && panOk) {
+        holderNameStatus = "gst+pan";
+        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
+      } else if (gstOk) {
+        holderNameStatus = "gst";
+        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
+      } else if (gstLegalName || panHolderName) {
+        const msg = "Account Holder Name does not match with GST and PAN details.";
+        setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+        return;
+      }
+
+      const normalized: Record<string, any> = {
+        account_number: apiAccount,
+        ifsc_code: apiIfsc,
+        bank_name: bankName,
+        branch_name: branchName,
+        account_holder_name: nameAtBank,
+        branch_address: branchAddress,
+      };
+      const fileName = `Manual ${apiAccount.slice(-4).padStart(apiAccount.length, "•")}`;
+      setDoc({
+        status: "verified",
+        fileName,
+        ocrData: normalized,
+        originalOcrData: normalized,
+        apiData: {
+          accountHolderName: nameAtBank,
+          bankName,
+          branchName,
+          ifsc: apiIfsc,
+          accountNumber: apiAccount,
+          bankAddress: branchAddress,
+          accountExists: d.account_exists,
+          impsRefNo: d.imps_ref_no,
+          holderNameStatus,
+          holderNameMessage,
+          normalized,
+        },
+        nameMatchScore: nameMatchScore(effectiveLegalName, nameAtBank),
+        verifiedAt: Date.now(),
+      });
+      // Push branch address into the editable Bank Address field if untouched.
+      if (target === "secondary") {
+        if (!bankAddressTouchedRef2.current && branchAddress) setBankBranchAddress2(branchAddress);
+      } else {
+        if (!bankAddressTouchedRef.current && branchAddress) setBankBranchAddress(branchAddress);
+      }
+      setBankPopup((p) => ({ ...p, open: false, submitting: false, error: "" }));
+    } catch (e: any) {
+      const msg = e?.message || "Bank verification failed unexpectedly.";
+      setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+      setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+    }
+  };
+
 
   useEffect(() => {
     if (!bank2Enabled) return;
