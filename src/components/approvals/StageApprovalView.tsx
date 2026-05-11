@@ -12,6 +12,8 @@ import { CheckCircle2, XCircle, LucideIcon, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
+import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+import { FileText } from 'lucide-react';
 
 interface Props {
   stage: ApprovalStage;
@@ -30,6 +32,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [viewVendorId, setViewVendorId] = useState<string | null>(null);
+  const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
 
 
   const submit = async () => {
@@ -119,6 +122,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                           <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
                             <Eye className="h-4 w-4 mr-1" /> View
                           </Button>
+                          <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
+                            <FileText className="h-4 w-4 mr-1" /> Preview
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -182,6 +188,12 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         vendorId={viewVendorId}
         open={!!viewVendorId}
         onOpenChange={(o) => { if (!o) setViewVendorId(null); }}
+      />
+
+      <VendorSubmissionPreviewDialog
+        vendorId={previewVendorId}
+        open={!!previewVendorId}
+        onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
       />
     </div>
   );
