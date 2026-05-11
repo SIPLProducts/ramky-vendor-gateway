@@ -864,6 +864,37 @@ export function DocumentVerificationStep({
     [],
   );
 
+  // ---------- Toggle handlers: clear stale data when Yes/No flips ----------
+  const handleGstRegisteredChange = useCallback((next: boolean | null) => {
+    setIsGstRegistered((prev) => {
+      if (prev === next) return prev;
+      // Reset GST verification state regardless of direction so previously
+      // fetched fields/files cannot leak into the new selection's payload.
+      setGstDoc(idleDoc);
+      setEditablePrincipalPlace("");
+      // Clear self-declaration / manual fields when leaving the No path.
+      if (next !== false) {
+        setGstDeclarationFile(null);
+        setGstDeclarationReason("");
+        setManualLegalName("");
+        setManualAddress({ address: "", city: "", state: "", pincode: "" });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleMsmeRegisteredChange = useCallback((next: boolean | null) => {
+    setIsMsmeRegistered((prev) => {
+      if (prev === next) return prev;
+      setMsmeDoc(idleDoc);
+      if (next !== false) {
+        setMsmeDeclarationFile(null);
+        setMsmeDeclarationReason("");
+      }
+      return next;
+    });
+  }, []);
+
   const effectiveLegalName = useMemo(() => {
     if (isGstRegistered === true) return gstDoc.ocrData?.legal_name || gstDoc.apiData?.legalName;
     if (isGstRegistered === false) return manualLegalName;
