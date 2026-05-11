@@ -1414,12 +1414,19 @@ export function DocumentVerificationStep({
         bankAddress: bankBranchAddress2,
       };
     }
-    // Lift uploaded files so the parent can persist them in the draft
-    out.gstCertificateFile = gstDoc.file ?? null;
-    out.panCardFile = panDoc.file ?? null;
-    out.msmeCertificateFile = msmeDoc.file ?? null;
-    out.cancelledChequeFile = bankDoc.file ?? null;
-    out.cancelledChequeFile2 = bank2Enabled ? (bankDoc2.file ?? null) : null;
+    // Lift uploaded files so the parent can persist them in the draft.
+    // IMPORTANT: only include a file when the section actually applies to the
+    // current selection AND the doc is verified, so that flipping a Yes/No
+    // toggle or re-uploading a different document never leaves a stale file
+    // reference in the saved payload.
+    out.gstCertificateFile =
+      isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
+    out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
+    out.msmeCertificateFile =
+      isMsmeRegistered === true && msmeDoc.status === "verified" ? (msmeDoc.file ?? null) : null;
+    out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null;
+    out.cancelledChequeFile2 =
+      bank2Enabled && bankDoc2.status === "verified" ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
@@ -1562,7 +1569,7 @@ export function DocumentVerificationStep({
                 <GateRow
                   label="Are you GST registered?"
                   value={isGstRegistered}
-                  onChange={setIsGstRegistered}
+                  onChange={handleGstRegisteredChange}
                   yesLabel="Yes"
                   noLabel="No"
                 />
@@ -1793,7 +1800,7 @@ export function DocumentVerificationStep({
                 <GateRow
                   label="Are you MSME / Udyam registered?"
                   value={isMsmeRegistered}
-                  onChange={setIsMsmeRegistered}
+                  onChange={handleMsmeRegisteredChange}
                   yesLabel="Yes"
                   noLabel="No, skip"
                 />
