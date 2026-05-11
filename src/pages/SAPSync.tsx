@@ -18,11 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ValidationStatus } from '@/components/vendor/ValidationStatus';
-import { VendorDocuments } from '@/components/vendor/VendorDocuments';
+import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
-import { ValidationResult } from '@/types/vendor';
 import {
   Search,
   Eye,
