@@ -1,12 +1,19 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, Lock, XCircle } from 'lucide-react';
+import { CheckCircle2, Lock, Pencil, Upload, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { VerifyButton } from '@/components/vendor/VerifyButton';
+import { ValidationMessage } from '@/components/vendor/ValidationMessage';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
+import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
 import { fuzzyNameMatch } from '@/lib/nameMatch';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
+import { FileUpload } from '@/components/vendor/FileUpload';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -24,18 +31,10 @@ interface BankKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed') => void;
   vendorId?: string;
-  /** Verified GST legal name — used to validate Bank account holder name. */
   gstLegalName?: string;
-  /** Verified PAN holder name — used to validate Bank account holder name. */
   panHolderName?: string;
 }
 
-/**
- * Coerce values that might come back as a Surepass `{ value, confidence }`
- * object (when the admin's response_data_mapping forgets to drill into `.value`)
- * into a plain string. Belt-and-braces — the migration already maps `.value`
- * paths, but this avoids `[object Object]` if config drifts.
- */
 function pickString(v: any): string {
   if (v == null) return '';
   if (typeof v === 'string' || typeof v === 'number') return String(v);
@@ -45,82 +44,27 @@ function pickString(v: any): string {
 
 export function BankKycTab(props: BankKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
+  const { state: manualState, verify: manualVerify } = useProviderVerify();
+  const [mode, setMode] = useState<'manual' | 'upload'>('upload');
+  const [manualAccount, setManualAccount] = useState('');
+  const [manualIfsc, setManualIfsc] = useState('');
   const [holderName, setHolderName] = useState<string>('');
   const [holderCheck, setHolderCheck] =
     useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
 
-  // OCR step: read cancelled cheque via configured BANK_OCR provider.
-  const runBankOcr = async (file: File) => {
-    const r = await callProvider({ providerName: 'BANK_OCR', file });
-    toastKycResult('Bank OCR', r);
-    if (!r.found && !r.message_code) {
-      return { success: false, error: 'Bank OCR provider not configured. Add it in KYC & Validation API Settings.', apiResult: r };
-    }
-    if (!r.ok) {
-      return { success: false, error: r.message || r.message_code || 'Could not read cheque', apiResult: r };
-    }
-    const extracted = mergeOcrExtracted(r.data, r.raw);
-    if (!('account_number' in (r.data || {})) || !('ifsc_code' in (r.data || {}))) {
-      console.warn('[BANK_OCR] response_data_mapping is missing fields; falling back to raw.data', {
-        mappedKeys: Object.keys(r.data || {}),
-        recoveredKeys: Object.keys(extracted),
-      });
-    }
-    return { success: true, extracted, apiResult: r };
-  };
-
-  // Verify step: penny-drop via configured BANK validation provider, then
-  // enrich Bank Name / Branch from the public IFSC lookup since Surepass
-  // cheque OCR doesn't return them.
-  const handleVerify = async (extracted: Record<string, any>) => {
-    const account = pickString(extracted.account_number).replace(/\s+/g, '');
-    const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
-    setHolderCheck('idle');
-    setHolderName('');
-    if (!account || account.length < 8) {
-      props.onStatusChange?.('failed');
-      return { ok: false, message: 'Could not read a valid account number from the cheque.' };
-    }
-    if (!isValidIfsc(ifsc)) {
-      props.onStatusChange?.('failed');
-      return { ok: false, message: 'Could not read a valid 11-character IFSC code from the cheque.' };
-    }
-
-    props.onStatusChange?.('validating');
-
-    // Enrich Bank Name + Branch from public IFSC directory (cheque OCR has neither).
+  // Shared post-verification logic: IFSC enrichment, name matching, and state updates.
+  const finalizePennyDrop = async (
+    account: string,
+    ifsc: string,
+    apiData: Record<string, any>,
+  ): Promise<{ ok: boolean; message: string; apiData: Record<string, any> }> => {
     const ifscDetails = await lookupIfsc(ifsc);
     const enrichedBankName = ifscDetails?.bank;
     const enrichedBranch = ifscDetails?.branch;
 
-    props.onBankDetailsChange({
-      bankAccountNumber: account,
-      ifscCode: ifsc,
-      bankName: enrichedBankName,
-      branchName: enrichedBranch,
-      accountHolderName: undefined,
-    });
-
-    const r = await callProvider({
-      providerName: 'BANK',
-      input: { account, ifsc, id_number: account },
-    });
-    toastKycResult('Bank', r);
-    if (!r.found) {
-      props.onStatusChange?.('failed');
-      return { ok: false, message: r.message || 'Bank validation provider not configured' };
-    }
-    if (!r.ok || !r.data) {
-      props.onStatusChange?.('failed');
-      return { ok: false, message: r.message || 'Bank verification failed', apiData: r.data };
-    }
-    const apiData = r.data;
     const apiName = (pickString(apiData.full_name) || pickString(apiData.name_at_bank)).trim();
     setHolderName(apiName);
 
-    // Compare account holder name against verified GST + PAN names. Both
-    // values come from official registries and are higher-trust than the
-    // user's typed legalName.
     const gstOk = fuzzyNameMatch(apiName, props.gstLegalName);
     const panOk = fuzzyNameMatch(apiName, props.panHolderName);
 
@@ -145,7 +89,6 @@ export function BankKycTab(props: BankKycTabProps) {
         };
       }
     } else if (props.legalName && apiName) {
-      // Fallback to typed legal name if neither GST nor PAN names are present.
       const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
       if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
@@ -166,7 +109,11 @@ export function BankKycTab(props: BankKycTabProps) {
       branchName: pickString(apiData.branch_name) || enrichedBranch,
       accountHolderName: apiName || undefined,
     });
-    props.onVerifiedDetails?.({ ...apiData, bank_name_resolved: pickString(apiData.bank_name) || enrichedBankName, branch_name_resolved: pickString(apiData.branch_name) || enrichedBranch });
+    props.onVerifiedDetails?.({
+      ...apiData,
+      bank_name_resolved: pickString(apiData.bank_name) || enrichedBankName,
+      branch_name_resolved: pickString(apiData.branch_name) || enrichedBranch,
+    });
     props.onStatusChange?.('passed');
     return {
       ok: true,
@@ -175,11 +122,100 @@ export function BankKycTab(props: BankKycTabProps) {
     };
   };
 
+  // OCR step: read cancelled cheque via configured BANK_OCR provider.
+  const runBankOcr = async (file: File) => {
+    const r = await callProvider({ providerName: 'BANK_OCR', file });
+    toastKycResult('Bank OCR', r);
+    if (!r.found && !r.message_code) {
+      return { success: false, error: 'Bank OCR provider not configured. Add it in KYC & Validation API Settings.', apiResult: r };
+    }
+    if (!r.ok) {
+      return { success: false, error: r.message || r.message_code || 'Could not read cheque', apiResult: r };
+    }
+    const extracted = mergeOcrExtracted(r.data, r.raw);
+    return { success: true, extracted, apiResult: r };
+  };
+
+  // OCR-mode verify
+  const handleOcrVerify = async (extracted: Record<string, any>) => {
+    const account = pickString(extracted.account_number).replace(/\s+/g, '');
+    const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
+    setHolderCheck('idle');
+    setHolderName('');
+    if (!account || account.length < 8) {
+      props.onStatusChange?.('failed');
+      return { ok: false, message: 'Could not read a valid account number from the cheque. Switch to manual entry to continue.' };
+    }
+    if (!isValidIfsc(ifsc)) {
+      props.onStatusChange?.('failed');
+      return { ok: false, message: 'Could not read a valid 11-character IFSC code from the cheque. Switch to manual entry to continue.' };
+    }
+
+    props.onStatusChange?.('validating');
+    props.onBankDetailsChange({
+      bankAccountNumber: account,
+      ifscCode: ifsc,
+      accountHolderName: undefined,
+    });
+
+    const r = await callProvider({
+      providerName: 'BANK',
+      input: { account, ifsc, id_number: account },
+    });
+    toastKycResult('Bank', r);
+    if (!r.found) {
+      props.onStatusChange?.('failed');
+      return { ok: false, message: r.message || 'Bank validation provider not configured' };
+    }
+    if (!r.ok || !r.data) {
+      props.onStatusChange?.('failed');
+      return { ok: false, message: r.message || 'Bank verification failed', apiData: r.data };
+    }
+    return finalizePennyDrop(account, ifsc, r.data);
+  };
+
+  // Manual-mode verify
+  const handleManualVerify = async () => {
+    const account = manualAccount.replace(/\s+/g, '');
+    const ifsc = manualIfsc.toUpperCase().trim();
+    setHolderCheck('idle');
+    setHolderName('');
+    await manualVerify({
+      providerName: 'BANK',
+      label: 'Bank',
+      input: { account, ifsc, id_number: account },
+      validate: (data) => {
+        // synchronous validate runs before finalize; we update state via finalize below
+        return { ok: true, message: '', data };
+      },
+    });
+    // useProviderVerify already toasted. Now run shared finalize.
+    if (manualState.status === 'failed') return;
+    props.onStatusChange?.('validating');
+    props.onBankDetailsChange({
+      bankAccountNumber: account,
+      ifscCode: ifsc,
+      accountHolderName: undefined,
+    });
+    const r = await callProvider({
+      providerName: 'BANK',
+      input: { account, ifsc, id_number: account },
+    });
+    if (!r.ok || !r.data) {
+      props.onStatusChange?.('failed');
+      return;
+    }
+    await finalizePennyDrop(account, ifsc, r.data);
+  };
+
+  const canManualVerify =
+    manualAccount.replace(/\s+/g, '').length >= 8 && isValidIfsc(manualIfsc);
+
   return (
     <div className="space-y-4">
       <Alert>
         <AlertDescription className="text-sm">
-          Upload a clear image of your cancelled cheque. We'll read the account number and IFSC, derive Bank Name and Branch from the IFSC directory, then verify via penny-drop. Manual entry is disabled.
+          Upload a cancelled cheque to auto-read the account number and IFSC, or switch to manual entry if OCR fails. Both flows verify the account via the configured Penny-Drop API.
         </AlertDescription>
       </Alert>
 
@@ -198,17 +234,72 @@ export function BankKycTab(props: BankKycTabProps) {
         </div>
       )}
 
-      <OcrUploadAndVerify
-        documentType="cheque"
-        fileLabel="Cancelled Cheque *"
-        currentFile={props.cancelledChequeFile}
-        onFileChange={props.onCancelledChequeFileChange}
-        runOcr={runBankOcr}
-        onVerifyExtracted={handleVerify}
-        apiLabel="Bank"
-        onVerified={() => {}}
-        vendorId={props.vendorId}
-      />
+      <Tabs value={mode} onValueChange={(v) => setMode(v as 'manual' | 'upload')} className="space-y-4">
+        <TabsList className="grid grid-cols-2 max-w-sm">
+          <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-2" />Upload cheque</TabsTrigger>
+          <TabsTrigger value="manual"><Pencil className="h-3.5 w-3.5 mr-2" />Enter manually</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="upload" className="space-y-3">
+          <OcrUploadAndVerify
+            documentType="cheque"
+            fileLabel="Cancelled Cheque *"
+            currentFile={props.cancelledChequeFile}
+            onFileChange={props.onCancelledChequeFileChange}
+            runOcr={runBankOcr}
+            onVerifyExtracted={handleOcrVerify}
+            apiLabel="Bank"
+            onVerified={() => {}}
+            vendorId={props.vendorId}
+          />
+        </TabsContent>
+
+        <TabsContent value="manual" className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="manualAccount">Account Number *</Label>
+              <Input
+                id="manualAccount"
+                value={manualAccount}
+                onChange={(e) => setManualAccount(e.target.value.replace(/\s+/g, ''))}
+                placeholder="e.g. 50100123456789"
+                className="font-mono"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="manualIfsc">IFSC Code *</Label>
+              <Input
+                id="manualIfsc"
+                value={manualIfsc}
+                onChange={(e) => setManualIfsc(e.target.value.toUpperCase())}
+                placeholder="e.g. HDFC0001234"
+                maxLength={11}
+                className="font-mono uppercase"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Verifies via the configured Penny-Drop API (KYC API Settings).
+            </p>
+            <VerifyButton
+              onClick={handleManualVerify}
+              state={manualState}
+              disabled={!canManualVerify}
+            />
+          </div>
+          <ValidationMessage state={manualState} />
+
+          <FileUpload
+            label="Cancelled Cheque / Bank Proof (optional)"
+            accept=".pdf,.jpg,.jpeg,.png"
+            documentType="cheque"
+            onFileSelect={props.onCancelledChequeFileChange}
+            currentFile={props.cancelledChequeFile}
+            vendorId={props.vendorId}
+          />
+        </TabsContent>
+      </Tabs>
 
       {holderCheck !== 'idle' && holderName && (
         <div

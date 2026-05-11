@@ -280,7 +280,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
 
           <FileUpload
             label="Signed MSME Self-Declaration *"
-            accept=".pdf,.jpg,.jpeg,.png"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
             documentType="msme_self_declaration"
             onFileSelect={(f) => props.onMsmeSelfDeclarationFileChange?.(f)}
             currentFile={props.msmeSelfDeclarationFile ?? null}
