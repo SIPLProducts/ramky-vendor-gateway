@@ -781,11 +781,27 @@ export function DocumentVerificationStep({
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: ocrRes.error || "Could not read document" });
+      if (kind === "cheque") {
+        openBankManualPopup(
+          chequeTargetRef.current,
+          ocrRes.error || "We couldn't read your cheque. Please enter your bank details manually.",
+        );
+      }
       return;
     }
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      if (kind === "cheque") {
+        const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
+        const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
+        openBankManualPopup(
+          chequeTargetRef.current,
+          "We couldn't read your cheque clearly. Please enter your bank details manually.",
+          acc,
+          ifsc,
+        );
+      }
       return;
     }
     setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
@@ -799,17 +815,13 @@ export function DocumentVerificationStep({
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
       } else if (kind === "cheque") {
-        // Title is derived from structured upstream code/reason — body is the
-        // raw upstream message verbatim. No hardcoded copy.
-        const code = (v as any).messageCode || (v as any).reason;
-        let title = "Bank verification failed";
-        if (code === "bank_rate_limited" || code === "rate_limited") {
-          title = "Bank verification rate limited";
-        } else if (/Account Holder Name does not match/i.test(msg)) {
-          title = "Account Holder Name mismatch";
-        }
-        setMismatchDialog({ open: true, title, message: msg });
+        // For ANY cheque/penny-drop failure (rate-limit, OCR mismatch,
+        // upstream 500, account-holder mismatch) — let the vendor enter
+        // bank details manually and re-verify via the configured BANK API.
+        const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
+        const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
+        openBankManualPopup(chequeTargetRef.current, msg, acc, ifsc);
       }
       return;
     }
