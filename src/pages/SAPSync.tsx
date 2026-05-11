@@ -18,11 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ValidationStatus } from '@/components/vendor/ValidationStatus';
-import { VendorDocuments } from '@/components/vendor/VendorDocuments';
+import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
-import { ValidationResult } from '@/types/vendor';
 import {
   Search,
   Eye,
@@ -121,55 +118,7 @@ export default function SAPSync() {
     }
   };
 
-  // Helper function to map vendor verification status columns to ValidationResult format
-  const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
-    if (!vendor) return [];
 
-    const vendorData = vendor as VendorRow & {
-      gst_verification_status?: string;
-      pan_verification_status?: string;
-      bank_verification_status?: string;
-      msme_verification_status?: string;
-      name_match_verification_status?: string;
-    };
-
-    return [
-      {
-        type: 'gst' as const,
-        status: (vendorData.gst_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.gst_verification_status === 'passed' ? 'GST verified' : 'GST verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'pan' as const,
-        status: (vendorData.pan_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.pan_verification_status === 'passed' ? 'PAN verified' : 'PAN verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'bank' as const,
-        status: (vendorData.bank_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.bank_verification_status === 'passed' ? 'Bank account verified' : 'Bank verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'msme' as const,
-        status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
-          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'name_match' as const,
-        status: (vendorData.name_match_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.name_match_verification_status === 'passed' ? 'Name match verified' : 'Name match pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-    ];
-  };
-
-  // Get validations from vendor's verification status columns
-  const mappedValidations: ValidationResult[] = getValidationsFromVendor(selectedVendor);
 
   return (
     <div className="space-y-8">
@@ -280,299 +229,24 @@ export default function SAPSync() {
       </div>
 
       {/* Vendor Details Dialog with Sync Button */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              {selectedVendor?.legal_name}
-            </DialogTitle>
-            <DialogDescription>
-              Review vendor details before syncing to SAP
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedVendor && (
-            <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
-                <TabsTrigger value="details" className="rounded-lg">All Details</TabsTrigger>
-                <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
-                <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
-                <ScrollArea className="h-[50vh] pr-4">
-                  <div className="space-y-6">
-                    {/* Organization Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <Building2 className="h-4 w-4" />
-                        Organization Details
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Legal Name</p>
-                          <p className="font-medium">{selectedVendor.legal_name || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Trade Name</p>
-                          <p className="font-medium">{selectedVendor.trade_name || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Industry Type</p>
-                          <p className="font-medium">{selectedVendor.industry_type || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Organization Type</p>
-                          <p className="font-medium">{(selectedVendor as any).organization_type || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Ownership Type</p>
-                          <p className="font-medium">{(selectedVendor as any).ownership_type || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Entity Type</p>
-                          <p className="font-medium">{selectedVendor.entity_type || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Address Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <MapPin className="h-4 w-4" />
-                        Address Details
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Registered Address</p>
-                          <p className="font-medium">{selectedVendor.registered_address || '-'}</p>
-                          <p className="text-muted-foreground text-xs">{selectedVendor.registered_city}, {selectedVendor.registered_state} - {selectedVendor.registered_pincode}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Communication Address</p>
-                          <p className="font-medium">{selectedVendor.communication_address || selectedVendor.registered_address || '-'}</p>
-                          <p className="text-muted-foreground text-xs">{selectedVendor.communication_city || selectedVendor.registered_city}, {selectedVendor.communication_state || selectedVendor.registered_state}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Contact Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <User className="h-4 w-4" />
-                        Contact Details
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Primary Contact</p>
-                          <p className="font-medium">{selectedVendor.primary_contact_name || '-'}</p>
-                          <p className="text-xs text-muted-foreground">{selectedVendor.primary_designation}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Contact Info</p>
-                          <p className="font-medium flex items-center gap-1"><Phone className="h-3 w-3" /> {selectedVendor.primary_phone || '-'}</p>
-                          <p className="font-medium flex items-center gap-1"><Mail className="h-3 w-3" /> {selectedVendor.primary_email || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Statutory Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <FileText className="h-4 w-4" />
-                        Statutory Details
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">GSTIN</p>
-                          <p className="font-mono font-medium">{selectedVendor.gstin || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">PAN</p>
-                          <p className="font-mono font-medium">{selectedVendor.pan || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">MSME Number</p>
-                          <p className="font-mono font-medium">{selectedVendor.msme_number || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">MSME Category</p>
-                          <p className="font-medium capitalize">{selectedVendor.msme_category || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Firm Registration No</p>
-                          <p className="font-medium">{(selectedVendor as any).firm_registration_no || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">IEC No</p>
-                          <p className="font-medium">{(selectedVendor as any).iec_no || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Bank Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <Landmark className="h-4 w-4" />
-                        Bank Details
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Bank Name</p>
-                          <p className="font-medium">{selectedVendor.bank_name || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Branch</p>
-                          <p className="font-medium">{(selectedVendor as any).bank_branch_name || selectedVendor.branch_name || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Account Type</p>
-                          <p className="font-medium capitalize">{selectedVendor.account_type || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Account Number</p>
-                          <p className="font-mono font-medium">{selectedVendor.account_number || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">IFSC Code</p>
-                          <p className="font-mono font-medium">{selectedVendor.ifsc_code || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">MICR Code</p>
-                          <p className="font-mono font-medium">{(selectedVendor as any).micr_code || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Financial Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <CreditCard className="h-4 w-4" />
-                        Financial Details
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Turnover Year 1</p>
-                          <p className="font-medium">₹ {selectedVendor.turnover_year1?.toLocaleString('en-IN') || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Turnover Year 2</p>
-                          <p className="font-medium">₹ {selectedVendor.turnover_year2?.toLocaleString('en-IN') || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Turnover Year 3</p>
-                          <p className="font-medium">₹ {selectedVendor.turnover_year3?.toLocaleString('en-IN') || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Credit Period Expected</p>
-                          <p className="font-medium">{selectedVendor.credit_period_expected ? `${selectedVendor.credit_period_expected} days` : '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Approval Info */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <Calendar className="h-4 w-4" />
-                        Approval Timeline
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Finance Reviewed At</p>
-                          <p className="font-medium">{selectedVendor.finance_reviewed_at ? new Date(selectedVendor.finance_reviewed_at).toLocaleString('en-IN') : '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Purchase Reviewed At</p>
-                          <p className="font-medium">{selectedVendor.purchase_reviewed_at ? new Date(selectedVendor.purchase_reviewed_at).toLocaleString('en-IN') : '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Review Comments */}
-                    {(selectedVendor.finance_comments || selectedVendor.purchase_comments) && (
-                      <>
-                        <Separator />
-                        <div className="space-y-3">
-                          <h4 className="font-semibold flex items-center gap-2 text-primary">
-                            <MessageSquare className="h-4 w-4" />
-                            Review Comments
-                          </h4>
-                          <div className="grid grid-cols-1 gap-4 text-sm">
-                            {selectedVendor.finance_comments && (
-                              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
-                                  {selectedVendor.finance_reviewed_at && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {new Date(selectedVendor.finance_reviewed_at).toLocaleDateString('en-IN')}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-amber-900 dark:text-amber-100">{selectedVendor.finance_comments}</p>
-                              </div>
-                            )}
-                            {selectedVendor.purchase_comments && (
-                              <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
-                                  {selectedVendor.purchase_reviewed_at && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {new Date(selectedVendor.purchase_reviewed_at).toLocaleDateString('en-IN')}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-teal-900 dark:text-teal-100">{selectedVendor.purchase_comments}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-
-              <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
-                <VendorDocuments vendorId={selectedVendor.id} />
-              </TabsContent>
-
-              <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
-                <ValidationStatus validations={mappedValidations} />
-              </TabsContent>
-            </Tabs>
-          )}
-
-          <DialogFooter className="gap-2 mt-4 pt-4 border-t">
-            <Button variant="outline" onClick={() => setShowDetails(false)} className="rounded-xl">
-              Close
-            </Button>
-            <Button
-              className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
-              onClick={() => { if (selectedVendor) { setShowDetails(false); openSapFieldsDialog(selectedVendor); } }}
-              disabled={sapSync.isPending}
-            >
-              {sapSync.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
-              ) : (
-                <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <VendorReviewDialog
+        vendorId={selectedVendor?.id ?? null}
+        open={showDetails}
+        onOpenChange={setShowDetails}
+        footerExtra={
+          <Button
+            className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
+            onClick={() => { if (selectedVendor) { setShowDetails(false); openSapFieldsDialog(selectedVendor); } }}
+            disabled={sapSync.isPending}
+          >
+            {sapSync.isPending ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
+            ) : (
+              <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
+            )}
+          </Button>
+        }
+      />
 
       {/* SAP Sync Result Dialog */}
       <Dialog open={showSapResultDialog} onOpenChange={(open) => {
