@@ -1,37 +1,54 @@
-# Reuse SAP Sync vendor popup in approval-stage View
+# Plan: Self-declaration upload error & Bank manual fallback
 
-The SAP Sync screen shows a rich popup with three tabs — **All Details**, **Documents**, **Validations** — when the reviewer clicks **View**. The same popup should open from the **View** button on every approval-stage screen (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office). Today those screens use a much simpler dialog with only Overview + Bank + Documents.
+## Point 1 — Fix "mime type … wordprocessingml.document is not supported"
 
-## What to build
+**Root cause:** The `vendor-documents` storage bucket only allows `application/pdf`, `image/jpeg`, `image/png`, `image/jpg`. The MSME (and GST) self-declaration template is an HTML file the user fills/saves — many users save it as **.docx** from Word, which the bucket rejects.
 
-1. **Extract a shared component** `src/components/vendor/VendorReviewDialog.tsx`
-   - Inputs: `vendorId: string | null`, `open: boolean`, `onOpenChange(open)`, optional `footerExtra?: ReactNode` (so SAP Sync can still inject its **Prepare & Sync** button).
-   - Internally:
-     - Loads the full vendor row via `supabase.from('vendors').select('*').eq('id', vendorId)` (same fields the SAP Sync popup reads).
-     - Renders the exact same header (`Building2` icon + legal name + "Review vendor details before syncing to SAP" subtitle — wording stays the same so behaviour matches the screenshots).
-     - Renders the existing 3-tab layout copied from `SAPSync.tsx` lines 296–555:
-       - **All Details** — Organization, Address, Contact, Statutory, Bank, Financial, Approval Timeline blocks.
-       - **Documents** — `<VendorDocuments vendorId={vendor.id} />`.
-       - **Validations** — `<ValidationStatus validations={mappedValidations} />` using the same `getValidationsFromVendor` helper (also moved into this component).
-     - Footer: always shows **Close**; appends `footerExtra` when provided.
+**Fix (migration):** Extend `storage.buckets.allowed_mime_types` for `vendor-documents` to also accept:
+- `application/msword` (.doc)
+- `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx)
+- `text/html` (.html — the template itself)
 
-2. **Refactor `src/pages/SAPSync.tsx`**
-   - Remove the inline 3-tab JSX and `getValidationsFromVendor` helper.
-   - Use `<VendorReviewDialog vendorId={selectedVendor?.id ?? null} open={showDetails} onOpenChange={setShowDetails} footerExtra={<PrepareAndSyncButton/>} />`.
-   - Behaviour and styling stay identical to the current screen.
+**Fix (UI):** Update the self-declaration `FileUpload` `accept` props in:
+- `MsmeKycTab.tsx` (signed MSME self-declaration)
+- The equivalent GST self-declaration upload (in `GstKycTab.tsx`)
 
-3. **Update `src/components/approvals/StageApprovalView.tsx`**
-   - Replace the existing simple view dialog (lines 222–283) with `<VendorReviewDialog vendorId={viewVendor?.id ?? null} open={!!viewVendor} onOpenChange={(o) => !o && setViewVendor(null)} />`.
-   - Drop the now-unused `VendorDetails` interface, `openView` fetch logic, and related state — pass the vendor id directly from the row click. The dialog handles its own loading/fetching.
-   - This automatically updates all five approval pages (`ScmManagerApproval`, `ScmHeadApproval`, `Finance1Approval`, `Finance2Approval`, `CeoApproval`) since they all render through `StageApprovalView`.
+from `.pdf,.jpg,.jpeg,.png` → `.pdf,.jpg,.jpeg,.png,.doc,.docx`.
+
+Other document fields (PAN card, cheque, GST cert, MSME cert) keep the existing PDF/image-only accept list, since OCR only handles those.
+
+## Point 2 — Manual entry fallback on the Bank tab
+
+Today `BankKycTab.tsx` only supports the OCR cheque flow (manual entry is explicitly disabled per the alert). When OCR fails or the cheque is unreadable, the vendor is stuck.
+
+**Add a tab switcher (mirroring MSME/PAN/GST):**
+
+```text
+[ Enter manually ]   [ Upload cancelled cheque ]
+```
+
+- **Manual mode**: Two inputs — Account Number, IFSC (uppercase, 11-char). A single **Verify** button calls the same configured `BANK` provider (penny-drop) via `useConfiguredKycApi.callProvider({ providerName: 'BANK', input: { account, ifsc, id_number: account } })`. On success it runs the same IFSC enrichment + GST/PAN name match logic already in `handleVerify`. The cancelled-cheque file becomes optional in this mode (still recommended; vendor may upload a passbook/statement PDF as supporting proof).
+- **Upload mode**: unchanged (existing OCR + verify flow).
+
+**Refactor:** Extract the post-verification logic in `handleVerify` (IFSC lookup, name match, status updates, `onBankDetailsChange`) into a shared `runBankPennyDrop(account, ifsc)` helper used by both modes.
+
+**UI alert** updated: "Upload a cancelled cheque to auto-read account & IFSC, or switch to manual entry if OCR fails — both flows verify via penny-drop."
+
+## Files touched
+
+- `supabase/migrations/<new>.sql` — update `vendor-documents` bucket allowed_mime_types
+- `src/components/vendor/kyc/MsmeKycTab.tsx` — broaden self-declaration accept
+- `src/components/vendor/kyc/GstKycTab.tsx` — broaden self-declaration accept
+- `src/components/vendor/kyc/BankKycTab.tsx` — add manual/upload tabs, extract helper
 
 ## Out of scope
 
-- No backend / RLS / data changes.
-- No changes to the approve / reject action dialog.
-- No changes to the SAP sync flow itself — only the popup is shared.
+- No changes to OCR providers, penny-drop edge function, or KYC API config screens.
+- No name-match logic changes.
+- No backend RLS changes.
 
 ## Verification
 
-- Open each of the five approval pages → click **View** on a pending vendor → confirm the 3-tab popup opens with All Details, Documents, Validations populated and looks identical to the SAP Sync popup (minus the Prepare & Sync button).
-- Open SAP Sync → click **View** → confirm nothing visually changed and Prepare & Sync still works.
+1. Re-upload the .docx MSME self-declaration → save succeeds, no mime error toast.
+2. On Bank tab, switch to **Enter manually** → type a valid account + IFSC → click Verify → see the same green "Account Holder Name verified with …" banner as the OCR flow.
+3. Upload-cheque flow still works unchanged.
