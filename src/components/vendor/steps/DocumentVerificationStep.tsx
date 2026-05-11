@@ -2376,6 +2376,78 @@ export function DocumentVerificationStep({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={bankPopup.open}
+        onOpenChange={(o) => !bankPopup.submitting && setBankPopup((p) => ({ ...p, open: o }))}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bank verification — enter details manually</DialogTitle>
+            <DialogDescription>
+              {bankPopup.reason || "Please enter your bank account details to verify via Penny-Drop."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="bankPopupAccount">Account Number *</Label>
+              <Input
+                id="bankPopupAccount"
+                value={bankPopup.account}
+                onChange={(e) =>
+                  setBankPopup((p) => ({ ...p, account: e.target.value.replace(/\s+/g, "") }))
+                }
+                placeholder="e.g. 50100123456789"
+                className="font-mono"
+                autoFocus
+                disabled={bankPopup.submitting}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="bankPopupIfsc">IFSC Code *</Label>
+              <Input
+                id="bankPopupIfsc"
+                value={bankPopup.ifsc}
+                onChange={(e) =>
+                  setBankPopup((p) => ({ ...p, ifsc: e.target.value.toUpperCase() }))
+                }
+                placeholder="e.g. HDFC0001234"
+                maxLength={11}
+                className="font-mono uppercase"
+                disabled={bankPopup.submitting}
+              />
+            </div>
+            {bankPopup.error && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-sm text-destructive">
+                <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span className="break-words">{bankPopup.error}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBankPopup((p) => ({ ...p, open: false }))}
+              disabled={bankPopup.submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleBankPopupSubmit}
+              disabled={
+                bankPopup.submitting ||
+                bankPopup.account.replace(/\s+/g, "").length < 8 ||
+                !isValidIfsc(bankPopup.ifsc)
+              }
+            >
+              {bankPopup.submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
