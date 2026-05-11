@@ -1044,6 +1044,11 @@ export function DocumentVerificationStep({
 
   const handleBankUpload = (file: File) => {
     chequeTargetRef.current = "primary";
+    // Clear any previously fetched/auto-filled bank data so a fresh upload
+    // never inherits stale branch / address values from the prior cheque.
+    setBankDoc(idleDoc);
+    setBankBranchAutoFilled(false);
+    if (!bankAddressTouchedRef.current) setBankBranchAddress("");
     return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
@@ -1096,6 +1101,8 @@ export function DocumentVerificationStep({
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
   const handleBankUpload2 = (file: File) => {
     chequeTargetRef.current = "secondary";
+    setBankDoc2(idleDoc);
+    setBankBranchAutoFilled2(false);
     return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
       setBankDoc2((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
