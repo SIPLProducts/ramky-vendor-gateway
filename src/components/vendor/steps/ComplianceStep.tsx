@@ -43,6 +43,7 @@ const schema = z.object({
   isMsmeRegistered: z.boolean(),
   msmeNumber: z.string().optional(),
   msmeCategory: z.enum(['micro', 'small', 'medium', '']),
+  msmeDeclarationReason: z.string().optional(),
   msmeEnterpriseName: z.string().optional(),
   msmeEnterpriseType: z.string().optional(),
   msmeClassificationYear: z.string().optional(),
@@ -106,6 +107,7 @@ export function ComplianceStep({
   const [gstCertificateFile, setGstCertificateFile] = useState<File | null>(data.gstCertificateFile);
   const [panCardFile, setPanCardFile] = useState<File | null>(data.panCardFile);
   const [msmeCertificateFile, setMsmeCertificateFile] = useState<File | null>(data.msmeCertificateFile);
+  const [msmeSelfDeclarationFile, setMsmeSelfDeclarationFile] = useState<File | null>(data.msmeSelfDeclarationFile ?? null);
   const [gstSelfDeclarationFile, setGstSelfDeclarationFile] = useState<File | null>(data.gstSelfDeclarationFile);
   const [cancelledChequeFile, setCancelledChequeFile] = useState<File | null>(null);
 
@@ -149,7 +151,7 @@ export function ComplianceStep({
   const isStepValid =
     (statuses.gst === 'passed' || statuses.gst === 'na' || (!isGstRegistered && !!gstSelfDeclarationFile)) &&
     statuses.pan === 'passed' &&
-    (statuses.msme === 'passed' || statuses.msme === 'na' || !isMsmeRegistered) &&
+    (statuses.msme === 'passed' || statuses.msme === 'na' || (!isMsmeRegistered && !!msmeSelfDeclarationFile)) &&
     statuses.bank === 'passed';
 
   useEffect(() => {
@@ -278,6 +280,7 @@ export function ComplianceStep({
       gstCertificateFile,
       panCardFile,
       msmeCertificateFile,
+      msmeSelfDeclarationFile,
       gstSelfDeclarationFile,
       bankAccountNumber,
       ifscCode,
@@ -383,6 +386,10 @@ export function ComplianceStep({
             legalName={legalName}
             msmeCertificateFile={msmeCertificateFile}
             onMsmeCertificateFileChange={setMsmeCertificateFile}
+            msmeSelfDeclarationFile={msmeSelfDeclarationFile}
+            onMsmeSelfDeclarationFileChange={setMsmeSelfDeclarationFile}
+            msmeDeclarationReason={watch('msmeDeclarationReason' as any) || ''}
+            onMsmeDeclarationReasonChange={(v) => setValue('msmeDeclarationReason' as any, v)}
             onVerifiedDetails={handleMsmeVerified}
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}

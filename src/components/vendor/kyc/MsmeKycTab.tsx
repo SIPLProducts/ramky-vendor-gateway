@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { CheckCircle2, Pencil, Upload, XCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { CheckCircle2, Download, Pencil, Upload, XCircle } from 'lucide-react';
+import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { ApiResponseDetails } from './ApiResponseDetails';
@@ -25,6 +29,10 @@ interface MsmeKycTabProps {
   legalName?: string;
   msmeCertificateFile: File | null;
   onMsmeCertificateFileChange: (f: File | null) => void;
+  msmeSelfDeclarationFile?: File | null;
+  onMsmeSelfDeclarationFileChange?: (f: File | null) => void;
+  msmeDeclarationReason?: string;
+  onMsmeDeclarationReasonChange?: (v: string) => void;
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed' | 'na') => void;
   vendorId?: string;
@@ -45,7 +53,10 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
-    props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
+    const status = !props.isMsmeRegistered
+      ? (props.msmeSelfDeclarationFile ? 'passed' : 'na')
+      : (state.status as any);
+    props.onStatusChange(status);
   }
 
   // Coerce Surepass `{ value, confidence }` shape to a plain string.
@@ -239,6 +250,43 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
             />
           </TabsContent>
         </Tabs>
+      )}
+
+      {!props.isMsmeRegistered && (
+        <div className="space-y-4">
+          <Alert>
+            <AlertDescription>
+              Please download the MSME Self-Declaration form, sign it, and upload the signed copy below.
+            </AlertDescription>
+          </Alert>
+
+          <Button asChild type="button" variant="outline" size="sm">
+            <a href="/templates/msme-self-declaration.html" target="_blank" rel="noopener noreferrer">
+              <Download className="h-4 w-4 mr-2" />
+              Download MSME Self-Declaration Template
+            </a>
+          </Button>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="msmeDeclarationReason">Reason for non-registration (optional)</Label>
+            <Textarea
+              id="msmeDeclarationReason"
+              value={props.msmeDeclarationReason || ''}
+              onChange={(e) => props.onMsmeDeclarationReasonChange?.(e.target.value)}
+              placeholder="e.g. Turnover below MSME threshold limit"
+              rows={2}
+            />
+          </div>
+
+          <FileUpload
+            label="Signed MSME Self-Declaration *"
+            accept=".pdf,.jpg,.jpeg,.png"
+            documentType="msme_self_declaration"
+            onFileSelect={(f) => props.onMsmeSelfDeclarationFileChange?.(f)}
+            currentFile={props.msmeSelfDeclarationFile ?? null}
+            vendorId={props.vendorId}
+          />
+        </div>
       )}
 
       {props.isMsmeRegistered && enterpriseCheck !== 'idle' && enterpriseName && (
