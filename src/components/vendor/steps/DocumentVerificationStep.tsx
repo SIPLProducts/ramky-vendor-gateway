@@ -1559,9 +1559,34 @@ export function DocumentVerificationStep({
                 />
 
                 {isMsmeRegistered === false && (
-                  <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-success" />
-                    Skipped — not MSME registered
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">MSME Self-Declaration</p>
+                        <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
+                      </div>
+                      <a
+                        href="/templates/msme-self-declaration.html"
+                        download
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Template
+                      </a>
+                      <InlineFilePicker
+                        file={msmeDeclarationFile}
+                        onPick={setMsmeDeclarationFile}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                      />
+                    </div>
+
+                    <FormField
+                      label="Reason for non-registration"
+                      value={msmeDeclarationReason}
+                      onChange={setMsmeDeclarationReason}
+                      placeholder="e.g. Turnover below MSME threshold limit"
+                    />
                   </div>
                 )}
 
