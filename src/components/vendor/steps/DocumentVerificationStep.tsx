@@ -825,13 +825,16 @@ export function DocumentVerificationStep({
     return undefined;
   }, [isGstRegistered, gstDoc, manualLegalName]);
 
-  const handleGstUpload = (file: File) =>
-    runDocFlow("gst", file, setGstDoc, () => gstDoc.ocrData?.legal_name).then(() => {
+  const handleGstUpload = (file: File) => {
+    // Clear stale address up front so a previous upload's value can never
+    // bleed through if the new registry response is missing the field.
+    setEditablePrincipalPlace("");
+    return runDocFlow("gst", file, setGstDoc, () => gstDoc.ocrData?.legal_name).then(() => {
       setGstDoc((prev) => {
         // Registry response is the source of truth — always overwrite the
         // editable Principal Place of Business with the API-returned address
         // when verification succeeded. Fall back to OCR only if the API has
-        // no address and the field is currently empty.
+        // no address.
         const apiAddress =
           prev.apiData?.normalized?.principal_place_of_business ||
           prev.apiData?.normalized?.address;
@@ -839,11 +842,12 @@ export function DocumentVerificationStep({
           setEditablePrincipalPlace(apiAddress);
         } else {
           const ocrAddress = prev.ocrData?.principal_place_of_business || prev.ocrData?.address;
-          if (ocrAddress && !editablePrincipalPlace) setEditablePrincipalPlace(ocrAddress);
+          if (ocrAddress) setEditablePrincipalPlace(ocrAddress);
         }
         return prev;
       });
     });
+  };
 
   const handlePanUpload = (file: File) =>
     runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
