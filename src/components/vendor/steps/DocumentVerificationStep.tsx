@@ -276,6 +276,8 @@ export function DocumentVerificationStep({
 
   const [gstDeclarationFile, setGstDeclarationFile] = useState<File | null>(initialData?.gstSelfDeclarationFile ?? null);
   const [gstDeclarationReason, setGstDeclarationReason] = useState<string>(initialData?.gstDeclarationReason ?? "");
+  const [msmeDeclarationFile, setMsmeDeclarationFile] = useState<File | null>(initialData?.msmeSelfDeclarationFile ?? null);
+  const [msmeDeclarationReason, setMsmeDeclarationReason] = useState<string>(initialData?.msmeDeclarationReason ?? "");
   const [manualLegalName, setManualLegalName] = useState<string>(initialData?.manualLegalName ?? "");
   const [manualAddress, setManualAddress] = useState({
     address: initialData?.manualAddress?.address ?? "",
