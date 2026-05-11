@@ -98,10 +98,15 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
             </>
           )}
           <DataRow label="MSME Registered" value={data.statutory?.isMsmeRegistered ? 'Yes' : 'No'} />
-          {data.statutory?.isMsmeRegistered && (
+          {data.statutory?.isMsmeRegistered ? (
             <>
               <DataRow label="MSME Category" value={data.statutory?.msmeCategory} />
               <DataRow label="MSME Number" value={data.statutory?.msmeNumber} />
+            </>
+          ) : (
+            <>
+              <DataRow label="MSME Self-Declaration" value={data.statutory?.msmeSelfDeclarationFile ? 'Uploaded ✓' : 'Pending upload'} />
+              <DataRow label="Reason" value={data.statutory?.msmeDeclarationReason} />
             </>
           )}
         </div>
