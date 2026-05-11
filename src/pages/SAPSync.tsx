@@ -118,55 +118,7 @@ export default function SAPSync() {
     }
   };
 
-  // Helper function to map vendor verification status columns to ValidationResult format
-  const getValidationsFromVendor = (vendor: VendorRow | null): ValidationResult[] => {
-    if (!vendor) return [];
 
-    const vendorData = vendor as VendorRow & {
-      gst_verification_status?: string;
-      pan_verification_status?: string;
-      bank_verification_status?: string;
-      msme_verification_status?: string;
-      name_match_verification_status?: string;
-    };
-
-    return [
-      {
-        type: 'gst' as const,
-        status: (vendorData.gst_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.gst_verification_status === 'passed' ? 'GST verified' : 'GST verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'pan' as const,
-        status: (vendorData.pan_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.pan_verification_status === 'passed' ? 'PAN verified' : 'PAN verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'bank' as const,
-        status: (vendorData.bank_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.bank_verification_status === 'passed' ? 'Bank account verified' : 'Bank verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'msme' as const,
-        status: (vendorData.msme_verification_status || 'skipped') as ValidationResult['status'],
-        message: vendorData.msme_verification_status === 'passed' ? 'MSME verified' :
-          vendorData.msme_verification_status === 'skipped' ? 'MSME not provided' : 'MSME verification pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-      {
-        type: 'name_match' as const,
-        status: (vendorData.name_match_verification_status || 'pending') as ValidationResult['status'],
-        message: vendorData.name_match_verification_status === 'passed' ? 'Name match verified' : 'Name match pending',
-        timestamp: vendor.submitted_at || vendor.created_at,
-      },
-    ];
-  };
-
-  // Get validations from vendor's verification status columns
-  const mappedValidations: ValidationResult[] = getValidationsFromVendor(selectedVendor);
 
   return (
     <div className="space-y-8">
