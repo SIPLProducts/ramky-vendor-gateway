@@ -22,12 +22,12 @@ function buildHtml(opts: {
   primaryEmail: string;
   submittedAt: string;
   resubmission: boolean;
+  vendorId: string;
+  action: string;
 }) {
-  const { inviterFirstName, vendorName, primaryContact, primaryEmail, submittedAt, resubmission } = opts;
+  const { inviterFirstName, vendorName, primaryContact, primaryEmail, submittedAt, resubmission, vendorId, action } = opts;
   const heading = resubmission ? "Vendor Application Resubmitted" : "Vendor Application Submitted";
-  const intro = resubmission
-    ? `The vendor you invited has <strong>resubmitted</strong> their application with updates. It is now back in Purchase / SCM review.`
-    : `The vendor you invited has <strong>successfully submitted</strong> their registration. It is now in Purchase / SCM review.`;
+  const intro = `Vendor <strong>${vendorName}</strong> has ${action} the registration form successfully on <strong>${submittedAt}</strong>.<br/>Vendor ID: <strong>${vendorId}</strong>`;
   const currentYear = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -146,9 +146,8 @@ serve(async (req) => {
 
     const vendorName = (vendor.legal_name || vendor.trade_name || "Unnamed Vendor").trim();
     const resubmission = !!body.resubmission;
-    const subject = resubmission
-      ? `Vendor "${vendorName}" has resubmitted their application`
-      : `Vendor "${vendorName}" has submitted their application`;
+    const action = resubmission ? "resubmitted" : "submitted";
+    const subject = `Vendor Submitted Registration Form – ${vendorName}`;
 
     const html = buildHtml({
       inviterFirstName,
@@ -157,6 +156,8 @@ serve(async (req) => {
       primaryEmail: vendor.primary_email || "",
       submittedAt,
       resubmission,
+      vendorId: vendor.id,
+      action,
     });
 
     const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-smtp-email", {

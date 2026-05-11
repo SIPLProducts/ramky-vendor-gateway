@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
+import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
 import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import {
   Search,
@@ -53,6 +54,7 @@ export default function SAPSync() {
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
   const [showSapFieldsDialog, setShowSapFieldsDialog] = useState(false);
   const [pendingSyncVendor, setPendingSyncVendor] = useState<VendorRow | null>(null);
   const [sapSyncResult, setSapSyncResult] = useState<any>(null);
@@ -209,6 +211,9 @@ export default function SAPSync() {
                     <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
                       <Eye className="h-4 w-4 mr-2" />View
                     </Button>
+                    <Button variant="outline" className="rounded-xl" onClick={() => setPreviewVendorId(vendor.id)}>
+                      <FileText className="h-4 w-4 mr-2" />Preview
+                    </Button>
                     <Button
                       className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
                       onClick={() => openSapFieldsDialog(vendor)}
@@ -246,6 +251,12 @@ export default function SAPSync() {
             )}
           </Button>
         }
+      />
+
+      <VendorSubmissionPreviewDialog
+        vendorId={previewVendorId}
+        open={!!previewVendorId}
+        onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
       />
 
       {/* SAP Sync Result Dialog */}

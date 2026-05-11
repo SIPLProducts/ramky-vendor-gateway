@@ -864,6 +864,37 @@ export function DocumentVerificationStep({
     [],
   );
 
+  // ---------- Toggle handlers: clear stale data when Yes/No flips ----------
+  const handleGstRegisteredChange = useCallback((next: boolean | null) => {
+    setIsGstRegistered((prev) => {
+      if (prev === next) return prev;
+      // Reset GST verification state regardless of direction so previously
+      // fetched fields/files cannot leak into the new selection's payload.
+      setGstDoc(idleDoc);
+      setEditablePrincipalPlace("");
+      // Clear self-declaration / manual fields when leaving the No path.
+      if (next !== false) {
+        setGstDeclarationFile(null);
+        setGstDeclarationReason("");
+        setManualLegalName("");
+        setManualAddress({ address: "", city: "", state: "", pincode: "" });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleMsmeRegisteredChange = useCallback((next: boolean | null) => {
+    setIsMsmeRegistered((prev) => {
+      if (prev === next) return prev;
+      setMsmeDoc(idleDoc);
+      if (next !== false) {
+        setMsmeDeclarationFile(null);
+        setMsmeDeclarationReason("");
+      }
+      return next;
+    });
+  }, []);
+
   const effectiveLegalName = useMemo(() => {
     if (isGstRegistered === true) return gstDoc.ocrData?.legal_name || gstDoc.apiData?.legalName;
     if (isGstRegistered === false) return manualLegalName;
@@ -1013,6 +1044,11 @@ export function DocumentVerificationStep({
 
   const handleBankUpload = (file: File) => {
     chequeTargetRef.current = "primary";
+    // Clear any previously fetched/auto-filled bank data so a fresh upload
+    // never inherits stale branch / address values from the prior cheque.
+    setBankDoc(idleDoc);
+    setBankBranchAutoFilled(false);
+    if (!bankAddressTouchedRef.current) setBankBranchAddress("");
     return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
@@ -1065,6 +1101,8 @@ export function DocumentVerificationStep({
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
   const handleBankUpload2 = (file: File) => {
     chequeTargetRef.current = "secondary";
+    setBankDoc2(idleDoc);
+    setBankBranchAutoFilled2(false);
     return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
       setBankDoc2((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
@@ -1383,12 +1421,19 @@ export function DocumentVerificationStep({
         bankAddress: bankBranchAddress2,
       };
     }
-    // Lift uploaded files so the parent can persist them in the draft
-    out.gstCertificateFile = gstDoc.file ?? null;
-    out.panCardFile = panDoc.file ?? null;
-    out.msmeCertificateFile = msmeDoc.file ?? null;
-    out.cancelledChequeFile = bankDoc.file ?? null;
-    out.cancelledChequeFile2 = bank2Enabled ? (bankDoc2.file ?? null) : null;
+    // Lift uploaded files so the parent can persist them in the draft.
+    // IMPORTANT: only include a file when the section actually applies to the
+    // current selection AND the doc is verified, so that flipping a Yes/No
+    // toggle or re-uploading a different document never leaves a stale file
+    // reference in the saved payload.
+    out.gstCertificateFile =
+      isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
+    out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
+    out.msmeCertificateFile =
+      isMsmeRegistered === true && msmeDoc.status === "verified" ? (msmeDoc.file ?? null) : null;
+    out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null;
+    out.cancelledChequeFile2 =
+      bank2Enabled && bankDoc2.status === "verified" ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
@@ -1531,7 +1576,7 @@ export function DocumentVerificationStep({
                 <GateRow
                   label="Are you GST registered?"
                   value={isGstRegistered}
-                  onChange={setIsGstRegistered}
+                  onChange={handleGstRegisteredChange}
                   yesLabel="Yes"
                   noLabel="No"
                 />
@@ -1762,7 +1807,7 @@ export function DocumentVerificationStep({
                 <GateRow
                   label="Are you MSME / Udyam registered?"
                   value={isMsmeRegistered}
-                  onChange={setIsMsmeRegistered}
+                  onChange={handleMsmeRegisteredChange}
                   yesLabel="Yes"
                   noLabel="No, skip"
                 />
