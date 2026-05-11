@@ -1011,7 +1011,9 @@ export function DocumentVerificationStep({
     }
   };
 
-  const handleBankUpload = (file: File) =>
+  const handleBankUpload = (file: File) => {
+    chequeTargetRef.current = "primary";
+    return
     runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
