@@ -106,6 +106,7 @@ export function ComplianceStep({
   const [gstCertificateFile, setGstCertificateFile] = useState<File | null>(data.gstCertificateFile);
   const [panCardFile, setPanCardFile] = useState<File | null>(data.panCardFile);
   const [msmeCertificateFile, setMsmeCertificateFile] = useState<File | null>(data.msmeCertificateFile);
+  const [msmeSelfDeclarationFile, setMsmeSelfDeclarationFile] = useState<File | null>(data.msmeSelfDeclarationFile ?? null);
   const [gstSelfDeclarationFile, setGstSelfDeclarationFile] = useState<File | null>(data.gstSelfDeclarationFile);
   const [cancelledChequeFile, setCancelledChequeFile] = useState<File | null>(null);
 
@@ -149,7 +150,7 @@ export function ComplianceStep({
   const isStepValid =
     (statuses.gst === 'passed' || statuses.gst === 'na' || (!isGstRegistered && !!gstSelfDeclarationFile)) &&
     statuses.pan === 'passed' &&
-    (statuses.msme === 'passed' || statuses.msme === 'na' || !isMsmeRegistered) &&
+    (statuses.msme === 'passed' || statuses.msme === 'na' || (!isMsmeRegistered && !!msmeSelfDeclarationFile) || (isMsmeRegistered && false)) &&
     statuses.bank === 'passed';
 
   useEffect(() => {
