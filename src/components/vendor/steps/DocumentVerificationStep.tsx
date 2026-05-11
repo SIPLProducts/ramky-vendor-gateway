@@ -1087,6 +1087,8 @@ export function DocumentVerificationStep({
         return prev;
       });
     });
+  };
+
 
   useEffect(() => {
     if (!bank2Enabled) return;
