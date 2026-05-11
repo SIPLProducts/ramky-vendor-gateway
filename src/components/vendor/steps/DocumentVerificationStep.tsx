@@ -1146,6 +1146,9 @@ export function DocumentVerificationStep({
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
       };
+    } else if (isMsmeRegistered === false) {
+      out.msmeDeclarationReason = msmeDeclarationReason;
+      out.msmeSelfDeclarationFile = msmeDeclarationFile;
     }
     if (bankDoc.status === "verified" && bankDoc.ocrData) {
       out.bank = {
