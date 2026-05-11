@@ -60,6 +60,8 @@ import {
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NoReplyEmailConfig } from "@/components/admin/NoReplyEmailConfig";
 
 interface FormState extends SmtpConfigInput {
   use_app_password: boolean;
@@ -263,15 +265,27 @@ export default function EmailConfiguration() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Mail className="h-7 w-7 text-primary" /> Email Configuration
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage SMTP credentials for outbound emails (host, port, sender, app password).
-          </p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Mail className="h-7 w-7 text-primary" /> Email Configuration
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manage SMTP credentials for outbound emails (host, port, sender, app password).
+        </p>
+      </div>
+
+      <Tabs defaultValue="user" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="user">User SMTP Configuration</TabsTrigger>
+          <TabsTrigger value="noreply">No Reply Email Configuration</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="noreply">
+          <NoReplyEmailConfig />
+        </TabsContent>
+
+        <TabsContent value="user" className="space-y-6">
+      <div className="flex items-center justify-end">
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportExcel} disabled={data.length === 0}>
             <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
