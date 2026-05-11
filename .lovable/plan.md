@@ -1,54 +1,41 @@
-# Plan: Self-declaration upload error & Bank manual fallback
+# Plan
 
-## Point 1 — Fix "mime type … wordprocessingml.document is not supported"
+## Point 1 — MSME "No" hides all non-registered fields
 
-**Root cause:** The `vendor-documents` storage bucket only allows `application/pdf`, `image/jpeg`, `image/png`, `image/jpg`. The MSME (and GST) self-declaration template is an HTML file the user fills/saves — many users save it as **.docx** from Word, which the bucket rejects.
+In `src/components/vendor/kyc/MsmeKycTab.tsx`, when `isMsmeRegistered === false`:
 
-**Fix (migration):** Extend `storage.buckets.allowed_mime_types` for `vendor-documents` to also accept:
-- `application/msword` (.doc)
-- `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx)
-- `text/html` (.html — the template itself)
+- Remove the entire `!props.isMsmeRegistered` block (Alert, Download template button, Reason textarea, Signed Self-Declaration FileUpload).
+- Show only the Yes/No radio group. No further fields appear.
+- Update the status reporter so "No" reports `na` directly (no longer waits for a self-declaration file): `status = !isMsmeRegistered ? 'na' : state.status`.
+- Keep props (`msmeSelfDeclarationFile`, `onMsmeSelfDeclarationFileChange`, `msmeDeclarationReason`, `onMsmeDeclarationReasonChange`) in the interface as optional but unused inside the component, so parent callers don't break. Parent (`DocumentVerificationStep.tsx`) continues to pass them harmlessly.
 
-**Fix (UI):** Update the self-declaration `FileUpload` `accept` props in:
-- `MsmeKycTab.tsx` (signed MSME self-declaration)
-- The equivalent GST self-declaration upload (in `GstKycTab.tsx`)
+Verification gating (`mem://logic/verification-gating`) still passes because `na` is treated as non-blocking.
 
-from `.pdf,.jpg,.jpeg,.png` → `.pdf,.jpg,.jpeg,.png,.doc,.docx`.
+## Point 2 — Bank cheque failure → manual entry popup
 
-Other document fields (PAN card, cheque, GST cert, MSME cert) keep the existing PDF/image-only accept list, since OCR only handles those.
+Refactor `src/components/vendor/kyc/BankKycTab.tsx`:
 
-## Point 2 — Manual entry fallback on the Bank tab
-
-Today `BankKycTab.tsx` only supports the OCR cheque flow (manual entry is explicitly disabled per the alert). When OCR fails or the cheque is unreadable, the vendor is stuck.
-
-**Add a tab switcher (mirroring MSME/PAN/GST):**
-
-```text
-[ Enter manually ]   [ Upload cancelled cheque ]
-```
-
-- **Manual mode**: Two inputs — Account Number, IFSC (uppercase, 11-char). A single **Verify** button calls the same configured `BANK` provider (penny-drop) via `useConfiguredKycApi.callProvider({ providerName: 'BANK', input: { account, ifsc, id_number: account } })`. On success it runs the same IFSC enrichment + GST/PAN name match logic already in `handleVerify`. The cancelled-cheque file becomes optional in this mode (still recommended; vendor may upload a passbook/statement PDF as supporting proof).
-- **Upload mode**: unchanged (existing OCR + verify flow).
-
-**Refactor:** Extract the post-verification logic in `handleVerify` (IFSC lookup, name match, status updates, `onBankDetailsChange`) into a shared `runBankPennyDrop(account, ifsc)` helper used by both modes.
-
-**UI alert** updated: "Upload a cancelled cheque to auto-read account & IFSC, or switch to manual entry if OCR fails — both flows verify via penny-drop."
+- **Remove the Tabs UI** ("Enter manually" / "Upload cheque"). Show only the cheque uploader (`OcrUploadAndVerify`) plus the existing alert banner (reworded: "Upload your cancelled cheque. If we can't read it, you can enter the details manually.").
+- **Detect failure** inside `handleOcrVerify` (and the OCR step itself via `runBankOcr`). Whenever OCR fails, IFSC/account can't be parsed, or the penny-drop API returns `!ok`, set `manualPopupOpen = true` and stash any partial values (`prefillAccount`, `prefillIfsc`).
+- **Add an `AlertDialog`** with title "Bank verification failed — enter details manually", body containing two `Input`s (Account Number, IFSC, uppercase, max 11) and a Submit button (disabled until `account.length >= 8 && isValidIfsc(ifsc)`).
+- **Submit handler** calls `callProvider({ providerName: 'BANK', input: { account, ifsc, id_number: account } })`, then runs the existing `finalizePennyDrop(account, ifsc, data)` to populate bank name / branch / holder name and trigger GST/PAN name match. On success the popup closes and the green "Account Holder Name verified…" banner appears; on failure an inline error stays inside the popup so the user can correct and retry.
+- The shared `finalizePennyDrop` helper (already extracted) is reused unchanged, so the response data flows into the same parent fields as the cheque path (`onBankDetailsChange`, `onVerifiedDetails`, `onStatusChange`).
+- Remove now-unused imports: `Tabs*`, `Pencil`, `VerifyButton`, `ValidationMessage`, `useProviderVerify`, the standalone `FileUpload` inside the manual tab, `manualState`/`manualVerify` hook usage.
 
 ## Files touched
 
-- `supabase/migrations/<new>.sql` — update `vendor-documents` bucket allowed_mime_types
-- `src/components/vendor/kyc/MsmeKycTab.tsx` — broaden self-declaration accept
-- `src/components/vendor/kyc/GstKycTab.tsx` — broaden self-declaration accept
-- `src/components/vendor/kyc/BankKycTab.tsx` — add manual/upload tabs, extract helper
+- `src/components/vendor/kyc/MsmeKycTab.tsx`
+- `src/components/vendor/kyc/BankKycTab.tsx`
 
 ## Out of scope
 
-- No changes to OCR providers, penny-drop edge function, or KYC API config screens.
-- No name-match logic changes.
-- No backend RLS changes.
+- No backend / edge function / RLS changes.
+- No changes to GST tab or other KYC tabs.
+- Cheque file is still optional/required per existing parent rules — popup path doesn't require a file.
 
 ## Verification
 
-1. Re-upload the .docx MSME self-declaration → save succeeds, no mime error toast.
-2. On Bank tab, switch to **Enter manually** → type a valid account + IFSC → click Verify → see the same green "Account Holder Name verified with …" banner as the OCR flow.
-3. Upload-cheque flow still works unchanged.
+1. MSME tab → select **No** → only the Yes/No row remains; no template, reason, or upload field. Step is non-blocking.
+2. Bank tab → upload an unreadable cheque (or one whose penny-drop fails) → popup appears with Account + IFSC inputs.
+3. Enter valid account + IFSC, click **Submit** → penny-drop runs, popup closes, bank fields and "Account Holder Name verified with …" banner populate exactly as the OCR-success flow.
+4. Enter invalid details → inline error inside the popup, user can retry without losing context.
