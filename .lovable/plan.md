@@ -1,67 +1,41 @@
-# MSME Self-Declaration when "No" is selected
+## Problem
 
-Mirror the existing GST non-registration flow inside the MSME tab.
+The MSME self-declaration flow was added earlier to `MsmeKycTab.tsx`, but the screen the user is actually on (Document Verification step) uses **`DocumentVerificationStep.tsx`** instead. That file currently just renders a "Skipped — not MSME registered" line when "No, skip" is chosen — no download/upload/reason fields appear.
 
-## What to build
+## Fix
 
-When the user selects **No** for "Are you MSME registered?", show:
-1. An info alert explaining the next step.
-2. A **Download MSME Self-Declaration Template** button (opens an HTML template in a new tab; user prints/saves as PDF, signs, scans).
-3. An optional **Reason for non-registration** textarea.
-4. A **Signed MSME Self-Declaration** file upload (PDF/JPG/PNG).
+Mirror the existing GST self-declaration block (already present at lines 1357–1378 of `DocumentVerificationStep.tsx`) inside the MSME tab's `isMsmeRegistered === false` branch.
 
-When the user selects **Yes**, behavior is unchanged (existing manual entry / OCR upload tabs).
+### Changes (single file: `src/components/vendor/steps/DocumentVerificationStep.tsx`)
 
-## Files to change
+1. **State** (next to existing `gstDeclarationFile` / `gstDeclarationReason` around line 275):
+   ```ts
+   const [msmeDeclarationFile, setMsmeDeclarationFile] = useState<File | null>(initialData?.msmeSelfDeclarationFile ?? null);
+   const [msmeDeclarationReason, setMsmeDeclarationReason] = useState<string>(initialData?.msmeDeclarationReason ?? "");
+   ```
 
-### 1. `public/templates/msme-self-declaration.html` (new)
-A printable A4 declaration template, styled identically to `public/templates/gst-self-declaration.html`. Content adapted from the user-uploaded `Non-MSME_Declaration.docx`:
-- Title: "Self-Declaration for Non-Registration under MSME"
-- Subtitle: "(To be submitted on company letterhead, signed and stamped)"
-- Addressed to "The Procurement Department, Sharvi Infotech Private Limited"
-- Fields: Name of Entity, PAN, Constitution of Business, Registered Address, Reason for non-registration
-- Declaration paragraphs covering: not registered under MSME Act; will inform the company if registered later; information furnished is true
-- Signature block (Authorised Signatory + Company Seal & Date)
-- Same Print/Save-as-PDF button and `@media print` styles
+2. **Props type** (around line 56–63): add optional `msmeSelfDeclarationFile?: File | null` and `msmeDeclarationReason?: string` to `initialData`.
 
-### 2. `src/components/vendor/kyc/MsmeKycTab.tsx`
-- Add props: `msmeSelfDeclarationFile`, `onMsmeSelfDeclarationFileChange`, `msmeDeclarationReason`, `onMsmeDeclarationReasonChange`.
-- Update `onStatusChange` so when `isMsmeRegistered === false`, status is `'passed'` if a signed declaration file is present, otherwise `'na'` (matches GST tab).
-- Render the new "No" branch (Alert + Download button + Reason textarea + FileUpload) — using `documentType="msme_self_declaration"`.
-- Keep existing "Yes" branch unchanged.
+3. **Replace the "Skipped" block** (lines 1552–1557) with a download-template + InlineFilePicker + reason field, styled exactly like the GST block:
+   - Card row: `FileText` icon, "MSME Self-Declaration", "Download, sign, then upload"
+   - `<a href="/templates/msme-self-declaration.html" download>` Template link
+   - `InlineFilePicker` bound to `msmeDeclarationFile` / `setMsmeDeclarationFile`
+   - `FormField` for `msmeDeclarationReason` (placeholder: "e.g. Turnover below MSME threshold limit")
 
-### 3. `src/components/vendor/steps/ComplianceStep.tsx`
-- Add local state `msmeSelfDeclarationFile` and `msmeDeclarationReason` (read initial values from `data.statutory`).
-- Pass new props to `<MsmeKycTab>`.
-- Include both in the `onComplete`/save payload alongside `msmeCertificateFile`.
+4. **Gate** (`stage3Done`, line 1092): require declaration file when not registered.
+   ```ts
+   const stage3Done =
+     (isMsmeRegistered === false && !!msmeDeclarationFile) ||
+     (isMsmeRegistered === true && msmeDoc.status === "verified");
+   ```
 
-### 4. `src/pages/VendorRegistration.tsx`
-- Extend the `statutory` initial state with `msmeSelfDeclarationFile: null` and `msmeDeclarationReason: ''`.
-- Wire the new fields through `setVerifiedData` / step persistence the same way GST does.
-- Update the `msmeOk` gate so a non-MSME vendor is also acceptable when a signed declaration file is uploaded (mirrors GST behavior — optional, see Open question).
+5. **Persist in `out` payload** (around line 1133): when `isMsmeRegistered === false`, also write `msmeDeclarationReason` and `msmeSelfDeclarationFile` so the parent saves them (the existing upload pipeline already handles `msme_self_declaration` document type from the previous change).
 
-### 5. `src/hooks/useVendorRegistration.tsx`
-- Add `{ file: formData.statutory.msmeSelfDeclarationFile, type: 'msme_self_declaration' }` to the document upload list (next to `msme_certificate`).
-- Persist `msme_declaration_reason` if a column exists; otherwise skip (see DB section).
+6. **Effect deps**: add `msmeDeclarationFile`, `msmeDeclarationReason` to the dep array on line 1177.
 
-### 6. `src/components/vendor/steps/ReviewStep.tsx`
-- Under the MSME row, when `isMsmeRegistered === false`, show whether a signed declaration was uploaded and the reason (read-only summary), matching the GST review row pattern.
-
-## Database
-
-No schema change is required for the file itself — `msme_self_declaration` will be stored as a row in `vendor_documents` keyed by `document_type`, exactly like `gst_self_declaration` already is.
-
-If we want to persist the optional reason, we can either:
-- (a) reuse a notes/metadata column on `vendor_documents`, or
-- (b) add a `msme_declaration_reason text` column to the vendors table (matches `gst_declaration_reason` if that exists today).
-
-Recommendation: only add a column if the GST equivalent is already a column. Otherwise keep the reason in form state / document metadata.
+No other files change. The `public/templates/msme-self-declaration.html` template and the `msme_self_declaration` upload type added previously are reused.
 
 ## Out of scope
 
-- No OCR/verification of the signed declaration (same as GST).
-- No changes to MSME Yes-branch flow or to existing approval gating beyond letting "No + signed declaration" count as complete.
-
-## Open question
-
-Should uploading the signed MSME declaration be **mandatory** to proceed past the Compliance step (matches GST's strict gate), or remain **optional** like the current MSME-No path? Default in this plan: mandatory, matching GST.
+- No changes to the parent `VendorRegistration.tsx` wiring beyond what already exists (already supports `msmeSelfDeclarationFile` / `msmeDeclarationReason` from the prior loop).
+- No DB schema changes.

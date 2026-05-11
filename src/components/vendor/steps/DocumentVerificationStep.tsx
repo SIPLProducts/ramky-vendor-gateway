@@ -54,6 +54,8 @@ export interface VerifiedDocumentData {
   gstSelfDeclarationFile?: File | null;
   pan?: { number: string; holderName: string; apiName?: string; nameMatchScore?: number };
   isMsmeRegistered?: boolean;
+  msmeDeclarationReason?: string;
+  msmeSelfDeclarationFile?: File | null;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
@@ -274,6 +276,8 @@ export function DocumentVerificationStep({
 
   const [gstDeclarationFile, setGstDeclarationFile] = useState<File | null>(initialData?.gstSelfDeclarationFile ?? null);
   const [gstDeclarationReason, setGstDeclarationReason] = useState<string>(initialData?.gstDeclarationReason ?? "");
+  const [msmeDeclarationFile, setMsmeDeclarationFile] = useState<File | null>(initialData?.msmeSelfDeclarationFile ?? null);
+  const [msmeDeclarationReason, setMsmeDeclarationReason] = useState<string>(initialData?.msmeDeclarationReason ?? "");
   const [manualLegalName, setManualLegalName] = useState<string>(initialData?.manualLegalName ?? "");
   const [manualAddress, setManualAddress] = useState({
     address: initialData?.manualAddress?.address ?? "",
@@ -1089,7 +1093,9 @@ export function DocumentVerificationStep({
           manualAddress.pincode.trim().length >= 5
         : false;
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
-  const stage3Done = isMsmeRegistered === false || (isMsmeRegistered === true && msmeDoc.status === "verified");
+  const stage3Done =
+    (isMsmeRegistered === false && !!msmeDeclarationFile) ||
+    (isMsmeRegistered === true && msmeDoc.status === "verified");
   const stage4Done =
     bankDoc.status === "verified" &&
     (!bank2Enabled || bankDoc2.status === "verified");
@@ -1140,6 +1146,9 @@ export function DocumentVerificationStep({
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
       };
+    } else if (isMsmeRegistered === false) {
+      out.msmeDeclarationReason = msmeDeclarationReason;
+      out.msmeSelfDeclarationFile = msmeDeclarationFile;
     }
     if (bankDoc.status === "verified" && bankDoc.ocrData) {
       out.bank = {
@@ -1174,7 +1183,7 @@ export function DocumentVerificationStep({
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
@@ -1550,9 +1559,34 @@ export function DocumentVerificationStep({
                 />
 
                 {isMsmeRegistered === false && (
-                  <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-success" />
-                    Skipped — not MSME registered
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">MSME Self-Declaration</p>
+                        <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
+                      </div>
+                      <a
+                        href="/templates/msme-self-declaration.html"
+                        download
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Template
+                      </a>
+                      <InlineFilePicker
+                        file={msmeDeclarationFile}
+                        onPick={setMsmeDeclarationFile}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                      />
+                    </div>
+
+                    <FormField
+                      label="Reason for non-registration"
+                      value={msmeDeclarationReason}
+                      onChange={setMsmeDeclarationReason}
+                      placeholder="e.g. Turnover below MSME threshold limit"
+                    />
                   </div>
                 )}
 
