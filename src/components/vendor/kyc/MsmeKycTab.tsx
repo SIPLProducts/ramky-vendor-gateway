@@ -29,6 +29,10 @@ interface MsmeKycTabProps {
   legalName?: string;
   msmeCertificateFile: File | null;
   onMsmeCertificateFileChange: (f: File | null) => void;
+  msmeSelfDeclarationFile?: File | null;
+  onMsmeSelfDeclarationFileChange?: (f: File | null) => void;
+  msmeDeclarationReason?: string;
+  onMsmeDeclarationReasonChange?: (v: string) => void;
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed' | 'na') => void;
   vendorId?: string;
@@ -49,7 +53,10 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
-    props.onStatusChange(props.isMsmeRegistered ? (state.status as any) : 'na');
+    const status = !props.isMsmeRegistered
+      ? (props.msmeSelfDeclarationFile ? 'passed' : 'na')
+      : (state.status as any);
+    props.onStatusChange(status);
   }
 
   // Coerce Surepass `{ value, confidence }` shape to a plain string.
