@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
@@ -148,6 +148,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       { file: formData.statutory.gstSelfDeclarationFile, type: 'gst_self_declaration' },
       { file: formData.statutory.panCardFile, type: 'pan_card' },
       { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
+      { file: formData.statutory.msmeSelfDeclarationFile ?? null, type: 'msme_self_declaration' },
       { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
       { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
       { file: formData.financial.financialDocsFile, type: 'financial_docs' },
@@ -466,6 +467,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         gstCertificateFile: null,
         panCardFile: null,
         msmeCertificateFile: null,
+        msmeSelfDeclarationFile: null,
+        msmeDeclarationReason: '',
         iecCertificateFile: null,
         swiftIbanProofFile: null,
       },
