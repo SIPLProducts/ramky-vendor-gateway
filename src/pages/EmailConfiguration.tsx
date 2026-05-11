@@ -585,6 +585,8 @@ export default function EmailConfiguration() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
