@@ -1,19 +1,23 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, Lock, Pencil, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, Lock, XCircle } from 'lucide-react';
 import { useState } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { VerifyButton } from '@/components/vendor/VerifyButton';
-import { ValidationMessage } from '@/components/vendor/ValidationMessage';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
-import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
 import { fuzzyNameMatch } from '@/lib/nameMatch';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
-import { FileUpload } from '@/components/vendor/FileUpload';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -44,13 +48,25 @@ function pickString(v: any): string {
 
 export function BankKycTab(props: BankKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
-  const { state: manualState, verify: manualVerify } = useProviderVerify();
-  const [mode, setMode] = useState<'manual' | 'upload'>('upload');
-  const [manualAccount, setManualAccount] = useState('');
-  const [manualIfsc, setManualIfsc] = useState('');
   const [holderName, setHolderName] = useState<string>('');
   const [holderCheck, setHolderCheck] =
     useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
+
+  // Manual fallback popup
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupReason, setPopupReason] = useState<string>('');
+  const [popupAccount, setPopupAccount] = useState('');
+  const [popupIfsc, setPopupIfsc] = useState('');
+  const [popupSubmitting, setPopupSubmitting] = useState(false);
+  const [popupError, setPopupError] = useState<string>('');
+
+  const openManualPopup = (reason: string, prefillAccount = '', prefillIfsc = '') => {
+    setPopupReason(reason);
+    setPopupAccount(prefillAccount);
+    setPopupIfsc(prefillIfsc);
+    setPopupError('');
+    setPopupOpen(true);
+  };
 
   // Shared post-verification logic: IFSC enrichment, name matching, and state updates.
   const finalizePennyDrop = async (
@@ -88,18 +104,6 @@ export function BankKycTab(props: BankKycTabProps) {
           apiData,
         };
       }
-    } else if (props.legalName && apiName) {
-      const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-      const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-      if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
-        setHolderCheck('failed');
-        props.onStatusChange?.('failed');
-        return {
-          ok: false,
-          message: `Name mismatch: Bank account is registered to "${apiName}" but you entered "${props.legalName}".`,
-          apiData,
-        };
-      }
     }
 
     props.onBankDetailsChange({
@@ -127,9 +131,11 @@ export function BankKycTab(props: BankKycTabProps) {
     const r = await callProvider({ providerName: 'BANK_OCR', file });
     toastKycResult('Bank OCR', r);
     if (!r.found && !r.message_code) {
+      openManualPopup('Bank OCR provider not configured. Please enter your bank details manually.');
       return { success: false, error: 'Bank OCR provider not configured. Add it in KYC & Validation API Settings.', apiResult: r };
     }
     if (!r.ok) {
+      openManualPopup(r.message || 'We could not read your cheque. Please enter your bank details manually.');
       return { success: false, error: r.message || r.message_code || 'Could not read cheque', apiResult: r };
     }
     const extracted = mergeOcrExtracted(r.data, r.raw);
@@ -142,13 +148,15 @@ export function BankKycTab(props: BankKycTabProps) {
     const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
     setHolderCheck('idle');
     setHolderName('');
-    if (!account || account.length < 8) {
+
+    if (!account || account.length < 8 || !isValidIfsc(ifsc)) {
       props.onStatusChange?.('failed');
-      return { ok: false, message: 'Could not read a valid account number from the cheque. Switch to manual entry to continue.' };
-    }
-    if (!isValidIfsc(ifsc)) {
-      props.onStatusChange?.('failed');
-      return { ok: false, message: 'Could not read a valid 11-character IFSC code from the cheque. Switch to manual entry to continue.' };
+      openManualPopup(
+        'We could not read a valid Account Number / IFSC from your cheque. Please enter the details manually.',
+        account,
+        ifsc,
+      );
+      return { ok: false, message: 'Could not read account / IFSC from cheque — please enter manually.' };
     }
 
     props.onStatusChange?.('validating');
@@ -165,57 +173,69 @@ export function BankKycTab(props: BankKycTabProps) {
     toastKycResult('Bank', r);
     if (!r.found) {
       props.onStatusChange?.('failed');
+      openManualPopup(r.message || 'Bank verification provider not configured. Please enter manually.', account, ifsc);
       return { ok: false, message: r.message || 'Bank validation provider not configured' };
     }
     if (!r.ok || !r.data) {
       props.onStatusChange?.('failed');
+      openManualPopup(r.message || 'Bank verification failed. Please enter your details manually.', account, ifsc);
       return { ok: false, message: r.message || 'Bank verification failed', apiData: r.data };
     }
     return finalizePennyDrop(account, ifsc, r.data);
   };
 
-  // Manual-mode verify
-  const handleManualVerify = async () => {
-    const account = manualAccount.replace(/\s+/g, '');
-    const ifsc = manualIfsc.toUpperCase().trim();
+  // Popup submit
+  const handlePopupSubmit = async () => {
+    const account = popupAccount.replace(/\s+/g, '');
+    const ifsc = popupIfsc.toUpperCase().trim();
+    setPopupError('');
+    if (account.length < 8) {
+      setPopupError('Enter a valid account number (min 8 digits).');
+      return;
+    }
+    if (!isValidIfsc(ifsc)) {
+      setPopupError('Enter a valid 11-character IFSC code.');
+      return;
+    }
+    setPopupSubmitting(true);
     setHolderCheck('idle');
     setHolderName('');
-    await manualVerify({
-      providerName: 'BANK',
-      label: 'Bank',
-      input: { account, ifsc, id_number: account },
-      validate: (data) => {
-        // synchronous validate runs before finalize; we update state via finalize below
-        return { ok: true, message: '', data };
-      },
-    });
-    // useProviderVerify already toasted. Now run shared finalize.
-    if (manualState.status === 'failed') return;
     props.onStatusChange?.('validating');
     props.onBankDetailsChange({
       bankAccountNumber: account,
       ifscCode: ifsc,
       accountHolderName: undefined,
     });
-    const r = await callProvider({
-      providerName: 'BANK',
-      input: { account, ifsc, id_number: account },
-    });
-    if (!r.ok || !r.data) {
-      props.onStatusChange?.('failed');
-      return;
+    try {
+      const r = await callProvider({
+        providerName: 'BANK',
+        input: { account, ifsc, id_number: account },
+      });
+      toastKycResult('Bank', r);
+      if (!r.found || !r.ok || !r.data) {
+        props.onStatusChange?.('failed');
+        setPopupError(r.message || 'Bank verification failed. Please re-check the details and try again.');
+        return;
+      }
+      const result = await finalizePennyDrop(account, ifsc, r.data);
+      if (!result.ok) {
+        setPopupError(result.message);
+        return;
+      }
+      setPopupOpen(false);
+    } finally {
+      setPopupSubmitting(false);
     }
-    await finalizePennyDrop(account, ifsc, r.data);
   };
 
-  const canManualVerify =
-    manualAccount.replace(/\s+/g, '').length >= 8 && isValidIfsc(manualIfsc);
+  const canSubmitPopup =
+    popupAccount.replace(/\s+/g, '').length >= 8 && isValidIfsc(popupIfsc);
 
   return (
     <div className="space-y-4">
       <Alert>
         <AlertDescription className="text-sm">
-          Upload a cancelled cheque to auto-read the account number and IFSC, or switch to manual entry if OCR fails. Both flows verify the account via the configured Penny-Drop API.
+          Upload your cancelled cheque to auto-read account number and IFSC. If we can't read it, you'll be prompted to enter the details manually.
         </AlertDescription>
       </Alert>
 
@@ -234,72 +254,17 @@ export function BankKycTab(props: BankKycTabProps) {
         </div>
       )}
 
-      <Tabs value={mode} onValueChange={(v) => setMode(v as 'manual' | 'upload')} className="space-y-4">
-        <TabsList className="grid grid-cols-2 max-w-sm">
-          <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-2" />Upload cheque</TabsTrigger>
-          <TabsTrigger value="manual"><Pencil className="h-3.5 w-3.5 mr-2" />Enter manually</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="upload" className="space-y-3">
-          <OcrUploadAndVerify
-            documentType="cheque"
-            fileLabel="Cancelled Cheque *"
-            currentFile={props.cancelledChequeFile}
-            onFileChange={props.onCancelledChequeFileChange}
-            runOcr={runBankOcr}
-            onVerifyExtracted={handleOcrVerify}
-            apiLabel="Bank"
-            onVerified={() => {}}
-            vendorId={props.vendorId}
-          />
-        </TabsContent>
-
-        <TabsContent value="manual" className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="manualAccount">Account Number *</Label>
-              <Input
-                id="manualAccount"
-                value={manualAccount}
-                onChange={(e) => setManualAccount(e.target.value.replace(/\s+/g, ''))}
-                placeholder="e.g. 50100123456789"
-                className="font-mono"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="manualIfsc">IFSC Code *</Label>
-              <Input
-                id="manualIfsc"
-                value={manualIfsc}
-                onChange={(e) => setManualIfsc(e.target.value.toUpperCase())}
-                placeholder="e.g. HDFC0001234"
-                maxLength={11}
-                className="font-mono uppercase"
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Verifies via the configured Penny-Drop API (KYC API Settings).
-            </p>
-            <VerifyButton
-              onClick={handleManualVerify}
-              state={manualState}
-              disabled={!canManualVerify}
-            />
-          </div>
-          <ValidationMessage state={manualState} />
-
-          <FileUpload
-            label="Cancelled Cheque / Bank Proof (optional)"
-            accept=".pdf,.jpg,.jpeg,.png"
-            documentType="cheque"
-            onFileSelect={props.onCancelledChequeFileChange}
-            currentFile={props.cancelledChequeFile}
-            vendorId={props.vendorId}
-          />
-        </TabsContent>
-      </Tabs>
+      <OcrUploadAndVerify
+        documentType="cheque"
+        fileLabel="Cancelled Cheque *"
+        currentFile={props.cancelledChequeFile}
+        onFileChange={props.onCancelledChequeFileChange}
+        runOcr={runBankOcr}
+        onVerifyExtracted={handleOcrVerify}
+        apiLabel="Bank"
+        onVerified={() => {}}
+        vendorId={props.vendorId}
+      />
 
       {holderCheck !== 'idle' && holderName && (
         <div
@@ -330,6 +295,65 @@ export function BankKycTab(props: BankKycTabProps) {
           </div>
         </div>
       )}
+
+      <Dialog open={popupOpen} onOpenChange={(o) => !popupSubmitting && setPopupOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bank verification — enter details manually</DialogTitle>
+            <DialogDescription>
+              {popupReason || 'Please enter your bank account details to verify via Penny-Drop.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="popupAccount">Account Number *</Label>
+              <Input
+                id="popupAccount"
+                value={popupAccount}
+                onChange={(e) => setPopupAccount(e.target.value.replace(/\s+/g, ''))}
+                placeholder="e.g. 50100123456789"
+                className="font-mono"
+                autoFocus
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="popupIfsc">IFSC Code *</Label>
+              <Input
+                id="popupIfsc"
+                value={popupIfsc}
+                onChange={(e) => setPopupIfsc(e.target.value.toUpperCase())}
+                placeholder="e.g. HDFC0001234"
+                maxLength={11}
+                className="font-mono uppercase"
+              />
+            </div>
+            {popupError && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-sm text-destructive">
+                <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span className="break-words">{popupError}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPopupOpen(false)}
+              disabled={popupSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handlePopupSubmit}
+              disabled={!canSubmitPopup || popupSubmitting}
+            >
+              {popupSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
