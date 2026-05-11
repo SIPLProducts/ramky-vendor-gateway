@@ -150,7 +150,7 @@ export function ComplianceStep({
   const isStepValid =
     (statuses.gst === 'passed' || statuses.gst === 'na' || (!isGstRegistered && !!gstSelfDeclarationFile)) &&
     statuses.pan === 'passed' &&
-    (statuses.msme === 'passed' || statuses.msme === 'na' || (!isMsmeRegistered && !!msmeSelfDeclarationFile) || (isMsmeRegistered && false)) &&
+    (statuses.msme === 'passed' || statuses.msme === 'na' || (!isMsmeRegistered && !!msmeSelfDeclarationFile)) &&
     statuses.bank === 'passed';
 
   useEffect(() => {
@@ -279,6 +279,7 @@ export function ComplianceStep({
       gstCertificateFile,
       panCardFile,
       msmeCertificateFile,
+      msmeSelfDeclarationFile,
       gstSelfDeclarationFile,
       bankAccountNumber,
       ifscCode,
@@ -384,6 +385,10 @@ export function ComplianceStep({
             legalName={legalName}
             msmeCertificateFile={msmeCertificateFile}
             onMsmeCertificateFileChange={setMsmeCertificateFile}
+            msmeSelfDeclarationFile={msmeSelfDeclarationFile}
+            onMsmeSelfDeclarationFileChange={setMsmeSelfDeclarationFile}
+            msmeDeclarationReason={watch('msmeDeclarationReason' as any) || ''}
+            onMsmeDeclarationReasonChange={(v) => setValue('msmeDeclarationReason' as any, v)}
             onVerifiedDetails={handleMsmeVerified}
             onStatusChange={(s) => setStatus('msme', s)}
             vendorId={vendorId}
