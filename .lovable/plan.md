@@ -1,40 +1,17 @@
-## Problem
+## Plan
 
-In the Document Verification step (GST tab), after uploading a GST certificate, the **Principal Place of Business** field sometimes shows the address read by OCR from the certificate scan (e.g. `-, 15-80, -, SELAPADU, CHEBROLU, Guntur, Andhra Pradesh, 522213`) instead of the address returned by the GST registry validation API (e.g. `Ground Floor, 11, Revathi, 2nd Cross, George Garden, RVCE Post, Mysore Road, Bengaluru Urban, Karnataka, 560059`).
+1. **Make GST address extraction provider-safe**
+   - Update `DocumentVerificationStep.tsx` so GST verification reads the principal business address from all known registry response shapes, not only `d.address`.
+   - Prefer official registry fields in this order: `principal_place_of_business`, `principalPlaceOfBusiness`, `principal_address`, `address`, then nested raw response paths such as `raw.data.address`.
 
-The registry response is the authoritative source of truth — it must always win over the OCR value (or any stale value persisted from a previous upload/navigation).
+2. **Stop stale/OCR address from winning**
+   - When a new GST certificate is verified, clear any old Principal Place value at upload start.
+   - After verification, always set the field from the canonical registry address if present.
+   - Use OCR only as a fallback when the registry has no usable address.
 
-## Root cause
+3. **Keep saved/review data aligned**
+   - Ensure the same canonical address is written into `gst.principalPlaceOfBusiness`, `gst.address`, the statutory field, and the registered address merge.
+   - Update the “Matches registry address” indicator to compare against the canonical registry address, not just `api.address`.
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`:
-
-1. Line 273-275 initializes `editablePrincipalPlace` from previously persisted `initialData.gst.principalPlaceOfBusiness || address` once at mount.
-2. After `handleGstUpload` runs, line 798-799 only sets the field **if `!editablePrincipalPlace`**:
-   ```ts
-   if (principal && !editablePrincipalPlace) setEditablePrincipalPlace(principal);
-   ```
-   So if the field already had a value (from a previous upload, or from the OCR's `principal_place_of_business` that was hydrated before the API merge), the new registry address never overwrites it.
-3. The OCR extracted from the certificate image and the GST registry address can legitimately differ (e.g. OCR misreads, additional places, or the user uploaded the wrong cert). When they differ, the registry value should be the displayed/saved value.
-
-## Fix
-
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`:
-
-1. **`handleGstUpload` (~line 795-802)**: after `runDocFlow` resolves, always overwrite `editablePrincipalPlace` with the API-normalized address when present:
-   ```ts
-   const apiAddress = prev.apiData?.normalized?.principal_place_of_business
-                    || prev.apiData?.normalized?.address;
-   if (apiAddress) setEditablePrincipalPlace(apiAddress);
-   else if (!editablePrincipalPlace) setEditablePrincipalPlace(prev.ocrData?.principal_place_of_business || prev.ocrData?.address || "");
-   ```
-   This guarantees the registry value always replaces the OCR-derived value once verification succeeds.
-
-2. **Verified panel (~line 2604-2625)**: keep the field editable but show a small "Auto-filled from registry" hint when the current value matches `api.address`, so the vendor understands the source. (The existing "Matches registry address" success line already covers this — no UI change needed beyond making sure the auto-fill happens.)
-
-3. **Persistence (~line 1113-1114)**: no change. The `out` payload already prefers `editablePrincipalPlace` when present, and we are now setting it from the registry.
-
-## Out of scope
-
-- No changes to the GST_OCR / GST validation providers or to `kyc-api-execute`.
-- No changes to `ComplianceStep.tsx` or `ReviewStep.tsx` — they read the value already saved by this step.
-- No DB schema changes.
+4. **Verify the fix**
+   - Check the updated code path for GST upload → API normalization → field display → form merge, so the uploaded response address shown in your screenshot is the one displayed in “Principal Place of Business”.
