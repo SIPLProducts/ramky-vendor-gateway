@@ -416,23 +416,56 @@ export function DocumentVerificationStep({
         };
       }
       const d = r.data as Record<string, any>;
+      // The admin-configured response mapping may omit the address field.
+      // Fall back to the raw upstream response so we always have the
+      // registry's canonical Principal Place of Business.
+      const rawData: Record<string, any> =
+        (r.raw && typeof r.raw === "object" && (r.raw as any).data && typeof (r.raw as any).data === "object")
+          ? (r.raw as any).data
+          : {};
+      const pickAddress = (src: Record<string, any>): string | undefined => {
+        const candidates = [
+          src.principal_place_of_business,
+          src.principalPlaceOfBusiness,
+          src.principal_address,
+          src.address,
+          src.pradr,
+          src.pradr_addr,
+        ];
+        for (const c of candidates) {
+          if (typeof c === "string" && c.trim().length > 0) return c.trim();
+          if (c && typeof c === "object") {
+            // Surepass nested shapes: { addr: "...", building_name, ... }
+            const nested = (c as any).addr || (c as any).address || (c as any).full_address;
+            if (typeof nested === "string" && nested.trim().length > 0) return nested.trim();
+          }
+        }
+        return undefined;
+      };
+      const registryAddress = pickAddress(d) || pickAddress(rawData);
       // Normalize API field names to the keys the UI reads from `ocrData`.
       const normalized: Record<string, any> = {
         gstin: apiGstin || ocrGstin,
-        legal_name: d.legal_name,
-        trade_name: d.trade_name || d.business_name,
-        constitution_of_business: d.constitution_of_business,
-        principal_place_of_business: d.address,
-        address: d.address,
-        gst_status: d.gstin_status || d.gst_status,
-        registration_date: d.date_of_registration || d.registration_date,
-        taxpayer_type: d.taxpayer_type,
+        legal_name: d.legal_name || rawData.legal_name,
+        trade_name: d.trade_name || d.business_name || rawData.trade_name || rawData.business_name,
+        constitution_of_business: d.constitution_of_business || rawData.constitution_of_business,
+        principal_place_of_business: registryAddress,
+        address: registryAddress,
+        gst_status: d.gstin_status || d.gst_status || rawData.gstin_status || rawData.gst_status,
+        registration_date: d.date_of_registration || d.registration_date || rawData.date_of_registration || rawData.registration_date,
+        taxpayer_type: d.taxpayer_type || rawData.taxpayer_type,
         business_nature: Array.isArray(d.nature_bus_activities)
           ? d.nature_bus_activities
-          : (d.nature_of_core_business_activity_description ? [d.nature_of_core_business_activity_description] : undefined),
-        jurisdiction_centre: d.center_jurisdiction || d.jurisdiction_centre,
-        jurisdiction_state: d.state_jurisdiction || d.jurisdiction_state,
-        pan_number: d.pan_number,
+          : (d.nature_of_core_business_activity_description
+              ? [d.nature_of_core_business_activity_description]
+              : (Array.isArray(rawData.nature_bus_activities)
+                  ? rawData.nature_bus_activities
+                  : (rawData.nature_of_core_business_activity_description
+                      ? [rawData.nature_of_core_business_activity_description]
+                      : undefined))),
+        jurisdiction_centre: d.center_jurisdiction || d.jurisdiction_centre || rawData.center_jurisdiction || rawData.jurisdiction_centre,
+        jurisdiction_state: d.state_jurisdiction || d.jurisdiction_state || rawData.state_jurisdiction || rawData.jurisdiction_state,
+        pan_number: d.pan_number || rawData.pan_number,
       };
       return {
         ok: true as const,
