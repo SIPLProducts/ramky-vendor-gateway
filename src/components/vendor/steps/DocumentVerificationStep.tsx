@@ -8,6 +8,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
@@ -385,6 +387,37 @@ export function DocumentVerificationStep({
     message: "",
   });
 
+  // Manual bank-entry popup — opened when cheque OCR / penny-drop fails.
+  // Vendor types Account Number + IFSC, we re-call the configured BANK
+  // provider, and on success populate the bank doc as if cheque OCR had worked.
+  const chequeTargetRef = useRef<"primary" | "secondary">("primary");
+  const [bankPopup, setBankPopup] = useState<{
+    open: boolean;
+    target: "primary" | "secondary";
+    reason: string;
+    account: string;
+    ifsc: string;
+    submitting: boolean;
+    error: string;
+  }>({ open: false, target: "primary", reason: "", account: "", ifsc: "", submitting: false, error: "" });
+
+  const openBankManualPopup = (
+    target: "primary" | "secondary",
+    reason: string,
+    prefillAccount = "",
+    prefillIfsc = "",
+  ) => {
+    setBankPopup({
+      open: true,
+      target,
+      reason,
+      account: prefillAccount,
+      ifsc: prefillIfsc,
+      submitting: false,
+      error: "",
+    });
+  };
+
   // ---------- Verification ----------
   // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
   // Other kinds still use a lightweight simulation pending real provider wiring.
@@ -748,11 +781,27 @@ export function DocumentVerificationStep({
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: ocrRes.error || "Could not read document" });
+      if (kind === "cheque") {
+        openBankManualPopup(
+          chequeTargetRef.current,
+          ocrRes.error || "We couldn't read your cheque. Please enter your bank details manually.",
+        );
+      }
       return;
     }
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      if (kind === "cheque") {
+        const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
+        const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
+        openBankManualPopup(
+          chequeTargetRef.current,
+          "We couldn't read your cheque clearly. Please enter your bank details manually.",
+          acc,
+          ifsc,
+        );
+      }
       return;
     }
     setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
@@ -766,17 +815,13 @@ export function DocumentVerificationStep({
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
       } else if (kind === "cheque") {
-        // Title is derived from structured upstream code/reason — body is the
-        // raw upstream message verbatim. No hardcoded copy.
-        const code = (v as any).messageCode || (v as any).reason;
-        let title = "Bank verification failed";
-        if (code === "bank_rate_limited" || code === "rate_limited") {
-          title = "Bank verification rate limited";
-        } else if (/Account Holder Name does not match/i.test(msg)) {
-          title = "Account Holder Name mismatch";
-        }
-        setMismatchDialog({ open: true, title, message: msg });
+        // For ANY cheque/penny-drop failure (rate-limit, OCR mismatch,
+        // upstream 500, account-holder mismatch) — let the vendor enter
+        // bank details manually and re-verify via the configured BANK API.
+        const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
+        const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
+        openBankManualPopup(chequeTargetRef.current, msg, acc, ifsc);
       }
       return;
     }
@@ -966,8 +1011,9 @@ export function DocumentVerificationStep({
     }
   };
 
-  const handleBankUpload = (file: File) =>
-    runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
+  const handleBankUpload = (file: File) => {
+    chequeTargetRef.current = "primary";
+    return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
@@ -991,6 +1037,7 @@ export function DocumentVerificationStep({
         return prev;
       });
     });
+  };
 
   // When the user manually edits the IFSC code (and Branch is blank), look it up.
   useEffect(() => {
@@ -1016,8 +1063,9 @@ export function DocumentVerificationStep({
   }, [bankDoc.ocrData?.ifsc_code, bankDoc.ocrData?.branch_name]);
 
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
-  const handleBankUpload2 = (file: File) =>
-    runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
+  const handleBankUpload2 = (file: File) => {
+    chequeTargetRef.current = "secondary";
+    return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
       setBankDoc2((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
         const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
@@ -1039,6 +1087,119 @@ export function DocumentVerificationStep({
         return prev;
       });
     });
+  };
+
+  // Submit manual bank details from the popup → re-verify via configured BANK provider.
+  const handleBankPopupSubmit = async () => {
+    const account = bankPopup.account.replace(/\s+/g, "");
+    const ifsc = bankPopup.ifsc.toUpperCase().trim();
+    if (account.length < 8 || !/^\d+$/.test(account)) {
+      setBankPopup((p) => ({ ...p, error: "Enter a valid account number (8+ digits)." }));
+      return;
+    }
+    if (!isValidIfsc(ifsc)) {
+      setBankPopup((p) => ({ ...p, error: "Enter a valid 11-character IFSC code." }));
+      return;
+    }
+    setBankPopup((p) => ({ ...p, submitting: true, error: "" }));
+    const target = bankPopup.target;
+    const setDoc = target === "secondary" ? setBankDoc2 : setBankDoc;
+    setDoc((prev) => ({
+      ...prev,
+      status: "verifying",
+      ocrData: { ...(prev.ocrData || {}), account_number: account, ifsc_code: ifsc },
+    }));
+    try {
+      const r = await callProvider({
+        providerName: "BANK",
+        input: { account, ifsc, id_number: account },
+      });
+      toastKycResult("Bank", r);
+      if (!r.found || !r.ok || !r.data) {
+        setBankPopup((p) => ({
+          ...p,
+          submitting: false,
+          error: r.message || "Bank verification failed. Please re-check the details and try again.",
+        }));
+        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: r.message || "Bank verification failed" }));
+        return;
+      }
+      const d = r.data as Record<string, any>;
+      const apiAccount = String(d.account_number || account).replace(/\s+/g, "");
+      const apiIfsc = String(d.ifsc || ifsc).toUpperCase().trim();
+      const rawData = (r.raw && typeof r.raw === "object" && (r.raw as any).data) || {};
+      const nameAtBank = String(d.full_name || d.name_at_bank || rawData.full_name || "").trim();
+
+      // IFSC enrichment for bank/branch/address
+      const ifscInfo = await lookupIfsc(apiIfsc);
+      const bankName = String(d.bank_name || ifscInfo?.bank || "").trim();
+      const branchName = String(d.branch_name || ifscInfo?.branch || "").trim();
+      const branchAddress = String(d.branch_address || ifscInfo?.address || "").trim();
+
+      // Same name-match rules as the cheque flow.
+      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
+      let holderNameStatus: "gst+pan" | "gst" | "none" = "none";
+      let holderNameMessage = "";
+      const gstOk = nameAtBank && gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
+      const panOk = nameAtBank && panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
+      if (gstOk && panOk) {
+        holderNameStatus = "gst+pan";
+        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
+      } else if (gstOk) {
+        holderNameStatus = "gst";
+        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
+      } else if (gstLegalName || panHolderName) {
+        const msg = "Account Holder Name does not match with GST and PAN details.";
+        setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+        return;
+      }
+
+      const normalized: Record<string, any> = {
+        account_number: apiAccount,
+        ifsc_code: apiIfsc,
+        bank_name: bankName,
+        branch_name: branchName,
+        account_holder_name: nameAtBank,
+        branch_address: branchAddress,
+      };
+      const fileName = `Manual ${apiAccount.slice(-4).padStart(apiAccount.length, "•")}`;
+      setDoc({
+        status: "verified",
+        fileName,
+        ocrData: normalized,
+        originalOcrData: normalized,
+        apiData: {
+          accountHolderName: nameAtBank,
+          bankName,
+          branchName,
+          ifsc: apiIfsc,
+          accountNumber: apiAccount,
+          bankAddress: branchAddress,
+          accountExists: d.account_exists,
+          impsRefNo: d.imps_ref_no,
+          holderNameStatus,
+          holderNameMessage,
+          normalized,
+        },
+        nameMatchScore: nameMatchScore(effectiveLegalName, nameAtBank),
+        verifiedAt: Date.now(),
+      });
+      // Push branch address into the editable Bank Address field if untouched.
+      if (target === "secondary") {
+        if (!bankAddressTouchedRef2.current && branchAddress) setBankBranchAddress2(branchAddress);
+      } else {
+        if (!bankAddressTouchedRef.current && branchAddress) setBankBranchAddress(branchAddress);
+      }
+      setBankPopup((p) => ({ ...p, open: false, submitting: false, error: "" }));
+    } catch (e: any) {
+      const msg = e?.message || "Bank verification failed unexpectedly.";
+      setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+      setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+    }
+  };
+
 
   useEffect(() => {
     if (!bank2Enabled) return;
@@ -2215,6 +2376,78 @@ export function DocumentVerificationStep({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={bankPopup.open}
+        onOpenChange={(o) => !bankPopup.submitting && setBankPopup((p) => ({ ...p, open: o }))}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bank verification — enter details manually</DialogTitle>
+            <DialogDescription>
+              {bankPopup.reason || "Please enter your bank account details to verify via Penny-Drop."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="bankPopupAccount">Account Number *</Label>
+              <Input
+                id="bankPopupAccount"
+                value={bankPopup.account}
+                onChange={(e) =>
+                  setBankPopup((p) => ({ ...p, account: e.target.value.replace(/\s+/g, "") }))
+                }
+                placeholder="e.g. 50100123456789"
+                className="font-mono"
+                autoFocus
+                disabled={bankPopup.submitting}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="bankPopupIfsc">IFSC Code *</Label>
+              <Input
+                id="bankPopupIfsc"
+                value={bankPopup.ifsc}
+                onChange={(e) =>
+                  setBankPopup((p) => ({ ...p, ifsc: e.target.value.toUpperCase() }))
+                }
+                placeholder="e.g. HDFC0001234"
+                maxLength={11}
+                className="font-mono uppercase"
+                disabled={bankPopup.submitting}
+              />
+            </div>
+            {bankPopup.error && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-sm text-destructive">
+                <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span className="break-words">{bankPopup.error}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBankPopup((p) => ({ ...p, open: false }))}
+              disabled={bankPopup.submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleBankPopupSubmit}
+              disabled={
+                bankPopup.submitting ||
+                bankPopup.account.replace(/\s+/g, "").length < 8 ||
+                !isValidIfsc(bankPopup.ifsc)
+              }
+            >
+              {bankPopup.submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

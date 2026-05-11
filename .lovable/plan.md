@@ -1,41 +1,25 @@
-# Plan
+## Problem
+The earlier change was made in `BankKycTab.tsx`, but the screenshot is from the newer `DocumentVerificationStep.tsx` bank flow. That screen still handles cheque failures with the old failed banner / mismatch dialog path, so the manual Account Number + IFSC popup is not triggered there.
 
-## Point 1 — MSME "No" hides all non-registered fields
+## Plan
+1. **Add bank manual-entry popup state to `DocumentVerificationStep.tsx`**
+   - Track popup open/close, account number, IFSC, submitting state, error text, and whether it is for primary or secondary bank account.
 
-In `src/components/vendor/kyc/MsmeKycTab.tsx`, when `isMsmeRegistered === false`:
+2. **Open the popup on any primary/secondary cheque failure**
+   - In the cheque branch of `runDocFlow`, when OCR fails, extracted Account/IFSC is invalid, penny-drop fails, provider returns 500/internal error, rate-limit, or account-holder mismatch, open the manual popup instead of only showing the failed banner/re-upload dialog.
+   - Prefill Account Number / IFSC if the OCR response contains partial values.
 
-- Remove the entire `!props.isMsmeRegistered` block (Alert, Download template button, Reason textarea, Signed Self-Declaration FileUpload).
-- Show only the Yes/No radio group. No further fields appear.
-- Update the status reporter so "No" reports `na` directly (no longer waits for a self-declaration file): `status = !isMsmeRegistered ? 'na' : state.status`.
-- Keep props (`msmeSelfDeclarationFile`, `onMsmeSelfDeclarationFileChange`, `msmeDeclarationReason`, `onMsmeDeclarationReasonChange`) in the interface as optional but unused inside the component, so parent callers don't break. Parent (`DocumentVerificationStep.tsx`) continues to pass them harmlessly.
+3. **Submit manual details through configured Bank Verification API**
+   - On popup Submit, call the configured `BANK` provider with `{ account, ifsc, id_number: account }`.
+   - Reuse the same bank normalization, IFSC enrichment, and GST/PAN name-match rules so successful response fills Account Number, IFSC, Bank Name, Branch, Account Holder Name, and status becomes verified.
+   - If API still fails, keep the popup open and show the actual provider error inside it so the user can correct and retry.
 
-Verification gating (`mem://logic/verification-gating`) still passes because `na` is treated as non-blocking.
+4. **Update old bank failure dialog action**
+   - Replace the “Re-upload cheque” only path with popup-first behavior for bank failures, while leaving MSME/GST/PAN behavior unchanged.
 
-## Point 2 — Bank cheque failure → manual entry popup
-
-Refactor `src/components/vendor/kyc/BankKycTab.tsx`:
-
-- **Remove the Tabs UI** ("Enter manually" / "Upload cheque"). Show only the cheque uploader (`OcrUploadAndVerify`) plus the existing alert banner (reworded: "Upload your cancelled cheque. If we can't read it, you can enter the details manually.").
-- **Detect failure** inside `handleOcrVerify` (and the OCR step itself via `runBankOcr`). Whenever OCR fails, IFSC/account can't be parsed, or the penny-drop API returns `!ok`, set `manualPopupOpen = true` and stash any partial values (`prefillAccount`, `prefillIfsc`).
-- **Add an `AlertDialog`** with title "Bank verification failed — enter details manually", body containing two `Input`s (Account Number, IFSC, uppercase, max 11) and a Submit button (disabled until `account.length >= 8 && isValidIfsc(ifsc)`).
-- **Submit handler** calls `callProvider({ providerName: 'BANK', input: { account, ifsc, id_number: account } })`, then runs the existing `finalizePennyDrop(account, ifsc, data)` to populate bank name / branch / holder name and trigger GST/PAN name match. On success the popup closes and the green "Account Holder Name verified…" banner appears; on failure an inline error stays inside the popup so the user can correct and retry.
-- The shared `finalizePennyDrop` helper (already extracted) is reused unchanged, so the response data flows into the same parent fields as the cheque path (`onBankDetailsChange`, `onVerifiedDetails`, `onStatusChange`).
-- Remove now-unused imports: `Tabs*`, `Pencil`, `VerifyButton`, `ValidationMessage`, `useProviderVerify`, the standalone `FileUpload` inside the manual tab, `manualState`/`manualVerify` hook usage.
-
-## Files touched
-
-- `src/components/vendor/kyc/MsmeKycTab.tsx`
-- `src/components/vendor/kyc/BankKycTab.tsx`
+## Files to change
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
 
 ## Out of scope
-
-- No backend / edge function / RLS changes.
-- No changes to GST tab or other KYC tabs.
-- Cheque file is still optional/required per existing parent rules — popup path doesn't require a file.
-
-## Verification
-
-1. MSME tab → select **No** → only the Yes/No row remains; no template, reason, or upload field. Step is non-blocking.
-2. Bank tab → upload an unreadable cheque (or one whose penny-drop fails) → popup appears with Account + IFSC inputs.
-3. Enter valid account + IFSC, click **Submit** → penny-drop runs, popup closes, bank fields and "Account Holder Name verified with …" banner populate exactly as the OCR-success flow.
-4. Enter invalid details → inline error inside the popup, user can retry without losing context.
+- No database/backend changes.
+- No changes to GST, PAN, or MSME verification logic except keeping MSME “No” as already changed.
