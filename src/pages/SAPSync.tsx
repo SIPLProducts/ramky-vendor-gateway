@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
+import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
 import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import {
   Search,
