@@ -387,6 +387,37 @@ export function DocumentVerificationStep({
     message: "",
   });
 
+  // Manual bank-entry popup — opened when cheque OCR / penny-drop fails.
+  // Vendor types Account Number + IFSC, we re-call the configured BANK
+  // provider, and on success populate the bank doc as if cheque OCR had worked.
+  const chequeTargetRef = useRef<"primary" | "secondary">("primary");
+  const [bankPopup, setBankPopup] = useState<{
+    open: boolean;
+    target: "primary" | "secondary";
+    reason: string;
+    account: string;
+    ifsc: string;
+    submitting: boolean;
+    error: string;
+  }>({ open: false, target: "primary", reason: "", account: "", ifsc: "", submitting: false, error: "" });
+
+  const openBankManualPopup = (
+    target: "primary" | "secondary",
+    reason: string,
+    prefillAccount = "",
+    prefillIfsc = "",
+  ) => {
+    setBankPopup({
+      open: true,
+      target,
+      reason,
+      account: prefillAccount,
+      ifsc: prefillIfsc,
+      submitting: false,
+      error: "",
+    });
+  };
+
   // ---------- Verification ----------
   // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
   // Other kinds still use a lightweight simulation pending real provider wiring.
