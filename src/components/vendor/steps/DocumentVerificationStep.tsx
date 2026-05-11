@@ -1063,8 +1063,9 @@ export function DocumentVerificationStep({
   }, [bankDoc.ocrData?.ifsc_code, bankDoc.ocrData?.branch_name]);
 
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
-  const handleBankUpload2 = (file: File) =>
-    runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
+  const handleBankUpload2 = (file: File) => {
+    chequeTargetRef.current = "secondary";
+    return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
       setBankDoc2((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
         const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
