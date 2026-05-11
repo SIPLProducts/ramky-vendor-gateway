@@ -1013,8 +1013,7 @@ export function DocumentVerificationStep({
 
   const handleBankUpload = (file: File) => {
     chequeTargetRef.current = "primary";
-    return
-    runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
+    return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
@@ -1038,6 +1037,7 @@ export function DocumentVerificationStep({
         return prev;
       });
     });
+  };
 
   // When the user manually edits the IFSC code (and Branch is blank), look it up.
   useEffect(() => {
