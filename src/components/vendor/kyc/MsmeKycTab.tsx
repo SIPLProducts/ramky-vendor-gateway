@@ -250,42 +250,6 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
         </Tabs>
       )}
 
-      {!props.isMsmeRegistered && (
-        <div className="space-y-4">
-          <Alert>
-            <AlertDescription>
-              Please download the MSME Self-Declaration form, sign it, and upload the signed copy below.
-            </AlertDescription>
-          </Alert>
-
-          <Button asChild type="button" variant="outline" size="sm">
-            <a href="/templates/msme-self-declaration.html" target="_blank" rel="noopener noreferrer">
-              <Download className="h-4 w-4 mr-2" />
-              Download MSME Self-Declaration Template
-            </a>
-          </Button>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="msmeDeclarationReason">Reason for non-registration (optional)</Label>
-            <Textarea
-              id="msmeDeclarationReason"
-              value={props.msmeDeclarationReason || ''}
-              onChange={(e) => props.onMsmeDeclarationReasonChange?.(e.target.value)}
-              placeholder="e.g. Turnover below MSME threshold limit"
-              rows={2}
-            />
-          </div>
-
-          <FileUpload
-            label="Signed MSME Self-Declaration *"
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            documentType="msme_self_declaration"
-            onFileSelect={(f) => props.onMsmeSelfDeclarationFileChange?.(f)}
-            currentFile={props.msmeSelfDeclarationFile ?? null}
-            vendorId={props.vendorId}
-          />
-        </div>
-      )}
 
       {props.isMsmeRegistered && enterpriseCheck !== 'idle' && enterpriseName && (
         <div
