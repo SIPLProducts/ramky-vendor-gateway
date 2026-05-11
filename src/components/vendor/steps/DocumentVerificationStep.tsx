@@ -1093,7 +1093,9 @@ export function DocumentVerificationStep({
           manualAddress.pincode.trim().length >= 5
         : false;
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
-  const stage3Done = isMsmeRegistered === false || (isMsmeRegistered === true && msmeDoc.status === "verified");
+  const stage3Done =
+    (isMsmeRegistered === false && !!msmeDeclarationFile) ||
+    (isMsmeRegistered === true && msmeDoc.status === "verified");
   const stage4Done =
     bankDoc.status === "verified" &&
     (!bank2Enabled || bankDoc2.status === "verified");
