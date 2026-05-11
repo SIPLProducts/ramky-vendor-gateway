@@ -54,6 +54,8 @@ export interface VerifiedDocumentData {
   gstSelfDeclarationFile?: File | null;
   pan?: { number: string; holderName: string; apiName?: string; nameMatchScore?: number };
   isMsmeRegistered?: boolean;
+  msmeDeclarationReason?: string;
+  msmeSelfDeclarationFile?: File | null;
   msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
