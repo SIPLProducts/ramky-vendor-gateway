@@ -1,42 +1,67 @@
-## Goal
+# MSME Self-Declaration when "No" is selected
 
-Make the **full SAP payload** (the 100+ field array you pasted) visible in the browser Network tab when clicking "Sync", instead of the small `{ vendorId, overrides }` body.
+Mirror the existing GST non-registration flow inside the MSME tab.
 
-Right now the browser sends a compact request and the edge function expands it server-side via the template — that's why you only see the short body. We'll move the expansion to the client so the dynamic, fully-resolved payload travels over the wire and is inspectable.
+## What to build
 
-## Changes
+When the user selects **No** for "Are you MSME registered?", show:
+1. An info alert explaining the next step.
+2. A **Download MSME Self-Declaration Template** button (opens an HTML template in a new tab; user prints/saves as PDF, signs, scans).
+3. An optional **Reason for non-registration** textarea.
+4. A **Signed MSME Self-Declaration** file upload (PDF/JPG/PNG).
 
-### 1. New client-side payload builder
-Create `src/lib/sapPayloadBuilder.ts`:
-- Fetches the vendor row, tenant `sap_default_fields`, active `sap_payload_templates` (tenant-specific → global fallback), and `vendor_documents` (downloads + base64-encodes each, skipping >10MB).
-- Reuses the same resolver logic currently in the edge function (`resolveTemplate`, `resolveExpr`, `resolveRegion`, `DOC_NAME_MAP`, MSME inference, classify merging).
-- Returns the final `payload` array — identical shape to what the edge function builds today.
+When the user selects **Yes**, behavior is unchanged (existing manual entry / OCR upload tabs).
 
-### 2. Update `usePurchaseAction` (in `src/hooks/useVendors.tsx`)
-- Before invoking `sync-vendor-to-sap`, call `buildSapPayload(vendorId, overrides)`.
-- Pass the resolved payload in the request body: `{ vendorId, sapPayload }`.
-- This is the request the browser Network tab will show — full dynamic payload, every time.
+## Files to change
 
-### 3. Update edge function `sync-vendor-to-sap/index.ts`
-- If `sapPayload` is present in the request body, **use it directly** and skip template resolution / document fetching.
-- Keep the existing template path as a fallback (so older callers still work).
-- Still handle: SAP middleware/direct routing, auth headers, response parsing, vendor status update on success.
+### 1. `public/templates/msme-self-declaration.html` (new)
+A printable A4 declaration template, styled identically to `public/templates/gst-self-declaration.html`. Content adapted from the user-uploaded `Non-MSME_Declaration.docx`:
+- Title: "Self-Declaration for Non-Registration under MSME"
+- Subtitle: "(To be submitted on company letterhead, signed and stamped)"
+- Addressed to "The Procurement Department, Sharvi Infotech Private Limited"
+- Fields: Name of Entity, PAN, Constitution of Business, Registered Address, Reason for non-registration
+- Declaration paragraphs covering: not registered under MSME Act; will inform the company if registered later; information furnished is true
+- Signature block (Authorised Signatory + Company Seal & Date)
+- Same Print/Save-as-PDF button and `@media print` styles
 
-### 4. No DB schema changes
-Templates, defaults, and documents stay in the database — only the *resolution step* moves to the client.
+### 2. `src/components/vendor/kyc/MsmeKycTab.tsx`
+- Add props: `msmeSelfDeclarationFile`, `onMsmeSelfDeclarationFileChange`, `msmeDeclarationReason`, `onMsmeDeclarationReasonChange`.
+- Update `onStatusChange` so when `isMsmeRegistered === false`, status is `'passed'` if a signed declaration file is present, otherwise `'na'` (matches GST tab).
+- Render the new "No" branch (Alert + Download button + Reason textarea + FileUpload) — using `documentType="msme_self_declaration"`.
+- Keep existing "Yes" branch unchanged.
 
-## Why this fixes "same payload sent repeatedly"
+### 3. `src/components/vendor/steps/ComplianceStep.tsx`
+- Add local state `msmeSelfDeclarationFile` and `msmeDeclarationReason` (read initial values from `data.statutory`).
+- Pass new props to `<MsmeKycTab>`.
+- Include both in the `onComplete`/save payload alongside `msmeCertificateFile`.
 
-Today the browser body is literally just `{ vendorId, overrides }`, so it looks identical between syncs even when the resolved SAP payload differs. After this change, each click serializes the **current** vendor + template + classify + uploads, so the Network tab reflects exactly what SAP receives — and any vendor edit shows up immediately in the next request body.
+### 4. `src/pages/VendorRegistration.tsx`
+- Extend the `statutory` initial state with `msmeSelfDeclarationFile: null` and `msmeDeclarationReason: ''`.
+- Wire the new fields through `setVerifiedData` / step persistence the same way GST does.
+- Update the `msmeOk` gate so a non-MSME vendor is also acceptable when a signed declaration file is uploaded (mirrors GST behavior — optional, see Open question).
 
-## Technical notes
+### 5. `src/hooks/useVendorRegistration.tsx`
+- Add `{ file: formData.statutory.msmeSelfDeclarationFile, type: 'msme_self_declaration' }` to the document upload list (next to `msme_certificate`).
+- Persist `msme_declaration_reason` if a column exists; otherwise skip (see DB section).
 
-- Document base64 encoding on the client uses `FileReader` / `arrayBuffer()` from the Supabase Storage download — same logic as server, just in the browser.
-- Resolver is pure — moving it client-side is a straight port (no Deno-only APIs used).
-- Edge function keeps its auth gate (`requireAuthenticatedUser`) and middleware secret handling — those must stay server-side.
-- A "Preview SAP Payload" button can be added later in `PurchaseApproval.tsx` using the same builder if you want a dry-run view.
+### 6. `src/components/vendor/steps/ReviewStep.tsx`
+- Under the MSME row, when `isMsmeRegistered === false`, show whether a signed declaration was uploaded and the reason (read-only summary), matching the GST review row pattern.
+
+## Database
+
+No schema change is required for the file itself — `msme_self_declaration` will be stored as a row in `vendor_documents` keyed by `document_type`, exactly like `gst_self_declaration` already is.
+
+If we want to persist the optional reason, we can either:
+- (a) reuse a notes/metadata column on `vendor_documents`, or
+- (b) add a `msme_declaration_reason text` column to the vendors table (matches `gst_declaration_reason` if that exists today).
+
+Recommendation: only add a column if the GST equivalent is already a column. Otherwise keep the reason in form state / document metadata.
 
 ## Out of scope
 
-- Changing the SAP field mapping or template content.
-- Adding a UI preview modal (can be a follow-up).
+- No OCR/verification of the signed declaration (same as GST).
+- No changes to MSME Yes-branch flow or to existing approval gating beyond letting "No + signed declaration" count as complete.
+
+## Open question
+
+Should uploading the signed MSME declaration be **mandatory** to proceed past the Compliance step (matches GST's strict gate), or remain **optional** like the current MSME-No path? Default in this plan: mandatory, matching GST.
