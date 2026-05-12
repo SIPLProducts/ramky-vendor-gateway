@@ -1860,7 +1860,16 @@ export function DocumentVerificationStep({
                       </a>
                       <InlineFilePicker
                         file={msmeDeclarationFile}
-                        onPick={setMsmeDeclarationFile}
+                        onPick={async (f) => {
+                          if (!f) { setMsmeDeclarationFile(null); return; }
+                          try {
+                            const img = await normalizeUploadToImage(f);
+                            setMsmeDeclarationFile(img);
+                            if (img !== f) toast.success(`Converted to image: ${img.name}`);
+                          } catch (err: any) {
+                            toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
+                          }
+                        }}
                         accept=".pdf,.jpg,.jpeg,.png"
                       />
                     </div>
