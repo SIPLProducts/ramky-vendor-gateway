@@ -120,6 +120,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
     defaultValues: {
       ...data,
       state: data?.state || '',
+      accountingGroup: (data?.accountingGroup as 'Import' | 'Export') || undefined,
       productCategoriesOther: data?.productCategoriesOther || '',
       materialGroupVendor: data?.materialGroupVendor || '',
       vendorCategory: data?.vendorCategory || '',
