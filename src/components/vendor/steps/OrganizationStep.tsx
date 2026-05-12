@@ -43,6 +43,7 @@ const schema = z.object({
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
+  accountingGroup: z.enum(['Import', 'Export'], { required_error: 'Accounting group is required' }),
   // SAP Classification
   materialGroupVendor: z.string().min(1, 'Material Group for Vendors is required'),
   vendorCategory: z.string().min(1, 'Vendor Category is required'),
