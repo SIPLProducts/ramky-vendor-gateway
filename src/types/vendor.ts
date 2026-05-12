@@ -42,6 +42,8 @@ export interface OrganizationDetails {
   identificationSource?: string;
 }
 
+export const ACCOUNTING_GROUPS = ['Import', 'Export'] as const;
+
 export const VENDOR_CATEGORIES = [
   'TRADER',
   'MANUFACTURER',
