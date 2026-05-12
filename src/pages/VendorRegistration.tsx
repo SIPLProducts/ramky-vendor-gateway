@@ -935,8 +935,11 @@ export default function VendorRegistration() {
                     <Button
                       type="button"
                       onClick={handleSubmit}
-                      disabled={isSubmitting}
-                      className="min-w-[160px]"
+                      disabled={isSubmitting || !formData.declaration?.selfDeclared || !formData.declaration?.termsAccepted}
+                      className={cn(
+                        "min-w-[160px]",
+                        (!formData.declaration?.selfDeclared || !formData.declaration?.termsAccepted) && "opacity-50 cursor-not-allowed"
+                      )}
                     >
                       {isSubmitting ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
