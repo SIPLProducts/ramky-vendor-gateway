@@ -1607,7 +1607,7 @@ export function DocumentVerificationStep({
                   <>
                     <DocSplitRow
                       uploadLabel="GST Certificate"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.docx"
                       doc={gstDoc}
                       onUpload={handleGstUpload}
                       onReset={() => setGstDoc(idleDoc)}
@@ -1666,7 +1666,7 @@ export function DocumentVerificationStep({
                             toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
                       />
                     </div>
 
@@ -1722,7 +1722,7 @@ export function DocumentVerificationStep({
             >
               <DocSplitRow
                 uploadLabel="PAN Card"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.docx"
                 doc={panDoc}
                 onUpload={handlePanUpload}
                 onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
@@ -1870,7 +1870,7 @@ export function DocumentVerificationStep({
                             toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
                       />
                     </div>
 
@@ -2077,7 +2077,7 @@ export function DocumentVerificationStep({
                     <TabsContent value="upload" className="space-y-3">
                       <DocSplitRow
                         uploadLabel="Udyam Certificate"
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
                         doc={msmeDoc}
                         onUpload={handleMsmeUpload}
                         onReset={() => setMsmeDoc(idleDoc)}
@@ -2181,7 +2181,7 @@ export function DocumentVerificationStep({
             >
               <DocSplitRow
                 uploadLabel="Cancelled Cheque"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.docx"
                 doc={bankDoc}
                 onUpload={handleBankUpload}
                 onReset={() => setBankDoc(idleDoc)}
@@ -2321,7 +2321,7 @@ export function DocumentVerificationStep({
                     </div>
                     <DocSplitRow
                       uploadLabel="Cancelled Cheque (Secondary)"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.docx"
                       doc={bankDoc2}
                       onUpload={handleBankUpload2}
                       onReset={() => setBankDoc2(idleDoc)}
