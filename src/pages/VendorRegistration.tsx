@@ -670,7 +670,7 @@ export default function VendorRegistration() {
     }
     // Last step is always Review
     if (currentStep === registrationSteps.length) {
-      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
     }
     // Anything in between is an admin-defined custom tab (ids 6..N-1)
     const customIdx = currentStep - 6;
