@@ -1030,16 +1030,14 @@ export function DocumentVerificationStep({
         nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
       };
       const apiName = ocrShape.enterprise_name;
-      // Cross-tab gate: enterprise name must match GST Legal Name OR PAN Holder Name.
-      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      // Cross-tab gate: enterprise name must match PAN Holder Name (>=40%).
       const panHolderName = String(
         panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
       ).trim();
-      if (apiName && (gstLegalName || panHolderName)) {
-        const gstOk = gstLegalName ? fuzzyNameMatch(apiName, gstLegalName) : false;
-        const panOk = panHolderName ? fuzzyNameMatch(apiName, panHolderName) : false;
-        if (!gstOk && !panOk) {
-          const msg = "Enterprise Name does not match with GST Legal Name and PAN Holder Name.";
+      if (apiName && panHolderName) {
+        const score = nameMatchPercentage(apiName, panHolderName);
+        if (score < 40) {
+          const msg = "Enterprise Name does not match with PAN Holder Name.";
           setMsmeManualError(msg);
           setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
           setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
