@@ -30,6 +30,7 @@ import {
   INDIAN_STATES,
   VENDOR_CATEGORIES,
   IDENTIFICATION_SOURCES,
+  ACCOUNTING_GROUPS,
 } from '@/types/vendor';
 
 const schema = z.object({
