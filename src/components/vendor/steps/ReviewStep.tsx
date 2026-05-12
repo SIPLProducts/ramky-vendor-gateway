@@ -27,10 +27,19 @@ const DataRow = ({ label, value }: { label: string; value: string | undefined })
   </div>
 );
 
-export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
+export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: ReviewStepProps) {
   const [selfDeclared, setSelfDeclared] = useState(data.declaration?.selfDeclared || false);
   const [termsAccepted, setTermsAccepted] = useState(data.declaration?.termsAccepted || false);
   const canSubmit = selfDeclared && termsAccepted;
+
+  const updateSelfDeclared = (v: boolean) => {
+    setSelfDeclared(v);
+    onDeclarationChange?.({ selfDeclared: v, termsAccepted });
+  };
+  const updateTermsAccepted = (v: boolean) => {
+    setTermsAccepted(v);
+    onDeclarationChange?.({ selfDeclared, termsAccepted: v });
+  };
 
   // Step numbers (6-step flow):
   //  1 Doc Verification (PAN/GST/MSME/Bank captured & verified here)
