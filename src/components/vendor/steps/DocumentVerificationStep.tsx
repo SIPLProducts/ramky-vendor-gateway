@@ -1655,7 +1655,16 @@ export function DocumentVerificationStep({
                       </a>
                       <InlineFilePicker
                         file={gstDeclarationFile}
-                        onPick={setGstDeclarationFile}
+                        onPick={async (f) => {
+                          if (!f) { setGstDeclarationFile(null); return; }
+                          try {
+                            const img = await normalizeUploadToImage(f);
+                            setGstDeclarationFile(img);
+                            if (img !== f) toast({ title: "Converted to image", description: `${f.name} → ${img.name}` });
+                          } catch (err: any) {
+                            toast({ title: "Upload failed", description: err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).", variant: "destructive" });
+                          }
+                        }}
                         accept=".pdf,.jpg,.jpeg,.png"
                       />
                     </div>
