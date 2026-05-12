@@ -1,26 +1,54 @@
-# Convert Declaration Uploads to Single Image
 
-When the user uploads a Non-GST or Non-MSME Self-Declaration document, normalize the file to a single PNG/JPG/JPEG before storing it in form state.
+# Accept Any File for Non-GST / Non-MSME Declaration Uploads
 
-## Behavior
+## Problem
 
-- **Image upload (PNG/JPG/JPEG)**: keep as-is (already in target format).
-- **PDF upload (any number of pages)**: render every page client-side and stitch them vertically into one combined JPEG image. Replace the original `File` with the new image `File` (e.g. `original-name.jpg`) before calling `setGstDeclarationFile` / `setMsmeDeclarationFile`.
-- **Other formats** (DOCX, etc.): reject with a toast — only PDF/PNG/JPG/JPEG are accepted for conversion.
-- Show a small "Converting…" state on the dropzone while rendering, and a success toast like "Converted N pages to image" when done.
+1. The "Unsupported file type" toast fires because the dropzone `accept` is restricted to `.pdf,.jpg,.jpeg,.png` and `normalizeUploadToImage()` throws on anything else.
+2. The user wants any uploaded file (PDF, DOCX, image, etc.) normalized to a single JPG/JPEG/PNG before storage.
 
 ## Scope
 
 Only the two declaration uploaders in `src/components/vendor/steps/DocumentVerificationStep.tsx`:
-- GST Self-Declaration (`gstDeclarationFile`, ~line 1657)
-- MSME Self-Declaration (`msmeDeclarationFile`, ~line 1852)
+- GST Self-Declaration (line ~1657)
+- MSME Self-Declaration (line ~1862)
 
-All other uploads (GST doc, PAN, MSME cert, Bank doc) are unchanged.
+All other uploads remain unchanged.
 
-## Technical Notes
+## Behavior
 
-- Add a helper `src/lib/pdfToImage.ts` exporting `pdfToSingleImage(file: File, mime: 'image/jpeg'|'image/png' = 'image/jpeg'): Promise<File>`.
-- Use `pdfjs-dist` (already a common dep; install if missing) with its worker loaded via `?url` import for Vite.
-- For each PDF page: render to an offscreen canvas at scale ~1.5. Then create a master canvas with `width = max(pageWidths)` and `height = sum(pageHeights)`, draw each page stacked vertically on white background, and export via `canvas.toBlob` → wrap in `new File([blob], "<basename>.jpg", { type: 'image/jpeg' })`.
-- Restrict `accept` on both dropzones to `.pdf,.jpg,.jpeg,.png` (already the case) and validate MIME on pick.
-- Keep `accept` strings unchanged; conversion happens inside an `onPick` wrapper passed to `FileDropzone`.
+| Uploaded type | Conversion |
+|---|---|
+| PNG / JPG / JPEG | Pass through unchanged |
+| PDF | Render every page → stitch vertically → single JPEG (already implemented) |
+| DOCX | Convert to HTML via `mammoth` → render HTML to canvas via `html2canvas` → single JPEG |
+| Anything else | Reject with toast: "Unsupported file type. Please upload PDF, DOCX, or an image." |
+
+A success toast "Converted to image: <name>" fires whenever conversion runs.
+
+## Technical Changes
+
+### `src/lib/pdfToImage.ts` — extend `normalizeUploadToImage`
+
+- Add DOCX branch:
+  - Detect by `file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'` or `.docx` extension.
+  - `mammoth.convertToHtml({ arrayBuffer })` → HTML string.
+  - Append a hidden, fixed-width (e.g. 800px) container with the HTML to `document.body`, white background, basic typography.
+  - Use `html2canvas` to snapshot the container into one canvas.
+  - Export canvas → JPEG `File` named `<basename>.jpg`.
+  - Remove the temp container in `finally`.
+- Keep PDF and image branches as today.
+- Throw clear error for any other type.
+
+### `DocumentVerificationStep.tsx`
+
+- Update `accept` on both `InlineFilePicker` instances from `.pdf,.jpg,.jpeg,.png` to `.pdf,.jpg,.jpeg,.png,.docx` (and matching MIME types).
+- `onPick` handlers already call `normalizeUploadToImage` and toast on error — no change beyond the wider accept list.
+
+### Dependencies
+
+Add: `mammoth`, `html2canvas`.
+
+## Out of Scope
+
+- Legacy `.doc`, `.xls`, `.xlsx`, `.ppt`, `.pptx` (would require server-side LibreOffice).
+- Changing any other upload field, validation flow, or KYC logic.
