@@ -81,6 +81,20 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <TextField label="Vendor Account Group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
+              <ReadOnlyField label="Trade Name" value={(vendor as any)?.trade_name} />
+              <ReadOnlyField label="GST ID (GSTIN)" value={(vendor as any)?.gstin} />
+              <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
+              <ReadOnlyField label="Udyam Number (MSME)" value={(vendor as any)?.msme_number} />
+            </Section>
+
+            <Separator />
+
+            {/* Bank Details */}
+            <Section icon={<Landmark className="h-4 w-4" />} title="Bank Details">
+              <ReadOnlyField label="Bank Account Number" value={(vendor as any)?.account_number} />
+              <ReadOnlyField label="Bank ID (IFSC Code)" value={(vendor as any)?.ifsc_code} />
+              <ReadOnlyField label="Account Holder Name" value={(vendor as any)?.account_holder_name} />
+              <ReadOnlyField label="Bank Name" value={(vendor as any)?.bank_name} />
             </Section>
 
             <Separator />
