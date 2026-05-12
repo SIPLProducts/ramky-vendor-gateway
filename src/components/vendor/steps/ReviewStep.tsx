@@ -147,11 +147,11 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
         <h3 className="form-section-title"><CheckCircle2 className="h-5 w-5 text-primary" />Declaration & Submission</h3>
         <div className="space-y-4">
           <div className="flex items-start space-x-3">
-            <Checkbox id="selfDeclared" checked={selfDeclared} onCheckedChange={(checked) => setSelfDeclared(checked === true)} />
+            <Checkbox id="selfDeclared" checked={selfDeclared} onCheckedChange={(checked) => updateSelfDeclared(checked === true)} />
             <Label htmlFor="selfDeclared" className="text-sm font-normal cursor-pointer">I declare that the information furnished above is correct to the best of my knowledge. I undertake that I will inform you of any changes in the above at the earliest.</Label>
           </div>
           <div className="flex items-start space-x-3">
-            <Checkbox id="termsAccepted" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked === true)} />
+            <Checkbox id="termsAccepted" checked={termsAccepted} onCheckedChange={(checked) => updateTermsAccepted(checked === true)} />
             <Label htmlFor="termsAccepted" className="text-sm font-normal cursor-pointer">I accept the Terms and Conditions and Privacy Policy of Ramky Infrastructure Limited.</Label>
           </div>
         </div>
