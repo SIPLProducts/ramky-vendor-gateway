@@ -60,6 +60,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
             <DataRow label="Others (Specified)" value={data.organization.productCategoriesOther} />
           )}
           <DataRow label="State" value={data.organization?.state} />
+          <DataRow label="Accounting Group" value={data.organization?.accountingGroup} />
         </div>
       </div>
 
