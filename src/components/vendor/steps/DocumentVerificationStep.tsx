@@ -1267,7 +1267,7 @@ export function DocumentVerificationStep({
           return;
         }
         holderNameStatus = "passed";
-        holderNameMessage = "Account Holder Name verified successfully.";
+        holderNameMessage = buildHolderNameSuccessMessage(refs.map((rr) => rr.label));
       }
 
       const normalized: Record<string, any> = {
