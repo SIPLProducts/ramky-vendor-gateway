@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -81,6 +81,20 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <TextField label="Vendor Account Group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
+              <ReadOnlyField label="Trade Name" value={(vendor as any)?.trade_name} />
+              <ReadOnlyField label="GST ID (GSTIN)" value={(vendor as any)?.gstin} />
+              <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
+              <ReadOnlyField label="Udyam Number (MSME)" value={(vendor as any)?.msme_number} />
+            </Section>
+
+            <Separator />
+
+            {/* Bank Details */}
+            <Section icon={<Landmark className="h-4 w-4" />} title="Bank Details">
+              <ReadOnlyField label="Bank Account Number" value={(vendor as any)?.account_number} />
+              <ReadOnlyField label="Bank ID (IFSC Code)" value={(vendor as any)?.ifsc_code} />
+              <ReadOnlyField label="Account Holder Name" value={(vendor as any)?.account_holder_name} />
+              <ReadOnlyField label="Bank Name" value={(vendor as any)?.bank_name} />
             </Section>
 
             <Separator />
@@ -107,6 +121,38 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={v => set('webre', v ? 'X' : '')} />
               <CheckboxField label="Service-Based Invoice Verification" checked={form.lebre === 'X'}
                 onChange={v => set('lebre', v ? 'X' : '')} />
+            </Section>
+
+            <Separator />
+
+            {/* Classification */}
+            <Section icon={<Tags className="h-4 w-4" />} title="Classification">
+              <TextField label="Material Category" value={form.classify.MGV} onChange={v => setClassify('MGV', v)} />
+              <TextField label="Vendor Category" value={form.classify.CATV} onChange={v => setClassify('CATV', v)} />
+              <TextField label="Vendor Location" value={form.classify.LOCV} onChange={v => setClassify('LOCV', v)} />
+              <TextField label="Vendor Identification" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
+            </Section>
+
+            <Separator />
+
+            {/* Registered / Corporate Office Address */}
+            <Section icon={<MapPin className="h-4 w-4" />} title="Registered / Corporate Office Address">
+              <ReadOnlyField label="Address Line 1" value={(vendor as any)?.registered_address} />
+              <ReadOnlyField label="Address Line 2" value={(vendor as any)?.registered_address_line2} />
+              <ReadOnlyField label="Address Line 3" value={(vendor as any)?.registered_address_line3} />
+              <ReadOnlyField label="Address Line 4" value={(vendor as any)?.registered_address_line4} />
+              <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
+              <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
+              <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
+              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone} />
+            </Section>
+
+            <Separator />
+
+            {/* Contact Details */}
+            <Section icon={<Phone className="h-4 w-4" />} title="Contact Details">
+              <ReadOnlyField label="Contact Number" value={(vendor as any)?.primary_phone || (vendor as any)?.registered_phone} />
+              <ReadOnlyField label="Email ID" value={(vendor as any)?.primary_email || (vendor as any)?.registered_email} />
             </Section>
 
           </div>
@@ -203,6 +249,15 @@ function CheckboxField({ label, checked, onChange }: { label: string; checked: b
     <div className="flex items-center gap-2 pt-5">
       <Checkbox checked={checked} onCheckedChange={v => onChange(!!v)} />
       <Label className="text-sm cursor-pointer" onClick={() => onChange(!checked)}>{label}</Label>
+    </div>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input value={value == null || value === '' ? '—' : String(value)} disabled readOnly className="h-9 rounded-lg bg-muted/40 text-muted-foreground" />
     </div>
   );
 }
