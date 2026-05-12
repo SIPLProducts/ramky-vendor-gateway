@@ -1,31 +1,55 @@
-Plan:
+# Plan — Bank holder-name verification & PAN API gating
 
-1. Make upload conversion consistent and visible
-- Update the client-side upload normalizer so every selected declaration file becomes a new image file, not only PDFs.
-- Output declaration uploads as a single JPEG by default.
-- Convert:
-  - PDF: render all pages and stitch into one JPEG.
-  - JPG/JPEG/PNG/WebP/BMP/GIF: load into canvas and re-encode as one JPEG.
-  - DOCX: render document content to HTML, capture it, and save as one JPEG.
-  - TXT/CSV and XLS/XLSX: render readable content/table preview, capture it, and save as one JPEG.
-- For browser-unreadable legacy/binary formats, avoid the current “Unsupported file type” dead-end by showing a clear conversion failure message explaining the file content cannot be rendered client-side.
+Two files change. No backend / no schema change. All updates are to the Document Verification step (Bank + PAN flows) and matching messages.
 
-2. Apply conversion to the affected upload buttons
-- Fix Non-GST Declaration and Non-MSME Declaration upload handlers to always store the converted JPEG file and show the converted filename.
-- Update accepted file types and helper text so users can choose common document/image files, not only PDF/image.
-- Keep the conversion fully client-side.
+## 1. Bank — conditional success/failure messages
 
-3. Correct the GST “No” path
-- Keep the declaration template download and signed upload.
-- Remove/hide the GST manual legal name/address fields from this path because the user specified GST-related fields below are not required.
-- Once the signed declaration image is uploaded, automatically unlock/move to PAN.
+In `src/components/vendor/steps/DocumentVerificationStep.tsx` (cheque-OCR finalize path ~lines 729–757 and manual-popup path ~lines 1200–1221) and in `src/components/vendor/kyc/BankKycTab.tsx`, replace the current single "Account Holder Name verified successfully." with messages that depend on GST/MSME flags.
 
-4. Confirm the PAN, MSME, and Bank gating rules
-- PAN: after upload/OCR, call the configured “PAN Comprehensive Validation” provider and pass only when response status is valid; show the requested success/failure message.
-- MSME Yes: validate Udyam/MSME, compare MSME Enterprise Name with PAN Holder Name, pass at 40% or above, fail below 40% with the requested message.
-- MSME No: require only the self-declaration upload, then move to Bank.
-- Bank: after cancelled cheque upload/OCR, call configured Bank/Penny Drop validation and compare Account Holder Name against PAN only when GST=No/MSME=No, or against PAN + MSME when GST=No/MSME=Yes; fail below 40%, disable Continue, and allow re-upload/re-validation.
+Validation rule (kept as today): name match score ≥ 40% against the active reference set, where the reference set is:
 
-Technical details:
-- Main files to update: `src/lib/pdfToImage.ts` and `src/components/vendor/steps/DocumentVerificationStep.tsx`.
-- No backend changes are needed because this is frontend upload normalization and flow gating.
+| GST | MSME | References checked |
+|-----|------|--------------------|
+| No  | No   | PAN Holder Name only |
+| No  | Yes  | PAN Holder Name + MSME Enterprise Name |
+| Yes | No   | PAN Holder Name + GST Legal Name |
+| Yes | Yes  | PAN Holder Name + GST Legal Name + MSME Enterprise Name |
+
+Success message (shown inline + on the bank tile):
+
+- GST=No, MSME=No → `Account Holder Name verified with PAN Holder Name.`
+- GST=Yes, MSME=No → `Account Holder Name verified with PAN Holder Name and GST Legal Name.`
+- GST=No, MSME=Yes → `Account Holder Name verified with PAN Holder Name and MSME Enterprise Name.`
+- GST=Yes, MSME=Yes → `Account Holder Name verified with PAN Holder Name, GST Legal Name and MSME Enterprise Name.`
+
+Failure message (unchanged): `Account Holder Name does not match with the provided PAN/MSME details.`
+Failure handling (unchanged): block Continue, allow re-upload / re-validate.
+
+Implementation note: build the success string from the same `refs` array already used for matching, so the message stays in sync with the reference set.
+
+## 2. PAN — rename success message
+
+In `DocumentVerificationStep.tsx` line 572:
+- Replace `"PAN details validated successfully from PAN Comprehensive Validation API."`
+- With `"PAN details validated successfully from PAN verification."`
+
+Provider-not-configured message (line 535) stays as-is (it references the admin setting name).
+
+## 3. PAN — skip the PAN Comprehensive Validation API when GST = Yes
+
+When `isGstRegistered === true`, the GST registry already authoritatively returns the PAN number + legal name, so calling the PAN Comprehensive Validation provider is redundant. Update the `kind === "pan"` branch in `runDocFlow` (lines 517–576):
+
+- If `isGstRegistered === true`: skip the `callProvider({ providerName: "PAN", ... })` call entirely. Build the verified result purely from OCR + GST cross-check (PAN number must equal `gstin.slice(2,12)`, holder name fuzzy-matches GST legal name ≥ 40%). Set `apiData.source = "GST cross-check"` and `apiData.panMatchMessage = "PAN verified against GST registry."`.
+- If `isGstRegistered === false` (Self-Declaration path): keep current behaviour — call the PAN provider and use the new success message from item 2.
+
+The downstream PAN ↔ GSTIN useEffect cross-check (lines 1291–1309) already runs only when `isGstRegistered === true`, so it continues to guard live edits.
+
+## Files to edit
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` — items 1, 2, 3
+- `src/components/vendor/kyc/BankKycTab.tsx` — item 1 (inline holder-name banner messages, lines 87–107 and 287–294)
+
+## Out of scope
+
+- No changes to MSME tab logic, file upload conversion, or step gating.
+- No backend / RLS / edge-function changes.
