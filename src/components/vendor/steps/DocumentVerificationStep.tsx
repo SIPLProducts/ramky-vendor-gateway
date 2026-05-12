@@ -1661,9 +1661,9 @@ export function DocumentVerificationStep({
                           try {
                             const img = await normalizeUploadToImage(f);
                             setGstDeclarationFile(img);
-                            if (img !== f) toast({ title: "Converted to image", description: `${f.name} → ${img.name}` });
+                            if (img !== f) toast.success(`Converted to image: ${img.name}`);
                           } catch (err: any) {
-                            toast({ title: "Upload failed", description: err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).", variant: "destructive" });
+                            toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
                         accept=".pdf,.jpg,.jpeg,.png"
