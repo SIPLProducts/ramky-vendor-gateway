@@ -1357,12 +1357,7 @@ export function DocumentVerificationStep({
     isGstRegistered === true
       ? gstDoc.status === "verified"
       : isGstRegistered === false
-        ? !!gstDeclarationFile &&
-          manualLegalName.trim().length > 1 &&
-          manualAddress.address.trim().length > 1 &&
-          manualAddress.city.trim().length > 1 &&
-          manualAddress.state.trim().length > 1 &&
-          manualAddress.pincode.trim().length >= 5
+        ? !!gstDeclarationFile
         : false;
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
   const stage3Done =
