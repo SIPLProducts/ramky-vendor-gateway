@@ -307,14 +307,11 @@ export default function VendorRegistration() {
         verifiedData.isGstRegistered === true
           ? !!verifiedData.gst
           : verifiedData.isGstRegistered === false
-            ? !!verifiedData.gstSelfDeclarationFile &&
-              !!verifiedData.manualLegalName &&
-              !!verifiedData.manualAddress?.address &&
-              !!verifiedData.manualAddress?.city &&
-              !!verifiedData.manualAddress?.state &&
-              !!verifiedData.manualAddress?.pincode
+            ? !!verifiedData.gstSelfDeclarationFile
             : false;
-      const msmeOk = verifiedData.isMsmeRegistered === false || !!verifiedData.msme;
+      const msmeOk = verifiedData.isMsmeRegistered === false
+        ? !!verifiedData.msmeSelfDeclarationFile
+        : !!verifiedData.msme;
       return gstOk && !!verifiedData.pan && msmeOk && !!verifiedData.bank;
     }
     // Steps 2–5 are presentational — Continue is always allowed; the embedded
