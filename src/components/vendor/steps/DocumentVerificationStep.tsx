@@ -1198,24 +1198,27 @@ export function DocumentVerificationStep({
       const branchName = String(d.branch_name || ifscInfo?.branch || "").trim();
       const branchAddress = String(d.branch_address || ifscInfo?.address || "").trim();
 
-      // Same name-match rules as the cheque flow.
+      // Same conditional name-match rules as the cheque flow (>=40% threshold).
       const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
       const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
-      let holderNameStatus: "gst+pan" | "gst" | "none" = "none";
+      const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
+      const refs: { label: string; value: string }[] = [];
+      if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
+      if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
+      if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
+      let holderNameStatus: "passed" | "none" = "none";
       let holderNameMessage = "";
-      const gstOk = nameAtBank && gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
-      const panOk = nameAtBank && panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
-      if (gstOk && panOk) {
-        holderNameStatus = "gst+pan";
-        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
-      } else if (gstOk) {
-        holderNameStatus = "gst";
-        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
-      } else if (gstLegalName || panHolderName) {
-        const msg = "Account Holder Name does not match with GST and PAN details.";
-        setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
-        return;
+      if (nameAtBank && refs.length > 0) {
+        const scores = refs.map((rr) => ({ ...rr, score: nameMatchPercentage(nameAtBank, rr.value) }));
+        const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
+        if (best.score < 40) {
+          const msg = "Account Holder Name does not match with the provided PAN/MSME details.";
+          setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+          setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+          return;
+        }
+        holderNameStatus = "passed";
+        holderNameMessage = "Account Holder Name verified successfully.";
       }
 
       const normalized: Record<string, any> = {
