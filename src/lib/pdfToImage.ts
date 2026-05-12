@@ -16,7 +16,7 @@ function baseName(name: string) {
   return i > 0 ? name.slice(0, i) : name;
 }
 
-export async function pdfToSingleImage(
+export async function normalizeUploadToImage(
   file: File,
   mime: "image/jpeg" | "image/png" = "image/jpeg",
   scale = 1.5,
@@ -79,3 +79,5 @@ export async function pdfToSingleImage(
   const ext = mime === "image/png" ? "png" : "jpg";
   return new File([blob], `${baseName(file.name)}.${ext}`, { type: mime });
 }
+
+export { normalizeUploadToImage as pdfToSingleImage };
