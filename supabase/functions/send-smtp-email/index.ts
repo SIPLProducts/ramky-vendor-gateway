@@ -196,8 +196,14 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("send-smtp-email error:", error);
+    const raw = error?.message ?? String(error);
+    let friendly = raw;
+    if (/535/.test(raw) || /BadCredentials/i.test(raw) || /Username and Password not accepted/i.test(raw)) {
+      friendly =
+        "SMTP authentication failed. For Gmail, the Username must be the full Gmail address (e.g. you@gmail.com) and the App Password must be a 16-character app password generated at myaccount.google.com/apppasswords (with 2-Step Verification enabled). Update the credentials and try again.";
+    }
     return new Response(
-      JSON.stringify({ success: false, error: error?.message ?? String(error) }),
+      JSON.stringify({ success: false, error: friendly }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
