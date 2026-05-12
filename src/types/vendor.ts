@@ -34,6 +34,7 @@ export interface OrganizationDetails {
   productCategories: string[];
   productCategoriesOther?: string;
   state: string;
+  accountingGroup?: 'Import' | 'Export' | '';
   // SAP Classification
   materialGroupVendor?: string;
   vendorCategory?: string;
