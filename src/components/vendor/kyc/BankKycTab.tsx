@@ -286,11 +286,11 @@ export function BankKycTab(props: BankKycTabProps) {
             </div>
             <div className={holderCheck === 'failed' ? 'text-destructive' : 'text-success'}>
               {holderCheck === 'gst+pan' &&
-                'Account Holder Name verified with GST Legal Name and PAN Holder Name.'}
-              {holderCheck === 'gst' && 'Account Holder Name matched with GST Legal Name.'}
-              {holderCheck === 'pan' && 'Account Holder Name matched with PAN Holder Name.'}
+                'Account Holder Name verified with PAN Holder Name and GST Legal Name.'}
+              {holderCheck === 'gst' && 'Account Holder Name verified with GST Legal Name.'}
+              {holderCheck === 'pan' && 'Account Holder Name verified with PAN Holder Name.'}
               {holderCheck === 'failed' &&
-                'Account Holder Name does not match with GST Legal Name and PAN Holder Name.'}
+                'Account Holder Name does not match with the provided PAN/MSME details.'}
             </div>
           </div>
         </div>
