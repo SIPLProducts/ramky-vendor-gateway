@@ -10,6 +10,7 @@ interface ReviewStepProps {
   onSubmit: () => void;
   onBack: () => void;
   onEditStep: (step: number) => void;
+  onDeclarationChange?: (d: { selfDeclared: boolean; termsAccepted: boolean }) => void;
 }
 
 const SectionHeader = ({ icon: Icon, title, step, onEdit }: { icon: React.ElementType; title: string; step: number; onEdit: (step: number) => void }) => (
