@@ -15,7 +15,7 @@ import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
 import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
-import { fuzzyNameMatch } from "@/lib/nameMatch";
+import { nameMatchPercentage } from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 
@@ -514,43 +514,64 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "pan") {
-      // PAN is NOT validated against its own registry. We compare the OCR'd
-      // PAN number + holder name against the values returned by the GST
-      // registry (verified in the previous stage). GST is the source of truth.
+      // PAN flow: OCR has already run. Now call the configured `PAN`
+      // (PAN Comprehensive Validation) provider and treat
+      // `data.status === "valid"` as the source of truth. We no longer
+      // require GST to be verified first — GST may be skipped (Self-Declaration).
       const ocrPan = String(ocr.pan_number || "").toUpperCase().trim();
       const ocrName = String(ocr.full_name || ocr.holder_name || ocr.name || "").trim();
       if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(ocrPan)) {
         return { ok: false as const, message: "Could not read a valid 10-character PAN. Please upload a clearer scan." };
       }
-      const gstPan = String(gstDoc.ocrData?.pan_number || "").toUpperCase().trim();
-      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
-      if (!gstPan || !gstLegalName) {
+      const r = await callProvider({
+        providerName: "PAN",
+        input: { id_number: ocrPan, pan: ocrPan, pan_number: ocrPan },
+      });
+      toastKycResult("PAN", r);
+      if (!r.found) {
         return {
           ok: false as const,
-          message: "Please verify GST first — PAN is validated against the PAN number and legal name returned by the GST registry.",
+          message: "PAN Comprehensive Validation provider is not configured. Add it in KYC & Validation API Settings.",
         };
       }
-      const panOk = ocrPan === gstPan;
-      const nameOk = fuzzyNameMatch(ocrName, gstLegalName);
-      if (!panOk || !nameOk) {
-        return { ok: false as const, message: "PAN details do not match with GST data." };
+      const rawData: Record<string, any> =
+        (r.raw && typeof r.raw === "object" && (r.raw as any).data && typeof (r.raw as any).data === "object")
+          ? (r.raw as any).data
+          : {};
+      const apiStatus = String(
+        (r.data as any)?.status ?? (r.data as any)?.pan_status ?? rawData.status ?? rawData.pan_status ?? ""
+      ).toLowerCase().trim();
+      if (!r.ok || apiStatus !== "valid") {
+        return {
+          ok: false as const,
+          message: r.message || "PAN validation failed. Please upload a clearer PAN card and try again.",
+        };
       }
+      const apiName = String(
+        (r.data as any)?.full_name ||
+        (r.data as any)?.name ||
+        (r.data as any)?.holder_name ||
+        rawData.full_name ||
+        rawData.name ||
+        ""
+      ).trim();
+      const holderName = ocrName || apiName;
       const normalized: Record<string, any> = {
         pan_number: ocrPan,
-        holder_name: ocrName || gstLegalName,
-        full_name: ocrName || gstLegalName,
+        holder_name: holderName,
+        full_name: holderName,
       };
       return {
         ok: true as const,
         apiData: {
-          name: gstLegalName,
-          pan: gstPan,
-          source: "GST registry",
-          panMatchMessage: "PAN Number verified with GST PAN Number.",
-          nameMatchMessage: "PAN Holder Name verified with GST Legal Name.",
+          name: holderName,
+          pan: ocrPan,
+          source: "PAN Comprehensive Validation",
+          status: "valid",
+          panMatchMessage: "PAN details validated successfully from PAN Comprehensive Validation API.",
         },
         normalized,
-        registeredName: gstLegalName,
+        registeredName: holderName,
       };
     }
     if (kind === "msme") {
@@ -590,23 +611,18 @@ export function DocumentVerificationStep({
         mobile: pickStr(registry.mobile) || ocr.mobile,
         email: pickStr(registry.email) || ocr.email,
       };
-      // Cross-check: Enterprise Name MUST match GST Legal Name OR PAN Holder Name.
-      // If neither matches (and at least one reference is present), block the
-      // step. The exact message is rendered both in the inline error banner
-      // and via the modal popup raised in `runDocFlow`.
+      // Cross-check: Enterprise Name vs PAN Holder Name (>=40% match).
+      // GST may be skipped via Self-Declaration so it is no longer used here.
       const msmeName = String(normalized.enterprise_name || "").trim();
-      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
       const panHolderName = String(
         panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
       ).trim();
-      if (msmeName && (gstLegalName || panHolderName)) {
-        const gstOk = gstLegalName ? fuzzyNameMatch(msmeName, gstLegalName) : false;
-        const panOk = panHolderName ? fuzzyNameMatch(msmeName, panHolderName) : false;
-        if (!gstOk && !panOk) {
+      if (msmeName && panHolderName) {
+        const score = nameMatchPercentage(msmeName, panHolderName);
+        if (score < 40) {
           return {
             ok: false as const,
-            message:
-              "Enterprise Name does not match with GST Legal Name and PAN Holder Name.",
+            message: "Enterprise Name does not match with PAN Holder Name.",
             isNameMismatch: true,
           } as any;
         }
@@ -709,26 +725,34 @@ export function DocumentVerificationStep({
       d.full_name || d.name_at_bank || rawData.full_name || "",
     ).trim();
 
-    // Strict name-match: GST+PAN, GST-only, or fail. PAN-only no longer passes.
+    // Conditional name match (>=40% threshold against any required source):
+    //   GST=Yes  → check GST Legal Name + PAN Holder Name (+ MSME if registered)
+    //   GST=No, MSME=Yes → check PAN Holder Name + MSME Enterprise Name
+    //   GST=No, MSME=No  → check PAN Holder Name only
     const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
     const panHolderName = String(
       panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
     ).trim();
-    let holderNameStatus: "gst+pan" | "gst" | "none" = "none";
+    const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
+
+    const refs: { label: string; value: string }[] = [];
+    if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
+    if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
+    if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
+
+    let holderNameStatus: "passed" | "none" = "none";
     let holderNameMessage = "";
-    const gstOk = nameAtBank && gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
-    const panOk = nameAtBank && panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
-    if (gstOk && panOk) {
-      holderNameStatus = "gst+pan";
-      holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
-    } else if (gstOk) {
-      holderNameStatus = "gst";
-      holderNameMessage = "Account Holder Name matched with GST Legal Name.";
-    } else {
-      return {
-        ok: false as const,
-        message: "Account Holder Name does not match with GST and PAN details.",
-      };
+    if (nameAtBank && refs.length > 0) {
+      const scores = refs.map((r) => ({ ...r, score: nameMatchPercentage(nameAtBank, r.value) }));
+      const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
+      if (best.score < 40) {
+        return {
+          ok: false as const,
+          message: "Account Holder Name does not match with the provided PAN/MSME details.",
+        };
+      }
+      holderNameStatus = "passed";
+      holderNameMessage = "Account Holder Name verified successfully.";
     }
 
     const normalized: Record<string, any> = {
@@ -1006,16 +1030,14 @@ export function DocumentVerificationStep({
         nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
       };
       const apiName = ocrShape.enterprise_name;
-      // Cross-tab gate: enterprise name must match GST Legal Name OR PAN Holder Name.
-      const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      // Cross-tab gate: enterprise name must match PAN Holder Name (>=40%).
       const panHolderName = String(
         panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
       ).trim();
-      if (apiName && (gstLegalName || panHolderName)) {
-        const gstOk = gstLegalName ? fuzzyNameMatch(apiName, gstLegalName) : false;
-        const panOk = panHolderName ? fuzzyNameMatch(apiName, panHolderName) : false;
-        if (!gstOk && !panOk) {
-          const msg = "Enterprise Name does not match with GST Legal Name and PAN Holder Name.";
+      if (apiName && panHolderName) {
+        const score = nameMatchPercentage(apiName, panHolderName);
+        if (score < 40) {
+          const msg = "Enterprise Name does not match with PAN Holder Name.";
           setMsmeManualError(msg);
           setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
           setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
@@ -1174,24 +1196,27 @@ export function DocumentVerificationStep({
       const branchName = String(d.branch_name || ifscInfo?.branch || "").trim();
       const branchAddress = String(d.branch_address || ifscInfo?.address || "").trim();
 
-      // Same name-match rules as the cheque flow.
+      // Same conditional name-match rules as the cheque flow (>=40% threshold).
       const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
       const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
-      let holderNameStatus: "gst+pan" | "gst" | "none" = "none";
+      const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
+      const refs: { label: string; value: string }[] = [];
+      if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
+      if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
+      if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
+      let holderNameStatus: "passed" | "none" = "none";
       let holderNameMessage = "";
-      const gstOk = nameAtBank && gstLegalName ? fuzzyNameMatch(nameAtBank, gstLegalName) : false;
-      const panOk = nameAtBank && panHolderName ? fuzzyNameMatch(nameAtBank, panHolderName) : false;
-      if (gstOk && panOk) {
-        holderNameStatus = "gst+pan";
-        holderNameMessage = "Account Holder Name verified with GST Legal Name and PAN Holder Name.";
-      } else if (gstOk) {
-        holderNameStatus = "gst";
-        holderNameMessage = "Account Holder Name matched with GST Legal Name.";
-      } else if (gstLegalName || panHolderName) {
-        const msg = "Account Holder Name does not match with GST and PAN details.";
-        setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
-        return;
+      if (nameAtBank && refs.length > 0) {
+        const scores = refs.map((rr) => ({ ...rr, score: nameMatchPercentage(nameAtBank, rr.value) }));
+        const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
+        if (best.score < 40) {
+          const msg = "Account Holder Name does not match with the provided PAN/MSME details.";
+          setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+          setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+          return;
+        }
+        holderNameStatus = "passed";
+        holderNameMessage = "Account Holder Name verified successfully.";
       }
 
       const normalized: Record<string, any> = {
@@ -1332,12 +1357,7 @@ export function DocumentVerificationStep({
     isGstRegistered === true
       ? gstDoc.status === "verified"
       : isGstRegistered === false
-        ? !!gstDeclarationFile &&
-          manualLegalName.trim().length > 1 &&
-          manualAddress.address.trim().length > 1 &&
-          manualAddress.city.trim().length > 1 &&
-          manualAddress.state.trim().length > 1 &&
-          manualAddress.pincode.trim().length >= 5
+        ? !!gstDeclarationFile
         : false;
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
   const stage3Done =
