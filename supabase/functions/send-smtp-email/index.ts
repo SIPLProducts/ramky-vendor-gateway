@@ -131,7 +131,6 @@ const handler = async (req: Request): Promise<Response> => {
         tls: useImplicitTls,
         auth: { username, password },
       },
-      debug: { log: true },
     });
 
     const from = fromName
