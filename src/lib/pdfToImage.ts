@@ -16,20 +16,79 @@ function baseName(name: string) {
   return i > 0 ? name.slice(0, i) : name;
 }
 
+async function canvasToImageFile(
+  canvas: HTMLCanvasElement,
+  baseFileName: string,
+  mime: "image/jpeg" | "image/png",
+): Promise<File> {
+  const blob: Blob = await new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))),
+      mime,
+      0.92,
+    ),
+  );
+  const ext = mime === "image/png" ? "png" : "jpg";
+  return new File([blob], `${baseFileName}.${ext}`, { type: mime });
+}
+
+async function docxToImage(
+  file: File,
+  mime: "image/jpeg" | "image/png",
+): Promise<File> {
+  const mammoth = await import("mammoth/mammoth.browser");
+  const html2canvas = (await import("html2canvas")).default;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const { value: html } = await (mammoth as any).convertToHtml({ arrayBuffer });
+
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.style.width = "800px";
+  container.style.padding = "32px";
+  container.style.background = "#ffffff";
+  container.style.color = "#000000";
+  container.style.fontFamily = "Arial, sans-serif";
+  container.style.fontSize = "14px";
+  container.style.lineHeight = "1.5";
+  container.innerHTML = html || "<p>(empty document)</p>";
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      backgroundColor: "#ffffff",
+      scale: 1.5,
+      useCORS: true,
+    });
+    return await canvasToImageFile(canvas, baseName(file.name), mime);
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
 export async function normalizeUploadToImage(
   file: File,
   mime: "image/jpeg" | "image/png" = "image/jpeg",
   scale = 1.5,
 ): Promise<File> {
+  const lowerName = file.name.toLowerCase();
   const isPdf =
-    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    file.type === "application/pdf" || lowerName.endsWith(".pdf");
   const isImage =
-    IMAGE_MIMES.includes(file.type) ||
-    /\.(png|jpe?g)$/i.test(file.name);
+    IMAGE_MIMES.includes(file.type) || /\.(png|jpe?g)$/i.test(file.name);
+  const isDocx =
+    file.type ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    lowerName.endsWith(".docx");
 
   if (isImage) return file;
+  if (isDocx) return docxToImage(file, mime);
   if (!isPdf) {
-    throw new Error("Unsupported file type. Please upload a PDF or image.");
+    throw new Error(
+      "Unsupported file type. Please upload PDF, DOCX, or an image.",
+    );
   }
 
   const buf = await file.arrayBuffer();

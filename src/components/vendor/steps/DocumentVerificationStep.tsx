@@ -1666,7 +1666,7 @@ export function DocumentVerificationStep({
                             toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
                       />
                     </div>
 
@@ -1870,7 +1870,7 @@ export function DocumentVerificationStep({
                             toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
                       />
                     </div>
 
