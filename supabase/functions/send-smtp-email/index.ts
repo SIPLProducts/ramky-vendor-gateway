@@ -87,9 +87,16 @@ const handler = async (req: Request): Promise<Response> => {
     const encryption = String(
       smtp.encryption ?? stored.smtp_encryption ?? "tls"
     ).toLowerCase() as "none" | "ssl" | "tls" | "starttls";
-    const username = String(smtp.username ?? stored.smtp_username ?? "").trim();
-    const password = String(smtp.password ?? stored.smtp_password ?? "");
+    let username = String(smtp.username ?? stored.smtp_username ?? "").trim();
+    // App passwords from providers like Gmail must not contain stray whitespace
+    const password = String(smtp.password ?? stored.smtp_password ?? "").replace(/\s+/g, "");
     const fromEmail = String(smtp.from_email ?? stored.smtp_from_email ?? username).trim();
+    // Gmail (and most providers) require the SMTP username to be the full email
+    // address. If the saved username is a display name (no "@"), fall back to
+    // the From Email so authentication does not fail with 535 BadCredentials.
+    if (!username.includes("@") && fromEmail.includes("@")) {
+      username = fromEmail;
+    }
     const fromName = String(smtp.from_name ?? stored.smtp_from_name ?? "").trim();
     const replyTo = body.suppressReplyTo
       ? ""

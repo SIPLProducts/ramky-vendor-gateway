@@ -1,24 +1,9 @@
-# Fix: "Failed to send a request to the Edge Function" on No-Reply test
+The test email is failing because the saved No Reply SMTP username is `Sunil Kumar`, but Gmail requires the SMTP username to be the actual Gmail address. The backend then attempts to authenticate to Gmail with the name instead of `sunilakula1919@gmail.com`, causing `535 Username and Password not accepted`.
 
-## Root cause
-`portal_config.config_value` is stored as `{ "value": "smtp.gmail.com" }` (jsonb wrapper), but `supabase/functions/send-smtp-email/index.ts` uses the raw object directly. Result (from edge logs):
-
-- `host = "[object Object]"`
-- `port = NaN` → `TypeError: Invalid port: NaN`
-- `from = "[object Object] <[object Object]>"` → invalid from address
-
-The frontend (`NoReplyEmailConfig.tsx`) already unwraps with `unwrap(v)` — the edge function must do the same.
-
-## Change
-File: `supabase/functions/send-smtp-email/index.ts`
-
-1. Add an `unwrap(v)` helper that returns `v.value` when `v` is an object with a `value` key, otherwise returns `v` (and handles `null`/primitives).
-2. In `loadSmtpConfig`, store `unwrap(row.config_value)` in the `cfg` map so all downstream `String(...)` / `Number(...)` casts get the actual scalar.
-3. Also coerce `smtp_enabled` properly (boolean) — currently unused in send path but keep consistent.
-4. Re-deploy `send-smtp-email`.
-
-No other files change. No DB or UI changes.
-
-## Verification
-- Click "Send Test Email" on `/admin/email-config` → No-Reply tab.
-- Expect success toast and edge logs showing real host (`smtp.gmail.com`), port `587`/`465`, and a valid `From` address.
+Plan:
+1. Update the No Reply Email Configuration form so Gmail SMTP username is validated as an email address, not a display name.
+2. Auto-normalize this specific bad saved state by using the From Email as the SMTP username when the host is Gmail and the username is not an email.
+3. Save the corrected No Reply config value so future sends use the email address.
+4. Harden `send-smtp-email` so it returns a clear user-friendly error for Gmail auth failures instead of only “Edge Function returned a non-2xx status code”.
+5. Remove unsafe SMTP debug logging from the backend function so app-password/auth material is not printed in logs.
+6. Deploy and test the email function after the fix.
