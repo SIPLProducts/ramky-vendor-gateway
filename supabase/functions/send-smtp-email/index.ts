@@ -30,6 +30,13 @@ interface SmtpRequest {
   };
 }
 
+function unwrap(v: any): any {
+  if (v && typeof v === "object" && !Array.isArray(v) && "value" in v) {
+    return (v as any).value;
+  }
+  return v;
+}
+
 async function loadSmtpConfig(supabase: ReturnType<typeof createClient>) {
   const keys = [
     "smtp_host",
@@ -49,7 +56,7 @@ async function loadSmtpConfig(supabase: ReturnType<typeof createClient>) {
   if (error) throw error;
   const cfg: Record<string, unknown> = {};
   for (const row of data ?? []) {
-    cfg[(row as any).config_key] = (row as any).config_value;
+    cfg[(row as any).config_key] = unwrap((row as any).config_value);
   }
   return cfg;
 }
