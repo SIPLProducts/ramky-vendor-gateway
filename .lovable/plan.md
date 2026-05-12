@@ -1,27 +1,14 @@
-## Fix: State + Accounting Group alignment in Organization Profile
+## Change "Export" to "Domestic" in Accounting Group
 
-**Problem:** The new State and Accounting Group fields render at half the width of the surrounding paired fields (Ownership / Product Categories). Cause: I wrapped them in a nested `grid md:grid-cols-2`, which sub-divides their parent cell instead of letting them flow as direct siblings of the outer grid (which already pairs children 2-per-row at desktop).
+Rename the second option of the Accounting Group dropdown from "Export" to "Domestic" everywhere it appears.
 
-**File:** `src/components/vendor/steps/OrganizationStep.tsx`
+**Files to update:**
 
-Replace the nested wrapper around State + Accounting Group (lines 351–397) so each field becomes a direct sibling of the parent grid, mirroring how `Ownership` and `Product Categories` are laid out:
+1. `src/types/vendor.ts`
+   - Update the `accountingGroup` type union from `'Import' | 'Export' | ''` to `'Import' | 'Domestic' | ''`
+   - Update `ACCOUNTING_GROUPS` constant from `['Import', 'Export']` to `['Import', 'Domestic']`
 
-```tsx
-<div className="grid gap-1.5">
-  <Label>State *</Label>
-  <Controller name="state" ... />
-  {errors.state && <p className="text-xs text-destructive">{errors.state.message}</p>}
-</div>
+2. `src/components/vendor/steps/OrganizationStep.tsx`
+   - Update Zod enum for `accountingGroup` from `['Import', 'Export']` to `['Import', 'Domestic']`
 
-<div className="grid gap-1.5">
-  <Label>Accounting Group *</Label>
-  <Controller name="accountingGroup" ... />
-  {errors.accountingGroup && <p className="text-xs text-destructive">{errors.accountingGroup.message}</p>}
-</div>
-```
-
-This removes the outer `<div className="grid md:grid-cols-2 gap-5">` wrapper but keeps both Controllers and their option lists exactly as they are.
-
-## Out of scope
-- No changes to schema, types, or any other field.
-- No SAP / backend changes.
+No changes to ReviewStep (it just renders the stored value), backend, or SAP mappings.
