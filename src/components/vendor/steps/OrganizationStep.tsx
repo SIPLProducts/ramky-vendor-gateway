@@ -348,27 +348,52 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
             </div>
           )}
 
-          <div className="grid gap-1.5">
-            <Label>State *</Label>
-            <Controller
-              name="state"
-              control={control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
-                    <SelectValue placeholder="Select state" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INDIAN_STATES.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label>State *</Label>
+              <Controller
+                name="state"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.state && (
+                <p className="text-xs text-destructive">{errors.state.message as string}</p>
               )}
-            />
-            {errors.state && (
-              <p className="text-xs text-destructive">{errors.state.message as string}</p>
-            )}
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label>Accounting Group *</Label>
+              <Controller
+                name="accountingGroup"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <SelectTrigger className={errors.accountingGroup ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select accounting group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACCOUNTING_GROUPS.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.accountingGroup && (
+                <p className="text-xs text-destructive">{errors.accountingGroup.message as string}</p>
+              )}
+            </div>
           </div>
 
           {/* SAP Classification */}
