@@ -87,9 +87,16 @@ const handler = async (req: Request): Promise<Response> => {
     const encryption = String(
       smtp.encryption ?? stored.smtp_encryption ?? "tls"
     ).toLowerCase() as "none" | "ssl" | "tls" | "starttls";
-    const username = String(smtp.username ?? stored.smtp_username ?? "").trim();
-    const password = String(smtp.password ?? stored.smtp_password ?? "");
+    let username = String(smtp.username ?? stored.smtp_username ?? "").trim();
+    // App passwords from providers like Gmail must not contain stray whitespace
+    const password = String(smtp.password ?? stored.smtp_password ?? "").replace(/\s+/g, "");
     const fromEmail = String(smtp.from_email ?? stored.smtp_from_email ?? username).trim();
+    // Gmail (and most providers) require the SMTP username to be the full email
+    // address. If the saved username is a display name (no "@"), fall back to
+    // the From Email so authentication does not fail with 535 BadCredentials.
+    if (!username.includes("@") && fromEmail.includes("@")) {
+      username = fromEmail;
+    }
     const fromName = String(smtp.from_name ?? stored.smtp_from_name ?? "").trim();
     const replyTo = body.suppressReplyTo
       ? ""
@@ -124,7 +131,6 @@ const handler = async (req: Request): Promise<Response> => {
         tls: useImplicitTls,
         auth: { username, password },
       },
-      debug: { log: true },
     });
 
     const from = fromName
@@ -190,8 +196,14 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("send-smtp-email error:", error);
+    const raw = error?.message ?? String(error);
+    let friendly = raw;
+    if (/535/.test(raw) || /BadCredentials/i.test(raw) || /Username and Password not accepted/i.test(raw)) {
+      friendly =
+        "SMTP authentication failed. For Gmail, the Username must be the full Gmail address (e.g. you@gmail.com) and the App Password must be a 16-character app password generated at myaccount.google.com/apppasswords (with 2-Step Verification enabled). Update the credentials and try again.";
+    }
     return new Response(
-      JSON.stringify({ success: false, error: error?.message ?? String(error) }),
+      JSON.stringify({ success: false, error: friendly }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

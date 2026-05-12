@@ -114,6 +114,15 @@ export function NoReplyEmailConfig() {
       });
       return;
     }
+    if (!form.smtp_username.includes("@")) {
+      toast({
+        title: "Username must be an email",
+        description:
+          "SMTP Username should be the full email address (e.g. you@gmail.com), not a display name. Use the From Name field for the sender name.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!hasExistingPassword && !form.smtp_password) {
       toast({
         title: "Password required",
