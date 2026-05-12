@@ -88,19 +88,19 @@ export function BankKycTab(props: BankKycTabProps) {
     if (apiName && (props.gstLegalName || props.panHolderName)) {
       if (gstOk && panOk) {
         setHolderCheck('gst+pan');
-        nameMessage = 'Account Holder Name verified with GST Legal Name and PAN Holder Name.';
+        nameMessage = 'Account Holder Name verified with PAN Holder Name and GST Legal Name.';
       } else if (gstOk) {
         setHolderCheck('gst');
-        nameMessage = 'Account Holder Name matched with GST Legal Name.';
+        nameMessage = 'Account Holder Name verified with GST Legal Name.';
       } else if (panOk) {
         setHolderCheck('pan');
-        nameMessage = 'Account Holder Name matched with PAN Holder Name.';
+        nameMessage = 'Account Holder Name verified with PAN Holder Name.';
       } else {
         setHolderCheck('failed');
         props.onStatusChange?.('failed');
         return {
           ok: false,
-          message: 'Account Holder Name does not match with GST Legal Name and PAN Holder Name.',
+          message: 'Account Holder Name does not match with the provided PAN/MSME details.',
           apiData,
         };
       }
