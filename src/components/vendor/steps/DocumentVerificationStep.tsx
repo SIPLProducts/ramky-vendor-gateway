@@ -1666,45 +1666,16 @@ export function DocumentVerificationStep({
                             toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
-                        accept=".pdf,.jpg,.jpeg,.png,.docx"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.gif,.docx,.txt,.csv"
                       />
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <FormField
-                        label="Reason for non-registration"
-                        value={gstDeclarationReason}
-                        onChange={setGstDeclarationReason}
-                        placeholder="e.g. Turnover below threshold"
-                      />
-                      <FormField
-                        label="Legal Name *"
-                        value={manualLegalName}
-                        onChange={setManualLegalName}
-                        placeholder="Registered name of the entity"
-                      />
-                      <FormField
-                        label="Address *"
-                        value={manualAddress.address}
-                        onChange={(v) => setManualAddress((p) => ({ ...p, address: v }))}
-                        placeholder="Street, area"
-                      />
-                      <FormField
-                        label="City *"
-                        value={manualAddress.city}
-                        onChange={(v) => setManualAddress((p) => ({ ...p, city: v }))}
-                      />
-                      <FormField
-                        label="State *"
-                        value={manualAddress.state}
-                        onChange={(v) => setManualAddress((p) => ({ ...p, state: v }))}
-                      />
-                      <FormField
-                        label="Pincode *"
-                        value={manualAddress.pincode}
-                        onChange={(v) => setManualAddress((p) => ({ ...p, pincode: v }))}
-                      />
-                    </div>
+                    <FormField
+                      label="Reason for non-registration"
+                      value={gstDeclarationReason}
+                      onChange={setGstDeclarationReason}
+                      placeholder="e.g. Turnover below threshold"
+                    />
                   </div>
                 )}
               </div>
@@ -1870,7 +1841,7 @@ export function DocumentVerificationStep({
                             toast.error(err?.message ?? "Please upload a PDF or image (PNG/JPG/JPEG).");
                           }
                         }}
-                        accept=".pdf,.jpg,.jpeg,.png,.docx"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.gif,.docx,.txt,.csv"
                       />
                     </div>
 
