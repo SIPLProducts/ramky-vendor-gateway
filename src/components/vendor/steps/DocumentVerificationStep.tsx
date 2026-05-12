@@ -1607,7 +1607,7 @@ export function DocumentVerificationStep({
                   <>
                     <DocSplitRow
                       uploadLabel="GST Certificate"
-                      accept=".pdf,.jpg,.jpeg,.png,.docx"
+                      accept=".pdf,.jpg,.jpeg,.png"
                       doc={gstDoc}
                       onUpload={handleGstUpload}
                       onReset={() => setGstDoc(idleDoc)}
@@ -1722,7 +1722,7 @@ export function DocumentVerificationStep({
             >
               <DocSplitRow
                 uploadLabel="PAN Card"
-                accept=".pdf,.jpg,.jpeg,.png,.docx"
+                accept=".pdf,.jpg,.jpeg,.png"
                 doc={panDoc}
                 onUpload={handlePanUpload}
                 onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
@@ -2077,7 +2077,7 @@ export function DocumentVerificationStep({
                     <TabsContent value="upload" className="space-y-3">
                       <DocSplitRow
                         uploadLabel="Udyam Certificate"
-                        accept=".pdf,.jpg,.jpeg,.png,.docx"
+                        accept=".pdf,.jpg,.jpeg,.png"
                         doc={msmeDoc}
                         onUpload={handleMsmeUpload}
                         onReset={() => setMsmeDoc(idleDoc)}
@@ -2181,7 +2181,7 @@ export function DocumentVerificationStep({
             >
               <DocSplitRow
                 uploadLabel="Cancelled Cheque"
-                accept=".pdf,.jpg,.jpeg,.png,.docx"
+                accept=".pdf,.jpg,.jpeg,.png"
                 doc={bankDoc}
                 onUpload={handleBankUpload}
                 onReset={() => setBankDoc(idleDoc)}
@@ -2321,7 +2321,7 @@ export function DocumentVerificationStep({
                     </div>
                     <DocSplitRow
                       uploadLabel="Cancelled Cheque (Secondary)"
-                      accept=".pdf,.jpg,.jpeg,.png,.docx"
+                      accept=".pdf,.jpg,.jpeg,.png"
                       doc={bankDoc2}
                       onUpload={handleBankUpload2}
                       onReset={() => setBankDoc2(idleDoc)}
