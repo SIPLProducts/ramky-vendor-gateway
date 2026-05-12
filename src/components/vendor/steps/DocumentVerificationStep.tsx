@@ -18,6 +18,7 @@ import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
 import { nameMatchPercentage } from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
+import { toast } from "sonner";
 
 /**
  * Maps the registration step's document type → the provider_name configured
