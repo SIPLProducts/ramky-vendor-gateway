@@ -32,6 +32,16 @@ const OCR_PROVIDER_BY_KIND: Record<OcrDocumentType, { provider: string; label: s
   cheque: { provider: "BANK_OCR", label: "Bank OCR" },
 };
 
+/** Build the bank holder-name success message from the active reference labels. */
+function buildHolderNameSuccessMessage(labels: string[]): string {
+  if (!labels.length) return "Account Holder Name verified successfully.";
+  let joined: string;
+  if (labels.length === 1) joined = labels[0];
+  else if (labels.length === 2) joined = `${labels[0]} and ${labels[1]}`;
+  else joined = `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+  return `Account Holder Name verified with ${joined}.`;
+}
+
 export interface VerifiedDocumentData {
   isGstRegistered?: boolean;
   gstDeclarationReason?: string;
