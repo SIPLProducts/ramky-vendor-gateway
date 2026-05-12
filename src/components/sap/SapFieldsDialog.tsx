@@ -123,6 +123,38 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={v => set('lebre', v ? 'X' : '')} />
             </Section>
 
+            <Separator />
+
+            {/* Classification */}
+            <Section icon={<Tags className="h-4 w-4" />} title="Classification">
+              <TextField label="Material Category" value={form.classify.MGV} onChange={v => setClassify('MGV', v)} />
+              <TextField label="Vendor Category" value={form.classify.CATV} onChange={v => setClassify('CATV', v)} />
+              <TextField label="Vendor Location" value={form.classify.LOCV} onChange={v => setClassify('LOCV', v)} />
+              <TextField label="Vendor Identification" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
+            </Section>
+
+            <Separator />
+
+            {/* Registered / Corporate Office Address */}
+            <Section icon={<MapPin className="h-4 w-4" />} title="Registered / Corporate Office Address">
+              <ReadOnlyField label="Address Line 1" value={(vendor as any)?.registered_address} />
+              <ReadOnlyField label="Address Line 2" value={(vendor as any)?.registered_address_line2} />
+              <ReadOnlyField label="Address Line 3" value={(vendor as any)?.registered_address_line3} />
+              <ReadOnlyField label="Address Line 4" value={(vendor as any)?.registered_address_line4} />
+              <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
+              <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
+              <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
+              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone} />
+            </Section>
+
+            <Separator />
+
+            {/* Contact Details */}
+            <Section icon={<Phone className="h-4 w-4" />} title="Contact Details">
+              <ReadOnlyField label="Contact Number" value={(vendor as any)?.primary_phone || (vendor as any)?.registered_phone} />
+              <ReadOnlyField label="Email ID" value={(vendor as any)?.primary_email || (vendor as any)?.registered_email} />
+            </Section>
+
           </div>
         </div>
 
