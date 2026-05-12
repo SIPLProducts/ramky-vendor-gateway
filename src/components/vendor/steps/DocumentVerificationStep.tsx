@@ -32,6 +32,16 @@ const OCR_PROVIDER_BY_KIND: Record<OcrDocumentType, { provider: string; label: s
   cheque: { provider: "BANK_OCR", label: "Bank OCR" },
 };
 
+/** Build the bank holder-name success message from the active reference labels. */
+function buildHolderNameSuccessMessage(labels: string[]): string {
+  if (!labels.length) return "Account Holder Name verified successfully.";
+  let joined: string;
+  if (labels.length === 1) joined = labels[0];
+  else if (labels.length === 2) joined = `${labels[0]} and ${labels[1]}`;
+  else joined = `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+  return `Account Holder Name verified with ${joined}.`;
+}
+
 export interface VerifiedDocumentData {
   isGstRegistered?: boolean;
   gstDeclarationReason?: string;
@@ -515,15 +525,55 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "pan") {
-      // PAN flow: OCR has already run. Now call the configured `PAN`
-      // (PAN Comprehensive Validation) provider and treat
-      // `data.status === "valid"` as the source of truth. We no longer
-      // require GST to be verified first — GST may be skipped (Self-Declaration).
+      // PAN flow: OCR has already run.
+      // - If GST = Yes: GST registry is the source of truth for PAN + name,
+      //   so we skip the PAN Comprehensive Validation API and rely solely on
+      //   OCR + GST cross-check (PAN derived from GSTIN[2..12], holder name
+      //   fuzzy-matches GST legal name >= 40%).
+      // - If GST = No (Self-Declaration): call the PAN provider and require
+      //   `data.status === "valid"`.
       const ocrPan = String(ocr.pan_number || "").toUpperCase().trim();
       const ocrName = String(ocr.full_name || ocr.holder_name || ocr.name || "").trim();
       if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(ocrPan)) {
         return { ok: false as const, message: "Could not read a valid 10-character PAN. Please upload a clearer scan." };
       }
+
+      if (isGstRegistered === true) {
+        const gstin = String(gstDoc.ocrData?.gstin || "").toUpperCase().trim();
+        const panFromGst = gstin.slice(2, 12);
+        const gstLegal = String(gstDoc.ocrData?.legal_name || "").trim();
+        if (panFromGst.length === 10 && panFromGst !== ocrPan) {
+          return {
+            ok: false as const,
+            message: `PAN on card (${ocrPan}) does not match PAN derived from GSTIN (${panFromGst}).`,
+          };
+        }
+        if (ocrName && gstLegal && nameMatchPercentage(ocrName, gstLegal) < 40) {
+          return {
+            ok: false as const,
+            message: "PAN Holder Name does not match GST Legal Name.",
+          };
+        }
+        const holderName = ocrName || gstLegal;
+        const normalized: Record<string, any> = {
+          pan_number: ocrPan,
+          holder_name: holderName,
+          full_name: holderName,
+        };
+        return {
+          ok: true as const,
+          apiData: {
+            name: holderName,
+            pan: ocrPan,
+            source: "GST cross-check",
+            status: "valid",
+            panMatchMessage: "PAN verified against GST registry.",
+          },
+          normalized,
+          registeredName: holderName,
+        };
+      }
+
       const r = await callProvider({
         providerName: "PAN",
         input: { id_number: ocrPan, pan: ocrPan, pan_number: ocrPan },
@@ -567,9 +617,9 @@ export function DocumentVerificationStep({
         apiData: {
           name: holderName,
           pan: ocrPan,
-          source: "PAN Comprehensive Validation",
+          source: "PAN verification",
           status: "valid",
-          panMatchMessage: "PAN details validated successfully from PAN Comprehensive Validation API.",
+          panMatchMessage: "PAN details validated successfully from PAN verification.",
         },
         normalized,
         registeredName: holderName,
@@ -753,7 +803,7 @@ export function DocumentVerificationStep({
         };
       }
       holderNameStatus = "passed";
-      holderNameMessage = "Account Holder Name verified successfully.";
+      holderNameMessage = buildHolderNameSuccessMessage(refs.map((r) => r.label));
     }
 
     const normalized: Record<string, any> = {
@@ -1217,7 +1267,7 @@ export function DocumentVerificationStep({
           return;
         }
         holderNameStatus = "passed";
-        holderNameMessage = "Account Holder Name verified successfully.";
+        holderNameMessage = buildHolderNameSuccessMessage(refs.map((rr) => rr.label));
       }
 
       const normalized: Record<string, any> = {
