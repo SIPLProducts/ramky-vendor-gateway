@@ -252,3 +252,12 @@ function CheckboxField({ label, checked, onChange }: { label: string; checked: b
     </div>
   );
 }
+
+function ReadOnlyField({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input value={value == null || value === '' ? '—' : String(value)} disabled readOnly className="h-9 rounded-lg bg-muted/40 text-muted-foreground" />
+    </div>
+  );
+}
