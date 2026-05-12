@@ -15,7 +15,7 @@ import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
 import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
-import { fuzzyNameMatch, nameMatchPercentage } from "@/lib/nameMatch";
+import { nameMatchPercentage } from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 
