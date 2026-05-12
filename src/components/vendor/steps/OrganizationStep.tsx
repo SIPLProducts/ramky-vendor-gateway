@@ -30,6 +30,7 @@ import {
   INDIAN_STATES,
   VENDOR_CATEGORIES,
   IDENTIFICATION_SOURCES,
+  ACCOUNTING_GROUPS,
 } from '@/types/vendor';
 
 const schema = z.object({
@@ -42,6 +43,7 @@ const schema = z.object({
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
+  accountingGroup: z.enum(['Import', 'Export'], { required_error: 'Accounting group is required' }),
   // SAP Classification
   materialGroupVendor: z.string().min(1, 'Material Group for Vendors is required'),
   vendorCategory: z.string().min(1, 'Vendor Category is required'),
@@ -118,6 +120,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
     defaultValues: {
       ...data,
       state: data?.state || '',
+      accountingGroup: (data?.accountingGroup as 'Import' | 'Export') || undefined,
       productCategoriesOther: data?.productCategoriesOther || '',
       materialGroupVendor: data?.materialGroupVendor || '',
       vendorCategory: data?.vendorCategory || '',
@@ -152,6 +155,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
       productCategories: values.productCategories,
       productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
       state: values.state,
+      accountingGroup: values.accountingGroup,
       materialGroupVendor: values.materialGroupVendor,
       vendorCategory: values.vendorCategory,
       vendorLocation: values.vendorLocation,
@@ -344,27 +348,52 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
             </div>
           )}
 
-          <div className="grid gap-1.5">
-            <Label>State *</Label>
-            <Controller
-              name="state"
-              control={control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
-                    <SelectValue placeholder="Select state" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INDIAN_STATES.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label>State *</Label>
+              <Controller
+                name="state"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.state && (
+                <p className="text-xs text-destructive">{errors.state.message as string}</p>
               )}
-            />
-            {errors.state && (
-              <p className="text-xs text-destructive">{errors.state.message as string}</p>
-            )}
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label>Accounting Group *</Label>
+              <Controller
+                name="accountingGroup"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <SelectTrigger className={errors.accountingGroup ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select accounting group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACCOUNTING_GROUPS.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.accountingGroup && (
+                <p className="text-xs text-destructive">{errors.accountingGroup.message as string}</p>
+              )}
+            </div>
           </div>
 
           {/* SAP Classification */}

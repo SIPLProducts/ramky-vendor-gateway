@@ -670,7 +670,7 @@ export default function VendorRegistration() {
     }
     // Last step is always Review
     if (currentStep === registrationSteps.length) {
-      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} />;
+      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
     }
     // Anything in between is an admin-defined custom tab (ids 6..N-1)
     const customIdx = currentStep - 6;
@@ -935,8 +935,11 @@ export default function VendorRegistration() {
                     <Button
                       type="button"
                       onClick={handleSubmit}
-                      disabled={isSubmitting}
-                      className="min-w-[160px]"
+                      disabled={isSubmitting || !formData.declaration?.selfDeclared || !formData.declaration?.termsAccepted}
+                      className={cn(
+                        "min-w-[160px]",
+                        (!formData.declaration?.selfDeclared || !formData.declaration?.termsAccepted) && "opacity-50 cursor-not-allowed"
+                      )}
                     >
                       {isSubmitting ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

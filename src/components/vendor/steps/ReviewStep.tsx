@@ -10,6 +10,7 @@ interface ReviewStepProps {
   onSubmit: () => void;
   onBack: () => void;
   onEditStep: (step: number) => void;
+  onDeclarationChange?: (d: { selfDeclared: boolean; termsAccepted: boolean }) => void;
 }
 
 const SectionHeader = ({ icon: Icon, title, step, onEdit }: { icon: React.ElementType; title: string; step: number; onEdit: (step: number) => void }) => (
@@ -26,10 +27,19 @@ const DataRow = ({ label, value }: { label: string; value: string | undefined })
   </div>
 );
 
-export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
+export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: ReviewStepProps) {
   const [selfDeclared, setSelfDeclared] = useState(data.declaration?.selfDeclared || false);
   const [termsAccepted, setTermsAccepted] = useState(data.declaration?.termsAccepted || false);
   const canSubmit = selfDeclared && termsAccepted;
+
+  const updateSelfDeclared = (v: boolean) => {
+    setSelfDeclared(v);
+    onDeclarationChange?.({ selfDeclared: v, termsAccepted });
+  };
+  const updateTermsAccepted = (v: boolean) => {
+    setTermsAccepted(v);
+    onDeclarationChange?.({ selfDeclared, termsAccepted: v });
+  };
 
   // Step numbers (6-step flow):
   //  1 Doc Verification (PAN/GST/MSME/Bank captured & verified here)
@@ -50,6 +60,7 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
             <DataRow label="Others (Specified)" value={data.organization.productCategoriesOther} />
           )}
           <DataRow label="State" value={data.organization?.state} />
+          <DataRow label="Accounting Group" value={data.organization?.accountingGroup} />
         </div>
       </div>
 
@@ -136,11 +147,11 @@ export function ReviewStep({ data, onSubmit, onEditStep }: ReviewStepProps) {
         <h3 className="form-section-title"><CheckCircle2 className="h-5 w-5 text-primary" />Declaration & Submission</h3>
         <div className="space-y-4">
           <div className="flex items-start space-x-3">
-            <Checkbox id="selfDeclared" checked={selfDeclared} onCheckedChange={(checked) => setSelfDeclared(checked === true)} />
+            <Checkbox id="selfDeclared" checked={selfDeclared} onCheckedChange={(checked) => updateSelfDeclared(checked === true)} />
             <Label htmlFor="selfDeclared" className="text-sm font-normal cursor-pointer">I declare that the information furnished above is correct to the best of my knowledge. I undertake that I will inform you of any changes in the above at the earliest.</Label>
           </div>
           <div className="flex items-start space-x-3">
-            <Checkbox id="termsAccepted" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked === true)} />
+            <Checkbox id="termsAccepted" checked={termsAccepted} onCheckedChange={(checked) => updateTermsAccepted(checked === true)} />
             <Label htmlFor="termsAccepted" className="text-sm font-normal cursor-pointer">I accept the Terms and Conditions and Privacy Policy of Ramky Infrastructure Limited.</Label>
           </div>
         </div>
