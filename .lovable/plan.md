@@ -1,57 +1,26 @@
-# Show Vendor-Sourced Fields (Read-Only) in SAP Field Confirmation Dialog
+# Reorder SAP Field Confirmation Dialog
 
-The SAP Field Confirmation dialog (`SapFieldsDialog.tsx`) currently only shows editable SAP control fields (account groups, company codes, etc.). It must additionally display the vendor-registration data that is being synced to SAP, in **disabled / read-only** mode, so the approver can review what will actually be pushed.
+In `src/components/sap/SapFieldsDialog.tsx`, reorder the sections inside the scrollable container so the newly added vendor-sourced (disabled) fields appear FIRST, and the existing editable SAP control fields appear BELOW them.
 
-## Sections to add (all fields disabled, sourced from the `VendorRow`)
+## New section order (top → bottom)
 
-The dialog already has the sections **Vendor Header**, **Company Code Data**, **Purchase Data**. We will add the new fields into the existing grid and add three new sections below.
+1. **Vendor Information** (read-only, vendor-sourced) — Trade Name, GST ID (GSTIN), PAN Number, Udyam Number (MSME)
+2. **Bank Details** (read-only) — Bank Account Number, Bank ID (IFSC Code), Account Holder Name, Bank Name
+3. **Registered / Corporate Office Address** (read-only) — Address Line 1–4, City, State, Pincode, Phone
+4. **Contact Details** (read-only) — Contact Number, Email ID
+5. — separator —
+6. **Vendor Header** (editable SAP) — Vendor (Person/Org/Group), Vendor Account Group, MSME (Minority Indicator)
+7. **Company Code Data** (editable) — unchanged
+8. **Purchase Data** (editable) — unchanged
+9. **Classification** (editable) — unchanged
 
-### 1. Vendor Header — add disabled fields
-- Trade Name → `vendor.trade_name`
-- GST ID (GSTIN) → `vendor.gstin`
-- PAN Number → `vendor.pan_number`
-- Udyam (MSME) Number → `vendor.msme_number`
+## Technical notes
 
-### 2. New section — "Bank Details" (disabled)
-- Bank Account Number → `account_number`
-- Bank ID (IFSC Code) → `ifsc_code`
-- Account Holder Name → `account_holder_name`
-- Bank Name → `bank_name`
-
-### 3. Classification (already partially present; promote to its own visible disabled block)
-- Material Category → `classify.MGV` (existing, keep editable as today)
-- Vendor Category → `classify.CATV`
-- Vendor Location → `classify.LOCV` (defaults from `registered_state`)
-- Vendor Identification → `classify.IDS`
-
-These remain in the existing `classify` form state. (No change requested to editable behavior — only ensure the section is rendered.)
-
-### 4. New section — "Registered / Corporate Office Address" (disabled)
-Show all address fields except Fax, Website, Email:
-- Address Line 1 → `registered_address`
-- Address Line 2 → `registered_address_line2`
-- Address Line 3 → `registered_address_line3`
-- Address Line 4 → `registered_address_line4`
-- City → `registered_city`
-- State → `registered_state`
-- Pincode → `registered_pincode`
-- Phone → `registered_phone`
-
-### 5. New section — "Contact Details" (disabled)
-- Contact Number → `vendor.contact_phone` (or `registered_phone` fallback)
-- Email ID → `vendor.contact_email` (or `registered_email` fallback)
-
-## Technical Notes
-
-- File to edit: `src/components/sap/SapFieldsDialog.tsx`.
-- Add a small `ReadOnlyField` helper that renders a `Label` + `Input` with `disabled` and `value={vendor?.<field> || '—'}`, styled with the existing `h-9 rounded-lg` classes plus `bg-muted/40 text-muted-foreground` to make the disabled state visually distinct (semantic tokens, no hardcoded colors).
-- Use the existing `Section` / grid pattern (`md:grid-cols-2`) for consistency.
-- Place the new sections inside the existing scrollable container, separated by `<Separator />`.
-- These fields are **display only** — they are NOT added to `SapFieldOverrides` and are NOT included in `onConfirm` payload (sync logic already pulls them from the vendor record).
-- No backend, schema, or sync-logic changes.
-- No changes to the editable SAP control fields already in the dialog.
+- Pure presentational change. Move JSX blocks within the existing scroll container; keep `<Separator />` between groups.
+- Split the current "Vendor Header" section: editable SAP fields stay in "Vendor Header" (moved below); the four read-only vendor identity fields move into a new top section called "Vendor Information".
+- No changes to `SapFieldOverrides`, `buildDefaults`, `onConfirm` payload, `ReadOnlyField` helper, styling, or sync logic.
 
 ## Out of scope
-- No changes to `sync-vendor-to-sap` edge function.
-- No changes to vendor registration forms.
-- No changes to approval workflow.
+
+- No backend, schema, or sync-vendor-to-sap edge function changes.
+- No new fields added or removed.

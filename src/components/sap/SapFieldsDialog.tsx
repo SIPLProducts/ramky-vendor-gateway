@@ -74,13 +74,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
           <div className="space-y-6 py-2">
-            {/* Vendor Header */}
-            <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
-              <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
-                options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
-              <TextField label="Vendor Account Group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
-              <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
-                options={[['', 'None'], ['MIC', 'MIC']]} />
+            {/* Vendor Information (read-only) */}
+            <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Information">
               <ReadOnlyField label="Trade Name" value={(vendor as any)?.trade_name} />
               <ReadOnlyField label="GST ID (GSTIN)" value={(vendor as any)?.gstin} />
               <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
@@ -89,12 +84,45 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Bank Details */}
+            {/* Bank Details (read-only) */}
             <Section icon={<Landmark className="h-4 w-4" />} title="Bank Details">
               <ReadOnlyField label="Bank Account Number" value={(vendor as any)?.account_number} />
               <ReadOnlyField label="Bank ID (IFSC Code)" value={(vendor as any)?.ifsc_code} />
               <ReadOnlyField label="Account Holder Name" value={(vendor as any)?.account_holder_name} />
               <ReadOnlyField label="Bank Name" value={(vendor as any)?.bank_name} />
+            </Section>
+
+            <Separator />
+
+            {/* Registered / Corporate Office Address (read-only) */}
+            <Section icon={<MapPin className="h-4 w-4" />} title="Registered / Corporate Office Address">
+              <ReadOnlyField label="Address Line 1" value={(vendor as any)?.registered_address} />
+              <ReadOnlyField label="Address Line 2" value={(vendor as any)?.registered_address_line2} />
+              <ReadOnlyField label="Address Line 3" value={(vendor as any)?.registered_address_line3} />
+              <ReadOnlyField label="Address Line 4" value={(vendor as any)?.registered_address_line4} />
+              <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
+              <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
+              <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
+              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone} />
+            </Section>
+
+            <Separator />
+
+            {/* Contact Details (read-only) */}
+            <Section icon={<Phone className="h-4 w-4" />} title="Contact Details">
+              <ReadOnlyField label="Contact Number" value={(vendor as any)?.primary_phone || (vendor as any)?.registered_phone} />
+              <ReadOnlyField label="Email ID" value={(vendor as any)?.primary_email || (vendor as any)?.registered_email} />
+            </Section>
+
+            <Separator />
+
+            {/* Vendor Header (editable SAP) */}
+            <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
+              <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
+                options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
+              <TextField label="Vendor Account Group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
+              <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
+                options={[['', 'None'], ['MIC', 'MIC']]} />
             </Section>
 
             <Separator />
@@ -131,28 +159,6 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <TextField label="Vendor Category" value={form.classify.CATV} onChange={v => setClassify('CATV', v)} />
               <TextField label="Vendor Location" value={form.classify.LOCV} onChange={v => setClassify('LOCV', v)} />
               <TextField label="Vendor Identification" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
-            </Section>
-
-            <Separator />
-
-            {/* Registered / Corporate Office Address */}
-            <Section icon={<MapPin className="h-4 w-4" />} title="Registered / Corporate Office Address">
-              <ReadOnlyField label="Address Line 1" value={(vendor as any)?.registered_address} />
-              <ReadOnlyField label="Address Line 2" value={(vendor as any)?.registered_address_line2} />
-              <ReadOnlyField label="Address Line 3" value={(vendor as any)?.registered_address_line3} />
-              <ReadOnlyField label="Address Line 4" value={(vendor as any)?.registered_address_line4} />
-              <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
-              <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
-              <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
-              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone} />
-            </Section>
-
-            <Separator />
-
-            {/* Contact Details */}
-            <Section icon={<Phone className="h-4 w-4" />} title="Contact Details">
-              <ReadOnlyField label="Contact Number" value={(vendor as any)?.primary_phone || (vendor as any)?.registered_phone} />
-              <ReadOnlyField label="Email ID" value={(vendor as any)?.primary_email || (vendor as any)?.registered_email} />
             </Section>
 
           </div>
