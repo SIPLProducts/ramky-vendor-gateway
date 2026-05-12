@@ -34,7 +34,7 @@ export interface OrganizationDetails {
   productCategories: string[];
   productCategoriesOther?: string;
   state: string;
-  accountingGroup?: 'Import' | 'Export' | '';
+  accountingGroup?: 'Import' | 'Domestic' | '';
   // SAP Classification
   materialGroupVendor?: string;
   vendorCategory?: string;
@@ -42,7 +42,7 @@ export interface OrganizationDetails {
   identificationSource?: string;
 }
 
-export const ACCOUNTING_GROUPS = ['Import', 'Export'] as const;
+export const ACCOUNTING_GROUPS = ['Import', 'Domestic'] as const;
 
 export const VENDOR_CATEGORIES = [
   'TRADER',
