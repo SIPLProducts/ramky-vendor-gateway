@@ -113,7 +113,7 @@ export function VendorSubmissionPreviewDialog({
         {loading ? (
           <Skeleton className="h-64 w-full" />
         ) : vendor ? (
-          <ScrollArea className="flex-1 pr-4 -mr-2">
+          <ScrollArea className="h-[65vh] pr-4 -mr-2">
             <div className="space-y-6 py-2">
               {/* Organization */}
               <div className="form-section">
