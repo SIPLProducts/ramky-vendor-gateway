@@ -467,6 +467,8 @@ export function ApprovalMatrixConfig() {
       setResolvingUsers(false);
     }
   };
+
+  const handleTenantChange = (next: string) => {
     if (isDirty && next !== tenantId) setPendingTenantId(next);
     else setTenantId(next);
   };
