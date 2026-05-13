@@ -25,21 +25,47 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const email = (auth.email ?? '').toLowerCase();
+    const email = (auth.email ?? '').trim().toLowerCase();
 
-    // 1. Levels at this stage where user is an approver
-    const { data: myLevels, error: lvlErr } = await admin
+    // 1. Find all approver rows for this user — by user_id OR by email.
+    // Run as two clean queries instead of a fragile PostgREST .or() string,
+    // so dots/plus-aliases/punctuation in emails can never break the filter.
+    const selectCols = 'id, level_id, user_id, approver_email, approval_matrix_levels!inner(id, stage, level_name, approval_mode)';
+
+    const byUserPromise = admin
       .from('approval_matrix_approvers')
-      .select('level_id, approval_matrix_levels!inner(id, stage, level_name, approval_mode)')
-      .or(
-        email
-          ? `user_id.eq.${auth.userId},approver_email.ilike.${email}`
-          : `user_id.eq.${auth.userId}`,
-      );
-    if (lvlErr) throw lvlErr;
+      .select(selectCols)
+      .eq('user_id', auth.userId);
+
+    const byEmailPromise = email
+      ? admin
+          .from('approval_matrix_approvers')
+          .select(selectCols)
+          .ilike('approver_email', email)
+      : Promise.resolve({ data: [] as any[], error: null });
+
+    const [byUserRes, byEmailRes] = await Promise.all([byUserPromise, byEmailPromise]);
+    if (byUserRes.error) throw byUserRes.error;
+    if ((byEmailRes as any).error) throw (byEmailRes as any).error;
+
+    const merged = new Map<string, any>();
+    [...(byUserRes.data ?? []), ...((byEmailRes as any).data ?? [])].forEach((row: any) => {
+      merged.set(row.id, row);
+    });
+
+    // Auto-link user_id on rows matched by email so future lookups are exact.
+    const toLink = [...merged.values()].filter(
+      (r: any) => !r.user_id && r.approver_email && r.approver_email.toLowerCase() === email,
+    );
+    if (toLink.length > 0) {
+      await admin
+        .from('approval_matrix_approvers')
+        .update({ user_id: auth.userId })
+        .in('id', toLink.map((r: any) => r.id));
+    }
 
     const levelMeta = new Map<string, any>();
-    (myLevels ?? []).forEach((row: any) => {
+    [...merged.values()].forEach((row: any) => {
       if (row.approval_matrix_levels?.stage === stage) {
         levelMeta.set(row.level_id, row.approval_matrix_levels);
       }
