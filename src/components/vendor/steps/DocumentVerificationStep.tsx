@@ -1697,7 +1697,7 @@ export function DocumentVerificationStep({
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
                       <a
-                        href="/templates/gst-self-declaration.html"
+                        href="/templates/gst-self-declaration.docx"
                         download
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
@@ -1872,7 +1872,7 @@ export function DocumentVerificationStep({
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
                       <a
-                        href="/templates/msme-self-declaration.html"
+                        href="/templates/msme-self-declaration.docx"
                         download
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
