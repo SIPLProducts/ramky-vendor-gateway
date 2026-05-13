@@ -78,6 +78,7 @@ export function ApprovalMatrixConfig() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingWrite, setTestingWrite] = useState(false);
+  const [resolvingUsers, setResolvingUsers] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState<string>('[]');
   const [dbState, setDbState] = useState<DbState>({ levels: 0, approvers: 0, lastUpdated: null });
   const [lastSaveResult, setLastSaveResult] = useState<{ levels: number; approvers: number; at: number } | null>(null);
