@@ -78,6 +78,7 @@ export function ApprovalMatrixConfig() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingWrite, setTestingWrite] = useState(false);
+  const [resolvingUsers, setResolvingUsers] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState<string>('[]');
   const [dbState, setDbState] = useState<DbState>({ levels: 0, approvers: 0, lastUpdated: null });
   const [lastSaveResult, setLastSaveResult] = useState<{ levels: number; approvers: number; at: number } | null>(null);
@@ -411,6 +412,62 @@ export function ApprovalMatrixConfig() {
     }
   };
 
+  const resolveUserIds = async () => {
+    if (!tenantId) return;
+    setResolvingUsers(true);
+    try {
+      // Pull all approver rows for levels in this tenant that are missing user_id.
+      const { data: levels, error: lErr } = await supabase
+        .from('approval_matrix_levels').select('id').eq('tenant_id', tenantId);
+      if (lErr) throw lErr;
+      const levelIds = (levels ?? []).map((l: any) => l.id);
+      if (levelIds.length === 0) {
+        toast({ title: 'Nothing to resolve', description: 'No levels saved for this tenant yet.' });
+        return;
+      }
+      const { data: rows, error: rErr } = await supabase
+        .from('approval_matrix_approvers')
+        .select('id, approver_email, user_id')
+        .in('level_id', levelIds)
+        .is('user_id', null);
+      if (rErr) throw rErr;
+
+      const emails = [...new Set((rows ?? [])
+        .map((r: any) => (r.approver_email ?? '').trim().toLowerCase())
+        .filter((e: string) => !!e))];
+      if (emails.length === 0) {
+        toast({ title: 'All approvers already linked', description: 'Every saved approver row has a user_id.' });
+        return;
+      }
+
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles').select('id, email').in('email', emails);
+      if (pErr) throw pErr;
+      const emailToId = new Map<string, string>();
+      (profiles ?? []).forEach((p: any) => {
+        if (p.email) emailToId.set(p.email.toLowerCase(), p.id);
+      });
+
+      let linked = 0;
+      for (const r of rows ?? []) {
+        const e = (r.approver_email ?? '').trim().toLowerCase();
+        const uid = emailToId.get(e);
+        if (!uid) continue;
+        const { error } = await supabase
+          .from('approval_matrix_approvers').update({ user_id: uid }).eq('id', r.id);
+        if (!error) linked++;
+      }
+      toast({
+        title: 'Resolve complete',
+        description: `${linked} of ${rows?.length ?? 0} approver row(s) linked to existing users.`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Resolve failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setResolvingUsers(false);
+    }
+  };
+
   const handleTenantChange = (next: string) => {
     if (isDirty && next !== tenantId) setPendingTenantId(next);
     else setTenantId(next);
@@ -556,6 +613,10 @@ export function ApprovalMatrixConfig() {
           <Button variant="outline" size="sm" onClick={testWriteAccess} disabled={!tenantId || testingWrite}>
             {testingWrite ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-1" />}
             Test write access
+          </Button>
+          <Button variant="outline" size="sm" onClick={resolveUserIds} disabled={!tenantId || resolvingUsers}>
+            {resolvingUsers ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-1" />}
+            Resolve Users
           </Button>
           <Button onClick={saveAll} disabled={!canSave} variant={isDirty ? 'default' : 'secondary'}>
             <Save className="h-4 w-4 mr-1" /> {saving ? 'Saving...' : 'Save All'}

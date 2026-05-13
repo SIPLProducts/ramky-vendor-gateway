@@ -1,55 +1,64 @@
-# Plan — Bank holder-name verification & PAN API gating
+## Problem
 
-Two files change. No backend / no schema change. All updates are to the Document Verification step (Bank + PAN flows) and matching messages.
+When an admin adds a new email under **Approvers by Stage**, that person logs in but their Approval inbox is empty.
 
-## 1. Bank — conditional success/failure messages
+Root cause: in `list-pending-approvals-by-stage` we use a PostgREST `.or()` filter:
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx` (cheque-OCR finalize path ~lines 729–757 and manual-popup path ~lines 1200–1221) and in `src/components/vendor/kyc/BankKycTab.tsx`, replace the current single "Account Holder Name verified successfully." with messages that depend on GST/MSME flags.
+```ts
+.or(`user_id.eq.${auth.userId},approver_email.ilike.${email}`)
+```
 
-Validation rule (kept as today): name match score ≥ 40% against the active reference set, where the reference set is:
+Three fragile things happen here:
 
-| GST | MSME | References checked |
-|-----|------|--------------------|
-| No  | No   | PAN Holder Name only |
-| No  | Yes  | PAN Holder Name + MSME Enterprise Name |
-| Yes | No   | PAN Holder Name + GST Legal Name |
-| Yes | Yes  | PAN Holder Name + GST Legal Name + MSME Enterprise Name |
+1. `approver_email` is saved with `user_id = null` (see `ApprovalMatrixConfig.tsx` line 352), so the lookup depends entirely on the email leg of the `.or()`.
+2. PostgREST `.or()` parses the value string and certain emails (dots, plus-aliases, percent signs, commas if present) can silently fail the filter. The match also goes through `ilike` without wildcards, which is slower and easier to mis-build.
+3. The new user logs in with the SAME email that was typed in the matrix, but if the admin saved the matrix with even a stray space or different casing in the row that's still on screen (vs what's persisted), there's no second chance to match by `user_id`.
 
-Success message (shown inline + on the bank tile):
+The flow is already dynamic — no hardcoded roles or emails exist. The fix is making the email match bullet-proof and stitching `user_id` in once we know who the email belongs to.
 
-- GST=No, MSME=No → `Account Holder Name verified with PAN Holder Name.`
-- GST=Yes, MSME=No → `Account Holder Name verified with PAN Holder Name and GST Legal Name.`
-- GST=No, MSME=Yes → `Account Holder Name verified with PAN Holder Name and MSME Enterprise Name.`
-- GST=Yes, MSME=Yes → `Account Holder Name verified with PAN Holder Name, GST Legal Name and MSME Enterprise Name.`
+## Plan
 
-Failure message (unchanged): `Account Holder Name does not match with the provided PAN/MSME details.`
-Failure handling (unchanged): block Continue, allow re-upload / re-validate.
+### 1. Replace fragile `.or()` with two clean queries (server-side)
 
-Implementation note: build the success string from the same `refs` array already used for matching, so the message stays in sync with the reference set.
+In `supabase/functions/list-pending-approvals-by-stage/index.ts`:
 
-## 2. PAN — rename success message
+- Drop the `.or()` filter entirely.
+- Query 1: `approval_matrix_approvers` where `user_id = auth.userId`.
+- Query 2: `approval_matrix_approvers` where `lower(approver_email) = lower(auth.email)` using `.eq('approver_email', email)` after normalizing to lowercase (the matrix already saves lowercase at line 354 of `ApprovalMatrixConfig.tsx`).
+- Merge the two row sets and dedupe by `level_id`.
 
-In `DocumentVerificationStep.tsx` line 572:
-- Replace `"PAN details validated successfully from PAN Comprehensive Validation API."`
-- With `"PAN details validated successfully from PAN verification."`
+Apply the same two-query pattern in `supabase/functions/process-approval-action/index.ts` for consistency (it already does both checks in JS — keep that, just normalize email comparison with `trim().toLowerCase()` on both sides).
 
-Provider-not-configured message (line 535) stays as-is (it references the admin setting name).
+### 2. Auto-link `user_id` when an email matches an existing auth user
 
-## 3. PAN — skip the PAN Comprehensive Validation API when GST = Yes
+Add a tiny helper in `list-pending-approvals-by-stage` and `process-approval-action`: when we find approver rows by email and `user_id IS NULL`, write `user_id = auth.userId` back to those rows (service-role update). This makes future lookups exact and lets us drop the email leg over time.
 
-When `isGstRegistered === true`, the GST registry already authoritatively returns the PAN number + legal name, so calling the PAN Comprehensive Validation provider is redundant. Update the `kind === "pan"` branch in `runDocFlow` (lines 517–576):
+No schema change needed.
 
-- If `isGstRegistered === true`: skip the `callProvider({ providerName: "PAN", ... })` call entirely. Build the verified result purely from OCR + GST cross-check (PAN number must equal `gstin.slice(2,12)`, holder name fuzzy-matches GST legal name ≥ 40%). Set `apiData.source = "GST cross-check"` and `apiData.panMatchMessage = "PAN verified against GST registry."`.
-- If `isGstRegistered === false` (Self-Declaration path): keep current behaviour — call the PAN provider and use the new success message from item 2.
+### 3. Add a one-shot "Re-link approvers" button (optional but cheap)
 
-The downstream PAN ↔ GSTIN useEffect cross-check (lines 1291–1309) already runs only when `isGstRegistered === true`, so it continues to guard live edits.
+In `ApprovalMatrixConfig.tsx`, next to **Save All**, add a **Resolve Users** button that, for every approver row with `user_id IS NULL`, looks up `profiles` by email and patches `user_id`. Pure UI + one bulk update; no migration.
 
-## Files to edit
+### 4. Keep nothing else hardcoded
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — items 1, 2, 3
-- `src/components/vendor/kyc/BankKycTab.tsx` — item 1 (inline holder-name banner messages, lines 87–107 and 287–294)
+Confirm — no other code change required:
 
-## Out of scope
+- Stages, level numbers, modes, MSME-only flag → all read live from `approval_matrix_levels`.
+- Approver identity → resolved live from `approval_matrix_approvers` on every request.
+- Stage → vendor.status mapping is a small literal `Record` inside the edge function (`SCM_MANAGER → scm_manager_review`, etc.) and is keyed by the stage value stored on the level row, so reassigning who acts at a stage requires zero code change.
+- Sidebar/page access uses `role_screen_permissions` + `custom_role_screen_permissions`, both DB-driven.
 
-- No changes to MSME tab logic, file upload conversion, or step gating.
-- No backend / RLS / edge-function changes.
+## Files touched
+
+- `supabase/functions/list-pending-approvals-by-stage/index.ts` — replace `.or()` with two queries + merge; auto-link `user_id`.
+- `supabase/functions/process-approval-action/index.ts` — normalize email comparison; auto-link `user_id`.
+- `src/components/admin/ApprovalMatrixConfig.tsx` — add **Resolve Users** action that backfills `user_id` from `profiles` by email.
+
+No DB migration. No changes to the routing logic, stages, or RLS policies.
+
+## How to verify after build
+
+1. Add a brand-new email in **Approvers by Stage**, save.
+2. Sign in as that email.
+3. Open the matching Approval page — pending vendors should now appear.
+4. Reassign the same level to a different email, save. Sign in as the old email — inbox empty. Sign in as the new email — pending vendors visible. No deploy or code change required.
