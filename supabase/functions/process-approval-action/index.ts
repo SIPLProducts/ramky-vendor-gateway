@@ -45,15 +45,24 @@ Deno.serve(async (req) => {
     if (progress.status !== 'pending') throw new Error('Already actioned');
 
     // Validate user is approver for this level — either by user_id OR by matching email
-    const userEmail = (userData.user.email ?? '').toLowerCase();
+    const userEmail = (userData.user.email ?? '').trim().toLowerCase();
     const { data: approvers } = await admin
       .from('approval_matrix_approvers')
       .select('id, user_id, approver_email')
       .eq('level_id', progress.level_id);
-    const isApprover = (approvers ?? []).some(
-      (a: any) => a.user_id === userId || (a.approver_email && a.approver_email.toLowerCase() === userEmail)
-    );
-    if (!isApprover) throw new Error('You are not an approver for this level');
+
+    const matched = (approvers ?? []).filter((a: any) => {
+      if (a.user_id === userId) return true;
+      const e = (a.approver_email ?? '').trim().toLowerCase();
+      return !!userEmail && e === userEmail;
+    });
+    if (matched.length === 0) throw new Error('You are not an approver for this level');
+
+    // Auto-link user_id on rows matched by email so future lookups are exact.
+    const toLink = matched.filter((a: any) => !a.user_id).map((a: any) => a.id);
+    if (toLink.length > 0) {
+      await admin.from('approval_matrix_approvers').update({ user_id: userId }).in('id', toLink);
+    }
 
     // Validate it is the active (lowest-numbered pending) level for the vendor
     const { data: allProgress } = await admin
