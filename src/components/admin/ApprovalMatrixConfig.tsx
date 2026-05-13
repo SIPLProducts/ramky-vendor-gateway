@@ -614,6 +614,10 @@ export function ApprovalMatrixConfig() {
             {testingWrite ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-1" />}
             Test write access
           </Button>
+          <Button variant="outline" size="sm" onClick={resolveUserIds} disabled={!tenantId || resolvingUsers}>
+            {resolvingUsers ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-1" />}
+            Resolve Users
+          </Button>
           <Button onClick={saveAll} disabled={!canSave} variant={isDirty ? 'default' : 'secondary'}>
             <Save className="h-4 w-4 mr-1" /> {saving ? 'Saving...' : 'Save All'}
           </Button>
