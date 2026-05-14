@@ -1,41 +1,24 @@
-## Diagnosis
 
-The timeout is happening inside the on-prem Node middleware, not in the browser or Lovable Cloud request itself.
+## Goal
 
-The key clue is:
+Your SAP response structure (`VENDOR_ACC_GRP`, `COMPANY_CODE`, `PLANNING_GROUP`, `RECON_ACCOUNT`, `PURCHASE_ORG`, `CURRENCY`) is already mapped correctly in the edge function — the screenshot confirms 428 F4 options were refreshed and the dropdowns work (12 Purchase Orgs, 209 Currencies loaded).
 
-```text
-ConnectTimeoutError [UND_ERR_CONNECT_TIMEOUT]
-FAILED after 10020ms GET http://10.200.1.2:8000/...
-```
+The remaining issue is in `SapFieldsDialog.tsx`: **Rec-Account is being filtered by the selected Company Code (`BUKRS`)**, so users only see a subset. You want every dropdown to simply list **all** options returned by SAP for that master type — no matching/filtering between fields.
 
-Node 18+ `fetch` uses Undici internally. Undici has its own default TCP connect timeout of about 10 seconds. Your `SAP_REQUEST_TIMEOUT_MS=30000` AbortController controls the total request, but it does not override Undici’s lower-level connect timeout. That is why Postman can succeed while Node fails at around 10 seconds.
+## Changes
 
-## Plan
+### 1. `src/components/sap/SapFieldsDialog.tsx`
+- Remove the `filter={{ BUKRS: form.bukrs }}` and `extraLabelFields={["BUKRS"]}` and `allowFilterFallback` props from the Rec-Account combobox so it shows all `recon_account` rows from SAP regardless of selected company code.
+- (No other comboboxes currently use cross-field filters — Vendor Account Group, Company Code, Planning Group, Purchase Org, Currency already show all options.)
 
-1. **Update middleware HTTP client timeout behavior**
-   - Add Undici `Agent` / `setGlobalDispatcher` configuration in `middleware/server.js`.
-   - Set the connection timeout from env, e.g. `SAP_CONNECT_TIMEOUT_MS`, defaulting to a higher value like 60000ms.
-   - Keep `SAP_REQUEST_TIMEOUT_MS` as the total request timeout.
+### 2. `src/components/sap/SapMasterCombobox.tsx`
+- Mark the `filter` / `extraLabelFields` / `allowFilterFallback` props as no-ops (or remove them) since per your request we never want to match between fields. Simplest: keep the props for backward compatibility but always render all rows from `useSapMasterData(masterType)`.
 
-2. **Improve SAP diagnostics in middleware**
-   - Make timeout errors explicit: distinguish `UND_ERR_CONNECT_TIMEOUT`, AbortController timeout, DNS/network errors, and SAP HTTP errors.
-   - Include configured timeout values in the `/health` response so you can confirm the running service picked up the right settings.
-   - Keep secrets redacted.
+### Out of scope
+- No edge-function changes (`sap-master-fetch` already correctly parses your exact response structure).
+- No DB / migration changes.
+- No middleware changes.
 
-3. **Align environment examples and docs**
-   - Add `SAP_CONNECT_TIMEOUT_MS=60000` to `middleware/.env.example`.
-   - Update `middleware/README.md` troubleshooting so this exact Postman-vs-Node timeout case is documented.
+## Result
 
-4. **Optional safety in the F4 edge function**
-   - The edge function currently waits up to 25 seconds for middleware. If middleware is allowed to take 60 seconds, the F4 refresh can still fail early from Lovable Cloud.
-   - For the F4 master-data refresh, either:
-     - keep middleware connect timeout at 20–25 seconds for this path, or
-     - raise the edge function wait time carefully if platform limits allow it.
-   - I recommend setting middleware connect timeout to **20000ms** for F4 first, and only increasing if SAP truly needs longer to establish TCP connections.
-
-## Expected result
-
-- Node middleware will no longer fail at the hard 10-second Undici connect timeout.
-- If SAP still cannot be reached from that Windows server, the error will clearly say whether it is a network/firewall/connectivity issue versus an app timeout.
-- F4 refresh will continue showing only real SAP-loaded options, without fallback/unfiltered data.
+Every SAP field in the "SAP Field Confirmation" dialog will list the full set of values returned by SAP for that key (e.g., all `RECON_ACCOUNT` entries, all `CURRENCY` entries) — exactly mirroring your SAP response, with no inter-field filtering.

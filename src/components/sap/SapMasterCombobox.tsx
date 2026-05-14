@@ -23,31 +23,17 @@ interface Props {
   allowFilterFallback?: boolean;
 }
 
-export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, filter, extraLabelFields }: Props) {
+export function SapMasterCombobox({ label, masterType, value, onChange, placeholder }: Props) {
   const [open, setOpen] = useState(false);
   const { data: allRows, isLoading } = useSapMasterData(masterType);
 
-  const sourceRows = allRows || [];
-  const rows = sourceRows.filter((r) => {
-    if (!filter) return true;
-    const ex = (r.extra || {}) as Record<string, any>;
-    return Object.entries(filter).every(([k, v]) => !v || String(ex?.[k] ?? "") === String(v));
-  });
-  const hasActiveFilter = !!filter && Object.values(filter).some(Boolean);
-  const filterSummary = hasActiveFilter
-    ? Object.entries(filter!).filter(([, v]) => !!v).map(([k, v]) => `${k}: ${v}`).join(", ")
-    : "";
-
-  const formatExtra = (r: { extra: any }) => {
-    if (!extraLabelFields?.length) return "";
-    const ex = (r.extra || {}) as Record<string, any>;
-    const parts = extraLabelFields.map((k) => (ex?.[k] != null ? `${k}: ${ex[k]}` : null)).filter(Boolean);
-    return parts.length ? ` (${parts.join(", ")})` : "";
-  };
+  // Show all options returned by SAP for this master type — no cross-field filtering.
+  const rows = allRows || [];
+  const sourceRows = rows;
 
   const match = rows.find((r) => r.code === value);
   const displayed = match
-    ? `${match.code}${match.description ? ` — ${match.description}` : ""}${formatExtra(match)}`
+    ? `${match.code}${match.description ? ` — ${match.description}` : ""}`
     : value || "";
 
   return (
@@ -82,23 +68,18 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
                   <CommandEmpty>
                     {sourceRows.length === 0
                       ? "No SAP F4 values loaded for this field."
-                      : hasActiveFilter && rows.length === 0
-                        ? `No option matches the selected filter${filterSummary ? ` (${filterSummary})` : ""}. Press Enter to keep the typed value.`
-                        : `No match. Press Enter to keep "${value}".`}
+                      : `No match. Press Enter to keep "${value}".`}
                   </CommandEmpty>
                   <CommandGroup>
                     {rows.map((r) => (
                       <CommandItem
                         key={r.id}
-                        value={`${r.code} ${r.description || ""} ${JSON.stringify(r.extra || {})}`}
+                        value={`${r.code} ${r.description || ""}`}
                         onSelect={() => { onChange(r.code); setOpen(false); }}
                       >
                         <Check className={cn("mr-2 h-4 w-4", value === r.code ? "opacity-100" : "opacity-0")} />
                         <span className="font-mono">{r.code}</span>
                         {r.description && <span className="ml-2 text-muted-foreground">— {r.description}</span>}
-                        {extraLabelFields?.length ? (
-                          <span className="ml-2 text-xs text-muted-foreground">{formatExtra(r)}</span>
-                        ) : null}
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -111,7 +92,7 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
       <p className="text-[11px] text-muted-foreground">
         {isLoading
           ? "Loading F4 values…"
-          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${hasActiveFilter ? ` for current filter${filterSummary ? ` (${filterSummary})` : ""}` : ""}.`}
+          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded.`}
       </p>
     </div>
   );
