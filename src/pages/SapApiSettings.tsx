@@ -208,6 +208,10 @@ export default function SapApiSettings() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="master">
+          <SapMasterDataTab />
+        </TabsContent>
+
         <TabsContent value="template">
           <SapPayloadTemplateEditor />
         </TabsContent>
