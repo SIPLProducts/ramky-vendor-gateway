@@ -76,32 +76,44 @@ async function forwardToSap({ url, method, headers, body }) {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   const startedAt = Date.now();
+  const upstreamMethod = method || "POST";
+  console.log(`[forwardToSap] -> ${upstreamMethod} ${url}`);
   try {
-    const res = await fetch(url, {
-      method: method || "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...headers,
-      },
-      body: body == null ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+    const init = {
+      method: upstreamMethod,
+      headers: { ...(headers || {}) },
       signal: controller.signal,
-    });
+    };
+    // Only attach a body / content-type for methods that have one.
+    if (body != null && upstreamMethod !== "GET" && upstreamMethod !== "HEAD") {
+      init.body = typeof body === "string" ? body : JSON.stringify(body);
+      if (!init.headers["Content-Type"] && !init.headers["content-type"]) {
+        init.headers["Content-Type"] = "application/json";
+      }
+    }
+    const res = await fetch(url, init);
     const text = await res.text();
     let json = null;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      // SAP returned non-JSON — pass through as text.
-    }
-    return {
-      ok: res.ok,
-      status: res.status,
-      durationMs: Date.now() - startedAt,
-      body: json ?? text,
-    };
+    try { json = JSON.parse(text); } catch { /* non-JSON */ }
+    console.log(`[forwardToSap] <- ${res.status} in ${Date.now() - startedAt}ms (${url})`);
+    return { ok: res.ok, status: res.status, durationMs: Date.now() - startedAt, body: json ?? text };
+  } catch (err) {
+    console.error(`[forwardToSap] FAILED after ${Date.now() - startedAt}ms ${upstreamMethod} ${url}:`, err);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
+}
+
+function describeFetchError(err) {
+  const code = err?.cause?.code || err?.code || null;
+  const name = err?.name || "Error";
+  const msg = err?.message || String(err);
+  const causeMsg = err?.cause?.message ? ` (cause: ${err.cause.message})` : "";
+  if (name === "AbortError") {
+    return { code: "TIMEOUT", message: "SAP request timed out (middleware AbortController fired)." };
+  }
+  return { code: code || name, message: `${msg}${causeMsg}` };
 }
 
 // ---------- Routes ----------
@@ -159,9 +171,12 @@ app.post("/sap/bp/create", authGuard, async (req, res) => {
     });
   } catch (err) {
     console.error("[bp/create] error:", err);
+    const info = describeFetchError(err);
     return res.status(502).json({
       ok: false,
-      error: err.name === "AbortError" ? "SAP request timed out" : err.message || "Upstream error",
+      error: info.message,
+      code: info.code,
+      target: SAP_BP_API_URL,
     });
   }
 });
@@ -212,9 +227,12 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
     });
   } catch (err) {
     console.error("[proxy] error:", err);
+    const info = describeFetchError(err);
     return res.status(502).json({
       ok: false,
-      error: err.name === "AbortError" ? "SAP request timed out" : err.message || "Upstream error",
+      error: info.message,
+      code: info.code,
+      target: url,
     });
   }
 });

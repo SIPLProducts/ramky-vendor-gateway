@@ -130,7 +130,12 @@ serve(async (req) => {
         clearTimeout(timer);
         const text = await res.text();
         if (!res.ok) {
-          networkError = `Middleware HTTP ${res.status}: ${text.slice(0, 300)}`;
+          let detail = text.slice(0, 400);
+          try {
+            const j = JSON.parse(text);
+            detail = `${j.error || "upstream error"}${j.code ? ` [${j.code}]` : ""}${j.target ? ` -> ${j.target}` : ""}`;
+          } catch { /* keep raw text */ }
+          networkError = `Middleware HTTP ${res.status}: ${detail}`;
         } else {
           let wrapper: any = null;
           try { wrapper = JSON.parse(text); } catch {
