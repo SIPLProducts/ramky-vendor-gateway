@@ -7,25 +7,32 @@ import { Input } from '@/components/ui/input';
 import { Users, User, Briefcase, Headphones } from 'lucide-react';
 import { ContactDetails } from '@/types/vendor';
 import { useBuiltInFieldOverrides, isFieldVisible } from '@/hooks/useBuiltInFieldOverrides';
+import { digitsOnly } from '@/lib/utils';
+
+const phoneRequired = z.string().regex(/^\d{10}$/, '10-digit mobile number required');
+const phoneOptional = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d{10}$/.test(v), { message: '10-digit mobile number required' });
 
 const schema = z.object({
   ceoName: z.string().min(2, 'Name is required'),
   ceoDesignation: z.string().optional(),
-  ceoPhone: z.string().min(10, 'Valid phone number required'),
+  ceoPhone: phoneRequired,
   ceoEmail: z.string().email('Valid email required'),
-  ceoPhone2: z.string().optional(),
+  ceoPhone2: phoneOptional,
   ceoEmail2: z.string().email('Valid email required').optional().or(z.literal('')),
   marketingName: z.string().optional(),
   marketingDesignation: z.string().optional(),
-  marketingPhone: z.string().optional(),
+  marketingPhone: phoneOptional,
   marketingEmail: z.string().optional(),
   productionName: z.string().optional(),
   productionDesignation: z.string().optional(),
-  productionPhone: z.string().optional(),
+  productionPhone: phoneOptional,
   productionEmail: z.string().optional(),
   customerServiceName: z.string().optional(),
   customerServiceDesignation: z.string().optional(),
-  customerServicePhone: z.string().optional(),
+  customerServicePhone: phoneOptional,
   customerServiceEmail: z.string().optional(),
 });
 
