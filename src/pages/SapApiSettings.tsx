@@ -8,8 +8,9 @@ import {
   Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
 } from "@/components/ui/table";
 import {
-  Activity, Download, Upload, Plus, FileText, Link2, Trash2, Pencil,
+  Activity, Download, Upload, Plus, FileText, Link2, Trash2, Pencil, Database,
 } from "lucide-react";
+import { SapMasterDataTab } from "@/components/sap/SapMasterDataTab";
 import { SapConnectivityGuide } from "@/components/sap/SapConnectivityGuide";
 import { SapPayloadTemplateEditor } from "@/components/sap/SapPayloadTemplateEditor";
 import { AddSapApiConfigDialog } from "@/components/sap/AddSapApiConfigDialog";
