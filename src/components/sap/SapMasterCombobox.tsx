@@ -82,16 +82,11 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
                   <CommandEmpty>
                     {sourceRows.length === 0
                       ? "No SAP F4 values loaded for this field."
-                      : hasActiveFilter && filteredRows.length === 0
-                        ? "No option matches the selected filter. Press Enter to keep the typed value."
+                      : hasActiveFilter && rows.length === 0
+                        ? `No option matches the selected filter${filterSummary ? ` (${filterSummary})` : ""}. Press Enter to keep the typed value.`
                         : `No match. Press Enter to keep "${value}".`}
                   </CommandEmpty>
                   <CommandGroup>
-                    {usedFilterFallback ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground border-b">
-                        No company-specific Rec-Account matched. Showing all {sourceRows.length} recon accounts.
-                      </div>
-                    ) : null}
                     {rows.map((r) => (
                       <CommandItem
                         key={r.id}
@@ -116,9 +111,7 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
       <p className="text-[11px] text-muted-foreground">
         {isLoading
           ? "Loading F4 values…"
-          : usedFilterFallback
-            ? `Showing all ${rows.length} options; no match for current filter.`
-            : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${hasActiveFilter ? " for current filter" : ""}.`}
+          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${hasActiveFilter ? ` for current filter${filterSummary ? ` (${filterSummary})` : ""}` : ""}.`}
       </p>
     </div>
   );
