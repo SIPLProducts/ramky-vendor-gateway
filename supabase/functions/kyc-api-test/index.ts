@@ -74,8 +74,13 @@ async function callProvider(provider: any, credentialValue: string | null, opts:
     const blob = new Blob([base64ToUint8(opts.fileBase64)], {
       type: opts.fileMimeType || "application/octet-stream",
     });
-    fd.append(provider.file_field_name || "file", blob, "upload");
+    const uploadName = pickFilename(opts.fileName, opts.fileMimeType);
+    fd.append(provider.file_field_name || "file", blob, uploadName);
     body = fd;
+    // Strip any caller-supplied Content-Type so fetch sets the multipart boundary itself.
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === "content-type") delete headers[k];
+    }
   } else if (provider.http_method !== "GET") {
     const filled = substitute(provider.request_body_template ?? {}, opts.sampleInput ?? {});
     headers["Content-Type"] = headers["Content-Type"] || "application/json";
