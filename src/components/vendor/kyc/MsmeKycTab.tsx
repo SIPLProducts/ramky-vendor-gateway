@@ -14,7 +14,9 @@ import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKyc
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { toastKycResult } from '@/lib/kycToast';
-import { fuzzyNameMatch } from '@/lib/nameMatch';
+import { nameMatchPercentage } from '@/lib/nameMatch';
+
+const NAME_MATCH_THRESHOLD = 40;
 import {
   AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -49,7 +51,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
   const [enterpriseName, setEnterpriseName] = useState<string>('');
   const [enterpriseCheck, setEnterpriseCheck] =
-    useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
+    useState<'idle' | 'pan' | 'failed'>('idle');
   const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
@@ -65,28 +67,24 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     return '';
   };
 
-  // Cross-tab name check: enterprise name must match GST Legal Name OR PAN
-  // Holder Name. Returns the resolved status + a user-facing message.
+  // Cross-tab name check: enterprise name is validated against the verified
+  // PAN Holder Name only (≥ 40% similarity is treated as a match).
   const checkEnterpriseName = (apiName: string): {
-    status: 'gst+pan' | 'gst' | 'pan' | 'failed' | 'skipped';
+    status: 'pan' | 'failed' | 'skipped';
     message: string;
   } => {
-    const gst = props.gstLegalName?.trim();
     const pan = props.panHolderName?.trim();
-    if (!apiName || (!gst && !pan)) return { status: 'skipped', message: '' };
-    const gstOk = gst ? fuzzyNameMatch(apiName, gst) : false;
-    const panOk = pan ? fuzzyNameMatch(apiName, pan) : false;
-    if (gstOk && panOk) {
+    if (!apiName || !pan) return { status: 'skipped', message: '' };
+    const score = nameMatchPercentage(apiName, pan);
+    if (score >= NAME_MATCH_THRESHOLD) {
       return {
-        status: 'gst+pan',
-        message: 'Enterprise Name verified with GST Legal Name and PAN Holder Name.',
+        status: 'pan',
+        message: `Enterprise Name verified with PAN Holder Name (${score}% match).`,
       };
     }
-    if (gstOk) return { status: 'gst', message: 'Enterprise Name verified with GST Legal Name.' };
-    if (panOk) return { status: 'pan', message: 'Enterprise Name verified with PAN Holder Name.' };
     return {
       status: 'failed',
-      message: 'Enterprise Name does not match with GST Legal Name and PAN Holder Name.',
+      message: `Enterprise Name does not match PAN Holder Name (only ${score}% match, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
     };
   };
 
@@ -181,12 +179,9 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   };
 
   const checkMessage = (() => {
-    if (enterpriseCheck === 'gst+pan')
-      return 'Enterprise Name verified with GST Legal Name and PAN Holder Name.';
-    if (enterpriseCheck === 'gst') return 'Enterprise Name verified with GST Legal Name.';
     if (enterpriseCheck === 'pan') return 'Enterprise Name verified with PAN Holder Name.';
     if (enterpriseCheck === 'failed')
-      return 'Enterprise Name does not match with GST Legal Name and PAN Holder Name.';
+      return 'Enterprise Name does not match PAN Holder Name.';
     return '';
   })();
 
@@ -281,7 +276,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Enterprise Name mismatch</AlertDialogTitle>
             <AlertDialogDescription>
-              Enterprise Name does not match with GST Legal Name and PAN Holder Name.
+              Enterprise Name does not match the verified PAN Holder Name.
               Please re-check your MSME / Udyam certificate and resolve the mismatch
               before continuing.
             </AlertDialogDescription>
