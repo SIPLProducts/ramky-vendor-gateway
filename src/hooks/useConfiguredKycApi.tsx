@@ -33,6 +33,19 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+// Module-level in-flight map: dedupes concurrent identical provider calls
+// (same provider + same account/ifsc/id_number/file size). This prevents
+// accidental double invocations from React re-renders, double-clicks, or
+// effects firing twice — which was contributing to upstream "Transaction
+// rate limit exceeded" errors against Surepass for the BANK provider.
+const inflight = new Map<string, Promise<KycApiResult>>();
+
+function makeInflightKey(providerName: string, input: Record<string, any> | undefined, file?: File | null): string {
+  const inp = input ? JSON.stringify(Object.keys(input).sort().reduce((a, k) => { (a as any)[k] = input[k]; return a; }, {} as Record<string, any>)) : "";
+  const f = file ? `${file.name}|${file.size}|${file.lastModified}` : "";
+  return `${providerName}::${inp}::${f}`;
+}
+
 export function useConfiguredKycApi() {
   /** Call a configured provider with a file (multipart) or input (json). */
   const callProvider = useCallback(
@@ -41,41 +54,55 @@ export function useConfiguredKycApi() {
       file?: File | null;
       input?: Record<string, any>;
     }): Promise<KycApiResult> => {
-      try {
-        let fileBase64: string | undefined;
-        let fileMimeType: string | undefined;
-        let fileName: string | undefined;
-        if (params.file) {
-          fileBase64 = await fileToBase64(params.file);
-          fileMimeType = params.file.type || "application/octet-stream";
-          fileName = params.file.name || undefined;
-        }
-        const { data, error } = await supabase.functions.invoke(
-          "kyc-api-execute",
-          {
-            body: {
-              providerName: params.providerName,
-              input: params.input ?? {},
-              fileBase64,
-              fileMimeType,
-              fileName,
+      const key = makeInflightKey(params.providerName, params.input, params.file);
+      const existing = inflight.get(key);
+      if (existing) {
+        console.log(`[useConfiguredKycApi] Reusing in-flight ${params.providerName} request`);
+        return existing;
+      }
+      const p = (async (): Promise<KycApiResult> => {
+        try {
+          let fileBase64: string | undefined;
+          let fileMimeType: string | undefined;
+          let fileName: string | undefined;
+          if (params.file) {
+            fileBase64 = await fileToBase64(params.file);
+            fileMimeType = params.file.type || "application/octet-stream";
+            fileName = params.file.name || undefined;
+          }
+          const { data, error } = await supabase.functions.invoke(
+            "kyc-api-execute",
+            {
+              body: {
+                providerName: params.providerName,
+                input: params.input ?? {},
+                fileBase64,
+                fileMimeType,
+                fileName,
+              },
             },
-          },
-        );
-        if (error) {
+          );
+          if (error) {
+            return {
+              found: false,
+              ok: false,
+              message: error.message || "API call failed",
+            };
+          }
+          return data as KycApiResult;
+        } catch (e: any) {
           return {
             found: false,
             ok: false,
-            message: error.message || "API call failed",
+            message: e?.message || "Unexpected error",
           };
         }
-        return data as KycApiResult;
-      } catch (e: any) {
-        return {
-          found: false,
-          ok: false,
-          message: e?.message || "Unexpected error",
-        };
+      })();
+      inflight.set(key, p);
+      try {
+        return await p;
+      } finally {
+        inflight.delete(key);
       }
     },
     [],
