@@ -59,7 +59,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
       if (!cancelled) {
         setF4Status({ state: 'error', message: 'SAP Fields F4 API is taking longer than expected. Showing cached F4 options if available.' });
       }
-    }, 10000);
+    }, 20000);
     (async () => {
       try {
         const res = await refreshMaster.mutateAsync(undefined);
