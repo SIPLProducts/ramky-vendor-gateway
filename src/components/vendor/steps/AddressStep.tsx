@@ -249,9 +249,8 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               <Label htmlFor="registeredPincode">PIN Code *</Label>
               <Input
                 id="registeredPincode"
-                {...register('registeredPincode')}
+                {...numericField('registeredPincode', 6)}
                 placeholder="6-digit PIN"
-                maxLength={6}
                 className={errors.registeredPincode ? 'border-destructive' : ''}
               />
               {errors.registeredPincode && (
@@ -265,9 +264,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               <Label htmlFor="registeredPhone">Office Phone</Label>
               <Input
                 id="registeredPhone"
-                {...register('registeredPhone')}
-                placeholder="Office phone number"
+                {...numericField('registeredPhone', 10)}
+                placeholder="10-digit mobile number"
+                className={errors.registeredPhone ? 'border-destructive' : ''}
               />
+              {errors.registeredPhone && (
+                <p className="text-xs text-destructive">{errors.registeredPhone.message}</p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="registeredFax">Fax</Label>
