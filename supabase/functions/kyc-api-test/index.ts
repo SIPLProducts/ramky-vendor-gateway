@@ -118,7 +118,7 @@ async function callProvider(provider: any, credentialValue: string | null, opts:
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { providerId, sampleInput, fileBase64, fileMimeType } = await req.json();
+    const { providerId, sampleInput, fileBase64, fileMimeType, fileName } = await req.json();
     if (!providerId) {
       return new Response(JSON.stringify({ ok: false, message: "providerId required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
