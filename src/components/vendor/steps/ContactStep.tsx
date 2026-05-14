@@ -52,6 +52,19 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
     defaultValues: data,
   });
 
+  // Wrap register() to enforce 10-digit numeric input on phone fields.
+  const phoneField = (name: keyof ContactDetails) => ({
+    ...register(name as any, {
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = digitsOnly(e.target.value, 10);
+        if (v !== e.target.value) setValue(name as any, v as any, { shouldValidate: false });
+      },
+    }),
+    inputMode: 'numeric' as const,
+    pattern: '\\d*',
+    maxLength: 10,
+  });
+
   // Required fields that the admin hid → seed a placeholder so zod passes
   useEffect(() => {
     if (!show('ceoName') && !data.ceoName) setValue('ceoName', 'N/A');
