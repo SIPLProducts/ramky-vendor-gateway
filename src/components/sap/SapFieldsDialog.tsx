@@ -12,6 +12,7 @@ import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, Ma
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { SapMasterCombobox } from '@/components/sap/SapMasterCombobox';
+import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
