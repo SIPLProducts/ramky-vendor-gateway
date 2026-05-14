@@ -171,9 +171,12 @@ app.post("/sap/bp/create", authGuard, async (req, res) => {
     });
   } catch (err) {
     console.error("[bp/create] error:", err);
+    const info = describeFetchError(err);
     return res.status(502).json({
       ok: false,
-      error: err.name === "AbortError" ? "SAP request timed out" : err.message || "Upstream error",
+      error: info.message,
+      code: info.code,
+      target: SAP_BP_API_URL,
     });
   }
 });
