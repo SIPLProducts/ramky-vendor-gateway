@@ -314,7 +314,7 @@ serve(async (req) => {
     const upstream_status_code = parsed && typeof parsed === "object" ? parsed.status_code : undefined;
     const upstream_success = parsed && typeof parsed === "object" ? parsed.success : undefined;
 
-    return new Response(JSON.stringify({
+    const responsePayload = {
       found: true,
       valid: ok,
       ok,
@@ -329,7 +329,16 @@ serve(async (req) => {
       provider_id: provider.id,
       provider_name: provider.provider_name,
       endpoint_url: url,
-    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    };
+
+    if (provider.provider_name === "BANK" && ok && bankCacheKey) {
+      bankSuccessCache.set(bankCacheKey, {
+        expiresAt: Date.now() + BANK_SUCCESS_CACHE_TTL_MS,
+        response: responsePayload,
+      });
+    }
+
+    return new Response(JSON.stringify(responsePayload), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("[kyc-api-execute]", e);
     // Return 200 so the client can render the real message instead of a
