@@ -106,6 +106,17 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
     defaultValues: data,
   });
 
+  // Wrap register() so phone/pincode inputs strip non-digits + clamp length.
+  const numericField = (name: keyof AddressDetails, max: number) => ({
+    ...register(name as any, {
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = digitsOnly(e.target.value, max);
+        if (v !== e.target.value) setValue(name as any, v as any, { shouldValidate: false });
+      },
+    }),
+    ...numericInput(max),
+  });
+
   const sameAsRegistered = watch('sameAsRegistered');
   const registeredAddress = watch('registeredAddress');
   const registeredAddressLine2 = watch('registeredAddressLine2');
