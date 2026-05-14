@@ -146,8 +146,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Purchase Data */}
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <TextField label="Purchase Org" value={form.vkorg} onChange={v => set('vkorg', v)} />
-              <TextField label="Currency" value={form.waers} onChange={v => set('waers', v)} />
+              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} />
+              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
