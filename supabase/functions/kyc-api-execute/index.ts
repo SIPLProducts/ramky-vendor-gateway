@@ -162,6 +162,15 @@ serve(async (req) => {
           }
         }
       }
+      if (provider.provider_name === "PAN") {
+        // Always derive PAN payload from runtime input — never trust a saved
+        // template that may contain a hardcoded sample PAN like "ABDCS6352G".
+        const rawPan =
+          input?.id_number ?? input?.pan_number ?? input?.pan ??
+          (filled && typeof filled === "object" ? (filled as any).id_number : "") ?? "";
+        const idNumber = String(rawPan).toUpperCase().replace(/\s+/g, "").trim();
+        filled = { id_number: idNumber };
+      }
       if (provider.provider_name === "BANK") {
         const normalized = normalizeBankPayload(filled, input);
         filled = normalized.payload;
