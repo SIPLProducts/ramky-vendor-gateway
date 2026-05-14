@@ -1,22 +1,41 @@
-## Goal
-Remove the "show all options" fallback on the Rec-Account dropdown. Only show options that actually match the current filter (e.g. selected Company Code). If nothing matches, show an empty state message — never inject unrelated options.
+## Diagnosis
 
-## Changes
+The timeout is happening inside the on-prem Node middleware, not in the browser or Lovable Cloud request itself.
 
-### 1. `src/components/sap/SapMasterCombobox.tsx`
-- Remove the `allowFilterFallback` behavior that swaps in the unfiltered list when the filtered list is empty.
-- Always render only the filtered `options` array.
-- When the filtered list is empty, show a clear empty state inside the dropdown:
-  - "No options match the current filter (Company Code: 1000)." for Rec-Account
-  - "No options available." for others
-- Remove the helper line "Showing all 534 options; no match for current filter." since fallback is gone.
-- Keep the "X options loaded." count, but base it on the filtered list so the number reflects what the user actually sees.
+The key clue is:
 
-### 2. `src/components/sap/SapFieldsDialog.tsx`
-- Remove the `allowFilterFallback` prop being passed to the Rec-Account `SapMasterCombobox` (no longer needed).
-- No other behavior changes.
+```text
+ConnectTimeoutError [UND_ERR_CONNECT_TIMEOUT]
+FAILED after 10020ms GET http://10.200.1.2:8000/...
+```
 
-## Out of scope
-- No edge function changes.
-- No master-data refresh logic changes.
-- No filter rule changes (Rec-Account stays filtered by selected Company Code).
+Node 18+ `fetch` uses Undici internally. Undici has its own default TCP connect timeout of about 10 seconds. Your `SAP_REQUEST_TIMEOUT_MS=30000` AbortController controls the total request, but it does not override Undici’s lower-level connect timeout. That is why Postman can succeed while Node fails at around 10 seconds.
+
+## Plan
+
+1. **Update middleware HTTP client timeout behavior**
+   - Add Undici `Agent` / `setGlobalDispatcher` configuration in `middleware/server.js`.
+   - Set the connection timeout from env, e.g. `SAP_CONNECT_TIMEOUT_MS`, defaulting to a higher value like 60000ms.
+   - Keep `SAP_REQUEST_TIMEOUT_MS` as the total request timeout.
+
+2. **Improve SAP diagnostics in middleware**
+   - Make timeout errors explicit: distinguish `UND_ERR_CONNECT_TIMEOUT`, AbortController timeout, DNS/network errors, and SAP HTTP errors.
+   - Include configured timeout values in the `/health` response so you can confirm the running service picked up the right settings.
+   - Keep secrets redacted.
+
+3. **Align environment examples and docs**
+   - Add `SAP_CONNECT_TIMEOUT_MS=60000` to `middleware/.env.example`.
+   - Update `middleware/README.md` troubleshooting so this exact Postman-vs-Node timeout case is documented.
+
+4. **Optional safety in the F4 edge function**
+   - The edge function currently waits up to 25 seconds for middleware. If middleware is allowed to take 60 seconds, the F4 refresh can still fail early from Lovable Cloud.
+   - For the F4 master-data refresh, either:
+     - keep middleware connect timeout at 20–25 seconds for this path, or
+     - raise the edge function wait time carefully if platform limits allow it.
+   - I recommend setting middleware connect timeout to **20000ms** for F4 first, and only increasing if SAP truly needs longer to establish TCP connections.
+
+## Expected result
+
+- Node middleware will no longer fail at the hard 10-second Undici connect timeout.
+- If SAP still cannot be reached from that Windows server, the error will clearly say whether it is a network/firewall/connectivity issue versus an app timeout.
+- F4 refresh will continue showing only real SAP-loaded options, without fallback/unfiltered data.

@@ -100,5 +100,6 @@ curl -s -X POST http://localhost:3002/sap/bp/create \
 
 - **401 Unauthorized** → `x-middleware-key` header missing or doesn't match `MIDDLEWARE_SHARED_SECRET`.
 - **502 + "SAP request timed out"** → SAP host unreachable from the middleware machine. Check firewall / VPN.
+- **502 + `UND_ERR_CONNECT_TIMEOUT` (works in Postman, fails here)** → Node's built-in fetch (undici) has a hard 10s TCP connect timeout by default. This middleware overrides it via `SAP_CONNECT_TIMEOUT_MS` (default 60000). If you still see it, the middleware host genuinely cannot reach the SAP host:port — Postman likely runs from a different machine/network. Verify with `Test-NetConnection 10.200.1.2 -Port 8000` (PowerShell) or `curl -v http://10.200.1.2:8000/...` from the same Windows server. Check firewall, VPN split-tunnel, and any HTTP proxy.
 - **TLS errors against SAP** → set `ALLOW_INSECURE_TLS=1` (only if SAP uses a self-signed cert).
 - **403 from `/sap/proxy`** → target URL host doesn't match `SAP_BP_API_URL` host.
