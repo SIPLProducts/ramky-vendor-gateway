@@ -19,22 +19,24 @@ interface Props {
   filter?: Record<string, string | undefined>;
   /** Optional extra fields from `extra` to render after the description, e.g. ["BUKRS"]. */
   extraLabelFields?: string[];
+  /** Deprecated: kept for backward-compatibility, no longer used. */
   allowFilterFallback?: boolean;
 }
 
-export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, filter, extraLabelFields, allowFilterFallback }: Props) {
+export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, filter, extraLabelFields }: Props) {
   const [open, setOpen] = useState(false);
   const { data: allRows, isLoading } = useSapMasterData(masterType);
 
   const sourceRows = allRows || [];
-  const filteredRows = sourceRows.filter((r) => {
+  const rows = sourceRows.filter((r) => {
     if (!filter) return true;
     const ex = (r.extra || {}) as Record<string, any>;
     return Object.entries(filter).every(([k, v]) => !v || String(ex?.[k] ?? "") === String(v));
   });
-  const usedFilterFallback = !!allowFilterFallback && !!filter && sourceRows.length > 0 && filteredRows.length === 0;
-  const rows = usedFilterFallback ? sourceRows : filteredRows;
   const hasActiveFilter = !!filter && Object.values(filter).some(Boolean);
+  const filterSummary = hasActiveFilter
+    ? Object.entries(filter!).filter(([, v]) => !!v).map(([k, v]) => `${k}: ${v}`).join(", ")
+    : "";
 
   const formatExtra = (r: { extra: any }) => {
     if (!extraLabelFields?.length) return "";
@@ -80,16 +82,11 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
                   <CommandEmpty>
                     {sourceRows.length === 0
                       ? "No SAP F4 values loaded for this field."
-                      : hasActiveFilter && filteredRows.length === 0
-                        ? "No option matches the selected filter. Press Enter to keep the typed value."
+                      : hasActiveFilter && rows.length === 0
+                        ? `No option matches the selected filter${filterSummary ? ` (${filterSummary})` : ""}. Press Enter to keep the typed value.`
                         : `No match. Press Enter to keep "${value}".`}
                   </CommandEmpty>
                   <CommandGroup>
-                    {usedFilterFallback ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground border-b">
-                        No company-specific Rec-Account matched. Showing all {sourceRows.length} recon accounts.
-                      </div>
-                    ) : null}
                     {rows.map((r) => (
                       <CommandItem
                         key={r.id}
@@ -114,9 +111,7 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
       <p className="text-[11px] text-muted-foreground">
         {isLoading
           ? "Loading F4 values…"
-          : usedFilterFallback
-            ? `Showing all ${rows.length} options; no match for current filter.`
-            : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${hasActiveFilter ? " for current filter" : ""}.`}
+          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${hasActiveFilter ? ` for current filter${filterSummary ? ` (${filterSummary})` : ""}` : ""}.`}
       </p>
     </div>
   );
