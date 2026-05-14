@@ -593,10 +593,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               <Label htmlFor="branchPincode">PIN Code</Label>
               <Input
                 id="branchPincode"
-                {...register('branchPincode')}
-                placeholder="PIN"
-                maxLength={6}
+                {...numericField('branchPincode', 6)}
+                placeholder="6-digit PIN"
+                className={errors.branchPincode ? 'border-destructive' : ''}
               />
+              {errors.branchPincode && (
+                <p className="text-xs text-destructive">{errors.branchPincode.message}</p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="branchCountry">Country</Label>
@@ -644,9 +647,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <Label htmlFor="branchContactPhone">Phone</Label>
                 <Input
                   id="branchContactPhone"
-                  {...register('branchContactPhone')}
-                  placeholder="Phone number"
+                  {...numericField('branchContactPhone', 10)}
+                  placeholder="10-digit mobile number"
+                  className={errors.branchContactPhone ? 'border-destructive' : ''}
                 />
+                {errors.branchContactPhone && (
+                  <p className="text-xs text-destructive">{errors.branchContactPhone.message}</p>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="branchContactFax">Fax</Label>
