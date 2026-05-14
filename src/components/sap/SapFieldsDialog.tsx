@@ -135,7 +135,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
               <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} />
-              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} />
+              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} filter={{ BUKRS: form.bukrs }} extraLabelFields={["BUKRS"]} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
               <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
