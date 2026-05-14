@@ -1,45 +1,39 @@
-## 1. Name-match logic (KYC tabs)
+Plan to address the SAP F4 issue:
 
-Per the bank API response shown ("M V R ENGINEERING WORKS" vs PAN "M V Engineering Works" — fuzzy ≈40% token overlap), relax the matcher and switch the source of truth to **PAN holder name**.
+1. **Fix the dropdown showing only one option**
+   - Update `SapMasterCombobox` so the search box is independent from the selected value.
+   - Right now the selected value is being used as the search text, so opening a field like `ZDOM` filters the list down to matching options only.
+   - After the fix, clicking the field will show all loaded F4 options first, and searching will filter only when the user types.
 
-### `src/components/vendor/kyc/BankKycTab.tsx`
-- Replace `fuzzyNameMatch` with `nameMatchPercentage` from `src/lib/nameMatch.ts`.
-- Compute `panScore` and `gstScore`. Pass if `max(panScore, gstScore) >= 40`.
-- Update result message to show which name matched + the % (e.g. *"Account Holder Name verified with PAN Holder Name (62% match)."*).
-- Failure message stays: *"Account Holder Name does not match with the provided PAN/MSME details."*
+2. **Display SAP fields using the SAP response keys**
+   - Render options from the raw SAP row saved in `extra`, using the exact SAP keys:
+     - `VENDOR_ACC_GRP`: `KTOKK — TXT30`
+     - `COMPANY_CODE`: `BUKRS — BUTXT`
+     - `PLANNING_GROUP`: `GRUPP`
+     - `RECON_ACCOUNT`: `BUKRS / SAKNR — TXT20`
+     - `PURCHASE_ORG`: `EKORG — EKOTX`
+     - `CURRENCY`: `WAERS — LTEXT`
+   - Keep the selected value as the SAP code needed for the final SAP payload.
 
-### `src/components/vendor/kyc/MsmeKycTab.tsx`
-- Drop the GST-legal-name comparison. Validate enterprise name **only** against `panHolderName` using `nameMatchPercentage(...) >= 40`.
-- Simplify `enterpriseCheck` states to `'idle' | 'pan' | 'failed'` and update the message ("Enterprise Name verified with PAN Holder Name.").
+3. **Return the raw SAP F4 response from the refresh call**
+   - Update the `sap-master-fetch` backend function to include the original SAP response shape in its result, for example:
 
-### `src/components/vendor/kyc/GstKycTab.tsx`
-- Remove the user-entered `legalName` fuzzy comparison block (in both `handleManualVerify` and `handleOcrVerify`). GST stays as the registry source of truth; cross-checks now happen on the PAN tab (already in place) and on MSME/Bank tabs against PAN.
+```json
+{
+  "VENDOR_ACC_GRP": [{ "KTOKK": "0001", "TXT30": "Vendor" }],
+  "COMPANY_CODE": [{ "BUKRS": "0001", "BUTXT": "SAP A.G." }],
+  "PLANNING_GROUP": [{ "GRUPP": "A1" }],
+  "RECON_ACCOUNT": [{ "BUKRS": "ES01", "SAKNR": "580000", "TXT20": "Travel expenses" }],
+  "PURCHASE_ORG": [{ "EKORG": "0001", "EKOTX": "Einkaufsorg. 0001" }],
+  "CURRENCY": [{ "WAERS": "ADP", "LTEXT": "Andorran Peseta --> (Old --> EUR)" }]
+}
+```
 
-No edge-function or DB changes.
+4. **Keep cached database fallback, but not as the visible SAP response**
+   - The normalized `sap_master_data` table can remain only as a cache for dropdown loading.
+   - The user-facing refresh response and option labels will follow SAP’s structure, not the app’s internal normalized design.
 
-## 2. Numeric-only enforcement
-
-Restrict to digits only (strip any non-numeric on input) and enforce length.
-
-### Mobile / phone fields — exactly 10 digits
-Files + fields:
-- `src/components/vendor/steps/ContactStep.tsx` — `ceoPhone`, `ceoPhone2`, `marketingPhone`, `productionPhone`, `customerServicePhone`. Use `Controller` (or `register` with `onChange` interceptor) to `value.replace(/\D/g, '').slice(0, 10)`. Set `inputMode="numeric"`, `maxLength={10}`. Tighten zod: `z.string().regex(/^\d{10}$/, '10-digit mobile number required')` for required fields; optional fields use `.regex(/^\d{10}$/).optional().or(z.literal(''))`.
-- `src/components/vendor/steps/AddressStep.tsx` — `registeredPhone`, `manufacturingPhone`, `branchContactPhone` (and any other `*Phone` inputs). Same digit-strip + maxLength=10 + zod regex (optional variant for non-required ones).
-- `src/components/vendor/DynamicStep.tsx` — `case 'phone'`: change handler to `setField(f.field_name, e.target.value.replace(/\D/g, '').slice(0, 10))`, add `inputMode="numeric"` and `maxLength={10}`.
-
-### Pincode fields — exactly 6 digits
-Files + fields (`registeredPincode`, `manufacturingPincode`, `branchPincode`) in `src/components/vendor/steps/AddressStep.tsx`:
-- Strip non-digits on input, `maxLength={6}`, `inputMode="numeric"`.
-- Zod for required: `z.string().regex(/^\d{6}$/, 'Valid 6-digit pincode required')` (already in place for `registeredPincode`); add the same regex (optional) for `manufacturingPincode` / `branchPincode`.
-
-### Helper
-Introduce a tiny `digitsOnly(value, max)` helper inside the steps (or in `src/lib/utils.ts`) to avoid repetition.
-
-## Out of scope
-- SAP, middleware, edge functions, dynamic field-config-driven phone fields (those already flow through `DynamicStep` which is covered).
-- Changes to `nameMatchPercentage` itself.
-
-## Verification
-- Bank tab with the sample response → "verified with PAN Holder Name (≈60% match)" instead of fail.
-- Pasting "+91 98765 43210" into a phone field → becomes `9876543210`.
-- Typing letters/symbols into pincode → blocked; only 6 digits accepted.
+Technical details:
+- No filtering/matching between fields will be added.
+- No change to SAP payload field names unless required by existing sync logic.
+- No database migration is needed for this fix because the raw SAP object is already stored in `extra`.
