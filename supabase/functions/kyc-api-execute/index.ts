@@ -70,7 +70,7 @@ function pickFilename(originalName: string | undefined, mime: string | undefined
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { providerName, input, fileBase64, fileMimeType } = await req.json();
+    const { providerName, input, fileBase64, fileMimeType, fileName } = await req.json();
     if (!providerName) {
       return new Response(JSON.stringify({ found: false, ok: false, message: "providerName required" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
