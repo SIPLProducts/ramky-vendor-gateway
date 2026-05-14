@@ -23,31 +23,17 @@ interface Props {
   allowFilterFallback?: boolean;
 }
 
-export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, filter, extraLabelFields }: Props) {
+export function SapMasterCombobox({ label, masterType, value, onChange, placeholder }: Props) {
   const [open, setOpen] = useState(false);
   const { data: allRows, isLoading } = useSapMasterData(masterType);
 
-  const sourceRows = allRows || [];
-  const rows = sourceRows.filter((r) => {
-    if (!filter) return true;
-    const ex = (r.extra || {}) as Record<string, any>;
-    return Object.entries(filter).every(([k, v]) => !v || String(ex?.[k] ?? "") === String(v));
-  });
-  const hasActiveFilter = !!filter && Object.values(filter).some(Boolean);
-  const filterSummary = hasActiveFilter
-    ? Object.entries(filter!).filter(([, v]) => !!v).map(([k, v]) => `${k}: ${v}`).join(", ")
-    : "";
-
-  const formatExtra = (r: { extra: any }) => {
-    if (!extraLabelFields?.length) return "";
-    const ex = (r.extra || {}) as Record<string, any>;
-    const parts = extraLabelFields.map((k) => (ex?.[k] != null ? `${k}: ${ex[k]}` : null)).filter(Boolean);
-    return parts.length ? ` (${parts.join(", ")})` : "";
-  };
+  // Show all options returned by SAP for this master type — no cross-field filtering.
+  const rows = allRows || [];
+  const sourceRows = rows;
 
   const match = rows.find((r) => r.code === value);
   const displayed = match
-    ? `${match.code}${match.description ? ` — ${match.description}` : ""}${formatExtra(match)}`
+    ? `${match.code}${match.description ? ` — ${match.description}` : ""}`
     : value || "";
 
   return (
