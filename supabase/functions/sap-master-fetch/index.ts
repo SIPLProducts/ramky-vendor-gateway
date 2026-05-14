@@ -197,8 +197,8 @@ serve(async (req) => {
     for (const [sapKey, mapping] of Object.entries(MASTER_MAP)) {
       if (requestedTypes && !requestedTypes.includes(mapping.type)) continue;
       const arr: any[] = Array.isArray(sapJson?.[sapKey]) ? sapJson[sapKey] : [];
-      let upserted = 0;
       let skipped = 0;
+      const rows: any[] = [];
       for (const item of arr) {
         const code = item?.[mapping.code];
         if (code === undefined || code === null || String(code).trim() === "") {
@@ -206,21 +206,27 @@ serve(async (req) => {
           continue;
         }
         const desc = mapping.desc ? (item?.[mapping.desc] ?? null) : null;
+        rows.push({
+          master_type: mapping.type,
+          code: String(code),
+          description: desc == null ? null : String(desc),
+          extra: item,
+          source: "sap",
+          last_synced_at: now,
+        });
+      }
+      let upserted = 0;
+      for (let i = 0; i < rows.length; i += 500) {
+        const chunk = rows.slice(i, i + 500);
         const { error } = await supabase
           .from("sap_master_data")
-          .upsert(
-            {
-              master_type: mapping.type,
-              code: String(code),
-              description: desc == null ? null : String(desc),
-              extra: item,
-              source: "sap",
-              last_synced_at: now,
-            },
-            { onConflict: "master_type,code" },
-          );
-        if (error) { console.error("upsert error", mapping.type, code, error.message); skipped++; }
-        else upserted++;
+          .upsert(chunk, { onConflict: "master_type,code" });
+        if (error) {
+          console.error("bulk upsert error", mapping.type, error.message);
+          skipped += chunk.length;
+        } else {
+          upserted += chunk.length;
+        }
       }
       summary[mapping.type] = { upserted, skipped };
     }

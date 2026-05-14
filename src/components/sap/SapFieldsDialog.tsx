@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { SapMasterCombobox } from '@/components/sap/SapMasterCombobox';
@@ -36,6 +36,7 @@ function isMsme(v: any): boolean {
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
+  const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
@@ -53,9 +54,29 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setForm(buildDefaults(vendor, data));
       })();
     }
-    // Background refresh of all F4 master values from SAP (silent)
-    refreshMaster.mutate(undefined);
-    return () => { cancelled = true; };
+    setF4Status({ state: 'loading', message: 'Refreshing F4 options from SAP Fields F4 API…' });
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setF4Status({ state: 'error', message: 'SAP Fields F4 API is taking longer than expected. Showing cached F4 options if available.' });
+      }
+    }, 20000);
+    (async () => {
+      try {
+        const res = await refreshMaster.mutateAsync(undefined);
+        if (cancelled) return;
+        window.clearTimeout(slowTimer);
+        if (res?.success) {
+          const total = Object.values(res.summary || {}).reduce((s, v: any) => s + (v.upserted || 0), 0);
+          setF4Status({ state: 'success', message: `${total} F4 options refreshed from SAP.` });
+        } else {
+          setF4Status({ state: 'error', message: res?.message || 'SAP Fields F4 refresh failed.' });
+        }
+      } catch (e: any) {
+        window.clearTimeout(slowTimer);
+        if (!cancelled) setF4Status({ state: 'error', message: e?.message || 'SAP Fields F4 refresh failed.' });
+      }
+    })();
+    return () => { cancelled = true; window.clearTimeout(slowTimer); };
   }, [open, vendor]);
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
@@ -75,6 +96,12 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           <DialogDescription>
             Review and confirm SAP-specific fields before pushing this vendor to S/4HANA.
           </DialogDescription>
+          {f4Status.state !== 'idle' && (
+            <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${f4Status.state === 'error' ? 'border-destructive/30 text-destructive' : 'border-border text-muted-foreground'}`}>
+              {f4Status.state === 'loading' ? <Loader2 className="mt-0.5 h-3.5 w-3.5 animate-spin" /> : f4Status.state === 'error' ? <AlertCircle className="mt-0.5 h-3.5 w-3.5" /> : <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-primary" />}
+              <span>{f4Status.message}</span>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
@@ -135,7 +162,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
               <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} />
-              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} filter={{ BUKRS: form.bukrs }} extraLabelFields={["BUKRS"]} />
+              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} filter={{ BUKRS: form.bukrs }} extraLabelFields={["BUKRS"]} allowFilterFallback />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
               <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
