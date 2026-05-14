@@ -147,7 +147,7 @@ serve(async (req) => {
       .maybeSingle();
 
     const result = await callProvider(provider, cred?.credential_value ?? null, {
-      sampleInput, fileBase64, fileMimeType,
+      sampleInput, fileBase64, fileMimeType, fileName,
     });
 
     return new Response(JSON.stringify(result),
