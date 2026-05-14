@@ -1,39 +1,28 @@
-Plan to address the SAP F4 issue:
+## Problem
+The app sends the cheque image to the configured BANK_OCR provider as multipart form-data, but the backend appends the file with the filename `upload` and no extension:
 
-1. **Fix the dropdown showing only one option**
-   - Update `SapMasterCombobox` so the search box is independent from the selected value.
-   - Right now the selected value is being used as the search text, so opening a field like `ZDOM` filters the list down to matching options only.
-   - After the fix, clicking the field will show all loaded F4 options first, and searching will filter only when the user types.
-
-2. **Display SAP fields using the SAP response keys**
-   - Render options from the raw SAP row saved in `extra`, using the exact SAP keys:
-     - `VENDOR_ACC_GRP`: `KTOKK — TXT30`
-     - `COMPANY_CODE`: `BUKRS — BUTXT`
-     - `PLANNING_GROUP`: `GRUPP`
-     - `RECON_ACCOUNT`: `BUKRS / SAKNR — TXT20`
-     - `PURCHASE_ORG`: `EKORG — EKOTX`
-     - `CURRENCY`: `WAERS — LTEXT`
-   - Keep the selected value as the SAP code needed for the final SAP payload.
-
-3. **Return the raw SAP F4 response from the refresh call**
-   - Update the `sap-master-fetch` backend function to include the original SAP response shape in its result, for example:
-
-```json
-{
-  "VENDOR_ACC_GRP": [{ "KTOKK": "0001", "TXT30": "Vendor" }],
-  "COMPANY_CODE": [{ "BUKRS": "0001", "BUTXT": "SAP A.G." }],
-  "PLANNING_GROUP": [{ "GRUPP": "A1" }],
-  "RECON_ACCOUNT": [{ "BUKRS": "ES01", "SAKNR": "580000", "TXT20": "Travel expenses" }],
-  "PURCHASE_ORG": [{ "EKORG": "0001", "EKOTX": "Einkaufsorg. 0001" }],
-  "CURRENCY": [{ "WAERS": "ADP", "LTEXT": "Andorran Peseta --> (Old --> EUR)" }]
-}
+```ts
+fd.append(provider.file_field_name || "file", blob, "upload")
 ```
 
-4. **Keep cached database fallback, but not as the visible SAP response**
-   - The normalized `sap_master_data` table can remain only as a cache for dropdown loading.
-   - The user-facing refresh response and option labels will follow SAP’s structure, not the app’s internal normalized design.
+Surepass cheque OCR validates the multipart filename extension, so even though the image content and MIME type are correct (`image/jpeg`), it rejects the request with `File extension not allowed.` Postman works because it sends a real filename like `...jpg`.
 
-Technical details:
-- No filtering/matching between fields will be added.
-- No change to SAP payload field names unless required by existing sync logic.
-- No database migration is needed for this fix because the raw SAP object is already stored in `extra`.
+## Plan
+1. Update the KYC provider client to include the original uploaded filename when invoking the backend function.
+2. Update `kyc-api-execute` multipart handling to:
+   - sanitize/clean base64 input defensively,
+   - choose a valid filename with extension from the original file name or MIME type,
+   - append the multipart file as `file` with a name like `cheque.jpg` instead of extensionless `upload`,
+   - keep removing manual `Content-Type` so the multipart boundary is still generated correctly.
+3. Apply the same filename fix to the KYC API Settings test function (`kyc-api-test`) and test request path, so admin “Test” behaves the same as vendor registration.
+4. Add focused logs around multipart filename/MIME/provider URL without logging API tokens or file contents.
+
+## Files to change
+- `src/hooks/useConfiguredKycApi.tsx`
+- `src/pages/KycApiConfigEdit.tsx`
+- `src/hooks/useKycApiConfigs.tsx`
+- `supabase/functions/kyc-api-execute/index.ts`
+- `supabase/functions/kyc-api-test/index.ts`
+
+## Expected result
+BANK_OCR requests from the application will match Postman/Surepass behavior: multipart field `file`, actual image bytes, MIME `image/jpeg`, and filename ending in `.jpg`/`.jpeg`, so Surepass should stop returning `File extension not allowed.`

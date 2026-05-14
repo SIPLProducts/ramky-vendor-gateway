@@ -44,9 +44,11 @@ export function useConfiguredKycApi() {
       try {
         let fileBase64: string | undefined;
         let fileMimeType: string | undefined;
+        let fileName: string | undefined;
         if (params.file) {
           fileBase64 = await fileToBase64(params.file);
           fileMimeType = params.file.type || "application/octet-stream";
+          fileName = params.file.name || undefined;
         }
         const { data, error } = await supabase.functions.invoke(
           "kyc-api-execute",
@@ -56,6 +58,7 @@ export function useConfiguredKycApi() {
               input: params.input ?? {},
               fileBase64,
               fileMimeType,
+              fileName,
             },
           },
         );
