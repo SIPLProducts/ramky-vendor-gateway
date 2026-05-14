@@ -1,32 +1,36 @@
-Do I know what the issue is? Yes.
+Root cause found:
+- The live PAN provider configuration is hardcoded: `request_body_template` is `{ id_number: "ABDCS6352G" }`.
+- Its `response_data_mapping` is also wrong: it contains a pasted sample Sharvi response object, not JSON-path mappings.
+- Because of that, when you send `AAUFM3575C`, the backend still calls Surepass with `ABDCS6352G`, so Surepass correctly returns Sharvi data for the hardcoded PAN.
+- The middleware log is unrelated for this KYC call. The app calls the hosted backend function directly, not the local `middleware/server.js`, so nothing will appear in the local middleware console.
+- For Bank verification, the backend code already forces `ifsc_details: true` and recent function logs show `ifsc_details=true`; however, the function can still be strengthened so saved admin misconfiguration cannot send `false` or stale templates.
 
-The BANK provider is currently configured with `ifsc_details: true`, and the latest backend log shows the app is sending keys `ifsc,id_number,ifsc_details` for BANK. Your screenshot with `ifsc_details: false` explains the behavior: when it is false, Surepass can return incomplete/failing bank validation and still consumes a transaction attempt, which can quickly lead to `429 Transaction rate limit exceeded` during repeated testing.
+Plan:
+1. Correct the PAN provider configuration in the backend database:
+   - Change PAN request template to use the actual input value: `{ "id_number": "{{id_number}}" }`.
+   - Replace the pasted sample response mapping with real JSON paths, for example:
+     - `pan_number -> data.pan_number`
+     - `full_name -> data.full_name`
+     - `status -> data.status`
+     - `category -> data.category`
+     - `dob -> data.dob`
+     - `aadhaar_linked -> data.aadhaar_linked`
+     - `client_id -> data.client_id`
+   - Keep success check as `success == true`.
 
-The problem is not the other APIs. It is specifically the BANK verification request shape and config hardening.
+2. Harden `kyc-api-execute` so this cannot recur:
+   - For provider `PAN`, always normalize the outgoing payload from the runtime input, not from any saved literal sample.
+   - Send only the Surepass-required payload shape: `{ id_number: <entered PAN> }`.
+   - Add safe logs showing provider name and keys only, not PAN/account values.
 
-Plan to fix permanently:
+3. Harden Bank verification similarly:
+   - Continue normalizing `BANK` payload server-side as `{ id_number: <account>, ifsc: <IFSC>, ifsc_details: true }`.
+   - Ensure any saved `ifsc_details: false` or hardcoded sample template cannot override it.
 
-1. Lock the BANK payload in the backend executor
-   - In `kyc-api-execute`, when `providerName === "BANK"`, force the outgoing payload to exactly include:
-     - `id_number: <account number>`
-     - `ifsc: <IFSC>`
-     - `ifsc_details: true`
-   - This prevents any admin/provider template mistake or frontend input from accidentally sending `false`.
+4. Validate with direct backend function calls:
+   - Call `kyc-api-execute` with the user’s PAN payload and confirm logs show keys only and payload uses runtime input.
+   - Confirm response data is no longer Sharvi hardcoded data unless that exact PAN is submitted.
+   - Call BANK payload and confirm `ifsc_details` remains true.
 
-2. Normalize account input keys
-   - The frontend sometimes sends both `account` and `id_number` for compatibility.
-   - The backend will canonicalize this so Surepass receives only the required BANK fields, not extra or empty fields.
-
-3. Fix the existing BANK provider mapping/config data
-   - Update the active BANK provider config so `request_body_template.ifsc_details` is `true`.
-   - Replace the currently bad `response_data_mapping` sample-response object with proper dotted paths, so successful responses map cleanly.
-
-4. Keep duplicate-call protection but make it safer
-   - Keep the frontend in-flight dedupe already added.
-   - Add a backend-side short cache only for identical successful BANK calls so accidental double-clicks do not create repeated Surepass transactions.
-   - Do not auto-retry BANK on 429.
-
-5. Verify after implementation
-   - Test the deployed `kyc-api-execute` function with the same account/IFSC payload.
-   - Confirm logs show BANK payload keys include `ifsc_details` and no `false` value.
-   - Confirm the UI receives the real Surepass response and not a designed/mock response.
+5. Optional UI safeguard:
+   - If the app shows raw provider response details, surface the requested PAN/account alongside returned PAN/account so mismatches are visible immediately to admins/testers.
