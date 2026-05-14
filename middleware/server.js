@@ -15,6 +15,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const { Agent, setGlobalDispatcher, fetch: undiciFetch } = require("undici");
 
 const PORT = parseInt(process.env.PORT || "3002", 10);
 const SHARED_SECRET = process.env.MIDDLEWARE_SHARED_SECRET || "";
@@ -22,6 +23,9 @@ const SAP_BP_API_URL = process.env.SAP_BP_API_URL || "";
 const SAP_BP_USERNAME = process.env.SAP_BP_USERNAME || "";
 const SAP_BP_PASSWORD = process.env.SAP_BP_PASSWORD || "";
 const TIMEOUT_MS = parseInt(process.env.SAP_REQUEST_TIMEOUT_MS || "30000", 10);
+const CONNECT_TIMEOUT_MS = parseInt(process.env.SAP_CONNECT_TIMEOUT_MS || "60000", 10);
+const HEADERS_TIMEOUT_MS = parseInt(process.env.SAP_HEADERS_TIMEOUT_MS || "60000", 10);
+const BODY_TIMEOUT_MS = parseInt(process.env.SAP_BODY_TIMEOUT_MS || "60000", 10);
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "*")
   .split(",")
   .map((s) => s.trim())
@@ -32,6 +36,21 @@ if (ALLOW_INSECURE_TLS) {
   // SAP servers often use self-signed certs on internal networks.
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
+
+// Override Node's built-in fetch (undici) timeouts. The default connect
+// timeout is only 10s, which causes UND_ERR_CONNECT_TIMEOUT against slow
+// internal SAP hosts even when Postman succeeds.
+const sapDispatcher = new Agent({
+  connect: {
+    timeout: CONNECT_TIMEOUT_MS,
+    rejectUnauthorized: !ALLOW_INSECURE_TLS,
+  },
+  headersTimeout: HEADERS_TIMEOUT_MS,
+  bodyTimeout: BODY_TIMEOUT_MS,
+  keepAliveTimeout: 30_000,
+  keepAliveMaxTimeout: 600_000,
+});
+setGlobalDispatcher(sapDispatcher);
 
 if (!SHARED_SECRET) {
   console.warn("[WARN] MIDDLEWARE_SHARED_SECRET is not set — refusing all authenticated requests.");
@@ -110,8 +129,30 @@ function describeFetchError(err) {
   const name = err?.name || "Error";
   const msg = err?.message || String(err);
   const causeMsg = err?.cause?.message ? ` (cause: ${err.cause.message})` : "";
+  if (code === "UND_ERR_CONNECT_TIMEOUT") {
+    return {
+      code,
+      message: `TCP connect to SAP timed out after ${CONNECT_TIMEOUT_MS}ms. ` +
+        `Check that the middleware host can actually reach the SAP host:port ` +
+        `(firewall, VPN, routing). Postman may use a different network path. ` +
+        `You can raise SAP_CONNECT_TIMEOUT_MS in the middleware .env if the ` +
+        `network is just slow.`,
+    };
+  }
+  if (code === "UND_ERR_HEADERS_TIMEOUT") {
+    return { code, message: `SAP did not send response headers within ${HEADERS_TIMEOUT_MS}ms.` };
+  }
+  if (code === "UND_ERR_BODY_TIMEOUT") {
+    return { code, message: `SAP stopped sending response body within ${BODY_TIMEOUT_MS}ms.` };
+  }
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
+    return { code, message: `DNS lookup failed for SAP host: ${msg}` };
+  }
+  if (code === "ECONNREFUSED") {
+    return { code, message: `SAP host actively refused the connection: ${msg}` };
+  }
   if (name === "AbortError") {
-    return { code: "TIMEOUT", message: "SAP request timed out (middleware AbortController fired)." };
+    return { code: "TIMEOUT", message: `SAP request aborted after ${TIMEOUT_MS}ms (middleware AbortController fired).` };
   }
   return { code: code || name, message: `${msg}${causeMsg}` };
 }
