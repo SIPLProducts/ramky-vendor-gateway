@@ -36,16 +36,41 @@ function substitute(template: any, vars: Record<string, any>): any {
 }
 
 function base64ToUint8(b64: string): Uint8Array {
-  const bin = atob(b64);
+  // Strip data URL prefix and any whitespace/newlines that may have crept in.
+  let cleaned = (b64 || "").trim();
+  if (cleaned.startsWith("data:") && cleaned.includes(",")) {
+    cleaned = cleaned.split(",")[1];
+  }
+  cleaned = cleaned.replace(/\s+/g, "");
+  const bin = atob(cleaned);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return arr;
 }
 
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/bmp": "bmp",
+  "image/tiff": "tiff",
+  "application/pdf": "pdf",
+};
+
+function pickFilename(originalName: string | undefined, mime: string | undefined): string {
+  const safe = (originalName || "").trim().replace(/[\r\n"\\]/g, "").replace(/\s+/g, "_");
+  if (safe && /\.[A-Za-z0-9]{2,5}$/.test(safe)) return safe;
+  const ext = MIME_EXT[(mime || "").toLowerCase()] || "bin";
+  const base = safe ? safe.replace(/\.+$/, "") : "upload";
+  return `${base}.${ext}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { providerName, input, fileBase64, fileMimeType } = await req.json();
+    const { providerName, input, fileBase64, fileMimeType, fileName } = await req.json();
     if (!providerName) {
       return new Response(JSON.stringify({ found: false, ok: false, message: "providerName required" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -99,7 +124,9 @@ serve(async (req) => {
       }
       const fd = new FormData();
       const blob = new Blob([base64ToUint8(fileBase64)], { type: fileMimeType || "application/octet-stream" });
-      fd.append(provider.file_field_name || "file", blob, "upload");
+      const uploadName = pickFilename(fileName, fileMimeType);
+      console.log(`[kyc-api-execute] multipart upload field=${provider.file_field_name || "file"} name=${uploadName} mime=${fileMimeType}`);
+      fd.append(provider.file_field_name || "file", blob, uploadName);
       body = fd;
       // CRITICAL: never force Content-Type for multipart — fetch must set the
       // multipart/form-data boundary itself, otherwise Surepass returns HTTP 400.

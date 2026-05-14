@@ -193,6 +193,7 @@ export default function KycApiConfigEdit() {
     try { sampleInput = JSON.parse(sampleText || "{}"); } catch { /* ignore */ }
     let fileBase64: string | undefined;
     let fileMimeType: string | undefined;
+    let fileName: string | undefined;
     if (testFile) {
       fileBase64 = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
@@ -204,9 +205,10 @@ export default function KycApiConfigEdit() {
         r.readAsDataURL(testFile);
       });
       fileMimeType = testFile.type;
+      fileName = testFile.name;
     }
     try {
-      const res = await test.mutateAsync({ providerId: form.id, sampleInput, fileBase64, fileMimeType });
+      const res = await test.mutateAsync({ providerId: form.id, sampleInput, fileBase64, fileMimeType, fileName });
       setTestResult(res);
     } catch (e: any) {
       setTestResult({ ok: false, message: e.message });

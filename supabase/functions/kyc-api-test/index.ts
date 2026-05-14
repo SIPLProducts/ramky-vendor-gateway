@@ -26,16 +26,32 @@ function substitute(template: any, vars: Record<string, any>): any {
 }
 
 function base64ToUint8(b64: string): Uint8Array {
-  const bin = atob(b64);
+  let cleaned = (b64 || "").trim();
+  if (cleaned.startsWith("data:") && cleaned.includes(",")) cleaned = cleaned.split(",")[1];
+  cleaned = cleaned.replace(/\s+/g, "");
+  const bin = atob(cleaned);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return arr;
+}
+
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp",
+  "image/gif": "gif", "image/bmp": "bmp", "image/tiff": "tiff", "application/pdf": "pdf",
+};
+function pickFilename(originalName: string | undefined, mime: string | undefined): string {
+  const safe = (originalName || "").trim().replace(/[\r\n"\\]/g, "").replace(/\s+/g, "_");
+  if (safe && /\.[A-Za-z0-9]{2,5}$/.test(safe)) return safe;
+  const ext = MIME_EXT[(mime || "").toLowerCase()] || "bin";
+  const base = safe ? safe.replace(/\.+$/, "") : "upload";
+  return `${base}.${ext}`;
 }
 
 async function callProvider(provider: any, credentialValue: string | null, opts: {
   sampleInput?: Record<string, any>;
   fileBase64?: string;
   fileMimeType?: string;
+  fileName?: string;
 }) {
   const url = `${provider.base_url}${provider.endpoint_path}`;
   const headers: Record<string, string> = {};
@@ -58,8 +74,13 @@ async function callProvider(provider: any, credentialValue: string | null, opts:
     const blob = new Blob([base64ToUint8(opts.fileBase64)], {
       type: opts.fileMimeType || "application/octet-stream",
     });
-    fd.append(provider.file_field_name || "file", blob, "upload");
+    const uploadName = pickFilename(opts.fileName, opts.fileMimeType);
+    fd.append(provider.file_field_name || "file", blob, uploadName);
     body = fd;
+    // Strip any caller-supplied Content-Type so fetch sets the multipart boundary itself.
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === "content-type") delete headers[k];
+    }
   } else if (provider.http_method !== "GET") {
     const filled = substitute(provider.request_body_template ?? {}, opts.sampleInput ?? {});
     headers["Content-Type"] = headers["Content-Type"] || "application/json";
@@ -97,7 +118,7 @@ async function callProvider(provider: any, credentialValue: string | null, opts:
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { providerId, sampleInput, fileBase64, fileMimeType } = await req.json();
+    const { providerId, sampleInput, fileBase64, fileMimeType, fileName } = await req.json();
     if (!providerId) {
       return new Response(JSON.stringify({ ok: false, message: "providerId required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -126,7 +147,7 @@ serve(async (req) => {
       .maybeSingle();
 
     const result = await callProvider(provider, cred?.credential_value ?? null, {
-      sampleInput, fileBase64, fileMimeType,
+      sampleInput, fileBase64, fileMimeType, fileName,
     });
 
     return new Response(JSON.stringify(result),
