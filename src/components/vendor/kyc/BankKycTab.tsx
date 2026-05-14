@@ -16,7 +16,9 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
-import { fuzzyNameMatch } from '@/lib/nameMatch';
+import { nameMatchPercentage } from '@/lib/nameMatch';
+
+const NAME_MATCH_THRESHOLD = 40;
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 
 interface BankKycTabProps {
@@ -81,26 +83,28 @@ export function BankKycTab(props: BankKycTabProps) {
     const apiName = (pickString(apiData.full_name) || pickString(apiData.name_at_bank)).trim();
     setHolderName(apiName);
 
-    const gstOk = fuzzyNameMatch(apiName, props.gstLegalName);
-    const panOk = fuzzyNameMatch(apiName, props.panHolderName);
+    const panScore = nameMatchPercentage(apiName, props.panHolderName);
+    const gstScore = nameMatchPercentage(apiName, props.gstLegalName);
+    const panOk = panScore >= NAME_MATCH_THRESHOLD;
+    const gstOk = gstScore >= NAME_MATCH_THRESHOLD;
 
     let nameMessage = '';
     if (apiName && (props.gstLegalName || props.panHolderName)) {
-      if (gstOk && panOk) {
+      if (panOk && gstOk) {
         setHolderCheck('gst+pan');
-        nameMessage = 'Account Holder Name verified with PAN Holder Name and GST Legal Name.';
-      } else if (gstOk) {
-        setHolderCheck('gst');
-        nameMessage = 'Account Holder Name verified with GST Legal Name.';
+        nameMessage = `Account Holder Name verified with PAN Holder Name (${panScore}% match) and GST Legal Name (${gstScore}% match).`;
       } else if (panOk) {
         setHolderCheck('pan');
-        nameMessage = 'Account Holder Name verified with PAN Holder Name.';
+        nameMessage = `Account Holder Name verified with PAN Holder Name (${panScore}% match).`;
+      } else if (gstOk) {
+        setHolderCheck('gst');
+        nameMessage = `Account Holder Name verified with GST Legal Name (${gstScore}% match).`;
       } else {
         setHolderCheck('failed');
         props.onStatusChange?.('failed');
         return {
           ok: false,
-          message: 'Account Holder Name does not match with the provided PAN/MSME details.',
+          message: `Account Holder Name does not match with the provided PAN/MSME details (best match ${Math.max(panScore, gstScore)}%, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
           apiData,
         };
       }
