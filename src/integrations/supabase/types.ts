@@ -1043,6 +1043,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sap_master_data: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          extra: Json | null
+          id: string
+          last_synced_at: string | null
+          master_type: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          extra?: Json | null
+          id?: string
+          last_synced_at?: string | null
+          master_type: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          extra?: Json | null
+          id?: string
+          last_synced_at?: string | null
+          master_type?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sap_payload_templates: {
         Row: {
           created_at: string
