@@ -1,41 +1,35 @@
-## Problem
+## Goal
+Apply F4 (searchable dropdown) value-help to the remaining SAP master fields in the SAP Sync popup, and auto-refresh values from SAP when the popup opens.
 
-The "Download Self-Declaration Template" buttons in the **Non-GST** and **Non-MSME** sections currently link to HTML files (`/templates/gst-self-declaration.html`, `/templates/msme-self-declaration.html`). These open in the browser, not in Word, so vendors can't edit them like a normal document. After printing back to PDF/image and uploading, the experience is awkward.
+## Scope (frontend only, no DB / edge-fn changes)
 
-The upload pipeline (`src/lib/pdfToImage.ts → normalizeUploadToImage`) already supports DOCX, PDF, PNG, JPG, JPEG, WebP, etc., and the upload control accepts `.pdf,.jpg,.jpeg,.png,.doc,.docx`. So the only missing piece is the download format.
+The edge function `sap-master-fetch` and the `sap_master_data` table already support all 6 master types (`vendor_account_group`, `company_code`, `planning_group`, `recon_account`, `purchase_org`, `currency`). Only the dialog wiring is missing.
 
-## Fix
+### 1. `src/components/sap/SapFieldsDialog.tsx` — swap inputs to combobox
 
-Switch the two declaration templates to real **.docx** files so vendors can:
+Replace the existing `<TextField>` instances with `<SapMasterCombobox>` for these fields (form key → master_type):
 
-1. Click **Download Self-Declaration Template** and get a Word document.
-2. Open it in Word / Google Docs / mobile Word, fill in entity name / PAN / address / reason, sign, save.
-3. Re-upload the filled file (DOCX, PDF, or scanned PNG/JPG/JPEG) — all already handled by `normalizeUploadToImage`, which converts the upload to a single JPEG before OCR/verification.
+- `bukrs` (Company Code) → `company_code`
+- `akont` (Rec-Account) → `recon_account`
+- `fdgrv` (Planning Group) → `planning_group`
+- `vkorg` (Purchase Org) → `purchase_org`
+- `waers` (Currency) → `currency`
 
-### Files to add
-- `public/templates/gst-self-declaration.docx`
-- `public/templates/msme-self-declaration.docx`
+`partn_grp` already uses the combobox — leave as-is. `zuawa`, `kalsk`, `ven_class`, and the Classification fields stay as plain text inputs (no master JSON for them).
 
-Generated with the `docx` npm skill (Arial body, bold field labels, dotted-line entry rows for Name of Entity / PAN / Constitution / Registered Address / Reason, the same declaration paragraphs and signature block as today's HTML).
+### 2. Auto-refresh on popup open
 
-### Files to edit
-- `src/components/vendor/kyc/GstKycTab.tsx` — change the download link to `/templates/gst-self-declaration.docx` and update the button label to "Download GST Self-Declaration Template (Word)".
-- `src/components/vendor/kyc/MsmeKycTab.tsx` — same change for the MSME template (`/templates/msme-self-declaration.docx`).
-- (Optional) `src/components/admin/KycLiveTestPanel.tsx` if it links to the templates — verify and update if needed.
+Inside the existing `useEffect` that runs when `open` becomes true, also fire `supabase.functions.invoke('sap-master-fetch', { body: { master_types: ['vendor_account_group','company_code','planning_group','recon_account','purchase_org','currency'] } })` once per open, then invalidate the `["sap_master_data"]` query so all comboboxes show the freshest values. Failure is silent (toast not needed — manual entry still works, the dropdown falls back to cached rows).
 
-### Files to delete (after switch)
-- `public/templates/gst-self-declaration.html`
-- `public/templates/msme-self-declaration.html`
+To keep this clean, add a small `useRefreshSapMaster()` call (already exported from `src/hooks/useSapMasterData.tsx`) and trigger it from the dialog open effect — no new hooks needed.
 
-## Out of scope
+### 3. No other changes
+- No DB migration.
+- No edge function change.
+- `SapMasterDataTab` (Settings page) is unchanged; its manual Refresh button keeps working.
+- Combobox keeps allowing free-typed custom values, so users are never blocked if SAP is unreachable.
 
-- No change to upload handling — DOCX is already converted to JPEG by `normalizeUploadToImage` and passed to the existing OCR/validation flow exactly like PNG/JPG.
-- No change to KYC validation logic, edge functions, or registration flow.
-- Not pre-filling vendor data into the template (can be a follow-up if you want the entity name / PAN auto-injected at download time).
-
-## Verification
-
-1. Click **Download GST Self-Declaration Template** → file downloads as `.docx`, opens in Word and is fully editable.
-2. Same for MSME.
-3. Fill, save, upload as DOCX → preview shows the rendered image and verification proceeds as before.
-4. Repeat with a printed-and-scanned JPG/PNG → still works (unchanged path).
+## Acceptance
+- Opening the SAP Sync dialog triggers one background SAP refresh.
+- Company Code, Rec-Account, Planning Group, Purchase Org, Currency, and Vendor Account Group all show searchable dropdowns sourced from `sap_master_data`.
+- Typing a custom value still works for any of them.

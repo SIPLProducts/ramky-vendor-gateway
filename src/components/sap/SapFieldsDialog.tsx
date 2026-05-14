@@ -12,6 +12,7 @@ import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, Ma
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { SapMasterCombobox } from '@/components/sap/SapMasterCombobox';
+import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
@@ -35,6 +36,7 @@ function isMsme(v: any): boolean {
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
+  const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +53,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setForm(buildDefaults(vendor, data));
       })();
     }
+    // Background refresh of all F4 master values from SAP (silent)
+    refreshMaster.mutate(undefined);
     return () => { cancelled = true; };
   }, [open, vendor]);
 
@@ -130,10 +134,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
-              <TextField label="Company Code" value={form.bukrs} onChange={v => set('bukrs', v)} />
-              <TextField label="Rec-Account" value={form.akont} onChange={v => set('akont', v)} />
+              <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} />
+              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
-              <TextField label="Planning Group" value={form.fdgrv} onChange={v => set('fdgrv', v)} />
+              <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
@@ -142,8 +146,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Purchase Data */}
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <TextField label="Purchase Org" value={form.vkorg} onChange={v => set('vkorg', v)} />
-              <TextField label="Currency" value={form.waers} onChange={v => set('waers', v)} />
+              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} />
+              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
