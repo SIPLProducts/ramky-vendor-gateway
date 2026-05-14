@@ -227,9 +227,12 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
     });
   } catch (err) {
     console.error("[proxy] error:", err);
+    const info = describeFetchError(err);
     return res.status(502).json({
       ok: false,
-      error: err.name === "AbortError" ? "SAP request timed out" : err.message || "Upstream error",
+      error: info.message,
+      code: info.code,
+      target: url,
     });
   }
 });
