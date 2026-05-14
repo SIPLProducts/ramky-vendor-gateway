@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
+import { SapMasterCombobox } from '@/components/sap/SapMasterCombobox';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
