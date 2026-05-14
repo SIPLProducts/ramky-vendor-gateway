@@ -1,38 +1,22 @@
-## Findings
-- The SAP Sync popup opens and reads existing F4 rows from `sap_master_data`.
-- The F4 refresh function is being called when the popup opens, but it is silent and does not surface status inside the popup.
-- Current stored master data has values for vendor account group, company code, planning group, and recon account, but purchase org and currency are missing.
-- Rec-Account is filtered by selected company code `1000`; there are no recon-account rows with `BUKRS = 1000`, so that dropdown can look empty even though recon-account data exists for other company codes.
-- The user-visible issue is likely a combination of: no in-popup refresh status, missing master types, and strict filtering/default mismatches.
+## Goal
+Remove the "show all options" fallback on the Rec-Account dropdown. Only show options that actually match the current filter (e.g. selected Company Code). If nothing matches, show an empty state message — never inject unrelated options.
 
-## Plan
-1. Update the SAP Field Confirmation popup to explicitly show F4 refresh status when it opens:
-   - loading message while the SAP Fields F4 API is running
-   - success count after refresh
-   - clear error message if the refresh fails
+## Changes
 
-2. Make each SAP F4 dropdown more transparent:
-   - show how many options are loaded for the field
-   - show a better empty state when no options match the current filter
-   - for Rec-Account, show that it is filtered by Company Code and allow the user to understand why it is empty
+### 1. `src/components/sap/SapMasterCombobox.tsx`
+- Remove the `allowFilterFallback` behavior that swaps in the unfiltered list when the filtered list is empty.
+- Always render only the filtered `options` array.
+- When the filtered list is empty, show a clear empty state inside the dropdown:
+  - "No options match the current filter (Company Code: 1000)." for Rec-Account
+  - "No options available." for others
+- Remove the helper line "Showing all 534 options; no match for current filter." since fallback is gone.
+- Keep the "X options loaded." count, but base it on the filtered list so the number reflects what the user actually sees.
 
-3. Improve F4 refresh reliability in frontend state:
-   - after `sap-master-fetch` completes, invalidate/refetch the master-data queries used by all open comboboxes
-   - ensure dropdowns update without needing to close/reopen the popup
+### 2. `src/components/sap/SapFieldsDialog.tsx`
+- Remove the `allowFilterFallback` prop being passed to the Rec-Account `SapMasterCombobox` (no longer needed).
+- No other behavior changes.
 
-4. Adjust Rec-Account filtering behavior safely:
-   - keep company-code filtering when matching rows exist
-   - if no row exists for the selected company code, show all recon accounts instead of an empty dropdown, with a small hint that no company-specific match was found
-
-5. Validate in the browser:
-   - open SAP Sync popup
-   - confirm the `sap-master-fetch` request fires
-   - open Vendor Account Group, Company Code, Planning Group, Rec-Account, Purchase Org, and Currency dropdowns
-   - verify options or clear empty-state messages are visible
-
-## Technical notes
-- Main files to change:
-  - `src/components/sap/SapFieldsDialog.tsx`
-  - `src/components/sap/SapMasterCombobox.tsx`
-  - `src/hooks/useSapMasterData.tsx`
-- No database schema change is required.
+## Out of scope
+- No edge function changes.
+- No master-data refresh logic changes.
+- No filter rule changes (Rec-Account stays filtered by selected Company Code).
