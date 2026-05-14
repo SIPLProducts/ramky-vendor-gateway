@@ -67,6 +67,20 @@ function pickFilename(originalName: string | undefined, mime: string | undefined
   return `${base}.${ext}`;
 }
 
+const BANK_SUCCESS_CACHE_TTL_MS = 60_000;
+const bankSuccessCache = new Map<string, { expiresAt: number; response: any }>();
+
+function normalizeBankPayload(filled: any, input: Record<string, any> | undefined): { payload: Record<string, any>; cacheKey: string | null } {
+  const source = (filled && typeof filled === "object" && !Array.isArray(filled)) ? filled : {};
+  const rawAccount = input?.id_number ?? input?.account ?? source.id_number ?? source.account ?? "";
+  const rawIfsc = input?.ifsc ?? source.ifsc ?? "";
+  const idNumber = String(rawAccount).replace(/\s+/g, "").trim();
+  const ifsc = String(rawIfsc).toUpperCase().trim();
+  const payload = { id_number: idNumber, ifsc, ifsc_details: true };
+  const cacheKey = idNumber && ifsc ? `${idNumber}::${ifsc}` : null;
+  return { payload, cacheKey };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -117,6 +131,7 @@ serve(async (req) => {
     }
 
     let body: BodyInit | undefined;
+    let bankCacheKey: string | null = null;
     if (provider.request_mode === "multipart") {
       if (!fileBase64) {
         return new Response(JSON.stringify({ found: true, ok: false, message: "File required for multipart provider" }),
@@ -134,7 +149,7 @@ serve(async (req) => {
         if (k.toLowerCase() === "content-type") delete headers[k];
       }
     } else if ((provider.http_method || "POST") !== "GET") {
-      const filled = substitute(provider.request_body_template ?? {}, input ?? {});
+      let filled = substitute(provider.request_body_template ?? {}, input ?? {});
       // Defensive guard: if the saved template was misconfigured (e.g. literal
       // `{"id_number": ""}` with no `{{id_number}}` placeholder) but the caller
       // actually provided values in `input`, merge the input keys in for any
@@ -147,13 +162,27 @@ serve(async (req) => {
           }
         }
       }
+      if (provider.provider_name === "BANK") {
+        const normalized = normalizeBankPayload(filled, input);
+        filled = normalized.payload;
+        bankCacheKey = normalized.cacheKey;
+        if (bankCacheKey) {
+          const cached = bankSuccessCache.get(bankCacheKey);
+          if (cached && cached.expiresAt > Date.now()) {
+            console.log(`[kyc-api-execute] provider=BANK cache=hit keys=id_number,ifsc,ifsc_details ifsc_details=true`);
+            return new Response(JSON.stringify({ ...cached.response, cache_hit: true }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+          if (cached) bankSuccessCache.delete(bankCacheKey);
+        }
+      }
       headers["Content-Type"] = headers["Content-Type"] || "application/json";
       body = JSON.stringify(filled);
       // Safe diagnostic: provider + which input keys we filled in (no values, no secrets).
       console.log(
         `[kyc-api-execute] provider=${provider.provider_name} mode=json keys=${
           filled && typeof filled === "object" ? Object.keys(filled).join(",") : "-"
-        } inputKeys=${input ? Object.keys(input).join(",") : "-"}`,
+        } inputKeys=${input ? Object.keys(input).join(",") : "-"}${provider.provider_name === "BANK" ? " ifsc_details=true" : ""}`,
       );
     }
 
