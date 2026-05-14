@@ -149,6 +149,12 @@ serve(async (req) => {
       }
       headers["Content-Type"] = headers["Content-Type"] || "application/json";
       body = JSON.stringify(filled);
+      // Safe diagnostic: provider + which input keys we filled in (no values, no secrets).
+      console.log(
+        `[kyc-api-execute] provider=${provider.provider_name} mode=json keys=${
+          filled && typeof filled === "object" ? Object.keys(filled).join(",") : "-"
+        } inputKeys=${input ? Object.keys(input).join(",") : "-"}`,
+      );
     }
 
     const start = Date.now();
