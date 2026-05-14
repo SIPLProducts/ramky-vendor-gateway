@@ -1,28 +1,73 @@
-## Problem
-The app sends the cheque image to the configured BANK_OCR provider as multipart form-data, but the backend appends the file with the filename `upload` and no extension:
+## What I found
 
-```ts
-fd.append(provider.file_field_name || "file", blob, "upload")
-```
+The hosted backend looks healthy, and the main issue is in the integrated registration flow:
 
-Surepass cheque OCR validates the multipart filename extension, so even though the image content and MIME type are correct (`image/jpeg`), it rejects the request with `File extension not allowed.` Postman works because it sends a real filename like `...jpg`.
+- The active vendor registration screen uses `DocumentVerificationStep.tsx`, not only the smaller `BankKycTab.tsx` component.
+- In the cheque flow, after OCR extracts account + IFSC, the app calls the `BANK` provider once, but then it has an internal retry loop for rate-limit responses:
+  - first call immediately
+  - retry after 15 seconds
+  - retry again after 30 seconds
+- That means one user action can trigger up to 3 Surepass bank-verification transactions, which can itself cause or prolong `Transaction rate limit exceeded`.
+- When that fails, the app opens the manual bank popup; submitting that popup calls the same `BANK` provider again, creating an additional transaction attempt for the same account/IFSC.
+- The database configuration for `BANK` is also misconfigured: the saved request body currently contains hardcoded sample values (`1714348594`, `KKBK0007746`) instead of placeholders. The edge function has a partial safety merge, but because the hardcoded values are not empty, it will not replace them. This is a real hardcoded-value problem.
+- The `BANK` response mapping is also misconfigured: it appears to contain a pasted sample response instead of JSON-path mappings. The edge function falls back to flattening data, but fixing the config will make results deterministic.
 
-## Plan
-1. Update the KYC provider client to include the original uploaded filename when invoking the backend function.
-2. Update `kyc-api-execute` multipart handling to:
-   - sanitize/clean base64 input defensively,
-   - choose a valid filename with extension from the original file name or MIME type,
-   - append the multipart file as `file` with a name like `cheque.jpg` instead of extensionless `upload`,
-   - keep removing manual `Content-Type` so the multipart boundary is still generated correctly.
-3. Apply the same filename fix to the KYC API Settings test function (`kyc-api-test`) and test request path, so admin “Test” behaves the same as vendor registration.
-4. Add focused logs around multipart filename/MIME/provider URL without logging API tokens or file contents.
+## Fix plan
 
-## Files to change
-- `src/hooks/useConfiguredKycApi.tsx`
-- `src/pages/KycApiConfigEdit.tsx`
-- `src/hooks/useKycApiConfigs.tsx`
-- `supabase/functions/kyc-api-execute/index.ts`
-- `supabase/functions/kyc-api-test/index.ts`
+1. **Remove retry behavior from bank verification**
+   - Remove the 15s/30s retry loop in `DocumentVerificationStep.tsx`.
+   - A single click/upload/manual submit should trigger only one `BANK` provider call.
+   - If Surepass returns 429/rate-limit, show the real provider message and do not auto retry.
 
-## Expected result
-BANK_OCR requests from the application will match Postman/Surepass behavior: multipart field `file`, actual image bytes, MIME `image/jpeg`, and filename ending in `.jpg`/`.jpeg`, so Surepass should stop returning `File extension not allowed.`
+2. **Prevent duplicate user-triggered bank calls**
+   - Add an in-flight guard for bank verification requests keyed by account + IFSC.
+   - If the same bank verification is already running, the UI will not start another call.
+   - Disable/ignore repeated upload/manual submit actions while bank verification is busy.
+
+3. **Fix hardcoded BANK provider payload configuration**
+   - Update the active `BANK` provider configuration in the database from hardcoded sample values to:
+     ```json
+     {
+       "id_number": "{{id_number}}",
+       "ifsc": "{{ifsc}}",
+       "ifsc_details": true
+     }
+     ```
+   - Keep the application payload as:
+     ```json
+     {
+       "account": "...",
+       "ifsc": "...",
+       "id_number": "..."
+     }
+     ```
+     so both existing placeholders and provider templates continue working.
+
+4. **Fix BANK response mapping**
+   - Update the active `BANK` mapping to JSON paths, for example:
+     ```json
+     {
+       "account_number": "data.account_number",
+       "account_exists": "data.account_exists",
+       "full_name": "data.full_name",
+       "name_at_bank": "data.full_name",
+       "ifsc": "data.ifsc_details.ifsc",
+       "bank_name": "data.ifsc_details.bank_name",
+       "branch_name": "data.ifsc_details.branch",
+       "branch_address": "data.ifsc_details.address",
+       "branch_city": "data.ifsc_details.city",
+       "branch_state": "data.ifsc_details.state",
+       "micr": "data.ifsc_details.micr",
+       "imps_ref_no": "data.imps_ref_no"
+     }
+     ```
+
+5. **Add better diagnostic logging without exposing secrets**
+   - Log one safe line in the edge function for each provider call: provider name, request mode, and sanitized payload keys/placeholder status.
+   - Do not log API tokens or full Authorization headers.
+   - This will make it clear whether the app is sending one request or multiple.
+
+6. **Validate after implementation**
+   - Use the deployed edge function test endpoint with the exact payload you provided.
+   - Confirm the backend sends dynamic values, not the hardcoded sample values.
+   - Confirm the UI path cannot auto-trigger multiple bank-verification calls from one upload or repeated submit.

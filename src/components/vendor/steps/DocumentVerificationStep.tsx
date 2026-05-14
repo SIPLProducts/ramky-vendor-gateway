@@ -701,30 +701,21 @@ export function DocumentVerificationStep({
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ocrIfscRaw)) {
       return { ok: false as const, message: "Could not read a valid 11-character IFSC from the cheque. Please upload a clearer scan." };
     }
-    // Surepass throttles the penny-drop endpoint aggressively. Retry with
-    // backoff (15s, then 30s) before giving up — and if we're still throttled
-    // after retries, soft-pass with the OCR-extracted account/IFSC + IFSC
-    // directory enrichment so the vendor can still complete registration.
+    // Surepass throttles the penny-drop endpoint aggressively. We do NOT
+    // auto-retry here — repeated automatic calls were the root cause of the
+    // "Transaction rate limit exceeded" loop seen from the integrated app.
+    // A single user action triggers exactly one BANK provider call; if the
+    // upstream is throttled, surface the real provider message and let the
+    // vendor retry manually.
     const isRateLimited = (res: any) =>
       res && (res.found || res.message_code) &&
       typeof res.message === "string" &&
       /rate limit|too many requests|throttl/i.test(res.message);
 
-    let r = await callProvider({
+    const r = await callProvider({
       providerName: "BANK",
       input: { account: ocrAccountRaw, ifsc: ocrIfscRaw, id_number: ocrAccountRaw },
     });
-    const backoffs = [15000, 30000];
-    let attempt = 0;
-    while (isRateLimited(r) && attempt < backoffs.length) {
-      const wait = backoffs[attempt++];
-      console.log(`[Bank] Rate limited by upstream — retrying in ${wait / 1000}s (attempt ${attempt}/${backoffs.length})`);
-      await new Promise((resolve) => setTimeout(resolve, wait));
-      r = await callProvider({
-        providerName: "BANK",
-        input: { account: ocrAccountRaw, ifsc: ocrIfscRaw, id_number: ocrAccountRaw },
-      });
-    }
     toastKycResult("Bank", r);
 
     // Always prefer the upstream message verbatim — never hardcode UI copy
