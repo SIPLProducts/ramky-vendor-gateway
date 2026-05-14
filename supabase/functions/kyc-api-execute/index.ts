@@ -124,7 +124,9 @@ serve(async (req) => {
       }
       const fd = new FormData();
       const blob = new Blob([base64ToUint8(fileBase64)], { type: fileMimeType || "application/octet-stream" });
-      fd.append(provider.file_field_name || "file", blob, "upload");
+      const uploadName = pickFilename(fileName, fileMimeType);
+      console.log(`[kyc-api-execute] multipart upload field=${provider.file_field_name || "file"} name=${uploadName} mime=${fileMimeType}`);
+      fd.append(provider.file_field_name || "file", blob, uploadName);
       body = fd;
       // CRITICAL: never force Content-Type for multipart — fetch must set the
       // multipart/form-data boundary itself, otherwise Surepass returns HTTP 400.
