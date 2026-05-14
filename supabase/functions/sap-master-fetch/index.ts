@@ -56,52 +56,132 @@ serve(async (req) => {
     const config = findConfig(configs || []);
     if (!config) return ok({ success: false, message: "No active SAP API config found." }, 200);
 
-    // Build target URL
+    // Build SAP target URL (the actual SAP endpoint, regardless of proxy)
     const base = (config.base_url || "").replace(/\/$/, "");
     const path = config.endpoint_path || "";
-    const directUrl = `${base}${path}`;
-    if (!directUrl) {
+    const sapUrl = `${base}${path}`;
+    if (!sapUrl) {
       return ok({ success: false, message: "SAP config base_url + endpoint_path missing." }, 200);
     }
 
-    // Get credentials (Basic / Bearer)
+    // Get credentials (Basic / Bearer) for direct calls (middleware adds its own SAP creds)
     const { data: creds } = await supabase
       .from("sap_api_credentials").select("*").eq("config_id", config.id).maybeSingle();
-    const headers: Record<string, string> = { "Accept": "application/json" };
+    const sapHeaders: Record<string, string> = { "Accept": "application/json" };
     if (config.auth_type === "Basic" && creds?.username) {
-      headers["Authorization"] = `Basic ${btoa(`${creds.username}:${creds.password_encrypted ?? ""}`)}`;
+      sapHeaders["Authorization"] = `Basic ${btoa(`${creds.username}:${creds.password_encrypted ?? ""}`)}`;
     } else if (config.auth_type === "Bearer" && creds?.password_encrypted) {
-      headers["Authorization"] = `Bearer ${creds.password_encrypted}`;
+      sapHeaders["Authorization"] = `Bearer ${creds.password_encrypted}`;
     }
 
-    // Try call SAP (direct). If it fails (e.g. internal IP), return graceful message.
+    const httpMethod = (config.http_method || "GET").toUpperCase();
+    const connectionMode = (config.connection_mode || "direct").toLowerCase();
+
+    function normalizeMiddlewareBase(raw: string): string {
+      let v = String(raw || "").replace(/\s+/g, "").trim().replace(/\/+$/, "");
+      v = v.replace(/\/sap\/bp\/create$/i, "")
+           .replace(/\/sap\/proxy$/i, "")
+           .replace(/\/health$/i, "")
+           .replace(/\/+$/, "");
+      return v;
+    }
+
     let sapJson: any = null;
     let networkError: string | null = null;
+
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
-      const res = await fetch(directUrl, {
-        method: (config.http_method || "GET").toUpperCase(),
-        headers,
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      const text = await res.text();
-      if (!res.ok) {
-        networkError = `SAP HTTP ${res.status}: ${text.slice(0, 200)}`;
+      const timer = setTimeout(() => controller.abort(), 25000);
+
+      if (connectionMode === "proxy") {
+        const middlewareBase = normalizeMiddlewareBase(config.middleware_url || "");
+        const middlewareKey = (config.proxy_secret || "").trim();
+        if (!middlewareBase) {
+          clearTimeout(timer);
+          return ok({
+            success: false,
+            message: "SAP middleware URL is not configured for the 'SAP Fields F4' API.",
+            hint: "Open SAP API Settings → SAP Fields F4 and set the Node.js Middleware URL and Proxy Secret.",
+          }, 200);
+        }
+        if (!middlewareKey) {
+          clearTimeout(timer);
+          return ok({
+            success: false,
+            message: "Proxy Secret is not set for the 'SAP Fields F4' API.",
+            hint: "Open SAP API Settings → SAP Fields F4 and set the Proxy Secret.",
+          }, 200);
+        }
+        const proxyUrl = `${middlewareBase}/sap/proxy`;
+        const res = await fetch(proxyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-middleware-key": middlewareKey,
+          },
+          body: JSON.stringify({
+            url: sapUrl,
+            method: httpMethod,
+            headers: { Accept: "application/json" },
+            useBasicAuth: true,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        const text = await res.text();
+        if (!res.ok) {
+          networkError = `Middleware HTTP ${res.status}: ${text.slice(0, 300)}`;
+        } else {
+          let wrapper: any = null;
+          try { wrapper = JSON.parse(text); } catch {
+            networkError = `Invalid JSON from middleware: ${text.slice(0, 200)}`;
+          }
+          if (wrapper) {
+            if (wrapper.ok === false) {
+              networkError = `Middleware error: ${wrapper.error || JSON.stringify(wrapper).slice(0, 200)}`;
+            } else if (typeof wrapper.sapStatus === "number" && wrapper.sapStatus >= 400) {
+              networkError = `SAP HTTP ${wrapper.sapStatus} via middleware: ${
+                typeof wrapper.sapResponse === "string"
+                  ? wrapper.sapResponse.slice(0, 200)
+                  : JSON.stringify(wrapper.sapResponse).slice(0, 200)
+              }`;
+            } else {
+              const inner = wrapper.sapResponse;
+              if (typeof inner === "string") {
+                try { sapJson = JSON.parse(inner); }
+                catch { networkError = `SAP response not JSON: ${inner.slice(0, 200)}`; }
+              } else {
+                sapJson = inner;
+              }
+            }
+          }
+        }
       } else {
-        try { sapJson = JSON.parse(text); }
-        catch { networkError = `Invalid JSON from SAP: ${text.slice(0, 200)}`; }
+        const res = await fetch(sapUrl, {
+          method: httpMethod,
+          headers: sapHeaders,
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        const text = await res.text();
+        if (!res.ok) {
+          networkError = `SAP HTTP ${res.status}: ${text.slice(0, 200)}`;
+        } else {
+          try { sapJson = JSON.parse(text); }
+          catch { networkError = `Invalid JSON from SAP: ${text.slice(0, 200)}`; }
+        }
       }
     } catch (e: any) {
-      networkError = `Could not reach SAP at ${directUrl}: ${e?.message || e}`;
+      networkError = `Could not reach SAP${connectionMode === "proxy" ? " via middleware" : ""}: ${e?.message || e}`;
     }
 
     if (networkError || !sapJson) {
       return ok({
         success: false,
         message: networkError || "Empty response from SAP.",
-        hint: "Check the 'SAP Fields F4' config base_url, endpoint_path, and credentials. If SAP sits on an internal network, the cloud function cannot reach it directly — manage values manually in this tab.",
+        hint: connectionMode === "proxy"
+          ? "Check the middleware is running and the Proxy Secret matches. The middleware must allow the SAP host."
+          : "Check the 'SAP Fields F4' config base_url, endpoint_path, and credentials. If SAP sits on an internal network, switch the config Connection to 'proxy' and set the middleware URL.",
       }, 200);
     }
 

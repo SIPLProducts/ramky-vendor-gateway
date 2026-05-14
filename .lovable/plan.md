@@ -1,38 +1,40 @@
-# SAP Sync Popup — F4 Dropdown Binding Plan
+## Diagnosis
 
-## What is already in place
-The previous iteration already wired this end-to-end. On opening the SAP Sync popup:
-1. `SapFieldsDialog` calls `useRefreshSapMaster()` → invokes the `sap-master-fetch` edge function.
-2. The edge function reads the active `SAP Fields F4` config from `sap_api_configs`, calls the GET URL with stored credentials, parses the JSON, and upserts into `sap_master_data`.
-3. Each dropdown is a `SapMasterCombobox` bound to a `master_type` and reads live rows via `useSapMasterData`.
+The SAP Sync popup is hitting the app backend function (`sap-master-fetch`) correctly. The failing part is that the backend function is trying to call the internal SAP URL directly:
 
-## Field → JSON key → master_type mapping (verified)
+`http://10.200.1.2:8000/vendor/bp/create?sap-client=300`
 
-| Popup Field | JSON Key | Code | Description | master_type |
-|---|---|---|---|---|
-| Vendor Account Group | `VENDOR_ACC_GRP` | `KTOKK` | `TXT30` | `vendor_account_group` |
-| Company Code | `COMPANY_CODE` | `BUKRS` | `BUTXT` | `company_code` |
-| Planning Group | `PLANNING_GROUP` | `GRUPP` | — | `planning_group` |
-| Rec-Account | `RECON_ACCOUNT` | `SAKNR` | `TXT20` | `recon_account` |
-| Purchase Org | `PURCHASE_ORG` | `EKORG` | `EKOTX` | `purchase_org` |
-| Currency | `WAERS` | `WAERS` | `LTEXT` | `currency` |
+That internal `10.x.x.x` address is not reachable from Lovable Cloud, so it times out/aborts. Your `SAP Fields F4` config is saved with `connection_mode = proxy` and a middleware URL, but `sap-master-fetch` currently ignores proxy mode and always calls `base_url + endpoint_path` directly. That is why F4 values are not getting refreshed into the dropdown tables.
 
-All six are already in `MASTER_MAP` inside `supabase/functions/sap-master-fetch/index.ts`, and all six fields in `SapFieldsDialog.tsx` already use `<SapMasterCombobox>`.
+## Plan
 
-## Small fix needed
-**Recon Account** rows from SAP include `BUKRS` (Company Code), but the combobox currently shows the same `SAKNR` for every company code without distinguishing them. Plan:
-- Show description as `"<SAKNR> — <TXT20> (BUKRS: <BUKRS>)"` in the combobox label so the same G/L code under different company codes is distinguishable.
-- Optionally filter Recon Account dropdown by the currently selected `bukrs` value on the form (best UX, matches SAP behaviour).
+1. **Update `sap-master-fetch` to honor proxy mode**
+   - If the `SAP Fields F4` config uses `connection_mode = proxy`, call the configured middleware instead of calling `10.200.1.2` directly.
+   - Use middleware endpoint `/sap/proxy` with the saved `proxy_secret`.
+   - Pass the target SAP URL, HTTP method `GET`, headers, and no body.
 
-## Validation steps after change
-1. Open SAP Sync popup → Network tab should show one POST to `sap-master-fetch`.
-2. Check edge function logs → confirm `summary` returned non-zero `upserted` for all 6 types.
-3. Each of the 6 dropdowns shows refreshed values; manual entry still works as fallback.
-4. If the "SAP Fields F4" config is unreachable (internal SAP), comboboxes silently fall back to cached `sap_master_data` rows — no popup error.
+2. **Keep direct mode as fallback**
+   - If `connection_mode = direct`, continue using the existing direct SAP call logic.
+   - Improve the error message so it says whether the failure came from direct SAP or middleware proxy.
 
-## Files to touch
-- `src/components/sap/SapMasterCombobox.tsx` — accept optional `filter` prop and richer label rendering.
-- `src/components/sap/SapFieldsDialog.tsx` — pass `filter={{ BUKRS: form.bukrs }}` to the Rec-Account combobox.
-- `supabase/functions/sap-master-fetch/index.ts` — already stores raw item in `extra` column; no change needed.
+3. **Parse middleware responses correctly**
+   - Middleware `/sap/proxy` returns a wrapper like `{ ok, sapStatus, sapResponse }`.
+   - If `sapResponse` contains the F4 JSON, unwrap it before mapping:
+     - `VENDOR_ACC_GRP` → Vendor Account Group
+     - `COMPANY_CODE` → Company Code
+     - `PLANNING_GROUP` → Planning Group
+     - `RECON_ACCOUNT` → Rec-Account
+     - `PURCHASE_ORG` → Purchase Org
+     - `CURRENCY` → Currency
 
-No DB migration needed.
+4. **Ensure dropdown queries refresh after import**
+   - Keep the popup opening behavior: opening SAP sync triggers `sap-master-fetch`.
+   - After successful import, invalidate the per-master dropdown queries so values appear immediately.
+
+5. **Optional middleware hardening if needed**
+   - The existing middleware already has `/sap/proxy`, so no app-side UI change is needed.
+   - If the middleware blocks the F4 URL because its host validation uses `SAP_BP_API_URL`, keep the same host (`10.200.1.2:8000`) and it should pass.
+
+## Expected result
+
+When opening the SAP Sync popup, the app will call `sap-master-fetch`, `sap-master-fetch` will call your configured middleware URL, the middleware will call the internal SAP GET API, and the returned F4 arrays will be saved into `sap_master_data` and shown in the popup dropdowns.
