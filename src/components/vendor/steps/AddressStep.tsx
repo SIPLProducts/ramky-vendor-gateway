@@ -14,6 +14,25 @@ import {
 import { MapPin, Building, Globe } from 'lucide-react';
 import { AddressDetails, INDIAN_STATES } from '@/types/vendor';
 import { useEffect } from 'react';
+import { digitsOnly } from '@/lib/utils';
+
+const optionalPhone = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d{10}$/.test(v), { message: '10-digit mobile number required' });
+const optionalPincode = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d{6}$/.test(v), { message: 'Valid 6-digit pincode required' });
+const numericInput = (max: number) => ({
+  inputMode: 'numeric' as const,
+  pattern: '\\d*',
+  maxLength: max,
+  onInput: (e: React.FormEvent<HTMLInputElement>) => {
+    const el = e.currentTarget;
+    el.value = digitsOnly(el.value, max);
+  },
+});
 
 const optionalEmail = z
   .string()
