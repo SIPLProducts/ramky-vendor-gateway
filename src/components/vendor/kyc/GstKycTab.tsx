@@ -50,13 +50,6 @@ export function GstKycTab(props: GstKycTabProps) {
       input: { gstin: props.gstin, id_number: props.gstin },
       validate: (data) => {
         const apiName = String(data.legal_name || data.business_name || '').trim();
-        if (props.legalName && apiName) {
-          const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-          const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-          if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
-            return { ok: false, message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`, data };
-          }
-        }
         return { ok: true, message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`, data };
       },
     });
@@ -136,20 +129,9 @@ export function GstKycTab(props: GstKycTabProps) {
       };
     }
 
-    // Optional secondary check: legal name fuzzy match if user already typed one.
+    // GST registry is the source of truth — no user-entered name comparison here.
+    // Cross-checks against the holder name are performed on the PAN/MSME/Bank tabs.
     const apiName = String(merged.legal_name || merged.business_name || merged.trade_name || '').trim();
-    if (props.legalName && apiName) {
-      const a = props.legalName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-      const b = apiName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-      if (!a.includes(b.split(' ')[0]) && !b.includes(a.split(' ')[0])) {
-        return {
-          ok: false,
-          message: `Name mismatch: GSTIN is registered to "${apiName}" but you entered "${props.legalName}".`,
-          apiData: merged,
-          apiResult: verify,
-        };
-      }
-    }
 
     // Commit the registry GSTIN to the form (covers OCR misreads of single chars)
     // and pass the merged record up so missing fields auto-populate.

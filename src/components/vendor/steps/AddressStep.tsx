@@ -14,6 +14,21 @@ import {
 import { MapPin, Building, Globe } from 'lucide-react';
 import { AddressDetails, INDIAN_STATES } from '@/types/vendor';
 import { useEffect } from 'react';
+import { digitsOnly } from '@/lib/utils';
+
+const optionalPhone = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d{10}$/.test(v), { message: '10-digit mobile number required' });
+const optionalPincode = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d{6}$/.test(v), { message: 'Valid 6-digit pincode required' });
+const numericInput = (max: number) => ({
+  inputMode: 'numeric' as const,
+  pattern: '\\d*',
+  maxLength: max,
+});
 
 const optionalEmail = z
   .string()
@@ -31,7 +46,7 @@ const schema = z.object({
   registeredCity: z.string().min(2, 'City is required'),
   registeredState: z.string().min(2, 'State is required'),
   registeredPincode: z.string().regex(/^\d{6}$/, 'Valid 6-digit pincode required'),
-  registeredPhone: z.string().optional(),
+  registeredPhone: optionalPhone,
   registeredFax: z.string().optional(),
   registeredWebsite: z.string().optional(),
   registeredEmail: z
@@ -48,8 +63,8 @@ const schema = z.object({
   manufacturingAddressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional(),
   manufacturingCity: z.string().optional(),
   manufacturingState: z.string().optional(),
-  manufacturingPincode: z.string().optional(),
-  manufacturingPhone: z.string().optional(),
+  manufacturingPincode: optionalPincode,
+  manufacturingPhone: optionalPhone,
   manufacturingFax: z.string().optional(),
   manufacturingEmail: optionalEmail,
 
@@ -60,14 +75,14 @@ const schema = z.object({
   branchAddressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional(),
   branchCity: z.string().optional(),
   branchState: z.string().optional(),
-  branchPincode: z.string().optional(),
+  branchPincode: optionalPincode,
   branchCountry: z.string().optional(),
   branchWebsite: z.string().optional(),
   branchEmail: optionalEmail,
   branchContactName: z.string().optional(),
   branchContactDesignation: z.string().optional(),
   branchContactEmail: z.string().optional(),
-  branchContactPhone: z.string().optional(),
+  branchContactPhone: optionalPhone,
   branchContactFax: z.string().optional(),
 });
 
@@ -89,6 +104,17 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
   } = useForm<AddressDetails>({
     resolver: zodResolver(schema),
     defaultValues: data,
+  });
+
+  // Wrap register() so phone/pincode inputs strip non-digits + clamp length.
+  const numericField = (name: keyof AddressDetails, max: number) => ({
+    ...register(name as any, {
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = digitsOnly(e.target.value, max);
+        if (v !== e.target.value) setValue(name as any, v as any, { shouldValidate: false });
+      },
+    }),
+    ...numericInput(max),
   });
 
   const sameAsRegistered = watch('sameAsRegistered');
@@ -223,9 +249,8 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               <Label htmlFor="registeredPincode">PIN Code *</Label>
               <Input
                 id="registeredPincode"
-                {...register('registeredPincode')}
+                {...numericField('registeredPincode', 6)}
                 placeholder="6-digit PIN"
-                maxLength={6}
                 className={errors.registeredPincode ? 'border-destructive' : ''}
               />
               {errors.registeredPincode && (
@@ -239,9 +264,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               <Label htmlFor="registeredPhone">Office Phone</Label>
               <Input
                 id="registeredPhone"
-                {...register('registeredPhone')}
-                placeholder="Office phone number"
+                {...numericField('registeredPhone', 10)}
+                placeholder="10-digit mobile number"
+                className={errors.registeredPhone ? 'border-destructive' : ''}
               />
+              {errors.registeredPhone && (
+                <p className="text-xs text-destructive">{errors.registeredPhone.message}</p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="registeredFax">Fax</Label>
@@ -397,10 +426,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <Label htmlFor="manufacturingPincode">PIN Code</Label>
                 <Input
                   id="manufacturingPincode"
-                  {...register('manufacturingPincode')}
+                  {...numericField('manufacturingPincode', 6)}
                   placeholder="6-digit PIN"
-                  maxLength={6}
+                  className={errors.manufacturingPincode ? 'border-destructive' : ''}
                 />
+                {errors.manufacturingPincode && (
+                  <p className="text-xs text-destructive">{errors.manufacturingPincode.message}</p>
+                )}
               </div>
             </div>
 
@@ -409,9 +441,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <Label htmlFor="manufacturingPhone">Office Phone</Label>
                 <Input
                   id="manufacturingPhone"
-                  {...register('manufacturingPhone')}
-                  placeholder="Office phone number"
+                  {...numericField('manufacturingPhone', 10)}
+                  placeholder="10-digit mobile number"
+                  className={errors.manufacturingPhone ? 'border-destructive' : ''}
                 />
+                {errors.manufacturingPhone && (
+                  <p className="text-xs text-destructive">{errors.manufacturingPhone.message}</p>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingFax">Fax</Label>
@@ -557,10 +593,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               <Label htmlFor="branchPincode">PIN Code</Label>
               <Input
                 id="branchPincode"
-                {...register('branchPincode')}
-                placeholder="PIN"
-                maxLength={6}
+                {...numericField('branchPincode', 6)}
+                placeholder="6-digit PIN"
+                className={errors.branchPincode ? 'border-destructive' : ''}
               />
+              {errors.branchPincode && (
+                <p className="text-xs text-destructive">{errors.branchPincode.message}</p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="branchCountry">Country</Label>
@@ -608,9 +647,13 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <Label htmlFor="branchContactPhone">Phone</Label>
                 <Input
                   id="branchContactPhone"
-                  {...register('branchContactPhone')}
-                  placeholder="Phone number"
+                  {...numericField('branchContactPhone', 10)}
+                  placeholder="10-digit mobile number"
+                  className={errors.branchContactPhone ? 'border-destructive' : ''}
                 />
+                {errors.branchContactPhone && (
+                  <p className="text-xs text-destructive">{errors.branchContactPhone.message}</p>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="branchContactFax">Fax</Label>
