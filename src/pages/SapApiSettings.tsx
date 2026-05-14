@@ -95,6 +95,7 @@ export default function SapApiSettings() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <TabsList>
             <TabsTrigger value="configs"><FileText className="h-4 w-4 mr-2" />API Configurations</TabsTrigger>
+            <TabsTrigger value="master"><Database className="h-4 w-4 mr-2" />Master Data (F4)</TabsTrigger>
             <TabsTrigger value="template"><FileText className="h-4 w-4 mr-2" />Payload Template</TabsTrigger>
             <TabsTrigger value="guide"><Link2 className="h-4 w-4 mr-2" />SAP Connectivity Guide</TabsTrigger>
           </TabsList>
