@@ -90,8 +90,9 @@ export function useRefreshSapMaster() {
       if (error) throw error;
       return data as { success: boolean; message?: string; hint?: string; summary?: Record<string, { upserted: number; skipped: number }> };
     },
-    onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["sap_master_data"] });
+    onSuccess: async (res) => {
+      await qc.invalidateQueries({ queryKey: ["sap_master_data"] });
+      await qc.refetchQueries({ queryKey: ["sap_master_data"], type: "active" });
       if (res?.success) {
         const total = Object.values(res.summary || {}).reduce((s, v) => s + (v.upserted || 0), 0);
         toast({ title: "Refreshed from SAP", description: `${total} values updated.` });
