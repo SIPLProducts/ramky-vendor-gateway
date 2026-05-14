@@ -15,15 +15,32 @@ interface Props {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  /** Optional filter applied against each row's `extra` JSON (e.g. { BUKRS: "1000" }). */
+  filter?: Record<string, string | undefined>;
+  /** Optional extra fields from `extra` to render after the description, e.g. ["BUKRS"]. */
+  extraLabelFields?: string[];
 }
 
-export function SapMasterCombobox({ label, masterType, value, onChange, placeholder }: Props) {
+export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, filter, extraLabelFields }: Props) {
   const [open, setOpen] = useState(false);
-  const { data: rows, isLoading } = useSapMasterData(masterType);
+  const { data: allRows, isLoading } = useSapMasterData(masterType);
 
-  const match = rows?.find((r) => r.code === value);
+  const rows = (allRows || []).filter((r) => {
+    if (!filter) return true;
+    const ex = (r.extra || {}) as Record<string, any>;
+    return Object.entries(filter).every(([k, v]) => !v || String(ex?.[k] ?? "") === String(v));
+  });
+
+  const formatExtra = (r: { extra: any }) => {
+    if (!extraLabelFields?.length) return "";
+    const ex = (r.extra || {}) as Record<string, any>;
+    const parts = extraLabelFields.map((k) => (ex?.[k] != null ? `${k}: ${ex[k]}` : null)).filter(Boolean);
+    return parts.length ? ` (${parts.join(", ")})` : "";
+  };
+
+  const match = rows.find((r) => r.code === value);
   const displayed = match
-    ? `${match.code}${match.description ? ` — ${match.description}` : ""}`
+    ? `${match.code}${match.description ? ` — ${match.description}` : ""}${formatExtra(match)}`
     : value || "";
 
   return (
