@@ -231,7 +231,13 @@ serve(async (req) => {
       summary[mapping.type] = { upserted, skipped };
     }
 
-    return ok({ success: true, summary, fetched_at: now });
+    // Also return the raw SAP F4 response so the UI can show it 1:1
+    const sapResponse: Record<string, any[]> = {};
+    for (const sapKey of Object.keys(MASTER_MAP)) {
+      sapResponse[sapKey] = Array.isArray(sapJson?.[sapKey]) ? sapJson[sapKey] : [];
+    }
+
+    return ok({ success: true, summary, fetched_at: now, sap_response: sapResponse });
   } catch (e: any) {
     console.error("sap-master-fetch error:", e?.message || e);
     return ok({ success: false, message: e?.message || "Unexpected error" }, 200);
