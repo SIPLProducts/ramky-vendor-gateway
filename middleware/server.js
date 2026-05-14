@@ -175,6 +175,13 @@ app.get("/health", (_req, res) => {
     ok: true,
     service: "sharvi-sap-middleware",
     sapTarget: SAP_BP_API_URL ? new URL(SAP_BP_API_URL).host : null,
+    timeouts: {
+      requestMs: TIMEOUT_MS,
+      connectMs: CONNECT_TIMEOUT_MS,
+      headersMs: HEADERS_TIMEOUT_MS,
+      bodyMs: BODY_TIMEOUT_MS,
+    },
+    allowInsecureTls: ALLOW_INSECURE_TLS,
     time: new Date().toISOString(),
   });
 });
