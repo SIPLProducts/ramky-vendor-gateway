@@ -76,15 +76,18 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
                     No match. Press Enter to keep "{value}".
                   </CommandEmpty>
                   <CommandGroup>
-                    {(rows || []).map((r) => (
+                    {rows.map((r) => (
                       <CommandItem
                         key={r.id}
-                        value={`${r.code} ${r.description || ""}`}
+                        value={`${r.code} ${r.description || ""} ${JSON.stringify(r.extra || {})}`}
                         onSelect={() => { onChange(r.code); setOpen(false); }}
                       >
                         <Check className={cn("mr-2 h-4 w-4", value === r.code ? "opacity-100" : "opacity-0")} />
                         <span className="font-mono">{r.code}</span>
                         {r.description && <span className="ml-2 text-muted-foreground">— {r.description}</span>}
+                        {extraLabelFields?.length ? (
+                          <span className="ml-2 text-xs text-muted-foreground">{formatExtra(r)}</span>
+                        ) : null}
                       </CommandItem>
                     ))}
                   </CommandGroup>
