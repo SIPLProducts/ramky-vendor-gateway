@@ -46,7 +46,7 @@ const schema = z.object({
   registeredCity: z.string().min(2, 'City is required'),
   registeredState: z.string().min(2, 'State is required'),
   registeredPincode: z.string().regex(/^\d{6}$/, 'Valid 6-digit pincode required'),
-  registeredPhone: z.string().optional(),
+  registeredPhone: optionalPhone,
   registeredFax: z.string().optional(),
   registeredWebsite: z.string().optional(),
   registeredEmail: z
@@ -63,8 +63,8 @@ const schema = z.object({
   manufacturingAddressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional(),
   manufacturingCity: z.string().optional(),
   manufacturingState: z.string().optional(),
-  manufacturingPincode: z.string().optional(),
-  manufacturingPhone: z.string().optional(),
+  manufacturingPincode: optionalPincode,
+  manufacturingPhone: optionalPhone,
   manufacturingFax: z.string().optional(),
   manufacturingEmail: optionalEmail,
 
@@ -75,14 +75,14 @@ const schema = z.object({
   branchAddressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional(),
   branchCity: z.string().optional(),
   branchState: z.string().optional(),
-  branchPincode: z.string().optional(),
+  branchPincode: optionalPincode,
   branchCountry: z.string().optional(),
   branchWebsite: z.string().optional(),
   branchEmail: optionalEmail,
   branchContactName: z.string().optional(),
   branchContactDesignation: z.string().optional(),
   branchContactEmail: z.string().optional(),
-  branchContactPhone: z.string().optional(),
+  branchContactPhone: optionalPhone,
   branchContactFax: z.string().optional(),
 });
 
