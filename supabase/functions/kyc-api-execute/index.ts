@@ -36,10 +36,35 @@ function substitute(template: any, vars: Record<string, any>): any {
 }
 
 function base64ToUint8(b64: string): Uint8Array {
-  const bin = atob(b64);
+  // Strip data URL prefix and any whitespace/newlines that may have crept in.
+  let cleaned = (b64 || "").trim();
+  if (cleaned.startsWith("data:") && cleaned.includes(",")) {
+    cleaned = cleaned.split(",")[1];
+  }
+  cleaned = cleaned.replace(/\s+/g, "");
+  const bin = atob(cleaned);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return arr;
+}
+
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/bmp": "bmp",
+  "image/tiff": "tiff",
+  "application/pdf": "pdf",
+};
+
+function pickFilename(originalName: string | undefined, mime: string | undefined): string {
+  const safe = (originalName || "").trim().replace(/[\r\n"\\]/g, "").replace(/\s+/g, "_");
+  if (safe && /\.[A-Za-z0-9]{2,5}$/.test(safe)) return safe;
+  const ext = MIME_EXT[(mime || "").toLowerCase()] || "bin";
+  const base = safe ? safe.replace(/\.+$/, "") : "upload";
+  return `${base}.${ext}`;
 }
 
 serve(async (req) => {
