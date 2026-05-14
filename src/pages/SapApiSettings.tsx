@@ -8,8 +8,9 @@ import {
   Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
 } from "@/components/ui/table";
 import {
-  Activity, Download, Upload, Plus, FileText, Link2, Trash2, Pencil,
+  Activity, Download, Upload, Plus, FileText, Link2, Trash2, Pencil, Database,
 } from "lucide-react";
+import { SapMasterDataTab } from "@/components/sap/SapMasterDataTab";
 import { SapConnectivityGuide } from "@/components/sap/SapConnectivityGuide";
 import { SapPayloadTemplateEditor } from "@/components/sap/SapPayloadTemplateEditor";
 import { AddSapApiConfigDialog } from "@/components/sap/AddSapApiConfigDialog";
@@ -94,6 +95,7 @@ export default function SapApiSettings() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <TabsList>
             <TabsTrigger value="configs"><FileText className="h-4 w-4 mr-2" />API Configurations</TabsTrigger>
+            <TabsTrigger value="master"><Database className="h-4 w-4 mr-2" />Master Data (F4)</TabsTrigger>
             <TabsTrigger value="template"><FileText className="h-4 w-4 mr-2" />Payload Template</TabsTrigger>
             <TabsTrigger value="guide"><Link2 className="h-4 w-4 mr-2" />SAP Connectivity Guide</TabsTrigger>
           </TabsList>
@@ -204,6 +206,10 @@ export default function SapApiSettings() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="master">
+          <SapMasterDataTab />
         </TabsContent>
 
         <TabsContent value="template">

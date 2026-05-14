@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.ocr-extract]
 verify_jwt = false
+
+[functions.sap-master-fetch]
+verify_jwt = false
