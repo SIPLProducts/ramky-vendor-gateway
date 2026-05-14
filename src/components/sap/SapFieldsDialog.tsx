@@ -55,10 +55,16 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
       })();
     }
     setF4Status({ state: 'loading', message: 'Refreshing F4 options from SAP Fields F4 API…' });
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setF4Status({ state: 'error', message: 'SAP Fields F4 API is taking longer than expected. Showing cached F4 options if available.' });
+      }
+    }, 10000);
     (async () => {
       try {
         const res = await refreshMaster.mutateAsync(undefined);
         if (cancelled) return;
+        window.clearTimeout(slowTimer);
         if (res?.success) {
           const total = Object.values(res.summary || {}).reduce((s, v: any) => s + (v.upserted || 0), 0);
           setF4Status({ state: 'success', message: `${total} F4 options refreshed from SAP.` });
@@ -66,10 +72,11 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           setF4Status({ state: 'error', message: res?.message || 'SAP Fields F4 refresh failed.' });
         }
       } catch (e: any) {
+        window.clearTimeout(slowTimer);
         if (!cancelled) setF4Status({ state: 'error', message: e?.message || 'SAP Fields F4 refresh failed.' });
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; window.clearTimeout(slowTimer); };
   }, [open, vendor]);
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
