@@ -229,6 +229,7 @@ export function useTestKycApi() {
       sampleInput?: Record<string, any>;
       fileBase64?: string;
       fileMimeType?: string;
+      fileName?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke("kyc-api-test", {
         body: payload,
