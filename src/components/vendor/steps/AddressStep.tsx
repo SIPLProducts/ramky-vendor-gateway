@@ -28,10 +28,6 @@ const numericInput = (max: number) => ({
   inputMode: 'numeric' as const,
   pattern: '\\d*',
   maxLength: max,
-  onInput: (e: React.FormEvent<HTMLInputElement>) => {
-    const el = e.currentTarget;
-    el.value = digitsOnly(el.value, max);
-  },
 });
 
 const optionalEmail = z
