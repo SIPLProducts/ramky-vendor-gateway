@@ -119,8 +119,17 @@ function renderInput(
       );
     case 'phone':
       return (
-        <Input id={id} type="tel" value={(value as string) || ''} placeholder={f.placeholder || ''} disabled={disabled}
-          onChange={(e) => setField(f.field_name, e.target.value)} />
+        <Input
+          id={id}
+          type="tel"
+          inputMode="numeric"
+          pattern="\d*"
+          maxLength={10}
+          value={(value as string) || ''}
+          placeholder={f.placeholder || '10-digit mobile number'}
+          disabled={disabled}
+          onChange={(e) => setField(f.field_name, e.target.value.replace(/\D/g, '').slice(0, 10))}
+        />
       );
     case 'date':
       return (
