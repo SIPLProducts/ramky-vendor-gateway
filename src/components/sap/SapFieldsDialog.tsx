@@ -36,6 +36,7 @@ function isMsme(v: any): boolean {
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
+  const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
     if (!open) return;
@@ -52,6 +53,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setForm(buildDefaults(vendor, data));
       })();
     }
+    // Background refresh of all F4 master values from SAP (silent)
+    refreshMaster.mutate(undefined);
     return () => { cancelled = true; };
   }, [open, vendor]);
 
