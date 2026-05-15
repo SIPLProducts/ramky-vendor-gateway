@@ -1,28 +1,51 @@
 ## Goal
-Wipe all rows from `vendor_invitations` so you can re-issue fresh invitations from the Vendor Invitations screen. Existing vendors, users, SMTP configs, approval setup, branding, and all other data stay untouched.
+Wipe all vendor submission/test data so the same email IDs (e.g., `sunilkumar@sharviinfotech.com`) can be re-invited and re-tested end-to-end. Keep all configuration, users, roles, branding, SMTP, SAP, approval matrix, and field configs untouched.
 
-## Scope
-- **Delete:** all 110 rows in `public.vendor_invitations`.
-- **Also delete (dependent, safe):** all rows in `public.invitation_email_events` (currently 0 — Resend webhook events tied to invitations). This avoids orphan rows.
-- **Do NOT touch:** `vendors` (25 rows), `profiles`, `user_roles`, `user_tenants`, `smtp_email_configs`, `tenant_branding`, `approval_matrix_*`, `audit_logs`, `sap_*`, or any other table.
+## What gets cleared
+| Table | Rows now | After |
+|---|---|---|
+| `vendors` | 25 | 0 |
+| `vendor_invitations` | 1 | 0 |
+| `vendor_documents` | 51 | 0 |
+| `vendor_validations` | 54 | 0 |
+| `vendor_approval_progress` | 25 | 0 |
+| `vendor_feedback` | 26 | 0 |
+| `ocr_extractions` | 95 | 0 |
+| `validation_api_logs` | 12 | 0 |
+| `scheduled_validations` | 8 | 0 |
+| `invitation_email_events` | 0 | 0 |
+| `audit_logs` (only rows with `vendor_id IS NOT NULL`) | — | cleared |
 
-## Will it work after clearing?
-Yes — full re-invite + vendor submission flow will continue to work on both preview and `vms.siplproducts.com`:
-1. Buyer opens Vendor Invitations → "Invite Vendor" → enters email → invitation row is created with a fresh token, `created_by` set to buyer, and `send-vendor-invitation` edge function emails the link via the buyer's SMTP config.
-2. Vendor clicks link → `/vendor/invite?token=...` → `record_invitation_access` + `claim_invitation` work because they look up by token (which is unique per new row).
-3. Vendor fills the 7-step form, submits → `notify-vendor-submission` finds `created_by` on the new invitation and notifies the buyer + CC list.
+## What is NOT touched
+- `profiles`, `user_roles`, `user_tenants`, `user_custom_roles`, `custom_roles`
+- `tenants`, `tenant_branding`
+- `smtp_email_configs`, `api_credentials`, `api_providers`, `validation_configs`
+- `approval_matrix_levels`, `approval_matrix_approvers`, `approval_workflows`, `approval_workflow_steps`, `buyer_scm_mappings`
+- `sap_*` (configs, credentials, fields, master data, payload templates, defaults)
+- `form_field_configs`, `form_step_configs`, `role_screen_permissions`, `custom_role_screen_permissions`, `portal_config`
+- All Storage buckets / uploaded files in `vendor-documents` bucket remain (DB rows pointing to them are gone). If you also want the storage objects deleted, tell me and I'll add that step.
 
-No code, RLS, edge function, or schema change is required. The recent fix that backfills `created_by` on send remains in place, so new invitations will always carry the buyer link.
+## Will it work after?
+Yes. After the wipe:
+1. Buyer (Sunil) → Vendor Invitations → "+ New Invitation" with the same email → fresh token → email goes via buyer SMTP (existing send-vendor-invitation logic, unchanged).
+2. Vendor opens link → registers → 7-step form → Submit.
+3. Approval pipeline (SCM Manager → SCM Head → Finance 1 → Finance 2 → SAP Sync) runs as configured — approval matrix and approver mappings are preserved.
 
-## Caveats
-- Any vendor who already received an old invitation link will get "Invitation not found" if they click it after the wipe. They must be re-invited.
-- The 25 existing `vendors` rows remain. If a vendor was invited before, completed registration, and you re-invite the same email, they can still register again (a new invite + new submission path); existing vendor records are not affected.
-- This runs against the **same Lovable Cloud database** used by both preview and `vms.siplproducts.com` (single backend). The clear applies to both immediately — that is expected and is what you asked for.
+No code, RLS, edge function, schema, or config changes. Single backend powers both preview and `vms.siplproducts.com`, so the reset applies to both — that is what you asked for.
 
-## Execution (after you approve)
-Two `DELETE` statements via the data tool:
+## Execution (after approval)
+One transactional batch via the data tool, in dependency-safe order:
 ```sql
 DELETE FROM public.invitation_email_events;
+DELETE FROM public.vendor_feedback;
+DELETE FROM public.vendor_documents;
+DELETE FROM public.vendor_validations;
+DELETE FROM public.vendor_approval_progress;
+DELETE FROM public.ocr_extractions;
+DELETE FROM public.validation_api_logs;
+DELETE FROM public.scheduled_validations;
+DELETE FROM public.audit_logs WHERE vendor_id IS NOT NULL;
 DELETE FROM public.vendor_invitations;
+DELETE FROM public.vendors;
 ```
-Then a quick `SELECT COUNT(*)` to confirm both are 0. No file edits, no migration, no edge function redeploy.
+Then a `SELECT count(*)` per table to confirm zeros.
