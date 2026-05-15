@@ -188,12 +188,13 @@ serve(async (req) => {
       action,
     });
 
+    // Reply-To is taken from the No-Reply Email Configuration (portal_config.smtp_reply_to)
+    // by send-smtp-email when suppressReplyTo is not set.
     const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-smtp-email", {
       body: {
         to: profile.email,
         subject,
         html,
-        suppressReplyTo: true,
       },
     });
     if (sendErr) throw sendErr;
