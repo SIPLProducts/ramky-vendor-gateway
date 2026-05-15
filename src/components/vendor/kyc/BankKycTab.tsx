@@ -42,6 +42,7 @@ interface BankKycTabProps {
   vendorId?: string;
   gstLegalName?: string;
   panHolderName?: string;
+  msmeEnterpriseName?: string;
 }
 
 function pickString(v: any): string {
