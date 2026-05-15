@@ -239,7 +239,7 @@ export function BrandingConfig({ tenantId, tenantName }: BrandingConfigProps) {
                 <Input
                   value={formData.help_phone}
                   onChange={(e) => handleChange('help_phone', e.target.value)}
-                  placeholder="+91 1234567890"
+                  placeholder="10-digit number"
                 />
               </div>
               <div className="space-y-2">

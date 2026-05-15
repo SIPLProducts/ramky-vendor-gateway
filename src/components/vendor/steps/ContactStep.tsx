@@ -99,7 +99,7 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
             {show('ceoPhone') && (
               <div className="grid gap-1.5">
                 <Label htmlFor="ceoPhone">Contact Number 1 *</Label>
-                <Input id="ceoPhone" {...phoneField('ceoPhone')} placeholder="+91 XXXXX XXXXX" className={errors.ceoPhone ? 'border-destructive' : ''} />
+                <Input id="ceoPhone" {...phoneField('ceoPhone')} placeholder="10-digit mobile number" className={errors.ceoPhone ? 'border-destructive' : ''} />
                 {errors.ceoPhone && <p className="text-xs text-destructive">{errors.ceoPhone.message}</p>}
               </div>
             )}
@@ -115,7 +115,7 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
             {show('ceoPhone2') && (
               <div className="grid gap-1.5">
                 <Label htmlFor="ceoPhone2">Contact Number 2</Label>
-                <Input id="ceoPhone2" {...phoneField('ceoPhone2')} placeholder="+91 XXXXX XXXXX (optional)" />
+                <Input id="ceoPhone2" {...phoneField('ceoPhone2')} placeholder="10-digit mobile number (optional)" />
               </div>
             )}
             {show('ceoEmail2') && (
@@ -138,7 +138,7 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
               {show('marketingDesignation') && <div className="grid gap-1.5"><Label htmlFor="marketingDesignation">Designation</Label><Input id="marketingDesignation" {...register('marketingDesignation')} placeholder="Sales Manager" /></div>}
             </div>
             <div className="grid md:grid-cols-2 gap-5">
-              {show('marketingPhone') && <div className="grid gap-1.5"><Label htmlFor="marketingPhone">Contact Number</Label><Input id="marketingPhone" {...phoneField('marketingPhone')} placeholder="+91 XXXXX XXXXX" /></div>}
+              {show('marketingPhone') && <div className="grid gap-1.5"><Label htmlFor="marketingPhone">Contact Number</Label><Input id="marketingPhone" {...phoneField('marketingPhone')} placeholder="10-digit mobile number" /></div>}
               {show('marketingEmail') && <div className="grid gap-1.5"><Label htmlFor="marketingEmail">Email Address</Label><Input id="marketingEmail" type="email" {...register('marketingEmail')} placeholder="email@company.com" /></div>}
             </div>
           </div>
@@ -154,7 +154,7 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
               {show('productionDesignation') && <div className="grid gap-1.5"><Label htmlFor="productionDesignation">Designation</Label><Input id="productionDesignation" {...register('productionDesignation')} placeholder="Production Manager" /></div>}
             </div>
             <div className="grid md:grid-cols-2 gap-5">
-              {show('productionPhone') && <div className="grid gap-1.5"><Label htmlFor="productionPhone">Contact Number</Label><Input id="productionPhone" {...phoneField('productionPhone')} placeholder="+91 XXXXX XXXXX" /></div>}
+              {show('productionPhone') && <div className="grid gap-1.5"><Label htmlFor="productionPhone">Contact Number</Label><Input id="productionPhone" {...phoneField('productionPhone')} placeholder="10-digit mobile number" /></div>}
               {show('productionEmail') && <div className="grid gap-1.5"><Label htmlFor="productionEmail">Email Address</Label><Input id="productionEmail" type="email" {...register('productionEmail')} placeholder="email@company.com" /></div>}
             </div>
           </div>
@@ -170,7 +170,7 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
               {show('customerServiceDesignation') && <div className="grid gap-1.5"><Label htmlFor="customerServiceDesignation">Designation</Label><Input id="customerServiceDesignation" {...register('customerServiceDesignation')} placeholder="Customer Service Head" /></div>}
             </div>
             <div className="grid md:grid-cols-2 gap-5">
-              {show('customerServicePhone') && <div className="grid gap-1.5"><Label htmlFor="customerServicePhone">Contact Number</Label><Input id="customerServicePhone" {...phoneField('customerServicePhone')} placeholder="+91 XXXXX XXXXX" /></div>}
+              {show('customerServicePhone') && <div className="grid gap-1.5"><Label htmlFor="customerServicePhone">Contact Number</Label><Input id="customerServicePhone" {...phoneField('customerServicePhone')} placeholder="10-digit mobile number" /></div>}
               {show('customerServiceEmail') && <div className="grid gap-1.5"><Label htmlFor="customerServiceEmail">Email Address</Label><Input id="customerServiceEmail" type="email" {...register('customerServiceEmail')} placeholder="email@company.com" /></div>}
             </div>
           </div>
