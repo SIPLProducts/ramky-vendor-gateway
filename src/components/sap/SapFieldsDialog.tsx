@@ -209,6 +209,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             </Section>
 
           </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 mt-4 pt-4 border-t">
