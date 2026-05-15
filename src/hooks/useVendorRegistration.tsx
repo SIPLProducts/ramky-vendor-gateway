@@ -778,23 +778,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       });
 
       // Notify the inviter that the vendor has resubmitted (best-effort)
+      let notifyResult: any = null;
       try {
-        await supabase.functions.invoke('notify-vendor-submission', {
+        const { data: notifyData } = await supabase.functions.invoke('notify-vendor-submission', {
           body: { vendorId, resubmission: true },
         });
+        notifyResult = notifyData;
       } catch (notifyError) {
         console.error('[Vendor] Failed to send resubmission notification:', notifyError);
       }
 
       setVendorStatus('validation_pending');
       await refetchVendor();
-      return data;
+      return { ...data, _notify: notifyResult } as typeof data & { _notify: any };
     },
     onSuccess: () => {
-      toast({
-        title: 'Registration Resubmitted',
-        description: 'Your updated registration has been submitted for verification.',
-      });
+      // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
     },
     onError: (error) => {
       toast({
