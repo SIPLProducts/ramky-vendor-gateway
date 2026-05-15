@@ -229,7 +229,7 @@ export function ApprovalMatrixConfig() {
     let nextLevel = 1;
     if (activeStage === 'SCM_MANAGER') {
       const scm = rows.filter((r) => r.stage === 'SCM_MANAGER');
-      nextLevel = scm.length === 0 ? 1 : Math.max(...scm.map((r) => r.level_number));
+      nextLevel = scm.length === 0 ? 1 : Math.max(...scm.map((r) => r.level_number)) + 1;
     }
     setRows((prev) => [
       ...prev,
@@ -319,6 +319,21 @@ export function ApprovalMatrixConfig() {
     }
     setSaving(true);
     try {
+      // Step 1: park existing levels out of the way (level_number + 10000) so renumbering
+      // never collides with rows that still occupy the target slots.
+      const { data: existingLevels, error: fetchErr } = await supabase
+        .from('approval_matrix_levels')
+        .select('id, level_number')
+        .eq('tenant_id', tenantId);
+      if (fetchErr) throw new Error(`Could not reserve level numbers: ${fetchErr.message}`);
+      for (const lv of existingLevels ?? []) {
+        const { error: upErr } = await supabase
+          .from('approval_matrix_levels')
+          .update({ level_number: 10000 + lv.level_number })
+          .eq('id', lv.id);
+        if (upErr) throw new Error(`Could not reserve level numbers: ${upErr.message}`);
+      }
+
       const keptLevelIds: string[] = [];
       let savedApprovers = 0;
       for (const grp of savePlan) {
@@ -339,7 +354,7 @@ export function ApprovalMatrixConfig() {
         } else {
           const { data, error } = await supabase
             .from('approval_matrix_levels')
-            .upsert(levelPayload, { onConflict: 'tenant_id,level_number' })
+            .insert(levelPayload)
             .select('id')
             .single();
           if (error) throw error;
