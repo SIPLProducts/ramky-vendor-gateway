@@ -319,18 +319,8 @@ export function ApprovalMatrixConfig() {
     }
     setSaving(true);
     try {
-      // Step 1: park existing levels out of the way to free L1..Ln slots before renumbering
-      const { error: parkErr } = await supabase.rpc as any; // placeholder to keep types
-      const { error: offsetErr } = await supabase
-        .from('approval_matrix_levels')
-        .update({ level_number: 10000 })
-        .eq('tenant_id', tenantId)
-        .gte('level_number', 0); // dummy filter, will be replaced below
-      // The single-column update above can't add per-row; use raw SQL via rpc-like approach.
-      // Fallback: fetch ids, then bulk update with offsets.
-      if (offsetErr) {
-        // ignore — handled by per-row offset below
-      }
+      // Step 1: park existing levels out of the way (level_number + 10000) so renumbering
+      // never collides with rows that still occupy the target slots.
       const { data: existingLevels, error: fetchErr } = await supabase
         .from('approval_matrix_levels')
         .select('id, level_number')
