@@ -219,8 +219,11 @@ export function ComplianceStep({
     const udyam = pickStr(d.udyam_number);
     if (udyam) setValue('msmeNumber' as any, udyam);
 
-    const enterpriseName = pickStr(d.enterprise_name || d.legal_name);
-    if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
+    const enterpriseName = pickStr(d.enterprise_name || d.legal_name || d.name_of_enterprise);
+    if (enterpriseName) {
+      setValue('msmeEnterpriseName' as any, enterpriseName);
+      setMsmeEnterpriseName(enterpriseName);
+    }
     const enterpriseType = pickStr(d.enterprise_type);
     if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
     const classificationYear = pickStr(d.classification_year);
