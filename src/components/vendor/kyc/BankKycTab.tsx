@@ -88,6 +88,14 @@ export function BankKycTab(props: BankKycTabProps) {
     const panOk = panScore >= NAME_MATCH_THRESHOLD;
     const gstOk = gstScore >= NAME_MATCH_THRESHOLD;
 
+    const refsLabel = props.panHolderName && props.gstLegalName
+      ? 'PAN Holder Name and GST Legal Name'
+      : props.panHolderName
+        ? 'PAN Holder Name'
+        : props.gstLegalName
+          ? 'GST Legal Name'
+          : '';
+
     let nameMessage = '';
     if (apiName && (props.gstLegalName || props.panHolderName)) {
       if (panOk && gstOk) {
