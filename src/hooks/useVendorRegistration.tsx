@@ -141,7 +141,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     }
   };
 
-  // Upload all documents for a vendor
+  // Upload all documents for a vendor (deduplicated by vendor_id + document_type)
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
     const documentsToUpload: { file: File | null; type: DocumentType }[] = [
       { file: formData.statutory.gstCertificateFile, type: 'gst_certificate' },
@@ -155,12 +155,36 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
     ];
 
+    // Fetch existing docs once to dedupe
+    const { data: existingDocs } = await supabase
+      .from('vendor_documents')
+      .select('id, document_type, file_name, file_size, file_path')
+      .eq('vendor_id', vendorIdForUpload);
+    const existingByType = new Map<string, { id: string; file_name: string; file_size: number | null; file_path: string }>();
+    (existingDocs || []).forEach((d: any) => existingByType.set(d.document_type, d));
+
     for (const doc of documentsToUpload) {
-      if (doc.file) {
-        const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
-        if (result) {
-          await saveDocumentMetadata(vendorIdForUpload, result);
+      if (!doc.file) continue;
+      const existing = existingByType.get(doc.type);
+
+      // Same file already uploaded → skip entirely
+      if (existing && existing.file_name === doc.file.name && existing.file_size === doc.file.size) {
+        continue;
+      }
+
+      // Different file (replacement) → remove old storage object + row first
+      if (existing) {
+        try {
+          await supabase.storage.from('vendor-documents').remove([existing.file_path]);
+        } catch (e) {
+          console.warn('Failed to remove old storage object:', e);
         }
+        await supabase.from('vendor_documents').delete().eq('id', existing.id);
+      }
+
+      const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
+      if (result) {
+        await saveDocumentMetadata(vendorIdForUpload, result);
       }
     }
   };
