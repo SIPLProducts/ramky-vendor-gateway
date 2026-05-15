@@ -13,7 +13,7 @@ import { FileUp, Award } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { KycTabs, KycStatus } from '@/components/vendor/kyc/KycTabs';
 import { GstKycTab } from '@/components/vendor/kyc/GstKycTab';
-import { PanKycTab } from '@/components/vendor/kyc/PanKycTab';
+import { PanKycTab, type PanTabResult } from '@/components/vendor/kyc/PanKycTab';
 import { MsmeKycTab } from '@/components/vendor/kyc/MsmeKycTab';
 import { BankKycTab } from '@/components/vendor/kyc/BankKycTab';
 import {
