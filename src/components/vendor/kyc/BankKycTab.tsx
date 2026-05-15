@@ -41,6 +41,7 @@ interface BankKycTabProps {
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed') => void;
   vendorId?: string;
   gstLegalName?: string;
+  gstTradeName?: string;
   panHolderName?: string;
   msmeEnterpriseName?: string;
 }
@@ -90,6 +91,7 @@ export function BankKycTab(props: BankKycTabProps) {
 
     const nameEval = evaluateCrossNameMatch(apiName, [
       { field: 'GST Legal Name', value: props.gstLegalName },
+      { field: 'GST Trade Name', value: props.gstTradeName },
       { field: 'PAN Holder Name', value: props.panHolderName },
       { field: 'MSME Enterprise Name', value: props.msmeEnterpriseName },
     ]);

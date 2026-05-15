@@ -127,6 +127,7 @@ export function ComplianceStep({
   // legal name; PAN tab then yields the holder name used to validate MSME
   // enterprise name and Bank account holder name.
   const [gstLegalName, setGstLegalName] = useState<string | undefined>();
+  const [gstTradeName, setGstTradeName] = useState<string | undefined>();
   const [gstPanNumber, setGstPanNumber] = useState<string | undefined>();
   const [panHolderName, setPanHolderName] = useState<string | undefined>();
   const [msmeEnterpriseName, setMsmeEnterpriseName] = useState<string | undefined>();
@@ -189,8 +190,10 @@ export function ComplianceStep({
       // Pre-fill the PAN field so the PAN tab already shows the registry value.
       setValue('pan', panFromGst);
     }
-    const legalFromGst = pickStr(d.legal_name || d.business_name || d.trade_name).trim();
+    const legalFromGst = pickStr(d.legal_name).trim();
     if (legalFromGst) setGstLegalName(legalFromGst);
+    const tradeFromGst = pickStr(d.trade_name || d.business_name).trim();
+    if (tradeFromGst) setGstTradeName(tradeFromGst);
   };
 
   const handlePanVerified = (d: Record<string, any>) => {
@@ -387,6 +390,7 @@ export function ComplianceStep({
             vendorId={vendorId}
             gstPanNumber={gstPanNumber}
             gstLegalName={gstLegalName}
+            gstTradeName={gstTradeName}
             gstVerified={statuses.gst === 'passed'}
             msmeEnterpriseName={msmeEnterpriseName}
             bankAccountHolderName={bankAccountHolderName}
@@ -413,6 +417,7 @@ export function ComplianceStep({
             vendorId={vendorId}
             panHolderName={panHolderName}
             gstLegalName={gstLegalName}
+            gstTradeName={gstTradeName}
             bankAccountHolderName={bankAccountHolderName}
           />
         }
@@ -427,6 +432,7 @@ export function ComplianceStep({
             onStatusChange={(s) => setStatus('bank', s)}
             vendorId={vendorId}
             gstLegalName={gstLegalName}
+            gstTradeName={gstTradeName}
             panHolderName={panHolderName}
             msmeEnterpriseName={msmeEnterpriseName}
           />
