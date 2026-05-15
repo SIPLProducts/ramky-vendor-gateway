@@ -175,12 +175,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     setEnterpriseName(apiName);
 
     const check = checkEnterpriseName(apiName);
+    setEnterpriseCheckMessage(check.message);
     if (check.status === 'failed') {
       setEnterpriseCheck('failed');
       setMismatchOpen(true);
       return { ok: false, message: check.message, apiData: merged };
     }
-    if (check.status !== 'skipped') setEnterpriseCheck(check.status);
+    setEnterpriseCheck(check.status === 'skipped' ? 'skipped' : 'passed');
 
     const cat = pick(merged.enterprise_type).toLowerCase();
     if (cat === 'micro' || cat === 'small' || cat === 'medium') {
@@ -193,13 +194,6 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       apiData: merged,
     };
   };
-
-  const checkMessage = (() => {
-    if (enterpriseCheck === 'pan') return 'Enterprise Name verified with PAN Holder Name.';
-    if (enterpriseCheck === 'failed')
-      return 'Enterprise Name does not match PAN Holder Name.';
-    return '';
-  })();
 
   return (
     <div className="space-y-5">
