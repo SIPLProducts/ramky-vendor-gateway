@@ -113,6 +113,13 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
+          {f4Status.state === 'loading' ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-sm font-medium">Calling SAP Fields F4 API…</div>
+              <div className="text-xs">Please wait while we fetch the latest dropdown options from SAP.</div>
+            </div>
+          ) : (
           <div className="space-y-6 py-2">
             {/* Vendor Information (read-only) */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Information">
