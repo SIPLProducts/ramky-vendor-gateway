@@ -16,9 +16,12 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { toastKycResult } from '@/lib/kycToast';
 import { lookupIfsc, isValidIfsc } from '@/lib/ifscLookup';
-import { nameMatchPercentage } from '@/lib/nameMatch';
+import {
+  evaluateCrossNameMatch,
+  formatCrossMatchSuccess,
+  formatCrossMatchFailure,
+} from '@/lib/nameMatch';
 
-const NAME_MATCH_THRESHOLD = 40;
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 
 interface BankKycTabProps {
