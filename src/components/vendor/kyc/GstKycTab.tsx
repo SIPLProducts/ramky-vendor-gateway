@@ -172,17 +172,28 @@ export function GstKycTab(props: GstKycTabProps) {
       };
     }
 
-    // GST registry is the source of truth — no user-entered name comparison here.
-    // Cross-checks against the holder name are performed on the PAN/MSME/Bank tabs.
+    // GST registry is the source of truth for the GSTIN. The Legal Name is
+    // additionally cross-checked against any other already-verified names
+    // (PAN / MSME / Bank). On a typical first-tab run there are no refs and
+    // we simply skip the check.
     const apiName = String(merged.legal_name || merged.business_name || merged.trade_name || '').trim();
+    setVerifiedLegalName(apiName);
+    const check = evalLegalName(apiName);
+    setLegalNameCheck(check.status);
+    setLegalNameCheckMessage(check.message);
 
-    // Commit the registry GSTIN to the form (covers OCR misreads of single chars)
-    // and pass the merged record up so missing fields auto-populate.
     if (apiGstin) props.onGstinChange(apiGstin);
+
+    if (check.status === 'failed') {
+      // Surface failure via setState so the OCR component renders the error.
+      setState({ status: 'failed', message: check.message, data: merged });
+      return { ok: false, message: check.message, apiData: merged, apiResult: verify };
+    }
+
     props.onVerifiedDetails?.(merged);
     return {
       ok: true,
-      message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
+      message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
       apiData: merged,
       apiResult: verify,
     };
