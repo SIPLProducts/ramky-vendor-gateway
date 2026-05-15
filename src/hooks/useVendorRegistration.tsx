@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -122,18 +122,21 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     };
   };
 
-  // Save document metadata to vendor_documents table
+  // Save document metadata to vendor_documents table (atomic upsert against unique index)
   const saveDocumentMetadata = async (vendorIdForDoc: string, doc: DocumentUploadResult) => {
     const { error } = await supabase
       .from('vendor_documents')
-      .insert({
-        vendor_id: vendorIdForDoc,
-        document_type: doc.documentType,
-        file_name: doc.fileName,
-        file_path: doc.filePath,
-        file_size: doc.fileSize,
-        mime_type: doc.mimeType,
-      });
+      .upsert(
+        {
+          vendor_id: vendorIdForDoc,
+          document_type: doc.documentType,
+          file_name: doc.fileName,
+          file_path: doc.filePath,
+          file_size: doc.fileSize,
+          mime_type: doc.mimeType,
+        },
+        { onConflict: 'vendor_id,document_type' }
+      );
 
     if (error) {
       console.error(`Failed to save document metadata for ${doc.documentType}:`, error);
@@ -141,51 +144,68 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     }
   };
 
+  // Serialize concurrent upload runs (autosave + manual save) to avoid races on the
+  // unique index (vendor_id, document_type).
+  const uploadInFlight = useRef<Promise<void> | null>(null);
+
   // Upload all documents for a vendor (deduplicated by vendor_id + document_type)
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
-    const documentsToUpload: { file: File | null; type: DocumentType }[] = [
-      { file: formData.statutory.gstCertificateFile, type: 'gst_certificate' },
-      { file: formData.statutory.gstSelfDeclarationFile, type: 'gst_self_declaration' },
-      { file: formData.statutory.panCardFile, type: 'pan_card' },
-      { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
-      { file: formData.statutory.msmeSelfDeclarationFile ?? null, type: 'msme_self_declaration' },
-      { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
-      { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
-      { file: formData.financial.financialDocsFile, type: 'financial_docs' },
-      { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
-    ];
+    if (uploadInFlight.current) {
+      try { await uploadInFlight.current; } catch { /* swallow prior error */ }
+    }
 
-    // Fetch existing docs once to dedupe
-    const { data: existingDocs } = await supabase
-      .from('vendor_documents')
-      .select('id, document_type, file_name, file_size, file_path')
-      .eq('vendor_id', vendorIdForUpload);
-    const existingByType = new Map<string, { id: string; file_name: string; file_size: number | null; file_path: string }>();
-    (existingDocs || []).forEach((d: any) => existingByType.set(d.document_type, d));
+    const run = async () => {
+      const documentsToUpload: { file: File | null; type: DocumentType }[] = [
+        { file: formData.statutory.gstCertificateFile, type: 'gst_certificate' },
+        { file: formData.statutory.gstSelfDeclarationFile, type: 'gst_self_declaration' },
+        { file: formData.statutory.panCardFile, type: 'pan_card' },
+        { file: formData.statutory.msmeCertificateFile, type: 'msme_certificate' },
+        { file: formData.statutory.msmeSelfDeclarationFile ?? null, type: 'msme_self_declaration' },
+        { file: formData.bank.cancelledChequeFile, type: 'cancelled_cheque' },
+        { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
+        { file: formData.financial.financialDocsFile, type: 'financial_docs' },
+        { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
+      ];
 
-    for (const doc of documentsToUpload) {
-      if (!doc.file) continue;
-      const existing = existingByType.get(doc.type);
+      // Fetch existing docs once to dedupe
+      const { data: existingDocs } = await supabase
+        .from('vendor_documents')
+        .select('id, document_type, file_name, file_size, file_path')
+        .eq('vendor_id', vendorIdForUpload);
+      const existingByType = new Map<string, { id: string; file_name: string; file_size: number | null; file_path: string }>();
+      (existingDocs || []).forEach((d: any) => existingByType.set(d.document_type, d));
 
-      // Same file already uploaded → skip entirely
-      if (existing && existing.file_name === doc.file.name && existing.file_size === doc.file.size) {
-        continue;
-      }
+      for (const doc of documentsToUpload) {
+        if (!doc.file) continue;
+        const existing = existingByType.get(doc.type);
 
-      // Different file (replacement) → remove old storage object + row first
-      if (existing) {
-        try {
-          await supabase.storage.from('vendor-documents').remove([existing.file_path]);
-        } catch (e) {
-          console.warn('Failed to remove old storage object:', e);
+        // Same file already uploaded → skip entirely
+        if (existing && existing.file_name === doc.file.name && existing.file_size === doc.file.size) {
+          continue;
         }
-        await supabase.from('vendor_documents').delete().eq('id', existing.id);
-      }
 
-      const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
-      if (result) {
-        await saveDocumentMetadata(vendorIdForUpload, result);
+        // Different file (replacement) → remove old storage object first.
+        // The metadata row is updated atomically via upsert below (no manual delete).
+        if (existing) {
+          try {
+            await supabase.storage.from('vendor-documents').remove([existing.file_path]);
+          } catch (e) {
+            console.warn('Failed to remove old storage object:', e);
+          }
+        }
+
+        const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
+        if (result) {
+          await saveDocumentMetadata(vendorIdForUpload, result);
+        }
       }
+    };
+
+    uploadInFlight.current = run();
+    try {
+      await uploadInFlight.current;
+    } finally {
+      uploadInFlight.current = null;
     }
   };
 
