@@ -14,9 +14,12 @@ import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKyc
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { toastKycResult } from '@/lib/kycToast';
-import { nameMatchPercentage } from '@/lib/nameMatch';
+import {
+  evaluateCrossNameMatch,
+  formatCrossMatchSuccess,
+  formatCrossMatchFailure,
+} from '@/lib/nameMatch';
 
-const NAME_MATCH_THRESHOLD = 40;
 import {
   AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
