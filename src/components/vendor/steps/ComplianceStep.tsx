@@ -129,6 +129,8 @@ export function ComplianceStep({
   const [gstLegalName, setGstLegalName] = useState<string | undefined>();
   const [gstPanNumber, setGstPanNumber] = useState<string | undefined>();
   const [panHolderName, setPanHolderName] = useState<string | undefined>();
+  const [msmeEnterpriseName, setMsmeEnterpriseName] = useState<string | undefined>();
+  const [bankAccountHolderName, setBankAccountHolderName] = useState<string | undefined>();
   const setStatus = (k: keyof typeof statuses, s: KycStatus) =>
     setStatuses((prev) => (prev[k] === s ? prev : { ...prev, [k]: s }));
 
