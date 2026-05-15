@@ -413,6 +413,7 @@ export function ComplianceStep({
             vendorId={vendorId}
             panHolderName={panHolderName}
             gstLegalName={gstLegalName}
+            bankAccountHolderName={bankAccountHolderName}
           />
         }
         bank={
