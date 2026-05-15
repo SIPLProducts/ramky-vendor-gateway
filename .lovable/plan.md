@@ -1,37 +1,38 @@
-## Issues
+## What I found
 
-1. **Bank tab — wrong message text.** `BankKycTab.tsx` always says *"Account Holder Name does not match with the provided PAN/MSME details"*. MSME is never used in the comparison (bank is matched only against PAN holder name + GST legal name), and when GST is "No" the message still mentions PAN/MSME.
-2. **PAN tab — verified message disappears on tab switch.** `PanKycTab.tsx` keeps its OCR result (`ocrPan`, `ocrName`, `panCheck`, `nameCheck`) in **local component state**. `KycTabs` uses Radix `<TabsContent>`, which unmounts inactive tabs, so leaving PAN and coming back wipes the green "PAN Number verified / PAN Holder Name verified" panel even though the field-level status is still "passed".
+- The latest submitted vendor is **Brickwork Ratings India Private Limited** with reference **130dc9ef-70b8-4c05-8f84-12558af5d169**.
+- It was submitted successfully at **15 May 2026 06:14 UTC** and status is **SCM Manager Review**.
+- The email did not go to the buyer because the submitted vendor row has **no invitation_id**, so the notification function cannot find the buyer who invited the vendor.
+- The invitation token shown in the screenshot exists, but its `created_by` is also empty, so even if linked later, the system still cannot know which buyer should receive the mail.
+- The current submit flow calls `notify-vendor-submission` **before** the invitation is claimed/linked in one place, and the hook does not include `invitation_id` when creating/updating the vendor.
 
-## Fix
+## Plan
 
-### 1. Dynamic mismatch message in `src/components/vendor/kyc/BankKycTab.tsx`
+1. **Persist invitation link on vendor save**
+   - When vendor opens registration using an invitation token, look up the invitation and save its `id` into the vendor record as `invitation_id`.
+   - This ensures the submitted vendor is permanently connected to the invitation.
 
-- Build the reference list from whatever sources actually exist:
-  - Both `panHolderName` and `gstLegalName` present → "PAN Holder Name and GST Legal Name"
-  - Only `panHolderName` (GST = No) → "PAN Holder Name"
-  - Only `gstLegalName` (rare) → "GST Legal Name"
-- Use that string in **both** places that currently say "PAN/MSME details":
-  - line 107 (`finalizePennyDrop` failure return)
-  - line 297 (rendered failed-state panel)
-- Remove the word "MSME" from these messages entirely (MSME is not used in bank name matching).
+2. **Fix notification timing**
+   - In the vendor submission flow, claim/link the invitation before sending the buyer notification email.
+   - Avoid duplicate/non-blocking claim logic in the page and hook so the order is reliable.
 
-### 2. Persist PAN tab OCR result across tab switches
+3. **Make the notification function more resilient**
+   - If `vendors.invitation_id` is missing, fall back to finding an invitation by `vendor_id`.
+   - If the invitation has no `created_by`, return a clear skipped reason and log it.
 
-Lift the four pieces of state out of `PanKycTab.tsx` so they survive remounts:
+4. **Fix invitation creation ownership**
+   - Check the invitation creation function/page and make sure new invitations store the logged-in buyer as `created_by`.
+   - This is required because the notification email is sent to the inviter’s profile email.
 
-- Add new optional props on `PanKycTab`:
-  - `ocrPan`, `ocrName`, `panCheck`, `nameCheck`
-  - `onOcrResultChange(result: { ocrPan, ocrName, panCheck, nameCheck })`
-- Replace internal `useState` calls with controlled values from props (fall back to local state only if parent doesn't pass them, to keep the component reusable).
-- In `src/components/vendor/steps/ComplianceStep.tsx`:
-  - Add a `panTabResult` state (`{ ocrPan, ocrName, panCheck, nameCheck }`, default empty/idle).
-  - Pass it + `onOcrResultChange={setPanTabResult}` to `<PanKycTab>`.
-- Result: navigating PAN → MSME → Bank → back to PAN keeps the green "PAN Number verified with GST PAN Number" / "PAN Holder Name verified with GST Legal Name" rows visible.
+5. **Add buyer/admin visibility for submitted vendors**
+   - Ensure submitted vendors are visible in the normal review lists so you can verify submission even if email fails.
+   - Add or surface audit logs/status messages showing: vendor submitted, notification attempted, notification sent/skipped/failed.
 
-No changes to API calls, validation logic, or other tabs.
+6. **Validate with backend data/logs**
+   - Confirm a submitted vendor has `invitation_id`.
+   - Confirm the invitation has `created_by` and maps to the buyer profile email.
+   - Confirm `notify-vendor-submission` invokes `send-smtp-email` and records an audit log.
 
-## Files touched
-- `src/components/vendor/kyc/BankKycTab.tsx` — dynamic mismatch text (2 spots).
-- `src/components/vendor/kyc/PanKycTab.tsx` — accept controlled OCR-result props; emit changes upward.
-- `src/components/vendor/steps/ComplianceStep.tsx` — hold `panTabResult` state and wire it into `<PanKycTab>`.
+## Immediate note for this current vendor
+
+For the current submitted vendor, the database confirms the vendor submitted successfully, but the invitation/buyer link is missing. After the fix, new submissions will notify correctly. Existing broken records may need a one-time data correction if you want this specific vendor linked back to the buyer invitation.
