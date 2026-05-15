@@ -15,7 +15,12 @@ import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
 import { toastKycResult } from "@/lib/kycToast";
 import { lookupIfsc, isValidIfsc } from "@/lib/ifscLookup";
-import { nameMatchPercentage } from "@/lib/nameMatch";
+import {
+  nameMatchPercentage,
+  evaluateCrossNameMatch,
+  formatCrossMatchSuccess,
+  formatCrossMatchFailure,
+} from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
@@ -662,21 +667,20 @@ export function DocumentVerificationStep({
         mobile: pickStr(registry.mobile) || ocr.mobile,
         email: pickStr(registry.email) || ocr.email,
       };
-      // Cross-check: Enterprise Name vs PAN Holder Name (>=40% match).
-      // GST may be skipped via Self-Declaration so it is no longer used here.
+      // Cross-check: Enterprise Name vs ANY of GST Legal / PAN Holder / Bank
+      // Account Holder names (>=20% to pass against any one).
       const msmeName = String(normalized.enterprise_name || "").trim();
-      const panHolderName = String(
-        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
-      ).trim();
-      if (msmeName && panHolderName) {
-        const score = nameMatchPercentage(msmeName, panHolderName);
-        if (score < 40) {
-          return {
-            ok: false as const,
-            message: "Enterprise Name does not match with PAN Holder Name.",
-            isNameMismatch: true,
-          } as any;
-        }
+      const evalRes = evaluateCrossNameMatch(msmeName, [
+        { field: "GST Legal Name", value: gstDoc.ocrData?.legal_name },
+        { field: "PAN Holder Name", value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
+        { field: "Bank Account Holder Name", value: bankDoc.ocrData?.account_holder_name },
+      ]);
+      if (!evalRes.skipped && !evalRes.passed) {
+        return {
+          ok: false as const,
+          message: formatCrossMatchFailure("Enterprise Name", evalRes.best),
+          isNameMismatch: true,
+        } as any;
       }
       return {
         ok: true as const,
@@ -767,34 +771,32 @@ export function DocumentVerificationStep({
       d.full_name || d.name_at_bank || rawData.full_name || "",
     ).trim();
 
-    // Conditional name match (>=40% threshold against any required source):
-    //   GST=Yes  → check GST Legal Name + PAN Holder Name (+ MSME if registered)
-    //   GST=No, MSME=Yes → check PAN Holder Name + MSME Enterprise Name
-    //   GST=No, MSME=No  → check PAN Holder Name only
+    // Cross-field match: Account Holder Name vs ANY of GST Legal / PAN Holder
+    // / MSME Enterprise names (>=20% against any one).
     const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
     const panHolderName = String(
       panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
     ).trim();
     const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
 
-    const refs: { label: string; value: string }[] = [];
-    if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
-    if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
-    if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
-
     let holderNameStatus: "passed" | "none" = "none";
     let holderNameMessage = "";
-    if (nameAtBank && refs.length > 0) {
-      const scores = refs.map((r) => ({ ...r, score: nameMatchPercentage(nameAtBank, r.value) }));
-      const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
-      if (best.score < 40) {
-        return {
-          ok: false as const,
-          message: "Account Holder Name does not match with the provided PAN/MSME details.",
-        };
+    if (nameAtBank) {
+      const evalRes = evaluateCrossNameMatch(nameAtBank, [
+        { field: "GST Legal Name", value: gstLegalName },
+        { field: "PAN Holder Name", value: panHolderName },
+        { field: "MSME Enterprise Name", value: msmeEnterpriseName },
+      ]);
+      if (!evalRes.skipped) {
+        if (!evalRes.passed) {
+          return {
+            ok: false as const,
+            message: formatCrossMatchFailure("Account Holder Name", evalRes.best),
+          };
+        }
+        holderNameStatus = "passed";
+        holderNameMessage = formatCrossMatchSuccess("Account Holder Name", evalRes.matches);
       }
-      holderNameStatus = "passed";
-      holderNameMessage = buildHolderNameSuccessMessage(refs.map((r) => r.label));
     }
 
     const normalized: Record<string, any> = {
@@ -1072,20 +1074,20 @@ export function DocumentVerificationStep({
         nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
       };
       const apiName = ocrShape.enterprise_name;
-      // Cross-tab gate: enterprise name must match PAN Holder Name (>=40%).
-      const panHolderName = String(
-        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
-      ).trim();
-      if (apiName && panHolderName) {
-        const score = nameMatchPercentage(apiName, panHolderName);
-        if (score < 40) {
-          const msg = "Enterprise Name does not match with PAN Holder Name.";
-          setMsmeManualError(msg);
-          setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
-          setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
-          setActiveTab("msme");
-          return;
-        }
+      // Cross-tab gate: enterprise name vs ANY of GST Legal / PAN Holder /
+      // Bank Account Holder names (>=20% to pass against any one).
+      const evalRes = evaluateCrossNameMatch(apiName, [
+        { field: "GST Legal Name", value: gstDoc.ocrData?.legal_name },
+        { field: "PAN Holder Name", value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
+        { field: "Bank Account Holder Name", value: bankDoc.ocrData?.account_holder_name },
+      ]);
+      if (apiName && !evalRes.skipped && !evalRes.passed) {
+        const msg = formatCrossMatchFailure("Enterprise Name", evalRes.best);
+        setMsmeManualError(msg);
+        setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
+        setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
+        setActiveTab("msme");
+        return;
       }
       const score = nameMatchScore(effectiveLegalName, apiName);
       setMsmeDoc({
@@ -1238,27 +1240,29 @@ export function DocumentVerificationStep({
       const branchName = String(d.branch_name || ifscInfo?.branch || "").trim();
       const branchAddress = String(d.branch_address || ifscInfo?.address || "").trim();
 
-      // Same conditional name-match rules as the cheque flow (>=40% threshold).
+      // Cross-field match: Account Holder Name vs ANY of GST Legal / PAN
+      // Holder / MSME Enterprise names (>=20% against any one).
       const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
       const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
       const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
-      const refs: { label: string; value: string }[] = [];
-      if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
-      if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
-      if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
       let holderNameStatus: "passed" | "none" = "none";
       let holderNameMessage = "";
-      if (nameAtBank && refs.length > 0) {
-        const scores = refs.map((rr) => ({ ...rr, score: nameMatchPercentage(nameAtBank, rr.value) }));
-        const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
-        if (best.score < 40) {
-          const msg = "Account Holder Name does not match with the provided PAN/MSME details.";
-          setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-          setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
-          return;
+      if (nameAtBank) {
+        const evalRes = evaluateCrossNameMatch(nameAtBank, [
+          { field: "GST Legal Name", value: gstLegalName },
+          { field: "PAN Holder Name", value: panHolderName },
+          { field: "MSME Enterprise Name", value: msmeEnterpriseName },
+        ]);
+        if (!evalRes.skipped) {
+          if (!evalRes.passed) {
+            const msg = formatCrossMatchFailure("Account Holder Name", evalRes.best);
+            setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+            setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+            return;
+          }
+          holderNameStatus = "passed";
+          holderNameMessage = formatCrossMatchSuccess("Account Holder Name", evalRes.matches);
         }
-        holderNameStatus = "passed";
-        holderNameMessage = buildHolderNameSuccessMessage(refs.map((rr) => rr.label));
       }
 
       const normalized: Record<string, any> = {
