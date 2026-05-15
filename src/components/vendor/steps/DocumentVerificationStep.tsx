@@ -672,6 +672,7 @@ export function DocumentVerificationStep({
       const msmeName = String(normalized.enterprise_name || "").trim();
       const evalRes = evaluateCrossNameMatch(msmeName, [
         { field: "GST Legal Name", value: gstDoc.ocrData?.legal_name },
+        { field: "GST Trade Name", value: gstDoc.ocrData?.trade_name || gstDoc.ocrData?.business_name },
         { field: "PAN Holder Name", value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
         { field: "Bank Account Holder Name", value: bankDoc.ocrData?.account_holder_name },
       ]);
@@ -774,6 +775,7 @@ export function DocumentVerificationStep({
     // Cross-field match: Account Holder Name vs ANY of GST Legal / PAN Holder
     // / MSME Enterprise names (>=20% against any one).
     const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+    const gstTradeName = String(gstDoc.ocrData?.trade_name || gstDoc.ocrData?.business_name || "").trim();
     const panHolderName = String(
       panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
     ).trim();
@@ -784,6 +786,7 @@ export function DocumentVerificationStep({
     if (nameAtBank) {
       const evalRes = evaluateCrossNameMatch(nameAtBank, [
         { field: "GST Legal Name", value: gstLegalName },
+        { field: "GST Trade Name", value: gstTradeName },
         { field: "PAN Holder Name", value: panHolderName },
         { field: "MSME Enterprise Name", value: msmeEnterpriseName },
       ]);
@@ -1078,6 +1081,7 @@ export function DocumentVerificationStep({
       // Bank Account Holder names (>=20% to pass against any one).
       const evalRes = evaluateCrossNameMatch(apiName, [
         { field: "GST Legal Name", value: gstDoc.ocrData?.legal_name },
+        { field: "GST Trade Name", value: gstDoc.ocrData?.trade_name || gstDoc.ocrData?.business_name },
         { field: "PAN Holder Name", value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
         { field: "Bank Account Holder Name", value: bankDoc.ocrData?.account_holder_name },
       ]);
@@ -1243,6 +1247,7 @@ export function DocumentVerificationStep({
       // Cross-field match: Account Holder Name vs ANY of GST Legal / PAN
       // Holder / MSME Enterprise names (>=20% against any one).
       const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
+      const gstTradeName = String(gstDoc.ocrData?.trade_name || gstDoc.ocrData?.business_name || "").trim();
       const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
       const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
       let holderNameStatus: "passed" | "none" = "none";
@@ -1250,6 +1255,7 @@ export function DocumentVerificationStep({
       if (nameAtBank) {
         const evalRes = evaluateCrossNameMatch(nameAtBank, [
           { field: "GST Legal Name", value: gstLegalName },
+          { field: "GST Trade Name", value: gstTradeName },
           { field: "PAN Holder Name", value: panHolderName },
           { field: "MSME Enterprise Name", value: msmeEnterpriseName },
         ]);
