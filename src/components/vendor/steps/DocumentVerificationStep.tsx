@@ -1240,27 +1240,29 @@ export function DocumentVerificationStep({
       const branchName = String(d.branch_name || ifscInfo?.branch || "").trim();
       const branchAddress = String(d.branch_address || ifscInfo?.address || "").trim();
 
-      // Same conditional name-match rules as the cheque flow (>=40% threshold).
+      // Cross-field match: Account Holder Name vs ANY of GST Legal / PAN
+      // Holder / MSME Enterprise names (>=20% against any one).
       const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
       const panHolderName = String(panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "").trim();
       const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
-      const refs: { label: string; value: string }[] = [];
-      if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
-      if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
-      if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
       let holderNameStatus: "passed" | "none" = "none";
       let holderNameMessage = "";
-      if (nameAtBank && refs.length > 0) {
-        const scores = refs.map((rr) => ({ ...rr, score: nameMatchPercentage(nameAtBank, rr.value) }));
-        const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
-        if (best.score < 40) {
-          const msg = "Account Holder Name does not match with the provided PAN/MSME details.";
-          setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-          setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
-          return;
+      if (nameAtBank) {
+        const evalRes = evaluateCrossNameMatch(nameAtBank, [
+          { field: "GST Legal Name", value: gstLegalName },
+          { field: "PAN Holder Name", value: panHolderName },
+          { field: "MSME Enterprise Name", value: msmeEnterpriseName },
+        ]);
+        if (!evalRes.skipped) {
+          if (!evalRes.passed) {
+            const msg = formatCrossMatchFailure("Account Holder Name", evalRes.best);
+            setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
+            setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+            return;
+          }
+          holderNameStatus = "passed";
+          holderNameMessage = formatCrossMatchSuccess("Account Holder Name", evalRes.matches);
         }
-        holderNameStatus = "passed";
-        holderNameMessage = buildHolderNameSuccessMessage(refs.map((rr) => rr.label));
       }
 
       const normalized: Record<string, any> = {
