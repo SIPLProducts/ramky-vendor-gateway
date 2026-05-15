@@ -560,6 +560,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (!vendorData.tenant_id && (invitation as any)?.tenant_id) {
         vendorData.tenant_id = (invitation as any).tenant_id;
       }
+      // Persist link to the invitation so notification emails can find the inviter
+      if ((invitation as any)?.id) {
+        vendorData.invitation_id = (invitation as any).id;
+      }
 
       if (vendorId) {
         const { data, error } = await supabase
