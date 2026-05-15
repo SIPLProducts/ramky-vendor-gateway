@@ -1,51 +1,36 @@
 ## Goal
 
-1. Add **GST Trade Name** as an extra cross-reference for MSME, Bank, and PAN tabs.
-2. Success/failure banners must clearly name **which** field(s) matched, e.g.:
-   - `Enterprise Name matched with GST Legal Name (85% — Strong) and PAN Holder Name (78% — Strong).`
-   - `Enterprise Name matched with GST Trade Name (62% — Medium).`
-   - `Account Holder Name matched with GST Legal Name (90% — Strong), GST Trade Name (88% — Strong), PAN Holder Name (80% — Strong) and MSME Enterprise Name (75% — Strong).`
-   - On failure: `Enterprise Name does not match any of the verified names (best 12% with GST Legal Name). Minimum required is 20%.`
+In the MSME section of `DocumentVerificationStep`, replace the misleading legacy "Name match vs Legal Name: 0%" red strip with the same cross-match success line already used by the Bank tab — i.e. listing every reference the Enterprise Name matched against (GST Legal Name, GST Trade Name, PAN Holder Name, Bank Account Holder Name).
 
-References used per tab:
+Example desired line under the Enterprise Name field:
 
-| Candidate | References |
-|---|---|
-| MSME Enterprise Name | GST Legal Name, GST Trade Name, PAN Holder Name, Bank Account Holder Name |
-| Bank Account Holder Name | GST Legal Name, GST Trade Name, PAN Holder Name, MSME Enterprise Name |
-| PAN Holder Name | GST Legal Name, GST Trade Name |
+> ✓ Enterprise Name matched with GST Trade Name (100% — Strong Match) and PAN Holder Name (67% — Medium Match).
 
-Same 20% gate / Low–Medium–Strong tiers — no threshold or formatter signature changes.
+(Mirrors the bank-tab line in screenshot #2.)
 
 ## Files touched
 
-1. **`src/components/vendor/steps/ComplianceStep.tsx`**
-   - Add `const [gstTradeName, setGstTradeName] = useState<string|undefined>()`.
-   - In `handleGstVerified`: capture trade name separately —
-     `const tradeFromGst = pickStr(d.trade_name || d.business_name).trim(); if (tradeFromGst) setGstTradeName(tradeFromGst);`
-     Keep `gstLegalName` strictly from `d.legal_name` (drop the trade_name fallback so the two stay distinct).
-   - Pass `gstTradeName={gstTradeName}` into `PanKycTab`, `MsmeKycTab`, `BankKycTab`.
+**`src/components/vendor/steps/DocumentVerificationStep.tsx`** (only file)
 
-2. **`src/components/vendor/kyc/MsmeKycTab.tsx`**
-   - Add `gstTradeName?: string` prop.
-   - In `checkEnterpriseName`, insert `{ field: 'GST Trade Name', value: props.gstTradeName }` into the references list (right after GST Legal Name).
-   - No formatter changes — `formatCrossMatchSuccess` / `formatCrossMatchFailure` already list every passing field.
+1. **Upload-path verify (≈ line 670–691)** — after the `evaluateCrossNameMatch` call, when `!evalRes.skipped && evalRes.passed`, compute `enterpriseNameMessage = formatCrossMatchSuccess("Enterprise Name", evalRes.matches)` and add it into the returned `apiData` object (alongside `name`, `enterpriseName`, `udyamNumber`).
 
-3. **`src/components/vendor/kyc/BankKycTab.tsx`**
-   - Add `gstTradeName?: string` prop.
-   - Insert `{ field: 'GST Trade Name', value: props.gstTradeName }` into the references list.
+2. **Manual-verify path (≈ line 1080–1105)** — same: when the cross-match passes, compute `enterpriseNameMessage` and include it in `setMsmeDoc({ ..., apiData: { ..., enterpriseNameMessage } })`.
 
-4. **`src/components/vendor/kyc/PanKycTab.tsx`**
-   - Add `gstTradeName?: string` prop and reference entry.
+3. **Enterprise Name field render — both MSME render blocks (≈ line 1971 and ≈ line 2127)** — directly below the `EditableOcrField` for Enterprise Name, render:
+   ```tsx
+   {msmeDoc.apiData?.enterpriseNameMessage && (
+     <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+       <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+       <span>{msmeDoc.apiData.enterpriseNameMessage}</span>
+     </p>
+   )}
+   ```
+   (Identical pattern to the Bank Account Holder Name line at ≈ 2270.)
 
-5. **`src/components/vendor/steps/DocumentVerificationStep.tsx`** (parallel KYC implementation already on the cross-match policy)
-   - In all four `evaluateCrossNameMatch` blocks (MSME upload ~line 665, Bank cheque ~line 770, MSME manual ~line 1075, Bank manual ~line 1240), add
-     `{ field: 'GST Trade Name', value: gstDoc.ocrData?.trade_name || gstDoc.ocrData?.business_name }`
-     next to the existing GST Legal Name reference.
+4. **Legacy strip (≈ line 2185–2190)** — remove the `CrossCheckStrip` that renders `Name match vs Legal Name: ${msmeDoc.nameMatchScore}%`. It's the red 0% banner in screenshot #1 and is fully superseded by the new cross-match line. Keep `nameMatchScore` state (it is still written into `initialData` / passed back upstream) but stop rendering it here.
 
 ## Out of scope
 
-- No changes to `src/lib/nameMatch.ts` (the helper already lists all matching fields by name in its success message — exactly what the user asked for).
-- No threshold / tier changes.
+- No changes to `nameMatch.ts`, `MsmeKycTab.tsx`, `BankKycTab.tsx`, `PanKycTab.tsx`, or `ComplianceStep.tsx` — those tabs already render the new cross-match line correctly.
+- No threshold or formatter changes.
 - No edge function or DB changes.
-- No restyling of the success/failure banners.
