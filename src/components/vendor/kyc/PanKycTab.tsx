@@ -7,6 +7,14 @@ import { fuzzyNameMatch, panMatch } from '@/lib/nameMatch';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { useState } from 'react';
 
+export type PanCheckStatus = 'idle' | 'passed' | 'failed';
+export interface PanTabResult {
+  ocrPan: string;
+  ocrName: string;
+  panCheck: PanCheckStatus;
+  nameCheck: PanCheckStatus;
+}
+
 interface PanKycTabProps {
   pan: string;
   onPanChange: (v: string) => void;
@@ -22,6 +30,9 @@ interface PanKycTabProps {
   gstLegalName?: string;
   /** Whether GST verification has passed. PAN cannot be validated otherwise. */
   gstVerified: boolean;
+  /** Persisted OCR result (lifted to parent so it survives tab switches). */
+  ocrResult?: PanTabResult;
+  onOcrResultChange?: (r: PanTabResult) => void;
 }
 
 function pickStr(v: any): string {
@@ -31,12 +42,19 @@ function pickStr(v: any): string {
   return '';
 }
 
+const EMPTY_RESULT: PanTabResult = { ocrPan: '', ocrName: '', panCheck: 'idle', nameCheck: 'idle' };
+
 export function PanKycTab(props: PanKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
-  const [ocrPan, setOcrPan] = useState<string>('');
-  const [ocrName, setOcrName] = useState<string>('');
-  const [panCheck, setPanCheck] = useState<'idle' | 'passed' | 'failed'>('idle');
-  const [nameCheck, setNameCheck] = useState<'idle' | 'passed' | 'failed'>('idle');
+  const [localResult, setLocalResult] = useState<PanTabResult>(EMPTY_RESULT);
+  const result = props.ocrResult ?? localResult;
+  const { ocrPan, ocrName, panCheck, nameCheck } = result;
+  const updateResult = (next: Partial<PanTabResult>) => {
+    const merged = { ...result, ...next };
+    if (props.onOcrResultChange) props.onOcrResultChange(merged);
+    else setLocalResult(merged);
+  };
+
 
   const runPanOcr = async (file: File) => {
     if (!props.gstVerified) {
@@ -69,16 +87,18 @@ export function PanKycTab(props: PanKycTabProps) {
     const extractedPan = pickStr(extracted.pan_number).toUpperCase().trim();
     const extractedName = pickStr(extracted.full_name || extracted.holder_name || extracted.name).trim();
 
-    setOcrPan(extractedPan);
-    setOcrName(extractedName);
     if (extractedPan && extractedPan.length === 10) {
       props.onPanChange(extractedPan);
     }
 
     const panOk = panMatch(extractedPan, props.gstPanNumber);
     const nameOk = fuzzyNameMatch(extractedName, props.gstLegalName);
-    setPanCheck(panOk ? 'passed' : 'failed');
-    setNameCheck(nameOk ? 'passed' : 'failed');
+    updateResult({
+      ocrPan: extractedPan,
+      ocrName: extractedName,
+      panCheck: panOk ? 'passed' : 'failed',
+      nameCheck: nameOk ? 'passed' : 'failed',
+    });
 
     props.onVerifiedDetails?.(extracted);
 

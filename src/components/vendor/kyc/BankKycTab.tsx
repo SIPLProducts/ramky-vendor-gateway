@@ -88,6 +88,14 @@ export function BankKycTab(props: BankKycTabProps) {
     const panOk = panScore >= NAME_MATCH_THRESHOLD;
     const gstOk = gstScore >= NAME_MATCH_THRESHOLD;
 
+    const refsLabel = props.panHolderName && props.gstLegalName
+      ? 'PAN Holder Name and GST Legal Name'
+      : props.panHolderName
+        ? 'PAN Holder Name'
+        : props.gstLegalName
+          ? 'GST Legal Name'
+          : '';
+
     let nameMessage = '';
     if (apiName && (props.gstLegalName || props.panHolderName)) {
       if (panOk && gstOk) {
@@ -104,7 +112,7 @@ export function BankKycTab(props: BankKycTabProps) {
         props.onStatusChange?.('failed');
         return {
           ok: false,
-          message: `Account Holder Name does not match with the provided PAN/MSME details (best match ${Math.max(panScore, gstScore)}%, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
+          message: `Account Holder Name does not match with the provided ${refsLabel || 'PAN'} (best match ${Math.max(panScore, gstScore)}%, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
           apiData,
         };
       }
@@ -294,7 +302,15 @@ export function BankKycTab(props: BankKycTabProps) {
               {holderCheck === 'gst' && 'Account Holder Name verified with GST Legal Name.'}
               {holderCheck === 'pan' && 'Account Holder Name verified with PAN Holder Name.'}
               {holderCheck === 'failed' &&
-                'Account Holder Name does not match with the provided PAN/MSME details.'}
+                `Account Holder Name does not match with the provided ${
+                  props.panHolderName && props.gstLegalName
+                    ? 'PAN Holder Name and GST Legal Name'
+                    : props.panHolderName
+                      ? 'PAN Holder Name'
+                      : props.gstLegalName
+                        ? 'GST Legal Name'
+                        : 'reference details'
+                }.`}
             </div>
           </div>
         </div>
