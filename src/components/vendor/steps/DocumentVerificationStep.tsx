@@ -683,9 +683,12 @@ export function DocumentVerificationStep({
           isNameMismatch: true,
         } as any;
       }
+      const enterpriseNameMessage = !evalRes.skipped && evalRes.passed
+        ? formatCrossMatchSuccess("Enterprise Name", evalRes.matches)
+        : undefined;
       return {
         ok: true as const,
-        apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number },
+        apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number, enterpriseNameMessage },
         normalized,
         registeredName: normalized.enterprise_name,
       };
@@ -1094,12 +1097,15 @@ export function DocumentVerificationStep({
         return;
       }
       const score = nameMatchScore(effectiveLegalName, apiName);
+      const enterpriseNameMessage = !evalRes.skipped && evalRes.passed
+        ? formatCrossMatchSuccess("Enterprise Name", evalRes.matches)
+        : undefined;
       setMsmeDoc({
         status: "verified",
         fileName: `Udyam ${ocrShape.udyam_number}`,
         ocrData: ocrShape,
         originalOcrData: ocrShape,
-        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number, normalized: { ...ocrShape } },
+        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number, normalized: { ...ocrShape }, enterpriseNameMessage },
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
@@ -1967,14 +1973,22 @@ export function DocumentVerificationStep({
                                 verifiedValue={m.udyam_number}
                                 verifiedLabel="Udyam Number is verified"
                               />
-                              <EditableOcrField
-                                label="Enterprise Name"
-                                value={msmeDoc.ocrData?.enterprise_name}
-                                originalValue={msmeDoc.originalOcrData?.enterprise_name}
-                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
-                                verifiedValue={m.enterprise_name}
-                                verifiedLabel="Enterprise Name matches registry"
-                              />
+                              <div className="md:col-span-2">
+                                <EditableOcrField
+                                  label="Enterprise Name"
+                                  value={msmeDoc.ocrData?.enterprise_name}
+                                  originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                                  onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                                  verifiedValue={m.enterprise_name}
+                                  verifiedLabel="Enterprise Name matches registry"
+                                />
+                                {msmeDoc.apiData?.enterpriseNameMessage && (
+                                  <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                    <span>{msmeDoc.apiData.enterpriseNameMessage}</span>
+                                  </p>
+                                )}
+                              </div>
                               <EditableOcrField
                                 label="Enterprise Type"
                                 value={msmeDoc.ocrData?.enterprise_type}
@@ -2123,14 +2137,22 @@ export function DocumentVerificationStep({
                                 verifiedValue={m.udyam_number}
                                 verifiedLabel="Udyam Number is verified"
                               />
-                              <EditableOcrField
-                                label="Enterprise Name"
-                                value={msmeDoc.ocrData?.enterprise_name}
-                                originalValue={msmeDoc.originalOcrData?.enterprise_name}
-                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
-                                verifiedValue={m.enterprise_name}
-                                verifiedLabel="Enterprise Name matches registry"
-                              />
+                              <div className="md:col-span-2">
+                                <EditableOcrField
+                                  label="Enterprise Name"
+                                  value={msmeDoc.ocrData?.enterprise_name}
+                                  originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                                  onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                                  verifiedValue={m.enterprise_name}
+                                  verifiedLabel="Enterprise Name matches registry"
+                                />
+                                {msmeDoc.apiData?.enterpriseNameMessage && (
+                                  <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                    <span>{msmeDoc.apiData.enterpriseNameMessage}</span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <EditableOcrField
@@ -2182,12 +2204,6 @@ export function DocumentVerificationStep({
                 )}
 
 
-                {isMsmeRegistered === true && msmeDoc.status === "verified" && typeof msmeDoc.nameMatchScore === "number" && (
-                  <CrossCheckStrip
-                    ok={msmeDoc.nameMatchScore >= 80}
-                    text={`Name match vs Legal Name: ${msmeDoc.nameMatchScore}%`}
-                  />
-                )}
               </div>
             </StageShell>
           </TabsContent>
