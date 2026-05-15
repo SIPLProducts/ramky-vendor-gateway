@@ -218,7 +218,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           </Button>
           <Button
             onClick={() => onConfirm(form)}
-            disabled={isSubmitting}
+            disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
           >
             {isSubmitting ? (
