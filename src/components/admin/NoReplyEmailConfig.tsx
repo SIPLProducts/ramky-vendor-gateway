@@ -323,13 +323,13 @@ export function NoReplyEmailConfig() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Reply-To (optional)</Label>
+            <Label>CC Recipients (optional)</Label>
             <ReplyToChips
               value={form.smtp_reply_to}
               onChange={(v) => setForm((f) => ({ ...f, smtp_reply_to: v }))}
             />
             <p className="text-xs text-muted-foreground">
-              Add one or more emails. Press Enter or comma after each. Replies to buyer notifications go to all listed addresses.
+              Add one or more emails. Press Enter or comma after each. Every valid address here is CC'd on the buyer notification email. Invalid entries are skipped automatically.
             </p>
           </div>
         </div>
@@ -338,9 +338,9 @@ export function NoReplyEmailConfig() {
           <Info className="h-4 w-4 mt-0.5 text-primary shrink-0" />
           <div className="space-y-1">
             <p>
-              This account is used as the <span className="font-semibold">sender</span> for buyer notifications
-              (e.g. when a vendor submits the registration form). The buyer receives the email but cannot reply
-              to the no-reply mailbox unless you configure a Reply-To address above.
+              This account is the <span className="font-semibold">From</span> address for buyer notifications
+              (e.g. when a vendor submits the registration form). The buyer is on <span className="font-semibold">To</span>;
+              the addresses listed above are added as <span className="font-semibold">CC</span>.
             </p>
           </div>
         </div>
