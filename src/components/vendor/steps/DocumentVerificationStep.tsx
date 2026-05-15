@@ -667,21 +667,20 @@ export function DocumentVerificationStep({
         mobile: pickStr(registry.mobile) || ocr.mobile,
         email: pickStr(registry.email) || ocr.email,
       };
-      // Cross-check: Enterprise Name vs PAN Holder Name (>=40% match).
-      // GST may be skipped via Self-Declaration so it is no longer used here.
+      // Cross-check: Enterprise Name vs ANY of GST Legal / PAN Holder / Bank
+      // Account Holder names (>=20% to pass against any one).
       const msmeName = String(normalized.enterprise_name || "").trim();
-      const panHolderName = String(
-        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
-      ).trim();
-      if (msmeName && panHolderName) {
-        const score = nameMatchPercentage(msmeName, panHolderName);
-        if (score < 40) {
-          return {
-            ok: false as const,
-            message: "Enterprise Name does not match with PAN Holder Name.",
-            isNameMismatch: true,
-          } as any;
-        }
+      const evalRes = evaluateCrossNameMatch(msmeName, [
+        { field: "GST Legal Name", value: gstDoc.ocrData?.legal_name },
+        { field: "PAN Holder Name", value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
+        { field: "Bank Account Holder Name", value: bankDoc.ocrData?.account_holder_name },
+      ]);
+      if (!evalRes.skipped && !evalRes.passed) {
+        return {
+          ok: false as const,
+          message: formatCrossMatchFailure("Enterprise Name", evalRes.best),
+          isNameMismatch: true,
+        } as any;
       }
       return {
         ok: true as const,
