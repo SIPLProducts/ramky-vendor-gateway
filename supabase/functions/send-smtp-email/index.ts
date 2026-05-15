@@ -98,14 +98,32 @@ const handler = async (req: Request): Promise<Response> => {
       username = fromEmail;
     }
     const fromName = String(smtp.from_name ?? stored.smtp_from_name ?? "").trim();
-    // Reply-To may be a single address or comma/semicolon/newline-separated list.
-    // RFC 5322 allows multiple addresses joined by ", " in the Reply-To header.
+
+    // Reply-To: best-effort. Parse the (possibly multi-address) value, drop
+    // anything that is not a valid email, use the first valid one as the
+    // SMTP replyTo (denomailer only accepts one), and CC the rest. If none
+    // are valid, send without a Reply-To rather than failing the whole email.
+    const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
     const replyToRaw = body.suppressReplyTo
       ? ""
       : String(smtp.reply_to ?? body.replyTo ?? stored.smtp_reply_to ?? "").trim();
-    const replyTo = replyToRaw
-      ? replyToRaw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean).join(", ")
-      : "";
+    const replyToEntries = replyToRaw
+      ? replyToRaw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+      : [];
+    const replyToValid: string[] = [];
+    const replyToDropped: string[] = [];
+    for (const entry of replyToEntries) {
+      // Extract bare email if wrapped as "Name <a@b>"
+      const m = entry.match(/<([^>]+)>/);
+      const candidate = (m ? m[1] : entry).trim();
+      if (isEmail(candidate)) replyToValid.push(candidate);
+      else replyToDropped.push(entry);
+    }
+    if (replyToDropped.length) {
+      console.warn(`[send-smtp-email] Dropping invalid Reply-To entries: ${JSON.stringify(replyToDropped)}`);
+    }
+    let replyTo = replyToValid[0] ?? "";
+    const replyToCcExtras = replyToValid.slice(1);
 
     if (!host || !username || !password || !fromEmail) {
       return new Response(
