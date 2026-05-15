@@ -117,12 +117,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
         ).trim();
         setEnterpriseName(apiName);
         const check = checkEnterpriseName(apiName);
+        setEnterpriseCheckMessage(check.message);
         if (check.status === 'failed') {
           setEnterpriseCheck('failed');
           setMismatchOpen(true);
           return { ok: false, message: check.message, data };
         }
-        if (check.status !== 'skipped') setEnterpriseCheck(check.status);
+        setEnterpriseCheck(check.status === 'skipped' ? 'skipped' : 'passed');
         const cat = pick(data.enterprise_type).toLowerCase();
         if (cat === 'micro' || cat === 'small' || cat === 'medium') {
           props.onMsmeCategoryChange?.(cat as any);
