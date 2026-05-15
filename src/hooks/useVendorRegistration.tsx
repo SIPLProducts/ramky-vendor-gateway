@@ -709,6 +709,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       });
 
       // Send notification email to buyer who invited this vendor
+      let notifyResult: any = null;
       try {
         const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-vendor-submission', {
           body: { vendorId: vendor.id },
@@ -717,6 +718,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           console.error('[Vendor] notify-vendor-submission error:', notifyError);
         } else {
           console.log('[Vendor] Submission notification result:', notifyData);
+          notifyResult = notifyData;
         }
       } catch (notifyError) {
         // Don't fail the submission if notification fails
@@ -724,13 +726,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       }
 
       setVendorStatus('purchase_review');
-      return vendor;
+      return { ...vendor, _notify: notifyResult } as typeof vendor & { _notify: any };
     },
     onSuccess: () => {
-      toast({
-        title: 'Registration Submitted',
-        description: 'Your vendor registration is now in Purchase/SCM approval.',
-      });
+      // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
     },
     onError: (error) => {
       toast({
