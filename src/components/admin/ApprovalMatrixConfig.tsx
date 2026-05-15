@@ -229,7 +229,7 @@ export function ApprovalMatrixConfig() {
     let nextLevel = 1;
     if (activeStage === 'SCM_MANAGER') {
       const scm = rows.filter((r) => r.stage === 'SCM_MANAGER');
-      nextLevel = scm.length === 0 ? 1 : Math.max(...scm.map((r) => r.level_number));
+      nextLevel = scm.length === 0 ? 1 : Math.max(...scm.map((r) => r.level_number)) + 1;
     }
     setRows((prev) => [
       ...prev,
