@@ -771,34 +771,32 @@ export function DocumentVerificationStep({
       d.full_name || d.name_at_bank || rawData.full_name || "",
     ).trim();
 
-    // Conditional name match (>=40% threshold against any required source):
-    //   GST=Yes  → check GST Legal Name + PAN Holder Name (+ MSME if registered)
-    //   GST=No, MSME=Yes → check PAN Holder Name + MSME Enterprise Name
-    //   GST=No, MSME=No  → check PAN Holder Name only
+    // Cross-field match: Account Holder Name vs ANY of GST Legal / PAN Holder
+    // / MSME Enterprise names (>=20% against any one).
     const gstLegalName = String(gstDoc.ocrData?.legal_name || "").trim();
     const panHolderName = String(
       panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
     ).trim();
     const msmeEnterpriseName = String(msmeDoc.ocrData?.enterprise_name || "").trim();
 
-    const refs: { label: string; value: string }[] = [];
-    if (isGstRegistered === true && gstLegalName) refs.push({ label: "GST Legal Name", value: gstLegalName });
-    if (panHolderName) refs.push({ label: "PAN Holder Name", value: panHolderName });
-    if (isMsmeRegistered === true && msmeEnterpriseName) refs.push({ label: "MSME Enterprise Name", value: msmeEnterpriseName });
-
     let holderNameStatus: "passed" | "none" = "none";
     let holderNameMessage = "";
-    if (nameAtBank && refs.length > 0) {
-      const scores = refs.map((r) => ({ ...r, score: nameMatchPercentage(nameAtBank, r.value) }));
-      const best = scores.reduce((a, b) => (b.score > a.score ? b : a), scores[0]);
-      if (best.score < 40) {
-        return {
-          ok: false as const,
-          message: "Account Holder Name does not match with the provided PAN/MSME details.",
-        };
+    if (nameAtBank) {
+      const evalRes = evaluateCrossNameMatch(nameAtBank, [
+        { field: "GST Legal Name", value: gstLegalName },
+        { field: "PAN Holder Name", value: panHolderName },
+        { field: "MSME Enterprise Name", value: msmeEnterpriseName },
+      ]);
+      if (!evalRes.skipped) {
+        if (!evalRes.passed) {
+          return {
+            ok: false as const,
+            message: formatCrossMatchFailure("Account Holder Name", evalRes.best),
+          };
+        }
+        holderNameStatus = "passed";
+        holderNameMessage = formatCrossMatchSuccess("Account Holder Name", evalRes.matches);
       }
-      holderNameStatus = "passed";
-      holderNameMessage = buildHolderNameSuccessMessage(refs.map((r) => r.label));
     }
 
     const normalized: Record<string, any> = {
