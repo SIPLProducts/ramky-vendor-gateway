@@ -370,6 +370,9 @@ export function ComplianceStep({
             onVerifiedDetails={handleGstVerified}
             onStatusChange={(s) => setStatus('gst', s)}
             vendorId={vendorId}
+            panHolderName={panHolderName}
+            msmeEnterpriseName={msmeEnterpriseName}
+            bankAccountHolderName={bankAccountHolderName}
           />
         }
         pan={
