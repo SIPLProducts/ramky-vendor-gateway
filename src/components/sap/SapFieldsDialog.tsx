@@ -314,3 +314,83 @@ function ReadOnlyField({ label, value }: { label: string; value: string | number
     </div>
   );
 }
+
+const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: string }> = {
+  vendor_account_group: { code: 'KTOKK', desc: 'TXT30' },
+  company_code:         { code: 'BUKRS', desc: 'BUTXT' },
+  planning_group:       { code: 'GRUPP' },
+  recon_account:        { code: 'SAKNR', desc: 'TXT20', prefix: 'BUKRS' },
+  purchase_org:         { code: 'EKORG', desc: 'EKOTX' },
+  currency:             { code: 'WAERS', desc: 'LTEXT' },
+};
+
+function SapF4SelectField({
+  label, masterType, value, onChange, liveItems, placeholder,
+}: {
+  label: string;
+  masterType: string;
+  value: string;
+  onChange: (v: string) => void;
+  liveItems?: any[] | null;
+  placeholder?: string;
+}) {
+  const map = F4_FIELD_MAP[masterType];
+  const isLive = Array.isArray(liveItems);
+  const { data: cachedRows, isLoading: isLoadingCache } = useSapMasterData(isLive ? undefined : masterType);
+
+  const options = (() => {
+    if (isLive) {
+      return (liveItems || [])
+        .map((item) => {
+          const code = map ? item?.[map.code] : item?.code;
+          if (code === undefined || code === null || String(code).trim() === '') return null;
+          const desc = map?.desc ? item?.[map.desc] : item?.description;
+          const prefix = map?.prefix ? item?.[map.prefix] : null;
+          const codePart = prefix ? `${prefix} / ${code}` : String(code);
+          const labelText = desc ? `${codePart} — ${desc}` : codePart;
+          return { value: String(code), label: labelText };
+        })
+        .filter(Boolean) as { value: string; label: string }[];
+    }
+    return (cachedRows || []).map((r: any) => {
+      const extra = r.extra || {};
+      const code = map ? (extra[map.code] ?? r.code) : r.code;
+      const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
+      const prefix = map?.prefix ? extra[map.prefix] : null;
+      const codePart = prefix ? `${prefix} / ${code}` : String(code);
+      const labelText = desc ? `${codePart} — ${desc}` : codePart;
+      return { value: String(r.code), label: labelText };
+    });
+  })();
+
+  const isLoading = isLive ? false : isLoadingCache;
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Select value={value || undefined} onValueChange={(v) => onChange(v)}>
+        <SelectTrigger className="h-9 rounded-lg">
+          <SelectValue placeholder={placeholder || 'Select…'} />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              {isLoading ? 'Loading F4 values…' : 'No options available.'}
+            </div>
+          ) : (
+            options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                <span className="font-mono text-xs">{o.label}</span>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+      <p className="text-[11px] text-muted-foreground">
+        {isLoading
+          ? 'Loading F4 values…'
+          : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
+      </p>
+    </div>
+  );
+}
