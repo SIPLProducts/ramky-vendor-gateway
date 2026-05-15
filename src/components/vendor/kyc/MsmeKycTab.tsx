@@ -45,6 +45,8 @@ interface MsmeKycTabProps {
   panHolderName?: string;
   /** Verified GST legal name from the GST tab — used to validate enterprise name. */
   gstLegalName?: string;
+  /** Verified bank account holder name — used as another cross-check reference. */
+  bankAccountHolderName?: string;
 }
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
