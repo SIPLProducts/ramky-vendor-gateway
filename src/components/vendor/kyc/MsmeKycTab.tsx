@@ -56,7 +56,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
   const [enterpriseName, setEnterpriseName] = useState<string>('');
   const [enterpriseCheck, setEnterpriseCheck] =
-    useState<'idle' | 'pan' | 'failed'>('idle');
+    useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
+  const [enterpriseCheckMessage, setEnterpriseCheckMessage] = useState<string>('');
   const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
@@ -72,24 +73,33 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     return '';
   };
 
-  // Cross-tab name check: enterprise name is validated against the verified
-  // PAN Holder Name only (≥ 40% similarity is treated as a match).
+  // Cross-tab name check: enterprise name is validated against ALL other
+  // available verified names (GST / PAN / Bank). Any match >= 20% allows
+  // the tab to pass; below that we block and show a mismatch message.
   const checkEnterpriseName = (apiName: string): {
-    status: 'pan' | 'failed' | 'skipped';
+    status: 'passed' | 'failed' | 'skipped';
     message: string;
   } => {
-    const pan = props.panHolderName?.trim();
-    if (!apiName || !pan) return { status: 'skipped', message: '' };
-    const score = nameMatchPercentage(apiName, pan);
-    if (score >= NAME_MATCH_THRESHOLD) {
+    const evalResult = evaluateCrossNameMatch(apiName, [
+      { field: 'GST Legal Name', value: props.gstLegalName },
+      { field: 'PAN Holder Name', value: props.panHolderName },
+      { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
+    ]);
+    if (evalResult.skipped) {
       return {
-        status: 'pan',
-        message: `Enterprise Name verified with PAN Holder Name (${score}% match).`,
+        status: 'skipped',
+        message: 'Enterprise Name captured (no other verified names yet to cross-check).',
+      };
+    }
+    if (evalResult.passed) {
+      return {
+        status: 'passed',
+        message: formatCrossMatchSuccess('Enterprise Name', evalResult.matches),
       };
     }
     return {
       status: 'failed',
-      message: `Enterprise Name does not match PAN Holder Name (only ${score}% match, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
+      message: formatCrossMatchFailure('Enterprise Name', evalResult.best),
     };
   };
 
