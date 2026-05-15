@@ -1074,20 +1074,20 @@ export function DocumentVerificationStep({
         nic_code: pickValue(d.nic_5_digit) || pickValue(d.nic_4_digit) || pickValue(d.nic_2_digit),
       };
       const apiName = ocrShape.enterprise_name;
-      // Cross-tab gate: enterprise name must match PAN Holder Name (>=40%).
-      const panHolderName = String(
-        panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name || "",
-      ).trim();
-      if (apiName && panHolderName) {
-        const score = nameMatchPercentage(apiName, panHolderName);
-        if (score < 40) {
-          const msg = "Enterprise Name does not match with PAN Holder Name.";
-          setMsmeManualError(msg);
-          setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
-          setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
-          setActiveTab("msme");
-          return;
-        }
+      // Cross-tab gate: enterprise name vs ANY of GST Legal / PAN Holder /
+      // Bank Account Holder names (>=20% to pass against any one).
+      const evalRes = evaluateCrossNameMatch(apiName, [
+        { field: "GST Legal Name", value: gstDoc.ocrData?.legal_name },
+        { field: "PAN Holder Name", value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
+        { field: "Bank Account Holder Name", value: bankDoc.ocrData?.account_holder_name },
+      ]);
+      if (apiName && !evalRes.skipped && !evalRes.passed) {
+        const msg = formatCrossMatchFailure("Enterprise Name", evalRes.best);
+        setMsmeManualError(msg);
+        setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
+        setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
+        setActiveTab("msme");
+        return;
       }
       const score = nameMatchScore(effectiveLegalName, apiName);
       setMsmeDoc({
