@@ -1,38 +1,39 @@
-## What I found
+## Root cause
 
-- The latest submitted vendor is **Brickwork Ratings India Private Limited** with reference **130dc9ef-70b8-4c05-8f84-12558af5d169**.
-- It was submitted successfully at **15 May 2026 06:14 UTC** and status is **SCM Manager Review**.
-- The email did not go to the buyer because the submitted vendor row has **no invitation_id**, so the notification function cannot find the buyer who invited the vendor.
-- The invitation token shown in the screenshot exists, but its `created_by` is also empty, so even if linked later, the system still cannot know which buyer should receive the mail.
-- The current submit flow calls `notify-vendor-submission` **before** the invitation is claimed/linked in one place, and the hook does not include `invitation_id` when creating/updating the vendor.
+Every time the vendor form is saved (autosave + step nav + submit), `uploadAllDocuments` in `src/hooks/useVendorRegistration.tsx` runs again. For each `documentType` whose `formData...File` is set, it:
+
+1. Re-uploads the file to storage with a new timestamped path.
+2. Inserts a brand new row into `vendor_documents`.
+
+There is no check for an existing row of the same `(vendor_id, document_type)`. For Brickwork Ratings the same 4 files (gst_self_declaration, pan_card, msme_self_declaration, cancelled_cheque) were inserted ~30+ times → 122 documents shown in the dialog.
 
 ## Plan
 
-1. **Persist invitation link on vendor save**
-   - When vendor opens registration using an invitation token, look up the invitation and save its `id` into the vendor record as `invitation_id`.
-   - This ensures the submitted vendor is permanently connected to the invitation.
+1. **Deduplicate document uploads in `useVendorRegistration.tsx`**
+   - In `uploadAllDocuments`, before re-uploading a `documentType`, query `vendor_documents` for an existing row with the same `vendor_id` + `document_type`.
+   - If a row exists and the in-memory `File` is the same one already uploaded (track an "uploaded" flag per file in component state, or compare `file_name` + `file_size`), skip both the storage upload and the metadata insert.
+   - If the user replaced the file (different name/size), delete the old storage object + old `vendor_documents` row, then upload the new one.
+   - Result: at most one row per `(vendor_id, document_type)` (two for the secondary cancelled cheque slot).
 
-2. **Fix notification timing**
-   - In the vendor submission flow, claim/link the invitation before sending the buyer notification email.
-   - Avoid duplicate/non-blocking claim logic in the page and hook so the order is reliable.
+2. **Mark file fields as "already uploaded" after first successful save**
+   - After `uploadAllDocuments` succeeds, clear the in-memory `File` objects from `formData.statutory.*File`, `formData.bank.*File`, etc., so subsequent autosaves do not see a `File` to re-upload. The metadata in `vendor_documents` is the source of truth for "already uploaded".
+   - Loaded vendor records already do not rehydrate `File` objects, so this only affects the current edit session.
 
-3. **Make the notification function more resilient**
-   - If `vendors.invitation_id` is missing, fall back to finding an invitation by `vendor_id`.
-   - If the invitation has no `created_by`, return a clear skipped reason and log it.
+3. **One-time cleanup of existing duplicate rows**
+   - Add a migration that, for each `(vendor_id, document_type)` group in `vendor_documents`, keeps the most recent row and deletes the rest. Same for storage objects under `vendor-documents` bucket (delete orphaned files whose paths are not referenced by any remaining `vendor_documents` row).
+   - This will fix the Brickwork Ratings vendor (122 → ~4 documents) and any other affected vendors.
 
-4. **Fix invitation creation ownership**
-   - Check the invitation creation function/page and make sure new invitations store the logged-in buyer as `created_by`.
-   - This is required because the notification email is sent to the inviter’s profile email.
+4. **Optional safety net (DB-level)**
+   - Add a partial unique index on `vendor_documents (vendor_id, document_type)` (excluding the secondary cheque slot, or include it because it has its own type `cancelled_cheque_2`). This guarantees the bug cannot reappear even if another code path forgets to dedupe.
 
-5. **Add buyer/admin visibility for submitted vendors**
-   - Ensure submitted vendors are visible in the normal review lists so you can verify submission even if email fails.
-   - Add or surface audit logs/status messages showing: vendor submitted, notification attempted, notification sent/skipped/failed.
+## Files to change
 
-6. **Validate with backend data/logs**
-   - Confirm a submitted vendor has `invitation_id`.
-   - Confirm the invitation has `created_by` and maps to the buyer profile email.
-   - Confirm `notify-vendor-submission` invokes `send-smtp-email` and records an audit log.
+- `src/hooks/useVendorRegistration.tsx` — dedup logic in `uploadAllDocuments`, clear file refs after upload.
+- New SQL migration — cleanup duplicate `vendor_documents` rows + add unique index on `(vendor_id, document_type)`.
+- (Optional) cleanup of orphaned storage objects via the migration or an edge function.
 
-## Immediate note for this current vendor
+## Verification
 
-For the current submitted vendor, the database confirms the vendor submitted successfully, but the invitation/buyer link is missing. After the fix, new submissions will notify correctly. Existing broken records may need a one-time data correction if you want this specific vendor linked back to the buyer invitation.
+- Re-open Brickwork Ratings → Documents tab should show 4 files, not 122.
+- Save the form multiple times → `vendor_documents` count stays the same.
+- Replace a file and save → old row replaced, count still stable.
