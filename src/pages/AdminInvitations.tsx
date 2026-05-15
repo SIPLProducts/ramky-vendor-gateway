@@ -124,6 +124,9 @@ export default function AdminInvitations() {
   const createInvitation = useMutation<any, Error, { email: string; vendorName: string; phoneNumber: string; expiryDays: number; tenantId: string | null }>({
     mutationFn: async ({ email, vendorName, phoneNumber, expiryDays, tenantId }) => {
       // Pre-validate via SECURITY DEFINER RPC (bypasses RLS, returns boolean only)
+      if (!user?.id) {
+        throw new Error('Your session is still loading. Please reload the page and try again.');
+      }
       if (!user?.email) {
         throw new Error('You are not configured in Email Configuration');
       }

@@ -98,9 +98,14 @@ const handler = async (req: Request): Promise<Response> => {
       username = fromEmail;
     }
     const fromName = String(smtp.from_name ?? stored.smtp_from_name ?? "").trim();
-    const replyTo = body.suppressReplyTo
+    // Reply-To may be a single address or comma/semicolon/newline-separated list.
+    // RFC 5322 allows multiple addresses joined by ", " in the Reply-To header.
+    const replyToRaw = body.suppressReplyTo
       ? ""
       : String(smtp.reply_to ?? body.replyTo ?? stored.smtp_reply_to ?? "").trim();
+    const replyTo = replyToRaw
+      ? replyToRaw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean).join(", ")
+      : "";
 
     if (!host || !username || !password || !fromEmail) {
       return new Response(

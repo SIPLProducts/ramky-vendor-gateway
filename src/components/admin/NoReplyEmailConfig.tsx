@@ -13,7 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Eye, EyeOff, Info, Send, Loader2 } from "lucide-react";
+import { Mail, Eye, EyeOff, Info, Send, Loader2, X } from "lucide-react";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const KEYS = [
   "smtp_host",
@@ -322,11 +324,13 @@ export function NoReplyEmailConfig() {
           </div>
           <div className="space-y-2">
             <Label>Reply-To (optional)</Label>
-            <Input
-              placeholder="support@example.com"
+            <ReplyToChips
               value={form.smtp_reply_to}
-              onChange={(e) => setForm((f) => ({ ...f, smtp_reply_to: e.target.value }))}
+              onChange={(v) => setForm((f) => ({ ...f, smtp_reply_to: v }))}
             />
+            <p className="text-xs text-muted-foreground">
+              Add one or more emails. Press Enter or comma after each. Replies to buyer notifications go to all listed addresses.
+            </p>
           </div>
         </div>
 
@@ -362,5 +366,80 @@ export function NoReplyEmailConfig() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function ReplyToChips({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const emails = value
+    ? value.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+    : [];
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const commit = (raw: string) => {
+    const parts = raw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return;
+    const next = [...emails];
+    let invalid: string | null = null;
+    for (const p of parts) {
+      if (!EMAIL_RE.test(p)) { invalid = p; continue; }
+      if (next.some((e) => e.toLowerCase() === p.toLowerCase())) continue;
+      next.push(p);
+    }
+    setError(invalid ? `Not a valid email: ${invalid}` : null);
+    onChange(next.join(", "));
+    setDraft("");
+  };
+
+  const remove = (email: string) => {
+    onChange(emails.filter((e) => e !== email).join(", "));
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-1.5 min-h-10 rounded-md border border-input bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+        {emails.map((email) => (
+          <span
+            key={email}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium pl-2.5 pr-1 py-0.5"
+          >
+            {email}
+            <button
+              type="button"
+              onClick={() => remove(email)}
+              className="hover:bg-primary/20 rounded-full p-0.5"
+              aria-label={`Remove ${email}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          className="flex-1 min-w-[140px] bg-transparent outline-none text-sm py-0.5"
+          placeholder={emails.length === 0 ? "support@example.com" : "Add another…"}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); if (error) setError(null); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "," || e.key === ";" || e.key === "Tab") {
+              if (draft.trim()) {
+                e.preventDefault();
+                commit(draft);
+              }
+            } else if (e.key === "Backspace" && !draft && emails.length) {
+              remove(emails[emails.length - 1]);
+            }
+          }}
+          onBlur={() => { if (draft.trim()) commit(draft); }}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData("text");
+            if (/[,;\s]/.test(text)) {
+              e.preventDefault();
+              commit(text);
+            }
+          }}
+        />
+      </div>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
   );
 }
