@@ -11,8 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
-import { SapMasterCombobox } from '@/components/sap/SapMasterCombobox';
-import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
+import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
@@ -167,7 +166,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
-              <SapMasterCombobox label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" />
+              <SapF4SelectField label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
             </Section>
@@ -176,10 +175,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
-              <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" />
-              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" />
+              <SapF4SelectField label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" />
+              <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
-              <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" />
+              <SapF4SelectField label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
@@ -188,8 +187,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Purchase Data */}
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" />
-              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" />
+              <SapF4SelectField label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" />
+              <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
@@ -312,6 +311,86 @@ function ReadOnlyField({ label, value }: { label: string; value: string | number
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Input value={value == null || value === '' ? '—' : String(value)} disabled readOnly className="h-9 rounded-lg bg-muted/40 text-muted-foreground" />
+    </div>
+  );
+}
+
+const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: string }> = {
+  vendor_account_group: { code: 'KTOKK', desc: 'TXT30' },
+  company_code:         { code: 'BUKRS', desc: 'BUTXT' },
+  planning_group:       { code: 'GRUPP' },
+  recon_account:        { code: 'SAKNR', desc: 'TXT20', prefix: 'BUKRS' },
+  purchase_org:         { code: 'EKORG', desc: 'EKOTX' },
+  currency:             { code: 'WAERS', desc: 'LTEXT' },
+};
+
+function SapF4SelectField({
+  label, masterType, value, onChange, liveItems, placeholder,
+}: {
+  label: string;
+  masterType: string;
+  value: string;
+  onChange: (v: string) => void;
+  liveItems?: any[] | null;
+  placeholder?: string;
+}) {
+  const map = F4_FIELD_MAP[masterType];
+  const isLive = Array.isArray(liveItems);
+  const { data: cachedRows, isLoading: isLoadingCache } = useSapMasterData(isLive ? undefined : masterType);
+
+  const options = (() => {
+    if (isLive) {
+      return (liveItems || [])
+        .map((item) => {
+          const code = map ? item?.[map.code] : item?.code;
+          if (code === undefined || code === null || String(code).trim() === '') return null;
+          const desc = map?.desc ? item?.[map.desc] : item?.description;
+          const prefix = map?.prefix ? item?.[map.prefix] : null;
+          const codePart = prefix ? `${prefix} / ${code}` : String(code);
+          const labelText = desc ? `${codePart} — ${desc}` : codePart;
+          return { value: String(code), label: labelText };
+        })
+        .filter(Boolean) as { value: string; label: string }[];
+    }
+    return (cachedRows || []).map((r: any) => {
+      const extra = r.extra || {};
+      const code = map ? (extra[map.code] ?? r.code) : r.code;
+      const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
+      const prefix = map?.prefix ? extra[map.prefix] : null;
+      const codePart = prefix ? `${prefix} / ${code}` : String(code);
+      const labelText = desc ? `${codePart} — ${desc}` : codePart;
+      return { value: String(r.code), label: labelText };
+    });
+  })();
+
+  const isLoading = isLive ? false : isLoadingCache;
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Select value={value || undefined} onValueChange={(v) => onChange(v)}>
+        <SelectTrigger className="h-9 rounded-lg">
+          <SelectValue placeholder={placeholder || 'Select…'} />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              {isLoading ? 'Loading F4 values…' : 'No options available.'}
+            </div>
+          ) : (
+            options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                <span className="font-mono text-xs">{o.label}</span>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+      <p className="text-[11px] text-muted-foreground">
+        {isLoading
+          ? 'Loading F4 values…'
+          : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
+      </p>
     </div>
   );
 }
