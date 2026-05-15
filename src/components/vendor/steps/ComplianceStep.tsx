@@ -133,6 +133,9 @@ export function ComplianceStep({
     setStatuses((prev) => (prev[k] === s ? prev : { ...prev, [k]: s }));
 
   const [activeTab, setActiveTab] = useState<'gst' | 'pan' | 'msme' | 'bank'>('gst');
+  const [panTabResult, setPanTabResult] = useState<PanTabResult>({
+    ocrPan: '', ocrName: '', panCheck: 'idle', nameCheck: 'idle',
+  });
 
   const {
     register, handleSubmit, control, watch, setValue,
