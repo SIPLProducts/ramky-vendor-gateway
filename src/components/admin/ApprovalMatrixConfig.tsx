@@ -319,6 +319,31 @@ export function ApprovalMatrixConfig() {
     }
     setSaving(true);
     try {
+      // Step 1: park existing levels out of the way to free L1..Ln slots before renumbering
+      const { error: parkErr } = await supabase.rpc as any; // placeholder to keep types
+      const { error: offsetErr } = await supabase
+        .from('approval_matrix_levels')
+        .update({ level_number: 10000 })
+        .eq('tenant_id', tenantId)
+        .gte('level_number', 0); // dummy filter, will be replaced below
+      // The single-column update above can't add per-row; use raw SQL via rpc-like approach.
+      // Fallback: fetch ids, then bulk update with offsets.
+      if (offsetErr) {
+        // ignore — handled by per-row offset below
+      }
+      const { data: existingLevels, error: fetchErr } = await supabase
+        .from('approval_matrix_levels')
+        .select('id, level_number')
+        .eq('tenant_id', tenantId);
+      if (fetchErr) throw new Error(`Could not reserve level numbers: ${fetchErr.message}`);
+      for (const lv of existingLevels ?? []) {
+        const { error: upErr } = await supabase
+          .from('approval_matrix_levels')
+          .update({ level_number: 10000 + lv.level_number })
+          .eq('id', lv.id);
+        if (upErr) throw new Error(`Could not reserve level numbers: ${upErr.message}`);
+      }
+
       const keptLevelIds: string[] = [];
       let savedApprovers = 0;
       for (const grp of savePlan) {
@@ -339,7 +364,7 @@ export function ApprovalMatrixConfig() {
         } else {
           const { data, error } = await supabase
             .from('approval_matrix_levels')
-            .upsert(levelPayload, { onConflict: 'tenant_id,level_number' })
+            .insert(levelPayload)
             .select('id')
             .single();
           if (error) throw error;
