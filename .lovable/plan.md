@@ -1,41 +1,37 @@
-## Problem
-Autosave + manual save both call `uploadAllDocuments`, which does `SELECT → DELETE → INSERT` per document. Two concurrent runs race and the second `INSERT` violates the unique index `vendor_documents_vendor_type_unique` on `(vendor_id, document_type)`. The toast shown is:
+# Fix: Vendor submission blocked by RLS
 
-> Failed to save document metadata for gst_self_declaration: duplicate key value violates unique constraint "vendor_documents_vendor_type_unique"
+## Root cause
 
-## Fix (frontend only — `src/hooks/useVendorRegistration.tsx`)
+On submit, `useVendorRegistration` updates the vendor row with `status = 'scm_manager_review'` (the new SCM-first approval flow). But the existing RLS policy `"Vendors can update own draft data"` on `public.vendors` has a `WITH CHECK` that only permits the new status to be one of:
 
-### 1. Use `upsert` instead of delete-then-insert
-Change `saveDocumentMetadata` to:
-```ts
-supabase
-  .from('vendor_documents')
-  .upsert(
-    { vendor_id, document_type, file_name, file_path, file_size, mime_type },
-    { onConflict: 'vendor_id,document_type' }
-  );
 ```
-This is atomic against the unique index — no second writer can fail with a duplicate-key error. Drop the explicit `delete().eq('id', existing.id)` block; storage cleanup of the old object stays.
-
-### 2. Serialize `uploadAllDocuments` per vendor
-Add a module-level `Map<string, Promise<void>>` (or a `useRef`) so a second invocation for the same `vendorId` `await`s the in-flight one before starting:
-```ts
-const inFlight = useRef<Promise<void> | null>(null);
-const uploadAllDocuments = async (...) => {
-  if (inFlight.current) await inFlight.current.catch(() => {});
-  inFlight.current = (async () => { /* existing body */ })();
-  try { await inFlight.current; } finally { inFlight.current = null; }
-};
+draft, submitted, validation_pending, finance_review, purchase_review
 ```
 
-### 3. Clear in-memory `File` refs after a successful upload (defensive)
-After each successful upload of a doc, set the corresponding `formData.*.File` field to `null` (already partially done in earlier work — verify it covers `gst_self_declaration`, `msme_self_declaration`, both cancelled cheques, financial docs, and dealership cert). This stops autosave from re-uploading the same file.
+`scm_manager_review` is not in that list, so Postgres rejects the UPDATE with:
 
-## Verify
-- Open vendor registration, upload GST cert + GST self-declaration, then move to MSME step and upload MSME cert.
-- Confirm: no "Couldn't save — will retry" / no duplicate-key toast.
-- Check `vendor_documents` for the test vendor: exactly one row per `document_type`.
+> new row violates row-level security policy for table "vendors"
+
+This is why the toast says "Submission Failed" right at the end of step 6.
+
+## Fix
+
+Drop and recreate the `Vendors can update own draft data` policy so the WITH CHECK also allows the SCM/Finance/CEO review statuses the vendor's submit/resubmit transitions into:
+
+```
+draft, submitted, validation_pending,
+purchase_review, finance_review,
+scm_manager_review, scm_head_review,
+finance_1_review, finance_2_review,
+ceo_office_review
+```
+
+USING clause stays the same (vendor can only edit their own row while it's in `draft`, `validation_failed`, or `finance_rejected`) — so this only widens what the row may transition *into*, not which rows the vendor can touch.
+
+No frontend code changes. After the migration, submission will go through and the existing success dialog + buyer notification email will fire as designed.
 
 ## Out of scope
-- No DB migration. The unique index stays — it's the safety net that exposed this bug.
-- No edge-function changes.
+
+- No changes to other vendor RLS policies.
+- No changes to the submit flow, notification function, or success dialog.
+- The duplicate-document concurrency fix from the previous turn stays as-is.
