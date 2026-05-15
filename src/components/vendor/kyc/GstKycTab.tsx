@@ -14,6 +14,13 @@ import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 
+import {
+  evaluateCrossNameMatch,
+  formatCrossMatchSuccess,
+  formatCrossMatchFailure,
+} from '@/lib/nameMatch';
+import { CheckCircle2, XCircle } from 'lucide-react';
+
 interface GstKycTabProps {
   isGstRegistered: boolean;
   onIsGstRegisteredChange: (val: boolean) => void;
@@ -29,12 +36,20 @@ interface GstKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed' | 'na') => void;
   vendorId?: string;
+  /** Cross-tab refs for name policy (only used if any are already verified). */
+  panHolderName?: string;
+  msmeEnterpriseName?: string;
+  bankAccountHolderName?: string;
 }
 
 export function GstKycTab(props: GstKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
-  const { state, verify, reset } = useProviderVerify();
+  const { state, verify, reset, setState } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
+  const [legalNameCheck, setLegalNameCheck] =
+    useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
+  const [legalNameCheckMessage, setLegalNameCheckMessage] = useState<string>('');
+  const [verifiedLegalName, setVerifiedLegalName] = useState<string>('');
 
   if (props.onStatusChange) {
     const status = !props.isGstRegistered
@@ -43,14 +58,42 @@ export function GstKycTab(props: GstKycTabProps) {
     props.onStatusChange(status as any);
   }
 
+  // Cross-field name policy: GST Legal Name vs PAN/MSME/Bank verified names.
+  // If no other names are verified yet (typical first-tab case), we skip.
+  const evalLegalName = (apiName: string) => {
+    const r = evaluateCrossNameMatch(apiName, [
+      { field: 'PAN Holder Name', value: props.panHolderName },
+      { field: 'MSME Enterprise Name', value: props.msmeEnterpriseName },
+      { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
+    ]);
+    if (r.skipped) return { status: 'skipped' as const, message: '' };
+    if (r.passed)
+      return { status: 'passed' as const, message: formatCrossMatchSuccess('GST Legal Name', r.matches) };
+    return { status: 'failed' as const, message: formatCrossMatchFailure('GST Legal Name', r.best) };
+  };
+
   const handleManualVerify = async () => {
+    setLegalNameCheck('idle');
+    setLegalNameCheckMessage('');
+    setVerifiedLegalName('');
     const r = await verify({
       providerName: 'GST',
       label: 'GST',
       input: { gstin: props.gstin, id_number: props.gstin },
       validate: (data) => {
         const apiName = String(data.legal_name || data.business_name || '').trim();
-        return { ok: true, message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`, data };
+        setVerifiedLegalName(apiName);
+        const check = evalLegalName(apiName);
+        setLegalNameCheck(check.status);
+        setLegalNameCheckMessage(check.message);
+        if (check.status === 'failed') {
+          return { ok: false, message: check.message, data };
+        }
+        return {
+          ok: true,
+          message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
+          data,
+        };
       },
     });
     if (r.ok) props.onVerifiedDetails?.(r.data || {});
@@ -129,17 +172,28 @@ export function GstKycTab(props: GstKycTabProps) {
       };
     }
 
-    // GST registry is the source of truth — no user-entered name comparison here.
-    // Cross-checks against the holder name are performed on the PAN/MSME/Bank tabs.
+    // GST registry is the source of truth for the GSTIN. The Legal Name is
+    // additionally cross-checked against any other already-verified names
+    // (PAN / MSME / Bank). On a typical first-tab run there are no refs and
+    // we simply skip the check.
     const apiName = String(merged.legal_name || merged.business_name || merged.trade_name || '').trim();
+    setVerifiedLegalName(apiName);
+    const check = evalLegalName(apiName);
+    setLegalNameCheck(check.status);
+    setLegalNameCheckMessage(check.message);
 
-    // Commit the registry GSTIN to the form (covers OCR misreads of single chars)
-    // and pass the merged record up so missing fields auto-populate.
     if (apiGstin) props.onGstinChange(apiGstin);
+
+    if (check.status === 'failed') {
+      // Surface failure via setState so the OCR component renders the error.
+      setState({ status: 'failed', message: check.message, data: merged });
+      return { ok: false, message: check.message, apiData: merged, apiResult: verify };
+    }
+
     props.onVerifiedDetails?.(merged);
     return {
       ok: true,
-      message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
+      message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
       apiData: merged,
       apiResult: verify,
     };
@@ -202,7 +256,34 @@ export function GstKycTab(props: GstKycTabProps) {
             />
           </TabsContent>
         </Tabs>
-      ) : (
+      ) : null}
+
+      {props.isGstRegistered && legalNameCheck !== 'idle' && legalNameCheck !== 'skipped' && verifiedLegalName && (
+        <div
+          className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
+            legalNameCheck === 'failed'
+              ? 'border-destructive/30 bg-destructive/5'
+              : 'border-success/30 bg-success/5'
+          }`}
+        >
+          {legalNameCheck === 'failed' ? (
+            <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
+          )}
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex flex-wrap gap-x-2 items-baseline">
+              <span className="text-xs text-muted-foreground">GST Legal Name:</span>
+              <span className="font-medium break-words">{verifiedLegalName}</span>
+            </div>
+            <div className={legalNameCheck === 'failed' ? 'text-destructive' : 'text-success'}>
+              {legalNameCheckMessage}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {props.isGstRegistered ? null : (
         <div className="space-y-4">
           <Alert>
             <AlertDescription>

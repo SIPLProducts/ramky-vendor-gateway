@@ -129,6 +129,8 @@ export function ComplianceStep({
   const [gstLegalName, setGstLegalName] = useState<string | undefined>();
   const [gstPanNumber, setGstPanNumber] = useState<string | undefined>();
   const [panHolderName, setPanHolderName] = useState<string | undefined>();
+  const [msmeEnterpriseName, setMsmeEnterpriseName] = useState<string | undefined>();
+  const [bankAccountHolderName, setBankAccountHolderName] = useState<string | undefined>();
   const setStatus = (k: keyof typeof statuses, s: KycStatus) =>
     setStatuses((prev) => (prev[k] === s ? prev : { ...prev, [k]: s }));
 
@@ -217,8 +219,11 @@ export function ComplianceStep({
     const udyam = pickStr(d.udyam_number);
     if (udyam) setValue('msmeNumber' as any, udyam);
 
-    const enterpriseName = pickStr(d.enterprise_name || d.legal_name);
-    if (enterpriseName) setValue('msmeEnterpriseName' as any, enterpriseName);
+    const enterpriseName = pickStr(d.enterprise_name || d.legal_name || d.name_of_enterprise);
+    if (enterpriseName) {
+      setValue('msmeEnterpriseName' as any, enterpriseName);
+      setMsmeEnterpriseName(enterpriseName);
+    }
     const enterpriseType = pickStr(d.enterprise_type);
     if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
     const classificationYear = pickStr(d.classification_year);
@@ -267,7 +272,10 @@ export function ComplianceStep({
     setIfscCode(b.ifscCode);
     if (b.bankName) setBankName(b.bankName);
     if (b.branchName) setBranchName(b.branchName);
-    if (b.accountHolderName) setAccountHolderName(b.accountHolderName);
+    if (b.accountHolderName) {
+      setAccountHolderName(b.accountHolderName);
+      setBankAccountHolderName(b.accountHolderName);
+    }
   };
 
   const handleFormSubmit = (formData: StatutoryDetails) => {
@@ -362,6 +370,9 @@ export function ComplianceStep({
             onVerifiedDetails={handleGstVerified}
             onStatusChange={(s) => setStatus('gst', s)}
             vendorId={vendorId}
+            panHolderName={panHolderName}
+            msmeEnterpriseName={msmeEnterpriseName}
+            bankAccountHolderName={bankAccountHolderName}
           />
         }
         pan={
@@ -377,6 +388,8 @@ export function ComplianceStep({
             gstPanNumber={gstPanNumber}
             gstLegalName={gstLegalName}
             gstVerified={statuses.gst === 'passed'}
+            msmeEnterpriseName={msmeEnterpriseName}
+            bankAccountHolderName={bankAccountHolderName}
             ocrResult={panTabResult}
             onOcrResultChange={setPanTabResult}
           />
@@ -400,6 +413,7 @@ export function ComplianceStep({
             vendorId={vendorId}
             panHolderName={panHolderName}
             gstLegalName={gstLegalName}
+            bankAccountHolderName={bankAccountHolderName}
           />
         }
         bank={
@@ -414,6 +428,7 @@ export function ComplianceStep({
             vendorId={vendorId}
             gstLegalName={gstLegalName}
             panHolderName={panHolderName}
+            msmeEnterpriseName={msmeEnterpriseName}
           />
         }
       />

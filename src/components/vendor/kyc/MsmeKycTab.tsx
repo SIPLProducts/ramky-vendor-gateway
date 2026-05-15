@@ -14,9 +14,12 @@ import { useConfiguredKycApi, type KycApiResult } from '@/hooks/useConfiguredKyc
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { toastKycResult } from '@/lib/kycToast';
-import { nameMatchPercentage } from '@/lib/nameMatch';
+import {
+  evaluateCrossNameMatch,
+  formatCrossMatchSuccess,
+  formatCrossMatchFailure,
+} from '@/lib/nameMatch';
 
-const NAME_MATCH_THRESHOLD = 40;
 import {
   AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -42,6 +45,8 @@ interface MsmeKycTabProps {
   panHolderName?: string;
   /** Verified GST legal name from the GST tab — used to validate enterprise name. */
   gstLegalName?: string;
+  /** Verified bank account holder name — used as another cross-check reference. */
+  bankAccountHolderName?: string;
 }
 
 export function MsmeKycTab(props: MsmeKycTabProps) {
@@ -51,7 +56,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
   const [enterpriseName, setEnterpriseName] = useState<string>('');
   const [enterpriseCheck, setEnterpriseCheck] =
-    useState<'idle' | 'pan' | 'failed'>('idle');
+    useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
+  const [enterpriseCheckMessage, setEnterpriseCheckMessage] = useState<string>('');
   const [mismatchOpen, setMismatchOpen] = useState(false);
 
   if (props.onStatusChange) {
@@ -67,24 +73,33 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     return '';
   };
 
-  // Cross-tab name check: enterprise name is validated against the verified
-  // PAN Holder Name only (≥ 40% similarity is treated as a match).
+  // Cross-tab name check: enterprise name is validated against ALL other
+  // available verified names (GST / PAN / Bank). Any match >= 20% allows
+  // the tab to pass; below that we block and show a mismatch message.
   const checkEnterpriseName = (apiName: string): {
-    status: 'pan' | 'failed' | 'skipped';
+    status: 'passed' | 'failed' | 'skipped';
     message: string;
   } => {
-    const pan = props.panHolderName?.trim();
-    if (!apiName || !pan) return { status: 'skipped', message: '' };
-    const score = nameMatchPercentage(apiName, pan);
-    if (score >= NAME_MATCH_THRESHOLD) {
+    const evalResult = evaluateCrossNameMatch(apiName, [
+      { field: 'GST Legal Name', value: props.gstLegalName },
+      { field: 'PAN Holder Name', value: props.panHolderName },
+      { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
+    ]);
+    if (evalResult.skipped) {
       return {
-        status: 'pan',
-        message: `Enterprise Name verified with PAN Holder Name (${score}% match).`,
+        status: 'skipped',
+        message: 'Enterprise Name captured (no other verified names yet to cross-check).',
+      };
+    }
+    if (evalResult.passed) {
+      return {
+        status: 'passed',
+        message: formatCrossMatchSuccess('Enterprise Name', evalResult.matches),
       };
     }
     return {
       status: 'failed',
-      message: `Enterprise Name does not match PAN Holder Name (only ${score}% match, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
+      message: formatCrossMatchFailure('Enterprise Name', evalResult.best),
     };
   };
 
@@ -102,12 +117,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
         ).trim();
         setEnterpriseName(apiName);
         const check = checkEnterpriseName(apiName);
+        setEnterpriseCheckMessage(check.message);
         if (check.status === 'failed') {
           setEnterpriseCheck('failed');
           setMismatchOpen(true);
           return { ok: false, message: check.message, data };
         }
-        if (check.status !== 'skipped') setEnterpriseCheck(check.status);
+        setEnterpriseCheck(check.status === 'skipped' ? 'skipped' : 'passed');
         const cat = pick(data.enterprise_type).toLowerCase();
         if (cat === 'micro' || cat === 'small' || cat === 'medium') {
           props.onMsmeCategoryChange?.(cat as any);
@@ -159,12 +175,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
     setEnterpriseName(apiName);
 
     const check = checkEnterpriseName(apiName);
+    setEnterpriseCheckMessage(check.message);
     if (check.status === 'failed') {
       setEnterpriseCheck('failed');
       setMismatchOpen(true);
       return { ok: false, message: check.message, apiData: merged };
     }
-    if (check.status !== 'skipped') setEnterpriseCheck(check.status);
+    setEnterpriseCheck(check.status === 'skipped' ? 'skipped' : 'passed');
 
     const cat = pick(merged.enterprise_type).toLowerCase();
     if (cat === 'micro' || cat === 'small' || cat === 'medium') {
@@ -177,13 +194,6 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       apiData: merged,
     };
   };
-
-  const checkMessage = (() => {
-    if (enterpriseCheck === 'pan') return 'Enterprise Name verified with PAN Holder Name.';
-    if (enterpriseCheck === 'failed')
-      return 'Enterprise Name does not match PAN Holder Name.';
-    return '';
-  })();
 
   return (
     <div className="space-y-5">
@@ -265,7 +275,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               <span className="font-medium break-words">{enterpriseName}</span>
             </div>
             <div className={enterpriseCheck === 'failed' ? 'text-destructive' : 'text-success'}>
-              {checkMessage}
+              {enterpriseCheckMessage}
             </div>
           </div>
         </div>
@@ -276,8 +286,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Enterprise Name mismatch</AlertDialogTitle>
             <AlertDialogDescription>
-              Enterprise Name does not match the verified PAN Holder Name.
-              Please re-check your MSME / Udyam certificate and resolve the mismatch
+              {enterpriseCheckMessage || 'Enterprise Name does not match any of the verified names (GST / PAN / Bank).'}
+              <br /><br />Please re-check your MSME / Udyam certificate and resolve the mismatch
               before continuing.
             </AlertDialogDescription>
           </AlertDialogHeader>
