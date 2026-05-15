@@ -102,21 +102,40 @@ serve(async (req) => {
       });
     }
 
-    if (!vendor.invitation_id) {
-      console.log("[notify-vendor-submission] No invitation_id, skipping");
+    // Resolve the invitation linked to this vendor. Prefer the explicit
+    // invitation_id on the vendor row; fall back to looking up by vendor_id
+    // (claim_invitation sets vendor_id on the invitation at submit time).
+    let invite: { id: string; created_by: string | null } | null = null;
+
+    if (vendor.invitation_id) {
+      const { data } = await supabase
+        .from("vendor_invitations")
+        .select("id, created_by")
+        .eq("id", vendor.invitation_id)
+        .maybeSingle();
+      invite = (data as any) ?? null;
+    }
+
+    if (!invite) {
+      const { data } = await supabase
+        .from("vendor_invitations")
+        .select("id, created_by")
+        .eq("vendor_id", vendor.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      invite = (data as any) ?? null;
+    }
+
+    if (!invite) {
+      console.log("[notify-vendor-submission] No invitation linked to vendor, skipping");
       return new Response(JSON.stringify({ success: true, skipped: "no_invitation" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: invite } = await supabase
-      .from("vendor_invitations")
-      .select("created_by")
-      .eq("id", vendor.invitation_id)
-      .maybeSingle();
-
-    if (!invite?.created_by) {
-      console.log("[notify-vendor-submission] No inviter (created_by) on invitation, skipping");
+    if (!invite.created_by) {
+      console.log("[notify-vendor-submission] Invitation has no created_by (inviter), skipping");
       return new Response(JSON.stringify({ success: true, skipped: "no_inviter" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

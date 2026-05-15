@@ -152,6 +152,7 @@ export default function AdminInvitations() {
           tenant_id: tenantId || null,
           vendor_name: vendorName || null,
           phone_number: phoneNumber || null,
+          created_by: user?.id ?? null,
         })
         .select('*')
         .single();

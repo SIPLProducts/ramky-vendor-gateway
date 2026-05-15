@@ -560,6 +560,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (!vendorData.tenant_id && (invitation as any)?.tenant_id) {
         vendorData.tenant_id = (invitation as any).tenant_id;
       }
+      // Persist link to the invitation so notification emails can find the inviter
+      if ((invitation as any)?.id) {
+        vendorData.invitation_id = (invitation as any).id;
+      }
 
       if (vendorId) {
         const { data, error } = await supabase
@@ -617,16 +621,33 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       // Update vendor with verification statuses and submit
       // New flow: submission goes to Purchase/SCM matrix first, then Finance
+      const submitUpdate: Record<string, unknown> = {
+        ...verificationStatuses,
+        status: 'scm_manager_review' as const, // Goes to SCM Manager approval first
+        submitted_at: new Date().toISOString(),
+      };
+      // Backfill invitation link in case the row was created before this fix
+      if ((invitation as any)?.id) {
+        submitUpdate.invitation_id = (invitation as any).id;
+      }
       const { error: updateError } = await supabase
         .from('vendors')
-        .update({
-          ...verificationStatuses,
-          status: 'scm_manager_review' as const, // Goes to SCM Manager approval first
-          submitted_at: new Date().toISOString(),
-        })
+        .update(submitUpdate)
         .eq('id', vendor.id);
 
       if (updateError) throw updateError;
+
+      // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe) BEFORE notifying,
+      // so the notification function can resolve the inviter reliably.
+      if (options?.invitationToken) {
+        const { error: claimErr } = await supabase.rpc('claim_invitation', {
+          _token: options.invitationToken,
+          _vendor_id: vendor.id,
+        });
+        if (claimErr) {
+          console.warn('claim_invitation failed (non-blocking):', claimErr);
+        }
+      }
 
       // Initialise approval matrix progress
       try {
@@ -652,17 +673,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         console.error('route-vendor-approval threw:', e);
       }
 
-      // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
-      if (options?.invitationToken) {
-        const { error: claimErr } = await supabase.rpc('claim_invitation', {
-          _token: options.invitationToken,
-          _vendor_id: vendor.id,
-        });
-        if (claimErr) {
-          console.warn('claim_invitation failed (non-blocking):', claimErr);
-        }
-      }
-
       // Log submission
       await supabase.from('audit_logs').insert({
         vendor_id: vendor.id,
@@ -674,12 +684,16 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         },
       });
 
-      // Send notification email to admin about new vendor submission
+      // Send notification email to buyer who invited this vendor
       try {
-        await supabase.functions.invoke('notify-vendor-submission', {
+        const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-vendor-submission', {
           body: { vendorId: vendor.id },
         });
-        console.log('[Vendor] Submission notification email sent successfully');
+        if (notifyError) {
+          console.error('[Vendor] notify-vendor-submission error:', notifyError);
+        } else {
+          console.log('[Vendor] Submission notification result:', notifyData);
+        }
       } catch (notifyError) {
         // Don't fail the submission if notification fails
         console.error('[Vendor] Failed to send submission notification:', notifyError);
