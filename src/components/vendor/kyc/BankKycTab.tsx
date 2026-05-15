@@ -56,7 +56,8 @@ export function BankKycTab(props: BankKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const [holderName, setHolderName] = useState<string>('');
   const [holderCheck, setHolderCheck] =
-    useState<'idle' | 'gst+pan' | 'gst' | 'pan' | 'failed'>('idle');
+    useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
+  const [holderCheckMessage, setHolderCheckMessage] = useState<string>('');
 
   // Manual fallback popup
   const [popupOpen, setPopupOpen] = useState(false);
