@@ -173,14 +173,18 @@ serve(async (req) => {
     const action = resubmission ? "resubmitted" : "submitted";
     const subject = `Vendor Submitted Registration Form – ${vendorName}`;
 
+    const vendorRef = vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+
     const html = buildHtml({
       inviterFirstName,
       vendorName,
       primaryContact: vendor.primary_contact_name || "",
       primaryEmail: vendor.primary_email || "",
+      primaryPhone: (vendor as any).primary_phone || "",
       submittedAt,
       resubmission,
       vendorId: vendor.id,
+      vendorRef,
       action,
     });
 
@@ -207,9 +211,14 @@ serve(async (req) => {
       console.error("audit_logs insert failed", e);
     }
 
-    return new Response(JSON.stringify({ success: true, sentTo: profile.email }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        sentTo: profile.email,
+        inviter: { name: fullName || profile.email, email: profile.email },
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err: any) {
     console.error("notify-vendor-submission error:", err);
     return new Response(JSON.stringify({ success: false, error: err?.message ?? String(err) }), {
