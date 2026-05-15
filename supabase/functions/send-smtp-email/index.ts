@@ -161,10 +161,25 @@ const handler = async (req: Request): Promise<Response> => {
       : fromEmail;
 
     const toArr = Array.isArray(body.to) ? body.to : [body.to];
-    const ccArr = body.cc ? (Array.isArray(body.cc) ? body.cc : [body.cc]) : undefined;
+    const baseCc = body.cc ? (Array.isArray(body.cc) ? body.cc : [body.cc]) : [];
     const bccArr = body.bcc ? (Array.isArray(body.bcc) ? body.bcc : [body.bcc]) : undefined;
 
-    console.log(`[send-smtp-email] from="${from}" to=${JSON.stringify(toArr)}`);
+    // Merge extra Reply-To addresses into Cc, deduped, excluding addresses
+    // already in To.
+    const toLower = new Set(toArr.map((a) => String(a).toLowerCase().trim()));
+    const ccSet = new Map<string, string>();
+    for (const c of [...baseCc, ...replyToCcExtras]) {
+      const s = String(c).trim();
+      if (!s) continue;
+      const key = s.toLowerCase();
+      if (toLower.has(key)) continue;
+      if (!ccSet.has(key)) ccSet.set(key, s);
+    }
+    let ccArr: string[] | undefined = ccSet.size ? Array.from(ccSet.values()) : undefined;
+
+    console.log(
+      `[send-smtp-email] from="${from}" to=${JSON.stringify(toArr)} cc=${JSON.stringify(ccArr ?? [])} replyTo=${JSON.stringify(replyTo || null)}`,
+    );
 
     // Build plain-text fallback from HTML if not explicitly provided
     const plainText = body.text ?? (body.html
@@ -183,16 +198,34 @@ const handler = async (req: Request): Promise<Response> => {
           .trim()
       : "");
 
-    await client.send({
-      from,
-      to: toArr,
-      cc: ccArr,
-      bcc: bccArr,
-      replyTo: replyTo || undefined,
-      subject: body.subject,
-      content: plainText,
-      html: body.html,
-    });
+    const trySend = async () => {
+      await client.send({
+        from,
+        to: toArr,
+        cc: ccArr,
+        bcc: bccArr,
+        replyTo: replyTo || undefined,
+        subject: body.subject,
+        content: plainText,
+        html: body.html,
+      });
+    };
+
+    try {
+      await trySend();
+    } catch (sendErr: any) {
+      const msg = String(sendErr?.message ?? sendErr);
+      // If denomailer still rejects something Reply-To related, retry once
+      // without Reply-To and the extra Cc so the buyer email goes through.
+      if (/reply.?to/i.test(msg) || /not a valid email/i.test(msg)) {
+        console.warn(`[send-smtp-email] Retrying without Reply-To/extra Cc due to: ${msg}`);
+        replyTo = "";
+        ccArr = baseCc.length ? baseCc.map(String) : undefined;
+        await trySend();
+      } else {
+        throw sendErr;
+      }
+    }
 
     await client.close();
 
