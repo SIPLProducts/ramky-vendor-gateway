@@ -2137,14 +2137,22 @@ export function DocumentVerificationStep({
                                 verifiedValue={m.udyam_number}
                                 verifiedLabel="Udyam Number is verified"
                               />
-                              <EditableOcrField
-                                label="Enterprise Name"
-                                value={msmeDoc.ocrData?.enterprise_name}
-                                originalValue={msmeDoc.originalOcrData?.enterprise_name}
-                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
-                                verifiedValue={m.enterprise_name}
-                                verifiedLabel="Enterprise Name matches registry"
-                              />
+                              <div className="md:col-span-2">
+                                <EditableOcrField
+                                  label="Enterprise Name"
+                                  value={msmeDoc.ocrData?.enterprise_name}
+                                  originalValue={msmeDoc.originalOcrData?.enterprise_name}
+                                  onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
+                                  verifiedValue={m.enterprise_name}
+                                  verifiedLabel="Enterprise Name matches registry"
+                                />
+                                {msmeDoc.apiData?.enterpriseNameMessage && (
+                                  <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
+                                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                    <span>{msmeDoc.apiData.enterpriseNameMessage}</span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <EditableOcrField
