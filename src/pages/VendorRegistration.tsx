@@ -992,6 +992,13 @@ export default function VendorRegistration() {
           </div>
         </main>
       </div>
+      </div>
+      <SubmissionSuccessDialog
+        open={submissionSuccess.open}
+        inviter={submissionSuccess.inviter}
+        notifyFailed={submissionSuccess.notifyFailed}
+        onClose={handleSubmissionDialogClose}
+      />
     </div>
   );
 }
