@@ -88,39 +88,26 @@ export function BankKycTab(props: BankKycTabProps) {
     const apiName = (pickString(apiData.full_name) || pickString(apiData.name_at_bank)).trim();
     setHolderName(apiName);
 
-    const panScore = nameMatchPercentage(apiName, props.panHolderName);
-    const gstScore = nameMatchPercentage(apiName, props.gstLegalName);
-    const panOk = panScore >= NAME_MATCH_THRESHOLD;
-    const gstOk = gstScore >= NAME_MATCH_THRESHOLD;
-
-    const refsLabel = props.panHolderName && props.gstLegalName
-      ? 'PAN Holder Name and GST Legal Name'
-      : props.panHolderName
-        ? 'PAN Holder Name'
-        : props.gstLegalName
-          ? 'GST Legal Name'
-          : '';
+    const nameEval = evaluateCrossNameMatch(apiName, [
+      { field: 'GST Legal Name', value: props.gstLegalName },
+      { field: 'PAN Holder Name', value: props.panHolderName },
+      { field: 'MSME Enterprise Name', value: props.msmeEnterpriseName },
+    ]);
 
     let nameMessage = '';
-    if (apiName && (props.gstLegalName || props.panHolderName)) {
-      if (panOk && gstOk) {
-        setHolderCheck('gst+pan');
-        nameMessage = `Account Holder Name verified with PAN Holder Name (${panScore}% match) and GST Legal Name (${gstScore}% match).`;
-      } else if (panOk) {
-        setHolderCheck('pan');
-        nameMessage = `Account Holder Name verified with PAN Holder Name (${panScore}% match).`;
-      } else if (gstOk) {
-        setHolderCheck('gst');
-        nameMessage = `Account Holder Name verified with GST Legal Name (${gstScore}% match).`;
-      } else {
-        setHolderCheck('failed');
-        props.onStatusChange?.('failed');
-        return {
-          ok: false,
-          message: `Account Holder Name does not match with the provided ${refsLabel || 'PAN'} (best match ${Math.max(panScore, gstScore)}%, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
-          apiData,
-        };
-      }
+    if (nameEval.skipped) {
+      setHolderCheck('skipped');
+      setHolderCheckMessage('');
+    } else if (nameEval.passed) {
+      setHolderCheck('passed');
+      nameMessage = formatCrossMatchSuccess('Account Holder Name', nameEval.matches);
+      setHolderCheckMessage(nameMessage);
+    } else {
+      setHolderCheck('failed');
+      nameMessage = formatCrossMatchFailure('Account Holder Name', nameEval.best);
+      setHolderCheckMessage(nameMessage);
+      props.onStatusChange?.('failed');
+      return { ok: false, message: nameMessage, apiData };
     }
 
     props.onBankDetailsChange({
