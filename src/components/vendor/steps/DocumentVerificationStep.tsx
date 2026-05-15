@@ -2204,12 +2204,6 @@ export function DocumentVerificationStep({
                 )}
 
 
-                {isMsmeRegistered === true && msmeDoc.status === "verified" && typeof msmeDoc.nameMatchScore === "number" && (
-                  <CrossCheckStrip
-                    ok={msmeDoc.nameMatchScore >= 80}
-                    text={`Name match vs Legal Name: ${msmeDoc.nameMatchScore}%`}
-                  />
-                )}
               </div>
             </StageShell>
           </TabsContent>
