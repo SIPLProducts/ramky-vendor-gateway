@@ -37,6 +37,7 @@ function isMsme(v: any): boolean {
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
+  const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     let cancelled = false;
     const tenantId = (vendor as any)?.tenant_id;
     setForm(buildDefaults(vendor, null));
+    setLiveF4(null);
     if (tenantId) {
       (async () => {
         const { data } = await supabase
@@ -54,26 +56,32 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setForm(buildDefaults(vendor, data));
       })();
     }
-    setF4Status({ state: 'loading', message: 'Refreshing F4 options from SAP Fields F4 API…' });
+    setF4Status({ state: 'loading', message: 'Calling SAP Fields F4 API… please wait.' });
     const slowTimer = window.setTimeout(() => {
       if (!cancelled) {
-        setF4Status({ state: 'error', message: 'SAP Fields F4 API is taking longer than expected. Showing cached F4 options if available.' });
+        setF4Status((prev) => prev.state === 'loading'
+          ? { state: 'loading', message: 'SAP Fields F4 API is taking longer than expected. Still waiting…' }
+          : prev);
       }
-    }, 20000);
+    }, 60000);
     (async () => {
       try {
-        const res = await refreshMaster.mutateAsync(undefined);
+        const res: any = await refreshMaster.mutateAsync(undefined);
         if (cancelled) return;
         window.clearTimeout(slowTimer);
         if (res?.success) {
-          const total = Object.values(res.summary || {}).reduce((s, v: any) => s + (v.upserted || 0), 0);
-          setF4Status({ state: 'success', message: `${total} F4 options refreshed from SAP.` });
+          if (res.sap_response && typeof res.sap_response === 'object') {
+            setLiveF4(res.sap_response as Record<string, any[]>);
+          }
+          const total = Object.values(res.summary || {}).reduce((s: number, v: any) => s + (v.upserted || 0), 0);
+          setF4Status({ state: 'success', message: `${total} F4 options loaded from SAP Fields F4 API.` });
         } else {
-          setF4Status({ state: 'error', message: res?.message || 'SAP Fields F4 refresh failed.' });
+          const hint = res?.hint ? ` ${res.hint}` : '';
+          setF4Status({ state: 'error', message: `${res?.message || 'SAP Fields F4 refresh failed.'}${hint} Showing cached F4 options if available.` });
         }
       } catch (e: any) {
         window.clearTimeout(slowTimer);
-        if (!cancelled) setF4Status({ state: 'error', message: e?.message || 'SAP Fields F4 refresh failed.' });
+        if (!cancelled) setF4Status({ state: 'error', message: `${e?.message || 'SAP Fields F4 refresh failed.'} Showing cached F4 options if available.` });
       }
     })();
     return () => { cancelled = true; window.clearTimeout(slowTimer); };
