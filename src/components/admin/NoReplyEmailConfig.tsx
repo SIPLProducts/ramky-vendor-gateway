@@ -324,11 +324,13 @@ export function NoReplyEmailConfig() {
           </div>
           <div className="space-y-2">
             <Label>Reply-To (optional)</Label>
-            <Input
-              placeholder="support@example.com"
+            <ReplyToChips
               value={form.smtp_reply_to}
-              onChange={(e) => setForm((f) => ({ ...f, smtp_reply_to: e.target.value }))}
+              onChange={(v) => setForm((f) => ({ ...f, smtp_reply_to: v }))}
             />
+            <p className="text-xs text-muted-foreground">
+              Add one or more emails. Press Enter or comma after each. Replies to buyer notifications go to all listed addresses.
+            </p>
           </div>
         </div>
 
