@@ -275,7 +275,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               <span className="font-medium break-words">{enterpriseName}</span>
             </div>
             <div className={enterpriseCheck === 'failed' ? 'text-destructive' : 'text-success'}>
-              {checkMessage}
+              {enterpriseCheckMessage}
             </div>
           </div>
         </div>
