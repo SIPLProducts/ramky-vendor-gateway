@@ -270,7 +270,7 @@ export function BankKycTab(props: BankKycTabProps) {
         vendorId={props.vendorId}
       />
 
-      {holderCheck !== 'idle' && holderName && (
+      {holderCheck !== 'idle' && holderCheck !== 'skipped' && holderName && (
         <div
           className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
             holderCheck === 'failed'
