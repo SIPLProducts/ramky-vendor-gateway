@@ -14,6 +14,13 @@ import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 
+import {
+  evaluateCrossNameMatch,
+  formatCrossMatchSuccess,
+  formatCrossMatchFailure,
+} from '@/lib/nameMatch';
+import { CheckCircle2, XCircle } from 'lucide-react';
+
 interface GstKycTabProps {
   isGstRegistered: boolean;
   onIsGstRegisteredChange: (val: boolean) => void;
@@ -29,6 +36,10 @@ interface GstKycTabProps {
   onVerifiedDetails?: (data: Record<string, any>) => void;
   onStatusChange?: (status: 'idle' | 'validating' | 'passed' | 'failed' | 'na') => void;
   vendorId?: string;
+  /** Cross-tab refs for name policy (only used if any are already verified). */
+  panHolderName?: string;
+  msmeEnterpriseName?: string;
+  bankAccountHolderName?: string;
 }
 
 export function GstKycTab(props: GstKycTabProps) {
