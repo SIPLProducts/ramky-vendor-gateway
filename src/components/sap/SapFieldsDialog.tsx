@@ -167,7 +167,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
-              <SapMasterCombobox label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} />
+              <SapMasterCombobox label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
             </Section>
@@ -176,10 +176,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
-              <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} />
-              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} />
+              <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" />
+              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
-              <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} />
+              <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
@@ -188,8 +188,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Purchase Data */}
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} />
-              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} />
+              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" />
+              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
@@ -238,19 +238,19 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
   const d = tenantDefaults || {};
   return {
     partn_cat: d.partn_cat ?? '2',
-    partn_grp: d.partn_grp ?? 'ZDOM',
+    partn_grp: d.partn_grp ?? '',
     title: d.title ?? '0003',
     taxtype: d.taxtype ?? 'IN3',
     msme: msme ? 'MIC' : '',
     idtype: msme ? 'ZMSMEN' : '',
     idnum: (vendor as any)?.msme_number || '',
-    bukrs: d.bukrs ?? '1000',
-    akont: d.akont ?? '155000005',
+    bukrs: d.bukrs ?? '',
+    akont: d.akont ?? '',
     zuawa: d.zuawa ?? '014',
     cdi: d.cdi ?? 'X',
-    fdgrv: d.fdgrv ?? 'A1',
-    vkorg: d.vkorg ?? '1000',
-    waers: d.waers ?? 'INR',
+    fdgrv: d.fdgrv ?? '',
+    vkorg: d.vkorg ?? '',
+    waers: d.waers ?? '',
     kalsk: d.kalsk ?? 'L1',
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',

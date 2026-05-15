@@ -1,51 +1,75 @@
-## What is happening today
+## Root cause found
 
-- Click on **Prepare & Sync** opens **SAP Field Confirmation** and triggers `sap-master-fetch` (which calls the `SAP Fields F4` API via the Node middleware in proxy mode).
-- The dropdowns (`Vendor Account Group`, `Company Code`, `Planning Group`, `Rec-Account`, `Purchase Org`, `Currency`) are SAP master comboboxes (`SapMasterCombobox`). They render correctly as dropdowns and show "159 / 534 / 14 options loaded" — but those values come from the **cached `sap_master_data` table**, not from the live F4 response.
-- The live refresh in your screenshot fails with `Middleware HTTP 401: Unauthorized`. That comes from `middleware/server.js`, which logs `[WARN] MIDDLEWARE_SHARED_SECRET is not set — refusing all authenticated requests.` So the live F4 call never reaches SAP, and the dialog only falls back to old cached data.
-- The edge function already returns the full F4 JSON (`sap_response: { VENDOR_ACC_GRP, COMPANY_CODE, PLANNING_GROUP, RECON_ACCOUNT, PURCHASE_ORG, CURRENCY }`), but the UI is not consuming it directly — it relies entirely on the DB cache.
+1. The six SAP F4 fields are already using a custom combobox component. In HTML/devtools it appears as a `<button role="combobox">`, which is normal for shadcn/Radix dropdown controls, but it is still a dropdown behaviorally.
+2. Values are preselected because `SapFieldsDialog.buildDefaults()` hardcodes defaults:
+   - `partn_grp = ZDOM`
+   - `bukrs = 1000`
+   - `akont = 155000005`
+   - `fdgrv = A1`
+   - `vkorg = 1000`
+   - `waers = INR`
+3. The selected SAP payload keys are correctly named as you listed:
+   - Vendor Account Group → `partn_grp`
+   - Company Code → `bukrs`
+   - Planning Group → `fdgrv`
+   - Rec-Account → `akont`
+   - Purchase Org → `vkorg`
+   - Currency → `waers`
+4. The live F4 response arrays are being passed to these fields, but the UI currently auto-selects the default SAP values instead of showing an empty “Select…” dropdown first.
 
-So two real problems to fix:
+## Implementation plan
 
-1. The dropdowns must be bound from the **live F4 response** when the user clicks Prepare & Sync, after waiting for it to arrive.
-2. The middleware 401 must be surfaced with a precise, fix-it message (it is an env/config issue, not a code bug — the local middleware needs `MIDDLEWARE_SHARED_SECRET` set to the same value as the Proxy Secret in `SAP API Settings → SAP Fields F4`).
+### 1. Remove hardcoded preselection for the six F4 dropdowns
+Update `SapFieldsDialog.buildDefaults()` so these fields start empty unless saved tenant defaults exist:
 
-## Plan
+- `partn_grp`
+- `bukrs`
+- `akont`
+- `fdgrv`
+- `vkorg`
+- `waers`
 
-### 1. Bind dropdowns from the live F4 response
+This means when Prepare & Sync opens, the dropdowns will show placeholders instead of automatically selecting ZDOM / 1000 / A1 / INR.
 
-- In `SapFieldsDialog`:
-  - Show a clean blocking loader (spinner + "Fetching F4 options from SAP…") in the body while the F4 call is in flight. Hide the form until the response arrives or fails.
-  - Increase the soft-timeout from 20s to 60s (SAP F4 can be slow; current Postman call took ~1.8s but production can be slower).
-  - On success, capture `sap_response` from `sap-master-fetch` and pass it down as `liveOptions` to each `SapMasterCombobox`.
-  - On failure, fall back to DB cache and show the precise error returned by the edge function (the message + hint).
+### 2. Keep the SAP payload key mapping exactly as required
+No payload key rename is needed. The existing form already stores selections in the keys SAP expects:
 
-### 2. Make `SapMasterCombobox` accept live options
+```text
+VENDOR_ACC_GRP selected value -> partn_grp
+COMPANY_CODE selected value   -> bukrs
+PLANNING_GROUP selected value -> fdgrv
+RECON_ACCOUNT selected value  -> akont
+PURCHASE_ORG selected value   -> vkorg
+CURRENCY selected value       -> waers
+```
 
-- Add an optional `liveItems?: any[]` prop. When provided, it takes precedence over the cached DB rows.
-- Reuse the existing `buildLabel` logic (it already understands `KTOKK / TXT30`, `BUKRS / BUTXT`, `GRUPP`, `BUKRS + SAKNR / TXT20`, `EKORG / EKOTX`, `WAERS / LTEXT`).
-- The wiring per dropdown:
-  - Vendor Account Group ← `sap_response.VENDOR_ACC_GRP`
-  - Company Code ← `sap_response.COMPANY_CODE`
-  - Planning Group ← `sap_response.PLANNING_GROUP`
-  - Rec-Account ← `sap_response.RECON_ACCOUNT`
-  - Purchase Org ← `sap_response.PURCHASE_ORG`
-  - Currency ← `sap_response.CURRENCY`
-- Footer text becomes `"<n> options loaded from live SAP F4."` when live, otherwise the existing cached count.
+### 3. Make the dropdown UI clearer
+Keep the accessible combobox implementation, but change the visible behavior/text so it clearly looks and acts like a dropdown:
 
-### 3. Improve the middleware 401 message
+- Show `Select Vendor Account Group`, `Select Company Code`, etc. when empty.
+- Keep the chevron and search list.
+- Use the live SAP F4 response first, cached rows only as fallback.
+- Keep option labels from SAP response:
+  - `KTOKK — TXT30`
+  - `BUKRS — BUTXT`
+  - `GRUPP`
+  - `BUKRS / SAKNR — TXT20`
+  - `EKORG — EKOTX`
+  - `WAERS — LTEXT`
 
-- In `sap-master-fetch`, when the middleware returns 401, return a specific message:
-  - `Middleware rejected the request (HTTP 401). The Node middleware running on <middleware_url> needs MIDDLEWARE_SHARED_SECRET set to the same value as the Proxy Secret saved in SAP API Settings → SAP Fields F4. Restart the middleware after setting it.`
-- Surface that message verbatim in the dialog banner so the operator knows exactly what to do.
+### 4. Fix selected value matching for Rec-Account if needed
+For Rec-Account, the dropdown currently stores only `SAKNR` as `akont`, while the label displays `BUKRS / SAKNR`. I will keep payload value as only `akont = SAKNR`, because your SAP key says `akont: "155000005"`.
 
-### 4. Validate
+### 5. Validate the flow
+After implementation, verify from code behavior that:
 
-- Direct `supabase--curl_edge_functions` call to `sap-master-fetch` and confirm `sap_response` is returned with all six arrays once the middleware secret is fixed.
-- Open Prepare & Sync in the preview, confirm the form is hidden until the response arrives, then confirm each dropdown shows the live counts and items.
-- Confirm the saved selection (`code`) remains compatible with the current `SAP Fields F4` keys.
-
-## Out of scope
-
-- No changes to the actual SAP API config, the proxy URL, or credentials — those are admin-side settings.
-- No changes to how the synced vendor payload is built; only the F4 dropdown source changes.
+- Prepare & Sync waits for SAP Fields F4.
+- All six fields are dropdowns populated from:
+  - `VENDOR_ACC_GRP`
+  - `COMPANY_CODE`
+  - `PLANNING_GROUP`
+  - `RECON_ACCOUNT`
+  - `PURCHASE_ORG`
+  - `CURRENCY`
+- No hardcoded values are preselected for these six fields unless tenant defaults are configured.
+- Confirm Sync still sends the selected values under `partn_grp`, `bukrs`, `fdgrv`, `akont`, `vkorg`, and `waers`.
