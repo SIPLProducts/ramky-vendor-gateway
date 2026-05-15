@@ -74,3 +74,88 @@ export function nameMatchPercentage(a?: string | null, b?: string | null): numbe
   if (na.includes(nb) || nb.includes(na)) score = Math.max(score, 60);
   return score;
 }
+
+/**
+ * Cross-field name match policy used by the KYC tabs (GST / PAN / MSME / Bank).
+ * Any score >= 20 against any reference is treated as a pass; the score is
+ * classified into Low / Medium / Strong tiers for messaging.
+ */
+export const NAME_MATCH_MIN_PASS = 20;
+
+export type MatchLevel = 'low' | 'medium' | 'strong' | 'fail';
+
+export function classifyNameMatch(score: number): MatchLevel {
+  if (score >= 70) return 'strong';
+  if (score >= 50) return 'medium';
+  if (score >= NAME_MATCH_MIN_PASS) return 'low';
+  return 'fail';
+}
+
+export function matchLevelLabel(level: MatchLevel): string {
+  switch (level) {
+    case 'strong': return 'Strong Match';
+    case 'medium': return 'Medium Match';
+    case 'low': return 'Low Match';
+    default: return 'No Match';
+  }
+}
+
+export interface CrossNameReference {
+  field: string;                 // e.g. "PAN Holder Name"
+  value?: string | null;
+}
+
+export interface CrossNameMatchResult {
+  /** True when there is at least one reference and best score >= 20. */
+  passed: boolean;
+  /** True when there were no usable references to compare against. */
+  skipped: boolean;
+  bestScore: number;
+  matches: { field: string; score: number; level: MatchLevel }[];
+  best: { field: string; score: number; level: MatchLevel } | null;
+}
+
+export function evaluateCrossNameMatch(
+  candidate: string | null | undefined,
+  references: CrossNameReference[],
+): CrossNameMatchResult {
+  const usable = (references || []).filter((r) => r && r.value && String(r.value).trim());
+  if (!candidate || !candidate.trim() || usable.length === 0) {
+    return { passed: false, skipped: true, bestScore: 0, matches: [], best: null };
+  }
+
+  const scored = usable.map((r) => {
+    const score = nameMatchPercentage(candidate, r.value);
+    return { field: r.field, score, level: classifyNameMatch(score) };
+  });
+
+  const best = scored.reduce((acc, cur) => (cur.score > acc.score ? cur : acc), scored[0]);
+  const matches = scored.filter((s) => s.score >= NAME_MATCH_MIN_PASS);
+  return {
+    passed: best.score >= NAME_MATCH_MIN_PASS,
+    skipped: false,
+    bestScore: best.score,
+    matches,
+    best,
+  };
+}
+
+/** Format a list of passing matches for a success banner. */
+export function formatCrossMatchSuccess(
+  candidateLabel: string,
+  matches: { field: string; score: number; level: MatchLevel }[],
+): string {
+  if (!matches.length) return `${candidateLabel} verified.`;
+  const parts = matches.map((m) => `${m.field} (${m.score}% — ${matchLevelLabel(m.level)})`);
+  return `${candidateLabel} matched with ${parts.join(' and ')}.`;
+}
+
+/** Format a failure message when best score is below the gate. */
+export function formatCrossMatchFailure(
+  candidateLabel: string,
+  best: { field: string; score: number } | null,
+): string {
+  if (!best) return `${candidateLabel} could not be matched against any verified name.`;
+  return `${candidateLabel} does not match any of the verified names (best ${best.score}% with ${best.field}). Minimum required is ${NAME_MATCH_MIN_PASS}%.`;
+}
+
