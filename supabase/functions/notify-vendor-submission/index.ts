@@ -110,12 +110,12 @@ serve(async (req) => {
     // Resolve the invitation linked to this vendor. Prefer the explicit
     // invitation_id on the vendor row; fall back to looking up by vendor_id
     // (claim_invitation sets vendor_id on the invitation at submit time).
-    let invite: { id: string; created_by: string | null } | null = null;
+    let invite: { id: string; created_by: string | null; tenant_id: string | null } | null = null;
 
     if (vendor.invitation_id) {
       const { data } = await supabase
         .from("vendor_invitations")
-        .select("id, created_by")
+        .select("id, created_by, tenant_id")
         .eq("id", vendor.invitation_id)
         .maybeSingle();
       invite = (data as any) ?? null;
@@ -124,7 +124,7 @@ serve(async (req) => {
     if (!invite) {
       const { data } = await supabase
         .from("vendor_invitations")
-        .select("id, created_by")
+        .select("id, created_by, tenant_id")
         .eq("vendor_id", vendor.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -132,32 +132,83 @@ serve(async (req) => {
       invite = (data as any) ?? null;
     }
 
+    const logFailure = async (reason: string, extra: Record<string, unknown> = {}) => {
+      try {
+        await supabase.from("audit_logs").insert({
+          vendor_id: vendor.id,
+          action: "buyer_notification_failed",
+          details: { reason, invitation_id: invite?.id ?? null, ...extra },
+        });
+      } catch (e) {
+        console.error("audit_logs insert failed", e);
+      }
+    };
+
     if (!invite) {
-      console.log("[notify-vendor-submission] No invitation linked to vendor, skipping");
+      console.log("[notify-vendor-submission] No invitation linked to vendor");
+      await logFailure("no_invitation");
       return new Response(JSON.stringify({ success: true, skipped: "no_invitation" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!invite.created_by) {
-      console.log("[notify-vendor-submission] Invitation has no created_by (inviter), skipping");
-      return new Response(JSON.stringify({ success: true, skipped: "no_inviter" }), {
+    // Resolve recipient email(s) dynamically:
+    // 1) Prefer invitation.created_by (the buyer who sent the invite)
+    // 2) Fallback: all customer_admin users in the invitation's tenant
+    let recipientEmails: string[] = [];
+    let recipientFullName = "";
+    let resolutionMode: "inviter" | "tenant_admins" = "inviter";
+
+    if (invite.created_by) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", invite.created_by)
+        .maybeSingle();
+      if (profile?.email) {
+        recipientEmails = [profile.email];
+        recipientFullName = (profile.full_name ?? "").trim();
+      }
+    }
+
+    if (recipientEmails.length === 0 && invite.tenant_id) {
+      resolutionMode = "tenant_admins";
+      const { data: tenantUsers } = await supabase
+        .from("user_tenants")
+        .select("user_id")
+        .eq("tenant_id", invite.tenant_id);
+      const userIds = (tenantUsers ?? []).map((u: any) => u.user_id);
+      if (userIds.length > 0) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .in("user_id", userIds)
+          .eq("role", "customer_admin");
+        const adminIds = (roles ?? []).map((r: any) => r.user_id);
+        if (adminIds.length > 0) {
+          const { data: admins } = await supabase
+            .from("profiles")
+            .select("email, full_name")
+            .in("id", adminIds);
+          recipientEmails = (admins ?? [])
+            .map((a: any) => a.email)
+            .filter((e: string | null) => !!e);
+          if (admins && admins.length > 0) {
+            recipientFullName = (admins[0].full_name ?? "").trim();
+          }
+        }
+      }
+    }
+
+    if (recipientEmails.length === 0) {
+      console.log("[notify-vendor-submission] No recipient could be resolved");
+      await logFailure("no_recipient", { had_created_by: !!invite.created_by, tenant_id: invite.tenant_id });
+      return new Response(JSON.stringify({ success: true, skipped: "no_recipient" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("email, full_name")
-      .eq("id", invite.created_by)
-      .maybeSingle();
-
-    if (!profile?.email) {
-      console.log("[notify-vendor-submission] Inviter profile has no email, skipping");
-      return new Response(JSON.stringify({ success: true, skipped: "no_inviter_email" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const profile = { email: recipientEmails[0], full_name: recipientFullName };
 
     const fullName = (profile.full_name ?? "").trim();
     const inviterFirstName = fullName
@@ -192,7 +243,7 @@ serve(async (req) => {
     // by send-smtp-email when suppressReplyTo is not set.
     const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-smtp-email", {
       body: {
-        to: profile.email,
+        to: recipientEmails.join(", "),
         subject,
         html,
       },
@@ -206,7 +257,7 @@ serve(async (req) => {
       await supabase.from("audit_logs").insert({
         vendor_id: vendor.id,
         action: "vendor_submission_notified",
-        details: { to: profile.email, resubmission, subject },
+        details: { to: recipientEmails, resubmission, subject, resolution: resolutionMode },
       });
     } catch (e) {
       console.error("audit_logs insert failed", e);
@@ -215,8 +266,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        sentTo: profile.email,
-        inviter: { name: fullName || profile.email, email: profile.email },
+        sentTo: recipientEmails,
+        resolution: resolutionMode,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
