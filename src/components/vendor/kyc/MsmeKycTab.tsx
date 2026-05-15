@@ -45,6 +45,8 @@ interface MsmeKycTabProps {
   panHolderName?: string;
   /** Verified GST legal name from the GST tab — used to validate enterprise name. */
   gstLegalName?: string;
+  /** Verified GST trade name from the GST tab — additional cross-check reference. */
+  gstTradeName?: string;
   /** Verified bank account holder name — used as another cross-check reference. */
   bankAccountHolderName?: string;
 }
@@ -82,6 +84,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
   } => {
     const evalResult = evaluateCrossNameMatch(apiName, [
       { field: 'GST Legal Name', value: props.gstLegalName },
+      { field: 'GST Trade Name', value: props.gstTradeName },
       { field: 'PAN Holder Name', value: props.panHolderName },
       { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
     ]);

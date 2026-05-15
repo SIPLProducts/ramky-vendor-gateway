@@ -36,6 +36,8 @@ interface PanKycTabProps {
   gstPanNumber?: string;
   /** Legal name from the verified GST registry record. */
   gstLegalName?: string;
+  /** Trade name from the verified GST registry record (cross-check). */
+  gstTradeName?: string;
   /** Enterprise name from the verified MSME record (cross-check). */
   msmeEnterpriseName?: string;
   /** Account holder name from the verified Bank record (cross-check). */
@@ -108,6 +110,7 @@ export function PanKycTab(props: PanKycTabProps) {
 
     const nameEval = evaluateCrossNameMatch(extractedName, [
       { field: 'GST Legal Name', value: props.gstLegalName },
+      { field: 'GST Trade Name', value: props.gstTradeName },
       { field: 'MSME Enterprise Name', value: props.msmeEnterpriseName },
       { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
     ]);

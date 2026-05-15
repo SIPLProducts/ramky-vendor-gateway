@@ -1,51 +1,51 @@
 ## Goal
 
-The screenshot mismatch ("Enterprise Name does not match with PAN Holder Name") comes from `src/components/vendor/steps/DocumentVerificationStep.tsx`, a parallel KYC implementation that still uses the old single-reference / 40% check. The newer `MsmeKycTab` / `BankKycTab` already use the shared cross-field 20% policy. This plan brings DocumentVerificationStep in line so:
+1. Add **GST Trade Name** as an extra cross-reference for MSME, Bank, and PAN tabs.
+2. Success/failure banners must clearly name **which** field(s) matched, e.g.:
+   - `Enterprise Name matched with GST Legal Name (85% — Strong) and PAN Holder Name (78% — Strong).`
+   - `Enterprise Name matched with GST Trade Name (62% — Medium).`
+   - `Account Holder Name matched with GST Legal Name (90% — Strong), GST Trade Name (88% — Strong), PAN Holder Name (80% — Strong) and MSME Enterprise Name (75% — Strong).`
+   - On failure: `Enterprise Name does not match any of the verified names (best 12% with GST Legal Name). Minimum required is 20%.`
 
-- **MSME Enterprise Name** passes if it matches **any** of GST Legal Name, PAN Holder Name, or Bank Account Holder Name at >=20%.
-- **Bank Account Holder Name** passes if it matches **any** of GST Legal Name, PAN Holder Name, or MSME Enterprise Name at >=20%.
-- Below 20% on every available reference -> block with a clear "best Xx% with <field>" message.
+References used per tab:
 
-No threshold or behavior changes anywhere else.
+| Candidate | References |
+|---|---|
+| MSME Enterprise Name | GST Legal Name, GST Trade Name, PAN Holder Name, Bank Account Holder Name |
+| Bank Account Holder Name | GST Legal Name, GST Trade Name, PAN Holder Name, MSME Enterprise Name |
+| PAN Holder Name | GST Legal Name, GST Trade Name |
 
-## File touched
+Same 20% gate / Low–Medium–Strong tiers — no threshold or formatter signature changes.
 
-`src/components/vendor/steps/DocumentVerificationStep.tsx` only.
+## Files touched
 
-## Changes
+1. **`src/components/vendor/steps/ComplianceStep.tsx`**
+   - Add `const [gstTradeName, setGstTradeName] = useState<string|undefined>()`.
+   - In `handleGstVerified`: capture trade name separately —
+     `const tradeFromGst = pickStr(d.trade_name || d.business_name).trim(); if (tradeFromGst) setGstTradeName(tradeFromGst);`
+     Keep `gstLegalName` strictly from `d.legal_name` (drop the trade_name fallback so the two stay distinct).
+   - Pass `gstTradeName={gstTradeName}` into `PanKycTab`, `MsmeKycTab`, `BankKycTab`.
 
-1. **Imports**: add `evaluateCrossNameMatch`, `formatCrossMatchSuccess`, `formatCrossMatchFailure`, `NAME_MATCH_MIN_PASS` from `@/lib/nameMatch`. Drop the local `nameMatchPercentage`/threshold use in the four blocks below.
+2. **`src/components/vendor/kyc/MsmeKycTab.tsx`**
+   - Add `gstTradeName?: string` prop.
+   - In `checkEnterpriseName`, insert `{ field: 'GST Trade Name', value: props.gstTradeName }` into the references list (right after GST Legal Name).
+   - No formatter changes — `formatCrossMatchSuccess` / `formatCrossMatchFailure` already list every passing field.
 
-2. **MSME upload flow (~line 665-680)**
-   - Replace the PAN-only check with:
-     ```ts
-     const evalRes = evaluateCrossNameMatch(msmeName, [
-       { field: 'GST Legal Name', value: gstDoc.ocrData?.legal_name },
-       { field: 'PAN Holder Name', value: panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name },
-       { field: 'Bank Account Holder Name', value: bankDoc.ocrData?.account_holder_name },
-     ]);
-     if (!evalRes.skipped && !evalRes.passed) {
-       return { ok:false, message: formatCrossMatchFailure('Enterprise Name', evalRes.best), isNameMismatch:true };
-     }
-     ```
+3. **`src/components/vendor/kyc/BankKycTab.tsx`**
+   - Add `gstTradeName?: string` prop.
+   - Insert `{ field: 'GST Trade Name', value: props.gstTradeName }` into the references list.
 
-3. **MSME manual verify flow (~line 1075-1090)**
-   - Same replacement; on failure use `formatCrossMatchFailure('Enterprise Name', evalRes.best)` for `setMsmeManualError`, `setMsmeDoc.errorMessage`, and the `mismatchDialog` message.
+4. **`src/components/vendor/kyc/PanKycTab.tsx`**
+   - Add `gstTradeName?: string` prop and reference entry.
 
-4. **Bank cheque flow (~line 770-798)**
-   - Build the references list for ALL three (GST / PAN / MSME) regardless of `isGstRegistered` / `isMsmeRegistered` flags (any non-empty value is a valid cross-reference; that's the user's request).
-   - Call `evaluateCrossNameMatch(nameAtBank, refs)`.
-   - On fail return `formatCrossMatchFailure('Account Holder Name', evalRes.best)`.
-   - On pass set `holderNameMessage = formatCrossMatchSuccess('Account Holder Name', evalRes.matches)`.
-
-5. **Bank manual popup flow (~line 1240-1262)**
-   - Same replacement as step 4 (build refs from all three, evaluate, format success/failure messages).
-
-6. **Threshold constant**: any local `>= 40` / `< 40` literals in these four blocks are removed; the gate is owned by `NAME_MATCH_MIN_PASS` (20) inside the helper.
+5. **`src/components/vendor/steps/DocumentVerificationStep.tsx`** (parallel KYC implementation already on the cross-match policy)
+   - In all four `evaluateCrossNameMatch` blocks (MSME upload ~line 665, Bank cheque ~line 770, MSME manual ~line 1075, Bank manual ~line 1240), add
+     `{ field: 'GST Trade Name', value: gstDoc.ocrData?.trade_name || gstDoc.ocrData?.business_name }`
+     next to the existing GST Legal Name reference.
 
 ## Out of scope
 
-- No DB / edge-function / migration changes.
-- No UI restyling.
-- No changes to `MsmeKycTab` / `BankKycTab` (already correct).
-- No changes to the OCR / verify provider calls or the `isGstRegistered` / `isMsmeRegistered` gating elsewhere in the file.
+- No changes to `src/lib/nameMatch.ts` (the helper already lists all matching fields by name in its success message — exactly what the user asked for).
+- No threshold / tier changes.
+- No edge function or DB changes.
+- No restyling of the success/failure banners.
