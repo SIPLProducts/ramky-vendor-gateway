@@ -480,7 +480,7 @@ export default function AdminInvitations() {
                 <Input
                   id="vendor-phone"
                   type="tel"
-                  placeholder="+91 98765 43210"
+                  placeholder="10-digit mobile number"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                 />
