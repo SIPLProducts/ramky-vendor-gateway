@@ -18,6 +18,8 @@ interface Props {
   filter?: Record<string, string | undefined>;
   extraLabelFields?: string[];
   allowFilterFallback?: boolean;
+  /** Live items from SAP F4 response. When provided, overrides the cached DB rows. */
+  liveItems?: any[] | null;
 }
 
 // Map our internal master_type -> SAP key fields used to render labels exactly like SAP F4 response
@@ -43,12 +45,31 @@ function buildLabel(masterType: string, row: { code: string; description: string
   return desc ? `${codePart} — ${desc}` : codePart;
 }
 
-export function SapMasterCombobox({ label, masterType, value, onChange, placeholder }: Props) {
+export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, liveItems }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const { data: allRows, isLoading } = useSapMasterData(masterType);
+  const { data: allRows, isLoading: isLoadingCache } = useSapMasterData(masterType);
 
-  const rows = allRows || [];
+  const isLive = Array.isArray(liveItems);
+  const map = SAP_FIELDS[masterType];
+
+  const rows = useMemo(() => {
+    if (isLive) {
+      return (liveItems || []).map((item, idx) => {
+        const code = map ? item?.[map.code] : (item?.code ?? "");
+        const desc = map?.desc ? item?.[map.desc] : (item?.description ?? null);
+        return {
+          id: `live-${masterType}-${idx}-${code ?? ""}`,
+          code: code == null ? "" : String(code),
+          description: desc == null ? null : String(desc),
+          extra: item,
+        };
+      }).filter(r => r.code !== "");
+    }
+    return allRows || [];
+  }, [isLive, liveItems, allRows, masterType, map]);
+
+  const isLoading = isLive ? false : isLoadingCache;
 
   const labelFor = useMemo(() => {
     const m = rows.find((r) => r.code === value);
@@ -114,7 +135,7 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
       <p className="text-[11px] text-muted-foreground">
         {isLoading
           ? "Loading F4 values…"
-          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded.`}
+          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${isLive ? " from live SAP F4." : "."}`}
       </p>
     </div>
   );

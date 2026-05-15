@@ -37,6 +37,7 @@ function isMsme(v: any): boolean {
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
+  const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     let cancelled = false;
     const tenantId = (vendor as any)?.tenant_id;
     setForm(buildDefaults(vendor, null));
+    setLiveF4(null);
     if (tenantId) {
       (async () => {
         const { data } = await supabase
@@ -54,26 +56,32 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setForm(buildDefaults(vendor, data));
       })();
     }
-    setF4Status({ state: 'loading', message: 'Refreshing F4 options from SAP Fields F4 API…' });
+    setF4Status({ state: 'loading', message: 'Calling SAP Fields F4 API… please wait.' });
     const slowTimer = window.setTimeout(() => {
       if (!cancelled) {
-        setF4Status({ state: 'error', message: 'SAP Fields F4 API is taking longer than expected. Showing cached F4 options if available.' });
+        setF4Status((prev) => prev.state === 'loading'
+          ? { state: 'loading', message: 'SAP Fields F4 API is taking longer than expected. Still waiting…' }
+          : prev);
       }
-    }, 20000);
+    }, 60000);
     (async () => {
       try {
-        const res = await refreshMaster.mutateAsync(undefined);
+        const res: any = await refreshMaster.mutateAsync(undefined);
         if (cancelled) return;
         window.clearTimeout(slowTimer);
         if (res?.success) {
-          const total = Object.values(res.summary || {}).reduce((s, v: any) => s + (v.upserted || 0), 0);
-          setF4Status({ state: 'success', message: `${total} F4 options refreshed from SAP.` });
+          if (res.sap_response && typeof res.sap_response === 'object') {
+            setLiveF4(res.sap_response as Record<string, any[]>);
+          }
+          const total = Object.values(res.summary || {}).reduce((s: number, v: any) => s + (v.upserted || 0), 0);
+          setF4Status({ state: 'success', message: `${total} F4 options loaded from SAP Fields F4 API.` });
         } else {
-          setF4Status({ state: 'error', message: res?.message || 'SAP Fields F4 refresh failed.' });
+          const hint = res?.hint ? ` ${res.hint}` : '';
+          setF4Status({ state: 'error', message: `${res?.message || 'SAP Fields F4 refresh failed.'}${hint} Showing cached F4 options if available.` });
         }
       } catch (e: any) {
         window.clearTimeout(slowTimer);
-        if (!cancelled) setF4Status({ state: 'error', message: e?.message || 'SAP Fields F4 refresh failed.' });
+        if (!cancelled) setF4Status({ state: 'error', message: `${e?.message || 'SAP Fields F4 refresh failed.'} Showing cached F4 options if available.` });
       }
     })();
     return () => { cancelled = true; window.clearTimeout(slowTimer); };
@@ -105,6 +113,13 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
+          {f4Status.state === 'loading' ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-sm font-medium">Calling SAP Fields F4 API…</div>
+              <div className="text-xs">Please wait while we fetch the latest dropdown options from SAP.</div>
+            </div>
+          ) : (
           <div className="space-y-6 py-2">
             {/* Vendor Information (read-only) */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Information">
@@ -152,7 +167,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
-              <SapMasterCombobox label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} />
+              <SapMasterCombobox label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
             </Section>
@@ -161,10 +176,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
-              <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} />
-              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} />
+              <SapMasterCombobox label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} />
+              <SapMasterCombobox label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
-              <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} />
+              <SapMasterCombobox label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
@@ -173,8 +188,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Purchase Data */}
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} />
-              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} />
+              <SapMasterCombobox label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} />
+              <SapMasterCombobox label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
@@ -194,6 +209,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             </Section>
 
           </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 mt-4 pt-4 border-t">
@@ -202,7 +218,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           </Button>
           <Button
             onClick={() => onConfirm(form)}
-            disabled={isSubmitting}
+            disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
           >
             {isSubmitting ? (
