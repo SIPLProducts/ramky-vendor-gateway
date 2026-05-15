@@ -44,8 +44,12 @@ interface GstKycTabProps {
 
 export function GstKycTab(props: GstKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
-  const { state, verify, reset } = useProviderVerify();
+  const { state, verify, reset, setState } = useProviderVerify();
   const [mode, setMode] = useState<'manual' | 'upload'>('manual');
+  const [legalNameCheck, setLegalNameCheck] =
+    useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
+  const [legalNameCheckMessage, setLegalNameCheckMessage] = useState<string>('');
+  const [verifiedLegalName, setVerifiedLegalName] = useState<string>('');
 
   if (props.onStatusChange) {
     const status = !props.isGstRegistered
@@ -54,14 +58,42 @@ export function GstKycTab(props: GstKycTabProps) {
     props.onStatusChange(status as any);
   }
 
+  // Cross-field name policy: GST Legal Name vs PAN/MSME/Bank verified names.
+  // If no other names are verified yet (typical first-tab case), we skip.
+  const evalLegalName = (apiName: string) => {
+    const r = evaluateCrossNameMatch(apiName, [
+      { field: 'PAN Holder Name', value: props.panHolderName },
+      { field: 'MSME Enterprise Name', value: props.msmeEnterpriseName },
+      { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
+    ]);
+    if (r.skipped) return { status: 'skipped' as const, message: '' };
+    if (r.passed)
+      return { status: 'passed' as const, message: formatCrossMatchSuccess('GST Legal Name', r.matches) };
+    return { status: 'failed' as const, message: formatCrossMatchFailure('GST Legal Name', r.best) };
+  };
+
   const handleManualVerify = async () => {
+    setLegalNameCheck('idle');
+    setLegalNameCheckMessage('');
+    setVerifiedLegalName('');
     const r = await verify({
       providerName: 'GST',
       label: 'GST',
       input: { gstin: props.gstin, id_number: props.gstin },
       validate: (data) => {
         const apiName = String(data.legal_name || data.business_name || '').trim();
-        return { ok: true, message: `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`, data };
+        setVerifiedLegalName(apiName);
+        const check = evalLegalName(apiName);
+        setLegalNameCheck(check.status);
+        setLegalNameCheckMessage(check.message);
+        if (check.status === 'failed') {
+          return { ok: false, message: check.message, data };
+        }
+        return {
+          ok: true,
+          message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
+          data,
+        };
       },
     });
     if (r.ok) props.onVerifiedDetails?.(r.data || {});
