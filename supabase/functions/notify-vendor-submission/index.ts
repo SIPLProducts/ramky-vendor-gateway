@@ -243,7 +243,7 @@ serve(async (req) => {
     // by send-smtp-email when suppressReplyTo is not set.
     const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-smtp-email", {
       body: {
-        to: profile.email,
+        to: recipientEmails.join(", "),
         subject,
         html,
       },
@@ -257,7 +257,7 @@ serve(async (req) => {
       await supabase.from("audit_logs").insert({
         vendor_id: vendor.id,
         action: "vendor_submission_notified",
-        details: { to: profile.email, resubmission, subject },
+        details: { to: recipientEmails, resubmission, subject, resolution: resolutionMode },
       });
     } catch (e) {
       console.error("audit_logs insert failed", e);
@@ -266,8 +266,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        sentTo: profile.email,
-        inviter: { name: fullName || profile.email, email: profile.email },
+        sentTo: recipientEmails,
+        resolution: resolutionMode,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
