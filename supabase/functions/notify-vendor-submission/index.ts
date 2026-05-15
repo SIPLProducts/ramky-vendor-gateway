@@ -171,6 +171,66 @@ serve(async (req) => {
       }
     }
 
+    // Fallback A: if invite has no created_by, resolve the buyer by looking
+    // at the audit log for the original invitation email send. The "from"
+    // address there is the buyer's SMTP sender; match it back to a profile.
+    if (recipientEmails.length === 0) {
+      try {
+        const { data: inviteEmail } = await supabase
+          .from("vendor_invitations")
+          .select("email")
+          .eq("id", invite.id)
+          .maybeSingle();
+        const inviteToEmail = (inviteEmail as any)?.email as string | undefined;
+        if (inviteToEmail) {
+          const { data: logs } = await supabase
+            .from("audit_logs")
+            .select("details, created_at")
+            .eq("action", "smtp_email_sent")
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const senderEmail = (() => {
+            for (const row of (logs ?? []) as any[]) {
+              const d = row.details ?? {};
+              const to = String(d.to ?? "").toLowerCase();
+              const subj = String(d.subject ?? "").toLowerCase();
+              if (
+                to.includes(inviteToEmail.toLowerCase()) &&
+                subj.includes("vendor registration invitation")
+              ) {
+                const from = String(d.from ?? "");
+                const m = from.match(/<([^>]+)>/);
+                return (m ? m[1] : from).trim().toLowerCase();
+              }
+            }
+            return "";
+          })();
+          if (senderEmail) {
+            const { data: senderProfile } = await supabase
+              .from("profiles")
+              .select("id, email, full_name")
+              .ilike("email", senderEmail)
+              .maybeSingle();
+            if ((senderProfile as any)?.email) {
+              recipientEmails = [(senderProfile as any).email];
+              recipientFullName = ((senderProfile as any).full_name ?? "").trim();
+              // Best-effort backfill so future runs are fast and the dialog is correct
+              try {
+                await supabase
+                  .from("vendor_invitations")
+                  .update({ created_by: (senderProfile as any).id })
+                  .eq("id", invite.id);
+              } catch (e) {
+                console.warn("Backfill invite created_by failed:", e);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Fallback sender resolution failed:", e);
+      }
+    }
+
     if (recipientEmails.length === 0 && invite.tenant_id) {
       resolutionMode = "tenant_admins";
       const { data: tenantUsers } = await supabase

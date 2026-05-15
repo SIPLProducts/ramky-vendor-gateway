@@ -382,11 +382,52 @@ const handler = async (req: Request): Promise<Response> => {
         
         if (supabaseUrl && supabaseKey) {
           const supabase = createClient(supabaseUrl, supabaseKey);
+          // Best-effort: ensure created_by (the inviting buyer) is set on
+          // the invitation. Resolve the caller from the Authorization header
+          // and only update when created_by is missing.
+          let callerId: string | null = null;
+          try {
+            const authHeader = req.headers.get("Authorization") ?? "";
+            const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+            if (authHeader && anonKey) {
+              const userClient = createClient(supabaseUrl, anonKey, {
+                global: { headers: { Authorization: authHeader } },
+              });
+              const { data: u } = await userClient.auth.getUser();
+              callerId = u?.user?.id ?? null;
+            }
+          } catch (e) {
+            console.warn("auth.getUser failed in send-vendor-invitation:", e);
+          }
+
+          // If no caller identified, try matching senderEmail to a profile
+          if (!callerId && senderEmail) {
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("id")
+              .ilike("email", senderEmail)
+              .maybeSingle();
+            callerId = (prof as any)?.id ?? null;
+          }
+
+          const updatePayload: Record<string, unknown> = {
+            email_sent_at: new Date().toISOString(),
+          };
+          if (callerId) {
+            // Only set when missing — don't overwrite a real buyer
+            const { data: existing } = await supabase
+              .from("vendor_invitations")
+              .select("created_by")
+              .eq("id", invitationId)
+              .maybeSingle();
+            if (!(existing as any)?.created_by) {
+              updatePayload.created_by = callerId;
+            }
+          }
+
           await supabase
             .from("vendor_invitations")
-            .update({ 
-              email_sent_at: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq("id", invitationId);
           
           // Log to audit_logs
