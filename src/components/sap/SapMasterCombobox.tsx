@@ -45,12 +45,31 @@ function buildLabel(masterType: string, row: { code: string; description: string
   return desc ? `${codePart} — ${desc}` : codePart;
 }
 
-export function SapMasterCombobox({ label, masterType, value, onChange, placeholder }: Props) {
+export function SapMasterCombobox({ label, masterType, value, onChange, placeholder, liveItems }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const { data: allRows, isLoading } = useSapMasterData(masterType);
+  const { data: allRows, isLoading: isLoadingCache } = useSapMasterData(masterType);
 
-  const rows = allRows || [];
+  const isLive = Array.isArray(liveItems);
+  const map = SAP_FIELDS[masterType];
+
+  const rows = useMemo(() => {
+    if (isLive) {
+      return (liveItems || []).map((item, idx) => {
+        const code = map ? item?.[map.code] : (item?.code ?? "");
+        const desc = map?.desc ? item?.[map.desc] : (item?.description ?? null);
+        return {
+          id: `live-${masterType}-${idx}-${code ?? ""}`,
+          code: code == null ? "" : String(code),
+          description: desc == null ? null : String(desc),
+          extra: item,
+        };
+      }).filter(r => r.code !== "");
+    }
+    return allRows || [];
+  }, [isLive, liveItems, allRows, masterType, map]);
+
+  const isLoading = isLive ? false : isLoadingCache;
 
   const labelFor = useMemo(() => {
     const m = rows.find((r) => r.code === value);
