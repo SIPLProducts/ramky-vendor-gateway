@@ -1,39 +1,53 @@
-## Root cause
+# Submission Success Popup + Improved Email Body
 
-Every time the vendor form is saved (autosave + step nav + submit), `uploadAllDocuments` in `src/hooks/useVendorRegistration.tsx` runs again. For each `documentType` whose `formData...File` is set, it:
+## 1. Return buyer info from `notify-vendor-submission`
 
-1. Re-uploads the file to storage with a new timestamped path.
-2. Inserts a brand new row into `vendor_documents`.
+Edge function `supabase/functions/notify-vendor-submission/index.ts`:
 
-There is no check for an existing row of the same `(vendor_id, document_type)`. For Brickwork Ratings the same 4 files (gst_self_declaration, pan_card, msme_self_declaration, cancelled_cheque) were inserted ~30+ times → 122 documents shown in the dialog.
+- On successful send, return the inviter's name + email in the response:
+  ```json
+  { "success": true, "sentTo": "...", "inviter": { "name": "Buyer Name", "email": "buyer@x.com" } }
+  ```
+- On skip cases (`no_invitation`, `no_inviter`, `no_inviter_email`), keep returning `success: true` but without `inviter`.
 
-## Plan
+## 2. Enrich the email body
 
-1. **Deduplicate document uploads in `useVendorRegistration.tsx`**
-   - In `uploadAllDocuments`, before re-uploading a `documentType`, query `vendor_documents` for an existing row with the same `vendor_id` + `document_type`.
-   - If a row exists and the in-memory `File` is the same one already uploaded (track an "uploaded" flag per file in component state, or compare `file_name` + `file_size`), skip both the storage upload and the metadata insert.
-   - If the user replaced the file (different name/size), delete the old storage object + old `vendor_documents` row, then upload the new one.
-   - Result: at most one row per `(vendor_id, document_type)` (two for the secondary cancelled cheque slot).
+In `buildHtml(...)` add a vendor details block containing:
 
-2. **Mark file fields as "already uploaded" after first successful save**
-   - After `uploadAllDocuments` succeeds, clear the in-memory `File` objects from `formData.statutory.*File`, `formData.bank.*File`, etc., so subsequent autosaves do not see a `File` to re-upload. The metadata in `vendor_documents` is the source of truth for "already uploaded".
-   - Loaded vendor records already do not rehydrate `File` objects, so this only affects the current edit session.
+- Vendor Name (legal/trade)
+- Vendor Email (`primary_email`)
+- Vendor Contact Number (fetch `primary_phone` from `vendors`)
+- Vendor Unique ID (existing `vendor.id`, plus short ref code if available)
+- Submitted Date & Time (formatted IST)
 
-3. **One-time cleanup of existing duplicate rows**
-   - Add a migration that, for each `(vendor_id, document_type)` group in `vendor_documents`, keeps the most recent row and deletes the rest. Same for storage objects under `vendor-documents` bucket (delete orphaned files whose paths are not referenced by any remaining `vendor_documents` row).
-   - This will fix the Brickwork Ratings vendor (122 → ~4 documents) and any other affected vendors.
+Update the SELECT in the function to also pull `primary_phone` and any short reference code column on `vendors`. Keep the existing Sharvi-styled (navy header + gold accent) layout, just expand the details table and tighten copy. No other layout changes.
 
-4. **Optional safety net (DB-level)**
-   - Add a partial unique index on `vendor_documents (vendor_id, document_type)` (excluding the secondary cheque slot, or include it because it has its own type `cancelled_cheque_2`). This guarantees the bug cannot reappear even if another code path forgets to dedupe.
+## 3. Submission flow change in `useVendorRegistration.tsx`
 
-## Files to change
+In `submitVendorMutation`:
 
-- `src/hooks/useVendorRegistration.tsx` — dedup logic in `uploadAllDocuments`, clear file refs after upload.
-- New SQL migration — cleanup duplicate `vendor_documents` rows + add unique index on `(vendor_id, document_type)`.
-- (Optional) cleanup of orphaned storage objects via the migration or an edge function.
+- `await` the `notify-vendor-submission` invoke (already awaited).
+- Capture `notifyData` and attach it to the returned vendor object, e.g. `return { ...vendor, _notify: notifyData };`
+- Remove the generic success toast from `onSuccess` (popup will replace it).
 
-## Verification
+## 4. Success popup in `src/pages/VendorRegistration.tsx`
 
-- Re-open Brickwork Ratings → Documents tab should show 4 files, not 122.
-- Save the form multiple times → `vendor_documents` count stays the same.
-- Replace a file and save → old row replaced, count still stable.
+In `handleSubmit`:
+
+- After `submitVendor`/`resubmitVendor` resolves, read `_notify`.
+- If `_notify?.success && _notify?.inviter?.email`, open a new `SubmissionSuccessDialog` with:
+  > "Application submitted successfully. Submission details have been sent to the respective buyer who sent the invitation: **{inviter.name}** ({inviter.email})."
+- If notify was skipped or failed, show a softer variant:
+  > "Application submitted successfully. The buyer notification could not be sent automatically — our team has been informed."
+- Only after the user closes this dialog, transition to the existing `SuccessScreen` view (`setIsSubmitted(true)`).
+
+New component: `src/components/vendor/SubmissionSuccessDialog.tsx` — shadcn `Dialog`, success icon, the message, single "Continue" button. Uses semantic tokens only.
+
+## 5. Files touched
+
+- `supabase/functions/notify-vendor-submission/index.ts` — return inviter info, expand email body with vendor details (name, email, phone, ID, submitted at).
+- `src/hooks/useVendorRegistration.tsx` — propagate notify result, drop duplicate toast.
+- `src/pages/VendorRegistration.tsx` — gate `SuccessScreen` behind new dialog; show buyer name/email from notify response.
+- `src/components/vendor/SubmissionSuccessDialog.tsx` — new component.
+
+No DB schema changes. Edge function will be auto-deployed.

@@ -20,14 +20,16 @@ function buildHtml(opts: {
   vendorName: string;
   primaryContact: string;
   primaryEmail: string;
+  primaryPhone: string;
   submittedAt: string;
   resubmission: boolean;
   vendorId: string;
+  vendorRef: string;
   action: string;
 }) {
-  const { inviterFirstName, vendorName, primaryContact, primaryEmail, submittedAt, resubmission, vendorId, action } = opts;
+  const { inviterFirstName, vendorName, primaryContact, primaryEmail, primaryPhone, submittedAt, resubmission, vendorId, vendorRef, action } = opts;
   const heading = resubmission ? "Vendor Application Resubmitted" : "Vendor Application Submitted";
-  const intro = `Vendor <strong>${vendorName}</strong> has ${action} the registration form successfully on <strong>${submittedAt}</strong>.<br/>Vendor ID: <strong>${vendorId}</strong>`;
+  const intro = `We're pleased to inform you that vendor <strong>${vendorName}</strong> has ${action} their registration form successfully. The complete details are summarised below for your review.`;
   const currentYear = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -47,9 +49,12 @@ function buildHtml(opts: {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:0 0 28px;">
             <tr><td style="padding:18px 22px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;color:#2d3748;">
-                <tr><td style="padding:6px 0;color:#718096;width:140px;">Vendor</td><td style="padding:6px 0;font-weight:600;">${vendorName}</td></tr>
+                <tr><td style="padding:6px 0;color:#718096;width:160px;">Vendor Name</td><td style="padding:6px 0;font-weight:600;">${vendorName}</td></tr>
                 <tr><td style="padding:6px 0;color:#718096;">Primary Contact</td><td style="padding:6px 0;">${primaryContact || "—"}</td></tr>
-                <tr><td style="padding:6px 0;color:#718096;">Email</td><td style="padding:6px 0;"><a href="mailto:${primaryEmail}" style="color:#1e3a5f;text-decoration:none;">${primaryEmail || "—"}</a></td></tr>
+                <tr><td style="padding:6px 0;color:#718096;">Vendor Email</td><td style="padding:6px 0;"><a href="mailto:${primaryEmail}" style="color:#1e3a5f;text-decoration:none;">${primaryEmail || "—"}</a></td></tr>
+                <tr><td style="padding:6px 0;color:#718096;">Vendor Phone</td><td style="padding:6px 0;">${primaryPhone || "—"}</td></tr>
+                <tr><td style="padding:6px 0;color:#718096;">Vendor Reference</td><td style="padding:6px 0;font-family:'SFMono-Regular',Consolas,Menlo,monospace;font-weight:600;letter-spacing:0.5px;">${vendorRef}</td></tr>
+                <tr><td style="padding:6px 0;color:#718096;">Vendor Unique ID</td><td style="padding:6px 0;font-family:'SFMono-Regular',Consolas,Menlo,monospace;font-size:12px;color:#4a5568;">${vendorId}</td></tr>
                 <tr><td style="padding:6px 0;color:#718096;">Submitted At</td><td style="padding:6px 0;">${submittedAt}</td></tr>
               </table>
             </td></tr>
@@ -92,7 +97,7 @@ serve(async (req) => {
 
     const { data: vendor, error: vErr } = await supabase
       .from("vendors")
-      .select("id, legal_name, trade_name, primary_contact_name, primary_email, submitted_at, invitation_id")
+      .select("id, legal_name, trade_name, primary_contact_name, primary_email, primary_phone, submitted_at, invitation_id")
       .eq("id", body.vendorId)
       .maybeSingle();
     if (vErr) throw vErr;
@@ -168,14 +173,18 @@ serve(async (req) => {
     const action = resubmission ? "resubmitted" : "submitted";
     const subject = `Vendor Submitted Registration Form – ${vendorName}`;
 
+    const vendorRef = vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+
     const html = buildHtml({
       inviterFirstName,
       vendorName,
       primaryContact: vendor.primary_contact_name || "",
       primaryEmail: vendor.primary_email || "",
+      primaryPhone: (vendor as any).primary_phone || "",
       submittedAt,
       resubmission,
       vendorId: vendor.id,
+      vendorRef,
       action,
     });
 
@@ -202,9 +211,14 @@ serve(async (req) => {
       console.error("audit_logs insert failed", e);
     }
 
-    return new Response(JSON.stringify({ success: true, sentTo: profile.email }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        sentTo: profile.email,
+        inviter: { name: fullName || profile.email, email: profile.email },
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err: any) {
     console.error("notify-vendor-submission error:", err);
     return new Response(JSON.stringify({ success: false, error: err?.message ?? String(err) }), {
