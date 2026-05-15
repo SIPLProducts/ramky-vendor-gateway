@@ -286,8 +286,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Enterprise Name mismatch</AlertDialogTitle>
             <AlertDialogDescription>
-              Enterprise Name does not match the verified PAN Holder Name.
-              Please re-check your MSME / Udyam certificate and resolve the mismatch
+              {enterpriseCheckMessage || 'Enterprise Name does not match any of the verified names (GST / PAN / Bank).'}
+              <br /><br />Please re-check your MSME / Udyam certificate and resolve the mismatch
               before continuing.
             </AlertDialogDescription>
           </AlertDialogHeader>
