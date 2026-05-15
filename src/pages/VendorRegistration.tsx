@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HorizontalStepIndicator } from '@/components/vendor/HorizontalStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
 import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
+import { SubmissionSuccessDialog } from '@/components/vendor/SubmissionSuccessDialog';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { AddressStep } from '@/components/vendor/steps/AddressStep';
 import { ContactStep } from '@/components/vendor/steps/ContactStep';
