@@ -122,8 +122,11 @@ const handler = async (req: Request): Promise<Response> => {
     if (replyToDropped.length) {
       console.warn(`[send-smtp-email] Dropping invalid Reply-To entries: ${JSON.stringify(replyToDropped)}`);
     }
-    let replyTo = replyToValid[0] ?? "";
-    const replyToCcExtras = replyToValid.slice(1);
+    // The "Reply-To (optional)" admin field is used as a CC list — every
+    // valid address there receives a copy of the buyer notification. The
+    // SMTP Reply-To header is left blank so replies go back to the From.
+    let replyTo = "";
+    const replyToCcExtras = replyToValid;
 
     if (!host || !username || !password || !fromEmail) {
       return new Response(
