@@ -151,6 +151,7 @@ export function BankKycTab(props: BankKycTabProps) {
     const account = pickString(extracted.account_number).replace(/\s+/g, '');
     const ifsc = pickString(extracted.ifsc_code).toUpperCase().trim();
     setHolderCheck('idle');
+    setHolderCheckMessage('');
     setHolderName('');
 
     if (!account || account.length < 8 || !isValidIfsc(ifsc)) {
@@ -203,6 +204,7 @@ export function BankKycTab(props: BankKycTabProps) {
     }
     setPopupSubmitting(true);
     setHolderCheck('idle');
+    setHolderCheckMessage('');
     setHolderName('');
     props.onStatusChange?.('validating');
     props.onBankDetailsChange({
