@@ -377,6 +377,8 @@ export function ComplianceStep({
             gstPanNumber={gstPanNumber}
             gstLegalName={gstLegalName}
             gstVerified={statuses.gst === 'passed'}
+            ocrResult={panTabResult}
+            onOcrResultChange={setPanTabResult}
           />
         }
         msme={
