@@ -256,7 +256,34 @@ export function GstKycTab(props: GstKycTabProps) {
             />
           </TabsContent>
         </Tabs>
-      ) : (
+      ) : null}
+
+      {props.isGstRegistered && legalNameCheck !== 'idle' && legalNameCheck !== 'skipped' && verifiedLegalName && (
+        <div
+          className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
+            legalNameCheck === 'failed'
+              ? 'border-destructive/30 bg-destructive/5'
+              : 'border-success/30 bg-success/5'
+          }`}
+        >
+          {legalNameCheck === 'failed' ? (
+            <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-success" />
+          )}
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex flex-wrap gap-x-2 items-baseline">
+              <span className="text-xs text-muted-foreground">GST Legal Name:</span>
+              <span className="font-medium break-words">{verifiedLegalName}</span>
+            </div>
+            <div className={legalNameCheck === 'failed' ? 'text-destructive' : 'text-success'}>
+              {legalNameCheckMessage}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {props.isGstRegistered ? null : (
         <div className="space-y-4">
           <Alert>
             <AlertDescription>
