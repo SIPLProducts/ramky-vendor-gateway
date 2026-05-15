@@ -112,7 +112,7 @@ export function BankKycTab(props: BankKycTabProps) {
         props.onStatusChange?.('failed');
         return {
           ok: false,
-          message: `Account Holder Name does not match with the provided PAN/MSME details (best match ${Math.max(panScore, gstScore)}%, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
+          message: `Account Holder Name does not match with the provided ${refsLabel || 'PAN'} (best match ${Math.max(panScore, gstScore)}%, need ≥ ${NAME_MATCH_THRESHOLD}%).`,
           apiData,
         };
       }
