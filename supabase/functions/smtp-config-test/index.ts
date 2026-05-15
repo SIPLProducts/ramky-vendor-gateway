@@ -111,16 +111,38 @@ serve(async (req) => {
     const from = cleanFromName ? `${cleanFromName} <${fromEmail}>` : fromEmail;
     const recipient = (to && String(to).trim()) || fromEmail;
 
-    await client.send({
-      from,
-      to: [recipient],
-      replyTo: replyTo ?? undefined,
-      subject: "Sharvi Vendor Portal — SMTP Test Email",
-      content:
-        "This is a test email confirming your SMTP configuration is working.",
-      html:
-        "<p>This is a <strong>test email</strong> confirming your SMTP configuration is working.</p>",
-    });
+    // Treat the configured Reply-To list as CC. Drop invalid entries so the
+    // test send is never aborted by a malformed address.
+    const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+    const ccArr = (replyTo ?? "")
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => {
+        const m = s.match(/<([^>]+)>/);
+        return (m ? m[1] : s).trim();
+      })
+      .filter((s) => isEmail(s) && s.toLowerCase() !== recipient.toLowerCase());
+
+    const trySend = async (withCc: boolean) => {
+      await client.send({
+        from,
+        to: [recipient],
+        cc: withCc && ccArr.length ? ccArr : undefined,
+        subject: "Sharvi Vendor Portal — SMTP Test Email",
+        content:
+          "This is a test email confirming your SMTP configuration is working.",
+        html:
+          "<p>This is a <strong>test email</strong> confirming your SMTP configuration is working.</p>",
+      });
+    };
+
+    try {
+      await trySend(true);
+    } catch (e: any) {
+      console.warn("smtp-config-test retry without cc:", e?.message ?? e);
+      await trySend(false);
+    }
     await client.close();
 
     return new Response(
