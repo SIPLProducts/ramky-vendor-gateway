@@ -626,7 +626,9 @@ export default function VendorRegistration() {
 
   const handleSubmit = async () => {
     try {
-      const vendor = isEditMode && vendorId ? await resubmitVendor(formData) : await submitVendor(formData);
+      const vendor = isEditMode && vendorId
+        ? await resubmitVendor(formData)
+        : await submitVendor(formData);
 
       // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
       if (invitationToken) {
@@ -639,12 +641,19 @@ export default function VendorRegistration() {
         }
       }
 
-      setIsSubmitted(true); setIsEditMode(false); setVendorStatusState('finance_review');
-      toast({ title: isEditMode ? 'Application Resubmitted' : 'Application Submitted' });
-      setShowFeedback(true);
-      // Skip runValidations since frontend already validated
+      const notify = (vendor as any)?._notify ?? null;
+      const inviter = notify?.inviter ?? null;
+      const notifyFailed = !notify || notify?.success === false;
+
+      // Defer success-screen transition until the user closes the dialog,
+      // so the popup is shown before the form is replaced.
+      setPendingPostSubmit(true);
+      setSubmissionSuccess({
+        open: true,
+        inviter,
+        notifyFailed,
+      });
     } catch (error) {
-      // Surface the deepest message we can find — Supabase errors often nest details/hint
       const err = error as { message?: string; details?: string; hint?: string; code?: string } | null;
       const description =
         err?.message ||
@@ -655,6 +664,17 @@ export default function VendorRegistration() {
         'An unexpected error occurred. Please check your data and try again.';
       console.error('[VendorRegistration] Submit failed:', error);
       toast({ title: 'Submission Failed', description, variant: 'destructive' });
+    }
+  };
+
+  const handleSubmissionDialogClose = () => {
+    setSubmissionSuccess((s) => ({ ...s, open: false }));
+    if (pendingPostSubmit) {
+      setIsSubmitted(true);
+      setIsEditMode(false);
+      setVendorStatusState('finance_review');
+      setShowFeedback(true);
+      setPendingPostSubmit(false);
     }
   };
 
