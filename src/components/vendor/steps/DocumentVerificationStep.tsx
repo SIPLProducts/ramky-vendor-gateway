@@ -1097,12 +1097,15 @@ export function DocumentVerificationStep({
         return;
       }
       const score = nameMatchScore(effectiveLegalName, apiName);
+      const enterpriseNameMessage = !evalRes.skipped && evalRes.passed
+        ? formatCrossMatchSuccess("Enterprise Name", evalRes.matches)
+        : undefined;
       setMsmeDoc({
         status: "verified",
         fileName: `Udyam ${ocrShape.udyam_number}`,
         ocrData: ocrShape,
         originalOcrData: ocrShape,
-        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number, normalized: { ...ocrShape } },
+        apiData: { name: apiName, enterpriseName: apiName, udyamNumber: ocrShape.udyam_number, normalized: { ...ocrShape }, enterpriseNameMessage },
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
