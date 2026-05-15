@@ -272,7 +272,10 @@ export function ComplianceStep({
     setIfscCode(b.ifscCode);
     if (b.bankName) setBankName(b.bankName);
     if (b.branchName) setBranchName(b.branchName);
-    if (b.accountHolderName) setAccountHolderName(b.accountHolderName);
+    if (b.accountHolderName) {
+      setAccountHolderName(b.accountHolderName);
+      setBankAccountHolderName(b.accountHolderName);
+    }
   };
 
   const handleFormSubmit = (formData: StatutoryDetails) => {
