@@ -135,7 +135,7 @@ export function SapMasterCombobox({ label, masterType, value, onChange, placehol
       <p className="text-[11px] text-muted-foreground">
         {isLoading
           ? "Loading F4 values…"
-          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded.`}
+          : `${rows.length} option${rows.length === 1 ? "" : "s"} loaded${isLive ? " from live SAP F4." : "."}`}
       </p>
     </div>
   );
