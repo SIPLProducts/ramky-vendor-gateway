@@ -992,7 +992,6 @@ export default function VendorRegistration() {
           </div>
         </main>
       </div>
-      </div>
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}
