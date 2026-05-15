@@ -18,6 +18,8 @@ interface Props {
   filter?: Record<string, string | undefined>;
   extraLabelFields?: string[];
   allowFilterFallback?: boolean;
+  /** Live items from SAP F4 response. When provided, overrides the cached DB rows. */
+  liveItems?: any[] | null;
 }
 
 // Map our internal master_type -> SAP key fields used to render labels exactly like SAP F4 response
