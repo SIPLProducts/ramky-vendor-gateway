@@ -13,7 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Eye, EyeOff, Info, Send, Loader2 } from "lucide-react";
+import { Mail, Eye, EyeOff, Info, Send, Loader2, X } from "lucide-react";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const KEYS = [
   "smtp_host",
