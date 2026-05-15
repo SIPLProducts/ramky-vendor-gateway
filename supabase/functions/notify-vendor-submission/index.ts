@@ -20,14 +20,16 @@ function buildHtml(opts: {
   vendorName: string;
   primaryContact: string;
   primaryEmail: string;
+  primaryPhone: string;
   submittedAt: string;
   resubmission: boolean;
   vendorId: string;
+  vendorRef: string;
   action: string;
 }) {
-  const { inviterFirstName, vendorName, primaryContact, primaryEmail, submittedAt, resubmission, vendorId, action } = opts;
+  const { inviterFirstName, vendorName, primaryContact, primaryEmail, primaryPhone, submittedAt, resubmission, vendorId, vendorRef, action } = opts;
   const heading = resubmission ? "Vendor Application Resubmitted" : "Vendor Application Submitted";
-  const intro = `Vendor <strong>${vendorName}</strong> has ${action} the registration form successfully on <strong>${submittedAt}</strong>.<br/>Vendor ID: <strong>${vendorId}</strong>`;
+  const intro = `We're pleased to inform you that vendor <strong>${vendorName}</strong> has ${action} their registration form successfully. The complete details are summarised below for your review.`;
   const currentYear = new Date().getFullYear();
 
   return `<!DOCTYPE html>
