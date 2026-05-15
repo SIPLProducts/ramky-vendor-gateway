@@ -135,7 +135,11 @@ serve(async (req) => {
             const j = JSON.parse(text);
             detail = `${j.error || "upstream error"}${j.code ? ` [${j.code}]` : ""}${j.target ? ` -> ${j.target}` : ""}`;
           } catch { /* keep raw text */ }
-          networkError = `Middleware HTTP ${res.status}: ${detail}`;
+          if (res.status === 401) {
+            networkError = `Middleware rejected the request (HTTP 401 Unauthorized). The Node middleware running at ${middlewareBase} needs the env var MIDDLEWARE_SHARED_SECRET set to the same value as the Proxy Secret saved in SAP API Settings → SAP Fields F4. Restart the middleware after setting it.`;
+          } else {
+            networkError = `Middleware HTTP ${res.status}: ${detail}`;
+          }
         } else {
           let wrapper: any = null;
           try { wrapper = JSON.parse(text); } catch {
