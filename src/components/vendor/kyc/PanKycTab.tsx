@@ -87,16 +87,18 @@ export function PanKycTab(props: PanKycTabProps) {
     const extractedPan = pickStr(extracted.pan_number).toUpperCase().trim();
     const extractedName = pickStr(extracted.full_name || extracted.holder_name || extracted.name).trim();
 
-    setOcrPan(extractedPan);
-    setOcrName(extractedName);
     if (extractedPan && extractedPan.length === 10) {
       props.onPanChange(extractedPan);
     }
 
     const panOk = panMatch(extractedPan, props.gstPanNumber);
     const nameOk = fuzzyNameMatch(extractedName, props.gstLegalName);
-    setPanCheck(panOk ? 'passed' : 'failed');
-    setNameCheck(nameOk ? 'passed' : 'failed');
+    updateResult({
+      ocrPan: extractedPan,
+      ocrName: extractedName,
+      panCheck: panOk ? 'passed' : 'failed',
+      nameCheck: nameOk ? 'passed' : 'failed',
+    });
 
     props.onVerifiedDetails?.(extracted);
 
