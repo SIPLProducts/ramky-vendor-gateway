@@ -683,9 +683,12 @@ export function DocumentVerificationStep({
           isNameMismatch: true,
         } as any;
       }
+      const enterpriseNameMessage = !evalRes.skipped && evalRes.passed
+        ? formatCrossMatchSuccess("Enterprise Name", evalRes.matches)
+        : undefined;
       return {
         ok: true as const,
-        apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number },
+        apiData: { name: normalized.enterprise_name, enterpriseName: normalized.enterprise_name, udyamNumber: normalized.udyam_number, enterpriseNameMessage },
         normalized,
         registeredName: normalized.enterprise_name,
       };
