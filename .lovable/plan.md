@@ -1,51 +1,76 @@
 ## Goal
-Wipe all vendor submission/test data so the same email IDs (e.g., `sunilkumar@sharviinfotech.com`) can be re-invited and re-tested end-to-end. Keep all configuration, users, roles, branding, SMTP, SAP, approval matrix, and field configs untouched.
 
-## What gets cleared
-| Table | Rows now | After |
-|---|---|---|
-| `vendors` | 25 | 0 |
-| `vendor_invitations` | 1 | 0 |
-| `vendor_documents` | 51 | 0 |
-| `vendor_validations` | 54 | 0 |
-| `vendor_approval_progress` | 25 | 0 |
-| `vendor_feedback` | 26 | 0 |
-| `ocr_extractions` | 95 | 0 |
-| `validation_api_logs` | 12 | 0 |
-| `scheduled_validations` | 8 | 0 |
-| `invitation_email_events` | 0 | 0 |
-| `audit_logs` (only rows with `vendor_id IS NOT NULL`) | — | cleared |
+Add a public, SEO-optimized marketing landing page for Sharvi Vendor Gateway at `/`, targeting the keywords **"vendor management system"** and **"vendor onboarding portal"** (plus secondary: "supplier management software", "vendor portal"). Today `/` renders the `Auth` login screen, which has no SEO value and blocks Google from indexing any marketing copy.
 
-## What is NOT touched
-- `profiles`, `user_roles`, `user_tenants`, `user_custom_roles`, `custom_roles`
-- `tenants`, `tenant_branding`
-- `smtp_email_configs`, `api_credentials`, `api_providers`, `validation_configs`
-- `approval_matrix_levels`, `approval_matrix_approvers`, `approval_workflows`, `approval_workflow_steps`, `buyer_scm_mappings`
-- `sap_*` (configs, credentials, fields, master data, payload templates, defaults)
-- `form_field_configs`, `form_step_configs`, `role_screen_permissions`, `custom_role_screen_permissions`, `portal_config`
-- All Storage buckets / uploaded files in `vendor-documents` bucket remain (DB rows pointing to them are gone). If you also want the storage objects deleted, tell me and I'll add that step.
+## Scope
 
-## Will it work after?
-Yes. After the wipe:
-1. Buyer (Sunil) → Vendor Invitations → "+ New Invitation" with the same email → fresh token → email goes via buyer SMTP (existing send-vendor-invitation logic, unchanged).
-2. Vendor opens link → registers → 7-step form → Submit.
-3. Approval pipeline (SCM Manager → SCM Head → Finance 1 → Finance 2 → SAP Sync) runs as configured — approval matrix and approver mappings are preserved.
+### 1. Routing change (`src/App.tsx`)
+- `/` → new `Landing` page (public)
+- `/auth` → existing `Auth` (unchanged)
+- All other routes unchanged
+- Existing login links continue to work; landing CTAs point to `/auth` and `/vendor/invite`
 
-No code, RLS, edge function, schema, or config changes. Single backend powers both preview and `vms.siplproducts.com`, so the reset applies to both — that is what you asked for.
+### 2. New page `src/pages/Landing.tsx`
+Single long-scroll page, SAP Fiori-inspired styling consistent with the app (grey `#F7F9FC` bg, white rounded cards, blue primary). Sections:
 
-## Execution (after approval)
-One transactional batch via the data tool, in dependency-safe order:
-```sql
-DELETE FROM public.invitation_email_events;
-DELETE FROM public.vendor_feedback;
-DELETE FROM public.vendor_documents;
-DELETE FROM public.vendor_validations;
-DELETE FROM public.vendor_approval_progress;
-DELETE FROM public.ocr_extractions;
-DELETE FROM public.validation_api_logs;
-DELETE FROM public.scheduled_validations;
-DELETE FROM public.audit_logs WHERE vendor_id IS NOT NULL;
-DELETE FROM public.vendor_invitations;
-DELETE FROM public.vendors;
+1. **Hero** — H1 "Vendor Management System for Enterprise Onboarding", subheading mentioning "vendor onboarding portal", primary CTA "Vendor Login", secondary "Request a Demo" (mailto support@sharviinfotech.com)
+2. **Trust strip** — SAP S/4HANA, GST, PAN, MSME, Bank verification badges
+3. **Features grid** — 6 cards mapped to real product capabilities (7-step onboarding, multi-level approval workflow, KYC verifications, SAP sync, audit logs, role-based access)
+4. **How it works** — 3 steps (Invite → Vendor Self-Registration → Approval & SAP Sync)
+5. **Keyword-rich content block** — 2–3 short paragraphs naturally using the target keywords + supplier management software / vendor portal
+6. **FAQ** — answers to "What is a vendor management system?", "How does vendor onboarding work?", "What's the best vendor management system for enterprise use?" (mirrors high-volume question keywords from Semrush). Doubles as `FAQPage` JSON-LD source.
+7. **Footer** — support email, login link
+
+### 3. SEO head (per-route via `react-helmet-async`)
+- Install `react-helmet-async`, wrap app in `<HelmetProvider>` in `src/main.tsx`
+- `Landing.tsx` `<Helmet>`:
+  - `<title>` (~58 chars): "Vendor Management System & Onboarding Portal | Sharvi"
+  - `<meta name="description">` (~155 chars) including both primary keywords
+  - `<link rel="canonical" href="https://vms.siplproducts.com/">`
+  - `og:title`, `og:description`, `og:url`, `og:type=website`
+  - JSON-LD: `Organization` + `FAQPage` (from the FAQ section)
+- Update `index.html`:
+  - Replace sitewide `<title>` and `<meta description>` with Sharvi-branded, keyword-aware fallbacks (so non-JS crawlers still get good defaults)
+  - Remove any conflicting per-page tags (none currently — safe)
+  - No `og:image` for now (placeholder would hurt previews; can add later if the user provides/wants one generated)
+
+### 4. Semantic HTML & on-page SEO
+- Exactly one `<h1>` containing "Vendor Management System"
+- `<h2>` per section, using secondary keywords ("Vendor onboarding portal", "Supplier management", etc.) naturally
+- Descriptive `alt` text on any imagery
+- Internal link from landing → `/auth`, `/vendor/invite`, `/support`
+- Lazy-load below-the-fold images if any
+
+### 5. `public/robots.txt` and sitemap
+- Confirm `robots.txt` allows `/`
+- Add a minimal `public/sitemap.xml` listing `/` (and `/auth`, `/support`) so Google can discover the landing page
+
+## Out of scope
+- No backend changes, no DB migrations, no auth changes
+- No changes to the vendor registration flow, approval workflow, or any portal screens
+- No new images (text-first landing; can add later)
+- Existing portal users land on `/auth` directly via bookmark/email — unaffected
+
+## Technical notes
+
 ```
-Then a `SELECT count(*)` per table to confirm zeros.
+src/
+  pages/Landing.tsx          NEW
+  App.tsx                    EDIT — / → Landing, keep /auth → Auth
+  main.tsx                   EDIT — wrap with <HelmetProvider>
+index.html                   EDIT — title, description, brand
+public/sitemap.xml           NEW
+package.json                 +react-helmet-async
+```
+
+Routes table after change:
+
+```text
+/            Landing (public, SEO)
+/auth        Auth (existing, unchanged)
+/vendor/*    unchanged
+/dashboard…  unchanged (protected)
+```
+
+## Expected SEO impact
+Targets ~2,400/mo "vendor management system" (KDI 42, achievable) + the exact-match "vendor onboarding portal" (KDI 0, trivial to rank). Both have high commercial intent ($22–$55 CPC). Rankings typically take 4–8 weeks after Google indexes the page.
