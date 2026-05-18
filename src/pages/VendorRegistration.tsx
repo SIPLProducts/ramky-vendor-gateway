@@ -1135,18 +1135,29 @@ export default function VendorRegistration() {
                       Submit Application
                     </Button>
                   ) : (
-                    <Button
-                      type="submit"
-                      form="step-form"
-                      disabled={!canProceed}
-                      className={cn(
-                        "min-w-[120px]",
-                        !canProceed && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      Continue
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
+                    isInternational && currentStep === 1 ? (
+                      <Button
+                        type="button"
+                        onClick={handleIntlDocsContinue}
+                        className="min-w-[120px]"
+                      >
+                        Continue
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        form="step-form"
+                        disabled={!canProceed}
+                        className={cn(
+                          "min-w-[120px]",
+                          !canProceed && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        Continue
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
