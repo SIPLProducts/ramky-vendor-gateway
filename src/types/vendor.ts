@@ -35,11 +35,11 @@ export interface OrganizationDetails {
   productCategoriesOther?: string;
   state: string;
   accountingGroup?: 'Import' | 'Domestic' | '';
-  // SAP Classification
-  materialGroupVendor?: string;
-  vendorCategory?: string;
-  vendorLocation?: string;
-  identificationSource?: string;
+  // SAP Classification (multi-select)
+  materialGroupVendor?: string[];
+  vendorCategory?: string[];
+  vendorLocation?: string[];
+  identificationSource?: string[];
 }
 
 export const ACCOUNTING_GROUPS = ['Import', 'Domestic'] as const;
