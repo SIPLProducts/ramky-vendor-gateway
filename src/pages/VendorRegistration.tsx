@@ -78,6 +78,8 @@ export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
+  const [vendorTypeChosen, setVendorTypeChosen] = useState(false);
+  const [pendingChoiceType, setPendingChoiceType] = useState<VendorOriginType>('domestic');
   const [verifiedData, setVerifiedData] = useState<VerifiedDocumentData | undefined>(undefined);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
@@ -384,6 +386,8 @@ export default function VendorRegistration() {
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
+        setVendorTypeChosen(true);
+        setPendingChoiceType(existingFormData.vendorType);
         // For draft status, allow user to continue from where they left off
         // Mark steps as completed based on filled data
         if (vendorStatus === 'draft') {
@@ -914,6 +918,77 @@ export default function VendorRegistration() {
   const canProceed = canProceedFromCurrentStep();
   const validationMessage = getValidationMessage();
 
+  // Gating screen — choose vendor type BEFORE showing the registration tabs
+  if (!vendorTypeChosen && !isSubmitted) {
+    const confirmChoice = () => {
+      if (pendingChoiceType !== formData.vendorType) {
+        handleVendorTypeChange(pendingChoiceType);
+      }
+      setVendorTypeChosen(true);
+      setCurrentStep(1);
+    };
+    return (
+      <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
+        <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+          {isTokenMode ? (
+            <div className="flex items-center gap-3">
+              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+              <span className="text-sm font-semibold text-foreground">Vendor Registration</span>
+            </div>
+          ) : (
+            <Link to="/" className="flex items-center gap-3">
+              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+              <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+            </Link>
+          )}
+        </header>
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+          <div className="w-full max-w-3xl bg-card rounded-[10px] shadow-enterprise-md border p-6 sm:p-8 space-y-6">
+            {isTokenMode && invitationEmail && (
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
+                </p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <h1 className="text-xl font-semibold text-foreground">Select Vendor Type</h1>
+              <p className="text-sm text-muted-foreground">Choose the vendor category to begin your registration. You can change this later.</p>
+            </div>
+            <VendorTypeSelector
+              value={pendingChoiceType}
+              onChange={setPendingChoiceType}
+              disabled={isSubmitting}
+            />
+            <div className="flex justify-end pt-2">
+              <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
+                Continue
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        </main>
+        <AlertDialog open={!!pendingTypeSwitch} onOpenChange={(o) => { if (!o) setPendingTypeSwitch(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Switch vendor type?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved data in the {formData.vendorType === 'international' ? 'International' : 'Domestic'} section. Switching will clear it. Continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingTypeSwitch(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { if (pendingTypeSwitch) applyVendorTypeSwitch(pendingTypeSwitch); setPendingTypeSwitch(null); }}>
+                Yes, switch
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
+
   return (
     <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
       {/* Header */}
@@ -1013,14 +1088,23 @@ export default function VendorRegistration() {
           </div>
         </div>
 
-        {/* Vendor Type Selector (above the form card, hidden once submitted) */}
+        {/* Vendor Type chip (shown after type is chosen) */}
         {!isSubmitted && (
-          <div className="px-4 sm:px-6 pt-4">
-            <VendorTypeSelector
-              value={formData.vendorType}
-              onChange={handleVendorTypeChange}
+          <div className="px-4 sm:px-6 pt-4 flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Vendor Type: {isInternational ? 'International' : 'Domestic'}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs"
               disabled={isSubmitting}
-            />
+              onClick={() => { setPendingChoiceType(formData.vendorType); setVendorTypeChosen(false); }}
+            >
+              Change
+            </Button>
           </div>
         )}
 
