@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, MapPin, Users, FileCheck, Landmark, TrendingUp, CheckCircle2, Edit2 } from 'lucide-react';
+import { Building2, MapPin, Users, FileCheck, Landmark, TrendingUp, CheckCircle2, Edit2, Globe2, Award, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
