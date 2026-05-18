@@ -600,7 +600,7 @@ export function ComplianceStep({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="msmeMobile">Mobile</Label>
-                <Input id="msmeMobile" {...register('msmeMobile' as any)} placeholder="Registered mobile" />
+                <Input id="msmeMobile" type="tel" inputMode="numeric" maxLength={10} {...register('msmeMobile' as any)} placeholder="10-digit mobile number" onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); setValue('msmeMobile' as any, e.target.value); }} />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="msmeEmail">Email</Label>
