@@ -631,6 +631,82 @@ export default function VendorRegistration() {
   const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
   const handleEditStep = (step: number) => setCurrentStep(step);
 
+  // ----- Vendor type switching with reset-confirm -----
+  const [pendingTypeSwitch, setPendingTypeSwitch] = useState<VendorOriginType | null>(null);
+
+  const hasDomesticData = () => {
+    const o = formData.organization;
+    const s = formData.statutory;
+    const b = formData.bank;
+    return !!(o.legalName || o.tradeName || o.industryType || s.pan || s.gstin || b.accountNumber || formData.address.registeredAddress || formData.contact.ceoName);
+  };
+  const hasInternationalData = () => {
+    const i = formData.international;
+    if (!i) return false;
+    return !!(i.company.companyName || i.company.companyAddress || i.company.country || i.bank.accountNumber || i.bank.swiftCode || i.bank.ibanNumber || i.documents.registrationCopyFile || i.documents.swiftIbanFile || (i.classification.materialGroupVendor?.length || 0) > 0);
+  };
+
+  const applyVendorTypeSwitch = (next: VendorOriginType) => {
+    setFormData((prev) => {
+      if (next === 'international') {
+        return {
+          ...prev,
+          vendorType: 'international',
+          ...EMPTY_DOMESTIC_SLICES,
+          international: prev.international ?? EMPTY_INTERNATIONAL_DATA,
+        };
+      }
+      return {
+        ...prev,
+        vendorType: 'domestic',
+        international: EMPTY_INTERNATIONAL_DATA,
+      };
+    });
+    setCompletedSteps([]);
+    setCurrentStep(1);
+    setVerifiedData(undefined);
+    latestStep1DataRef.current = null;
+  };
+
+  const handleVendorTypeChange = (next: VendorOriginType) => {
+    if (next === formData.vendorType) return;
+    const abandonedHasData = next === 'international' ? hasDomesticData() : hasInternationalData();
+    if (abandonedHasData) {
+      setPendingTypeSwitch(next);
+      return;
+    }
+    applyVendorTypeSwitch(next);
+  };
+
+  // ----- International step setters -----
+  const setIntlSlice = <K extends keyof InternationalData>(key: K, value: InternationalData[K]) => {
+    setFormData((prev) => ({
+      ...prev,
+      international: { ...(prev.international ?? EMPTY_INTERNATIONAL_DATA), [key]: value },
+    }));
+  };
+
+  const handleIntlDocsContinue = () => {
+    if (!completedSteps.includes(1)) setCompletedSteps((p) => [...p, 1]);
+    setCurrentStep(2);
+  };
+  const handleIntlCompanyComplete = (d: InternationalCompanyDetails) => {
+    setIntlSlice('company', d);
+    if (!completedSteps.includes(2)) setCompletedSteps((p) => [...p, 2]);
+    setCurrentStep(3);
+  };
+  const handleIntlBankComplete = (d: InternationalBankDetails) => {
+    setIntlSlice('bank', d);
+    if (!completedSteps.includes(3)) setCompletedSteps((p) => [...p, 3]);
+    setCurrentStep(4);
+  };
+  const handleIntlClassificationComplete = (d: InternationalClassification) => {
+    setIntlSlice('classification', d);
+    if (!completedSteps.includes(4)) setCompletedSteps((p) => [...p, 4]);
+    setCurrentStep(5);
+  };
+
+
   const handleSaveAsDraft = async () => {
     try {
       setAutoSaveState('saving');
