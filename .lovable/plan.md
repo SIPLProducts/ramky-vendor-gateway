@@ -1,24 +1,13 @@
-## Change
+## Make "Vendor Identification Source" optional in Domestic Classification
 
-**`src/components/vendor/steps/international/IntlClassificationStep.tsx`** — simplify the international Classification step.
+**File:** `src/components/vendor/steps/OrganizationStep.tsx`
 
-### Remove non-required fields
-- Delete the **Vendor Category** input.
-- Delete the **Vendor Identification Source** input.
-- Drop their entries from the Zod schema, `defaultValues`, `watch` live-update payload, and `handleFormSubmit` payload (pass empty arrays for the removed keys to keep `InternationalClassification` shape intact, or leave them out — see Technical below).
+1. Line 52 — change schema from required to optional:
+   - From: `identificationSource: z.array(z.string()).min(1, 'Identification Source is required'),`
+   - To: `identificationSource: z.array(z.string()).optional().default([]),`
+2. Line 518 — remove the red asterisk from the label:
+   - From: `<Label>Vendor Identification Source *</Label>`
+   - To: `<Label>Vendor Identification Source</Label>`
+3. Leave the MultiSelect, default values, and payload mapping unchanged so existing data still flows through.
 
-### Keep & mark mandatory
-- **Material Group for Vendors** — keep, label rendered with red asterisk: `<span className="text-destructive ml-0.5">*</span>`.
-- **Vendor Location** — keep, same red asterisk treatment.
-- Both stay validated as required (`z.string().trim().min(1, ...)`).
-
-### Layout
-Two remaining fields render side-by-side in `grid md:grid-cols-2 gap-5` (unchanged grid).
-
-### Technical
-- `InternationalClassification` type currently has 4 array fields. To avoid touching `src/types/vendor.ts` and downstream consumers (ReviewStep, autosave hydration), still emit `vendorCategory: []` and `identificationSource: []` from `onLiveUpdate` and `onSubmit`. Schema and form state only track the two visible fields.
-
-### Out of scope
-- Domestic flow / `OrganizationStep` / `EnterpriseOrganizationStep` (Indian vendor classification) — no changes.
-- `InternationalClassification` type definition — unchanged.
-- Review step rendering — unchanged (it will simply show empty arrays for the dropped fields).
+No changes to international flow, types, or Review step.
