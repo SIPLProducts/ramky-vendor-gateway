@@ -1,40 +1,33 @@
-## Fix Multiple SAP Sync dialog
+## Problem
 
-**Issue 1 — Cannot scroll the dialog content.**
-The dialog uses `ScrollArea` with `max-h-[60vh]`, but the parent `DialogContent` uses `overflow-hidden flex flex-col` and the inner Radix Viewport sometimes does not get a constrained height, breaking scroll. Replace the `ScrollArea` block with the same scroll pattern used in `SapFieldsDialog.tsx` (plain `div` with `flex-1 min-h-0 overflow-y-auto`), which is known to scroll reliably.
+In `MultipleSapSyncDialog`, the toast "Refreshed from SAP — 428 values updated" fires (fetch succeeded), but the dialog body keeps showing the "Calling SAP Fields F4 API…" spinner instead of revealing the form.
 
-**Issue 2 — F4 dropdowns missing.**
-Currently, `MultipleSapSyncDialog` renders SAP fields (Vendor Account Group, Company Code, Rec-Account, Planning Group, Purchase Org, Currency) as plain text inputs. Replace these with SAP F4 dropdowns (same component pattern as `SapFieldsDialog.SapF4SelectField`), so users can pick from live SAP F4 values just like the single-vendor sync dialog.
+## Root cause
 
-### Changes to `src/components/sap/MultipleSapSyncDialog.tsx`
+The `useEffect` that drives the F4 fetch has `[open, vendors]` as its dependency array. `vendors` is an array prop built fresh on every parent render (`SAPSync.tsx` filters/maps selected vendors inline), so its reference changes constantly. Each parent re-render re-runs the effect, which:
 
-1. Add F4 fetching on dialog open:
-   - State: `f4Status` (idle/loading/success/error + message), `liveF4` (Record<string, any[]>).
-   - On open: call `useRefreshSapMaster().mutateAsync()` to fetch live F4 values; populate `liveF4` from `res.sap_response`.
-   - Show the same loading banner used in `SapFieldsDialog` ("Calling SAP Fields F4 API…") inside the header.
-   - While loading, show the centered loader instead of the form (mirror SapFieldsDialog behavior).
+1. Resets `f4Status` back to `{ state: 'loading', ... }`
+2. Resets `liveF4` to `null`
+3. Kicks off a new `refreshMaster.mutateAsync` call
 
-2. Replace plain `TextField` with `SapF4SelectField` (extracted/shared) for:
-   - Vendor Account Group → `vendor_account_group` / `liveF4.VENDOR_ACC_GRP`
-   - Company Code → `company_code` / `liveF4.COMPANY_CODE`
-   - Rec-Account → `recon_account` / `liveF4.RECON_ACCOUNT`
-   - Planning Group → `planning_group` / `liveF4.PLANNING_GROUP`
-   - Purchase Org → `purchase_org` / `liveF4.PURCHASE_ORG`
-   - Currency → `currency` / `liveF4.CURRENCY`
-   Keep TextField for Title, Tax Type, Sort Key, Calc Schema, Vendor Class.
+Because the parent re-renders (e.g. from the toast, react-query cache invalidation after the first refresh succeeds, etc.) faster than the next fetch resolves, the UI is permanently pinned to the loading state even though previous fetches succeeded.
 
-3. Fix scroll:
-   - Remove `ScrollArea` import/usage.
-   - Replace the scrolling block with: `<div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>…</div>`.
+The `onSuccess` of `useRefreshSapMaster` calls `qc.invalidateQueries({ queryKey: ["sap_master_data"] })` and `refetchQueries`, which causes parent re-renders → new `vendors` reference → effect re-runs → loading again. Infinite loop of "loading".
 
-4. Disable the "Sync Multiple to SAP" button while `f4Status.state === 'loading'`.
+## Fix
 
-### Refactor
+In `src/components/sap/MultipleSapSyncDialog.tsx`:
 
-To avoid duplicating `SapF4SelectField` and the F4 field map, export them from `SapFieldsDialog.tsx` and import in `MultipleSapSyncDialog.tsx`. Export: `SapF4SelectField`, `F4_FIELD_MAP` (already an internal const). No other files affected.
+1. Change the effect dependency from `[open, vendors]` to `[open]` only. We only want to (re)initialize when the dialog opens, not on every parent re-render.
+2. Read the tenant id from `vendors` inside the effect via a ref or by reading `vendors[0]` at effect time — but do NOT include `vendors` in deps. Since the dialog is opened with a fixed selection, the vendor list for one open cycle is stable enough; capturing it on open is correct behavior.
+3. Guard against the spinner re-appearing: only set `f4Status` to `loading` if it's currently `idle` or the dialog just transitioned from closed → open (handled naturally by `[open]` deps).
 
-### Out of scope
+That's the only change. No edge-function, no schema, no other component touched.
 
-- No changes to the bulk sync edge function or payload builder.
-- No behavior change to single-vendor `SapFieldsDialog`.
-- No design system or color token changes.
+## Files
+
+- `src/components/sap/MultipleSapSyncDialog.tsx` — change `useEffect` deps from `[open, vendors]` to `[open]`. Add an eslint-disable comment for the missing `vendors` dep (intentional).
+
+## Out of scope
+
+- Bulk sync edge function, payload builder, single-vendor `SapFieldsDialog`, design tokens.
