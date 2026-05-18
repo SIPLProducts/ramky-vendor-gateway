@@ -44,11 +44,11 @@ const schema = z.object({
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
   accountingGroup: z.enum(['Import', 'Domestic'], { required_error: 'Accounting group is required' }),
-  // SAP Classification
-  materialGroupVendor: z.string().min(1, 'Material Group for Vendors is required'),
-  vendorCategory: z.string().min(1, 'Vendor Category is required'),
-  vendorLocation: z.string().min(1, 'Vendor Location is required'),
-  identificationSource: z.string().min(1, 'Identification Source is required'),
+  // SAP Classification (multi-select)
+  materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
+  vendorCategory: z.array(z.string()).min(1, 'Vendor Category is required'),
+  vendorLocation: z.array(z.string()).min(1, 'Vendor Location is required'),
+  identificationSource: z.array(z.string()).min(1, 'Identification Source is required'),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
@@ -122,10 +122,10 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
       state: data?.state || '',
       accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
       productCategoriesOther: data?.productCategoriesOther || '',
-      materialGroupVendor: data?.materialGroupVendor || '',
-      vendorCategory: data?.vendorCategory || '',
-      vendorLocation: data?.vendorLocation || '',
-      identificationSource: data?.identificationSource || '',
+      materialGroupVendor: Array.isArray(data?.materialGroupVendor) ? data!.materialGroupVendor as string[] : (data?.materialGroupVendor ? [data.materialGroupVendor as unknown as string] : []),
+      vendorCategory: Array.isArray(data?.vendorCategory) ? data!.vendorCategory as string[] : (data?.vendorCategory ? [data.vendorCategory as unknown as string] : []),
+      vendorLocation: Array.isArray(data?.vendorLocation) ? data!.vendorLocation as string[] : (data?.vendorLocation ? [data.vendorLocation as unknown as string] : []),
+      identificationSource: Array.isArray(data?.identificationSource) ? data!.identificationSource as string[] : (data?.identificationSource ? [data.identificationSource as unknown as string] : []),
       entityType: statutoryData?.entityType || '',
       firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
       pfNumber: statutoryData?.pfNumber || '',
@@ -407,16 +407,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="materialGroupVendor"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.materialGroupVendor ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select material group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRODUCT_CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c.toUpperCase()}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={PRODUCT_CATEGORIES.map((c) => ({ label: c.toUpperCase(), value: c }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select material groups"
+                      className={errors.materialGroupVendor ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.materialGroupVendor && (
@@ -430,16 +427,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="vendorCategory"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.vendorCategory ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select vendor category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VENDOR_CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={VENDOR_CATEGORIES.map((c) => ({ label: c, value: c }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select vendor categories"
+                      className={errors.vendorCategory ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.vendorCategory && (
@@ -453,16 +447,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="vendorLocation"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.vendorLocation ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDIAN_STATES.map((s) => (
-                          <SelectItem key={s} value={s.toUpperCase()}>{s.toUpperCase()}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={INDIAN_STATES.map((s) => ({ label: s.toUpperCase(), value: s.toUpperCase() }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select locations"
+                      className={errors.vendorLocation ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.vendorLocation && (
@@ -476,16 +467,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="identificationSource"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.identificationSource ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select identification source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {IDENTIFICATION_SOURCES.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={IDENTIFICATION_SOURCES.map((s) => ({ label: s, value: s }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select identification sources"
+                      className={errors.identificationSource ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.identificationSource && (

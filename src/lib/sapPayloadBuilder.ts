@@ -205,11 +205,28 @@ export async function buildSapPayload(
 
   const productCats = Array.isArray((vendor as any).product_categories) ? (vendor as any).product_categories : [];
   const ovClassify = (overrides && overrides.classify) || {};
+  const toArr = (v: any): string[] =>
+    Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
+  const classifyArrays = {
+    MGV: toArr(ovClassify.MGV).length ? toArr(ovClassify.MGV)
+      : (toArr((vendor as any).material_group_vendors).length ? toArr((vendor as any).material_group_vendors)
+      : (toArr((vendor as any).material_group_vendor).length ? toArr((vendor as any).material_group_vendor)
+      : productCats.map(String))),
+    CATV: toArr(ovClassify.CATV).length ? toArr(ovClassify.CATV)
+      : (toArr((vendor as any).vendor_categories).length ? toArr((vendor as any).vendor_categories)
+      : toArr((vendor as any).vendor_category || (vendor as any).organization_type || (vendor as any).entity_type)),
+    LOCV: toArr(ovClassify.LOCV).length ? toArr(ovClassify.LOCV)
+      : (toArr((vendor as any).vendor_locations).length ? toArr((vendor as any).vendor_locations)
+      : toArr((vendor as any).vendor_location || vendor.registered_state)),
+    IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
+      : (toArr((vendor as any).identification_sources).length ? toArr((vendor as any).identification_sources)
+      : toArr((vendor as any).identification_source)),
+  };
   const classifyCtx = {
-    MGV: ovClassify.MGV || (vendor as any).material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
-    CATV: ovClassify.CATV || (vendor as any).vendor_category || (vendor as any).organization_type || (vendor as any).entity_type || "",
-    LOCV: ovClassify.LOCV || (vendor as any).vendor_location || vendor.registered_state || "",
-    IDS: ovClassify.IDS || (vendor as any).identification_source || "",
+    MGV: classifyArrays.MGV[0] || "",
+    CATV: classifyArrays.CATV[0] || "",
+    LOCV: classifyArrays.LOCV[0] || "",
+    IDS: classifyArrays.IDS[0] || "",
   };
 
   const isMsme = !!(vendor as any).msme_number;
@@ -241,5 +258,17 @@ export async function buildSapPayload(
   };
 
   const row = resolveTemplate(template, ctx);
+
+  // Post-process CLASSIFY block — emit one object per selected value
+  const expand = (arr: string[], key: string) =>
+    (arr.filter(Boolean).length ? arr.filter(Boolean) : [""]).map(v => ({ [key]: v }));
+  if (row && typeof row === "object") {
+    row.CLASSIFY = row.CLASSIFY && typeof row.CLASSIFY === "object" ? row.CLASSIFY : {};
+    row.CLASSIFY.MAT_GRP_VENDOR = expand(classifyArrays.MGV, "MGV");
+    row.CLASSIFY.CAT_VENDOR = expand(classifyArrays.CATV, "CATV");
+    row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
+    row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
+  }
+
   return { payload: [row], uploadsCount: uploads.length, skipped };
 }

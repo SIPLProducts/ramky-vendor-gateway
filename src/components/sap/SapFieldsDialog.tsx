@@ -18,7 +18,7 @@ export type SapFieldOverrides = {
   msme: string; idtype: string; idnum: string;
   bukrs: string; akont: string; zuawa: string; cdi: string; fdgrv: string;
   vkorg: string; waers: string; kalsk: string; webre: string; lebre: string; ven_class: string;
-  classify: { MGV: string; CATV: string; LOCV: string; IDS: string };
+  classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[] };
 };
 
 interface Props {
@@ -213,10 +213,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Classification — auto-filled from vendor registration data */}
             <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <ReadOnlyField label="Material Category" value={form.classify.MGV} />
-              <ReadOnlyField label="Vendor Category" value={form.classify.CATV} />
-              <ReadOnlyField label="Vendor Location" value={form.classify.LOCV} />
-              <ReadOnlyField label="Vendor Identification" value={form.classify.IDS} />
+              <ReadOnlyField label="Material Group for Vendors" value={(form.classify.MGV || []).join(', ')} />
+              <ReadOnlyField label="Vendor Category" value={(form.classify.CATV || []).join(', ')} />
+              <ReadOnlyField label="Vendor Location" value={(form.classify.LOCV || []).join(', ')} />
+              <ReadOnlyField label="Vendor Identification Source" value={(form.classify.IDS || []).join(', ')} />
               <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
                 These values are captured from the vendor's submitted registration form and cannot be edited here.
               </p>
@@ -282,12 +282,18 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     ven_class: d.ven_class ?? '',
     classify: (() => {
       const v: any = vendor || {};
+      const toArr = (val: any): string[] =>
+        Array.isArray(val) ? val.filter(Boolean).map(String) : (val ? [String(val)] : []);
       const cats = Array.isArray(v.product_categories) ? v.product_categories.filter(Boolean) : [];
+      const mgv = toArr(v.material_group_vendors);
+      const catv = toArr(v.vendor_categories);
+      const locv = toArr(v.vendor_locations);
+      const ids = toArr(v.identification_sources);
       return {
-        MGV: cats.length ? cats.join(', ') : (v.material_group_vendor || ''),
-        CATV: v.industry_type || v.organization_type || v.entity_type || '',
-        LOCV: v.registered_state || '',
-        IDS: v.gstin || v.pan || '',
+        MGV: mgv.length ? mgv : (v.material_group_vendor ? [v.material_group_vendor] : (cats.length ? cats : [])),
+        CATV: catv.length ? catv : (v.vendor_category ? [v.vendor_category] : (v.industry_type ? [v.industry_type] : (v.organization_type ? [v.organization_type] : []))),
+        LOCV: locv.length ? locv : (v.vendor_location ? [v.vendor_location] : (v.registered_state ? [v.registered_state] : [])),
+        IDS: ids.length ? ids : (v.identification_source ? [v.identification_source] : []),
       };
     })(),
   };

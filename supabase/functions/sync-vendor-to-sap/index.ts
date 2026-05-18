@@ -300,11 +300,28 @@ serve(async (req) => {
 
       const productCats = Array.isArray(vendor.product_categories) ? vendor.product_categories : [];
       const ovClassify = (overrides && overrides.classify) || {};
+      const toArr = (v: any): string[] =>
+        Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
+      const classifyArrays = {
+        MGV: toArr(ovClassify.MGV).length ? toArr(ovClassify.MGV)
+          : (toArr(vendor.material_group_vendors).length ? toArr(vendor.material_group_vendors)
+          : (toArr(vendor.material_group_vendor).length ? toArr(vendor.material_group_vendor)
+          : productCats.map(String))),
+        CATV: toArr(ovClassify.CATV).length ? toArr(ovClassify.CATV)
+          : (toArr(vendor.vendor_categories).length ? toArr(vendor.vendor_categories)
+          : toArr(vendor.vendor_category || vendor.organization_type || vendor.entity_type)),
+        LOCV: toArr(ovClassify.LOCV).length ? toArr(ovClassify.LOCV)
+          : (toArr(vendor.vendor_locations).length ? toArr(vendor.vendor_locations)
+          : toArr(vendor.vendor_location || vendor.registered_state)),
+        IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
+          : (toArr(vendor.identification_sources).length ? toArr(vendor.identification_sources)
+          : toArr(vendor.identification_source)),
+      };
       const classifyCtx = {
-        MGV: ovClassify.MGV || vendor.material_group_vendor || (productCats[0] ? String(productCats[0]) : ""),
-        CATV: ovClassify.CATV || vendor.vendor_category || vendor.organization_type || vendor.entity_type || "",
-        LOCV: ovClassify.LOCV || vendor.vendor_location || vendor.registered_state || "",
-        IDS: ovClassify.IDS || vendor.identification_source || "",
+        MGV: classifyArrays.MGV[0] || "",
+        CATV: classifyArrays.CATV[0] || "",
+        LOCV: classifyArrays.LOCV[0] || "",
+        IDS: classifyArrays.IDS[0] || "",
       };
 
       const isMsme = !!vendor.msme_number;
@@ -327,7 +344,6 @@ serve(async (req) => {
       }
 
       // Document uploads are temporarily disabled to avoid SAP middleware 413 (PayloadTooLarge).
-      // Re-enable by restoring: const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
       const uploads: any[] = [];
       const skipped: string[] = [];
 
@@ -340,6 +356,18 @@ serve(async (req) => {
       };
 
       row = resolveTemplate(template, ctx);
+
+      // Post-process CLASSIFY block — emit one object per selected value
+      const expand = (arr: string[], key: string) =>
+        (arr.filter(Boolean).length ? arr.filter(Boolean) : [""]).map((v) => ({ [key]: v }));
+      if (row && typeof row === "object") {
+        row.CLASSIFY = row.CLASSIFY && typeof row.CLASSIFY === "object" ? row.CLASSIFY : {};
+        row.CLASSIFY.MAT_GRP_VENDOR = expand(classifyArrays.MGV, "MGV");
+        row.CLASSIFY.CAT_VENDOR = expand(classifyArrays.CATV, "CATV");
+        row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
+        row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
+      }
+
       payload = [row];
 
       if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
