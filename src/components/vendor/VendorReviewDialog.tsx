@@ -391,6 +391,134 @@ export function VendorReviewDialog({
             <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
               <ValidationStatus validations={validations} />
             </TabsContent>
+
+            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
+              <ScrollArea className="h-[55vh] pr-4">
+                {gstReport && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-4">
+                      <Card className={
+                        gstReport.complianceScore >= 80
+                          ? 'border-green-200 bg-green-50 dark:bg-green-950/20'
+                          : gstReport.complianceScore >= 50
+                          ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20'
+                          : 'border-red-200 bg-red-50 dark:bg-red-950/20'
+                      }>
+                        <CardContent className="pt-4 text-center">
+                          <p className="text-sm text-muted-foreground">Compliance Score</p>
+                          <p className={`text-3xl font-bold ${
+                            gstReport.complianceScore >= 80
+                              ? 'text-green-600'
+                              : gstReport.complianceScore >= 50
+                              ? 'text-yellow-600'
+                              : 'text-red-600'
+                          }`}>
+                            {gstReport.complianceScore}%
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4 text-center">
+                          <p className="text-sm text-muted-foreground">GST Status</p>
+                          <p className="text-lg font-semibold">{gstReport.status}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4 text-center">
+                          <p className="text-sm text-muted-foreground">Risk Level</p>
+                          <p className="text-lg font-semibold">{gstReport.riskLevel}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">GSTIN</p>
+                        <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Registration Date</p>
+                        <p className="font-medium">{gstReport.registrationDate}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Filing Status</p>
+                        <p className="font-medium">{gstReport.filingStatus}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Last Filed Return</p>
+                        <p className="font-medium">{gstReport.lastFiledReturn}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3 text-primary">Recent Returns Filed</h4>
+                      <div className="border rounded-md">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Period</TableHead>
+                              <TableHead>Return Type</TableHead>
+                              <TableHead>Filed On</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {gstReport.returnsFiled.map((r, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{r.period}</TableCell>
+                                <TableCell>{r.type}</TableCell>
+                                <TableCell>{r.filedOn}</TableCell>
+                                <TableCell>
+                                  <Badge variant={r.status === 'Filed' ? 'default' : r.status === 'Late' ? 'destructive' : 'secondary'}>
+                                    {r.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2 text-primary">
+                        <FileText className="h-4 w-4" />
+                        Compliance Document
+                      </h4>
+                      {complianceDocs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No compliance document uploaded.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {complianceDocs.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between border rounded-md p-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <FileText className="h-5 w-5 text-primary shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="font-medium truncate">{doc.file_name}</p>
+                                  <p className="text-xs text-muted-foreground capitalize">
+                                    {String(doc.document_type).replace(/_/g, ' ')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => openDocument(doc.file_path)}>
+                                  <Eye className="h-4 w-4 mr-1" /> View
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => openDocument(doc.file_path)}>
+                                  <Download className="h-4 w-4 mr-1" /> Download
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
           </Tabs>
         ) : (
           <div className="text-sm text-muted-foreground py-8 text-center">Vendor not found.</div>
