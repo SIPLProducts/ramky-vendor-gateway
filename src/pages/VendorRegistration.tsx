@@ -651,7 +651,9 @@ export default function VendorRegistration() {
 
       const notify = (vendor as any)?._notify ?? null;
       const inviter = notify?.inviter ?? null;
-      const notifyFailed = !notify || notify?.success === false;
+      const vendorIdentity = notify?.vendorIdentity ?? null;
+      const notifyOk = !!notify && notify?.success !== false;
+      const errorMessage = notify?.error ?? (notify?.skipped ? `Notification skipped: ${notify.skipped}` : null);
 
       // Defer success-screen transition until the user closes the dialog,
       // so the popup is shown before the form is replaced.
@@ -659,7 +661,9 @@ export default function VendorRegistration() {
       setSubmissionSuccess({
         open: true,
         inviter,
-        notifyFailed,
+        status: notifyOk ? 'success' : 'failure',
+        vendorIdentity,
+        errorMessage,
       });
     } catch (error) {
       const err = error as { message?: string; details?: string; hint?: string; code?: string } | null;
