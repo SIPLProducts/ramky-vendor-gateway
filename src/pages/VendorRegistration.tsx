@@ -696,7 +696,7 @@ export default function VendorRegistration() {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
       case 2:
-        return <OrganizationStep tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} onNext={handleOrganizationComplete} />;
+        return <OrganizationStep tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} onNext={handleOrganizationComplete} onLiveUpdate={(d) => setFormData((prev) => ({ ...prev, organization: d.organization, statutory: d.statutory }))} />;
       case 3:
         return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
