@@ -65,8 +65,16 @@ export default function VendorRegistration() {
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     open: boolean;
     inviter: { name?: string; email?: string } | null;
-    notifyFailed: boolean;
-  }>({ open: false, inviter: null, notifyFailed: false });
+    status: 'success' | 'failure';
+    vendorIdentity: {
+      vendorName?: string;
+      vendorEmail?: string;
+      vendorPhone?: string;
+      contactPerson?: string;
+      vendorRef?: string;
+    } | null;
+    errorMessage: string | null;
+  }>({ open: false, inviter: null, status: 'success', vendorIdentity: null, errorMessage: null });
   const [pendingPostSubmit, setPendingPostSubmit] = useState(false);
   const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
