@@ -13,7 +13,14 @@ import { DocumentVerificationStep, VerifiedDocumentData } from '@/components/ven
 import { DynamicStep } from '@/components/vendor/DynamicStep';
 import { useDynamicFormSchema } from '@/hooks/useDynamicFormSchema';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
-import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails } from '@/types/vendor';
+import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails, VendorOriginType, InternationalData, InternationalDocuments, InternationalCompanyDetails, InternationalBankDetails, InternationalClassification, EMPTY_INTERNATIONAL_DATA } from '@/types/vendor';
+import { VendorTypeSelector } from '@/components/vendor/steps/international/VendorTypeSelector';
+import { IntlDocumentsStep } from '@/components/vendor/steps/international/IntlDocumentsStep';
+import { IntlCompanyDetailsStep } from '@/components/vendor/steps/international/IntlCompanyDetailsStep';
+import { IntlBankDetailsStep } from '@/components/vendor/steps/international/IntlBankDetailsStep';
+import { IntlClassificationStep } from '@/components/vendor/steps/international/IntlClassificationStep';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { FileText, Building2 as Building2Icon, Landmark, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert } from 'lucide-react';
