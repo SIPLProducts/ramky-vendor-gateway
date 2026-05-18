@@ -56,6 +56,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     const tenantId = (vendor as any)?.tenant_id;
     setForm(buildDefaults(vendor, null));
     setLiveF4(null);
+    setMissingFields([]);
     if (tenantId) {
       (async () => {
         const { data } = await supabase
