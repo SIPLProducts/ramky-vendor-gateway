@@ -33,10 +33,21 @@ function isMsme(v: any): boolean {
   return !!(v?.msme_number) || v?.msme_verification_status === 'passed';
 }
 
+const REQUIRED_KEYS: Array<keyof SapFieldOverrides> = ['partn_grp', 'bukrs', 'akont', 'fdgrv', 'vkorg', 'waers'];
+const REQUIRED_LABELS: Record<string, string> = {
+  partn_grp: 'Vendor Account Group',
+  bukrs: 'Company Code',
+  akont: 'Rec-Account',
+  fdgrv: 'Planning Group',
+  vkorg: 'Purchase Org',
+  waers: 'Currency',
+};
+
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
@@ -45,6 +56,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     const tenantId = (vendor as any)?.tenant_id;
     setForm(buildDefaults(vendor, null));
     setLiveF4(null);
+    setMissingFields([]);
     if (tenantId) {
       (async () => {
         const { data } = await supabase
@@ -166,7 +178,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
-              <SapF4SelectField label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" />
+              <SapF4SelectField label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" required invalid={missingFields.includes('partn_grp')} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
                 options={[['', 'None'], ['MIC', 'MIC']]} />
             </Section>
@@ -175,10 +187,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Company Code Data */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
-              <SapF4SelectField label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" />
-              <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" />
+              <SapF4SelectField label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" required invalid={missingFields.includes('bukrs')} />
+              <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" required invalid={missingFields.includes('akont')} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
-              <SapF4SelectField label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" />
+              <SapF4SelectField label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" required invalid={missingFields.includes('fdgrv')} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
@@ -187,8 +199,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Purchase Data */}
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <SapF4SelectField label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" />
-              <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" />
+              <SapF4SelectField label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" required invalid={missingFields.includes('vkorg')} />
+              <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" required invalid={missingFields.includes('waers')} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
@@ -199,24 +211,38 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Classification */}
+            {/* Classification — auto-filled from vendor registration data */}
             <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <TextField label="Material Category" value={form.classify.MGV} onChange={v => setClassify('MGV', v)} />
-              <TextField label="Vendor Category" value={form.classify.CATV} onChange={v => setClassify('CATV', v)} />
-              <TextField label="Vendor Location" value={form.classify.LOCV} onChange={v => setClassify('LOCV', v)} />
-              <TextField label="Vendor Identification" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
+              <ReadOnlyField label="Material Category" value={form.classify.MGV} />
+              <ReadOnlyField label="Vendor Category" value={form.classify.CATV} />
+              <ReadOnlyField label="Vendor Location" value={form.classify.LOCV} />
+              <ReadOnlyField label="Vendor Identification" value={form.classify.IDS} />
+              <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
+                These values are captured from the vendor's submitted registration form and cannot be edited here.
+              </p>
             </Section>
 
           </div>
           )}
         </div>
 
+        {missingFields.length > 0 && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5" />
+            <span>Please fill required SAP fields: {missingFields.map(k => REQUIRED_LABELS[k]).join(', ')}.</span>
+          </div>
+        )}
+
         <DialogFooter className="gap-2 mt-4 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl" disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(form)}
+            onClick={() => {
+              const missing = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
+              setMissingFields(missing as string[]);
+              if (missing.length === 0) onConfirm(form);
+            }}
             disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
           >
@@ -254,12 +280,16 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
-    classify: {
-      MGV: '',
-      CATV: '',
-      LOCV: vendor?.registered_state || '',
-      IDS: '',
-    },
+    classify: (() => {
+      const v: any = vendor || {};
+      const cats = Array.isArray(v.product_categories) ? v.product_categories.filter(Boolean) : [];
+      return {
+        MGV: cats.length ? cats.join(', ') : (v.material_group_vendor || ''),
+        CATV: v.industry_type || v.organization_type || v.entity_type || '',
+        LOCV: v.registered_state || '',
+        IDS: v.gstin || v.pan || '',
+      };
+    })(),
   };
 }
 
@@ -325,7 +355,7 @@ const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: strin
 };
 
 function SapF4SelectField({
-  label, masterType, value, onChange, liveItems, placeholder,
+  label, masterType, value, onChange, liveItems, placeholder, required, invalid,
 }: {
   label: string;
   masterType: string;
@@ -333,6 +363,8 @@ function SapF4SelectField({
   onChange: (v: string) => void;
   liveItems?: any[] | null;
   placeholder?: string;
+  required?: boolean;
+  invalid?: boolean;
 }) {
   const map = F4_FIELD_MAP[masterType];
   const isLive = Array.isArray(liveItems);
@@ -367,9 +399,11 @@ function SapF4SelectField({
 
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
       <Select value={value || undefined} onValueChange={(v) => onChange(v)}>
-        <SelectTrigger className="h-9 rounded-lg">
+        <SelectTrigger className={`h-9 rounded-lg ${invalid ? 'border-destructive ring-1 ring-destructive' : ''}`}>
           <SelectValue placeholder={placeholder || 'Select…'} />
         </SelectTrigger>
         <SelectContent className="max-h-72">
