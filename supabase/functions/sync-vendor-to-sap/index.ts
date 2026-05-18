@@ -374,6 +374,10 @@ serve(async (req) => {
         row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
         row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
         row.UPLOAD = [];
+        row.idtype = "SOLMN1";
+        row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
+        row.idtype2 = "ZMSMEN";
+        row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
       }
 
       payload = [row];
