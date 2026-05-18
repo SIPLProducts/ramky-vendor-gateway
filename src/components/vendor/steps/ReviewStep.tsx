@@ -45,8 +45,66 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
   //  1 Doc Verification (PAN/GST/MSME/Bank captured & verified here)
   //  2 Organization (incl. Statutory & Memberships)
   //  3 Address  4 Contact  5 Financial/Infra  6 Review
+  const isInternational = data.vendorType === 'international';
+  const intl = data.international;
   return (
     <div className="space-y-6">
+      {isInternational ? (
+        <>
+          <div className="form-section">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe2 className="h-5 w-5 text-emerald-600" />
+              <h3 className="text-base font-semibold text-foreground">International Vendor</h3>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <SectionHeader icon={FileText} title="Documents Upload" step={1} onEdit={onEditStep} />
+            <div className="space-y-1">
+              <DataRow label="Registration Copy" value={intl?.documents?.registrationCopyFile ? 'Uploaded ✓' : 'Pending upload'} />
+              <DataRow label="SWIFT / IBAN Details" value={intl?.documents?.swiftIbanFile ? 'Uploaded ✓' : 'Pending upload'} />
+            </div>
+          </div>
+
+          <div className="form-section">
+            <SectionHeader icon={Building2} title="Company Details" step={2} onEdit={onEditStep} />
+            <div className="space-y-1">
+              <DataRow label="Company Name" value={intl?.company?.companyName} />
+              <DataRow label="Address" value={intl?.company?.companyAddress} />
+              <DataRow label="Pincode" value={intl?.company?.pincode} />
+              <DataRow label="Country" value={intl?.company?.country} />
+              <DataRow label="Region" value={intl?.company?.region} />
+              <DataRow label="Contact 1" value={intl?.company?.contact1} />
+              <DataRow label="Contact 2" value={intl?.company?.contact2} />
+              <DataRow label="Email 1" value={intl?.company?.email1} />
+              <DataRow label="Email 2" value={intl?.company?.email2} />
+            </div>
+          </div>
+
+          <div className="form-section">
+            <SectionHeader icon={Landmark} title="Company Bank Details" step={3} onEdit={onEditStep} />
+            <div className="space-y-1">
+              <DataRow label="Account Number" value={intl?.bank?.accountNumber} />
+              <DataRow label="SWIFT Code" value={intl?.bank?.swiftCode} />
+              <DataRow label="Company Name" value={intl?.bank?.companyName} />
+              <DataRow label="Bank Name" value={intl?.bank?.bankName} />
+              <DataRow label="Bank Branch" value={intl?.bank?.bankBranch} />
+              <DataRow label="IBAN Number" value={intl?.bank?.ibanNumber} />
+            </div>
+          </div>
+
+          <div className="form-section">
+            <SectionHeader icon={Award} title="Classification" step={4} onEdit={onEditStep} />
+            <div className="space-y-1">
+              <DataRow label="Material Group for Vendors" value={intl?.classification?.materialGroupVendor?.join(', ')} />
+              <DataRow label="Vendor Category" value={intl?.classification?.vendorCategory?.join(', ')} />
+              <DataRow label="Vendor Location" value={intl?.classification?.vendorLocation?.join(', ')} />
+              <DataRow label="Identification Source" value={intl?.classification?.identificationSource?.join(', ')} />
+            </div>
+          </div>
+        </>
+      ) : (
+      <>
       <div className="form-section">
         <SectionHeader icon={Building2} title="Organization Details" step={2} onEdit={onEditStep} />
         <div className="space-y-1">
