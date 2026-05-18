@@ -9,11 +9,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2 } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
-import type { SapFieldOverrides } from './SapFieldsDialog';
+import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
+import { SapF4SelectField, type SapFieldOverrides } from './SapFieldsDialog';
 
 interface Props {
   open: boolean;
@@ -40,7 +40,7 @@ function buildCommonDefaults(tenantDefaults: any | null): SapFieldOverrides {
     partn_grp: d.partn_grp ?? '',
     title: d.title ?? '0003',
     taxtype: d.taxtype ?? 'IN3',
-    msme: '', // per-vendor — ignored here
+    msme: '',
     idtype: '', idnum: '',
     bukrs: d.bukrs ?? '',
     akont: d.akont ?? '',
@@ -60,12 +60,17 @@ function buildCommonDefaults(tenantDefaults: any | null): SapFieldOverrides {
 export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildCommonDefaults(null));
   const [missing, setMissing] = useState<string[]>([]);
+  const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
+  const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
+  const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     setMissing([]);
     setForm(buildCommonDefaults(null));
-    // Load tenant defaults from first vendor
+    setLiveF4(null);
+
     const tenantId = (vendors[0] as any)?.tenant_id;
     if (tenantId) {
       (async () => {
@@ -74,9 +79,39 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
           .select('*')
           .eq('tenant_id', tenantId)
           .maybeSingle();
-        setForm(buildCommonDefaults(data));
+        if (!cancelled) setForm(buildCommonDefaults(data));
       })();
     }
+
+    setF4Status({ state: 'loading', message: 'Calling SAP Fields F4 API… please wait.' });
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setF4Status((prev) => prev.state === 'loading'
+          ? { state: 'loading', message: 'SAP Fields F4 API is taking longer than expected. Still waiting…' }
+          : prev);
+      }
+    }, 60000);
+    (async () => {
+      try {
+        const res: any = await refreshMaster.mutateAsync(undefined);
+        if (cancelled) return;
+        window.clearTimeout(slowTimer);
+        if (res?.success) {
+          if (res.sap_response && typeof res.sap_response === 'object') {
+            setLiveF4(res.sap_response as Record<string, any[]>);
+          }
+          const total = Object.values(res.summary || {}).reduce((s: number, v: any) => s + (v.upserted || 0), 0);
+          setF4Status({ state: 'success', message: `${total} F4 options loaded from SAP Fields F4 API.` });
+        } else {
+          const hint = res?.hint ? ` ${res.hint}` : '';
+          setF4Status({ state: 'error', message: `${res?.message || 'SAP Fields F4 refresh failed.'}${hint} Showing cached F4 options if available.` });
+        }
+      } catch (e: any) {
+        window.clearTimeout(slowTimer);
+        if (!cancelled) setF4Status({ state: 'error', message: `${e?.message || 'SAP Fields F4 refresh failed.'} Showing cached F4 options if available.` });
+      }
+    })();
+    return () => { cancelled = true; window.clearTimeout(slowTimer); };
   }, [open, vendors]);
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
@@ -101,14 +136,27 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
               </Badge>
             ))}
           </div>
+          {f4Status.state !== 'idle' && (
+            <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${f4Status.state === 'error' ? 'border-destructive/30 text-destructive' : 'border-border text-muted-foreground'}`}>
+              {f4Status.state === 'loading' ? <Loader2 className="mt-0.5 h-3.5 w-3.5 animate-spin" /> : f4Status.state === 'error' ? <AlertCircle className="mt-0.5 h-3.5 w-3.5" /> : <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-primary" />}
+              <span>{f4Status.message}</span>
+            </div>
+          )}
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[60vh] pr-3">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 260px)' }}>
+          {f4Status.state === 'loading' ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-sm font-medium">Calling SAP Fields F4 API…</div>
+              <div className="text-xs">Please wait while we fetch the latest dropdown options from SAP.</div>
+            </div>
+          ) : (
           <div className="space-y-6 py-2">
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
-              <TextField label="Vendor Account Group *" value={form.partn_grp} onChange={v => set('partn_grp', v)} invalid={missing.includes('partn_grp')} />
+              <SapF4SelectField label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" required invalid={missing.includes('partn_grp')} />
               <TextField label="Title" value={form.title} onChange={v => set('title', v)} />
               <TextField label="Tax Type" value={form.taxtype} onChange={v => set('taxtype', v)} />
             </Section>
@@ -116,17 +164,17 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
             <Separator />
 
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
-              <TextField label="Company Code *" value={form.bukrs} onChange={v => set('bukrs', v)} invalid={missing.includes('bukrs')} />
-              <TextField label="Rec-Account *" value={form.akont} onChange={v => set('akont', v)} invalid={missing.includes('akont')} />
+              <SapF4SelectField label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" required invalid={missing.includes('bukrs')} />
+              <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" required invalid={missing.includes('akont')} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
-              <TextField label="Planning Group *" value={form.fdgrv} onChange={v => set('fdgrv', v)} invalid={missing.includes('fdgrv')} />
+              <SapF4SelectField label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" required invalid={missing.includes('fdgrv')} />
             </Section>
 
             <Separator />
 
             <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
-              <TextField label="Purchase Org *" value={form.vkorg} onChange={v => set('vkorg', v)} invalid={missing.includes('vkorg')} />
-              <TextField label="Currency *" value={form.waers} onChange={v => set('waers', v)} invalid={missing.includes('waers')} />
+              <SapF4SelectField label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" required invalid={missing.includes('vkorg')} />
+              <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" required invalid={missing.includes('waers')} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
             </Section>
@@ -139,7 +187,8 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'} onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
           </div>
-        </ScrollArea>
+          )}
+        </div>
 
         {missing.length > 0 && (
           <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
@@ -157,7 +206,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
               setMissing(miss as string[]);
               if (miss.length === 0) onConfirm(form);
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
           >
             {isSubmitting ? (
@@ -181,11 +230,11 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
   );
 }
 
-function TextField({ label, value, onChange, invalid }: { label: string; value: string; onChange: (v: string) => void; invalid?: boolean }) {
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input value={value} onChange={e => onChange(e.target.value)} className={`h-9 rounded-lg ${invalid ? 'border-destructive ring-1 ring-destructive' : ''}`} />
+      <Input value={value} onChange={e => onChange(e.target.value)} className="h-9 rounded-lg" />
     </div>
   );
 }
