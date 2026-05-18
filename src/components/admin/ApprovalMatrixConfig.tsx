@@ -35,8 +35,6 @@ const STAGE_LABELS: Record<Stage, string> = {
 };
 
 const STAGE_ORDER: Stage[] = ['SCM_MANAGER', 'SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'];
-const SINGLE_APPROVER_STAGES: Stage[] = ['SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'];
-const isSingleApproverStage = (s: Stage) => SINGLE_APPROVER_STAGES.includes(s);
 
 interface Row {
   rowKey: string;
