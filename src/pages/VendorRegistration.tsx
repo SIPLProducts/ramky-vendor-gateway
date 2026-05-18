@@ -121,15 +121,24 @@ export default function VendorRegistration() {
   const customSteps = dynamicSchema?.steps || [];
   const fieldsByStep = dynamicSchema?.fieldsByStep || {};
 
-  // Build the runtime step list: built-in 1..5 + custom tabs + Review (last)
+  const isInternational = formData.vendorType === 'international';
+
+  // Build the runtime step list:
+  //   Domestic — built-in 1..5 + custom tabs + Review (last)
+  //   International — 4 fixed tabs + Review (no custom tabs)
   const registrationSteps = useMemo(() => {
+    if (isInternational) {
+      const list = internationalSteps.map((s) => ({ id: s.id, title: s.title, description: s.description }));
+      list.push({ id: internationalSteps.length + 1, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
+      return list;
+    }
     const list: Array<{ id: number; title: string; description: string; stepKey?: string }> = builtInSteps.map((s) => ({ ...s }));
     customSteps.forEach((cs, i) => {
       list.push({ id: 6 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
     });
     list.push({ id: 6 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
     return list;
-  }, [customSteps]);
+  }, [customSteps, isInternational]);
 
   // Hydrate custom values from existing vendor on load
   useEffect(() => {
