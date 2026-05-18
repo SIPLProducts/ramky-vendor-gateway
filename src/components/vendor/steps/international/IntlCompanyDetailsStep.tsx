@@ -71,27 +71,23 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
         </h3>
 
         <div className="grid gap-5">
-          <div className="grid gap-1.5">
-            <Label htmlFor="companyName">Company Name *</Label>
-            <Input id="companyName" {...register('companyName')} placeholder="Enter company name" className={errors.companyName ? 'border-destructive' : ''} />
-            {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="companyAddress">Company Address *</Label>
-            <Textarea id="companyAddress" rows={3} {...register('companyAddress')} placeholder="Full registered address" className={errors.companyAddress ? 'border-destructive' : ''} />
-            {errors.companyAddress && <p className="text-xs text-destructive">{errors.companyAddress.message}</p>}
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="pincode">Pincode / Postal Code *</Label>
-              <Input id="pincode" {...register('pincode')} placeholder="Postal code" className={errors.pincode ? 'border-destructive' : ''} />
-              {errors.pincode && <p className="text-xs text-destructive">{errors.pincode.message}</p>}
+              <Label htmlFor="companyName">Company Name <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="companyName" {...register('companyName')} placeholder="Enter company name" className={errors.companyName ? 'border-destructive' : ''} />
+              {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
             </div>
 
             <div className="grid gap-1.5">
-              <Label>Country (From SAP) *</Label>
+              <Label htmlFor="pincode">Pincode / Postal Code <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="pincode" {...register('pincode')} placeholder="Postal code" className={errors.pincode ? 'border-destructive' : ''} />
+              {errors.pincode && <p className="text-xs text-destructive">{errors.pincode.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label>Country (From SAP) <span className="text-destructive ml-0.5">*</span></Label>
               <Controller
                 name="country"
                 control={control}
@@ -132,7 +128,7 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
             </div>
 
             <div className="grid gap-1.5">
-              <Label>Region *</Label>
+              <Label>Region <span className="text-destructive ml-0.5">*</span></Label>
               <Controller
                 name="region"
                 control={control}
@@ -167,22 +163,28 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="contact1">Company Contact 1 *</Label>
+              <Label htmlFor="contact1">Company Contact 1 <span className="text-destructive ml-0.5">*</span></Label>
               <Input id="contact1" inputMode="numeric" {...register('contact1')} placeholder="Numbers only" className={errors.contact1 ? 'border-destructive' : ''} />
               {errors.contact1 && <p className="text-xs text-destructive">{errors.contact1.message}</p>}
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="contact2">Company Contact 2</Label>
-              <Input id="contact2" inputMode="numeric" {...register('contact2')} placeholder="Numbers only (optional)" className={errors.contact2 ? 'border-destructive' : ''} />
-              {errors.contact2 && <p className="text-xs text-destructive">{errors.contact2.message}</p>}
+              <Label htmlFor="email1">Company Email 1 <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="email1" type="email" {...register('email1')} placeholder="primary@company.com" className={errors.email1 ? 'border-destructive' : ''} />
+              {errors.email1 && <p className="text-xs text-destructive">{errors.email1.message}</p>}
             </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="companyAddress">Company Address</Label>
+            <Textarea id="companyAddress" rows={3} {...register('companyAddress')} placeholder="Full registered address (optional)" className={errors.companyAddress ? 'border-destructive' : ''} />
+            {errors.companyAddress && <p className="text-xs text-destructive">{errors.companyAddress.message}</p>}
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="email1">Company Email 1 *</Label>
-              <Input id="email1" type="email" {...register('email1')} placeholder="primary@company.com" className={errors.email1 ? 'border-destructive' : ''} />
-              {errors.email1 && <p className="text-xs text-destructive">{errors.email1.message}</p>}
+              <Label htmlFor="contact2">Company Contact 2</Label>
+              <Input id="contact2" inputMode="numeric" {...register('contact2')} placeholder="Numbers only (optional)" className={errors.contact2 ? 'border-destructive' : ''} />
+              {errors.contact2 && <p className="text-xs text-destructive">{errors.contact2.message}</p>}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="email2">Company Email 2</Label>
