@@ -200,6 +200,10 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
           <DataRow label="Major Customer 1" value={data.financial?.majorCustomer1} />
         </div>
       </div>
+      </>
+      )}
+
+
 
       <div className="form-section">
         <h3 className="form-section-title"><CheckCircle2 className="h-5 w-5 text-primary" />Declaration & Submission</h3>
