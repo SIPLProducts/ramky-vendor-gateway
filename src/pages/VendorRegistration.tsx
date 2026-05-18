@@ -386,6 +386,8 @@ export default function VendorRegistration() {
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
+        setVendorTypeChosen(true);
+        setPendingChoiceType(existingFormData.vendorType);
         // For draft status, allow user to continue from where they left off
         // Mark steps as completed based on filled data
         if (vendorStatus === 'draft') {
