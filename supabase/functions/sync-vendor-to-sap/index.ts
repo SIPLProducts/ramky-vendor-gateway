@@ -326,7 +326,10 @@ serve(async (req) => {
         return fail("No SAP payload template configured. Please seed sap_payload_templates with a default row.");
       }
 
-      const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
+      // Document uploads are temporarily disabled to avoid SAP middleware 413 (PayloadTooLarge).
+      // Re-enable by restoring: const { uploads, skipped } = await buildUploadArray(supabase, vendorId);
+      const uploads: any[] = [];
+      const skipped: string[] = [];
 
       const ctx: ResolverCtx = {
         vendor,
