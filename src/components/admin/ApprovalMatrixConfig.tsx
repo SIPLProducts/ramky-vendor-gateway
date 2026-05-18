@@ -503,11 +503,9 @@ export function ApprovalMatrixConfig() {
   };
 
   const renderRowsTable = () => {
-    const showStageColumn = false; // stage is fixed by the active tab
-    const showLevelColumn = activeStage === 'SCM_MANAGER';
-    const showModeColumn = activeStage === 'SCM_MANAGER';
-    const single = isSingleApproverStage(activeStage);
-    const canAdd = !single || stageRows.length === 0;
+    // Every stage now supports multiple independent levels (L1, L2, L3…)
+    const showLevelColumn = true;
+    const showModeColumn = true;
 
     return (
       <div className="border rounded-md overflow-x-auto">
@@ -548,7 +546,7 @@ export function ApprovalMatrixConfig() {
                         >
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {scmManagerLevels.map((n) => (
+                            {activeStageLevels.map((n) => (
                               <SelectItem key={n} value={String(n)}>L{n}</SelectItem>
                             ))}
                           </SelectContent>
@@ -578,7 +576,7 @@ export function ApprovalMatrixConfig() {
                       <TableCell>
                         <Select
                           value={r.approval_mode}
-                          onValueChange={(v) => updateLevelMode(r.level_number, v as 'ANY' | 'ALL')}
+                          onValueChange={(v) => updateLevelMode(r.stage, r.level_number, v as 'ANY' | 'ALL')}
                         >
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -601,13 +599,16 @@ export function ApprovalMatrixConfig() {
         </Table>
         <div className="flex items-center justify-between p-3 border-t bg-muted/20">
           <div className="text-xs text-muted-foreground">
-            {single
-              ? 'Only one approver allowed for this stage.'
-              : 'You can add multiple levels (L1, L2, L3…) and multiple approvers per level. Lower level acts first.'}
+            Add multiple levels (L1, L2, L3…) and multiple approvers per level. Lower level acts first within this stage.
           </div>
-          <Button size="sm" variant="outline" onClick={addRow} disabled={!canAdd}>
-            <Plus className="h-4 w-4 mr-1" /> Add Approver
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={addLevel}>
+              <Plus className="h-4 w-4 mr-1" /> Add Level
+            </Button>
+            <Button size="sm" variant="outline" onClick={addRow}>
+              <Plus className="h-4 w-4 mr-1" /> Add Approver
+            </Button>
+          </div>
         </div>
       </div>
     );
