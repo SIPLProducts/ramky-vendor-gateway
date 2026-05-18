@@ -17,12 +17,11 @@ export function IntlDocumentsStep({ vendorId, data, onChange }: Props) {
           Documents Upload
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Upload your registration document and SWIFT/IBAN details. Accepted formats: PDF, JPG, PNG (up to 5MB).
+          Upload your registration document and SWIFT/IBAN details (optional). Accepted formats: PDF, JPG, PNG (up to 5MB).
         </p>
         <div className="grid md:grid-cols-2 gap-5">
           <FileUpload
             label="Registration Copy"
-            required
             vendorId={vendorId || undefined}
             documentType="registration_copy"
             currentFile={data.registrationCopyFile}
@@ -30,7 +29,6 @@ export function IntlDocumentsStep({ vendorId, data, onChange }: Props) {
           />
           <FileUpload
             label="SWIFT / IBAN Details"
-            required
             vendorId={vendorId || undefined}
             documentType="swift_iban_details"
             currentFile={data.swiftIbanFile}
