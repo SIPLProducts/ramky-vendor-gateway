@@ -636,6 +636,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         selfDeclared: vendor.self_declared ?? false,
         termsAccepted: vendor.terms_accepted ?? false,
       },
+      international: (vendor as any).international_data ? {
+        documents: { registrationCopyFile: null, swiftIbanFile: null },
+        company: (vendor as any).international_data?.company || { companyName: '', companyAddress: '', pincode: '', country: '', region: '', contact1: '', contact2: '', email1: '', email2: '' },
+        bank: (vendor as any).international_data?.bank || { accountNumber: '', swiftCode: '', companyName: '', bankName: '', bankBranch: '', ibanNumber: '' },
+        classification: (vendor as any).international_data?.classification || { materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [] },
+      } : undefined,
     };
   }, [existingVendor]);
 
