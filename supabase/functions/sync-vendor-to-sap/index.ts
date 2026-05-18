@@ -285,6 +285,10 @@ serve(async (req) => {
       payload = clientPayload;
       row = clientPayload[0];
       row.UPLOAD = [];
+      row.idtype = "SOLMN1";
+      row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
+      row.idtype2 = "ZMSMEN";
+      row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
       console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
     } else {
       // Legacy path: resolve template server-side.
