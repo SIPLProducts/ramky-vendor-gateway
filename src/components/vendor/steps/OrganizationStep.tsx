@@ -44,11 +44,11 @@ const schema = z.object({
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
   accountingGroup: z.enum(['Import', 'Domestic'], { required_error: 'Accounting group is required' }),
-  // SAP Classification
-  materialGroupVendor: z.string().min(1, 'Material Group for Vendors is required'),
-  vendorCategory: z.string().min(1, 'Vendor Category is required'),
-  vendorLocation: z.string().min(1, 'Vendor Location is required'),
-  identificationSource: z.string().min(1, 'Identification Source is required'),
+  // SAP Classification (multi-select)
+  materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
+  vendorCategory: z.array(z.string()).min(1, 'Vendor Category is required'),
+  vendorLocation: z.array(z.string()).min(1, 'Vendor Location is required'),
+  identificationSource: z.array(z.string()).min(1, 'Identification Source is required'),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
