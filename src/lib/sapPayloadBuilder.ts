@@ -93,6 +93,8 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     value = String(t).split(" ")[0] || "";
   } else if (head === "vendor.registered_address_line3_or_2") {
     value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
+  } else if (head === "vendor.reference_no") {
+    value = String(ctx.vendor?.id || "").slice(0, 8).toUpperCase();
   } else {
     value = getPath(ctx, head);
   }
@@ -246,6 +248,10 @@ export async function buildSapPayload(
     row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
     row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
     row.UPLOAD = [];
+    row.idtype = "SOLMN1";
+    row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
+    row.idtype2 = "ZMSMEN";
+    row.idnum2 = (vendor as any).msme_number ? String((vendor as any).msme_number).slice(0, 20) : "";
   }
 
   return { payload: [row], uploadsCount: uploads.length, skipped };
