@@ -10,6 +10,8 @@ import { InternationalClassification } from '@/types/vendor';
 const schema = z.object({
   materialGroupVendor: z.string().trim().min(1, 'Material Group for Vendors is required'),
   vendorLocation: z.string().trim().min(1, 'Vendor Location is required'),
+  vendorCategory: z.string().trim().optional().or(z.literal('')),
+  identificationSource: z.string().trim().optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -29,6 +31,8 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
     defaultValues: {
       materialGroupVendor: toStr(data.materialGroupVendor),
       vendorLocation: toStr(data.vendorLocation),
+      vendorCategory: toStr(data.vendorCategory),
+      identificationSource: toStr(data.identificationSource),
     },
   });
 
@@ -37,9 +41,9 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
       const v = vals as FormValues;
       onLiveUpdate?.({
         materialGroupVendor: toArr(v.materialGroupVendor || ''),
-        vendorCategory: [],
+        vendorCategory: toArr(v.vendorCategory || ''),
         vendorLocation: toArr(v.vendorLocation || ''),
-        identificationSource: [],
+        identificationSource: toArr(v.identificationSource || ''),
       });
     });
     return () => sub.unsubscribe();
@@ -48,9 +52,9 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
   const handleFormSubmit = (v: FormValues) => {
     onSubmit({
       materialGroupVendor: toArr(v.materialGroupVendor),
-      vendorCategory: [],
+      vendorCategory: toArr(v.vendorCategory || ''),
       vendorLocation: toArr(v.vendorLocation),
-      identificationSource: [],
+      identificationSource: toArr(v.identificationSource || ''),
     });
   };
 
@@ -80,6 +84,16 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
             </Label>
             <Input id="vendorLocation" {...register('vendorLocation')} placeholder="e.g. Dubai, Singapore" className={errors.vendorLocation ? 'border-destructive' : ''} />
             {errors.vendorLocation && <p className="text-xs text-destructive">{errors.vendorLocation.message}</p>}
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="vendorCategory">Vendor Category</Label>
+            <Input id="vendorCategory" {...register('vendorCategory')} placeholder="e.g. Manufacturer, Trader (optional)" />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="identificationSource">Vendor Identification Source</Label>
+            <Input id="identificationSource" {...register('identificationSource')} placeholder="e.g. Trade Fair, Reference (optional)" />
           </div>
         </div>
       </div>
