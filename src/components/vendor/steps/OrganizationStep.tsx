@@ -96,7 +96,7 @@ interface OrganizationStepProps {
   onLiveUpdate?: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _tenantId, onNext }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _tenantId, onNext, onLiveUpdate }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
