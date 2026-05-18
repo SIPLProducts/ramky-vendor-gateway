@@ -407,16 +407,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="materialGroupVendor"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.materialGroupVendor ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select material group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRODUCT_CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c.toUpperCase()}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={PRODUCT_CATEGORIES.map((c) => ({ label: c.toUpperCase(), value: c }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select material groups"
+                      className={errors.materialGroupVendor ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.materialGroupVendor && (
@@ -430,16 +427,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="vendorCategory"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.vendorCategory ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select vendor category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VENDOR_CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={VENDOR_CATEGORIES.map((c) => ({ label: c, value: c }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select vendor categories"
+                      className={errors.vendorCategory ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.vendorCategory && (
@@ -453,16 +447,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="vendorLocation"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.vendorLocation ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDIAN_STATES.map((s) => (
-                          <SelectItem key={s} value={s.toUpperCase()}>{s.toUpperCase()}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={INDIAN_STATES.map((s) => ({ label: s.toUpperCase(), value: s.toUpperCase() }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select locations"
+                      className={errors.vendorLocation ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.vendorLocation && (
@@ -476,16 +467,13 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   name="identificationSource"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.identificationSource ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select identification source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {IDENTIFICATION_SOURCES.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={IDENTIFICATION_SOURCES.map((s) => ({ label: s, value: s }))}
+                      selected={(field.value as string[]) || []}
+                      onChange={field.onChange}
+                      placeholder="Select identification sources"
+                      className={errors.identificationSource ? 'border-destructive' : ''}
+                    />
                   )}
                 />
                 {errors.identificationSource && (
