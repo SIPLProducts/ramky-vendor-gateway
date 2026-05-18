@@ -280,12 +280,16 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
-    classify: {
-      MGV: '',
-      CATV: '',
-      LOCV: vendor?.registered_state || '',
-      IDS: '',
-    },
+    classify: (() => {
+      const v: any = vendor || {};
+      const cats = Array.isArray(v.product_categories) ? v.product_categories.filter(Boolean) : [];
+      return {
+        MGV: cats.length ? cats.join(', ') : (v.material_group_vendor || ''),
+        CATV: v.industry_type || v.organization_type || v.entity_type || '',
+        LOCV: v.registered_state || '',
+        IDS: v.gstin || v.pan || '',
+      };
+    })(),
   };
 }
 
