@@ -283,11 +283,6 @@ export function ApprovalMatrixConfig() {
         seenEmailPerLevel.set(key, rowNum);
       }
     });
-    // Single-approver enforcement
-    SINGLE_APPROVER_STAGES.forEach((s) => {
-      const count = rows.filter((r) => r.stage === s).length;
-      if (count > 1) errs.push({ rowKey: '', level_number: 0, message: `${STAGE_LABELS[s]} can only have one approver (currently ${count})` });
-    });
     return errs;
   }, [rows]);
 
@@ -295,26 +290,32 @@ export function ApprovalMatrixConfig() {
   const canSave = !!tenantId && rows.length > 0 && rowErrors.length === 0 && !saving;
   const totalApprovers = rows.filter((r) => r.approver_email.trim() && r.approver_name.trim()).length;
 
-  // Build canonical save plan: SCM_MANAGER rows first (1..N preserving user level ordering), then SCM_HEAD, FINANCE_1, FINANCE_2, CEO_OFFICE
+  // Build canonical save plan: every stage is independent and supports multiple
+  // levels. Within a stage we preserve the user's chosen level ordering (L1, L2…)
+  // and assign a globally unique level_number across the whole chain so the
+  // existing "lowest pending level acts first" logic continues to work.
   const buildSavePlan = () => {
-    const plan: { level_number: number; stage: Stage; approval_mode: 'ANY' | 'ALL'; rows: Row[] }[] = [];
-    // SCM_MANAGER: group by user-chosen level_number, sort ascending
-    const scmRows = rows.filter((r) => r.stage === 'SCM_MANAGER');
-    const scmGroups = new Map<number, Row[]>();
-    scmRows.forEach((r) => {
-      const arr = scmGroups.get(r.level_number) ?? [];
-      arr.push(r); scmGroups.set(r.level_number, arr);
-    });
-    const scmSortedKeys = [...scmGroups.keys()].sort((a, b) => a - b);
+    const plan: { level_number: number; stage: Stage; approval_mode: 'ANY' | 'ALL'; rows: Row[]; stage_level: number }[] = [];
     let counter = 1;
-    scmSortedKeys.forEach((k) => {
-      const group = scmGroups.get(k)!;
-      plan.push({ level_number: counter++, stage: 'SCM_MANAGER', approval_mode: group[0].approval_mode, rows: group });
-    });
-    // Other stages — single approver each
-    (['SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'] as Stage[]).forEach((s) => {
-      const r = rows.filter((x) => x.stage === s);
-      if (r.length > 0) plan.push({ level_number: counter++, stage: s, approval_mode: 'ANY', rows: r });
+    STAGE_ORDER.forEach((stage) => {
+      const stageRowsLocal = rows.filter((r) => r.stage === stage);
+      if (stageRowsLocal.length === 0) return;
+      const groups = new Map<number, Row[]>();
+      stageRowsLocal.forEach((r) => {
+        const arr = groups.get(r.level_number) ?? [];
+        arr.push(r); groups.set(r.level_number, arr);
+      });
+      const sortedKeys = [...groups.keys()].sort((a, b) => a - b);
+      sortedKeys.forEach((k) => {
+        const group = groups.get(k)!;
+        plan.push({
+          level_number: counter++,
+          stage_level: k,
+          stage,
+          approval_mode: group[0].approval_mode,
+          rows: group,
+        });
+      });
     });
     return plan;
   };
