@@ -33,10 +33,21 @@ function isMsme(v: any): boolean {
   return !!(v?.msme_number) || v?.msme_verification_status === 'passed';
 }
 
+const REQUIRED_KEYS: Array<keyof SapFieldOverrides> = ['partn_grp', 'bukrs', 'akont', 'fdgrv', 'vkorg', 'waers'];
+const REQUIRED_LABELS: Record<string, string> = {
+  partn_grp: 'Vendor Account Group',
+  bukrs: 'Company Code',
+  akont: 'Rec-Account',
+  fdgrv: 'Planning Group',
+  vkorg: 'Purchase Org',
+  waers: 'Currency',
+};
+
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const refreshMaster = useRefreshSapMaster();
 
   useEffect(() => {
