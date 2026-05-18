@@ -93,6 +93,7 @@ interface OrganizationStepProps {
   vendorId?: string;
   tenantId?: string | null;
   onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
+  onLiveUpdate?: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
 export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _tenantId, onNext }: OrganizationStepProps) {
