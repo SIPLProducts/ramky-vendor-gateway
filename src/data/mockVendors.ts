@@ -1,6 +1,7 @@
 import { Vendor, VendorFormData } from '@/types/vendor';
 
 const createMockFormData = (): VendorFormData => ({
+  vendorType: 'domestic',
   organization: {
     buyerCompanyId: '',
     legalName: 'ABC Infrastructure Pvt Ltd',
