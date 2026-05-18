@@ -462,12 +462,14 @@ serve(async (req) => {
     const sapVendorCode = successItem?.BP_LIFNR || (sapResponse || []).find((i: any) => i?.BP_LIFNR)?.BP_LIFNR || null;
 
     if (successItem && sapVendorCode) {
+      const refNo = String(vendor.id || "").slice(0, 8).toUpperCase();
       await supabase.from("vendors").update({
         sap_vendor_code: sapVendorCode,
+        sap_reference_no: refNo,
         sap_synced_at: new Date().toISOString(),
-        status: "sap_synced",
+        status: "dms_sync_pending",
       }).eq("id", vendorId);
-      return ok({ success: true, sapVendorCode, message: "Vendor successfully synced to SAP", sapResponse });
+      return ok({ success: true, sapVendorCode, sapReferenceNo: refNo, message: "Vendor successfully synced to SAP", sapResponse });
     }
 
     const errorItem = (sapResponse || []).find((it: any) => it?.MSGTYP === "E");

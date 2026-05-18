@@ -554,6 +554,73 @@ export function useSAPSync() {
   });
 }
 
+// Bulk SAP sync mutation for multiple vendors at once
+export function useMultipleSAPSync() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ vendorIds, overrides }: { vendorIds: string[]; overrides?: Record<string, any> }) => {
+      const { buildSapPayload } = await import('@/lib/sapPayloadBuilder');
+      // Build per-vendor rows and concatenate into one array
+      const rows: any[] = [];
+      for (const vid of vendorIds) {
+        const { payload } = await buildSapPayload(vid, overrides || {});
+        rows.push(...payload);
+      }
+
+      const { data, error } = await supabase.functions.invoke('sync-vendors-to-sap-bulk', {
+        body: { vendorIds, overrides, sapPayload: rows },
+      });
+      if (error) throw new Error(`Bulk SAP sync failed: ${error.message}`);
+      if (!data) throw new Error('No response from bulk SAP sync function');
+      return data;
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
+      toast({
+        title: result.success ? '✅ Bulk SAP Sync' : 'Bulk SAP Sync',
+        description: result.message,
+        variant: result.success ? 'default' : 'destructive',
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Bulk SAP Sync Failed', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+// DMS Sync mutation (single or multiple vendors)
+export function useDMSSync() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ vendorIds }: { vendorIds: string[] }) => {
+      const { data, error } = await supabase.functions.invoke('sync-vendor-to-dms', {
+        body: { vendorIds },
+      });
+      if (error) throw new Error(`DMS sync failed: ${error.message}`);
+      if (!data) throw new Error('No response from DMS sync function');
+      return data;
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
+      toast({
+        title: result.success ? '✅ DMS Sync' : 'DMS Sync',
+        description: result.message,
+        variant: result.success ? 'default' : 'destructive',
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'DMS Sync Failed', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 // Vendor statistics with offline support
 export function useVendorStats() {
   const { tenantIds, activeTenantId } = useTenantFilter();

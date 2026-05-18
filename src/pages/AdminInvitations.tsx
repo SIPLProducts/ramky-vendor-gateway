@@ -483,10 +483,16 @@ export default function AdminInvitations() {
                 <Input
                   id="vendor-phone"
                   type="tel"
+                  inputMode="numeric"
+                  pattern="\d{10}"
+                  maxLength={10}
                   placeholder="10-digit mobile number"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 />
+                {phoneNumber.length > 0 && phoneNumber.length !== 10 && (
+                  <p className="text-xs text-destructive">Enter a 10-digit mobile number</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -536,7 +542,7 @@ export default function AdminInvitations() {
               </Button>
               <Button
                 onClick={handleCreateInvitation}
-                disabled={createInvitation.isPending}
+                disabled={createInvitation.isPending || (phoneNumber.length > 0 && phoneNumber.length !== 10)}
                 className="gap-2"
               >
                 {createInvitation.isPending ? (

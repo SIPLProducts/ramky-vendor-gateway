@@ -1,57 +1,36 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
-import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
 import {
-  Search,
-  Eye,
-  CheckCircle,
-  Building2,
-  User,
-  Loader2,
-  RefreshCw,
-  FolderOpen,
-  Upload,
-  Server,
-  MapPin,
-  Phone,
-  Mail,
-  CreditCard,
-  FileText,
-  Landmark,
-  Globe,
-  Calendar,
-  Hash,
-  MessageSquare,
+  useVendors, useSAPSync, useMultipleSAPSync, useDMSSync, useBuyerCompanies, VendorRow,
+} from '@/hooks/useVendors';
+import {
+  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
+import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
 
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'sap' | 'dms'>('sap');
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
@@ -61,31 +40,75 @@ export default function SAPSync() {
   const [showSapResultDialog, setShowSapResultDialog] = useState(false);
   const [syncingVendorId, setSyncingVendorId] = useState<string | null>(null);
 
-  const { data: approvedVendors, isLoading, refetch } = useVendors(['pending_sap_sync', 'purchase_approved']);
+  // Multi-select state
+  const [selectedSapIds, setSelectedSapIds] = useState<Set<string>>(new Set());
+  const [selectedDmsIds, setSelectedDmsIds] = useState<Set<string>>(new Set());
+  const [showMultipleSync, setShowMultipleSync] = useState(false);
+  const [bulkResult, setBulkResult] = useState<any>(null);
+  const [showBulkResult, setShowBulkResult] = useState(false);
+  const [dmsResult, setDmsResult] = useState<any>(null);
+  const [showDmsResult, setShowDmsResult] = useState(false);
+
+  const { data: sapVendors, isLoading, refetch } = useVendors(['pending_sap_sync', 'purchase_approved']);
+  const { data: dmsVendors, isLoading: dmsLoading, refetch: refetchDms } = useVendors(['dms_sync_pending', 'dms_synced']);
   const { data: buyerCompanies } = useBuyerCompanies();
   const sapSync = useSAPSync();
+  const bulkSync = useMultipleSAPSync();
+  const dmsSync = useDMSSync();
 
-  const filteredVendors = approvedVendors?.filter((vendor) => {
+  const filterFn = (vendor: VendorRow) => {
     const matchesSearch =
       (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
-    return matchesSearch && matchesBuyerCompany;
-  }) || [];
+    const matchesBuyer = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
+    return matchesSearch && matchesBuyer;
+  };
+
+  const filteredSap = (sapVendors || []).filter(filterFn);
+  const filteredDms = (dmsVendors || []).filter(filterFn);
+
+  const selectedSapVendors = useMemo(
+    () => filteredSap.filter(v => selectedSapIds.has(v.id)),
+    [filteredSap, selectedSapIds],
+  );
+  const selectedDmsVendors = useMemo(
+    () => filteredDms.filter(v => selectedDmsIds.has(v.id) && v.status !== 'dms_synced'),
+    [filteredDms, selectedDmsIds],
+  );
+  const multiMode = selectedSapVendors.length > 1;
 
   const getBuyerCompanyName = (tenantId: string | null) => {
     if (!tenantId || !buyerCompanies) return 'Unassigned';
-    const company = buyerCompanies.find(c => c.id === tenantId);
-    return company ? `${company.name} (${company.code})` : 'Unassigned';
+    const c = buyerCompanies.find(c => c.id === tenantId);
+    return c ? `${c.name} (${c.code})` : 'Unassigned';
   };
 
   const isVendorMsme = (v: VendorRow | null) => {
     const x = v as any;
     return !!(x?.msme_number) || x?.msme_verification_status === 'passed';
   };
-
   const getApprovalLabel = (v: VendorRow) => isVendorMsme(v) ? 'CEO Office Approved' : 'Finance 2 Approved';
+
+  const toggleSap = (id: string) => {
+    setSelectedSapIds(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+  const toggleAllSap = () => {
+    if (selectedSapIds.size === filteredSap.length) setSelectedSapIds(new Set());
+    else setSelectedSapIds(new Set(filteredSap.map(v => v.id)));
+  };
+
+  const toggleDms = (id: string) => {
+    setSelectedDmsIds(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
 
   const openSapFieldsDialog = (vendor: VendorRow) => {
     setPendingSyncVendor(vendor);
@@ -102,15 +125,15 @@ export default function SAPSync() {
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
+      setSelectedSapIds(new Set());
     } catch (error: any) {
-      console.error('SAP sync failed:', error);
-      const fallbackResponse = error?.sapResponse ?? [
+      const fallback = error?.sapResponse ?? [
         { MSGTYP: 'E', MSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
       ];
       setSapSyncResult({
         success: false,
         message: error?.message || 'SAP sync failed',
-        sapResponse: fallbackResponse,
+        sapResponse: fallback,
       });
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
@@ -120,7 +143,34 @@ export default function SAPSync() {
     }
   };
 
+  const handleMultipleSync = async (overrides: SapFieldOverrides) => {
+    const vendorIds = selectedSapVendors.map(v => v.id);
+    try {
+      const result = await bulkSync.mutateAsync({ vendorIds, overrides });
+      setBulkResult(result);
+      setShowMultipleSync(false);
+      setShowBulkResult(true);
+      setSelectedSapIds(new Set());
+    } catch (error: any) {
+      setBulkResult({ success: false, message: error?.message || 'Bulk sync failed', ACC_RES: [], results: [] });
+      setShowMultipleSync(false);
+      setShowBulkResult(true);
+    }
+  };
 
+  const handleDmsSync = async (vendorIds: string[]) => {
+    try {
+      const result = await dmsSync.mutateAsync({ vendorIds });
+      setDmsResult(result);
+      setShowDmsResult(true);
+      setSelectedDmsIds(new Set());
+    } catch (error: any) {
+      setDmsResult({ success: false, message: error?.message || 'DMS sync failed', results: [] });
+      setShowDmsResult(true);
+    }
+  };
+
+  const refreshAll = () => { refetch(); refetchDms(); };
 
   return (
     <div className="space-y-8">
@@ -132,10 +182,10 @@ export default function SAPSync() {
             </div>
             <h1 className="text-3xl font-bold text-foreground">SAP Sync</h1>
           </div>
-          <p className="text-muted-foreground">Sync approved vendors to SAP system</p>
+          <p className="text-muted-foreground">Sync approved vendors to SAP and upload documents to DMS</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={() => refetch()} variant="outline" size="icon" className="rounded-xl">
+          <Button onClick={refreshAll} variant="outline" size="icon" className="rounded-xl">
             <RefreshCw className="h-4 w-4" />
           </Button>
           <div className="relative w-64">
@@ -159,14 +209,14 @@ export default function SAPSync() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Ready for Sync</p>
-                <p className="text-3xl font-bold text-blue-600">{filteredVendors.length}</p>
+                <p className="text-sm text-muted-foreground">Ready for SAP Sync</p>
+                <p className="text-3xl font-bold text-blue-600">{filteredSap.length}</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center">
                 <Upload className="h-6 w-6 text-white" />
@@ -174,83 +224,227 @@ export default function SAPSync() {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">DMS Sync Pending</p>
+                <p className="text-3xl font-bold text-emerald-600">
+                  {filteredDms.filter(v => v.status === 'dms_sync_pending').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center">
+                <FolderUp className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4">
-        {isLoading ? (
-          [...Array(3)].map((_, i) => (
-            <Card key={i} className="border-0 shadow-md"><CardContent className="p-6"><div className="flex items-start gap-4"><Skeleton className="h-14 w-14 rounded-xl" /><div className="flex-1 space-y-3"><Skeleton className="h-5 w-56" /><Skeleton className="h-4 w-40" /></div></div></CardContent></Card>
-          ))
-        ) : filteredVendors.length === 0 ? (
-          <Card className="border-0 shadow-md"><CardContent className="py-16 text-center">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center mx-auto mb-4 shadow-lg"><CheckCircle className="h-8 w-8 text-white" /></div>
-            <h3 className="text-xl font-semibold">No vendors pending SAP sync</h3>
-            <p className="text-muted-foreground mt-2">All approved vendors have been synced to SAP.</p>
-          </CardContent></Card>
-        ) : (
-          filteredVendors.map((vendor) => (
-            <Card key={vendor.id} className="border-0 shadow-md card-interactive">
-              <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/5 flex items-center justify-center"><Building2 className="h-7 w-7 text-blue-600" /></div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
-                        <Badge className="bg-green-100 text-green-700 border-green-200">{getApprovalLabel(vendor)}</Badge>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="sap" className="gap-2"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
+          <TabsTrigger value="dms" className="gap-2"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
+        </TabsList>
+
+        {/* SAP Sync tab */}
+        <TabsContent value="sap" className="space-y-4 mt-6">
+          {/* Toolbar: select all + multiple sync */}
+          {filteredSap.length > 0 && (
+            <div className="flex items-center justify-between bg-card border rounded-xl p-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={selectedSapIds.size > 0 && selectedSapIds.size === filteredSap.length}
+                  onCheckedChange={toggleAllSap}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {selectedSapIds.size > 0 ? `${selectedSapIds.size} selected` : 'Select vendors to enable bulk actions'}
+                </span>
+              </div>
+              {multiMode && (
+                <Button
+                  className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
+                  onClick={() => setShowMultipleSync(true)}
+                  disabled={bulkSync.isPending}
+                >
+                  {bulkSync.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
+                  ) : (
+                    <><Server className="h-4 w-4 mr-2" />Multiple Sync ({selectedSapVendors.length})</>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className="grid gap-4">
+            {isLoading ? (
+              [...Array(3)].map((_, i) => (
+                <Card key={i} className="border-0 shadow-md"><CardContent className="p-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+              ))
+            ) : filteredSap.length === 0 ? (
+              <Card className="border-0 shadow-md"><CardContent className="py-16 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <CheckCircle className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold">No vendors pending SAP sync</h3>
+                <p className="text-muted-foreground mt-2">All approved vendors have been synced.</p>
+              </CardContent></Card>
+            ) : (
+              filteredSap.map((vendor) => (
+                <Card key={vendor.id} className={`border-0 shadow-md card-interactive ${selectedSapIds.has(vendor.id) ? 'ring-2 ring-blue-500' : ''}`}>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <Checkbox
+                          checked={selectedSapIds.has(vendor.id)}
+                          onCheckedChange={() => toggleSap(vendor.id)}
+                          className="mt-2"
+                        />
+                        <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/5 flex items-center justify-center">
+                          <Building2 className="h-7 w-7 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                            <Badge className="bg-green-100 text-green-700 border-green-200">{getApprovalLabel(vendor)}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
+                          <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <span className="font-mono bg-muted px-2 py-0.5 rounded">ID: {vendor.id.slice(0, 8)}...</span>
+                            <span>GSTIN: {vendor.gstin || 'N/A'}</span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
-                      <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span className="font-mono bg-muted px-2 py-0.5 rounded">ID: {vendor.id.slice(0, 8)}...</span>
-                        <span>GSTIN: {vendor.gstin || 'N/A'}</span>
-                        <span>Approved: {vendor.purchase_reviewed_at ? new Date(vendor.purchase_reviewed_at).toLocaleDateString('en-IN') : '-'}</span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
+                          <Eye className="h-4 w-4 mr-2" />View
+                        </Button>
+                        <Button variant="outline" className="rounded-xl" onClick={() => setPreviewVendorId(vendor.id)}>
+                          <FileText className="h-4 w-4 mr-2" />Preview
+                        </Button>
+                        <Button
+                          className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
+                          onClick={() => openSapFieldsDialog(vendor)}
+                          disabled={syncingVendorId === vendor.id || multiMode}
+                          title={multiMode ? 'Uncheck other vendors to sync individually' : ''}
+                        >
+                          {syncingVendorId === vendor.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
+                          ) : (
+                            <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
+                          )}
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
-                      <Eye className="h-4 w-4 mr-2" />View
-                    </Button>
-                    <Button variant="outline" className="rounded-xl" onClick={() => setPreviewVendorId(vendor.id)}>
-                      <FileText className="h-4 w-4 mr-2" />Preview
-                    </Button>
-                    <Button
-                      className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
-                      onClick={() => openSapFieldsDialog(vendor)}
-                      disabled={syncingVendorId === vendor.id}
-                    >
-                      {syncingVendorId === vendor.id ? (
-                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
-                      ) : (
-                        <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
 
-      {/* Vendor Details Dialog with Sync Button */}
+        {/* DMS Sync tab */}
+        <TabsContent value="dms" className="space-y-4 mt-6">
+          {selectedDmsVendors.length > 0 && (
+            <div className="flex items-center justify-between bg-card border rounded-xl p-3 shadow-sm">
+              <span className="text-sm text-muted-foreground">{selectedDmsVendors.length} selected for DMS upload</span>
+              <Button
+                className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg"
+                onClick={() => handleDmsSync(selectedDmsVendors.map(v => v.id))}
+                disabled={dmsSync.isPending}
+              >
+                {dmsSync.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading…</>
+                ) : (
+                  <><FolderUp className="h-4 w-4 mr-2" />Bulk DMS Sync ({selectedDmsVendors.length})</>
+                )}
+              </Button>
+            </div>
+          )}
+
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-0">
+              {dmsLoading ? (
+                <div className="p-6"><Skeleton className="h-32 w-full" /></div>
+              ) : filteredDms.length === 0 ? (
+                <div className="py-16 text-center">
+                  <FolderUp className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold">No vendors pending DMS sync</h3>
+                  <p className="text-muted-foreground mt-1 text-sm">Vendors synced to SAP will appear here.</p>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[600px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Vendor</TableHead>
+                        <TableHead>Ref Number</TableHead>
+                        <TableHead>SAP Vendor Code</TableHead>
+                        <TableHead>Sync Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDms.map((v) => {
+                        const refNo = (v as any).sap_reference_no || v.id.slice(0, 8).toUpperCase();
+                        const sapCode = (v as any).sap_vendor_code || '—';
+                        const isSynced = v.status === 'dms_synced';
+                        return (
+                          <TableRow key={v.id}>
+                            <TableCell>
+                              {!isSynced && (
+                                <Checkbox
+                                  checked={selectedDmsIds.has(v.id)}
+                                  onCheckedChange={() => toggleDms(v.id)}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{v.legal_name || 'Unnamed'}</div>
+                              <div className="text-xs text-muted-foreground">{getBuyerCompanyName(v.tenant_id)}</div>
+                            </TableCell>
+                            <TableCell><span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{refNo}</span></TableCell>
+                            <TableCell><span className="font-mono text-xs">{sapCode}</span></TableCell>
+                            <TableCell>
+                              <Badge className={isSynced ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}>
+                                {isSynced ? 'DMS Synced' : 'Pending DMS'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setSelectedVendor(v); setShowDetails(true); }}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {!isSynced && (
+                                  <Button
+                                    size="sm"
+                                    className="rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+                                    onClick={() => handleDmsSync([v.id])}
+                                    disabled={dmsSync.isPending}
+                                  >
+                                    {dmsSync.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><FolderUp className="h-4 w-4 mr-1" />Sync to DMS</>}
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
       <VendorReviewDialog
         vendorId={selectedVendor?.id ?? null}
         open={showDetails}
         onOpenChange={setShowDetails}
-        footerExtra={
-          <Button
-            className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
-            onClick={() => { if (selectedVendor) { setShowDetails(false); openSapFieldsDialog(selectedVendor); } }}
-            disabled={sapSync.isPending}
-          >
-            {sapSync.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
-            ) : (
-              <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
-            )}
-          </Button>
-        }
       />
 
       <VendorSubmissionPreviewDialog
@@ -259,110 +453,6 @@ export default function SAPSync() {
         onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
       />
 
-      {/* SAP Sync Result Dialog */}
-      <Dialog open={showSapResultDialog} onOpenChange={(open) => {
-        setShowSapResultDialog(open);
-        if (!open) {
-          setShowDetails(false);
-          setSelectedVendor(null);
-          setSapSyncResult(null);
-        }
-      }}>
-        <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {sapSyncResult?.success === false ? (
-                <>
-                  <Server className="h-6 w-6 text-red-600" />
-                  SAP Sync Failed
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-6 w-6 text-green-600" />
-                  SAP Sync Successful
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {sapSyncResult?.success === false
-                ? 'SAP rejected the request. Review the response details below.'
-                : 'Vendor has been successfully synced to SAP'}
-              <span className="block mt-2 text-xs text-muted-foreground">
-                Note: Document attachments are temporarily disabled to stay within SAP middleware payload limits. They will be enabled in a future release.
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          {sapSyncResult && (
-            <ScrollArea className="flex-1 max-h-[65vh] pr-4">
-            <div className="space-y-4 py-4">
-              <div className={`border rounded-xl p-4 ${
-                sapSyncResult.success === false
-                  ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
-                  : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {sapSyncResult.success === false ? (
-                    <Server className="h-5 w-5 text-red-600" />
-                  ) : (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  )}
-                  <span className={`font-semibold ${
-                    sapSyncResult.success === false
-                      ? 'text-red-900 dark:text-red-100'
-                      : 'text-green-900 dark:text-green-100'
-                  }`}>
-                    {sapSyncResult.message}
-                  </span>
-                </div>
-                {sapSyncResult.sapVendorCode && (
-                  <div className="text-sm text-green-800 dark:text-green-200">
-                    <p className="font-mono bg-white dark:bg-green-950/40 px-3 py-2 rounded-lg mt-2">
-                      SAP Vendor Code: <span className="font-bold">{sapSyncResult.sapVendorCode}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {sapSyncResult.sapResponse && sapSyncResult.sapResponse.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">SAP Response Details:</h4>
-                  {sapSyncResult.sapResponse.map((response: any, index: number) => (
-                    <div key={index} className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{response.MSG}</span>
-                        <Badge variant={response.MSGTYP === 'S' ? 'default' : 'destructive'}>
-                          {response.MSGTYP === 'S' ? 'Success' : 'Error'}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-0.5">
-                        {response.BP_LIFNR && <p>BP / Vendor No: <span className="font-mono">{response.BP_LIFNR}</span></p>}
-                        {response.BPNAME && <p>Business Partner: {response.BPNAME}</p>}
-                        {(response.ERDAT || response.UZEIT) && <p>Date: {response.ERDAT} at {response.UZEIT}</p>}
-                        {response.UNAME && <p>Created by: {response.UNAME}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            </ScrollArea>
-          )}
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                setShowSapResultDialog(false);
-                setShowDetails(false);
-                setSelectedVendor(null);
-                setSapSyncResult(null);
-              }}
-              className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500"
-            >
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <SapFieldsDialog
         open={showSapFieldsDialog}
         onOpenChange={(o) => { setShowSapFieldsDialog(o); if (!o) setPendingSyncVendor(null); }}
@@ -370,6 +460,131 @@ export default function SAPSync() {
         onConfirm={handleConfirmSync}
         isSubmitting={!!syncingVendorId}
       />
+
+      <MultipleSapSyncDialog
+        open={showMultipleSync}
+        onOpenChange={setShowMultipleSync}
+        vendors={selectedSapVendors}
+        onConfirm={handleMultipleSync}
+        isSubmitting={bulkSync.isPending}
+      />
+
+      {/* Single SAP Sync Result Dialog */}
+      <Dialog open={showSapResultDialog} onOpenChange={(open) => {
+        setShowSapResultDialog(open);
+        if (!open) { setShowDetails(false); setSelectedVendor(null); setSapSyncResult(null); }
+      }}>
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {sapSyncResult?.success === false ? (
+                <><Server className="h-6 w-6 text-red-600" />SAP Sync Failed</>
+              ) : (
+                <><CheckCircle className="h-6 w-6 text-green-600" />SAP Sync Successful</>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {sapSyncResult?.success === false
+                ? 'SAP rejected the request. Review the response below.'
+                : 'Vendor synced to SAP and moved to DMS Sync.'}
+            </DialogDescription>
+          </DialogHeader>
+          {sapSyncResult && (
+            <ScrollArea className="flex-1 max-h-[65vh] pr-4">
+              <div className="space-y-3 py-4">
+                {(sapSyncResult.sapResponse || []).map((r: any, i: number) => (
+                  <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{r.MSG || r.LONGMSG}</span>
+                      <Badge variant={r.MSGTYP === 'S' ? 'default' : 'destructive'}>
+                        {r.MSGTYP === 'S' ? 'Success' : 'Error'}
+                      </Badge>
+                    </div>
+                    {r.BP_LIFNR && <p className="text-xs text-muted-foreground">BP / Vendor No: <span className="font-mono">{r.BP_LIFNR}</span></p>}
+                    {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+          <DialogFooter>
+            <Button onClick={() => { setShowSapResultDialog(false); setSelectedVendor(null); setSapSyncResult(null); }} className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk SAP Sync Result Dialog */}
+      <Dialog open={showBulkResult} onOpenChange={setShowBulkResult}>
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Server className="h-6 w-6 text-blue-600" />
+              Multiple SAP Sync Result
+            </DialogTitle>
+            <DialogDescription>{bulkResult?.message}</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 max-h-[65vh] pr-4">
+            <div className="space-y-3 py-4">
+              {(bulkResult?.ACC_RES || []).length === 0 && (
+                <p className="text-sm text-muted-foreground">No ACC_RES rows returned from SAP.</p>
+              )}
+              {(bulkResult?.ACC_RES || []).map((r: any, i: number) => (
+                <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{r.LONGMSG || r.MSG}</span>
+                    <Badge variant={r.MSGTYP === 'S' ? 'default' : 'destructive'}>
+                      {r.MSGTYP === 'S' ? 'Success' : 'Error'}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    {r.idnum && <p>Ref No (idnum): <span className="font-mono">{r.idnum}</span></p>}
+                    {r.BP_LIFNR && <p>SAP Vendor Code: <span className="font-mono font-semibold">{r.BP_LIFNR}</span></p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button onClick={() => { setShowBulkResult(false); setActiveTab('dms'); }} className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500">
+              Done — Go to DMS Sync
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DMS Sync Result Dialog */}
+      <Dialog open={showDmsResult} onOpenChange={setShowDmsResult}>
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderUp className="h-6 w-6 text-emerald-600" />
+              DMS Sync Result
+            </DialogTitle>
+            <DialogDescription>{dmsResult?.message}</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 max-h-[65vh] pr-4">
+            <div className="space-y-3 py-4">
+              {(dmsResult?.results || []).map((r: any, i: number) => (
+                <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{r.message}</span>
+                    <Badge variant={r.success ? 'default' : 'destructive'}>
+                      {r.success ? 'Success' : 'Failed'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Vendor: <span className="font-mono">{r.vendorId.slice(0, 8)}</span> • Uploaded: {r.uploadedCount}</p>
+                  {r.skipped?.length > 0 && (
+                    <p className="text-xs text-amber-600">Skipped: {r.skipped.join(', ')}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button onClick={() => setShowDmsResult(false)} className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
