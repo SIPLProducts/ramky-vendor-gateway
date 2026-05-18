@@ -213,25 +213,68 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Convert form data to database format
   const formDataToVendorRecord = (formData: VendorFormData & { customFieldValues?: Record<string, Record<string, unknown>> }, userId: string | null) => {
+    const isIntl = formData.vendorType === 'international';
+    const intl = formData.international;
+
+    // For international vendors, map the new International fields back to the
+    // domestic NOT NULL columns so existing constraints + queries keep working.
+    // The full original values are preserved in `international_data` JSONB.
+    const intlLegalName = intl?.company.companyName || '';
+    const intlEmail = intl?.company.email1 || '';
+    const intlPhone = intl?.company.contact1 || '';
+    const intlAddr = intl?.company.companyAddress || '';
+    const intlCity = intl?.company.region || '';
+    const intlState = intl?.company.region || '';
+    const intlPin = intl?.company.pincode || '';
+    const intlCountry = intl?.company.country || '';
+
+    const cls = intl?.classification;
+    const intlMaterial = cls?.materialGroupVendor || [];
+    const intlVendorCat = cls?.vendorCategory || [];
+    const intlVendorLoc = cls?.vendorLocation || [];
+    const intlIdSrc = cls?.identificationSource || [];
+
     return {
       user_id: userId,
       tenant_id: formData.organization.buyerCompanyId || null,
+      vendor_type: formData.vendorType || 'domestic',
+      international_data: isIntl
+        ? {
+            documents: {
+              // Files themselves are stored in vendor_documents; here we just
+              // capture which slots are populated so the JSONB is informative.
+              registrationCopy: intl?.documents.registrationCopyFile?.name || null,
+              swiftIban: intl?.documents.swiftIbanFile?.name || null,
+            },
+            company: intl?.company,
+            bank: intl?.bank,
+            classification: intl?.classification,
+          }
+        : null,
       // Organization
-      legal_name: formData.organization.legalName,
-      trade_name: formData.organization.tradeName || null,
-      industry_type: formData.organization.industryType,
-      organization_type: formData.organization.organizationType || null,
-      ownership_type: formData.organization.ownershipType || null,
-      product_categories: formData.organization.productCategories,
-      state: formData.organization.state || null,
-      material_group_vendor: (Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor[0] : formData.organization.materialGroupVendor) || null,
-      vendor_category: (Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory[0] : formData.organization.vendorCategory) || null,
-      vendor_location: (Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation[0] : formData.organization.vendorLocation) || null,
-      identification_source: (Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource[0] : formData.organization.identificationSource) || null,
-      material_group_vendors: Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor : (formData.organization.materialGroupVendor ? [formData.organization.materialGroupVendor as unknown as string] : []),
-      vendor_categories: Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory : (formData.organization.vendorCategory ? [formData.organization.vendorCategory as unknown as string] : []),
-      vendor_locations: Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation : (formData.organization.vendorLocation ? [formData.organization.vendorLocation as unknown as string] : []),
-      identification_sources: Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource : (formData.organization.identificationSource ? [formData.organization.identificationSource as unknown as string] : []),
+      legal_name: isIntl ? intlLegalName : formData.organization.legalName,
+      trade_name: isIntl ? null : (formData.organization.tradeName || null),
+      industry_type: isIntl ? '' : formData.organization.industryType,
+      organization_type: isIntl ? null : (formData.organization.organizationType || null),
+      ownership_type: isIntl ? null : (formData.organization.ownershipType || null),
+      product_categories: isIntl ? [] : formData.organization.productCategories,
+      state: isIntl ? (intlCountry || null) : (formData.organization.state || null),
+      material_group_vendor: isIntl
+        ? (intlMaterial[0] || null)
+        : ((Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor[0] : formData.organization.materialGroupVendor) || null),
+      vendor_category: isIntl
+        ? (intlVendorCat[0] || null)
+        : ((Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory[0] : formData.organization.vendorCategory) || null),
+      vendor_location: isIntl
+        ? (intlVendorLoc[0] || null)
+        : ((Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation[0] : formData.organization.vendorLocation) || null),
+      identification_source: isIntl
+        ? (intlIdSrc[0] || null)
+        : ((Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource[0] : formData.organization.identificationSource) || null),
+      material_group_vendors: isIntl ? intlMaterial : (Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor : (formData.organization.materialGroupVendor ? [formData.organization.materialGroupVendor as unknown as string] : [])),
+      vendor_categories: isIntl ? intlVendorCat : (Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory : (formData.organization.vendorCategory ? [formData.organization.vendorCategory as unknown as string] : [])),
+      vendor_locations: isIntl ? intlVendorLoc : (Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation : (formData.organization.vendorLocation ? [formData.organization.vendorLocation as unknown as string] : [])),
+      identification_sources: isIntl ? intlIdSrc : (Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource : (formData.organization.identificationSource ? [formData.organization.identificationSource as unknown as string] : [])),
       // Registered Address
       registered_address: formData.address.registeredAddress,
       registered_address_line2: formData.address.registeredAddressLine2 || null,
