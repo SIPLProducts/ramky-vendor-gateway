@@ -645,8 +645,43 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
+      const baseRecord = formDataToVendorRecord(formData, userId);
+
+      // International overrides: map intl fields onto domestic NOT NULL columns
+      // so existing CHECK/NOT NULL constraints stay green. Source-of-truth for
+      // international vendors is still `international_data` JSONB.
+      const isIntl = formData.vendorType === 'international';
+      const intl = formData.international;
+      const intlOverrides: VendorRecord = isIntl && intl ? {
+        legal_name: intl.company.companyName || 'INTERNATIONAL VENDOR',
+        registered_address: intl.company.companyAddress || '-',
+        registered_city: intl.company.region || '-',
+        registered_state: intl.company.region || '-',
+        registered_pincode: intl.company.pincode || '-',
+        registered_email: intl.company.email1 || null,
+        registered_phone: intl.company.contact1 || null,
+        primary_contact_name: intl.company.companyName || 'International Contact',
+        primary_designation: 'Authorized Representative',
+        primary_email: intl.company.email1 || '',
+        primary_phone: intl.company.contact1 || '',
+        primary_email_2: intl.company.email2 || null,
+        primary_phone_2: intl.company.contact2 || null,
+        branch_country: intl.company.country || null,
+        // Bank: optional for intl, use SWIFT/IBAN data if provided
+        bank_name: intl.bank.bankName || 'N/A',
+        bank_branch_name: intl.bank.bankBranch || 'N/A',
+        account_number: intl.bank.accountNumber || 'N/A',
+        ifsc_code: intl.bank.swiftCode || intl.bank.ibanNumber || 'N/A',
+        swift_iban_code: intl.bank.swiftCode || intl.bank.ibanNumber || null,
+        // Statutory: intl vendors are GST-exempt by definition
+        is_gst_registered: false,
+        gst_declaration_reason: 'International vendor — not GST registered',
+        is_msme_registered: false,
+      } : {};
+
       const vendorData: VendorRecord = {
-        ...formDataToVendorRecord(formData, userId),
+        ...baseRecord,
+        ...intlOverrides,
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
