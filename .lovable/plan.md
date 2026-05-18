@@ -1,26 +1,30 @@
-## Changes
+## Change
 
-### 1. Vendor type selection shown BEFORE the registration form
+**`src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`** — restyle required-field markers and tighten layout.
 
-Currently the Domestic / International selector sits above the stepper on the same screen as Step 1 (Documents Upload / Organization). Change this so the selector is its own gating screen.
+### 1. Red asterisks on required labels
+Replace the inline `*` inside each required label text with an explicit `<span className="text-destructive ml-0.5">*</span>` so the asterisk renders red (matching `DynamicStep.tsx`). Apply to:
+- Company Name
+- Pincode / Postal Code
+- Country (From SAP)
+- Region
+- Company Contact 1
+- Company Email 1
 
-**`src/pages/VendorRegistration.tsx`**
-- Add local state `vendorTypeChosen` (boolean), defaulting to `true` when `existingFormData?.vendorType` is set (resumed drafts), otherwise `false`.
-- When `!vendorTypeChosen`:
-  - Render only the header + a centered card containing the `<VendorTypeSelector>` and a "Continue" button.
-  - Continue is enabled once a type is picked; clicking it sets `vendorTypeChosen = true` and ensures `currentStep = 1`.
-  - Do NOT render the StepIndicator, Documents/Organization step, or sticky action bar yet.
-- When `vendorTypeChosen === true`:
-  - Render the stepper + the active step (current behavior), but the `<VendorTypeSelector>` is no longer shown above the stepper.
-  - Add a small "Vendor Type: International ✎ Change" chip in the header area that, when clicked, opens the existing AlertDialog. Confirming switches type and resets the abandoned slice (existing `applyVendorTypeSwitch` logic). This preserves the ability to change type after entering data.
+Optional fields (Company Address, Contact 2, Email 2) keep no asterisk.
 
-### 2. Make international Documents Upload fields optional
+### 2. Row/column layout for the required fields
+Reorganize the grid so the six required fields appear in compact rows of columns instead of full-width stacks:
 
-**`src/components/vendor/steps/international/IntlDocumentsStep.tsx`**
-- Remove `required` prop on both `<FileUpload>` instances (Registration Copy, SWIFT/IBAN Details) so the red asterisk disappears.
-- Update the helper sentence to say "(optional)".
+```text
+Row A:  [ Company Name ]              [ Pincode / Postal Code ]
+Row B:  [ Country (From SAP) ]        [ Region ]
+Row C:  [ Company Contact 1 ]         [ Company Email 1 ]
+Row D:  [ Company Address (full width, optional) ]
+Row E:  [ Contact 2 ]                 [ Email 2 ]
+```
 
-No backend, validation, or submission logic changes — the international flow already allows Continue without OCR gating, and there is no required-file enforcement on submit for these two fields.
+Implementation: wrap each pair in `grid md:grid-cols-2 gap-5`. Company Address stays full-width on its own row. The existing 3-column row (Pincode / Country / Region) is split as above so required fields are paired cleanly.
 
 ### Out of scope
-- Domestic flow, ReviewStep, edge functions, DB, and all other steps remain unchanged.
+No validation, schema, or other step changes.
