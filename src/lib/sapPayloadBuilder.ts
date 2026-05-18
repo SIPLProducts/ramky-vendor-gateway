@@ -248,6 +248,10 @@ export async function buildSapPayload(
     row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
     row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
     row.UPLOAD = [];
+    row.idtype = "SOLMN1";
+    row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
+    row.idtype2 = "ZMSMEN";
+    row.idnum2 = (vendor as any).msme_number ? String((vendor as any).msme_number).slice(0, 20) : "";
   }
 
   return { payload: [row], uploadsCount: uploads.length, skipped };
