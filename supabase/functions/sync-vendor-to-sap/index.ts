@@ -142,6 +142,8 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
   } else if (head === "vendor.trade_name_first_word") {
     const t = ctx.vendor?.trade_name || "";
     value = String(t).split(" ")[0] || "";
+  } else if (head === "vendor.reference_no") {
+    value = String(ctx.vendor?.id || "").slice(0, 8).toUpperCase();
   } else if (head === "vendor.registered_address_line3_or_2") {
     value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
   } else {
