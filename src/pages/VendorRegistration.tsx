@@ -1007,7 +1007,9 @@ export default function VendorRegistration() {
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}
-        notifyFailed={submissionSuccess.notifyFailed}
+        status={submissionSuccess.status}
+        vendorIdentity={submissionSuccess.vendorIdentity}
+        errorMessage={submissionSuccess.errorMessage}
         onClose={handleSubmissionDialogClose}
       />
     </div>
