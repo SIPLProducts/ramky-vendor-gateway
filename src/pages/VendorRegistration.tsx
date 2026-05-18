@@ -13,7 +13,14 @@ import { DocumentVerificationStep, VerifiedDocumentData } from '@/components/ven
 import { DynamicStep } from '@/components/vendor/DynamicStep';
 import { useDynamicFormSchema } from '@/hooks/useDynamicFormSchema';
 import { RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
-import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails } from '@/types/vendor';
+import { VendorFormData, OrganizationDetails, AddressDetails, ContactDetails, StatutoryDetails, BankDetails, FinancialDetails, InfrastructureDetails, QHSEDetails, VendorOriginType, InternationalData, InternationalDocuments, InternationalCompanyDetails, InternationalBankDetails, InternationalClassification, EMPTY_INTERNATIONAL_DATA } from '@/types/vendor';
+import { VendorTypeSelector } from '@/components/vendor/steps/international/VendorTypeSelector';
+import { IntlDocumentsStep } from '@/components/vendor/steps/international/IntlDocumentsStep';
+import { IntlCompanyDetailsStep } from '@/components/vendor/steps/international/IntlCompanyDetailsStep';
+import { IntlBankDetailsStep } from '@/components/vendor/steps/international/IntlBankDetailsStep';
+import { IntlClassificationStep } from '@/components/vendor/steps/international/IntlClassificationStep';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { FileText, Building2 as Building2Icon, Landmark, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert } from 'lucide-react';
@@ -41,16 +48,29 @@ const builtInSteps = [
 const REVIEW_TITLE = 'Review & Submit';
 const REVIEW_DESCRIPTION = 'Verify and submit application';
 
+// International flow — 4 tabs + Review
+const internationalSteps = [
+  { id: 1, title: 'Documents Upload', description: 'Registration copy & SWIFT/IBAN proof', icon: FileText },
+  { id: 2, title: 'Company Details', description: 'Company, address, contact & email', icon: Building2Icon },
+  { id: 3, title: 'Company Bank Details', description: 'Account, SWIFT, IBAN (optional)', icon: Landmark },
+  { id: 4, title: 'Classification', description: 'Material group, category & source', icon: Award },
+];
+
+const EMPTY_DOMESTIC_SLICES = {
+  organization: { buyerCompanyId: '', legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [], productCategoriesOther: '', state: '', materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [] } as OrganizationDetails,
+  address: { registeredAddress: '', registeredAddressLine2: '', registeredAddressLine3: '', registeredAddressLine4: '', registeredCity: '', registeredState: '', registeredPincode: '', registeredPhone: '', registeredFax: '', registeredWebsite: '', registeredEmail: '', sameAsRegistered: true, manufacturingAddress: '', manufacturingAddressLine2: '', manufacturingAddressLine3: '', manufacturingAddressLine4: '', manufacturingCity: '', manufacturingState: '', manufacturingPincode: '', manufacturingPhone: '', manufacturingFax: '', manufacturingEmail: '', branchName: '', branchAddress: '', branchAddressLine2: '', branchAddressLine3: '', branchAddressLine4: '', branchCity: '', branchState: '', branchPincode: '', branchCountry: 'India', branchWebsite: '', branchEmail: '', branchContactName: '', branchContactDesignation: '', branchContactEmail: '', branchContactPhone: '', branchContactFax: '' } as AddressDetails,
+  contact: { ceoName: '', ceoDesignation: '', ceoPhone: '', ceoEmail: '', ceoPhone2: '', ceoEmail2: '', marketingName: '', marketingDesignation: '', marketingPhone: '', marketingEmail: '', productionName: '', productionDesignation: '', productionPhone: '', productionEmail: '', customerServiceName: '', customerServiceDesignation: '', customerServicePhone: '', customerServiceEmail: '' } as ContactDetails,
+  statutory: { firmRegistrationNo: '', pan: '', pfNumber: '', esiNumber: '', isGstRegistered: true, gstin: '', gstDeclarationReason: '', gstSelfDeclarationFile: null, gstConstitutionOfBusiness: '', gstPrincipalPlaceOfBusiness: '', gstAdditionalPlaces: [], gstRegistrationDate: '', gstStatus: '', gstTaxpayerType: '', gstBusinessNature: [], gstJurisdictionCentre: '', gstJurisdictionState: '', isMsmeRegistered: false, msmeNumber: '', msmeCategory: '', msmeDeclarationReason: '', msmeSelfDeclarationFile: null, labourPermitNo: '', iecNo: '', swiftIbanCode: '', entityType: '', memberships: [], enlistments: [], certifications: [], operationalNetwork: '', gstCertificateFile: null, panCardFile: null, msmeCertificateFile: null, iecCertificateFile: null, swiftIbanProofFile: null } as StatutoryDetails,
+  bank: { bankName: '', branchName: '', accountNumber: '', confirmAccountNumber: '', accountType: 'current' as const, accountTypeOther: '', ifscCode: '', micrCode: '', bankAddress: '', cancelledChequeFile: null } as BankDetails,
+  financial: { turnoverYear1: '', turnoverYear2: '', turnoverYear3: '', creditPeriodExpected: '', majorCustomer1: '', majorCustomer2: '', majorCustomer3: '', authorizedDistributorName: '', authorizedDistributorAddress: '', dealershipCertificateFile: null, financialDocsFile: null } as FinancialDetails,
+  infrastructure: { rawMaterialsUsed: '', machineryAvailability: '', equipmentAvailability: '', powerSupply: '', waterSupply: '', dgCapacity: '', productionCapacity: '', storeCapacity: '', supplyCapacity: '', manpower: '', inspectionTesting: '', nearestRailway: '', nearestBusStation: '', nearestAirport: '', nearestPort: '', productTypes: [], productTypesOther: '', productionFacilities: [], leadTimeRequired: '' } as InfrastructureDetails,
+  qhse: { qualityIssues: '', healthIssues: '', environmentalIssues: '', safetyIssues: '' } as QHSEDetails,
+};
+
 const initialFormData: VendorFormData = {
   vendorType: 'domestic',
-  organization: { buyerCompanyId: '', legalName: '', tradeName: '', industryType: '', organizationType: '', ownershipType: '', productCategories: [], productCategoriesOther: '', state: '', materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [] },
-  address: { registeredAddress: '', registeredAddressLine2: '', registeredAddressLine3: '', registeredAddressLine4: '', registeredCity: '', registeredState: '', registeredPincode: '', registeredPhone: '', registeredFax: '', registeredWebsite: '', registeredEmail: '', sameAsRegistered: true, manufacturingAddress: '', manufacturingAddressLine2: '', manufacturingAddressLine3: '', manufacturingAddressLine4: '', manufacturingCity: '', manufacturingState: '', manufacturingPincode: '', manufacturingPhone: '', manufacturingFax: '', manufacturingEmail: '', branchName: '', branchAddress: '', branchAddressLine2: '', branchAddressLine3: '', branchAddressLine4: '', branchCity: '', branchState: '', branchPincode: '', branchCountry: 'India', branchWebsite: '', branchEmail: '', branchContactName: '', branchContactDesignation: '', branchContactEmail: '', branchContactPhone: '', branchContactFax: '' },
-  contact: { ceoName: '', ceoDesignation: '', ceoPhone: '', ceoEmail: '', ceoPhone2: '', ceoEmail2: '', marketingName: '', marketingDesignation: '', marketingPhone: '', marketingEmail: '', productionName: '', productionDesignation: '', productionPhone: '', productionEmail: '', customerServiceName: '', customerServiceDesignation: '', customerServicePhone: '', customerServiceEmail: '' },
-  statutory: { firmRegistrationNo: '', pan: '', pfNumber: '', esiNumber: '', isGstRegistered: true, gstin: '', gstDeclarationReason: '', gstSelfDeclarationFile: null, gstConstitutionOfBusiness: '', gstPrincipalPlaceOfBusiness: '', gstAdditionalPlaces: [], gstRegistrationDate: '', gstStatus: '', gstTaxpayerType: '', gstBusinessNature: [], gstJurisdictionCentre: '', gstJurisdictionState: '', isMsmeRegistered: false, msmeNumber: '', msmeCategory: '', msmeDeclarationReason: '', msmeSelfDeclarationFile: null, labourPermitNo: '', iecNo: '', swiftIbanCode: '', entityType: '', memberships: [], enlistments: [], certifications: [], operationalNetwork: '', gstCertificateFile: null, panCardFile: null, msmeCertificateFile: null, iecCertificateFile: null, swiftIbanProofFile: null },
-  bank: { bankName: '', branchName: '', accountNumber: '', confirmAccountNumber: '', accountType: 'current', accountTypeOther: '', ifscCode: '', micrCode: '', bankAddress: '', cancelledChequeFile: null },
-  financial: { turnoverYear1: '', turnoverYear2: '', turnoverYear3: '', creditPeriodExpected: '', majorCustomer1: '', majorCustomer2: '', majorCustomer3: '', authorizedDistributorName: '', authorizedDistributorAddress: '', dealershipCertificateFile: null, financialDocsFile: null },
-  infrastructure: { rawMaterialsUsed: '', machineryAvailability: '', equipmentAvailability: '', powerSupply: '', waterSupply: '', dgCapacity: '', productionCapacity: '', storeCapacity: '', supplyCapacity: '', manpower: '', inspectionTesting: '', nearestRailway: '', nearestBusStation: '', nearestAirport: '', nearestPort: '', productTypes: [], productTypesOther: '', productionFacilities: [], leadTimeRequired: '' },
-  qhse: { qualityIssues: '', healthIssues: '', environmentalIssues: '', safetyIssues: '' },
+  ...EMPTY_DOMESTIC_SLICES,
+  international: EMPTY_INTERNATIONAL_DATA,
   declaration: { selfDeclared: false, termsAccepted: false },
 };
 
@@ -101,15 +121,24 @@ export default function VendorRegistration() {
   const customSteps = dynamicSchema?.steps || [];
   const fieldsByStep = dynamicSchema?.fieldsByStep || {};
 
-  // Build the runtime step list: built-in 1..5 + custom tabs + Review (last)
+  const isInternational = formData.vendorType === 'international';
+
+  // Build the runtime step list:
+  //   Domestic — built-in 1..5 + custom tabs + Review (last)
+  //   International — 4 fixed tabs + Review (no custom tabs)
   const registrationSteps = useMemo(() => {
+    if (isInternational) {
+      const list = internationalSteps.map((s) => ({ id: s.id, title: s.title, description: s.description }));
+      list.push({ id: internationalSteps.length + 1, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
+      return list;
+    }
     const list: Array<{ id: number; title: string; description: string; stepKey?: string }> = builtInSteps.map((s) => ({ ...s }));
     customSteps.forEach((cs, i) => {
       list.push({ id: 6 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
     });
     list.push({ id: 6 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
     return list;
-  }, [customSteps]);
+  }, [customSteps, isInternational]);
 
   // Hydrate custom values from existing vendor on load
   useEffect(() => {
@@ -313,6 +342,8 @@ export default function VendorRegistration() {
   };
 
   const canProceedFromCurrentStep = () => {
+    // International flow — no OCR gate; per-step zod validation handles it.
+    if (isInternational) return true;
     // Step 1 (Document Verification) — trust the child's authoritative completion flag
     if (currentStep === 1) {
       if (!verifiedData) return false;
@@ -336,7 +367,7 @@ export default function VendorRegistration() {
   };
 
   const getValidationMessage = () => {
-    if (currentStep === 1 && !canProceedFromCurrentStep()) {
+    if (!isInternational && currentStep === 1 && !canProceedFromCurrentStep()) {
       return 'Complete each stage in order: GST → PAN → MSME → Bank';
     }
     return undefined;
@@ -357,37 +388,49 @@ export default function VendorRegistration() {
         // Mark steps as completed based on filled data
         if (vendorStatus === 'draft') {
           const filledSteps: number[] = [];
-          // Step 1 = doc verification — assume completed if we already have key fields
-          if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
-            filledSteps.push(1);
-            // Pre-seed verifiedData so Step 1 shows green tiles when revisited
-            setVerifiedData({
-              pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
-              gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
-              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
-              bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
-              bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
-                ? {
-                    accountNumber: existingFormData.bank.secondary.accountNumber,
-                    ifsc: existingFormData.bank.secondary.ifscCode || '',
-                    bankName: existingFormData.bank.secondary.bankName || '',
-                    branchName: existingFormData.bank.secondary.branchName || '',
-                    accountHolderName: existingFormData.bank.secondary.accountHolderName || '',
-                    accountType: existingFormData.bank.secondary.accountType || 'current',
-                    bankAddress: existingFormData.bank.secondary.bankAddress || '',
-                  }
-                : undefined,
-            });
+          if (existingFormData.vendorType === 'international') {
+            const i = existingFormData.international;
+            if (i?.documents?.registrationCopyFile || i?.documents?.swiftIbanFile) filledSteps.push(1);
+            if (i?.company?.companyName) filledSteps.push(2);
+            if (i?.bank?.accountNumber || i?.bank?.swiftCode || i?.bank?.ibanNumber) filledSteps.push(3);
+            if ((i?.classification?.materialGroupVendor?.length || 0) > 0) filledSteps.push(4);
+            setCompletedSteps(filledSteps);
+            const allSteps = [1, 2, 3, 4, 5];
+            const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
+            setCurrentStep(nextStep || 5);
+          } else {
+            // Step 1 = doc verification — assume completed if we already have key fields
+            if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
+              filledSteps.push(1);
+              // Pre-seed verifiedData so Step 1 shows green tiles when revisited
+              setVerifiedData({
+                pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
+                gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
+                msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
+                bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
+                bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
+                  ? {
+                      accountNumber: existingFormData.bank.secondary.accountNumber,
+                      ifsc: existingFormData.bank.secondary.ifscCode || '',
+                      bankName: existingFormData.bank.secondary.bankName || '',
+                      branchName: existingFormData.bank.secondary.branchName || '',
+                      accountHolderName: existingFormData.bank.secondary.accountHolderName || '',
+                      accountType: existingFormData.bank.secondary.accountType || 'current',
+                      bankAddress: existingFormData.bank.secondary.bankAddress || '',
+                    }
+                  : undefined,
+              });
+            }
+            if (existingFormData.organization?.legalName) filledSteps.push(2);
+            if (existingFormData.address?.registeredAddress) filledSteps.push(3);
+            if (existingFormData.contact?.ceoName) filledSteps.push(4);
+            if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
+            setCompletedSteps(filledSteps);
+            // Go to the first incomplete step or step 1
+            const allSteps = [1, 2, 3, 4, 5, 6];
+            const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
+            setCurrentStep(nextStep || 6);
           }
-          if (existingFormData.organization?.legalName) filledSteps.push(2);
-          if (existingFormData.address?.registeredAddress) filledSteps.push(3);
-          if (existingFormData.contact?.ceoName) filledSteps.push(4);
-          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
-          setCompletedSteps(filledSteps);
-          // Go to the first incomplete step or step 1
-          const allSteps = [1, 2, 3, 4, 5, 6];
-          const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-          setCurrentStep(nextStep || 6);
         } else {
           setIsSubmitted(true);
           setIsEditMode(false);
@@ -600,6 +643,82 @@ export default function VendorRegistration() {
   const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
   const handleEditStep = (step: number) => setCurrentStep(step);
 
+  // ----- Vendor type switching with reset-confirm -----
+  const [pendingTypeSwitch, setPendingTypeSwitch] = useState<VendorOriginType | null>(null);
+
+  const hasDomesticData = () => {
+    const o = formData.organization;
+    const s = formData.statutory;
+    const b = formData.bank;
+    return !!(o.legalName || o.tradeName || o.industryType || s.pan || s.gstin || b.accountNumber || formData.address.registeredAddress || formData.contact.ceoName);
+  };
+  const hasInternationalData = () => {
+    const i = formData.international;
+    if (!i) return false;
+    return !!(i.company.companyName || i.company.companyAddress || i.company.country || i.bank.accountNumber || i.bank.swiftCode || i.bank.ibanNumber || i.documents.registrationCopyFile || i.documents.swiftIbanFile || (i.classification.materialGroupVendor?.length || 0) > 0);
+  };
+
+  const applyVendorTypeSwitch = (next: VendorOriginType) => {
+    setFormData((prev) => {
+      if (next === 'international') {
+        return {
+          ...prev,
+          vendorType: 'international',
+          ...EMPTY_DOMESTIC_SLICES,
+          international: prev.international ?? EMPTY_INTERNATIONAL_DATA,
+        };
+      }
+      return {
+        ...prev,
+        vendorType: 'domestic',
+        international: EMPTY_INTERNATIONAL_DATA,
+      };
+    });
+    setCompletedSteps([]);
+    setCurrentStep(1);
+    setVerifiedData(undefined);
+    latestStep1DataRef.current = null;
+  };
+
+  const handleVendorTypeChange = (next: VendorOriginType) => {
+    if (next === formData.vendorType) return;
+    const abandonedHasData = next === 'international' ? hasDomesticData() : hasInternationalData();
+    if (abandonedHasData) {
+      setPendingTypeSwitch(next);
+      return;
+    }
+    applyVendorTypeSwitch(next);
+  };
+
+  // ----- International step setters -----
+  const setIntlSlice = <K extends keyof InternationalData>(key: K, value: InternationalData[K]) => {
+    setFormData((prev) => ({
+      ...prev,
+      international: { ...(prev.international ?? EMPTY_INTERNATIONAL_DATA), [key]: value },
+    }));
+  };
+
+  const handleIntlDocsContinue = () => {
+    if (!completedSteps.includes(1)) setCompletedSteps((p) => [...p, 1]);
+    setCurrentStep(2);
+  };
+  const handleIntlCompanyComplete = (d: InternationalCompanyDetails) => {
+    setIntlSlice('company', d);
+    if (!completedSteps.includes(2)) setCompletedSteps((p) => [...p, 2]);
+    setCurrentStep(3);
+  };
+  const handleIntlBankComplete = (d: InternationalBankDetails) => {
+    setIntlSlice('bank', d);
+    if (!completedSteps.includes(3)) setCompletedSteps((p) => [...p, 3]);
+    setCurrentStep(4);
+  };
+  const handleIntlClassificationComplete = (d: InternationalClassification) => {
+    setIntlSlice('classification', d);
+    if (!completedSteps.includes(4)) setCompletedSteps((p) => [...p, 4]);
+    setCurrentStep(5);
+  };
+
+
   const handleSaveAsDraft = async () => {
     try {
       setAutoSaveState('saving');
@@ -692,7 +811,25 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
-    // Built-in steps 1..5
+    // International flow
+    if (isInternational) {
+      const intl = formData.international ?? EMPTY_INTERNATIONAL_DATA;
+      if (currentStep === registrationSteps.length) {
+        return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
+      }
+      switch (currentStep) {
+        case 1:
+          return <IntlDocumentsStep vendorId={vendorId} data={intl.documents} onChange={(d) => setIntlSlice('documents', d)} />;
+        case 2:
+          return <IntlCompanyDetailsStep data={intl.company} onSubmit={handleIntlCompanyComplete} onLiveUpdate={(d) => setIntlSlice('company', d)} />;
+        case 3:
+          return <IntlBankDetailsStep data={intl.bank} onSubmit={handleIntlBankComplete} onLiveUpdate={(d) => setIntlSlice('bank', d)} />;
+        case 4:
+          return <IntlClassificationStep data={intl.classification} onSubmit={handleIntlClassificationComplete} onLiveUpdate={(d) => setIntlSlice('classification', d)} />;
+      }
+      return null;
+    }
+    // Built-in domestic steps 1..5
     switch (currentStep) {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
@@ -876,6 +1013,17 @@ export default function VendorRegistration() {
           </div>
         </div>
 
+        {/* Vendor Type Selector (above the form card, hidden once submitted) */}
+        {!isSubmitted && (
+          <div className="px-4 sm:px-6 pt-4">
+            <VendorTypeSelector
+              value={formData.vendorType}
+              onChange={handleVendorTypeChange}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
+
         {/* Form Card */}
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <div className="bg-card rounded-[10px] shadow-enterprise-md border">
@@ -890,12 +1038,25 @@ export default function VendorRegistration() {
               )}
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  {currentStep === 1 && <span className="text-lg">🛡️</span>}
-                  {currentStep === 2 && <span className="text-lg">🏢</span>}
-                  {currentStep === 3 && <span className="text-lg">📍</span>}
-                  {currentStep === 4 && <span className="text-lg">👤</span>}
-                  {currentStep === 5 && <span className="text-lg">💰</span>}
-                  {currentStep === 6 && <span className="text-lg">✓</span>}
+                  {isInternational ? (
+                    (() => {
+                      const intlStep = internationalSteps[currentStep - 1];
+                      if (intlStep) {
+                        const Icon = intlStep.icon;
+                        return <Icon className="h-5 w-5 text-primary" />;
+                      }
+                      return <span className="text-lg">✓</span>;
+                    })()
+                  ) : (
+                    <>
+                      {currentStep === 1 && <span className="text-lg">🛡️</span>}
+                      {currentStep === 2 && <span className="text-lg">🏢</span>}
+                      {currentStep === 3 && <span className="text-lg">📍</span>}
+                      {currentStep === 4 && <span className="text-lg">👤</span>}
+                      {currentStep === 5 && <span className="text-lg">💰</span>}
+                      {currentStep >= 6 && <span className="text-lg">✓</span>}
+                    </>
+                  )}
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">
@@ -986,18 +1147,29 @@ export default function VendorRegistration() {
                       Submit Application
                     </Button>
                   ) : (
-                    <Button
-                      type="submit"
-                      form="step-form"
-                      disabled={!canProceed}
-                      className={cn(
-                        "min-w-[120px]",
-                        !canProceed && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      Continue
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
+                    isInternational && currentStep === 1 ? (
+                      <Button
+                        type="button"
+                        onClick={handleIntlDocsContinue}
+                        className="min-w-[120px]"
+                      >
+                        Continue
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        form="step-form"
+                        disabled={!canProceed}
+                        className={cn(
+                          "min-w-[120px]",
+                          !canProceed && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        Continue
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
@@ -1005,6 +1177,27 @@ export default function VendorRegistration() {
           </div>
         </main>
       </div>
+      <AlertDialog open={!!pendingTypeSwitch} onOpenChange={(o) => { if (!o) setPendingTypeSwitch(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch vendor type?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All entered {pendingTypeSwitch === 'international' ? 'Domestic' : 'International'} data will be cleared and you'll restart from Step 1.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingTypeSwitch(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingTypeSwitch) applyVendorTypeSwitch(pendingTypeSwitch);
+                setPendingTypeSwitch(null);
+              }}
+            >
+              Yes, switch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}
