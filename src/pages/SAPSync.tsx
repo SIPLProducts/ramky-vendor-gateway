@@ -293,6 +293,7 @@ export default function SAPSync() {
             </DialogDescription>
           </DialogHeader>
           {sapSyncResult && (
+            <ScrollArea className="flex-1 max-h-[65vh] pr-4">
             <div className="space-y-4 py-4">
               <div className={`border rounded-xl p-4 ${
                 sapSyncResult.success === false
@@ -344,6 +345,7 @@ export default function SAPSync() {
                 </div>
               )}
             </div>
+            </ScrollArea>
           )}
           <DialogFooter>
             <Button
