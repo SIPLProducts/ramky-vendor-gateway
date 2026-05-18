@@ -1798,6 +1798,7 @@ export type Database = {
           ifsc_code_2: string | null
           industry_type: string | null
           inspection_testing: string | null
+          international_data: Json | null
           invitation_id: string | null
           is_gst_registered: boolean | null
           is_msme_registered: boolean | null
@@ -1902,6 +1903,7 @@ export type Database = {
           vendor_category: string | null
           vendor_location: string | null
           vendor_locations: string[]
+          vendor_type: string
           water_supply: string | null
         }
         Insert: {
@@ -1980,6 +1982,7 @@ export type Database = {
           ifsc_code_2?: string | null
           industry_type?: string | null
           inspection_testing?: string | null
+          international_data?: Json | null
           invitation_id?: string | null
           is_gst_registered?: boolean | null
           is_msme_registered?: boolean | null
@@ -2084,6 +2087,7 @@ export type Database = {
           vendor_category?: string | null
           vendor_location?: string | null
           vendor_locations?: string[]
+          vendor_type?: string
           water_supply?: string | null
         }
         Update: {
@@ -2162,6 +2166,7 @@ export type Database = {
           ifsc_code_2?: string | null
           industry_type?: string | null
           inspection_testing?: string | null
+          international_data?: Json | null
           invitation_id?: string | null
           is_gst_registered?: boolean | null
           is_msme_registered?: boolean | null
@@ -2266,6 +2271,7 @@ export type Database = {
           vendor_category?: string | null
           vendor_location?: string | null
           vendor_locations?: string[]
+          vendor_type?: string
           water_supply?: string | null
         }
         Relationships: [
