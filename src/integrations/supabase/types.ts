@@ -1791,6 +1791,7 @@ export type Database = {
           health_issues: string | null
           id: string
           identification_source: string | null
+          identification_sources: string[]
           iec_no: string | null
           ifsc_code: string | null
           ifsc_code_2: string | null
@@ -1818,6 +1819,7 @@ export type Database = {
           manufacturing_pincode: string | null
           manufacturing_state: string | null
           material_group_vendor: string | null
+          material_group_vendors: string[]
           memberships: Json | null
           micr_2: string | null
           micr_code: string | null
@@ -1894,8 +1896,10 @@ export type Database = {
           turnover_year3: number | null
           updated_at: string
           user_id: string | null
+          vendor_categories: string[]
           vendor_category: string | null
           vendor_location: string | null
+          vendor_locations: string[]
           water_supply: string | null
         }
         Insert: {
@@ -1967,6 +1971,7 @@ export type Database = {
           health_issues?: string | null
           id?: string
           identification_source?: string | null
+          identification_sources?: string[]
           iec_no?: string | null
           ifsc_code?: string | null
           ifsc_code_2?: string | null
@@ -1994,6 +1999,7 @@ export type Database = {
           manufacturing_pincode?: string | null
           manufacturing_state?: string | null
           material_group_vendor?: string | null
+          material_group_vendors?: string[]
           memberships?: Json | null
           micr_2?: string | null
           micr_code?: string | null
@@ -2070,8 +2076,10 @@ export type Database = {
           turnover_year3?: number | null
           updated_at?: string
           user_id?: string | null
+          vendor_categories?: string[]
           vendor_category?: string | null
           vendor_location?: string | null
+          vendor_locations?: string[]
           water_supply?: string | null
         }
         Update: {
@@ -2143,6 +2151,7 @@ export type Database = {
           health_issues?: string | null
           id?: string
           identification_source?: string | null
+          identification_sources?: string[]
           iec_no?: string | null
           ifsc_code?: string | null
           ifsc_code_2?: string | null
@@ -2170,6 +2179,7 @@ export type Database = {
           manufacturing_pincode?: string | null
           manufacturing_state?: string | null
           material_group_vendor?: string | null
+          material_group_vendors?: string[]
           memberships?: Json | null
           micr_2?: string | null
           micr_code?: string | null
@@ -2246,8 +2256,10 @@ export type Database = {
           turnover_year3?: number | null
           updated_at?: string
           user_id?: string | null
+          vendor_categories?: string[]
           vendor_category?: string | null
           vendor_location?: string | null
+          vendor_locations?: string[]
           water_supply?: string | null
         }
         Relationships: [
