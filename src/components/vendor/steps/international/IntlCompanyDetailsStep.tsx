@@ -12,7 +12,7 @@ import { useSapMasterData } from '@/hooks/useSapMasterData';
 
 const schema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required'),
-  companyAddress: z.string().trim().min(5, 'Company address is required'),
+  companyAddress: z.string().trim().optional().or(z.literal('')),
   pincode: z.string().trim().min(2, 'Pincode is required'),
   country: z.string().trim().min(1, 'Country is required'),
   region: z.string().trim().min(1, 'Region is required'),
