@@ -287,6 +287,9 @@ export default function SAPSync() {
               {sapSyncResult?.success === false
                 ? 'SAP rejected the request. Review the response details below.'
                 : 'Vendor has been successfully synced to SAP'}
+              <span className="block mt-2 text-xs text-muted-foreground">
+                Note: Document attachments are temporarily disabled to stay within SAP middleware payload limits. They will be enabled in a future release.
+              </span>
             </DialogDescription>
           </DialogHeader>
           {sapSyncResult && (
