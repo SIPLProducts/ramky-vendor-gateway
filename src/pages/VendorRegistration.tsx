@@ -65,8 +65,16 @@ export default function VendorRegistration() {
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     open: boolean;
     inviter: { name?: string; email?: string } | null;
-    notifyFailed: boolean;
-  }>({ open: false, inviter: null, notifyFailed: false });
+    status: 'success' | 'failure';
+    vendorIdentity: {
+      vendorName?: string;
+      vendorEmail?: string;
+      vendorPhone?: string;
+      contactPerson?: string;
+      vendorRef?: string;
+    } | null;
+    errorMessage: string | null;
+  }>({ open: false, inviter: null, status: 'success', vendorIdentity: null, errorMessage: null });
   const [pendingPostSubmit, setPendingPostSubmit] = useState(false);
   const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
@@ -643,7 +651,9 @@ export default function VendorRegistration() {
 
       const notify = (vendor as any)?._notify ?? null;
       const inviter = notify?.inviter ?? null;
-      const notifyFailed = !notify || notify?.success === false;
+      const vendorIdentity = notify?.vendorIdentity ?? null;
+      const notifyOk = !!notify && notify?.success !== false;
+      const errorMessage = notify?.error ?? (notify?.skipped ? `Notification skipped: ${notify.skipped}` : null);
 
       // Defer success-screen transition until the user closes the dialog,
       // so the popup is shown before the form is replaced.
@@ -651,7 +661,9 @@ export default function VendorRegistration() {
       setSubmissionSuccess({
         open: true,
         inviter,
-        notifyFailed,
+        status: notifyOk ? 'success' : 'failure',
+        vendorIdentity,
+        errorMessage,
       });
     } catch (error) {
       const err = error as { message?: string; details?: string; hint?: string; code?: string } | null;
@@ -995,7 +1007,9 @@ export default function VendorRegistration() {
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}
-        notifyFailed={submissionSuccess.notifyFailed}
+        status={submissionSuccess.status}
+        vendorIdentity={submissionSuccess.vendorIdentity}
+        errorMessage={submissionSuccess.errorMessage}
         onClose={handleSubmissionDialogClose}
       />
     </div>

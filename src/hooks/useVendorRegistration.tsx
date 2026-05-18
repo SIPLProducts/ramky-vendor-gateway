@@ -736,13 +736,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         });
         if (notifyError) {
           console.error('[Vendor] notify-vendor-submission error:', notifyError);
+          notifyResult = { success: false, error: notifyError.message || String(notifyError) };
         } else {
           console.log('[Vendor] Submission notification result:', notifyData);
           notifyResult = notifyData;
         }
-      } catch (notifyError) {
+      } catch (notifyError: any) {
         // Don't fail the submission if notification fails
         console.error('[Vendor] Failed to send submission notification:', notifyError);
+        notifyResult = { success: false, error: notifyError?.message || String(notifyError) };
       }
 
       setVendorStatus('purchase_review');
