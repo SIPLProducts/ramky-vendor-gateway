@@ -799,7 +799,25 @@ export default function VendorRegistration() {
   };
 
   const renderStep = () => {
-    // Built-in steps 1..5
+    // International flow
+    if (isInternational) {
+      const intl = formData.international ?? EMPTY_INTERNATIONAL_DATA;
+      if (currentStep === registrationSteps.length) {
+        return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
+      }
+      switch (currentStep) {
+        case 1:
+          return <IntlDocumentsStep vendorId={vendorId} data={intl.documents} onChange={(d) => setIntlSlice('documents', d)} />;
+        case 2:
+          return <IntlCompanyDetailsStep data={intl.company} onSubmit={handleIntlCompanyComplete} onLiveUpdate={(d) => setIntlSlice('company', d)} />;
+        case 3:
+          return <IntlBankDetailsStep data={intl.bank} onSubmit={handleIntlBankComplete} onLiveUpdate={(d) => setIntlSlice('bank', d)} />;
+        case 4:
+          return <IntlClassificationStep data={intl.classification} onSubmit={handleIntlClassificationComplete} onLiveUpdate={(d) => setIntlSlice('classification', d)} />;
+      }
+      return null;
+    }
+    // Built-in domestic steps 1..5
     switch (currentStep) {
       case 1:
         return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
