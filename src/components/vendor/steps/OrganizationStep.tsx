@@ -49,7 +49,7 @@ const schema = z.object({
   materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
   vendorCategory: z.array(z.string()).min(1, 'Vendor Category is required'),
   vendorLocation: z.array(z.string()).min(1, 'Vendor Location is required'),
-  identificationSource: z.array(z.string()).min(1, 'Identification Source is required'),
+  identificationSource: z.array(z.string()).optional().default([]),
   // Statutory & Memberships (moved here from former Commercial step)
   entityType: z.string().min(1, 'Entity type is required'),
   firmRegistrationNo: z.string().optional(),
@@ -515,7 +515,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
               </div>
 
               <div className="grid gap-1.5">
-                <Label>Vendor Identification Source *</Label>
+                <Label>Vendor Identification Source</Label>
                 <Controller
                   name="identificationSource"
                   control={control}
