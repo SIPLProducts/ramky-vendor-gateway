@@ -1017,14 +1017,23 @@ export default function VendorRegistration() {
           </div>
         </div>
 
-        {/* Vendor Type Selector (above the form card, hidden once submitted) */}
+        {/* Vendor Type chip (shown after type is chosen) */}
         {!isSubmitted && (
-          <div className="px-4 sm:px-6 pt-4">
-            <VendorTypeSelector
-              value={formData.vendorType}
-              onChange={handleVendorTypeChange}
+          <div className="px-4 sm:px-6 pt-4 flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Vendor Type: {isInternational ? 'International' : 'Domestic'}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs"
               disabled={isSubmitting}
-            />
+              onClick={() => { setPendingChoiceType(formData.vendorType); setVendorTypeChosen(false); }}
+            >
+              Change
+            </Button>
           </div>
         )}
 
