@@ -542,7 +542,7 @@ export default function AdminInvitations() {
               </Button>
               <Button
                 onClick={handleCreateInvitation}
-                disabled={createInvitation.isPending}
+                disabled={createInvitation.isPending || (phoneNumber.length > 0 && phoneNumber.length !== 10)}
                 className="gap-2"
               >
                 {createInvitation.isPending ? (
