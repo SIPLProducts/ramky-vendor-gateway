@@ -35,8 +35,6 @@ const STAGE_LABELS: Record<Stage, string> = {
 };
 
 const STAGE_ORDER: Stage[] = ['SCM_MANAGER', 'SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'];
-const SINGLE_APPROVER_STAGES: Stage[] = ['SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'];
-const isSingleApproverStage = (s: Stage) => SINGLE_APPROVER_STAGES.includes(s);
 
 interface Row {
   rowKey: string;
@@ -205,15 +203,15 @@ export function ApprovalMatrixConfig() {
   // Rows for the active stage tab only
   const stageRows = useMemo(() => rows.filter((r) => r.stage === activeStage), [rows, activeStage]);
 
-  // Level numbers available within SCM_MANAGER tab (multi-level)
-  const scmManagerLevels = useMemo(() => {
-    const scm = rows.filter((r) => r.stage === 'SCM_MANAGER');
-    const set = new Set(scm.map((r) => r.level_number));
-    const max = scm.length === 0 ? 0 : Math.max(...scm.map((r) => r.level_number));
+  // Level numbers available within the active stage (each stage is independent)
+  const activeStageLevels = useMemo(() => {
+    const stageRowsLocal = rows.filter((r) => r.stage === activeStage);
+    const set = new Set(stageRowsLocal.map((r) => r.level_number));
+    const max = stageRowsLocal.length === 0 ? 0 : Math.max(...stageRowsLocal.map((r) => r.level_number));
     const arr = Array.from(set).sort((a, b) => a - b);
     if (!arr.includes(max + 1)) arr.push(max + 1);
     return arr;
-  }, [rows]);
+  }, [rows, activeStage]);
 
   const stageCounts = useMemo(() => {
     const c: Record<Stage, number> = { SCM_MANAGER: 0, SCM_HEAD: 0, FINANCE_1: 0, FINANCE_2: 0, CEO_OFFICE: 0 };
@@ -222,15 +220,26 @@ export function ApprovalMatrixConfig() {
   }, [rows]);
 
   const addRow = () => {
-    if (isSingleApproverStage(activeStage) && stageRows.length >= 1) {
-      toast({ title: 'Only one approver allowed', description: `${STAGE_LABELS[activeStage]} accepts a single approver.`, variant: 'destructive' });
-      return;
-    }
-    let nextLevel = 1;
-    if (activeStage === 'SCM_MANAGER') {
-      const scm = rows.filter((r) => r.stage === 'SCM_MANAGER');
-      nextLevel = scm.length === 0 ? 1 : Math.max(...scm.map((r) => r.level_number)) + 1;
-    }
+    // Each stage is independent: new approver defaults to L1, user can change.
+    const existing = rows.filter((r) => r.stage === activeStage);
+    const nextLevel = existing.length === 0 ? 1 : Math.max(...existing.map((r) => r.level_number));
+    setRows((prev) => [
+      ...prev,
+      {
+        rowKey: newRowKey(),
+        level_number: nextLevel,
+        approval_mode: 'ANY',
+        approver_name: '',
+        approver_email: '',
+        stage: activeStage,
+        requires_msme: activeStage === 'CEO_OFFICE',
+      },
+    ]);
+  };
+
+  const addLevel = () => {
+    const existing = rows.filter((r) => r.stage === activeStage);
+    const nextLevel = existing.length === 0 ? 1 : Math.max(...existing.map((r) => r.level_number)) + 1;
     setRows((prev) => [
       ...prev,
       {
@@ -249,9 +258,9 @@ export function ApprovalMatrixConfig() {
     setRows((prev) => prev.map((r) => (r.rowKey === key ? { ...r, ...patch } : r)));
   };
 
-  const updateLevelMode = (level_number: number, mode: 'ANY' | 'ALL') => {
+  const updateLevelMode = (stage: Stage, level_number: number, mode: 'ANY' | 'ALL') => {
     setRows((prev) => prev.map((r) =>
-      r.stage === 'SCM_MANAGER' && r.level_number === level_number ? { ...r, approval_mode: mode } : r
+      r.stage === stage && r.level_number === level_number ? { ...r, approval_mode: mode } : r
     ));
   };
 
@@ -274,11 +283,6 @@ export function ApprovalMatrixConfig() {
         seenEmailPerLevel.set(key, rowNum);
       }
     });
-    // Single-approver enforcement
-    SINGLE_APPROVER_STAGES.forEach((s) => {
-      const count = rows.filter((r) => r.stage === s).length;
-      if (count > 1) errs.push({ rowKey: '', level_number: 0, message: `${STAGE_LABELS[s]} can only have one approver (currently ${count})` });
-    });
     return errs;
   }, [rows]);
 
@@ -286,26 +290,32 @@ export function ApprovalMatrixConfig() {
   const canSave = !!tenantId && rows.length > 0 && rowErrors.length === 0 && !saving;
   const totalApprovers = rows.filter((r) => r.approver_email.trim() && r.approver_name.trim()).length;
 
-  // Build canonical save plan: SCM_MANAGER rows first (1..N preserving user level ordering), then SCM_HEAD, FINANCE_1, FINANCE_2, CEO_OFFICE
+  // Build canonical save plan: every stage is independent and supports multiple
+  // levels. Within a stage we preserve the user's chosen level ordering (L1, L2…)
+  // and assign a globally unique level_number across the whole chain so the
+  // existing "lowest pending level acts first" logic continues to work.
   const buildSavePlan = () => {
-    const plan: { level_number: number; stage: Stage; approval_mode: 'ANY' | 'ALL'; rows: Row[] }[] = [];
-    // SCM_MANAGER: group by user-chosen level_number, sort ascending
-    const scmRows = rows.filter((r) => r.stage === 'SCM_MANAGER');
-    const scmGroups = new Map<number, Row[]>();
-    scmRows.forEach((r) => {
-      const arr = scmGroups.get(r.level_number) ?? [];
-      arr.push(r); scmGroups.set(r.level_number, arr);
-    });
-    const scmSortedKeys = [...scmGroups.keys()].sort((a, b) => a - b);
+    const plan: { level_number: number; stage: Stage; approval_mode: 'ANY' | 'ALL'; rows: Row[]; stage_level: number }[] = [];
     let counter = 1;
-    scmSortedKeys.forEach((k) => {
-      const group = scmGroups.get(k)!;
-      plan.push({ level_number: counter++, stage: 'SCM_MANAGER', approval_mode: group[0].approval_mode, rows: group });
-    });
-    // Other stages — single approver each
-    (['SCM_HEAD', 'FINANCE_1', 'FINANCE_2', 'CEO_OFFICE'] as Stage[]).forEach((s) => {
-      const r = rows.filter((x) => x.stage === s);
-      if (r.length > 0) plan.push({ level_number: counter++, stage: s, approval_mode: 'ANY', rows: r });
+    STAGE_ORDER.forEach((stage) => {
+      const stageRowsLocal = rows.filter((r) => r.stage === stage);
+      if (stageRowsLocal.length === 0) return;
+      const groups = new Map<number, Row[]>();
+      stageRowsLocal.forEach((r) => {
+        const arr = groups.get(r.level_number) ?? [];
+        arr.push(r); groups.set(r.level_number, arr);
+      });
+      const sortedKeys = [...groups.keys()].sort((a, b) => a - b);
+      sortedKeys.forEach((k) => {
+        const group = groups.get(k)!;
+        plan.push({
+          level_number: counter++,
+          stage_level: k,
+          stage,
+          approval_mode: group[0].approval_mode,
+          rows: group,
+        });
+      });
     });
     return plan;
   };
@@ -493,11 +503,9 @@ export function ApprovalMatrixConfig() {
   };
 
   const renderRowsTable = () => {
-    const showStageColumn = false; // stage is fixed by the active tab
-    const showLevelColumn = activeStage === 'SCM_MANAGER';
-    const showModeColumn = activeStage === 'SCM_MANAGER';
-    const single = isSingleApproverStage(activeStage);
-    const canAdd = !single || stageRows.length === 0;
+    // Every stage now supports multiple independent levels (L1, L2, L3…)
+    const showLevelColumn = true;
+    const showModeColumn = true;
 
     return (
       <div className="border rounded-md overflow-x-auto">
@@ -538,7 +546,7 @@ export function ApprovalMatrixConfig() {
                         >
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {scmManagerLevels.map((n) => (
+                            {activeStageLevels.map((n) => (
                               <SelectItem key={n} value={String(n)}>L{n}</SelectItem>
                             ))}
                           </SelectContent>
@@ -568,7 +576,7 @@ export function ApprovalMatrixConfig() {
                       <TableCell>
                         <Select
                           value={r.approval_mode}
-                          onValueChange={(v) => updateLevelMode(r.level_number, v as 'ANY' | 'ALL')}
+                          onValueChange={(v) => updateLevelMode(r.stage, r.level_number, v as 'ANY' | 'ALL')}
                         >
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -591,13 +599,16 @@ export function ApprovalMatrixConfig() {
         </Table>
         <div className="flex items-center justify-between p-3 border-t bg-muted/20">
           <div className="text-xs text-muted-foreground">
-            {single
-              ? 'Only one approver allowed for this stage.'
-              : 'You can add multiple levels (L1, L2, L3…) and multiple approvers per level. Lower level acts first.'}
+            Add multiple levels (L1, L2, L3…) and multiple approvers per level. Lower level acts first within this stage.
           </div>
-          <Button size="sm" variant="outline" onClick={addRow} disabled={!canAdd}>
-            <Plus className="h-4 w-4 mr-1" /> Add Approver
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={addLevel}>
+              <Plus className="h-4 w-4 mr-1" /> Add Level
+            </Button>
+            <Button size="sm" variant="outline" onClick={addRow}>
+              <Plus className="h-4 w-4 mr-1" /> Add Approver
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -728,7 +739,7 @@ export function ApprovalMatrixConfig() {
               return groupsForStage.map((g) => (
                 <span key={`${stage}-${g.level_number}`} className="flex items-center gap-2">
                   <Badge>
-                    L{g.level_number} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
+                    L{g.stage_level} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
                     {isCeo ? ' (MSME only)' : ''}
                   </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
