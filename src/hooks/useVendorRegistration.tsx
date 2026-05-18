@@ -408,6 +408,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     const vendor = existingVendor as VendorRecord;
 
     return {
+      vendorType: ((vendor as any).vendor_type as 'domestic' | 'international') || 'domestic',
       organization: {
         buyerCompanyId: vendor.tenant_id || '',
         legalName: vendor.legal_name || '',
