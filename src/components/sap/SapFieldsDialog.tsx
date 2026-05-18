@@ -351,7 +351,7 @@ const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: strin
 };
 
 function SapF4SelectField({
-  label, masterType, value, onChange, liveItems, placeholder,
+  label, masterType, value, onChange, liveItems, placeholder, required, invalid,
 }: {
   label: string;
   masterType: string;
@@ -359,6 +359,8 @@ function SapF4SelectField({
   onChange: (v: string) => void;
   liveItems?: any[] | null;
   placeholder?: string;
+  required?: boolean;
+  invalid?: boolean;
 }) {
   const map = F4_FIELD_MAP[masterType];
   const isLive = Array.isArray(liveItems);
