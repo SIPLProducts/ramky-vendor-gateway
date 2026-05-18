@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate' | 'registration_copy' | 'swift_iban_details';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
@@ -165,6 +165,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
         { file: formData.financial.financialDocsFile, type: 'financial_docs' },
         { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
+        { file: formData.international?.documents?.registrationCopyFile ?? null, type: 'registration_copy' },
+        { file: formData.international?.documents?.swiftIbanFile ?? null, type: 'swift_iban_details' },
       ];
 
       // Fetch existing docs once to dedupe
