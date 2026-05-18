@@ -342,6 +342,8 @@ export default function VendorRegistration() {
   };
 
   const canProceedFromCurrentStep = () => {
+    // International flow — no OCR gate; per-step zod validation handles it.
+    if (isInternational) return true;
     // Step 1 (Document Verification) — trust the child's authoritative completion flag
     if (currentStep === 1) {
       if (!verifiedData) return false;
