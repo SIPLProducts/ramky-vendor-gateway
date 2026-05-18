@@ -211,24 +211,38 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Classification */}
+            {/* Classification — auto-filled from vendor registration data */}
             <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <TextField label="Material Category" value={form.classify.MGV} onChange={v => setClassify('MGV', v)} />
-              <TextField label="Vendor Category" value={form.classify.CATV} onChange={v => setClassify('CATV', v)} />
-              <TextField label="Vendor Location" value={form.classify.LOCV} onChange={v => setClassify('LOCV', v)} />
-              <TextField label="Vendor Identification" value={form.classify.IDS} onChange={v => setClassify('IDS', v)} />
+              <ReadOnlyField label="Material Category" value={form.classify.MGV} />
+              <ReadOnlyField label="Vendor Category" value={form.classify.CATV} />
+              <ReadOnlyField label="Vendor Location" value={form.classify.LOCV} />
+              <ReadOnlyField label="Vendor Identification" value={form.classify.IDS} />
+              <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
+                These values are captured from the vendor's submitted registration form and cannot be edited here.
+              </p>
             </Section>
 
           </div>
           )}
         </div>
 
+        {missingFields.length > 0 && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5" />
+            <span>Please fill required SAP fields: {missingFields.map(k => REQUIRED_LABELS[k]).join(', ')}.</span>
+          </div>
+        )}
+
         <DialogFooter className="gap-2 mt-4 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl" disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(form)}
+            onClick={() => {
+              const missing = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
+              setMissingFields(missing as string[]);
+              if (missing.length === 0) onConfirm(form);
+            }}
             disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
           >
