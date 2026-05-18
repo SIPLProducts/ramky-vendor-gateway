@@ -1001,6 +1001,17 @@ export default function VendorRegistration() {
           </div>
         </div>
 
+        {/* Vendor Type Selector (above the form card, hidden once submitted) */}
+        {!isSubmitted && (
+          <div className="px-4 sm:px-6 pt-4">
+            <VendorTypeSelector
+              value={formData.vendorType}
+              onChange={handleVendorTypeChange}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
+
         {/* Form Card */}
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <div className="bg-card rounded-[10px] shadow-enterprise-md border">
