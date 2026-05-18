@@ -6,16 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Canonical stage order — buyer submits, then SCM Managers (L2..Ln) act before SCM Head (L1),
-// then Finance 1, Finance 2, and finally CEO Office (only for MSME-registered vendors).
-const STAGE_ORDER: Record<string, number> = {
-  SCM_MANAGER: 1,
-  SCM_HEAD: 2,
-  FINANCE_1: 3,
-  FINANCE_2: 4,
-  CEO_OFFICE: 5,
-};
-
+// Thin wrapper around the SECURITY DEFINER seed_vendor_approval_progress() RPC.
+// The actual seeding logic lives in the database so it can also run from the
+// AFTER UPDATE trigger on vendors and stay in sync with both code paths.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -35,80 +28,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get vendor + tenant + MSME flag
-    const { data: vendor, error: vErr } = await supabase
-      .from('vendors')
-      .select('id, tenant_id, status, is_msme_registered')
-      .eq('id', vendor_id)
-      .single();
-    if (vErr || !vendor) throw vErr ?? new Error('Vendor not found');
-    if (!vendor.tenant_id) {
-      return new Response(JSON.stringify({ error: 'Vendor has no tenant' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const { data, error } = await supabase.rpc('seed_vendor_approval_progress', { _vendor_id: vendor_id });
+    if (error) throw error;
 
-    const isMsme = !!vendor.is_msme_registered;
+    const row = Array.isArray(data) ? data[0] : data;
+    const levelsCreated = (row?.levels_created as number | undefined) ?? 0;
+    const vendorStatus = (row?.vendor_status as string | null | undefined) ?? null;
 
-    // Read matrix levels
-    const { data: levels, error: lErr } = await supabase
-      .from('approval_matrix_levels')
-      .select('id, level_number, stage, requires_msme')
-      .eq('tenant_id', vendor.tenant_id)
-      .eq('is_active', true);
-    if (lErr) throw lErr;
-    if (!levels || levels.length === 0) {
+    if (levelsCreated === 0) {
       return new Response(JSON.stringify({ ok: true, message: 'No matrix configured; skipping' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Filter MSME-only stages when vendor is non-MSME
-    const eligible = levels.filter((l: any) => !(l.requires_msme && !isMsme));
-
-    // Order by canonical stage, then by level_number within SCM_MANAGER (L2 < L3 < L4 ...)
-    eligible.sort((a: any, b: any) => {
-      const sa = STAGE_ORDER[a.stage] ?? 99;
-      const sb = STAGE_ORDER[b.stage] ?? 99;
-      if (sa !== sb) return sa - sb;
-      // Within SCM_MANAGER, lower level_number runs first (L2 before L3)
-      // But the buyer's diagram shows L2..Ln are parallel options; we still sort ascending
-      return (a.level_number ?? 0) - (b.level_number ?? 0);
-    });
-
-    // Clear existing progress (re-route)
-    await supabase.from('vendor_approval_progress').delete().eq('vendor_id', vendor_id);
-
-    // Renumber 1..N so the existing "active = lowest pending" logic continues to work
-    const rows = eligible.map((l: any, idx: number) => ({
-      vendor_id,
-      level_id: l.id,
-      level_number: idx + 1,
-      status: 'pending',
-    }));
-
-    if (rows.length === 0) {
-      return new Response(JSON.stringify({ ok: true, message: 'No eligible levels after MSME filter' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { error: insErr } = await supabase.from('vendor_approval_progress').insert(rows);
-    if (insErr) throw insErr;
-
-    // Set vendor.status to first pending stage
-    const STAGE_TO_REVIEW: Record<string, string> = {
-      SCM_MANAGER: 'scm_manager_review',
-      SCM_HEAD: 'scm_head_review',
-      FINANCE_1: 'finance_1_review',
-      FINANCE_2: 'finance_2_review',
-      CEO_OFFICE: 'ceo_office_review',
-    };
-    const firstStage = eligible[0]?.stage ?? 'SCM_MANAGER';
-    const initialStatus = STAGE_TO_REVIEW[firstStage] ?? 'scm_manager_review';
-    await supabase.from('vendors').update({ status: initialStatus }).eq('id', vendor_id);
-
-    return new Response(JSON.stringify({ ok: true, levels_created: rows.length, msme: isMsme, vendor_status: initialStatus }), {
+    return new Response(JSON.stringify({ ok: true, levels_created: levelsCreated, vendor_status: vendorStatus }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
