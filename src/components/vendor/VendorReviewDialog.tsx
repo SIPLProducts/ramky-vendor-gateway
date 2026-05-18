@@ -137,27 +137,44 @@ export function VendorReviewDialog({
 }: VendorReviewDialogProps) {
   const [vendor, setVendor] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [gstValidation, setGstValidation] = useState<any | null>(null);
+  const [complianceDocs, setComplianceDocs] = useState<any[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     if (!open || !vendorId) {
       setVendor(null);
+      setGstValidation(null);
+      setComplianceDocs([]);
       return;
     }
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('*')
-        .eq('id', vendorId)
-        .maybeSingle();
+      const [{ data: v, error: vErr }, { data: gst }, { data: docs }] = await Promise.all([
+        supabase.from('vendors').select('*').eq('id', vendorId).maybeSingle(),
+        supabase
+          .from('vendor_validations')
+          .select('*')
+          .eq('vendor_id', vendorId)
+          .eq('validation_type', 'gst')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('vendor_documents')
+          .select('*')
+          .eq('vendor_id', vendorId)
+          .in('document_type', ['gst_certificate', 'gst_self_declaration']),
+      ]);
       if (cancelled) return;
-      if (error) {
-        console.error('Failed to load vendor', error);
+      if (vErr) {
+        console.error('Failed to load vendor', vErr);
         setVendor(null);
       } else {
-        setVendor(data);
+        setVendor(v);
       }
+      setGstValidation(gst || null);
+      setComplianceDocs(docs || []);
       setLoading(false);
     })();
     return () => {
@@ -166,6 +183,12 @@ export function VendorReviewDialog({
   }, [vendorId, open]);
 
   const validations = getValidationsFromVendor(vendor);
+  const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation) : null;
+
+  const openDocument = async (filePath: string) => {
+    const { data } = await supabase.storage.from('vendor-documents').createSignedUrl(filePath, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
