@@ -395,9 +395,11 @@ function SapF4SelectField({
 
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
       <Select value={value || undefined} onValueChange={(v) => onChange(v)}>
-        <SelectTrigger className="h-9 rounded-lg">
+        <SelectTrigger className={`h-9 rounded-lg ${invalid ? 'border-destructive ring-1 ring-destructive' : ''}`}>
           <SelectValue placeholder={placeholder || 'Select…'} />
         </SelectTrigger>
         <SelectContent className="max-h-72">
