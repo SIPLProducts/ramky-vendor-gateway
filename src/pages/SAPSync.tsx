@@ -268,7 +268,7 @@ export default function SAPSync() {
           setSapSyncResult(null);
         }
       }}>
-        <DialogContent className="rounded-2xl max-w-2xl">
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {sapSyncResult?.success === false ? (
