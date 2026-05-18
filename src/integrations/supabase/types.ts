@@ -2336,6 +2336,13 @@ export type Database = {
           vendor_name: string
         }[]
       }
+      seed_vendor_approval_progress: {
+        Args: { _vendor_id: string }
+        Returns: {
+          levels_created: number
+          vendor_status: string
+        }[]
+      }
       user_belongs_to_tenant: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
