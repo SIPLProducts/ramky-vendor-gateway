@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
 import { useVendors, useSAPSync, useBuyerCompanies, VendorRow } from '@/hooks/useVendors';
