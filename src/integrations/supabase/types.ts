@@ -1767,6 +1767,7 @@ export type Database = {
           customer_service_name: string | null
           customer_service_phone: string | null
           dg_capacity: string | null
+          dms_synced_at: string | null
           enlistments: Json | null
           entity_type: string | null
           environmental_issues: string | null
@@ -1875,6 +1876,7 @@ export type Database = {
           relative_name: string | null
           safety_issues: string | null
           same_as_registered: boolean | null
+          sap_reference_no: string | null
           sap_synced_at: string | null
           sap_vendor_code: string | null
           secondary_contact_name: string | null
@@ -1947,6 +1949,7 @@ export type Database = {
           customer_service_name?: string | null
           customer_service_phone?: string | null
           dg_capacity?: string | null
+          dms_synced_at?: string | null
           enlistments?: Json | null
           entity_type?: string | null
           environmental_issues?: string | null
@@ -2055,6 +2058,7 @@ export type Database = {
           relative_name?: string | null
           safety_issues?: string | null
           same_as_registered?: boolean | null
+          sap_reference_no?: string | null
           sap_synced_at?: string | null
           sap_vendor_code?: string | null
           secondary_contact_name?: string | null
@@ -2127,6 +2131,7 @@ export type Database = {
           customer_service_name?: string | null
           customer_service_phone?: string | null
           dg_capacity?: string | null
+          dms_synced_at?: string | null
           enlistments?: Json | null
           entity_type?: string | null
           environmental_issues?: string | null
@@ -2235,6 +2240,7 @@ export type Database = {
           relative_name?: string | null
           safety_issues?: string | null
           same_as_registered?: boolean | null
+          sap_reference_no?: string | null
           sap_synced_at?: string | null
           sap_vendor_code?: string | null
           secondary_contact_name?: string | null
@@ -2395,6 +2401,8 @@ export type Database = {
         | "ceo_office_review"
         | "ceo_office_rejected"
         | "pending_sap_sync"
+        | "dms_sync_pending"
+        | "dms_synced"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2556,6 +2564,8 @@ export const Constants = {
         "ceo_office_review",
         "ceo_office_rejected",
         "pending_sap_sync",
+        "dms_sync_pending",
+        "dms_synced",
       ],
     },
   },
