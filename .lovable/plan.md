@@ -1,30 +1,24 @@
 ## Change
 
-**`src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`** — restyle required-field markers and tighten layout.
+**`src/components/vendor/steps/international/IntlClassificationStep.tsx`** — simplify the international Classification step.
 
-### 1. Red asterisks on required labels
-Replace the inline `*` inside each required label text with an explicit `<span className="text-destructive ml-0.5">*</span>` so the asterisk renders red (matching `DynamicStep.tsx`). Apply to:
-- Company Name
-- Pincode / Postal Code
-- Country (From SAP)
-- Region
-- Company Contact 1
-- Company Email 1
+### Remove non-required fields
+- Delete the **Vendor Category** input.
+- Delete the **Vendor Identification Source** input.
+- Drop their entries from the Zod schema, `defaultValues`, `watch` live-update payload, and `handleFormSubmit` payload (pass empty arrays for the removed keys to keep `InternationalClassification` shape intact, or leave them out — see Technical below).
 
-Optional fields (Company Address, Contact 2, Email 2) keep no asterisk.
+### Keep & mark mandatory
+- **Material Group for Vendors** — keep, label rendered with red asterisk: `<span className="text-destructive ml-0.5">*</span>`.
+- **Vendor Location** — keep, same red asterisk treatment.
+- Both stay validated as required (`z.string().trim().min(1, ...)`).
 
-### 2. Row/column layout for the required fields
-Reorganize the grid so the six required fields appear in compact rows of columns instead of full-width stacks:
+### Layout
+Two remaining fields render side-by-side in `grid md:grid-cols-2 gap-5` (unchanged grid).
 
-```text
-Row A:  [ Company Name ]              [ Pincode / Postal Code ]
-Row B:  [ Country (From SAP) ]        [ Region ]
-Row C:  [ Company Contact 1 ]         [ Company Email 1 ]
-Row D:  [ Company Address (full width, optional) ]
-Row E:  [ Contact 2 ]                 [ Email 2 ]
-```
-
-Implementation: wrap each pair in `grid md:grid-cols-2 gap-5`. Company Address stays full-width on its own row. The existing 3-column row (Pincode / Country / Region) is split as above so required fields are paired cleanly.
+### Technical
+- `InternationalClassification` type currently has 4 array fields. To avoid touching `src/types/vendor.ts` and downstream consumers (ReviewStep, autosave hydration), still emit `vendorCategory: []` and `identificationSource: []` from `onLiveUpdate` and `onSubmit`. Schema and form state only track the two visible fields.
 
 ### Out of scope
-No validation, schema, or other step changes.
+- Domestic flow / `OrganizationStep` / `EnterpriseOrganizationStep` (Indian vendor classification) — no changes.
+- `InternationalClassification` type definition — unchanged.
+- Review step rendering — unchanged (it will simply show empty arrays for the dropped fields).
