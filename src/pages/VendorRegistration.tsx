@@ -367,7 +367,7 @@ export default function VendorRegistration() {
   };
 
   const getValidationMessage = () => {
-    if (currentStep === 1 && !canProceedFromCurrentStep()) {
+    if (!isInternational && currentStep === 1 && !canProceedFromCurrentStep()) {
       return 'Complete each stage in order: GST → PAN → MSME → Bank';
     }
     return undefined;
