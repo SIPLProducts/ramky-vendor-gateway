@@ -112,7 +112,8 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
       }
     })();
     return () => { cancelled = true; window.clearTimeout(slowTimer); };
-  }, [open, vendors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
     setForm(prev => ({ ...prev, [k]: v }));
