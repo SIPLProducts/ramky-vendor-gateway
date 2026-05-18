@@ -258,7 +258,65 @@ export interface QHSEDetails {
   safetyIssues: string;
 }
 
+export type VendorOriginType = 'domestic' | 'international';
+
+export interface InternationalDocuments {
+  registrationCopyFile: File | null;
+  swiftIbanFile: File | null;
+}
+
+export interface InternationalCompanyDetails {
+  companyName: string;
+  companyAddress: string;
+  pincode: string;
+  country: string;
+  region: string;
+  contact1: string;
+  contact2: string;
+  email1: string;
+  email2: string;
+}
+
+export interface InternationalBankDetails {
+  accountNumber: string;
+  swiftCode: string;
+  companyName: string;
+  bankName: string;
+  bankBranch: string;
+  ibanNumber: string;
+}
+
+export interface InternationalClassification {
+  materialGroupVendor: string[];
+  vendorCategory: string[];
+  vendorLocation: string[];
+  identificationSource: string[];
+}
+
+export interface InternationalData {
+  documents: InternationalDocuments;
+  company: InternationalCompanyDetails;
+  bank: InternationalBankDetails;
+  classification: InternationalClassification;
+}
+
+export const EMPTY_INTERNATIONAL_DATA: InternationalData = {
+  documents: { registrationCopyFile: null, swiftIbanFile: null },
+  company: {
+    companyName: '', companyAddress: '', pincode: '', country: '', region: '',
+    contact1: '', contact2: '', email1: '', email2: '',
+  },
+  bank: {
+    accountNumber: '', swiftCode: '', companyName: '',
+    bankName: '', bankBranch: '', ibanNumber: '',
+  },
+  classification: {
+    materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [],
+  },
+};
+
 export interface VendorFormData {
+  vendorType: VendorOriginType;
   organization: OrganizationDetails;
   address: AddressDetails;
   contact: ContactDetails;
@@ -267,6 +325,7 @@ export interface VendorFormData {
   financial: FinancialDetails;
   infrastructure: InfrastructureDetails;
   qhse: QHSEDetails;
+  international?: InternationalData;
   declaration: {
     selfDeclared: boolean;
     termsAccepted: boolean;

@@ -12,7 +12,7 @@ interface UseVendorRegistrationOptions {
 const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected'];
 
 // Document types that can be uploaded
-type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate';
+type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate' | 'registration_copy' | 'swift_iban_details';
 
 interface DocumentUploadResult {
   documentType: DocumentType;
@@ -165,6 +165,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         { file: formData.bank.secondary?.cancelledChequeFile ?? null, type: 'cancelled_cheque_2' },
         { file: formData.financial.financialDocsFile, type: 'financial_docs' },
         { file: formData.financial.dealershipCertificateFile, type: 'dealership_certificate' },
+        { file: formData.international?.documents?.registrationCopyFile ?? null, type: 'registration_copy' },
+        { file: formData.international?.documents?.swiftIbanFile ?? null, type: 'swift_iban_details' },
       ];
 
       // Fetch existing docs once to dedupe
@@ -211,25 +213,68 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Convert form data to database format
   const formDataToVendorRecord = (formData: VendorFormData & { customFieldValues?: Record<string, Record<string, unknown>> }, userId: string | null) => {
+    const isIntl = formData.vendorType === 'international';
+    const intl = formData.international;
+
+    // For international vendors, map the new International fields back to the
+    // domestic NOT NULL columns so existing constraints + queries keep working.
+    // The full original values are preserved in `international_data` JSONB.
+    const intlLegalName = intl?.company.companyName || '';
+    const intlEmail = intl?.company.email1 || '';
+    const intlPhone = intl?.company.contact1 || '';
+    const intlAddr = intl?.company.companyAddress || '';
+    const intlCity = intl?.company.region || '';
+    const intlState = intl?.company.region || '';
+    const intlPin = intl?.company.pincode || '';
+    const intlCountry = intl?.company.country || '';
+
+    const cls = intl?.classification;
+    const intlMaterial = cls?.materialGroupVendor || [];
+    const intlVendorCat = cls?.vendorCategory || [];
+    const intlVendorLoc = cls?.vendorLocation || [];
+    const intlIdSrc = cls?.identificationSource || [];
+
     return {
       user_id: userId,
       tenant_id: formData.organization.buyerCompanyId || null,
+      vendor_type: formData.vendorType || 'domestic',
+      international_data: isIntl
+        ? {
+            documents: {
+              // Files themselves are stored in vendor_documents; here we just
+              // capture which slots are populated so the JSONB is informative.
+              registrationCopy: intl?.documents.registrationCopyFile?.name || null,
+              swiftIban: intl?.documents.swiftIbanFile?.name || null,
+            },
+            company: intl?.company,
+            bank: intl?.bank,
+            classification: intl?.classification,
+          }
+        : null,
       // Organization
-      legal_name: formData.organization.legalName,
-      trade_name: formData.organization.tradeName || null,
-      industry_type: formData.organization.industryType,
-      organization_type: formData.organization.organizationType || null,
-      ownership_type: formData.organization.ownershipType || null,
-      product_categories: formData.organization.productCategories,
-      state: formData.organization.state || null,
-      material_group_vendor: (Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor[0] : formData.organization.materialGroupVendor) || null,
-      vendor_category: (Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory[0] : formData.organization.vendorCategory) || null,
-      vendor_location: (Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation[0] : formData.organization.vendorLocation) || null,
-      identification_source: (Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource[0] : formData.organization.identificationSource) || null,
-      material_group_vendors: Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor : (formData.organization.materialGroupVendor ? [formData.organization.materialGroupVendor as unknown as string] : []),
-      vendor_categories: Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory : (formData.organization.vendorCategory ? [formData.organization.vendorCategory as unknown as string] : []),
-      vendor_locations: Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation : (formData.organization.vendorLocation ? [formData.organization.vendorLocation as unknown as string] : []),
-      identification_sources: Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource : (formData.organization.identificationSource ? [formData.organization.identificationSource as unknown as string] : []),
+      legal_name: isIntl ? intlLegalName : formData.organization.legalName,
+      trade_name: isIntl ? null : (formData.organization.tradeName || null),
+      industry_type: isIntl ? '' : formData.organization.industryType,
+      organization_type: isIntl ? null : (formData.organization.organizationType || null),
+      ownership_type: isIntl ? null : (formData.organization.ownershipType || null),
+      product_categories: isIntl ? [] : formData.organization.productCategories,
+      state: isIntl ? (intlCountry || null) : (formData.organization.state || null),
+      material_group_vendor: isIntl
+        ? (intlMaterial[0] || null)
+        : ((Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor[0] : formData.organization.materialGroupVendor) || null),
+      vendor_category: isIntl
+        ? (intlVendorCat[0] || null)
+        : ((Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory[0] : formData.organization.vendorCategory) || null),
+      vendor_location: isIntl
+        ? (intlVendorLoc[0] || null)
+        : ((Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation[0] : formData.organization.vendorLocation) || null),
+      identification_source: isIntl
+        ? (intlIdSrc[0] || null)
+        : ((Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource[0] : formData.organization.identificationSource) || null),
+      material_group_vendors: isIntl ? intlMaterial : (Array.isArray(formData.organization.materialGroupVendor) ? formData.organization.materialGroupVendor : (formData.organization.materialGroupVendor ? [formData.organization.materialGroupVendor as unknown as string] : [])),
+      vendor_categories: isIntl ? intlVendorCat : (Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory : (formData.organization.vendorCategory ? [formData.organization.vendorCategory as unknown as string] : [])),
+      vendor_locations: isIntl ? intlVendorLoc : (Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation : (formData.organization.vendorLocation ? [formData.organization.vendorLocation as unknown as string] : [])),
+      identification_sources: isIntl ? intlIdSrc : (Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource : (formData.organization.identificationSource ? [formData.organization.identificationSource as unknown as string] : [])),
       // Registered Address
       registered_address: formData.address.registeredAddress,
       registered_address_line2: formData.address.registeredAddressLine2 || null,
@@ -408,6 +453,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     const vendor = existingVendor as VendorRecord;
 
     return {
+      vendorType: ((vendor as any).vendor_type as 'domestic' | 'international') || 'domestic',
       organization: {
         buyerCompanyId: vendor.tenant_id || '',
         legalName: vendor.legal_name || '',
@@ -590,6 +636,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         selfDeclared: vendor.self_declared ?? false,
         termsAccepted: vendor.terms_accepted ?? false,
       },
+      international: (vendor as any).international_data ? {
+        documents: { registrationCopyFile: null, swiftIbanFile: null },
+        company: (vendor as any).international_data?.company || { companyName: '', companyAddress: '', pincode: '', country: '', region: '', contact1: '', contact2: '', email1: '', email2: '' },
+        bank: (vendor as any).international_data?.bank || { accountNumber: '', swiftCode: '', companyName: '', bankName: '', bankBranch: '', ibanNumber: '' },
+        classification: (vendor as any).international_data?.classification || { materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [] },
+      } : undefined,
     };
   }, [existingVendor]);
 
@@ -599,8 +651,43 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
+      const baseRecord = formDataToVendorRecord(formData, userId);
+
+      // International overrides: map intl fields onto domestic NOT NULL columns
+      // so existing CHECK/NOT NULL constraints stay green. Source-of-truth for
+      // international vendors is still `international_data` JSONB.
+      const isIntl = formData.vendorType === 'international';
+      const intl = formData.international;
+      const intlOverrides: VendorRecord = isIntl && intl ? {
+        legal_name: intl.company.companyName || 'INTERNATIONAL VENDOR',
+        registered_address: intl.company.companyAddress || '-',
+        registered_city: intl.company.region || '-',
+        registered_state: intl.company.region || '-',
+        registered_pincode: intl.company.pincode || '-',
+        registered_email: intl.company.email1 || null,
+        registered_phone: intl.company.contact1 || null,
+        primary_contact_name: intl.company.companyName || 'International Contact',
+        primary_designation: 'Authorized Representative',
+        primary_email: intl.company.email1 || '',
+        primary_phone: intl.company.contact1 || '',
+        primary_email_2: intl.company.email2 || null,
+        primary_phone_2: intl.company.contact2 || null,
+        branch_country: intl.company.country || null,
+        // Bank: optional for intl, use SWIFT/IBAN data if provided
+        bank_name: intl.bank.bankName || 'N/A',
+        bank_branch_name: intl.bank.bankBranch || 'N/A',
+        account_number: intl.bank.accountNumber || 'N/A',
+        ifsc_code: intl.bank.swiftCode || intl.bank.ibanNumber || 'N/A',
+        swift_iban_code: intl.bank.swiftCode || intl.bank.ibanNumber || null,
+        // Statutory: intl vendors are GST-exempt by definition
+        is_gst_registered: false,
+        gst_declaration_reason: 'International vendor — not GST registered',
+        is_msme_registered: false,
+      } : {};
+
       const vendorData: VendorRecord = {
-        ...formDataToVendorRecord(formData, userId),
+        ...baseRecord,
+        ...intlOverrides,
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
