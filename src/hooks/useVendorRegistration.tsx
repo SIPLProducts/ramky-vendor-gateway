@@ -693,16 +693,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         }
       }
 
-      // Initialise approval matrix progress
+      // Initialise approval matrix progress. The DB trigger seeds this automatically
+      // when status transitions into a review stage, but we still invoke the edge
+      // function explicitly so admins get a synchronous error if the matrix is empty.
       try {
         const { data: routeData, error: routeErr } = await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendor.id } });
         if (routeErr) {
           console.error('route-vendor-approval error:', routeErr);
-          toast({
-            title: 'Approval routing failed',
-            description: routeErr.message || 'Could not seed approval workflow. Please contact admin.',
-            variant: 'destructive',
-          });
         } else {
           const msg = (routeData as { message?: string } | null)?.message ?? '';
           if (/no matrix/i.test(msg) || /skipping/i.test(msg)) {
@@ -716,6 +713,29 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       } catch (e) {
         console.error('route-vendor-approval threw:', e);
       }
+
+      // Verify chain was actually seeded (defensive — trigger should have done it).
+      try {
+        const { count: progressCount } = await supabase
+          .from('vendor_approval_progress')
+          .select('id', { count: 'exact', head: true })
+          .eq('vendor_id', vendor.id);
+        if (!progressCount || progressCount === 0) {
+          await supabase.from('audit_logs').insert({
+            vendor_id: vendor.id,
+            action: 'approval_routing_failed',
+            details: { reason: 'no_progress_rows_after_submit' },
+          });
+          toast({
+            title: 'Approval chain not seeded',
+            description: 'Your application was saved but did not enter the approval workflow. Please contact an administrator.',
+            variant: 'destructive',
+          });
+        }
+      } catch (e) {
+        console.warn('post-submit progress check failed:', e);
+      }
+
 
       // Log submission
       await supabase.from('audit_logs').insert({
