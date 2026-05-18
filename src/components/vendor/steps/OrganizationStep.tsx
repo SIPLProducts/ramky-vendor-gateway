@@ -145,6 +145,57 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
   const selectedCategories = watch('productCategories') || [];
   const showOtherInput = selectedCategories.includes('Others');
 
+  // Live-push current form values up to parent so autosave persists Step-1 fields
+  // (including the four classification multi-selects) without waiting for "Next".
+  const liveUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onLiveUpdateRef = useRef(onLiveUpdate);
+  useEffect(() => { onLiveUpdateRef.current = onLiveUpdate; }, [onLiveUpdate]);
+  useEffect(() => {
+    const sub = watch((values) => {
+      if (!onLiveUpdateRef.current) return;
+      if (liveUpdateTimerRef.current) clearTimeout(liveUpdateTimerRef.current);
+      liveUpdateTimerRef.current = setTimeout(() => {
+        const v = values as FormValues;
+        const includesOthers = v.productCategories?.includes('Others');
+        const organization: OrganizationDetails = {
+          buyerCompanyId: v.buyerCompanyId || '',
+          legalName: v.legalName || '',
+          tradeName: v.tradeName || '',
+          industryType: v.industryType || '',
+          organizationType: v.organizationType || '',
+          ownershipType: v.ownershipType || '',
+          productCategories: v.productCategories || [],
+          productCategoriesOther: includesOthers ? (v.productCategoriesOther || '').trim() : '',
+          state: v.state || '',
+          accountingGroup: v.accountingGroup,
+          materialGroupVendor: v.materialGroupVendor || [],
+          vendorCategory: v.vendorCategory || [],
+          vendorLocation: v.vendorLocation || [],
+          identificationSource: v.identificationSource || [],
+        };
+        const statutory: StatutoryDetails = {
+          ...statutoryData,
+          entityType: v.entityType || '',
+          firmRegistrationNo: v.firmRegistrationNo || '',
+          pfNumber: v.pfNumber || '',
+          esiNumber: v.esiNumber || '',
+          iecNo: v.iecNo || '',
+          swiftIbanCode: v.swiftIbanCode || '',
+          labourPermitNo: v.labourPermitNo || '',
+          memberships: v.memberships || [],
+          enlistments: v.enlistments || [],
+          certifications: v.certifications || [],
+          operationalNetwork: v.operationalNetwork || '',
+        };
+        onLiveUpdateRef.current?.({ organization, statutory });
+      }, 400);
+    });
+    return () => {
+      sub.unsubscribe();
+      if (liveUpdateTimerRef.current) clearTimeout(liveUpdateTimerRef.current);
+    };
+  }, [watch, statutoryData]);
+
   const handleFormSubmit = (values: FormValues) => {
     const includesOthers = values.productCategories?.includes('Others');
     const organization: OrganizationDetails = {
