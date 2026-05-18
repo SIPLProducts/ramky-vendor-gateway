@@ -360,7 +360,7 @@ const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: strin
   currency:             { code: 'WAERS', desc: 'LTEXT' },
 };
 
-function SapF4SelectField({
+export function SapF4SelectField({
   label, masterType, value, onChange, liveItems, placeholder, required, invalid,
 }: {
   label: string;
