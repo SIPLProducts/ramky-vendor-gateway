@@ -140,33 +140,10 @@ function resolveTemplate(node: any, ctx: ResolverCtx): any {
 }
 
 async function buildUploads(vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
-  const uploads: any[] = [];
-  const skipped: string[] = [];
-  const { data: docs, error } = await supabase
-    .from("vendor_documents")
-    .select("document_type, file_name, file_path, file_size")
-    .eq("vendor_id", vendorId);
-  if (error) return { uploads, skipped };
-  for (const d of docs || []) {
-    try {
-      if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-        skipped.push(`${d.file_name} (>10MB)`);
-        continue;
-      }
-      const { data: blob, error: dlErr } = await supabase.storage
-        .from("vendor-documents").download(d.file_path);
-      if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
-      const base64 = await blobToBase64(blob);
-      uploads.push({
-        FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
-        FILE: base64,
-        FILE_PATH: d.file_path,
-      });
-    } catch {
-      skipped.push(d.file_name);
-    }
-  }
-  return { uploads, skipped };
+  // SAP document upload is intentionally disabled from this API payload because
+  // base64 documents make the request too large for the middleware/SAP route.
+  // Keep the key in the final payload as UPLOAD: [] so SAP receives the expected shape.
+  return { uploads: [], skipped: [] };
 }
 
 export type BuildResult = {
@@ -268,6 +245,7 @@ export async function buildSapPayload(
     row.CLASSIFY.CAT_VENDOR = expand(classifyArrays.CATV, "CATV");
     row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
     row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
+    row.UPLOAD = [];
   }
 
   return { payload: [row], uploadsCount: uploads.length, skipped };

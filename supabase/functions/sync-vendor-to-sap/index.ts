@@ -282,6 +282,7 @@ serve(async (req) => {
       // Client supplied a fully-resolved SAP payload — use it as-is.
       payload = clientPayload;
       row = clientPayload[0];
+      row.UPLOAD = [];
       console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
     } else {
       // Legacy path: resolve template server-side.
@@ -366,6 +367,7 @@ serve(async (req) => {
         row.CLASSIFY.CAT_VENDOR = expand(classifyArrays.CATV, "CATV");
         row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
         row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
+        row.UPLOAD = [];
       }
 
       payload = [row];
