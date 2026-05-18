@@ -18,7 +18,7 @@ export type SapFieldOverrides = {
   msme: string; idtype: string; idnum: string;
   bukrs: string; akont: string; zuawa: string; cdi: string; fdgrv: string;
   vkorg: string; waers: string; kalsk: string; webre: string; lebre: string; ven_class: string;
-  classify: { MGV: string; CATV: string; LOCV: string; IDS: string };
+  classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[] };
 };
 
 interface Props {
