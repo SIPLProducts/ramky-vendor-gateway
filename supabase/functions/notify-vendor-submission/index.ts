@@ -281,19 +281,30 @@ serve(async (req) => {
       ? new Date(vendor.submitted_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
       : new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
-    const vendorName = (vendor.legal_name || vendor.trade_name || "Unnamed Vendor").trim();
+    const vendorName = (invite?.vendor_name || vendor.legal_name || vendor.trade_name || "Unnamed Vendor").trim();
+    const vendorEmail = (invite?.email || vendor.primary_email || "").trim();
+    const vendorPhone = (invite?.phone_number || (vendor as any).primary_phone || "").trim();
+    const contactPerson = (vendor.primary_contact_name || "").trim();
     const resubmission = !!body.resubmission;
     const action = resubmission ? "resubmitted" : "submitted";
     const subject = `Vendor Submitted Registration Form – ${vendorName}`;
 
     const vendorRef = vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
 
+    const vendorIdentity = {
+      vendorName,
+      vendorEmail,
+      vendorPhone,
+      contactPerson,
+      vendorRef,
+    };
+
     const html = buildHtml({
       inviterFirstName,
       vendorName,
-      primaryContact: vendor.primary_contact_name || "",
-      primaryEmail: vendor.primary_email || "",
-      primaryPhone: (vendor as any).primary_phone || "",
+      primaryContact: contactPerson,
+      primaryEmail: vendorEmail,
+      primaryPhone: vendorPhone,
       submittedAt,
       resubmission,
       vendorId: vendor.id,
@@ -319,7 +330,7 @@ serve(async (req) => {
       await supabase.from("audit_logs").insert({
         vendor_id: vendor.id,
         action: "vendor_submission_notified",
-        details: { to: recipientEmails, resubmission, subject, resolution: resolutionMode },
+        details: { to: recipientEmails, resubmission, subject, resolution: resolutionMode, vendorIdentity },
       });
     } catch (e) {
       console.error("audit_logs insert failed", e);
@@ -330,6 +341,8 @@ serve(async (req) => {
         success: true,
         sentTo: recipientEmails,
         resolution: resolutionMode,
+        vendorIdentity,
+        inviter: { name: recipientFullName || null, email: recipientEmails[0] || null },
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
