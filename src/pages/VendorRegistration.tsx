@@ -388,37 +388,49 @@ export default function VendorRegistration() {
         // Mark steps as completed based on filled data
         if (vendorStatus === 'draft') {
           const filledSteps: number[] = [];
-          // Step 1 = doc verification — assume completed if we already have key fields
-          if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
-            filledSteps.push(1);
-            // Pre-seed verifiedData so Step 1 shows green tiles when revisited
-            setVerifiedData({
-              pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
-              gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
-              msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
-              bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
-              bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
-                ? {
-                    accountNumber: existingFormData.bank.secondary.accountNumber,
-                    ifsc: existingFormData.bank.secondary.ifscCode || '',
-                    bankName: existingFormData.bank.secondary.bankName || '',
-                    branchName: existingFormData.bank.secondary.branchName || '',
-                    accountHolderName: existingFormData.bank.secondary.accountHolderName || '',
-                    accountType: existingFormData.bank.secondary.accountType || 'current',
-                    bankAddress: existingFormData.bank.secondary.bankAddress || '',
-                  }
-                : undefined,
-            });
+          if (existingFormData.vendorType === 'international') {
+            const i = existingFormData.international;
+            if (i?.documents?.registrationCopyFile || i?.documents?.swiftIbanFile) filledSteps.push(1);
+            if (i?.company?.companyName) filledSteps.push(2);
+            if (i?.bank?.accountNumber || i?.bank?.swiftCode || i?.bank?.ibanNumber) filledSteps.push(3);
+            if ((i?.classification?.materialGroupVendor?.length || 0) > 0) filledSteps.push(4);
+            setCompletedSteps(filledSteps);
+            const allSteps = [1, 2, 3, 4, 5];
+            const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
+            setCurrentStep(nextStep || 5);
+          } else {
+            // Step 1 = doc verification — assume completed if we already have key fields
+            if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
+              filledSteps.push(1);
+              // Pre-seed verifiedData so Step 1 shows green tiles when revisited
+              setVerifiedData({
+                pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
+                gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
+                msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
+                bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
+                bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
+                  ? {
+                      accountNumber: existingFormData.bank.secondary.accountNumber,
+                      ifsc: existingFormData.bank.secondary.ifscCode || '',
+                      bankName: existingFormData.bank.secondary.bankName || '',
+                      branchName: existingFormData.bank.secondary.branchName || '',
+                      accountHolderName: existingFormData.bank.secondary.accountHolderName || '',
+                      accountType: existingFormData.bank.secondary.accountType || 'current',
+                      bankAddress: existingFormData.bank.secondary.bankAddress || '',
+                    }
+                  : undefined,
+              });
+            }
+            if (existingFormData.organization?.legalName) filledSteps.push(2);
+            if (existingFormData.address?.registeredAddress) filledSteps.push(3);
+            if (existingFormData.contact?.ceoName) filledSteps.push(4);
+            if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
+            setCompletedSteps(filledSteps);
+            // Go to the first incomplete step or step 1
+            const allSteps = [1, 2, 3, 4, 5, 6];
+            const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
+            setCurrentStep(nextStep || 6);
           }
-          if (existingFormData.organization?.legalName) filledSteps.push(2);
-          if (existingFormData.address?.registeredAddress) filledSteps.push(3);
-          if (existingFormData.contact?.ceoName) filledSteps.push(4);
-          if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
-          setCompletedSteps(filledSteps);
-          // Go to the first incomplete step or step 1
-          const allSteps = [1, 2, 3, 4, 5, 6];
-          const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-          setCurrentStep(nextStep || 6);
         } else {
           setIsSubmitted(true);
           setIsEditMode(false);
