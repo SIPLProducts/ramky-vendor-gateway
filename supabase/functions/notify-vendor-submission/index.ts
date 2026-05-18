@@ -110,12 +110,14 @@ serve(async (req) => {
     // Resolve the invitation linked to this vendor. Prefer the explicit
     // invitation_id on the vendor row; fall back to looking up by vendor_id
     // (claim_invitation sets vendor_id on the invitation at submit time).
-    let invite: { id: string; created_by: string | null; tenant_id: string | null } | null = null;
+    let invite:
+      | { id: string; created_by: string | null; tenant_id: string | null; email: string | null; phone_number: string | null; vendor_name: string | null }
+      | null = null;
 
     if (vendor.invitation_id) {
       const { data } = await supabase
         .from("vendor_invitations")
-        .select("id, created_by, tenant_id")
+        .select("id, created_by, tenant_id, email, phone_number, vendor_name")
         .eq("id", vendor.invitation_id)
         .maybeSingle();
       invite = (data as any) ?? null;
@@ -124,7 +126,7 @@ serve(async (req) => {
     if (!invite) {
       const { data } = await supabase
         .from("vendor_invitations")
-        .select("id, created_by, tenant_id")
+        .select("id, created_by, tenant_id, email, phone_number, vendor_name")
         .eq("vendor_id", vendor.id)
         .order("created_at", { ascending: false })
         .limit(1)
