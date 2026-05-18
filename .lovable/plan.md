@@ -1,76 +1,60 @@
+# Plan: Vendor identity from invitation + conditional success/failure dialog
+
 ## Goal
+1. The buyer-sent invitation already captures `vendor_name`, `email`, `phone_number` in `vendor_invitations`. Use these as the authoritative vendor identity in the post-submission email and the "Application Submitted" popup.
+2. The popup must show a success message only when notification actually succeeds; otherwise show a failure message.
 
-Add a public, SEO-optimized marketing landing page for Sharvi Vendor Gateway at `/`, targeting the keywords **"vendor management system"** and **"vendor onboarding portal"** (plus secondary: "supplier management software", "vendor portal"). Today `/` renders the `Auth` login screen, which has no SEO value and blocks Google from indexing any marketing copy.
+## Changes
 
-## Scope
+### 1. `supabase/functions/notify-vendor-submission/index.ts`
+- Extend the `vendor_invitations` lookup (all fallback paths) to also select `email, phone_number, vendor_name`.
+- Build a single `vendorIdentity` object used everywhere:
+  - `vendorName`  = invitation.vendor_name || vendors.legal_name || vendors.trade_name
+  - `vendorEmail` = invitation.email || vendors.primary_email
+  - `vendorPhone` = invitation.phone_number || vendors.primary_phone
+  - `contactPerson` = vendors.primary_contact_name (optional, shown only if present)
+- In `buildHtml`, replace the current "Primary Contact / Vendor Email" rows with:
+  - Vendor Name
+  - Vendor Email (from invitation)
+  - Vendor Phone (from invitation)
+  - Contact Person (only if available)
+- Return `vendorIdentity` in the JSON response.
+- Email "from" name / subject lines remain as-is (rebrand handled in a separate plan).
 
-### 1. Routing change (`src/App.tsx`)
-- `/` → new `Landing` page (public)
-- `/auth` → existing `Auth` (unchanged)
-- All other routes unchanged
-- Existing login links continue to work; landing CTAs point to `/auth` and `/vendor/invite`
+### 2. `src/pages/VendorRegistration.tsx` + `src/components/vendor/SubmissionSuccessDialog.tsx`
+- Capture `notifyResult` from the `notify-vendor-submission` invoke (success flag + vendorIdentity + error message).
+- Pass to `SubmissionSuccessDialog` new props:
+  - `status: 'success' | 'failure'`
+  - `vendorIdentity?: { vendorName, vendorEmail, vendorPhone, contactPerson? }`
+  - `errorMessage?: string`
+  - `referenceNumber: string` (already passed)
+- Dialog rendering:
+  - **Success** (notify ok): title "Application Submitted Successfully", body:
+    > Your application has been received successfully. An email has been sent to the respective buyer and configured email IDs.
+    >
+    > Thank you.
+    Followed by a "Vendor details" block (Name / Email / Phone / Reference #).
+  - **Failure** (notify threw or returned ok=false): title "Application Submitted — Notification Failed", body:
+    > Your application was saved (Ref #XYZ), but we could not send the confirmation email to the buyer. Our team has been notified. Please contact support@sharviinfotech.com if you do not receive a follow-up.
+    Show the underlying `errorMessage` in a muted line. Keep reference number visible.
+- The vendor's actual DB row is saved regardless of notification result — submission is never rolled back on email failure (current behaviour).
 
-### 2. New page `src/pages/Landing.tsx`
-Single long-scroll page, SAP Fiori-inspired styling consistent with the app (grey `#F7F9FC` bg, white rounded cards, blue primary). Sections:
+### 3. Resubmission flow
+Same dialog component is used → automatically inherits success/failure handling.
 
-1. **Hero** — H1 "Vendor Management System for Enterprise Onboarding", subheading mentioning "vendor onboarding portal", primary CTA "Vendor Login", secondary "Request a Demo" (mailto support@sharviinfotech.com)
-2. **Trust strip** — SAP S/4HANA, GST, PAN, MSME, Bank verification badges
-3. **Features grid** — 6 cards mapped to real product capabilities (7-step onboarding, multi-level approval workflow, KYC verifications, SAP sync, audit logs, role-based access)
-4. **How it works** — 3 steps (Invite → Vendor Self-Registration → Approval & SAP Sync)
-5. **Keyword-rich content block** — 2–3 short paragraphs naturally using the target keywords + supplier management software / vendor portal
-6. **FAQ** — answers to "What is a vendor management system?", "How does vendor onboarding work?", "What's the best vendor management system for enterprise use?" (mirrors high-volume question keywords from Semrush). Doubles as `FAQPage` JSON-LD source.
-7. **Footer** — support email, login link
+### 4. No DB schema changes
+`vendor_invitations.email`, `phone_number`, `vendor_name` already exist and are populated at invitation time.
 
-### 3. SEO head (per-route via `react-helmet-async`)
-- Install `react-helmet-async`, wrap app in `<HelmetProvider>` in `src/main.tsx`
-- `Landing.tsx` `<Helmet>`:
-  - `<title>` (~58 chars): "Vendor Management System & Onboarding Portal | Sharvi"
-  - `<meta name="description">` (~155 chars) including both primary keywords
-  - `<link rel="canonical" href="https://vms.siplproducts.com/">`
-  - `og:title`, `og:description`, `og:url`, `og:type=website`
-  - JSON-LD: `Organization` + `FAQPage` (from the FAQ section)
-- Update `index.html`:
-  - Replace sitewide `<title>` and `<meta description>` with Sharvi-branded, keyword-aware fallbacks (so non-JS crawlers still get good defaults)
-  - Remove any conflicting per-page tags (none currently — safe)
-  - No `og:image` for now (placeholder would hurt previews; can add later if the user provides/wants one generated)
+## Files touched
+- `supabase/functions/notify-vendor-submission/index.ts`
+- `src/pages/VendorRegistration.tsx`
+- `src/components/vendor/SubmissionSuccessDialog.tsx`
 
-### 4. Semantic HTML & on-page SEO
-- Exactly one `<h1>` containing "Vendor Management System"
-- `<h2>` per section, using secondary keywords ("Vendor onboarding portal", "Supplier management", etc.) naturally
-- Descriptive `alt` text on any imagery
-- Internal link from landing → `/auth`, `/vendor/invite`, `/support`
-- Lazy-load below-the-fold images if any
+## Out of scope (separate plans)
+- "Sharvi" → "Ramky" rebrand across email + UI.
+- Approval-routing trigger fix for orphaned vendors.
 
-### 5. `public/robots.txt` and sitemap
-- Confirm `robots.txt` allows `/`
-- Add a minimal `public/sitemap.xml` listing `/` (and `/auth`, `/support`) so Google can discover the landing page
-
-## Out of scope
-- No backend changes, no DB migrations, no auth changes
-- No changes to the vendor registration flow, approval workflow, or any portal screens
-- No new images (text-first landing; can add later)
-- Existing portal users land on `/auth` directly via bookmark/email — unaffected
-
-## Technical notes
-
-```
-src/
-  pages/Landing.tsx          NEW
-  App.tsx                    EDIT — / → Landing, keep /auth → Auth
-  main.tsx                   EDIT — wrap with <HelmetProvider>
-index.html                   EDIT — title, description, brand
-public/sitemap.xml           NEW
-package.json                 +react-helmet-async
-```
-
-Routes table after change:
-
-```text
-/            Landing (public, SEO)
-/auth        Auth (existing, unchanged)
-/vendor/*    unchanged
-/dashboard…  unchanged (protected)
-```
-
-## Expected SEO impact
-Targets ~2,400/mo "vendor management system" (KDI 42, achievable) + the exact-match "vendor onboarding portal" (KDI 0, trivial to rank). Both have high commercial intent ($22–$55 CPC). Rankings typically take 4–8 weeks after Google indexes the page.
+## Verification
+1. Submit a vendor against an existing invitation → popup shows success message + invitation email/phone/name; email contains same identity.
+2. Temporarily break Resend (invalid API key) → popup shows failure message with reference number still visible; vendor row still saved.
+3. Resubmit → identical behaviour.
