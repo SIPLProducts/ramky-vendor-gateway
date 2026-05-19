@@ -89,43 +89,18 @@ function middlewareMajorVersion(version: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
-async function checkDmsMiddlewareHealth(middlewareUrl: string): Promise<{ ok: boolean; message: string; health?: any }> {
+async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health: any; error?: string }> {
   const healthUrl = `${middlewareUrl}/health`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
-
   try {
     const res = await fetch(healthUrl, { method: "GET", signal: controller.signal });
     const text = await res.text();
     let health: any = null;
-    try { health = JSON.parse(text); } catch { /* non-JSON health response */ }
-
-    if (!res.ok || !health || typeof health !== "object") {
-      return { ok: false, message: `Middleware health check failed at /health (HTTP ${res.status}). Please restart the latest middleware before DMS upload.` };
-    }
-
-    const major = middlewareMajorVersion(health.middlewareVersion);
-    const bodyLimitBytes = parseSizeToBytes(health.bodyLimit);
-
-    if (!major || major < MIN_SUPPORTED_MIDDLEWARE_MAJOR || !bodyLimitBytes) {
-      return {
-        ok: false,
-        health,
-        message: `Old middleware is running. /health must show middlewareVersion dms-large-upload-v${MIN_SUPPORTED_MIDDLEWARE_MAJOR}+ and bodyLimit. Current: ${JSON.stringify({ middlewareVersion: health.middlewareVersion, bodyLimit: health.bodyLimit })}`,
-      };
-    }
-
-    if (bodyLimitBytes < MIN_MIDDLEWARE_BODY_LIMIT_BYTES) {
-      return {
-        ok: false,
-        health,
-        message: `Middleware body limit is too small for DMS upload (${health.bodyLimit}). Set MIDDLEWARE_BODY_LIMIT=500mb and restart middleware.`,
-      };
-    }
-
-    return { ok: true, message: "Middleware ready", health };
+    try { health = JSON.parse(text); } catch { /* non-JSON */ }
+    return { health };
   } catch (e: any) {
-    return { ok: false, message: `Could not reach middleware /health before DMS upload: ${e?.message || "network error"}` };
+    return { health: null, error: e?.message || "network error" };
   } finally {
     clearTimeout(timer);
   }
