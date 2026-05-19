@@ -5,10 +5,11 @@ import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { InternationalCompanyDetails } from '@/types/vendor';
-import { useSapMasterData } from '@/hooks/useSapMasterData';
+import { useEnsureSapMaster } from '@/hooks/useSapMasterData';
 
 const schema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required'),
