@@ -106,6 +106,7 @@ export default function VendorRegistration() {
   const [isTokenMode, setIsTokenMode] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const formDataLoadedRef = useRef(false);
+  const [resetNonce, setResetNonce] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -647,20 +648,8 @@ export default function VendorRegistration() {
   const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
   const handleEditStep = (step: number) => setCurrentStep(step);
 
-  // ----- Vendor type switching with reset-confirm -----
-  const [pendingTypeSwitch, setPendingTypeSwitch] = useState<VendorOriginType | null>(null);
+  // ----- Vendor type switching -----
 
-  const hasDomesticData = () => {
-    const o = formData.organization;
-    const s = formData.statutory;
-    const b = formData.bank;
-    return !!(o.legalName || o.tradeName || o.industryType || s.pan || s.gstin || b.accountNumber || formData.address.registeredAddress || formData.contact.ceoName);
-  };
-  const hasInternationalData = () => {
-    const i = formData.international;
-    if (!i) return false;
-    return !!(i.company.companyName || i.company.companyAddress || i.company.country || i.bank.accountNumber || i.bank.swiftCode || i.bank.ibanNumber || i.documents.registrationCopyFile || i.documents.swiftIbanFile || (i.classification.materialGroupVendor?.length || 0) > 0);
-  };
 
   const purgeVendorArtifacts = async (vId: string) => {
     try {
@@ -669,7 +658,6 @@ export default function VendorRegistration() {
       if (folders && folders.length) {
         const allPaths: string[] = [];
         for (const entry of folders) {
-          // Each entry is a subfolder (document_type). List files inside.
           const { data: files } = await supabase.storage.from('vendor-documents').list(`${vId}/${entry.name}`);
           if (files) {
             for (const f of files) allPaths.push(`${vId}/${entry.name}/${f.name}`);
@@ -679,30 +667,46 @@ export default function VendorRegistration() {
           await supabase.storage.from('vendor-documents').remove(allPaths);
         }
       }
-      // Delete document rows
       await supabase.from('vendor_documents').delete().eq('vendor_id', vId);
+      await supabase.from('vendor_validations').delete().eq('vendor_id', vId);
     } catch (err) {
       console.error('purgeVendorArtifacts failed', err);
     }
   };
 
-  const applyVendorTypeSwitch = (next: VendorOriginType) => {
-    setFormData((prev) => ({
-      ...prev,
+  const applyVendorTypeSwitch = async (next: VendorOriginType) => {
+    // Cancel any pending auto-save so it cannot re-persist stale data
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    setAutoSaveState('idle');
+
+    const cleared: VendorFormData = {
       vendorType: next,
       ...EMPTY_DOMESTIC_SLICES,
       international: EMPTY_INTERNATIONAL_DATA,
       declaration: { selfDeclared: false, termsAccepted: false },
-    }));
+    };
+    setFormData(cleared);
     setCompletedSteps([]);
     setCurrentStep(1);
     setVerifiedData(undefined);
     setCustomFieldValues({});
     setPendingChoiceType(next);
     latestStep1DataRef.current = null;
+    setResetNonce((n) => n + 1);
+
     if (vendorId) {
-      void purgeVendorArtifacts(vendorId);
+      await purgeVendorArtifacts(vendorId);
+      // Persist cleared payload so the draft row matches the UI
+      try {
+        await saveVendor(cleared);
+      } catch (err) {
+        console.error('Failed to persist cleared vendor draft', err);
+      }
     }
+
     toast({
       title: `Switched to ${next === 'international' ? 'International' : 'Domestic'}`,
       description: 'Previous data has been cleared.',
@@ -710,9 +714,14 @@ export default function VendorRegistration() {
   };
 
   const handleVendorTypeChange = (next: VendorOriginType) => {
-    if (next === formData.vendorType) return;
-    applyVendorTypeSwitch(next);
+    void applyVendorTypeSwitch(next);
   };
+
+  const handleBackToTypeSelector = async () => {
+    await applyVendorTypeSwitch(formData.vendorType);
+    setVendorTypeChosen(false);
+  };
+
 
 
   // ----- International step setters -----
@@ -989,22 +998,8 @@ export default function VendorRegistration() {
             </div>
           </div>
         </main>
-        <AlertDialog open={!!pendingTypeSwitch} onOpenChange={(o) => { if (!o) setPendingTypeSwitch(null); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Switch vendor type?</AlertDialogTitle>
-              <AlertDialogDescription>
-                You have unsaved data in the {formData.vendorType === 'international' ? 'International' : 'Domestic'} section. Switching will clear it. Continue?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setPendingTypeSwitch(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { if (pendingTypeSwitch) applyVendorTypeSwitch(pendingTypeSwitch); setPendingTypeSwitch(null); }}>
-                Yes, switch
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+
+
       </div>
     );
   }
@@ -1122,10 +1117,7 @@ export default function VendorRegistration() {
               size="sm"
               className="text-xs rounded-lg gap-1.5"
               disabled={isSubmitting}
-              onClick={() => {
-                setPendingChoiceType(formData.vendorType);
-                setVendorTypeChosen(false);
-              }}
+              onClick={() => { void handleBackToTypeSelector(); }}
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Back
@@ -1180,7 +1172,8 @@ export default function VendorRegistration() {
             </div>
 
             {/* Form Content */}
-            <div className="p-6">
+            <div className="p-6" key={`step-${formData.vendorType}-${resetNonce}`}>
+
               {renderStep()}
             </div>
 
@@ -1287,27 +1280,6 @@ export default function VendorRegistration() {
           </div>
         </main>
       </div>
-      <AlertDialog open={!!pendingTypeSwitch} onOpenChange={(o) => { if (!o) setPendingTypeSwitch(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Switch vendor type?</AlertDialogTitle>
-            <AlertDialogDescription>
-              All entered {pendingTypeSwitch === 'international' ? 'Domestic' : 'International'} data will be cleared and you'll restart from Step 1.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingTypeSwitch(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingTypeSwitch) applyVendorTypeSwitch(pendingTypeSwitch);
-                setPendingTypeSwitch(null);
-              }}
-            >
-              Yes, switch
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}
