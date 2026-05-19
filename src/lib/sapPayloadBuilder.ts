@@ -162,10 +162,14 @@ export async function buildSapPayload(
     .from("vendors").select("*").eq("id", vendorId).single();
   if (vErr || !vendor) throw new Error(`Vendor not found: ${vErr?.message || ""}`);
 
-  if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
-    throw new Error(
-      `Vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for IN.`,
-    );
+  const isInternational = (vendor as any).vendor_type === 'international';
+
+  if (!isInternational) {
+    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+      throw new Error(
+        `Vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for IN.`,
+      );
+    }
   }
 
   // Merge tenant defaults
