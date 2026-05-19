@@ -1,40 +1,72 @@
-## Plan to fix the repeated DMS 404
+## Root cause
 
-The current failure is not from SAP. The middleware process that is running on `:3002` is returning Express HTML `Cannot POST /sap/dms/upload`, so the requested route is not registered in that running process. I will make the app more resilient by no longer hard-depending on only that one route.
+The same SAP URL can accept different business payloads and return different response shapes. The app currently treats DMS as a separate middleware route problem and keeps trying:
 
-## Changes to implement
+```text
+/sap/dms/upload
+/dms/upload
+/sap/dms
+/sap/upload
+```
 
-1. **Add dynamic DMS endpoint resolution in `sync-vendor-to-dms`**
-   - Read `/health` and use `dmsEndpoint` if the middleware exposes it.
-   - If `/health` is old and does not expose `dmsEndpoint`, try a fallback list in order:
-     - `/sap/dms/upload`
-     - `/dms/upload`
-     - `/sap/dms`
-     - `/sap/upload`
-     - `/sap/bp/create` as final compatibility fallback, because your middleware log shows SAP target is already `vendor/bp/create`.
+Your working setup is different: the middleware route that exists is `/sap/bp/create`, and SAP behavior is determined by the payload sent to the target URL:
 
-2. **Stop failing the whole upload on the first 404 route**
-   - For each DMS batch, try the candidate routes until one returns a non-404 response.
-   - Only report failure if all candidates fail or SAP returns an actual error.
+```json
+{
+  "BP_LIFNR": "1061301",
+  "FILE_UPLOAD": [
+    { "FILE": "BASE64", "FILE_PATH": "PATH1" }
+  ]
+}
+```
 
-3. **Return the dynamic SAP response rows cleanly**
-   - If SAP/middleware returns an array like:
-     ```json
-     [{ "BP_LIFNR": "0001061303", "MSGTYP": "S", "MSG": "File(s) Uploaded Successfully" }]
+So we must not assume same URL means same payload/response. We should route by operation type and payload shape.
+
+## Plan
+
+1. **Add operation-aware routing in `sync-vendor-to-dms`**
+   - Detect DMS upload payload by shape: top-level `BP_LIFNR` plus `FILE_UPLOAD` array.
+   - For this DMS payload, send it through the existing middleware BP route:
+     ```text
+     POST {middlewareUrl}/sap/bp/create
      ```
-     keep it in `sapRows`, set `sap` to the success row, and mark the vendor as successful.
-   - Keep diagnostic errors only when SAP/middleware genuinely fails.
+   - Do not convert this DMS payload into the normal BP creation array payload.
 
-4. **Keep sending only SAP code and file payload**
-   - The outgoing payload will remain:
+2. **Keep SAP BP creation and DMS upload separate in code**
+   - `sync-vendor-to-sap` will continue using the normal BP creation payload and parsing `ACC_RES`.
+   - `sync-vendor-to-dms` will use the DMS payload and parse the flat SAP DMS rows.
+   - Even if both operations use the same SAP target URL, their request/response handling will remain separate.
+
+3. **Remove incorrect DMS route dependency**
+   - Stop failing only because `/sap/dms/upload` does not exist on the running middleware.
+   - Keep `/sap/dms/upload` support only as optional compatibility for newer middleware, but make `/sap/bp/create` the working fallback for your current middleware.
+
+4. **Return SAP’s dynamic DMS response exactly**
+   - If SAP returns:
      ```json
-     { "BP_LIFNR": "1061307", "FILE_UPLOAD": [...] }
+     [
+       {
+         "BP_LIFNR": "0001061303",
+         "MSGTYP": "S",
+         "MSGNR": "200",
+         "MSG": "File(s) Uploaded Successfully"
+       }
+     ]
      ```
-   - No vendor UUID/details will be sent to middleware.
+   - The function will set:
+     - `success: true`
+     - `message` from SAP `MSG`
+     - `sap` as the first success row
+     - `sapRows` as the full returned array
 
-5. **Clean up stale constants**
-   - Remove unused old version-gate constants from the DMS function so there is no confusion about hardcoded blocking checks.
+5. **Make diagnostics clearer**
+   - Logs will show the operation as `DMS payload via /sap/bp/create`.
+   - Failure messages will distinguish:
+     - middleware route not found
+     - SAP HTTP error
+     - SAP returned `MSGTYP !== "S"`
+     - SAP returned no DMS rows
 
 ## Expected result
 
-Instead of failing with HTML 404, the DMS function will dynamically find the working middleware path and return the actual SAP response rows, matching the structure you requested.
+The application will send the exact DMS payload that works in Postman through the existing working middleware route, and it will return SAP’s dynamic DMS response rows instead of repeatedly failing on missing `/sap/dms/upload` paths.
