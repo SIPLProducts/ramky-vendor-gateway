@@ -31,8 +31,7 @@ const DOC_NAME_MAP: Record<string, string> = {
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const DMS_BATCH_MAX_BYTES = 1 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
-const MIN_MIDDLEWARE_BODY_LIMIT_BYTES = 10 * 1024 * 1024;
-const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 4;
+const DMS_CANDIDATE_PATHS = ["/sap/dms/upload", "/dms/upload", "/sap/dms", "/sap/upload"];
 
 type DmsResult = {
   BP_LIFNR: string;
@@ -148,13 +147,20 @@ serve(async (req) => {
     const rawMiddlewareUrl = config?.middleware_url || Deno.env.get("SAP_MIDDLEWARE_URL") || "";
     const middlewareUrl = normalizeMiddlewareBase(rawMiddlewareUrl);
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
-    const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
-
-    // Probe middleware /health for diagnostics only — never block uploads on it.
+    // Build dynamic candidate endpoint list. Prefer the path advertised by /health if any.
     const middlewareHealth = middlewareUrl ? await probeDmsMiddlewareHealth(middlewareUrl) : null;
     if (middlewareHealth) {
       console.log("DMS middleware health probe:", JSON.stringify(middlewareHealth));
     }
+    const healthDmsPath: string | null = (middlewareHealth?.health?.dmsEndpoint && typeof middlewareHealth.health.dmsEndpoint === "string")
+      ? middlewareHealth.health.dmsEndpoint
+      : null;
+    const candidatePaths = Array.from(new Set([
+      ...(healthDmsPath ? [healthDmsPath] : []),
+      ...DMS_CANDIDATE_PATHS,
+    ]));
+    const dmsCandidateUrls = middlewareUrl ? candidatePaths.map((p) => `${middlewareUrl}${p.startsWith("/") ? p : `/${p}`}`) : [];
+    const dmsUrl = dmsCandidateUrls[0] || "";
 
     const results: DmsResult[] = [];
 
@@ -258,6 +264,7 @@ serve(async (req) => {
 
         let batchErrors = 0;
         let lastErrorMessage = "";
+        let workingDmsUrl: string | null = null;
 
         for (let i = 0; i < batches.length; i++) {
           const payload = {
@@ -268,19 +275,42 @@ serve(async (req) => {
           console.log(`DMS SAP payload batch ${i + 1}/${batches.length}: BP_LIFNR=${payload.BP_LIFNR} files=${batches[i].length} approx=${formatMb(payloadBytes)} paths=${batches[i].map((x) => x.FILE_PATH).join(", ")}`);
 
           try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 180000);
             const headers: Record<string, string> = { "Content-Type": "application/json" };
             if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
-            const res = await fetch(dmsUrl, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(payload),
-              signal: controller.signal,
-            });
-            clearTimeout(timer);
-            const text = await res.text();
-            console.log(`DMS batch ${i + 1}/${batches.length} status=${res.status} body=${text.slice(0, 300)}`);
+            const bodyStr = JSON.stringify(payload);
+
+            // Try each candidate path until one responds with non-404. Stick to the first working one for subsequent batches.
+            const urlsToTry = workingDmsUrl ? [workingDmsUrl] : [...dmsCandidateUrls];
+            let res: Response | null = null;
+            let text = "";
+            const triedDetails: string[] = [];
+            for (const url of urlsToTry) {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 180000);
+              try {
+                const r = await fetch(url, { method: "POST", headers, body: bodyStr, signal: controller.signal });
+                clearTimeout(timer);
+                const t = await r.text();
+                console.log(`DMS batch ${i + 1}/${batches.length} url=${url} status=${r.status} body=${t.slice(0, 200)}`);
+                if (r.status === 404 && !workingDmsUrl) {
+                  triedDetails.push(`${url}->404`);
+                  continue;
+                }
+                res = r;
+                text = t;
+                workingDmsUrl = url;
+                break;
+              } catch (e: any) {
+                clearTimeout(timer);
+                triedDetails.push(`${url}->${e?.message || "network error"}`);
+              }
+            }
+
+            if (!res) {
+              batchErrors++;
+              lastErrorMessage = `Could not reach a working DMS endpoint on batch ${i + 1}. Tried: ${triedDetails.join("; ")}`;
+              continue;
+            }
 
             let inner: any = null;
             try {

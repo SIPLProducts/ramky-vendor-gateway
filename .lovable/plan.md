@@ -1,92 +1,40 @@
-## Why this is happening
+## Plan to fix the repeated DMS 404
 
-Your latest logs show:
+The current failure is not from SAP. The middleware process that is running on `:3002` is returning Express HTML `Cannot POST /sap/dms/upload`, so the requested route is not registered in that running process. I will make the app more resilient by no longer hard-depending on only that one route.
 
-```text
-GET /health 200
-POST /sap/dms/upload 404
-Cannot POST /sap/dms/upload
-```
+## Changes to implement
 
-That means Lovable Cloud is reaching the middleware, but the **running middleware process does not have the `/sap/dms/upload` route registered**. So this is not a SAP success/failure response yet; it is Express returning 404 before forwarding to SAP.
+1. **Add dynamic DMS endpoint resolution in `sync-vendor-to-dms`**
+   - Read `/health` and use `dmsEndpoint` if the middleware exposes it.
+   - If `/health` is old and does not expose `dmsEndpoint`, try a fallback list in order:
+     - `/sap/dms/upload`
+     - `/dms/upload`
+     - `/sap/dms`
+     - `/sap/upload`
+     - `/sap/bp/create` as final compatibility fallback, because your middleware log shows SAP target is already `vendor/bp/create`.
 
-The desired dynamic response can only come after the request reaches the middleware DMS route and the middleware forwards it to SAP.
+2. **Stop failing the whole upload on the first 404 route**
+   - For each DMS batch, try the candidate routes until one returns a non-404 response.
+   - Only report failure if all candidates fail or SAP returns an actual error.
 
-## Plan
-
-1. **Make the middleware route more robust**
-   - Keep `POST /sap/dms/upload`.
-   - Add safe alias routes for common deployment/path mistakes, such as `POST /dms/upload` and `POST /sap/dms`.
-   - Add a JSON 404 handler that returns available endpoints and middleware version instead of an HTML `Cannot POST ...` page.
-   - This makes future errors clear and dynamic instead of browser/Express HTML.
-
-2. **Return SAP DMS rows directly in the middleware**
-   - When SAP returns the array:
+3. **Return the dynamic SAP response rows cleanly**
+   - If SAP/middleware returns an array like:
      ```json
      [{ "BP_LIFNR": "0001061303", "MSGTYP": "S", "MSG": "File(s) Uploaded Successfully" }]
      ```
-   - The middleware response will preserve that array under `sapResponse` and expose diagnostic metadata only outside it.
+     keep it in `sapRows`, set `sap` to the success row, and mark the vendor as successful.
+   - Keep diagnostic errors only when SAP/middleware genuinely fails.
 
-3. **Improve Edge Function parsing and result output**
-   - Keep sending payload as:
+4. **Keep sending only SAP code and file payload**
+   - The outgoing payload will remain:
      ```json
      { "BP_LIFNR": "1061307", "FILE_UPLOAD": [...] }
      ```
-   - Parse middleware `sapResponse` dynamically.
-   - If SAP returns success rows, mark the vendor success and include the exact SAP row in `sap` / `sapRows`.
-   - If middleware returns 404/413/502, show the real status and body, but no longer expose internal vendor UUIDs.
+   - No vendor UUID/details will be sent to middleware.
 
-4. **Fix outdated configuration normalization**
-   - Update frontend middleware URL cleanup to strip `/sap/dms/upload` too, so saving a full endpoint URL does not accidentally create wrong paths later.
-
-5. **Update troubleshooting docs**
-   - Remove the outdated README line that says browser Inspect only shows `vendorIds`.
-   - Document that current DMS flow sends the SAP-format payload in Inspect.
-   - Add a clear verification step: `/health` must list `POST /sap/dms/upload` or the running middleware file is old/wrong.
+5. **Clean up stale constants**
+   - Remove unused old version-gate constants from the DMS function so there is no confusion about hardcoded blocking checks.
 
 ## Expected result
 
-After implementing and restarting the middleware with the updated `server.js`, `/health` and 404 responses will clearly show whether DMS route exists. A successful DMS sync will return dynamic SAP data like:
-
-```json
-{
-  "success": true,
-  "message": "1/1 vendor(s) uploaded to DMS",
-  "results": [
-    {
-      "BP_LIFNR": "0001061303",
-      "success": true,
-      "message": "File(s) Uploaded Successfully",
-      "sap": {
-        "BP_LIFNR": "0001061303",
-        "MSGTYP": "S",
-        "MSGNR": "200",
-        "ERDAT": "2026-05-18",
-        "UZEIT": "18:57:22",
-        "UNAME": "22000208",
-        "MSG": "File(s) Uploaded Successfully"
-      },
-      "sapRows": [
-        {
-          "BP_LIFNR": "0001061303",
-          "MSGTYP": "S",
-          "MSGNR": "200",
-          "MSG": "File(s) Uploaded Successfully"
-        }
-      ]
-    }
-  ]
-}
-```
-
-## Important operational note
-
-Because your middleware console currently shows only:
-
-```text
-Sharvi SAP middleware listening on :3002
-SAP target: ...
-CORS origins: *
-```
-
-and does **not** show the newer startup banner with middleware build/body limit, Windows is almost certainly running an older `server.js` or a different folder. The code change will help, but the server must be restarted from the updated middleware folder for `/sap/dms/upload` to exist.
+Instead of failing with HTML 404, the DMS function will dynamically find the working middleware path and return the actual SAP response rows, matching the structure you requested.
