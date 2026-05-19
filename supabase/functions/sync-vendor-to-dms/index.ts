@@ -230,9 +230,6 @@ serve(async (req) => {
       } else if (uploads.length === 0) {
         success = false;
         message = "No uploadable documents found for this vendor";
-      } else if (middlewareHealth && !middlewareHealth.ok) {
-        success = false;
-        message = middlewareHealth.message;
       } else {
         // Split into batches to avoid 413 PayloadTooLarge at the middleware.
         // Each batch keeps total approximate JSON size under DMS_BATCH_MAX_BYTES.
