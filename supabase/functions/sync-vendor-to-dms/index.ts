@@ -138,9 +138,20 @@ serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendorIds } = await req.json();
-    if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
-      return ok({ success: false, message: "vendorIds (array) is required", results: [] });
+    const reqBody = await req.json();
+    // Accept two shapes:
+    //  A) { vendorIds: string[] }  — legacy multi-vendor flow
+    //  B) { vendorId, payload: { BP_LIFNR, FILE_UPLOAD } } — explicit single-vendor
+    //     payload (visible in browser Inspect).
+    const explicitPayload = (reqBody && reqBody.payload && Array.isArray(reqBody.payload.FILE_UPLOAD))
+      ? reqBody.payload as { BP_LIFNR: string; FILE_UPLOAD: any[] }
+      : null;
+    const vendorIds: string[] = explicitPayload && reqBody.vendorId
+      ? [reqBody.vendorId]
+      : (Array.isArray(reqBody?.vendorIds) ? reqBody.vendorIds : []);
+
+    if (vendorIds.length === 0) {
+      return ok({ success: false, message: "vendorIds (array) or { vendorId, payload } is required", results: [] });
     }
 
     const supabase = createClient(
