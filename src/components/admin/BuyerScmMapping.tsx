@@ -180,7 +180,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
             <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM Manager Mapping
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
             <div>
               <label className="text-xs text-muted-foreground">SCM Manager</label>
@@ -211,7 +211,19 @@ export function BuyerScmMapping({ tenantId }: Props) {
               Save Mapping
             </Button>
           </div>
+          <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+            <Switch id="include-scm" checked={includeScm} onCheckedChange={setIncludeScm} />
+            <div className="space-y-0.5">
+              <label htmlFor="include-scm" className="text-sm font-medium cursor-pointer">
+                Include SCM Manager / SCM Head in approval flow
+              </label>
+              <p className="text-xs text-muted-foreground">
+                When off, vendors invited by this buyer skip SCM stages and go directly to Finance 1.
+              </p>
+            </div>
+          </div>
         </CardContent>
+
       </Card>
 
       <Card>
