@@ -369,10 +369,10 @@ serve(async (req) => {
         await supabase.from("vendors").update({
           status: "dms_synced",
           dms_synced_at: new Date().toISOString(),
-        }).eq("id", vid);
+        }).eq("id", vendor.id);
 
         await supabase.from("audit_logs").insert({
-          vendor_id: vid,
+          vendor_id: vendor.id,
           user_id: auth.user.id,
           action: "dms_sync",
           details: {
@@ -386,14 +386,14 @@ serve(async (req) => {
         });
       }
 
-      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow, sapRows: allSapRows });
+      results.push({ BP_LIFNR: vendor.sap_vendor_code, success, message, uploadedCount: uploads.length, skipped, sap: sapRow, sapRows: allSapRows });
     }
 
 
     const successCount = results.filter(r => r.success).length;
     return ok({
       success: successCount > 0,
-      message: `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
+      message: `${successCount}/${targetCount} vendor(s) uploaded to DMS`,
       results,
     });
   } catch (error: any) {
