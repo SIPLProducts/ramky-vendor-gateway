@@ -232,6 +232,51 @@ app.post("/sap/bp/create", authGuard, async (req, res) => {
 });
 
 /**
+ * POST /sap/dms/upload
+ * Forwards a DMS document upload payload to SAP. Body shape expected by SAP:
+ *   { "BP_LIFNR": "0001061303",
+ *     "FILE_UPLOAD": [ { "FILE": "<base64>", "FILE_PATH": "..." }, ... ] }
+ * Response (array): [{ BP_LIFNR, MSGTYP, MSG, ERDAT, UZEIT, ... }]
+ */
+app.post("/sap/dms/upload", authGuard, async (req, res) => {
+  if (!SAP_DMS_API_URL || !SAP_BP_USERNAME || !SAP_BP_PASSWORD) {
+    return res.status(500).json({
+      ok: false,
+      error: "Middleware missing SAP_DMS_API_URL / SAP_BP_USERNAME / SAP_BP_PASSWORD env vars.",
+    });
+  }
+
+  const fileCount = Array.isArray(req.body?.FILE_UPLOAD) ? req.body.FILE_UPLOAD.length : 0;
+  console.log(`[dms/upload] BP_LIFNR=${req.body?.BP_LIFNR} files=${fileCount}`);
+
+  try {
+    const result = await forwardToSap({
+      url: SAP_DMS_API_URL,
+      method: "POST",
+      headers: { Authorization: basicAuthHeader(SAP_BP_USERNAME, SAP_BP_PASSWORD) },
+      body: req.body,
+    });
+    console.log(`[dms/upload] SAP responded ${result.status} in ${result.durationMs}ms`);
+    return res.status(200).json({
+      ok: result.ok,
+      sapStatus: result.status,
+      durationMs: result.durationMs,
+      sapResponse: result.body,
+    });
+  } catch (err) {
+    console.error("[dms/upload] error:", err);
+    const info = describeFetchError(err);
+    return res.status(502).json({
+      ok: false,
+      error: info.message,
+      code: info.code,
+      target: SAP_DMS_API_URL,
+    });
+  }
+});
+
+
+/**
  * POST /sap/proxy
  * Generic forwarder for future SAP endpoints (PO, invoices, etc.).
  * Body: { url, method?, headers?, body?, useBasicAuth? }
