@@ -127,13 +127,13 @@ export default function SAPSync() {
       setShowSapResultDialog(true);
       setSelectedSapIds(new Set());
     } catch (error: any) {
-      const fallback = error?.sapResponse ?? [
-        { MSGTYP: 'E', MSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
+      const fallback = error?.ACC_RES ?? [
+        { MSGTYP: 'E', LONGMSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
       ];
       setSapSyncResult({
         success: false,
         message: error?.message || 'SAP sync failed',
-        sapResponse: fallback,
+        ACC_RES: fallback,
       });
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
@@ -492,15 +492,18 @@ export default function SAPSync() {
           {sapSyncResult && (
             <ScrollArea className="flex-1 max-h-[65vh] pr-4">
               <div className="space-y-3 py-4">
-                {(sapSyncResult.sapResponse || []).map((r: any, i: number) => (
+                {(sapSyncResult.ACC_RES || []).length === 0 && (
+                  <p className="text-sm text-muted-foreground">No ACC_RES rows returned from SAP.</p>
+                )}
+                {(sapSyncResult.ACC_RES || []).map((r: any, i: number) => (
                   <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">{r.MSG || r.LONGMSG}</span>
+                      <span className="font-medium">{r.LONGMSG || r.MSG}</span>
                       <Badge variant={r.MSGTYP === 'S' ? 'default' : 'destructive'}>
                         {r.MSGTYP === 'S' ? 'Success' : 'Error'}
                       </Badge>
                     </div>
-                    {r.BP_LIFNR && <p className="text-xs text-muted-foreground">BP / Vendor No: <span className="font-mono">{r.BP_LIFNR}</span></p>}
+                    {r.BP_LIFNR && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{r.BP_LIFNR}</span></p>}
                     {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
                   </div>
                 ))}

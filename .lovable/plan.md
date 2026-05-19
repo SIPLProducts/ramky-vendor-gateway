@@ -1,32 +1,30 @@
-## Root cause
+## Problem
 
-The recurring broken-document preview is caused by the existing PWA/service worker setup, not by the SAP/DMS work.
+SAP now returns a wrapped shape:
+```json
+[{ "ACC_RES": [...], "TOT_RES": [...] }]
+```
+The current single-sync edge function looks for `MSGTYP === "S"` + `"business partner created"` at the **top level**, never matches, and falls through to the hardcoded `"SAP did not confirm Business Partner creation"`.
 
-Current code still ships `vite-plugin-pwa` with aggressive service-worker behavior (`clientsClaim`, `skipWaiting`, auto-update). The app also registers update listeners in `src/main.tsx` even inside Lovable preview. In the editor iframe, Lovable uses long rotating preview-token URLs; once a service worker claims that iframe, it can serve stale cached navigation responses or trigger reloads against expired/protected preview URLs. That is why the issue comes back repeatedly.
+`ACC_RES` is the authoritative success block — `MSGTYP`, `BP_LIFNR`, `LONGMSG` (e.g. `"BP Vendor Created with 1061306 Successfully for ..."`). The user wants **only `ACC_RES`** displayed in both single and multiple sync popups.
 
-## Fix plan
+## Fix
 
-1. **Harden `vite.config.ts` PWA config**
-   - Disable PWA/service worker in development preview.
-   - Add a navigation denylist for Lovable preview/token/internal paths.
-   - Add a `NetworkFirst` strategy for HTML navigations so the app shell is not locked to stale cache.
-   - Keep asset/API caching for the published app only.
+### 1. `supabase/functions/sync-vendor-to-sap/index.ts`
+- After parsing `sapResponse`, detect the new shape: if first item has `ACC_RES`, extract `ACC_RES`.
+- Determine success purely from `ACC_RES`: success if any row has `MSGTYP === "S"` and a `BP_LIFNR`.
+- Take `sapVendorCode` from that ACC_RES row's `BP_LIFNR`.
+- Remove the hardcoded `"SAP did not confirm Business Partner creation"` fallback. On failure, surface the first ACC_RES `MSG`/`LONGMSG`, else `"SAP returned no ACC_RES rows"`.
+- Return `{ success, sapVendorCode, sapReferenceNo, message, ACC_RES }` (plus raw `sapResponse` for debugging only; UI will not render it).
+- Keep flat-array fallback for older SAP responses (no ACC_RES present) — synthesize an `ACC_RES`-shaped row from the first `S`/`E` item so the popup still works.
 
-2. **Update `src/main.tsx` preview guard**
-   - Detect Lovable preview hosts and iframe context before mounting React.
-   - In those contexts, unregister all service workers and delete all caches.
-   - Do **not** attach `updatefound`, `focus reg.update()`, or `controllerchange reload` listeners in preview/iframe.
-   - Keep update notification/reload logic only for real published/non-preview usage.
+### 2. `src/pages/SAPSync.tsx`
+- **Single sync result dialog**: render only `ACC_RES` rows (`LONGMSG` / `MSG`, `BP_LIFNR`, `BPNAME` if present, MSGTYP badge). Remove the existing `sapResponse.map` block. Show empty state if ACC_RES is empty.
+- **Multiple sync result dialog**: already renders `bulkResult.ACC_RES` — keep as-is (no TOT_RES or other blocks).
+- Update `handleConfirmSync` error fallback to populate `ACC_RES` (not `sapResponse`) so the dialog renders consistently on failure.
 
-3. **Add a service-worker kill switch at `public/sw.js`**
-   - This cleans up service workers already installed in affected browsers.
-   - It will claim clients, delete existing caches, navigate open pages once with a cleanup marker, then unregister itself.
-   - This is needed because simply changing config does not remove an already-installed service worker from users’ browsers.
-
-4. **Leave SAP/DMS logic untouched**
-   - No changes to DMS payload, middleware, backend functions, database, or vendor workflow.
-   - This fix is limited to the preview/PWA layer causing the recurring broken preview.
-
-## Expected result
-
-The Lovable preview iframe will stop being controlled by a service worker, so stale/expired preview-token navigations should stop showing the broken-document page. The published app can still keep PWA behavior, but with safer navigation caching.
+## Out of scope
+- No DB schema changes.
+- No DMS / middleware changes.
+- Bulk sync edge function unchanged (already returns `ACC_RES`).
+- Vendor workflow unchanged — successful sync still moves vendor to `dms_sync_pending`.
