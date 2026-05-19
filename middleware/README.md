@@ -121,3 +121,39 @@ If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running m
 
 Optional: override with `MIDDLEWARE_BODY_LIMIT=500mb` in `.env` for very large document batches. Oversized requests now return JSON (with the active `bodyLimit`) instead of the HTML 413 page, so the portal surfaces a clear error.
 
+
+## Repeated 413 "request entity too large" fix
+
+If you keep seeing `PayloadTooLargeError: request entity too large` on Windows, it means an **old `server.js` is still running**. The new build prints a version banner on startup — if you don't see it, you're running the old file.
+
+### Steps (run in PowerShell as Administrator)
+
+1. Stop every Node process on port 3002:
+   ```powershell
+   Get-NetTCPConnection -LocalPort 3002 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+   ```
+2. Confirm you're in the right folder:
+   ```powershell
+   cd "D:\middleware (2)\middleware"
+   ```
+3. Copy the new `server.js` here (overwrite the existing one).
+4. (Optional) In `.env`, set a higher limit if you upload very large bundles:
+   ```
+   MIDDLEWARE_BODY_LIMIT=1gb
+   ```
+5. Start fresh:
+   ```powershell
+   node server.js
+   ```
+   You **must** see:
+   ```
+   Middleware build: dms-large-upload-v3
+   Body limit: 500mb (override with MIDDLEWARE_BODY_LIMIT in .env)
+   ```
+6. Verify from another terminal:
+   ```powershell
+   curl http://localhost:3002/health
+   ```
+   The JSON response must include `"middlewareVersion": "dms-large-upload-v3"` and `"bodyLimit": "500mb"` (or your override).
+
+If the banner or `/health` fields are missing, Windows is still running an older `server.js` from a different folder or a stale `node` process — repeat step 1.

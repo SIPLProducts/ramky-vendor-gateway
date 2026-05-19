@@ -57,21 +57,25 @@ if (!SHARED_SECRET) {
   console.warn("[WARN] MIDDLEWARE_SHARED_SECRET is not set — refusing all authenticated requests.");
 }
 
+const MIDDLEWARE_VERSION = "dms-large-upload-v3";
 const app = express();
 app.use(helmet());
-const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "200mb";
+const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "500mb";
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
 
-// Friendly JSON for oversized payloads instead of HTML 413 page
+// Friendly JSON for oversized payloads instead of HTML 413 page.
+// Registered as a 4-arg error handler AFTER body parsers so Express routes it here.
 app.use((err, _req, res, next) => {
-  if (err && (err.type === "entity.too.large" || err.status === 413 || err.name === "PayloadTooLargeError")) {
+  if (err && (err.type === "entity.too.large" || err.status === 413 || err.statusCode === 413 || err.name === "PayloadTooLargeError")) {
+    console.error(`[413] Payload exceeded ${BODY_LIMIT}. Raise MIDDLEWARE_BODY_LIMIT and restart.`);
     return res.status(413).json({
       ok: false,
       error: `Payload too large. Current middleware body limit is ${BODY_LIMIT}. ` +
-             `Increase MIDDLEWARE_BODY_LIMIT in middleware .env and restart, ` +
+             `Increase MIDDLEWARE_BODY_LIMIT in middleware .env (e.g. 1gb) and restart, ` +
              `or reduce the size/number of documents in a single upload.`,
       bodyLimit: BODY_LIMIT,
+      middlewareVersion: MIDDLEWARE_VERSION,
       code: "PAYLOAD_TOO_LARGE",
     });
   }
@@ -194,7 +198,9 @@ app.get("/health", (_req, res) => {
     ok: true,
     service: "sharvi-sap-middleware",
     sapTarget: SAP_BP_API_URL ? new URL(SAP_BP_API_URL).host : null,
+    middlewareVersion: MIDDLEWARE_VERSION,
     bodyLimit: BODY_LIMIT,
+    dmsEndpoint: "/sap/dms/upload",
     timeouts: {
       requestMs: TIMEOUT_MS,
       connectMs: CONNECT_TIMEOUT_MS,
@@ -353,10 +359,14 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
 // ---------- Start ----------
 
 app.listen(PORT, () => {
+  console.log(`========================================`);
   console.log(`Sharvi SAP middleware listening on :${PORT}`);
+  console.log(`Middleware build: ${MIDDLEWARE_VERSION}`);
+  console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT in .env)`);
+  console.log(`========================================`);
   console.log(`SAP target: ${SAP_BP_API_URL || "(not configured)"}`);
   console.log(`CORS origins: ${CORS_ORIGINS.join(", ")}`);
-  console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT)`);
+  
   console.log(`Timeouts (ms): request=${TIMEOUT_MS}, connect=${CONNECT_TIMEOUT_MS}, headers=${HEADERS_TIMEOUT_MS}, body=${BODY_TIMEOUT_MS}`);
   if (ALLOW_INSECURE_TLS) console.log("TLS verification: DISABLED (ALLOW_INSECURE_TLS=1)");
 });
