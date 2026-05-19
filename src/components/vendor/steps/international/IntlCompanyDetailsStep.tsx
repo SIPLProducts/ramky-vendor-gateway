@@ -44,23 +44,22 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
 
   const selectedCountry = watch('country');
 
-  // Live push so autosave persists international fields
   useEffect(() => {
     const sub = watch((vals) => onLiveUpdate?.(vals as InternationalCompanyDetails));
     return () => sub.unsubscribe();
   }, [watch, onLiveUpdate]);
 
-  // Reset region when country changes (unless still valid)
+  // Strict filter: only regions whose extra.LAND1 matches the selected country.
   const regionsForCountry = useMemo(() => {
     const list = regions || [];
-    if (!selectedCountry) return list;
-    const filtered = list.filter((r) => {
+    if (!selectedCountry) return [];
+    return list.filter((r) => {
       const extra = (r.extra || {}) as Record<string, unknown>;
-      const country = (extra.country || extra.country_code || extra.countryCode) as string | undefined;
-      return !country || country === selectedCountry;
+      return (extra.LAND1 as string | undefined) === selectedCountry;
     });
-    return filtered.length ? filtered : list;
   }, [regions, selectedCountry]);
+
+  const hasCountries = !!(countries && countries.length > 0);
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -92,70 +91,71 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
                 name="country"
                 control={control}
                 render={({ field }) => (
-                  countries && countries.length > 0 ? (
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        setValue('region', '');
-                      }}
-                    >
-                      <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {countries.map((c) => (
-                          <SelectItem key={c.id} value={c.code}>
-                            {c.code}{c.description ? ` — ${c.description}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      placeholder="Country code (e.g. US, GB, DE)"
-                      className={errors.country ? 'border-destructive' : ''}
-                    />
-                  )
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      setValue('region', '');
+                    }}
+                    disabled={!hasCountries}
+                  >
+                    <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
+                      <SelectValue placeholder={hasCountries ? 'Select country' : 'No SAP values — sync SAP master data'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(countries || []).map((c) => (
+                        <SelectItem key={c.id} value={c.code}>
+                          {c.code}{c.description ? ` — ${c.description}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               />
               {errors.country && <p className="text-xs text-destructive">{errors.country.message}</p>}
-              {(!countries || countries.length === 0) && (
-                <p className="text-xs text-muted-foreground">SAP country master not synced — enter the code manually.</p>
+              {!hasCountries && (
+                <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
               )}
             </div>
 
             <div className="grid gap-1.5">
-              <Label>Region <span className="text-destructive ml-0.5">*</span></Label>
+              <Label>Region (From SAP) <span className="text-destructive ml-0.5">*</span></Label>
               <Controller
                 name="region"
                 control={control}
-                render={({ field }) => (
-                  regionsForCountry && regionsForCountry.length > 0 ? (
-                    <Select value={field.value} onValueChange={field.onChange} disabled={!selectedCountry}>
+                render={({ field }) => {
+                  const hasRegions = regionsForCountry.length > 0;
+                  return (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={!selectedCountry || !hasRegions}
+                    >
                       <SelectTrigger className={errors.region ? 'border-destructive' : ''}>
-                        <SelectValue placeholder={selectedCountry ? 'Select region' : 'Select country first'} />
+                        <SelectValue
+                          placeholder={
+                            !selectedCountry
+                              ? 'Select country first'
+                              : hasRegions
+                              ? 'Select region'
+                              : 'No SAP regions for this country'
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {regionsForCountry.map((r) => (
-                          <SelectItem key={r.id} value={r.code}>
-                            {r.code}{r.description ? ` — ${r.description}` : ''}
-                          </SelectItem>
-                        ))}
+                        {regionsForCountry.map((r) => {
+                          const extra = (r.extra || {}) as Record<string, unknown>;
+                          const bland = (extra.BLAND as string | undefined) ?? r.code;
+                          return (
+                            <SelectItem key={r.id} value={bland}>
+                              {bland}{r.description ? ` — ${r.description}` : ''}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <Input
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      placeholder="Region / State"
-                      className={errors.region ? 'border-destructive' : ''}
-                      disabled={!selectedCountry}
-                    />
-                  )
-                )}
+                  );
+                }}
               />
               {errors.region && <p className="text-xs text-destructive">{errors.region.message}</p>}
             </div>
