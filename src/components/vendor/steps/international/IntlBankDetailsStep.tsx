@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Landmark } from 'lucide-react';
 import { InternationalBankDetails } from '@/types/vendor';
+import { useSapMasterData } from '@/hooks/useSapMasterData';
 
 interface Props {
   data: InternationalBankDetails;
@@ -12,9 +14,12 @@ interface Props {
 }
 
 export function IntlBankDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
-  const { register, handleSubmit, watch } = useForm<InternationalBankDetails>({
+  const { register, control, handleSubmit, watch } = useForm<InternationalBankDetails>({
     defaultValues: data,
   });
+
+  const { data: countries } = useSapMasterData('country');
+  const hasCountries = !!(countries && countries.length > 0);
 
   useEffect(() => {
     const sub = watch((vals) => onLiveUpdate?.(vals as InternationalBankDetails));
@@ -62,6 +67,34 @@ export function IntlBankDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
               })}
               placeholder="e.g. GB29NWBK60161331926819"
             />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Bank Country (From SAP)</Label>
+            <Controller
+              name="bankCountry"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value || ''}
+                  onValueChange={field.onChange}
+                  disabled={!hasCountries}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={hasCountries ? 'Select country' : 'No SAP values — sync SAP master data'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(countries || []).map((c) => (
+                      <SelectItem key={c.id} value={c.code}>
+                        {c.code}{c.description ? ` — ${c.description}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {!hasCountries && (
+              <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
+            )}
           </div>
         </div>
       </div>
