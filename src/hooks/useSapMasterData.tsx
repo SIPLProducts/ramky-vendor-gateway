@@ -40,6 +40,71 @@ export function useSapMasterData(masterType: string | undefined) {
   });
 }
 
+/**
+ * Loads SAP master data for `masterType`. If the cache is empty after the
+ * first read, automatically triggers `sap-master-fetch` for that type and
+ * exposes a granular status so the UI can show:
+ *   - fetching   → "Classification data fetching..."
+ *   - errorMessage → "Classification fetch failed — <reason>"
+ *   - retry()    → re-trigger sync from SAP
+ */
+export function useEnsureSapMaster(masterType: string | undefined) {
+  const qc = useQueryClient();
+  const query = useSapMasterData(masterType);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [autoTried, setAutoTried] = useState(false);
+
+  const runSync = useCallback(async () => {
+    if (!masterType) return;
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("sap-master-fetch", {
+        body: { master_type: masterType },
+      });
+      if (error) throw error;
+      if (data && data.success === false) {
+        const msg = [data.message, data.hint].filter(Boolean).join(" — ");
+        setSyncError(msg || "Unknown SAP error");
+      } else {
+        await qc.invalidateQueries({ queryKey: ["sap_master_data", masterType] });
+      }
+    } catch (e: any) {
+      setSyncError(e?.message || "Could not reach SAP");
+    } finally {
+      setSyncing(false);
+    }
+  }, [masterType, qc]);
+
+  // Auto-trigger one sync if list is empty on first successful fetch.
+  useEffect(() => {
+    if (!masterType || autoTried) return;
+    if (query.isLoading || query.isFetching) return;
+    if (query.data && query.data.length === 0 && !syncing) {
+      setAutoTried(true);
+      runSync();
+    } else if (query.data && query.data.length > 0) {
+      setAutoTried(true);
+    }
+  }, [masterType, autoTried, query.isLoading, query.isFetching, query.data, syncing, runSync]);
+
+  const retry = useCallback(() => {
+    setAutoTried(true);
+    runSync();
+  }, [runSync]);
+
+  const fetching = query.isLoading || query.isFetching || syncing;
+  const errorMessage = syncError || (query.isError ? (query.error as any)?.message || "Failed to load data" : null);
+
+  return {
+    rows: query.data,
+    fetching,
+    errorMessage,
+    retry,
+  };
+}
+
 export function useUpsertSapMaster() {
   const qc = useQueryClient();
   return useMutation({
