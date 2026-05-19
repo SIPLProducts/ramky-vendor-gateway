@@ -1,43 +1,61 @@
 ## Goal
-Stop the recurring `PayloadTooLargeError: request entity too large` during DMS document upload and make it obvious which middleware version/config is actually running on Windows.
+Make the DMS upload flow send exactly the SAP payload shape you shared and treat the SAP success response array as the final successful upload result.
 
-## Plan
-1. **Make the middleware limit fail-safe**
-   - Increase the default middleware body parser limit beyond the current upload size.
-   - Add a startup banner that always prints the active body limit and middleware version.
-   - Add `/health` fields for `bodyLimit`, `middlewareVersion`, and current upload endpoint.
+## What I will change
 
-2. **Move the oversized-payload handler before normal route flow where Express can return JSON cleanly**
-   - Keep the existing SAP payload shape unchanged:
+1. **Keep your app request body as-is**
+   - The frontend/backend function can continue receiving:
+     ```json
+     { "vendorIds": ["7fc4723c-3a26-43e6-a0e0-2aff76727ac3"] }
+     ```
+   - The DMS sync function will fetch that vendor and its uploaded documents, then build the SAP payload automatically.
+
+2. **Build the exact SAP DMS payload**
+   - Send this format to the middleware/SAP endpoint:
      ```json
      {
-       "BP_LIFNR": "0001061303",
+       "BP_LIFNR": "1061301",
        "FILE_UPLOAD": [
-         { "FILE": "<base64>", "FILE_PATH": "..." }
+         { "FILE": "BASE64", "FILE_PATH": "PATH1" },
+         { "FILE": "BASE64", "FILE_PATH": "PATH2" }
        ]
      }
      ```
-   - Return a clear JSON `413` response if the request is still too large instead of the HTML/stack trace page.
+   - Normalize `BP_LIFNR` so the response can support SAP’s padded value like `0001061303`.
 
-3. **Add hard proof that the correct local file is running**
-   - Print a unique version line on startup, e.g. `Middleware build: dms-large-upload-v2`.
-   - Update the Windows instructions so after copying the new `server.js`, you verify with:
-     ```powershell
-     curl http://localhost:3002/health
+3. **Return SAP success response cleanly**
+   - If SAP returns:
+     ```json
+     [
+       {
+         "BP_LIFNR": "0001061303",
+         "MSGTYP": "S",
+         "MSGNR": "200",
+         "MSG": "File(s) Uploaded Successfully"
+       }
+     ]
      ```
-   - If `Body limit` / `middlewareVersion` is missing, it means Windows is still running an old `server.js` or a different folder/process.
+   - The DMS sync result will mark the vendor upload as successful, save the SAP response in audit logs, and expose that SAP row back in the result.
 
-4. **Reduce upload payload pressure from the cloud function**
-   - Raise the current per-document gate in `sync-vendor-to-dms` only as needed, but keep a safe upper bound.
-   - Improve error message shown to the app so it clearly says whether the failure happened in middleware body parsing or SAP.
+4. **Reduce repeated 413 payload failures at the source**
+   - Instead of sending all documents in one very large JSON request, split documents into smaller batches before calling `/sap/dms/upload`.
+   - This avoids hitting Express JSON parser limits even when multiple files exist.
+   - Keep each batch under a safe request-size threshold and still upload all documents for the vendor.
 
-5. **Document the exact restart steps**
-   - Add a short “Repeated 413 fix” section in `middleware/README.md`:
-     - stop all old Node processes on port `3002`
-     - confirm the correct folder: `D:\middleware (2)\middleware`
-     - set optional `.env`: `MIDDLEWARE_BODY_LIMIT=500mb`
-     - restart: `node server.js`
-     - verify `/health` includes the new version and body limit
+5. **Improve middleware response passthrough**
+   - Keep middleware accepting the exact DMS payload.
+   - Preserve SAP’s response array under `sapResponse` so the cloud function can parse success correctly.
+   - Improve error details for `PAYLOAD_TOO_LARGE` so the portal shows whether the failure happened before SAP or inside SAP.
 
-## Important note
-The log you shared does **not** show `Body limit: 200mb`, so the deployed Windows middleware is almost certainly still running an old copy of `server.js` or a different Node process/folder. This plan fixes the code and adds verification so we can prove the correct middleware is running before retrying DMS upload.
+6. **Update middleware docs/env example**
+   - Add `MIDDLEWARE_BODY_LIMIT=500mb` to `.env.example` so future Windows copies are configured correctly.
+   - Correct README text that still says 200 MB, so the instructions match the current 500 MB code.
+
+## Technical notes
+- Files to update:
+  - `supabase/functions/sync-vendor-to-dms/index.ts`
+  - `middleware/server.js`
+  - `middleware/.env.example`
+  - `middleware/README.md`
+- No database schema changes are required.
+- The current Windows log still suggests an old middleware copy may be running if it does not print `Middleware build: dms-large-upload-v3` and `Body limit: 500mb`.

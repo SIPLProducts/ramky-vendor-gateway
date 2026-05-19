@@ -125,15 +125,10 @@ serve(async (req) => {
         }
       }
 
-      // SAP DMS payload shape
-      const payload = {
-        BP_LIFNR: vendor.sap_vendor_code,
-        FILE_UPLOAD: uploads,
-      };
-
       let success = false;
       let message = "";
       let sapRow: any = null;
+      const allSapRows: any[] = [];
 
       if (!dmsUrl) {
         success = true;
@@ -142,54 +137,96 @@ serve(async (req) => {
         success = false;
         message = "No uploadable documents found for this vendor";
       } else {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 120000);
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
-          const res = await fetch(dmsUrl, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          });
-          clearTimeout(timer);
-          const text = await res.text();
-          console.log(`DMS raw status: ${res.status} body: ${text.slice(0, 500)}`);
+        // Split into batches to avoid 413 PayloadTooLarge at the middleware.
+        // Each batch keeps total approximate JSON size under BATCH_MAX_BYTES.
+        const BATCH_MAX_BYTES = 40 * 1024 * 1024; // ~40MB per request
+        const batches: any[][] = [];
+        let current: any[] = [];
+        let currentBytes = 0;
+        for (const u of uploads) {
+          // base64 length is the dominant cost; approximate ~1 byte per char
+          const sz = (u.FILE?.length || 0) + (u.FILE_PATH?.length || 0) + 64;
+          if (current.length > 0 && currentBytes + sz > BATCH_MAX_BYTES) {
+            batches.push(current);
+            current = [];
+            currentBytes = 0;
+          }
+          current.push(u);
+          currentBytes += sz;
+        }
+        if (current.length > 0) batches.push(current);
 
-          let inner: any = null;
+        let batchErrors = 0;
+        let lastErrorMessage = "";
+
+        for (let i = 0; i < batches.length; i++) {
+          const payload = {
+            BP_LIFNR: vendor.sap_vendor_code,
+            FILE_UPLOAD: batches[i],
+          };
+
           try {
-            const parsed = JSON.parse(text);
-            inner = parsed && typeof parsed === "object" && "sapResponse" in parsed
-              ? parsed.sapResponse
-              : parsed;
-          } catch {
-            inner = null;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 180000);
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
+            const res = await fetch(dmsUrl, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            });
+            clearTimeout(timer);
+            const text = await res.text();
+            console.log(`DMS batch ${i + 1}/${batches.length} status=${res.status} body=${text.slice(0, 300)}`);
+
+            let inner: any = null;
+            try {
+              const parsed = JSON.parse(text);
+              if (parsed && typeof parsed === "object" && parsed.code === "PAYLOAD_TOO_LARGE") {
+                batchErrors++;
+                lastErrorMessage = `Middleware rejected batch ${i + 1}: ${parsed.error || "payload too large"}`;
+                continue;
+              }
+              inner = parsed && typeof parsed === "object" && "sapResponse" in parsed
+                ? parsed.sapResponse
+                : parsed;
+            } catch {
+              inner = null;
+            }
+
+            const rows: any[] = Array.isArray(inner)
+              ? inner
+              : (inner && typeof inner === "object" ? [inner] : []);
+            allSapRows.push(...rows);
+
+            const batchOk = res.ok && rows.length > 0 && rows.every((r: any) => r?.MSGTYP === "S");
+            const firstErr = rows.find((r: any) => r?.MSGTYP && r.MSGTYP !== "S");
+
+            if (!batchOk) {
+              batchErrors++;
+              if (res.ok && firstErr?.MSG) {
+                lastErrorMessage = `SAP DMS error (batch ${i + 1}): ${firstErr.MSG}`;
+              } else if (!res.ok) {
+                lastErrorMessage = `DMS upload failed (HTTP ${res.status}) on batch ${i + 1}: ${text.slice(0, 200)}`;
+              } else {
+                lastErrorMessage = `SAP DMS returned no success rows on batch ${i + 1}`;
+              }
+            }
+          } catch (e: any) {
+            batchErrors++;
+            lastErrorMessage = `Could not reach DMS endpoint on batch ${i + 1}: ${e?.message || "network error"}`;
           }
+        }
 
-          const rows: any[] = Array.isArray(inner)
-            ? inner
-            : (inner && typeof inner === "object" ? [inner] : []);
+        sapRow = allSapRows.find((r) => r?.MSGTYP === "S") || allSapRows[0] || null;
 
-          const allSuccess = rows.length > 0 && rows.every((r: any) => r?.MSGTYP === "S");
-          const firstError = rows.find((r: any) => r?.MSGTYP && r.MSGTYP !== "S");
-          sapRow = rows[0] || null;
-
-          if (res.ok && allSuccess) {
-            success = true;
-            message = rows[0]?.MSG || `DMS upload OK (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
-          } else if (res.ok && rows.length > 0) {
-            success = false;
-            message = firstError?.MSG
-              ? `SAP DMS error: ${firstError.MSG}`
-              : `SAP DMS returned no success rows`;
-          } else {
-            success = false;
-            message = `DMS upload failed (HTTP ${res.status}): ${text.slice(0, 200)}`;
-          }
-        } catch (e: any) {
+        if (batchErrors === 0) {
+          success = true;
+          message = sapRow?.MSG || `File(s) Uploaded Successfully (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
+        } else {
           success = false;
-          message = `Could not reach DMS endpoint: ${e?.message || "network error"}`;
+          message = lastErrorMessage || `DMS upload failed for ${batchErrors}/${batches.length} batch(es)`;
         }
       }
 
