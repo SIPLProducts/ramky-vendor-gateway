@@ -3,31 +3,40 @@ import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
 
-const previewHosts = ["localhost", "127.0.0.1", ".lovableproject.com", ".lovable.app"];
-const shouldClearPreviewCache = previewHosts.some((host) =>
-  host.startsWith(".")
-    ? window.location.hostname.endsWith(host)
-    : window.location.hostname === host
-);
+const isInIframe = (() => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+})();
 
-async function clearPreviewPwaCache() {
-  if (!shouldClearPreviewCache || !("serviceWorker" in navigator)) return;
+const hostname = window.location.hostname;
+const isPreviewHost =
+  hostname === "localhost" ||
+  hostname === "127.0.0.1" ||
+  hostname.includes("id-preview--") ||
+  hostname.endsWith(".lovableproject.com") ||
+  hostname.endsWith(".lovable.app") ||
+  hostname.endsWith(".lovable.dev");
 
+const shouldDisableSW = isInIframe || isPreviewHost;
+
+async function clearServiceWorkers() {
+  if (!("serviceWorker" in navigator)) return;
   try {
     const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
-
+    await Promise.all(registrations.map((r) => r.unregister()));
     if ("caches" in window) {
-      const cacheKeys = await caches.keys();
-      await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
     }
   } catch (error) {
-    console.error("Failed to clear preview cache", error);
+    console.error("Failed to clear service workers", error);
   }
 }
 
 function notifyNewVersion() {
-  // Lazy import sonner so it doesn't affect initial bundle critical path
   import("sonner").then(({ toast }) => {
     toast.info("A new version is available", {
       description: "Refreshing in 3 seconds to load the latest update…",
@@ -36,42 +45,49 @@ function notifyNewVersion() {
   });
 }
 
-clearPreviewPwaCache().finally(() => {
+function mount() {
   createRoot(document.getElementById("root")!).render(
     <HelmetProvider>
       <App />
     </HelmetProvider>
   );
+}
 
-  if (!("serviceWorker" in navigator)) return;
+if (shouldDisableSW) {
+  // Preview / iframe: ensure no SW controls the page, then mount.
+  clearServiceWorkers().finally(mount);
+} else {
+  mount();
 
-  // Periodically check for updates so long-lived sessions also pick up new versions
-  navigator.serviceWorker.getRegistrations().then((regs) => {
-    regs.forEach((reg) => {
-      reg.update();
-      reg.addEventListener("updatefound", () => {
-        const installing = reg.installing;
-        if (!installing) return;
-        installing.addEventListener("statechange", () => {
-          if (installing.state === "installed" && navigator.serviceWorker.controller) {
-            // A newer SW is waiting — let the user know; controllerchange will reload.
-            notifyNewVersion();
-          }
+  if (!("serviceWorker" in navigator)) {
+    // nothing else to do
+  } else {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => {
+        reg.update();
+        reg.addEventListener("updatefound", () => {
+          const installing = reg.installing;
+          if (!installing) return;
+          installing.addEventListener("statechange", () => {
+            if (installing.state === "installed" && navigator.serviceWorker.controller) {
+              notifyNewVersion();
+            }
+          });
         });
       });
     });
-  });
 
-  // Re-check whenever the tab regains focus
-  window.addEventListener("focus", () => {
-    navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.update()));
-  });
+    window.addEventListener("focus", () => {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => regs.forEach((r) => r.update()));
+    });
 
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (refreshing) return;
-    refreshing = true;
-    // Small delay so the toast is visible before reload
-    setTimeout(() => window.location.reload(), 800);
-  });
-});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      setTimeout(() => window.location.reload(), 800);
+    });
+  }
+}

@@ -15,6 +15,18 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      // Never run the SW during dev/preview — it breaks the Lovable iframe.
+      devOptions: { enabled: false },
+      // Use the static kill-switch SW in public/sw.js instead of generating one.
+      // This guarantees previously-installed SWs are cleaned up and no new
+      // workbox SW is registered to interfere with preview navigations.
+      strategies: "injectManifest",
+      srcDir: "public",
+      filename: "sw.js",
+      injectRegister: false,
+      injectManifest: {
+        injectionPoint: undefined,
+      },
       includeAssets: ["ramky-logo.png", "favicon.ico"],
       manifest: {
         name: "Ramky Vendor Portal",
@@ -38,66 +50,6 @@ export default defineConfig(({ mode }) => ({
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",
-          },
-        ],
-      },
-      workbox: {
-        clientsClaim: true,
-        skipWaiting: true,
-        cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,woff,ttf}"],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "supabase-api-cache",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
-              },
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "supabase-storage-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "image-cache",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:woff|woff2|ttf|otf)$/,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "font-cache",
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-            },
           },
         ],
       },

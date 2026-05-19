@@ -1,56 +1,32 @@
-# Bind real SAP DMS upload in the SAP Sync screen
+## Root cause
 
-The DMS Sync tab and `sync-vendor-to-dms` edge function already exist but currently send a custom payload (`UPLOAD: [{FILE_NAME, FILE, FILE_PATH}]`) and the middleware has no DMS route — so it always falls through to "simulated" mode. The actual SAP endpoint you shared expects a different shape and returns the classic SAP `MSGTYP`/`MSG`/`BP_LIFNR` array.
+The recurring broken-document preview is caused by the existing PWA/service worker setup, not by the SAP/DMS work.
 
-## SAP contract (confirmed from your message)
+Current code still ships `vite-plugin-pwa` with aggressive service-worker behavior (`clientsClaim`, `skipWaiting`, auto-update). The app also registers update listeners in `src/main.tsx` even inside Lovable preview. In the editor iframe, Lovable uses long rotating preview-token URLs; once a service worker claims that iframe, it can serve stale cached navigation responses or trigger reloads against expired/protected preview URLs. That is why the issue comes back repeatedly.
 
-- **URL:** `http://10.200.1.2:8000/vendor/bp/create?sap-client=300` (DMS upload — same host as BP create, configurable)
-- **Method:** POST, Basic Auth
-- **Request:**
-  ```json
-  { "BP_LIFNR": "1061301",
-    "FILE_UPLOAD": [
-      { "FILE": "BASE64", "FILE_PATH": "PATH1" },
-      { "FILE": "BASE64", "FILE_PATH": "PATH2" }
-    ] }
-  ```
-- **Response (array):**
-  ```json
-  [{ "BP_LIFNR":"0001061303","MSGTYP":"S","MSGNR":"200",
-     "ERDAT":"2026-05-18","UZEIT":"18:57:22","UNAME":"22000208",
-     "MSG":"File(s) Uploaded Successfully","BP_LIFNRX":"","BPNAME":"","PERNR":0,"EXCEL_ROW":0 }]
-  ```
-  Success = first item `MSGTYP === "S"`.
+## Fix plan
 
-## Changes
+1. **Harden `vite.config.ts` PWA config**
+   - Disable PWA/service worker in development preview.
+   - Add a navigation denylist for Lovable preview/token/internal paths.
+   - Add a `NetworkFirst` strategy for HTML navigations so the app shell is not locked to stale cache.
+   - Keep asset/API caching for the published app only.
 
-### 1. `middleware/server.js` — add real DMS route
-- New env vars: `SAP_DMS_API_URL` (defaults to `SAP_BP_API_URL` if unset), reuse `SAP_BP_USERNAME` / `SAP_BP_PASSWORD`.
-- Add `POST /sap/dms/upload` (auth-guarded, mirrors `/sap/bp/create`):
-  - Forwards JSON body verbatim with Basic Auth.
-  - Returns `{ ok, sapStatus, durationMs, sapResponse }`.
-- Update `/` index endpoint list + `.env.example`.
+2. **Update `src/main.tsx` preview guard**
+   - Detect Lovable preview hosts and iframe context before mounting React.
+   - In those contexts, unregister all service workers and delete all caches.
+   - Do **not** attach `updatefound`, `focus reg.update()`, or `controllerchange reload` listeners in preview/iframe.
+   - Keep update notification/reload logic only for real published/non-preview usage.
 
-### 2. `supabase/functions/sync-vendor-to-dms/index.ts` — match SAP shape
-- Build payload as `{ BP_LIFNR: vendor.sap_vendor_code, FILE_UPLOAD: [{ FILE, FILE_PATH }] }` (drop `UPLOAD`, `idnum`, `BPNAME`, `FILE_NAME`).
-- Skip vendors without `sap_vendor_code` with a clear message ("Vendor not yet synced to SAP").
-- Parse middleware response: unwrap `sapResponse`, accept either an array or single object; success when any row has `MSGTYP === "S"`.
-- Capture `BP_LIFNR`, `MSG`, `MSGTYP`, `ERDAT`, `UZEIT` and return them per vendor in `results[].sap` so the UI can render them.
-- Keep existing simulation fallback only when middleware URL is missing.
+3. **Add a service-worker kill switch at `public/sw.js`**
+   - This cleans up service workers already installed in affected browsers.
+   - It will claim clients, delete existing caches, navigate open pages once with a cleanup marker, then unregister itself.
+   - This is needed because simply changing config does not remove an already-installed service worker from users’ browsers.
 
-### 3. `src/pages/SAPSync.tsx` — show SAP fields in DMS result dialog
-- In the DMS Sync Result dialog (lines 555–587), render the returned SAP fields per row: `BP_LIFNR`, `MSG`, `ERDAT UZEIT`, `MSGTYP` badge — same visual style as the SAP sync result dialog.
+4. **Leave SAP/DMS logic untouched**
+   - No changes to DMS payload, middleware, backend functions, database, or vendor workflow.
+   - This fix is limited to the preview/PWA layer causing the recurring broken preview.
 
-### 4. Documentation
-- Append a short "DMS upload" section to `SAP_FIELD_MAPPING.md` documenting the new payload/response.
+## Expected result
 
-## Technical details
-
-- No DB schema changes. `vendors.status` transitions stay: `dms_sync_pending → dms_synced` on success.
-- No new secrets needed in Lovable Cloud — middleware reads `SAP_DMS_API_URL` from its own `.env` on the customer server.
-- Existing audit log entry (`action: "dms_sync"`) extended with `sap_vendor_code` and `msg`.
-
-## Out of scope
-
-- No changes to BP create flow, vendor list, or storage buckets.
-- No retry/queue logic — single-shot upload like today, just pointed at the real endpoint.
+The Lovable preview iframe will stop being controlled by a service worker, so stale/expired preview-token navigations should stop showing the broken-document page. The published app can still keep PWA behavior, but with safer navigation caching.
