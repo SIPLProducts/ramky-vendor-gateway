@@ -998,22 +998,8 @@ export default function VendorRegistration() {
             </div>
           </div>
         </main>
-        <AlertDialog open={!!pendingTypeSwitch} onOpenChange={(o) => { if (!o) setPendingTypeSwitch(null); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Switch vendor type?</AlertDialogTitle>
-              <AlertDialogDescription>
-                You have unsaved data in the {formData.vendorType === 'international' ? 'International' : 'Domestic'} section. Switching will clear it. Continue?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setPendingTypeSwitch(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { if (pendingTypeSwitch) applyVendorTypeSwitch(pendingTypeSwitch); setPendingTypeSwitch(null); }}>
-                Yes, switch
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+
+
       </div>
     );
   }
