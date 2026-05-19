@@ -157,12 +157,16 @@ serve(async (req) => {
     if (middlewareHealth) {
       console.log("DMS middleware health probe:", JSON.stringify(middlewareHealth));
     }
+    // Always prefer /sap/bp/create because that is the route guaranteed to
+    // exist on the current middleware build. SAP differentiates BP-create vs
+    // DMS-upload by the payload shape ({ BP_LIFNR, FILE_UPLOAD }), not by URL.
+    // /sap/dms/upload is tried only as a secondary path for forward compat.
     const healthDmsPath: string | null = (middlewareHealth?.health?.dmsEndpoint && typeof middlewareHealth.health.dmsEndpoint === "string")
       ? middlewareHealth.health.dmsEndpoint
       : null;
     const candidatePaths = Array.from(new Set([
-      ...(healthDmsPath ? [healthDmsPath] : []),
       ...DMS_CANDIDATE_PATHS,
+      ...(healthDmsPath ? [healthDmsPath] : []),
     ]));
     const dmsCandidateUrls = middlewareUrl ? candidatePaths.map((p) => `${middlewareUrl}${p.startsWith("/") ? p : `/${p}`}`) : [];
     const dmsUrl = dmsCandidateUrls[0] || "";
