@@ -139,19 +139,25 @@ serve(async (req) => {
 
   try {
     const reqBody = await req.json();
-    // Accept two shapes:
-    //  A) { vendorIds: string[] }  — legacy multi-vendor flow
-    //  B) { vendorId, payload: { BP_LIFNR, FILE_UPLOAD } } — explicit single-vendor
-    //     payload (visible in browser Inspect).
-    const explicitPayload = (reqBody && reqBody.payload && Array.isArray(reqBody.payload.FILE_UPLOAD))
-      ? reqBody.payload as { BP_LIFNR: string; FILE_UPLOAD: any[] }
+    // Accept three shapes:
+    //  A) { vendorIds: string[] } — legacy multi-vendor flow
+    //  B) { vendorId, payload: { BP_LIFNR, FILE_UPLOAD } } — previous explicit flow
+    //  C) { BP_LIFNR, FILE_UPLOAD } — exact SAP DMS payload visible in browser Inspect
+    const directPayload = (reqBody?.BP_LIFNR && Array.isArray(reqBody?.FILE_UPLOAD))
+      ? { BP_LIFNR: String(reqBody.BP_LIFNR), FILE_UPLOAD: reqBody.FILE_UPLOAD as any[] }
       : null;
+    const wrappedPayload = (reqBody?.payload?.BP_LIFNR && Array.isArray(reqBody?.payload?.FILE_UPLOAD))
+      ? { BP_LIFNR: String(reqBody.payload.BP_LIFNR), FILE_UPLOAD: reqBody.payload.FILE_UPLOAD as any[] }
+      : null;
+    const explicitPayload = directPayload || wrappedPayload;
     const vendorIds: string[] = explicitPayload && reqBody.vendorId
       ? [reqBody.vendorId]
       : (Array.isArray(reqBody?.vendorIds) ? reqBody.vendorIds : []);
+    const vendorCodes: string[] = explicitPayload && !reqBody.vendorId ? [explicitPayload.BP_LIFNR] : [];
+    const targetCount = vendorIds.length || vendorCodes.length;
 
-    if (vendorIds.length === 0) {
-      return ok({ success: false, message: "vendorIds (array) or { vendorId, payload } is required", results: [] });
+    if (targetCount === 0) {
+      return ok({ success: false, message: "vendorIds (array), { vendorId, payload }, or direct { BP_LIFNR, FILE_UPLOAD } is required", results: [] });
     }
 
     const supabase = createClient(
@@ -169,13 +175,10 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
-    // Health check is informational only — never block uploads on it.
-    // Some middleware deployments (older builds, ngrok, reverse proxies) don't
-    // expose middlewareVersion/bodyLimit. We still attempt the upload and let
-    // the actual /sap/dms/upload response decide success/failure.
+    // Health check blocks known-old middleware because it rejects even small DMS JSON payloads.
     const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
     if (middlewareHealth && !middlewareHealth.ok) {
-      console.warn("DMS middleware health warning (continuing anyway):", middlewareHealth.message);
+      return ok({ success: false, message: middlewareHealth.message, results: [] });
     } else if (middlewareHealth?.health) {
       console.log("DMS middleware ready:", JSON.stringify({
         middlewareVersion: middlewareHealth.health.middlewareVersion,
