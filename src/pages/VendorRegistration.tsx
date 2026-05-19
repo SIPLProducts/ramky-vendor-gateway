@@ -1172,7 +1172,8 @@ export default function VendorRegistration() {
             </div>
 
             {/* Form Content */}
-            <div className="p-6">
+            <div className="p-6" key={`step-${formData.vendorType}-${resetNonce}`}>
+
               {renderStep()}
             </div>
 
