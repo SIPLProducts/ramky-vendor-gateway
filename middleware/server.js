@@ -59,7 +59,9 @@ if (!SHARED_SECRET) {
 
 const app = express();
 app.use(helmet());
-app.use(express.json({ limit: "50mb" }));
+const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "50mb";
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
 app.use(morgan("tiny"));
 app.use(
   cors({

@@ -103,3 +103,15 @@ curl -s -X POST http://localhost:3002/sap/bp/create \
 - **502 + `UND_ERR_CONNECT_TIMEOUT` (works in Postman, fails here)** → Node's built-in fetch (undici) has a hard 10s TCP connect timeout by default. This middleware overrides it via `SAP_CONNECT_TIMEOUT_MS` (default 60000). If you still see it, the middleware host genuinely cannot reach the SAP host:port — Postman likely runs from a different machine/network. Verify with `Test-NetConnection 10.200.1.2 -Port 8000` (PowerShell) or `curl -v http://10.200.1.2:8000/...` from the same Windows server. Check firewall, VPN split-tunnel, and any HTTP proxy.
 - **TLS errors against SAP** → set `ALLOW_INSECURE_TLS=1` (only if SAP uses a self-signed cert).
 - **403 from `/sap/proxy`** → target URL host doesn't match `SAP_BP_API_URL` host.
+
+## Redeploy after body-limit / DMS changes
+
+If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, your running middleware predates the 50 MB body limit. Redeploy:
+
+1. Stop the Windows service (or `node server.js` process).
+2. Replace `server.js` (and `package.json` if changed) with the latest from this repo.
+3. Run `npm install` in the middleware folder.
+4. Restart the service.
+5. Verify: `curl http://localhost:3002/health` and re-run a DMS upload from the portal.
+
+Optional: set `MIDDLEWARE_BODY_LIMIT=100mb` in `.env` to bump the limit further without code edits.
