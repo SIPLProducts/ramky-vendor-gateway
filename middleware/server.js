@@ -356,6 +356,7 @@ app.listen(PORT, () => {
   console.log(`Sharvi SAP middleware listening on :${PORT}`);
   console.log(`SAP target: ${SAP_BP_API_URL || "(not configured)"}`);
   console.log(`CORS origins: ${CORS_ORIGINS.join(", ")}`);
+  console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT)`);
   console.log(`Timeouts (ms): request=${TIMEOUT_MS}, connect=${CONNECT_TIMEOUT_MS}, headers=${HEADERS_TIMEOUT_MS}, body=${BODY_TIMEOUT_MS}`);
   if (ALLOW_INSECURE_TLS) console.log("TLS verification: DISABLED (ALLOW_INSECURE_TLS=1)");
 });
