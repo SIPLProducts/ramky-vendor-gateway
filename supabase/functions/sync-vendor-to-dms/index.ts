@@ -31,7 +31,12 @@ const DOC_NAME_MAP: Record<string, string> = {
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const DMS_BATCH_MAX_BYTES = 1 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
-const DMS_CANDIDATE_PATHS = ["/sap/dms/upload", "/dms/upload", "/sap/dms", "/sap/upload"];
+// DMS payload is routed through the existing working middleware route.
+// The middleware forwards whatever JSON body it receives to the SAP target,
+// and SAP behavior is determined by the payload shape (BP_LIFNR + FILE_UPLOAD),
+// not by the middleware path. /sap/dms/upload is kept only as an optional
+// compatibility path for newer middleware builds that expose it.
+const DMS_CANDIDATE_PATHS = ["/sap/bp/create", "/sap/dms/upload"];
 
 type DmsResult = {
   BP_LIFNR: string;
@@ -152,12 +157,16 @@ serve(async (req) => {
     if (middlewareHealth) {
       console.log("DMS middleware health probe:", JSON.stringify(middlewareHealth));
     }
+    // Always prefer /sap/bp/create because that is the route guaranteed to
+    // exist on the current middleware build. SAP differentiates BP-create vs
+    // DMS-upload by the payload shape ({ BP_LIFNR, FILE_UPLOAD }), not by URL.
+    // /sap/dms/upload is tried only as a secondary path for forward compat.
     const healthDmsPath: string | null = (middlewareHealth?.health?.dmsEndpoint && typeof middlewareHealth.health.dmsEndpoint === "string")
       ? middlewareHealth.health.dmsEndpoint
       : null;
     const candidatePaths = Array.from(new Set([
-      ...(healthDmsPath ? [healthDmsPath] : []),
       ...DMS_CANDIDATE_PATHS,
+      ...(healthDmsPath ? [healthDmsPath] : []),
     ]));
     const dmsCandidateUrls = middlewareUrl ? candidatePaths.map((p) => `${middlewareUrl}${p.startsWith("/") ? p : `/${p}`}`) : [];
     const dmsUrl = dmsCandidateUrls[0] || "";
