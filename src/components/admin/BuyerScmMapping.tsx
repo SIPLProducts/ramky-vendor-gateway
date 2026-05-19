@@ -17,10 +17,12 @@ interface MappingRow {
   id: string;
   buyer_user_id: string;
   scm_manager_user_id: string;
+  include_scm_stages: boolean;
   created_at: string;
   buyer?: UserOpt;
   scm?: UserOpt;
 }
+
 
 const SCM_ROLE = 'SCM Manager';
 const BUYER_ROLE = 'Buyer';
