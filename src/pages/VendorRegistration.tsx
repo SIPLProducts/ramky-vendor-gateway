@@ -1118,14 +1118,19 @@ export default function VendorRegistration() {
             </div>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs rounded-lg gap-1.5"
               disabled={isSubmitting}
-              onClick={() => { setPendingChoiceType(formData.vendorType); setVendorTypeChosen(false); }}
+              onClick={() => {
+                setPendingChoiceType(formData.vendorType);
+                setVendorTypeChosen(false);
+              }}
             >
-              Change
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back
             </Button>
+
           </div>
         )}
 
