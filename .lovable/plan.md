@@ -1,51 +1,81 @@
-## Problem
+## Goal
 
-Clicking **Back** from the registration screen only returns the user to the Vendor Type selector — it does NOT clear the current slice or purge uploaded documents. So when the user goes Domestic → International, uploads Registration Copy + SWIFT/IBAN, then clicks **Back** and re-enters the flow (whether they pick the same type or switch), residual fields and previously uploaded files are still attached because:
+When syncing an **International** vendor to SAP, the payload row must use the International form data (Company, Bank, Classification, Documents) while mapping to the same SAP key names that the Domestic flow already produces. Domestic flow stays untouched. Also introduce the new bank keys `swift_code`, `iban`, `iban2` on the payload, and switch `partn_grp` / `taxtype` defaults appropriately for International.
 
-1. `Back` only flips `vendorTypeChosen = false` — no reset, no purge.
-2. `handleVendorTypeChange` early-returns when `next === formData.vendorType`, so re-selecting the same type after Back keeps everything.
-3. The auto-save loop may have already persisted the partial data, and on the next field touch it gets re-saved on top of any reset done elsewhere.
-4. `IntlDocumentsStep` / `DocumentVerificationStep` previews are driven by `data.*File` / `verifiedData`, which must be empty objects after reset (currently are, but only along the partial path).
+## Where the change lives
 
-## Fix
+Single file: `src/lib/sapPayloadBuilder.ts`.
 
-File: `src/pages/VendorRegistration.tsx` only.
+No DB template change is needed — the existing template already emits all the SAP keys the user listed; we only override values post-resolution when the vendor is International. New bank keys (`swift_code`, `iban`, `iban2`) are simply set onto the resolved row regardless (empty string for Domestic, populated for International) so the SAP contract carries them in both cases without disturbing existing Domestic mappings.
 
-### 1. Make Back fully reset + purge
+## International field mapping (applied only when `vendor.vendor_type === 'international'`)
 
-Replace the Back button click handler with a new `handleBackToTypeSelector()` that:
+Source: `vendor.international_data` JSONB (already persisted by `useVendorRegistration` save flow).
 
-- Calls `applyVendorTypeSwitch(formData.vendorType)` **forcing** the reset path (see #2) — clears both domestic and international slices, `completedSteps`, `currentStep=1`, `verifiedData`, `customFieldValues`, `latestStep1DataRef`, declaration.
-- Awaits `purgeVendorArtifacts(vendorId)` if a draft exists, so storage + `vendor_documents` rows are wiped before the selector re-opens.
-- Cancels any pending auto-save timer (`clearTimeout(autoSaveTimerRef.current)`) and sets `autoSaveState = 'idle'` so a stale debounce doesn't re-persist the old payload.
-- Sets `setVendorTypeChosen(false)` and `setPendingChoiceType(formData.vendorType)` last.
-- Shows a toast: "Previous data cleared. Choose vendor type to start fresh."
+| SAP key             | Source                                        |
+|---------------------|-----------------------------------------------|
+| `name1` / `sterm1`  | `intl.company.companyName` (trunc 40 / 20)    |
+| `sterm2`            | `""`                                          |
+| `street`            | `intl.company.companyAddress` (trunc 60)      |
+| `str_suppl1`        | `intl.company.companyAddress` (trunc 40)      |
+| `str_suppl2/3`      | `""`                                          |
+| `postl_cod1`        | `intl.company.pincode` (trunc 10)             |
+| `city`              | `""` (no city captured in intl form)          |
+| `country`           | `intl.company.country` (raw SAP code)         |
+| `region`            | `intl.company.region` (raw SAP code; bypass `region(vendor.registered_state)` resolver) |
+| `mob_number`        | `intl.company.contact1`                       |
+| `tel_number`        | `intl.company.contact2 \|\| ""`               |
+| `smtp_addr`         | `intl.company.email1`                         |
+| `bank_acct`         | `intl.bank.accountNumber`                     |
+| `swift_code` (new)  | `intl.bank.swiftCode`                         |
+| `iban` (new)        | `intl.bank.ibanNumber`                        |
+| `iban2` (new)       | `""`                                          |
+| `bank_key`          | `""`                                          |
+| `bank_ctry`         | `intl.bank.bankCountry \|\| intl.company.country` |
+| `accountholder`     | `intl.bank.companyName`                       |
+| `bankaccountname`   | `intl.bank.bankName`                          |
+| `partn_grp`         | `"ZIMP"` (override default `ZDOM`)            |
+| `taxtype`           | `"IN5"` (Import) — overrides Domestic `IN3`   |
+| `taxnumxl`, `j_1ipanno`, `gstin`-derived | `""`                     |
+| `msme`, `idnum2`    | `""`                                          |
+| `CLASSIFY.*`        | unchanged — already pulls from `vendor.material_group_vendors / vendor_categories / vendor_locations / identification_sources` which the save flow already populates from `intl.classification` |
 
-### 2. Always reset on selector choice (remove same-type early return)
+Identical overrides are also applied to the nested `vendors[0]` block.
 
-In `handleVendorTypeChange(next)`:
+For Domestic: behavior is unchanged. We only ensure the keys `swift_code`, `iban`, `iban2` are emitted as `""` on the row (additive, doesn't break SAP).
 
-- Drop the `if (next === formData.vendorType) return;` guard.
-- Always call `applyVendorTypeSwitch(next)` so picking the same type after Back also produces a clean slate (defence in depth in case Back was bypassed).
+## Skip-region validation
 
-### 3. Make `applyVendorTypeSwitch` purge synchronously before continuing
+`buildSapPayload` currently throws if `vendor.registered_state` is not mapped to an Indian region code. That check is Domestic-only and must be **skipped** when `vendor_type === 'international'` (region comes from the intl form, not from the IN mapping table).
 
-- Change `purgeVendorArtifacts` invocation from fire-and-forget to `await`ed inside an async `applyVendorTypeSwitch`, so the next render of the step components mounts against an empty storage state.
-- Also delete `vendor_validations` / `verified_documents` rows for `vendorId` (best-effort) so Step 1 KYC tabs reload empty.
-- Null out type-specific columns on the `vendors` row in a single update (legal_name, pan, gstin, bank_*, international_* etc.) so the draft persisted in DB matches the cleared UI.
+## Documents
 
-### 4. Reset uploaded-file UI state explicitly
+International documents (`registration_copy`, `swift_iban_details`) already upload through the same `FileUpload` + `vendor_documents` path as Domestic — confirmed in `useVendorRegistration.uploadDocument` and `IntlDocumentsStep`. No changes needed.
 
-- Pass a stable empty-object reference (`EMPTY_INTERNATIONAL_DATA.documents`) into `IntlDocumentsStep` after reset, and `verifiedData={undefined}` into `DocumentVerificationStep`, so their internal previews drop.
-- `FileUpload` already reflects `currentFile` — confirm by snapshotting `key={formData.vendorType + resetNonce}` on the step container; bump a `resetNonce` counter inside `applyVendorTypeSwitch` to force remount of step subtrees (cheapest way to drop any local preview state).
+`buildUploads` remains a no-op (`UPLOAD: []`) as it is today — SAP doc upload is intentionally disabled regardless of vendor type.
 
-### 5. Cleanup dead code
+## Implementation outline
 
-- Remove `hasDomesticData`, `hasInternationalData`, `pendingTypeSwitch` and the obsolete confirmation `AlertDialog` if still present — Back already wipes, so no confirmation is needed.
+```text
+buildSapPayload()
+  ├─ load vendor                                                   (unchanged)
+  ├─ if vendor.vendor_type !== 'international':
+  │     existing region-state guard
+  ├─ merge tenant defaults                                          (unchanged)
+  ├─ classifyArrays                                                  (unchanged — already covers intl)
+  ├─ load template, resolveTemplate(...)                            (unchanged)
+  ├─ row.CLASSIFY expansion                                          (unchanged)
+  ├─ if vendor.vendor_type === 'international':
+  │     const intl = vendor.international_data ?? {}
+  │     apply intl overrides to row.* and row.vendors[0].*
+  │     row.partn_grp = 'ZIMP'; row.taxtype = 'IN5'
+  ├─ row.swift_code ??= ''; row.iban ??= ''; row.iban2 ??= ''
+  └─ return [row]
+```
 
 ## Out of scope
 
-- No schema changes.
-- No edge function changes.
-- No changes to KYC, SAP master, or approval logic.
-- No other files touched.
+- No changes to Domestic field mapping, validation, KYC, or approval flow.
+- No DB schema or template migration.
+- No edge-function changes.
+- No new UI work; all International form fields already exist.
