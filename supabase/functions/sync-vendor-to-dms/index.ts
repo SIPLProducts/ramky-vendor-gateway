@@ -158,7 +158,18 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
-    const results: Array<{ vendorId: string; success: boolean; message: string; uploadedCount: number; skipped: string[] }> = [];
+    const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
+    if (middlewareHealth && !middlewareHealth.ok) {
+      console.error("DMS middleware health check failed:", middlewareHealth.message, middlewareHealth.health || null);
+    } else if (middlewareHealth?.health) {
+      console.log("DMS middleware ready:", JSON.stringify({
+        middlewareVersion: middlewareHealth.health.middlewareVersion,
+        bodyLimit: middlewareHealth.health.bodyLimit,
+        dmsEndpoint: middlewareHealth.health.dmsEndpoint,
+      }));
+    }
+
+    const results: DmsResult[] = [];
 
     for (const vid of vendorIds) {
       const { data: vendor } = await supabase
@@ -215,17 +226,22 @@ serve(async (req) => {
       } else if (uploads.length === 0) {
         success = false;
         message = "No uploadable documents found for this vendor";
+      } else if (middlewareHealth && !middlewareHealth.ok) {
+        success = false;
+        message = middlewareHealth.message;
       } else {
         // Split into batches to avoid 413 PayloadTooLarge at the middleware.
-        // Each batch keeps total approximate JSON size under BATCH_MAX_BYTES.
-        const BATCH_MAX_BYTES = 40 * 1024 * 1024; // ~40MB per request
+        // Each batch keeps total approximate JSON size under DMS_BATCH_MAX_BYTES.
         const batches: any[][] = [];
         let current: any[] = [];
         let currentBytes = 0;
         for (const u of uploads) {
-          // base64 length is the dominant cost; approximate ~1 byte per char
-          const sz = (u.FILE?.length || 0) + (u.FILE_PATH?.length || 0) + 64;
-          if (current.length > 0 && currentBytes + sz > BATCH_MAX_BYTES) {
+          const sz = estimateUploadBytes(u);
+          if (sz > DMS_BATCH_MAX_BYTES) {
+            skipped.push(`${u.FILE_PATH || "document"} (${formatMb(sz)} exceeds safe per-request DMS limit ${formatMb(DMS_BATCH_MAX_BYTES)})`);
+            continue;
+          }
+          if (current.length > 0 && currentBytes + sz > DMS_BATCH_MAX_BYTES) {
             batches.push(current);
             current = [];
             currentBytes = 0;
@@ -243,6 +259,8 @@ serve(async (req) => {
             BP_LIFNR: vendor.sap_vendor_code,
             FILE_UPLOAD: batches[i],
           };
+          const payloadBytes = batches[i].reduce((sum, item) => sum + estimateUploadBytes(item), 0);
+          console.log(`DMS SAP payload batch ${i + 1}/${batches.length}: BP_LIFNR=${payload.BP_LIFNR} files=${batches[i].length} approx=${formatMb(payloadBytes)} paths=${batches[i].map((x) => x.FILE_PATH).join(", ")}`);
 
           try {
             const controller = new AbortController();
