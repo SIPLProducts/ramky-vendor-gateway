@@ -1,81 +1,80 @@
+
 ## Goal
 
-When syncing an **International** vendor to SAP, the payload row must use the International form data (Company, Bank, Classification, Documents) while mapping to the same SAP key names that the Domestic flow already produces. Domestic flow stays untouched. Also introduce the new bank keys `swift_code`, `iban`, `iban2` on the payload, and switch `partn_grp` / `taxtype` defaults appropriately for International.
+1. **Point 1** — On the **Buyer ↔ SCM** screen, add a checkbox per mapping (and a default per buyer) that controls which approval flow is followed:
+   - **Checked** (Row 1 in screenshot): Buyer → L2-SCM → L1-SCM → Finance 1 → Finance 2 → (MSME → CEO Office) → SAP
+   - **Unchecked** (Row 2): Buyer → Finance 1 → Finance 2 → (MSME → CEO Office) → SAP (skip SCM Manager + SCM Head)
 
-## Where the change lives
+2. **Point 2** — Auto-skip any approval stage that has **zero approvers configured** in the matrix:
+   - If L1-SCM empty → go to Finance 1
+   - If Finance 1 empty → go to Finance 2
+   - If L1-SCM AND Finance 1 empty → go directly to Finance 2
+   - Same auto-skip logic applies to any stage in the chain
 
-Single file: `src/lib/sapPayloadBuilder.ts`.
+3. **Do not touch** the Approval Matrix UI or the existing Buyer ↔ SCM table UI layout (screenshots 2 & 3). Only add the checkbox column + a single boolean on the mapping row.
 
-No DB template change is needed — the existing template already emits all the SAP keys the user listed; we only override values post-resolution when the vendor is International. New bank keys (`swift_code`, `iban`, `iban2`) are simply set onto the resolved row regardless (empty string for Domestic, populated for International) so the SAP contract carries them in both cases without disturbing existing Domestic mappings.
+## Scope boundaries
 
-## International field mapping (applied only when `vendor.vendor_type === 'international'`)
+- No changes to `ApprovalMatrixConfig.tsx` rendering / approver editing.
+- No changes to `process-approval-action` action semantics (only the seeded chain shape changes).
+- Domestic vs International vendor flows are untouched.
 
-Source: `vendor.international_data` JSONB (already persisted by `useVendorRegistration` save flow).
+---
 
-| SAP key             | Source                                        |
-|---------------------|-----------------------------------------------|
-| `name1` / `sterm1`  | `intl.company.companyName` (trunc 40 / 20)    |
-| `sterm2`            | `""`                                          |
-| `street`            | `intl.company.companyAddress` (trunc 60)      |
-| `str_suppl1`        | `intl.company.companyAddress` (trunc 40)      |
-| `str_suppl2/3`      | `""`                                          |
-| `postl_cod1`        | `intl.company.pincode` (trunc 10)             |
-| `city`              | `""` (no city captured in intl form)          |
-| `country`           | `intl.company.country` (raw SAP code)         |
-| `region`            | `intl.company.region` (raw SAP code; bypass `region(vendor.registered_state)` resolver) |
-| `mob_number`        | `intl.company.contact1`                       |
-| `tel_number`        | `intl.company.contact2 \|\| ""`               |
-| `smtp_addr`         | `intl.company.email1`                         |
-| `bank_acct`         | `intl.bank.accountNumber`                     |
-| `swift_code` (new)  | `intl.bank.swiftCode`                         |
-| `iban` (new)        | `intl.bank.ibanNumber`                        |
-| `iban2` (new)       | `""`                                          |
-| `bank_key`          | `""`                                          |
-| `bank_ctry`         | `intl.bank.bankCountry \|\| intl.company.country` |
-| `accountholder`     | `intl.bank.companyName`                       |
-| `bankaccountname`   | `intl.bank.bankName`                          |
-| `partn_grp`         | `"ZIMP"` (override default `ZDOM`)            |
-| `taxtype`           | `"IN5"` (Import) — overrides Domestic `IN3`   |
-| `taxnumxl`, `j_1ipanno`, `gstin`-derived | `""`                     |
-| `msme`, `idnum2`    | `""`                                          |
-| `CLASSIFY.*`        | unchanged — already pulls from `vendor.material_group_vendors / vendor_categories / vendor_locations / identification_sources` which the save flow already populates from `intl.classification` |
+## Implementation
 
-Identical overrides are also applied to the nested `vendors[0]` block.
+### 1. Database migration
 
-For Domestic: behavior is unchanged. We only ensure the keys `swift_code`, `iban`, `iban2` are emitted as `""` on the row (additive, doesn't break SAP).
+Add a per-mapping flag and a tenant-wide default:
 
-## Skip-region validation
-
-`buildSapPayload` currently throws if `vendor.registered_state` is not mapped to an Indian region code. That check is Domestic-only and must be **skipped** when `vendor_type === 'international'` (region comes from the intl form, not from the IN mapping table).
-
-## Documents
-
-International documents (`registration_copy`, `swift_iban_details`) already upload through the same `FileUpload` + `vendor_documents` path as Domestic — confirmed in `useVendorRegistration.uploadDocument` and `IntlDocumentsStep`. No changes needed.
-
-`buildUploads` remains a no-op (`UPLOAD: []`) as it is today — SAP doc upload is intentionally disabled regardless of vendor type.
-
-## Implementation outline
-
-```text
-buildSapPayload()
-  ├─ load vendor                                                   (unchanged)
-  ├─ if vendor.vendor_type !== 'international':
-  │     existing region-state guard
-  ├─ merge tenant defaults                                          (unchanged)
-  ├─ classifyArrays                                                  (unchanged — already covers intl)
-  ├─ load template, resolveTemplate(...)                            (unchanged)
-  ├─ row.CLASSIFY expansion                                          (unchanged)
-  ├─ if vendor.vendor_type === 'international':
-  │     const intl = vendor.international_data ?? {}
-  │     apply intl overrides to row.* and row.vendors[0].*
-  │     row.partn_grp = 'ZIMP'; row.taxtype = 'IN5'
-  ├─ row.swift_code ??= ''; row.iban ??= ''; row.iban2 ??= ''
-  └─ return [row]
+```sql
+ALTER TABLE public.buyer_scm_mappings
+  ADD COLUMN include_scm_stages boolean NOT NULL DEFAULT true;
 ```
+
+Rationale: when a vendor is invited by a buyer, we read that buyer's mapping row; the `include_scm_stages` flag decides whether SCM_MANAGER + SCM_HEAD levels are seeded. Default `true` preserves current behavior for existing rows.
+
+### 2. Rework `public.seed_vendor_approval_progress(_vendor_id uuid)`
+
+Update the existing function (new migration, replaces body) so that, when building the `ordered` CTE of approval levels for the vendor:
+
+- **a.** Look up the buyer for this vendor via `vendor_invitations.created_by` (fallback: `vendors.user_id` → not a buyer, so default to "include SCM"). Then check `buyer_scm_mappings` for any row where `buyer_user_id = <buyer>` AND `tenant_id = v_tenant`. If any such row has `include_scm_stages = false`, set local `v_skip_scm := true`.
+
+- **b.** When `v_skip_scm` is true, exclude levels whose `stage IN ('SCM_MANAGER','SCM_HEAD')`.
+
+- **c.** **Auto-skip empty stages**: for each candidate level, `LEFT JOIN approval_matrix_approvers a ON a.level_id = l.id` and filter to levels where at least one approver row exists (`HAVING count(a.id) > 0`). This makes empty L1-SCM / Finance 1 / etc. drop out of the chain automatically, so the next configured stage becomes the next pending level.
+
+- **d.** Renumber the remaining levels 1..N via `ROW_NUMBER()` as today, and set `vendors.status` to the first stage's review status (existing CASE mapping).
+
+- **e.** If after filtering zero levels remain → behave as today (`RETURN 0, NULL`), keeping the vendor in its previous status so the caller can decide.
+
+### 3. Update `process-approval-action/index.ts` AUTO-EXTEND block
+
+The existing block re-checks `approval_matrix_levels` and inserts any newly added stages after an approval. Mirror the same two filters there:
+
+- Skip `SCM_MANAGER` / `SCM_HEAD` levels when the vendor's buyer mapping has `include_scm_stages = false`.
+- Skip any level that currently has zero rows in `approval_matrix_approvers`.
+
+This keeps both the initial seeding path and the "matrix grew later" path consistent.
+
+### 4. `BuyerScmMapping.tsx` UI
+
+- **Add column** to the "Existing Mappings" table: `Include SCM in approval flow` with an inline `<Switch />` (or `<Checkbox />`) bound to `include_scm_stages`. Toggling immediately `UPDATE buyer_scm_mappings SET include_scm_stages = $1` for that row.
+- **Add toggle** to the "Add Buyer ↔ SCM Manager Mapping" card, defaulting to `true` (checked), with helper text:
+  > "When unchecked, vendors created by this buyer skip SCM Manager / SCM Head approvals and go directly to Finance 1."
+- Insert the value alongside the existing insert call.
+
+No other UI files change.
+
+### 5. Manual verification
+
+After deploy:
+- Toggle the checkbox off for a buyer mapping, invite a new vendor, submit → vendor.status should land in `finance_1_review`, approval chain rows should contain only Finance 1 / Finance 2 (+ CEO if MSME).
+- With checkbox on but `Finance 1` approver list empty → chain should contain SCM_MANAGER, SCM_HEAD, FINANCE_2 (Finance 1 skipped).
 
 ## Out of scope
 
-- No changes to Domestic field mapping, validation, KYC, or approval flow.
-- No DB schema or template migration.
-- No edge-function changes.
-- No new UI work; all International form fields already exist.
+- No new edge functions.
+- No changes to vendor registration form.
+- No changes to SAP payload builder.
+- No changes to Domestic/International switching flow.
