@@ -264,6 +264,7 @@ serve(async (req) => {
 
         let batchErrors = 0;
         let lastErrorMessage = "";
+        let workingDmsUrl: string | null = null;
 
         for (let i = 0; i < batches.length; i++) {
           const payload = {
