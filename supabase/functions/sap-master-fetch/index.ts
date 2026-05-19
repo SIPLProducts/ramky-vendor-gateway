@@ -49,9 +49,7 @@ function findConfig(configs: any[]): any | null {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const auth = await requireAuthenticatedUser(req, [
-    "admin", "sharvi_admin", "customer_admin", "finance", "SAP Team",
-  ]);
+  const auth = await requireAuthenticatedUser(req);
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
