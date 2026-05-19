@@ -1,30 +1,62 @@
 ## Problem
 
-SAP now returns a wrapped shape:
+Current DMS flow already builds the exact SAP format:
 ```json
-[{ "ACC_RES": [...], "TOT_RES": [...] }]
+{
+  "BP_LIFNR": "1061301",
+  "FILE_UPLOAD": [
+    { "FILE": "<base64>", "FILE_PATH": "PATH1" },
+    { "FILE": "<base64>", "FILE_PATH": "PATH2" }
+  ]
+}
 ```
-The current single-sync edge function looks for `MSGTYP === "S"` + `"business partner created"` at the **top level**, never matches, and falls through to the hardcoded `"SAP did not confirm Business Partner creation"`.
+and SAP responds with the flat array you showed:
+```json
+[{ "BP_LIFNR": "...", "MSGTYP": "S", "MSG": "File(s) Uploaded Successfully", ... }]
+```
 
-`ACC_RES` is the authoritative success block — `MSGTYP`, `BP_LIFNR`, `LONGMSG` (e.g. `"BP Vendor Created with 1061306 Successfully for ..."`). The user wants **only `ACC_RES`** displayed in both single and multiple sync popups.
+The failure is **not** in the SAP call. It is the on-prem middleware rejecting the request before it ever reaches SAP:
+```
+HTTP 413 PayloadTooLargeError: request entity too large
+  at jsonParser (D:\middleware (2)\middleware\node_modules\body-parser\lib\read.js)
+```
+
+Three base64 documents easily exceed Express's default 100 KB JSON body limit. The repo's `middleware/server.js` already sets `express.json({ limit: "50mb" })`, but the running instance at `D:\middleware (2)\` is an older build without that limit, so it still 413s.
+
+You asked to keep the SAP single-request format — so the fix stays server-side, not in the payload shape.
 
 ## Fix
 
-### 1. `supabase/functions/sync-vendor-to-sap/index.ts`
-- After parsing `sapResponse`, detect the new shape: if first item has `ACC_RES`, extract `ACC_RES`.
-- Determine success purely from `ACC_RES`: success if any row has `MSGTYP === "S"` and a `BP_LIFNR`.
-- Take `sapVendorCode` from that ACC_RES row's `BP_LIFNR`.
-- Remove the hardcoded `"SAP did not confirm Business Partner creation"` fallback. On failure, surface the first ACC_RES `MSG`/`LONGMSG`, else `"SAP returned no ACC_RES rows"`.
-- Return `{ success, sapVendorCode, sapReferenceNo, message, ACC_RES }` (plus raw `sapResponse` for debugging only; UI will not render it).
-- Keep flat-array fallback for older SAP responses (no ACC_RES present) — synthesize an `ACC_RES`-shaped row from the first `S`/`E` item so the popup still works.
+### 1. `middleware/server.js` — raise limits explicitly and add urlencoded parity
+Confirm/keep:
+- `app.use(express.json({ limit: "50mb" }))`
+- Add `app.use(express.urlencoded({ limit: "50mb", extended: true }))` for parity.
+- Optional: read limit from env `MIDDLEWARE_BODY_LIMIT` (default `50mb`) so the customer can bump it without code edits.
 
-### 2. `src/pages/SAPSync.tsx`
-- **Single sync result dialog**: render only `ACC_RES` rows (`LONGMSG` / `MSG`, `BP_LIFNR`, `BPNAME` if present, MSGTYP badge). Remove the existing `sapResponse.map` block. Show empty state if ACC_RES is empty.
-- **Multiple sync result dialog**: already renders `bulkResult.ACC_RES` — keep as-is (no TOT_RES or other blocks).
-- Update `handleConfirmSync` error fallback to populate `ACC_RES` (not `sapResponse`) so the dialog renders consistently on failure.
+### 2. `middleware/README.md` — document the redeploy step
+Add a short section:
+- Stop the Windows service / node process.
+- Replace `D:\middleware (2)\middleware\server.js` (and `package.json` if changed) with the latest from repo.
+- `npm install` (no new deps, safe).
+- Restart the service.
+- Verify with `curl` against `/health` and a small `/sap/dms/upload` test.
+
+### 3. `supabase/functions/sync-vendor-to-dms/index.ts` — response parsing only
+Keep the **single batched request** in SAP format. Only refine response handling so the UI message is accurate when SAP returns the flat array:
+- Treat parsed response as array (`rows`).
+- `success = rows.every(r => r?.MSGTYP === "S")` (every file row OK).
+- `message` = first row's `MSG` (e.g. `"File(s) Uploaded Successfully"`), or first error `MSG` on failure.
+- Continue returning `sap` row array so the UI can list each file's status.
+- Drop the misleading single-row `find(MSGTYP==='S')` so partial failures are surfaced.
+
+No change to payload structure. No per-file splitting.
 
 ## Out of scope
-- No DB schema changes.
-- No DMS / middleware changes.
-- Bulk sync edge function unchanged (already returns `ACC_RES`).
-- Vendor workflow unchanged — successful sync still moves vendor to `dms_sync_pending`.
+- Database schema.
+- BP create flow (`sync-vendor-to-sap`) — unchanged.
+- Bulk SAP sync — unchanged.
+- UI dialog layout — only the message text changes through the edge function response.
+
+## Technical notes
+- 50 MB covers ~37 MB of raw file bytes after base64 inflation (~33%). Existing 10 MB per-file cap in the edge function already keeps a single vendor's batch well under that.
+- The middleware redeploy is a one-time customer action; without it, the code change in this repo has no effect on the running server.
