@@ -31,8 +31,7 @@ const DOC_NAME_MAP: Record<string, string> = {
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const DMS_BATCH_MAX_BYTES = 1 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
-const MIN_MIDDLEWARE_BODY_LIMIT_BYTES = 10 * 1024 * 1024;
-const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 4;
+const DMS_CANDIDATE_PATHS = ["/sap/dms/upload", "/dms/upload", "/sap/dms", "/sap/upload"];
 
 type DmsResult = {
   BP_LIFNR: string;
