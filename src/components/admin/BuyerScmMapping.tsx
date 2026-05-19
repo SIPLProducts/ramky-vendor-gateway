@@ -244,6 +244,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                 <TableRow>
                   <TableHead>SCM Manager</TableHead>
                   <TableHead>Buyer</TableHead>
+                  <TableHead className="w-56">Include SCM in flow</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -253,6 +254,17 @@ export function BuyerScmMapping({ tenantId }: Props) {
                   <TableRow key={m.id}>
                     <TableCell>{label(m.scm)}</TableCell>
                     <TableCell>{label(m.buyer)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={m.include_scm_stages}
+                          onCheckedChange={(v) => handleToggleScm(m.id, v)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {m.include_scm_stages ? 'With SCM' : 'Skip SCM → Finance 1'}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(m.created_at).toLocaleDateString()}
                     </TableCell>
@@ -265,6 +277,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                 ))}
               </TableBody>
             </Table>
+
           )}
         </CardContent>
       </Card>
