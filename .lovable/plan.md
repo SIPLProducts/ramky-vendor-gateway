@@ -1,103 +1,33 @@
-## What is actually happening
+## Plan
 
-- The DMS upload is now sending a browser-visible request that contains `{ vendorId, payload }`. That is why the vendor ID still appears in the request/response wrapper.
-- The 413 is happening before SAP receives the request. Latest logs show the middleware is still an old running process:
+1. **Remove the hardcoded old-middleware blocker**
+   - In `sync-vendor-to-dms`, stop returning this fixed message before upload:
+     `Old middleware is running. /health must show middlewareVersion...`
+   - Keep `/health` as diagnostic information only, so the upload response is based on the real `/sap/dms/upload` result.
 
-```text
-Old middleware is running. /health must show middlewareVersion dms-large-upload-v3+ and bodyLimit. Current: {}
-DMS SAP payload batch 1/1: BP_LIFNR=1061307 files=3 approx=1.51 MB
-DMS batch 1/1 status=413 PayloadTooLargeError
-```
+2. **Make the DMS response dynamic**
+   - If middleware `/health` returns `{}` or has missing fields, include that information in logs/metadata, but do not fail immediately.
+   - Return the actual middleware/SAP response for each upload batch, including real HTTP status and error body when available.
+   - Preserve SAP-oriented response fields like `BP_LIFNR`; do not expose internal vendor UUIDs in the result.
 
-- Since only ~1.51 MB is rejected, the live middleware is using Express default/small body limits, not the updated 500mb middleware.
+3. **Improve too-large-payload handling**
+   - Keep batching, but make payload-size errors come from the actual request result instead of a pre-check version gate.
+   - When a batch is too large, return a clear dynamic message showing which batch failed, status `413`, and the middleware error body if it exists.
 
-## Implementation plan
+4. **Clean the middleware docs if needed**
+   - Update the README wording that currently says the browser payload only shows `vendorIds`, because the current flow is intended to show the SAP-format payload.
 
-1. Change the browser-visible DMS request to use SAP code only
-   - Update the frontend DMS sync flow to send:
+## Expected result
+
+Browser Inspect will send/show the SAP DMS shape:
 
 ```json
 {
-  "BP_LIFNR": "1061307",
+  "BP_LIFNR": "1061301",
   "FILE_UPLOAD": [
     { "FILE": "BASE64", "FILE_PATH": "PATH1" }
   ]
 }
 ```
 
-   - Remove `vendorId` from the visible upload request body.
-   - The backend will identify the vendor by `BP_LIFNR` instead of `vendorId`.
-
-2. Stop returning vendor ID in the DMS result payload
-   - Update `sync-vendor-to-dms` response so each result returns SAP-oriented fields only, for example:
-
-```json
-{
-  "BP_LIFNR": "1061307",
-  "success": true,
-  "message": "File(s) Uploaded Successfully",
-  "uploadedCount": 3,
-  "sapRows": []
-}
-```
-
-   - Keep internal vendor lookup for status updates/audit logs, but do not expose `vendorId` in the API response.
-
-3. Remove the extra prepare response bloat
-   - Keep `prepare-dms-payload` only for building the exact SAP payload.
-   - The upload function will accept direct `{ BP_LIFNR, FILE_UPLOAD }`, so browser Inspect will show exactly the SAP payload shape instead of a wrapper.
-
-4. Tighten payload sizing to avoid 413
-   - Lower the per-request DMS batch limit further from 8 MB to a safer small limit.
-   - Keep batching in the backend so each call to the middleware remains:
-
-```json
-{
-  "BP_LIFNR": "1061307",
-  "FILE_UPLOAD": [...]
-}
-```
-
-   - If a single file is too large for the current path, return a clear message instead of retrying a guaranteed 413.
-
-5. Restore strict middleware detection
-   - Because the logs prove the old middleware is still running, make the error actionable again when `/health` does not expose `middlewareVersion` and `bodyLimit`.
-   - This avoids sending payloads into an old Express parser that will always fail.
-
-6. Update the DMS result dialog
-   - Show `BP_LIFNR` / SAP code instead of vendor UUID.
-   - Keep uploaded count, skipped documents, and SAP response rows visible.
-
-## Required Windows middleware action
-
-Even after code changes, the 413 will continue if the old Windows process is still running. The current live log proves that port 3002 is not serving the updated middleware.
-
-Run on the Windows middleware machine:
-
-```powershell
-Get-NetTCPConnection -LocalPort 3002 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-cd "D:\middleware (2)\middleware"
-node server.js
-```
-
-Startup must show:
-
-```text
-Middleware build: dms-large-upload-v4
-Body limit: 500mb
-```
-
-Then verify:
-
-```powershell
-curl http://localhost:3002/health
-```
-
-It must include:
-
-```json
-{
-  "middlewareVersion": "dms-large-upload-v4",
-  "bodyLimit": "500mb"
-}
-```
+And the response will be dynamic from the upload attempt, not the hardcoded old-middleware message.

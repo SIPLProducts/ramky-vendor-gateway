@@ -89,43 +89,18 @@ function middlewareMajorVersion(version: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
-async function checkDmsMiddlewareHealth(middlewareUrl: string): Promise<{ ok: boolean; message: string; health?: any }> {
+async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health: any; error?: string }> {
   const healthUrl = `${middlewareUrl}/health`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
-
   try {
     const res = await fetch(healthUrl, { method: "GET", signal: controller.signal });
     const text = await res.text();
     let health: any = null;
-    try { health = JSON.parse(text); } catch { /* non-JSON health response */ }
-
-    if (!res.ok || !health || typeof health !== "object") {
-      return { ok: false, message: `Middleware health check failed at /health (HTTP ${res.status}). Please restart the latest middleware before DMS upload.` };
-    }
-
-    const major = middlewareMajorVersion(health.middlewareVersion);
-    const bodyLimitBytes = parseSizeToBytes(health.bodyLimit);
-
-    if (!major || major < MIN_SUPPORTED_MIDDLEWARE_MAJOR || !bodyLimitBytes) {
-      return {
-        ok: false,
-        health,
-        message: `Old middleware is running. /health must show middlewareVersion dms-large-upload-v${MIN_SUPPORTED_MIDDLEWARE_MAJOR}+ and bodyLimit. Current: ${JSON.stringify({ middlewareVersion: health.middlewareVersion, bodyLimit: health.bodyLimit })}`,
-      };
-    }
-
-    if (bodyLimitBytes < MIN_MIDDLEWARE_BODY_LIMIT_BYTES) {
-      return {
-        ok: false,
-        health,
-        message: `Middleware body limit is too small for DMS upload (${health.bodyLimit}). Set MIDDLEWARE_BODY_LIMIT=500mb and restart middleware.`,
-      };
-    }
-
-    return { ok: true, message: "Middleware ready", health };
+    try { health = JSON.parse(text); } catch { /* non-JSON */ }
+    return { health };
   } catch (e: any) {
-    return { ok: false, message: `Could not reach middleware /health before DMS upload: ${e?.message || "network error"}` };
+    return { health: null, error: e?.message || "network error" };
   } finally {
     clearTimeout(timer);
   }
@@ -175,16 +150,10 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
-    // Health check blocks known-old middleware because it rejects even small DMS JSON payloads.
-    const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
-    if (middlewareHealth && !middlewareHealth.ok) {
-      return ok({ success: false, message: middlewareHealth.message, results: [] });
-    } else if (middlewareHealth?.health) {
-      console.log("DMS middleware ready:", JSON.stringify({
-        middlewareVersion: middlewareHealth.health.middlewareVersion,
-        bodyLimit: middlewareHealth.health.bodyLimit,
-        dmsEndpoint: middlewareHealth.health.dmsEndpoint,
-      }));
+    // Probe middleware /health for diagnostics only — never block uploads on it.
+    const middlewareHealth = middlewareUrl ? await probeDmsMiddlewareHealth(middlewareUrl) : null;
+    if (middlewareHealth) {
+      console.log("DMS middleware health probe:", JSON.stringify(middlewareHealth));
     }
 
     const results: DmsResult[] = [];
