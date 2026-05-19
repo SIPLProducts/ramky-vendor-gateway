@@ -39,22 +39,23 @@ export function ClassificationField({
         {required && <span className="text-destructive ml-0.5">*</span>}
       </Label>
 
-      <MultiSelect
-        options={toOptions(rows)}
-        selected={value || []}
-        onChange={onChange}
-        placeholder={
-          fetching
-            ? "Classification data fetching…"
-            : errorMessage
-            ? "Classification fetch failed"
-            : isEmpty
-            ? "No SAP values — click Sync now"
-            : selectPlaceholder
-        }
-        className={errorText ? "border-destructive" : ""}
-        disabled={fetching || !!errorMessage || isEmpty}
-      />
+      <div className={fetching || !!errorMessage || isEmpty ? "opacity-60 pointer-events-none" : ""}>
+        <MultiSelect
+          options={toOptions(rows)}
+          selected={value || []}
+          onChange={onChange}
+          placeholder={
+            fetching
+              ? "Classification data fetching…"
+              : errorMessage
+              ? "Classification fetch failed"
+              : isEmpty
+              ? "No SAP values — click Sync now"
+              : selectPlaceholder
+          }
+          className={errorText ? "border-destructive" : ""}
+        />
+      </div>
 
       {errorText && <p className="text-xs text-destructive">{errorText}</p>}
 
