@@ -28,7 +28,7 @@ const MASTER_MAP: Record<string, { type: string; code: string; desc?: string; co
   MAT_GRP_VENDOR:     { type: "material_group_vendor",    code: "ATWRT", desc: "ATWTB" },
   CAT_VENDOR:         { type: "vendor_category",          code: "ATWRT", desc: "ATWTB" },
   LOCATION_VENDOR:    { type: "vendor_location",          code: "ATWRT", desc: "ATWTB" },
-  ID_SOURCE_VENDOR:   { type: "identification_source",    code: "ATWRT", desc: "ATWTB" },
+  IDENTIFICATION_SOURCE: { type: "identification_source", code: "ATWRT", desc: "ATWTB" },
 };
 
 function ok(body: any, status = 200) {
