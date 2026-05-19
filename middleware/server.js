@@ -59,9 +59,24 @@ if (!SHARED_SECRET) {
 
 const app = express();
 app.use(helmet());
-const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "50mb";
+const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "200mb";
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
+
+// Friendly JSON for oversized payloads instead of HTML 413 page
+app.use((err, _req, res, next) => {
+  if (err && (err.type === "entity.too.large" || err.status === 413 || err.name === "PayloadTooLargeError")) {
+    return res.status(413).json({
+      ok: false,
+      error: `Payload too large. Current middleware body limit is ${BODY_LIMIT}. ` +
+             `Increase MIDDLEWARE_BODY_LIMIT in middleware .env and restart, ` +
+             `or reduce the size/number of documents in a single upload.`,
+      bodyLimit: BODY_LIMIT,
+      code: "PAYLOAD_TOO_LARGE",
+    });
+  }
+  return next(err);
+});
 app.use(morgan("tiny"));
 app.use(
   cors({
