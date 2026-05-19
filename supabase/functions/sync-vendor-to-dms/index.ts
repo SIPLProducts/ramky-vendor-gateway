@@ -147,13 +147,20 @@ serve(async (req) => {
     const rawMiddlewareUrl = config?.middleware_url || Deno.env.get("SAP_MIDDLEWARE_URL") || "";
     const middlewareUrl = normalizeMiddlewareBase(rawMiddlewareUrl);
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
-    const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
-
-    // Probe middleware /health for diagnostics only — never block uploads on it.
+    // Build dynamic candidate endpoint list. Prefer the path advertised by /health if any.
     const middlewareHealth = middlewareUrl ? await probeDmsMiddlewareHealth(middlewareUrl) : null;
     if (middlewareHealth) {
       console.log("DMS middleware health probe:", JSON.stringify(middlewareHealth));
     }
+    const healthDmsPath: string | null = (middlewareHealth?.health?.dmsEndpoint && typeof middlewareHealth.health.dmsEndpoint === "string")
+      ? middlewareHealth.health.dmsEndpoint
+      : null;
+    const candidatePaths = Array.from(new Set([
+      ...(healthDmsPath ? [healthDmsPath] : []),
+      ...DMS_CANDIDATE_PATHS,
+    ]));
+    const dmsCandidateUrls = middlewareUrl ? candidatePaths.map((p) => `${middlewareUrl}${p.startsWith("/") ? p : `/${p}`}`) : [];
+    const dmsUrl = dmsCandidateUrls[0] || "";
 
     const results: DmsResult[] = [];
 
