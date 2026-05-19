@@ -1,49 +1,51 @@
-# Vendor Registration — Back Button + Full Reset on Type Switch
+## Problem
 
-## 1. Replace "Change" with "Back" button
+Clicking **Back** from the registration screen only returns the user to the Vendor Type selector — it does NOT clear the current slice or purge uploaded documents. So when the user goes Domestic → International, uploads Registration Copy + SWIFT/IBAN, then clicks **Back** and re-enters the flow (whether they pick the same type or switch), residual fields and previously uploaded files are still attached because:
 
-File: `src/pages/VendorRegistration.tsx` (lines ~1091–1109)
+1. `Back` only flips `vendorTypeChosen = false` — no reset, no purge.
+2. `handleVendorTypeChange` early-returns when `next === formData.vendorType`, so re-selecting the same type after Back keeps everything.
+3. The auto-save loop may have already persisted the partial data, and on the next field touch it gets re-saved on top of any reset done elsewhere.
+4. `IntlDocumentsStep` / `DocumentVerificationStep` previews are driven by `data.*File` / `verifiedData`, which must be empty objects after reset (currently are, but only along the partial path).
 
-- Replace the ghost "Change" button next to the "Vendor Type: …" chip with a **Back** button that matches the reference screenshot:
-  - Label: `Back`
-  - Left `ArrowLeft` icon (lucide-react)
-  - Outline/ghost style, rounded, small size, right-aligned (same position)
-- Click behaviour unchanged in intent: returns user to the Vendor Type selector (`setVendorTypeChosen(false)` + `setPendingChoiceType(formData.vendorType)`), but now also triggers the full reset flow below so data does not leak across types.
+## Fix
 
-## 2. Auto-refresh all data when switching vendor type
+File: `src/pages/VendorRegistration.tsx` only.
 
-Today `applyVendorTypeSwitch` only clears the in-memory slice of the *other* type. The user reports that after going back and switching Domestic ↔ International, previously entered fields and **uploaded documents** still appear. Fix:
+### 1. Make Back fully reset + purge
 
-File: `src/pages/VendorRegistration.tsx`
+Replace the Back button click handler with a new `handleBackToTypeSelector()` that:
 
-- In `applyVendorTypeSwitch(next)`:
-  1. Reset **both** slices to empty, not just the abandoned one:
-     - Spread `EMPTY_DOMESTIC_SLICES` and set `international: EMPTY_INTERNATIONAL_DATA` regardless of `next`.
-  2. Reset auxiliary state already handled (`completedSteps`, `currentStep`, `verifiedData`, `latestStep1DataRef`), plus:
-     - `setCustomFieldValues({})` if present
-     - `setPendingChoiceType(next)` so the selector reflects the new choice
-  3. If a `vendorId` exists (draft was saved), call a new helper `purgeVendorArtifacts(vendorId)` that:
-     - Deletes all rows from `vendor_documents` for that vendor
-     - Deletes the corresponding files from the `vendor-documents` storage bucket (list by `${vendorId}/` prefix, then `storage.remove`)
-     - Deletes vendor verification rows (`vendor_validations` / `verified_documents` if used by Step 1)
-     - Updates the `vendors` row: set `vendor_type = next`, null out all type-specific columns (legal_name, pan, gstin, bank_*, international fields, etc.) using a single update with the empty payload derived from `EMPTY_DOMESTIC_SLICES` / `EMPTY_INTERNATIONAL_DATA`.
-     - Errors are toasted but do not block the UI reset.
-  4. Show a toast: "Switched to {Domestic|International}. Previous data cleared."
+- Calls `applyVendorTypeSwitch(formData.vendorType)` **forcing** the reset path (see #2) — clears both domestic and international slices, `completedSteps`, `currentStep=1`, `verifiedData`, `customFieldValues`, `latestStep1DataRef`, declaration.
+- Awaits `purgeVendorArtifacts(vendorId)` if a draft exists, so storage + `vendor_documents` rows are wiped before the selector re-opens.
+- Cancels any pending auto-save timer (`clearTimeout(autoSaveTimerRef.current)`) and sets `autoSaveState = 'idle'` so a stale debounce doesn't re-persist the old payload.
+- Sets `setVendorTypeChosen(false)` and `setPendingChoiceType(formData.vendorType)` last.
+- Shows a toast: "Previous data cleared. Choose vendor type to start fresh."
 
-- Drop the confirmation `AlertDialog` for the type switch (lines 971 and 1264) **only when triggered by the Back button**, because the user explicitly wants automatic refresh. Keep behaviour: clicking Back always returns to selector; selecting a different type always purges. Selecting the same type is a no-op.
+### 2. Always reset on selector choice (remove same-type early return)
 
-## 3. Reset uploaded-file UI state
+In `handleVendorTypeChange(next)`:
 
-- After purge, ensure `IntlDocumentsStep` and Step 1 (`DocumentVerificationStep`) reset their internal previews because `data.registrationCopyFile` / `data.swiftIbanFile` / `verifiedData` are now empty. Already handled via props — confirm by passing fresh empty objects.
+- Drop the `if (next === formData.vendorType) return;` guard.
+- Always call `applyVendorTypeSwitch(next)` so picking the same type after Back also produces a clean slate (defence in depth in case Back was bypassed).
+
+### 3. Make `applyVendorTypeSwitch` purge synchronously before continuing
+
+- Change `purgeVendorArtifacts` invocation from fire-and-forget to `await`ed inside an async `applyVendorTypeSwitch`, so the next render of the step components mounts against an empty storage state.
+- Also delete `vendor_validations` / `verified_documents` rows for `vendorId` (best-effort) so Step 1 KYC tabs reload empty.
+- Null out type-specific columns on the `vendors` row in a single update (legal_name, pan, gstin, bank_*, international_* etc.) so the draft persisted in DB matches the cleared UI.
+
+### 4. Reset uploaded-file UI state explicitly
+
+- Pass a stable empty-object reference (`EMPTY_INTERNATIONAL_DATA.documents`) into `IntlDocumentsStep` after reset, and `verifiedData={undefined}` into `DocumentVerificationStep`, so their internal previews drop.
+- `FileUpload` already reflects `currentFile` — confirm by snapshotting `key={formData.vendorType + resetNonce}` on the step container; bump a `resetNonce` counter inside `applyVendorTypeSwitch` to force remount of step subtrees (cheapest way to drop any local preview state).
+
+### 5. Cleanup dead code
+
+- Remove `hasDomesticData`, `hasInternationalData`, `pendingTypeSwitch` and the obsolete confirmation `AlertDialog` if still present — Back already wipes, so no confirmation is needed.
 
 ## Out of scope
 
 - No schema changes.
 - No edge function changes.
-- KYC/SAP/approval logic untouched.
-- Other steps unchanged.
-
-## Files touched
-
-- `src/pages/VendorRegistration.tsx` — button swap + reset/purge logic + helper
-- (Optional) small helper in same file; no new files required
+- No changes to KYC, SAP master, or approval logic.
+- No other files touched.
