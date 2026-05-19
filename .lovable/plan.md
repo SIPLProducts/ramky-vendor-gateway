@@ -1,7 +1,12 @@
-## What is actually happening
+## Diagnosis
 
-- The browser payload in your screenshot is expected: `{"vendorIds": [...]}` is only the portal calling the backend function.
-- The SAP DMS payload is created inside `sync-vendor-to-dms` and then sent from the backend to middleware as:
+1. The request you see in browser Inspect is currently the portal calling Lovable Cloud with:
+
+```json
+{ "vendorIds": ["..."] }
+```
+
+That is why you do not see this SAP payload in Inspect:
 
 ```json
 {
@@ -13,63 +18,81 @@
 }
 ```
 
-- The recurring 413 is not because the browser payload is wrong. The latest logs show the middleware returned an old HTML Express error page:
+The SAP payload is already built inside `sync-vendor-to-dms` and sent server-side to `/sap/dms/upload`, so browser Inspect cannot show it unless we change the frontend to call a separate backend function with the prepared payload.
 
-```text
-PayloadTooLargeError: request entity too large
+2. The response confirms the live Windows middleware is still old:
+
+```json
+"Old middleware is running. /health must show middlewareVersion dms-large-upload-v3+ and bodyLimit. Current: {}"
 ```
 
-That means the Windows middleware currently running on port `3002` is still an old instance/version. The new middleware should return JSON with `code: "PAYLOAD_TOO_LARGE"`, `middlewareVersion`, and `bodyLimit`; your log does not show that.
+The live `/health` response does not contain `middlewareVersion` and `bodyLimit`, which means the running process is not the updated `server.js` with `dms-large-upload-v4` and `500mb`.
 
 ## Fix plan
 
-1. **Make the SAP DMS payload explicit and verifiable**
-   - Keep the portal request as `vendorIds`, because the frontend does not have the base64 documents.
-   - In `sync-vendor-to-dms`, continue building the exact SAP payload with `BP_LIFNR` and `FILE_UPLOAD`.
-   - Add safe debug output that logs `BP_LIFNR`, file count, file paths, batch number, and approximate MB size without printing base64 content.
-
-2. **Make uploads smaller to avoid 413 even on older limits**
-   - Reduce DMS batch size from about `40 MB` JSON to a much smaller safer value, around `8 MB`, because base64 increases file size and some old middleware/server layers may still have lower body limits.
-   - If one single file is too large, return a clear message identifying that file instead of repeatedly failing the whole vendor sync.
-
-3. **Improve middleware `/sap/dms/upload` validation and logs**
-   - Validate the incoming body shape:
-     - `BP_LIFNR` required
-     - `FILE_UPLOAD` must be an array
-     - each item must contain `FILE` and `FILE_PATH`
-   - Log only safe metadata: vendor code, number of files, file paths, and estimated payload size.
-   - Preserve SAP response exactly under `sapResponse`, so the success response like `File(s) Uploaded Successfully` is passed back cleanly.
-
-4. **Add a health/version check before DMS upload**
-   - Before uploading, call middleware `/health`.
-   - If it does not show the expected new middleware version/body limit, return a clear message that the Windows middleware must be restarted/copied correctly instead of sending another large request that fails with HTML 413.
-
-5. **Update Windows troubleshooting instructions**
-   - Add exact commands to confirm the active middleware version and body limit:
-     - open `/health`
-     - confirm `middlewareVersion`
-     - confirm `bodyLimit`
-   - Add restart guidance for killing stale Node processes on port `3002`.
-
-## Expected result after implementation
-
-- In Chrome DevTools, the browser request will still show:
-
-```json
-{ "vendorIds": ["..."] }
-```
-
-- In backend/middleware logs, the actual SAP payload will be confirmed as:
+1. Add a new DMS payload prepare step
+   - Create/adjust backend function behavior so the portal can first request the exact SAP DMS payload shape:
 
 ```json
 {
   "BP_LIFNR": "1061301",
   "FILE_UPLOAD": [
-    { "FILE": "<base64 omitted from logs>", "FILE_PATH": "PATH1" }
+    { "FILE": "BASE64", "FILE_PATH": "PATH1" }
   ]
 }
 ```
 
-- The app will avoid large single requests by sending small batches.
-- If Windows is still running the old middleware, the app will tell you that directly before upload.
-- SAP success rows will be returned back in the DMS result, including messages like `File(s) Uploaded Successfully`.
+   - This lets browser Inspect show the payload in the requested format before upload.
+   - Keep base64 generated server-side from `vendor-documents`, not from the browser.
+
+2. Change frontend DMS sync request flow
+   - Instead of sending only `{ vendorIds }` for the visible DMS call, send the prepared payload to the upload function so Inspect shows `BP_LIFNR` and `FILE_UPLOAD`.
+   - For multiple vendors, handle each vendor payload separately.
+
+3. Keep safe upload batching internally
+   - Even though Inspect can show the requested payload shape, the actual upload should still split large `FILE_UPLOAD` arrays into smaller batches to avoid 413.
+   - Keep the SAP/middleware request body exactly as `{ BP_LIFNR, FILE_UPLOAD }` for every batch.
+
+4. Make the old middleware error clearer and actionable
+   - If `/health` does not return `middlewareVersion` and `bodyLimit`, show a direct message that the Windows process on port `3002` is not the latest file.
+   - Include the exact expected health output: `middlewareVersion: dms-large-upload-v4`, `bodyLimit: 500mb`.
+
+5. Verify deployment
+   - Deploy the updated DMS backend function.
+   - Confirm the function accepts the new frontend payload format and still supports the existing `{ vendorIds }` format if needed.
+
+## What you still must do on Windows middleware
+
+After code changes, you must restart the correct middleware folder on the Windows machine. The current response proves Cloud is reaching an old middleware instance.
+
+Run in PowerShell as Administrator:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3002 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd "D:\middleware (2)\middleware"
+node server.js
+```
+
+Startup must show:
+
+```text
+Middleware build: dms-large-upload-v4
+Body limit: 500mb
+```
+
+Then verify:
+
+```powershell
+curl http://localhost:3002/health
+```
+
+It must include:
+
+```json
+{
+  "middlewareVersion": "dms-large-upload-v4",
+  "bodyLimit": "500mb"
+}
+```
+
+If this is missing, the app will continue blocking DMS upload because the live middleware is still old.
