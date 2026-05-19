@@ -150,16 +150,10 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
-    // Health check blocks known-old middleware because it rejects even small DMS JSON payloads.
-    const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
-    if (middlewareHealth && !middlewareHealth.ok) {
-      return ok({ success: false, message: middlewareHealth.message, results: [] });
-    } else if (middlewareHealth?.health) {
-      console.log("DMS middleware ready:", JSON.stringify({
-        middlewareVersion: middlewareHealth.health.middlewareVersion,
-        bodyLimit: middlewareHealth.health.bodyLimit,
-        dmsEndpoint: middlewareHealth.health.dmsEndpoint,
-      }));
+    // Probe middleware /health for diagnostics only — never block uploads on it.
+    const middlewareHealth = middlewareUrl ? await probeDmsMiddlewareHealth(middlewareUrl) : null;
+    if (middlewareHealth) {
+      console.log("DMS middleware health probe:", JSON.stringify(middlewareHealth));
     }
 
     const results: DmsResult[] = [];
