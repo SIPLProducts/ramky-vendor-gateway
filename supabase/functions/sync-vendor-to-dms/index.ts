@@ -251,6 +251,11 @@ serve(async (req) => {
         }
         if (current.length > 0) batches.push(current);
 
+        if (uploads.length > 0 && batches.length === 0) {
+          success = false;
+          message = `No documents fit the safe DMS request size of ${formatMb(DMS_BATCH_MAX_BYTES)}. ${skipped.join("; ")}`;
+        }
+
         let batchErrors = 0;
         let lastErrorMessage = "";
 
@@ -318,7 +323,9 @@ serve(async (req) => {
 
         sapRow = allSapRows.find((r) => r?.MSGTYP === "S") || allSapRows[0] || null;
 
-        if (batchErrors === 0) {
+        if (success === false && batches.length === 0) {
+          // Message already set above for oversized single-file cases.
+        } else if (batchErrors === 0) {
           success = true;
           message = sapRow?.MSG || `File(s) Uploaded Successfully (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
         } else {
@@ -343,11 +350,12 @@ serve(async (req) => {
             skipped,
             sap_vendor_code: vendor.sap_vendor_code,
             sap: sapRow,
+            sap_rows: allSapRows,
           },
         });
       }
 
-      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow });
+      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow, sapRows: allSapRows });
     }
 
 
