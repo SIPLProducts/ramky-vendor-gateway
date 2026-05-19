@@ -576,7 +576,7 @@ export default function SAPSync() {
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Vendor: <span className="font-mono">{r.vendorId.slice(0, 8)}</span> • Uploaded: {r.uploadedCount}
+                    SAP Code: <span className="font-mono">{r.BP_LIFNR || r.sap?.BP_LIFNR || '-'}</span> • Uploaded: {r.uploadedCount}
                   </p>
                   {r.sap && (
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs bg-background rounded-md p-2 border">
