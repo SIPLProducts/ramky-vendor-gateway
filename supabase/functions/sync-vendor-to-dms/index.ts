@@ -189,18 +189,24 @@ serve(async (req) => {
 
     const results: DmsResult[] = [];
 
-    for (const vid of vendorIds) {
+    const targets = vendorIds.length > 0
+      ? vendorIds.map((vendorId) => ({ vendorId, BP_LIFNR: null as string | null }))
+      : vendorCodes.map((BP_LIFNR) => ({ vendorId: null as string | null, BP_LIFNR }));
+
+    for (const target of targets) {
       const { data: vendor } = await supabase
-        .from("vendors").select("*").eq("id", vid).single();
+        .from("vendors").select("*")
+        .eq(target.vendorId ? "id" : "sap_vendor_code", target.vendorId || target.BP_LIFNR)
+        .single();
 
       if (!vendor) {
-        results.push({ vendorId: vid, success: false, message: "Vendor not found", uploadedCount: 0, skipped: [], sap: null });
+        results.push({ BP_LIFNR: target.BP_LIFNR || "", success: false, message: "Vendor not found for BP_LIFNR", uploadedCount: 0, skipped: [], sap: null });
         continue;
       }
 
       if (!vendor.sap_vendor_code) {
         results.push({
-          vendorId: vid,
+          BP_LIFNR: vendor.sap_vendor_code || target.BP_LIFNR || "",
           success: false,
           message: "Vendor not yet synced to SAP (missing BP_LIFNR)",
           uploadedCount: 0,
@@ -224,7 +230,7 @@ serve(async (req) => {
         const { data: docs } = await supabase
           .from("vendor_documents")
           .select("document_type, file_name, file_path, file_size")
-          .eq("vendor_id", vid);
+          .eq("vendor_id", vendor.id);
 
         for (const d of docs || []) {
           try {
