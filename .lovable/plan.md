@@ -1,36 +1,21 @@
-## Root cause
+## Fix the missing retry button
 
-In `supabase/functions/sync-vendor-to-dms/index.ts`, the audit log insert references `auth.user.id`:
+The row is marked `DMS Synced`, so the current UI hides the DMS action button. To retry that same vendor, the DMS table needs to show a button even when the status is already synced.
 
-```ts
-await supabase.from("audit_logs").insert({
-  vendor_id: vendor.id,
-  user_id: auth.user.id,   // ❌ auth.user is undefined
-  ...
-});
-```
+## Planned change
 
-But the shared helper `requireAuthenticatedUser` (in `supabase/functions/_shared/auth.ts`) returns:
+Edit `src/pages/SAPSync.tsx` only:
 
-```ts
-{ ok: true, userId: string, email: string | null, roles: string[] }
-```
+1. In the DMS Sync table action column, remove the condition that hides the button when `isSynced` is true.
+2. Show:
+   - `Sync to DMS` for pending rows.
+   - `Resync to DMS` for rows already showing `DMS Synced`.
+3. Keep both buttons connected to the same working function:
+   ```ts
+   handleDmsSync([v.id])
+   ```
+4. Keep the existing eye/view button unchanged.
 
-There is no `auth.user` object — only `auth.userId`. So as soon as a DMS upload succeeds against SAP and we reach the audit log write, the function throws `Cannot read properties of undefined (reading 'id')`, the outer catch returns `{ success: false, message: "...", results: [] }`, and nothing is dynamic — the SAP response is actually being discarded.
+## Result
 
-The "DMS Synced" badge you see in the UI is the vendor's previously persisted `status` from an earlier successful run, not a fresh confirmation.
-
-## Plan
-
-1. **Fix the auth field reference** in `supabase/functions/sync-vendor-to-dms/index.ts`:
-   - Replace `auth.user.id` with `auth.userId` in the `audit_logs` insert.
-
-2. **Verify no other stale references** in the same file (search for `auth.user`, `auth.email`) and align them with the helper's actual shape (`auth.userId`, `auth.email`, `auth.roles`).
-
-3. **Redeploy** only `sync-vendor-to-dms`.
-
-4. **Expected result after fix**:
-   - The function will return SAP's real dynamic response in `results[].sap` and `results[].sapRows` (e.g. `MSGTYP: "S"`, `MSG: "File(s) Uploaded Successfully"`, `ERDAT`, `UZEIT`, `UNAME`) exactly as SAP sends it per call — nothing hardcoded.
-   - Top-level `success` will reflect the actual SAP outcome, and the audit log row will be written under the real authenticated user id.
-
-No other files need to change.
+For the vendor currently showing `DMS Synced`, you will see a **Resync to DMS** button next to the eye icon, so you can upload the documents again and get the proper SAP DMS response.
