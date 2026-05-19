@@ -670,7 +670,6 @@ export default function VendorRegistration() {
       if (folders && folders.length) {
         const allPaths: string[] = [];
         for (const entry of folders) {
-          // Each entry is a subfolder (document_type). List files inside.
           const { data: files } = await supabase.storage.from('vendor-documents').list(`${vId}/${entry.name}`);
           if (files) {
             for (const f of files) allPaths.push(`${vId}/${entry.name}/${f.name}`);
@@ -680,30 +679,46 @@ export default function VendorRegistration() {
           await supabase.storage.from('vendor-documents').remove(allPaths);
         }
       }
-      // Delete document rows
       await supabase.from('vendor_documents').delete().eq('vendor_id', vId);
+      await supabase.from('vendor_validations').delete().eq('vendor_id', vId);
     } catch (err) {
       console.error('purgeVendorArtifacts failed', err);
     }
   };
 
-  const applyVendorTypeSwitch = (next: VendorOriginType) => {
-    setFormData((prev) => ({
-      ...prev,
+  const applyVendorTypeSwitch = async (next: VendorOriginType) => {
+    // Cancel any pending auto-save so it cannot re-persist stale data
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    setAutoSaveState('idle');
+
+    const cleared: VendorFormData = {
       vendorType: next,
       ...EMPTY_DOMESTIC_SLICES,
       international: EMPTY_INTERNATIONAL_DATA,
       declaration: { selfDeclared: false, termsAccepted: false },
-    }));
+    };
+    setFormData(cleared);
     setCompletedSteps([]);
     setCurrentStep(1);
     setVerifiedData(undefined);
     setCustomFieldValues({});
     setPendingChoiceType(next);
     latestStep1DataRef.current = null;
+    setResetNonce((n) => n + 1);
+
     if (vendorId) {
-      void purgeVendorArtifacts(vendorId);
+      await purgeVendorArtifacts(vendorId);
+      // Persist cleared payload so the draft row matches the UI
+      try {
+        await saveVendor(cleared);
+      } catch (err) {
+        console.error('Failed to persist cleared vendor draft', err);
+      }
     }
+
     toast({
       title: `Switched to ${next === 'international' ? 'International' : 'Domestic'}`,
       description: 'Previous data has been cleared.',
@@ -711,9 +726,14 @@ export default function VendorRegistration() {
   };
 
   const handleVendorTypeChange = (next: VendorOriginType) => {
-    if (next === formData.vendorType) return;
-    applyVendorTypeSwitch(next);
+    void applyVendorTypeSwitch(next);
   };
+
+  const handleBackToTypeSelector = async () => {
+    await applyVendorTypeSwitch(formData.vendorType);
+    setVendorTypeChosen(false);
+  };
+
 
 
   // ----- International step setters -----
