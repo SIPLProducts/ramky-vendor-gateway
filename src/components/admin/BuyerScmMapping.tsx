@@ -114,6 +114,15 @@ export function BuyerScmMapping({ tenantId }: Props) {
       toast({ title: 'Both fields required', variant: 'destructive' });
       return;
     }
+    const existing = mappings.find((m) => m.buyer_user_id === buyerId);
+    if (existing) {
+      toast({
+        title: 'Buyer already mapped',
+        description: `This buyer is already mapped to ${label(existing.scm)}. Remove the existing mapping first.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase.from('buyer_scm_mappings').insert({
@@ -126,8 +135,9 @@ export function BuyerScmMapping({ tenantId }: Props) {
 
       if (error) {
         if (error.code === '23505') {
-          toast({ title: 'Mapping already exists', variant: 'destructive' });
+          toast({ title: 'Buyer already mapped', description: 'This buyer already has an SCM Manager assigned.', variant: 'destructive' });
         } else throw error;
+
       } else {
         toast({ title: 'Mapping saved' });
         setScmId(''); setBuyerId(''); setIncludeScm(true);
