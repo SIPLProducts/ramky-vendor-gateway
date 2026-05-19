@@ -81,7 +81,7 @@ serve(async (req) => {
       FILE_UPLOAD,
     };
 
-    return new Response(JSON.stringify({ vendorId, payload, skipped }), {
+    return new Response(JSON.stringify({ payload, skipped }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {

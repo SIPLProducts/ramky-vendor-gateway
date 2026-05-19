@@ -599,9 +599,8 @@ export function useDMSSync() {
 
   return useMutation({
     mutationFn: async ({ vendorIds }: { vendorIds: string[] }) => {
-      // For each vendor, first build the exact SAP DMS payload
-      // ({ BP_LIFNR, FILE_UPLOAD: [...] }) — this request+response is visible
-      // in browser DevTools — then post that payload to the upload function.
+      // For each vendor, first build the exact SAP DMS payload, then post that
+      // payload directly so browser DevTools shows { BP_LIFNR, FILE_UPLOAD }.
       const results: any[] = [];
       for (const vendorId of vendorIds) {
         try {
@@ -615,13 +614,13 @@ export function useDMSSync() {
           }
 
           const upload = await supabase.functions.invoke('sync-vendor-to-dms', {
-            body: { vendorId, payload },
+            body: payload,
           });
           if (upload.error) throw new Error(upload.error.message);
           const r = (upload.data as any)?.results?.[0];
-          results.push(r || { vendorId, success: false, message: 'No result' });
+          results.push(r || { BP_LIFNR: payload.BP_LIFNR, success: false, message: 'No result' });
         } catch (e: any) {
-          results.push({ vendorId, success: false, message: e?.message || 'Failed' });
+          results.push({ BP_LIFNR: '', success: false, message: e?.message || 'Failed' });
         }
       }
       const successCount = results.filter((r) => r.success).length;

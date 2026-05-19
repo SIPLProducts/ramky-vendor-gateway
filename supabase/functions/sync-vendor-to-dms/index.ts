@@ -30,12 +30,12 @@ const DOC_NAME_MAP: Record<string, string> = {
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const DMS_BATCH_MAX_BYTES = 8 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
+const DMS_BATCH_MAX_BYTES = 1 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
 const MIN_MIDDLEWARE_BODY_LIMIT_BYTES = 10 * 1024 * 1024;
-const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 3;
+const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 4;
 
 type DmsResult = {
-  vendorId: string;
+  BP_LIFNR: string;
   success: boolean;
   message: string;
   uploadedCount: number;
@@ -139,19 +139,25 @@ serve(async (req) => {
 
   try {
     const reqBody = await req.json();
-    // Accept two shapes:
-    //  A) { vendorIds: string[] }  — legacy multi-vendor flow
-    //  B) { vendorId, payload: { BP_LIFNR, FILE_UPLOAD } } — explicit single-vendor
-    //     payload (visible in browser Inspect).
-    const explicitPayload = (reqBody && reqBody.payload && Array.isArray(reqBody.payload.FILE_UPLOAD))
-      ? reqBody.payload as { BP_LIFNR: string; FILE_UPLOAD: any[] }
+    // Accept three shapes:
+    //  A) { vendorIds: string[] } — legacy multi-vendor flow
+    //  B) { vendorId, payload: { BP_LIFNR, FILE_UPLOAD } } — previous explicit flow
+    //  C) { BP_LIFNR, FILE_UPLOAD } — exact SAP DMS payload visible in browser Inspect
+    const directPayload = (reqBody?.BP_LIFNR && Array.isArray(reqBody?.FILE_UPLOAD))
+      ? { BP_LIFNR: String(reqBody.BP_LIFNR), FILE_UPLOAD: reqBody.FILE_UPLOAD as any[] }
       : null;
+    const wrappedPayload = (reqBody?.payload?.BP_LIFNR && Array.isArray(reqBody?.payload?.FILE_UPLOAD))
+      ? { BP_LIFNR: String(reqBody.payload.BP_LIFNR), FILE_UPLOAD: reqBody.payload.FILE_UPLOAD as any[] }
+      : null;
+    const explicitPayload = directPayload || wrappedPayload;
     const vendorIds: string[] = explicitPayload && reqBody.vendorId
       ? [reqBody.vendorId]
       : (Array.isArray(reqBody?.vendorIds) ? reqBody.vendorIds : []);
+    const vendorCodes: string[] = explicitPayload && !reqBody.vendorId ? [explicitPayload.BP_LIFNR] : [];
+    const targetCount = vendorIds.length || vendorCodes.length;
 
-    if (vendorIds.length === 0) {
-      return ok({ success: false, message: "vendorIds (array) or { vendorId, payload } is required", results: [] });
+    if (targetCount === 0) {
+      return ok({ success: false, message: "vendorIds (array), { vendorId, payload }, or direct { BP_LIFNR, FILE_UPLOAD } is required", results: [] });
     }
 
     const supabase = createClient(
@@ -169,13 +175,10 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
-    // Health check is informational only — never block uploads on it.
-    // Some middleware deployments (older builds, ngrok, reverse proxies) don't
-    // expose middlewareVersion/bodyLimit. We still attempt the upload and let
-    // the actual /sap/dms/upload response decide success/failure.
+    // Health check blocks known-old middleware because it rejects even small DMS JSON payloads.
     const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
     if (middlewareHealth && !middlewareHealth.ok) {
-      console.warn("DMS middleware health warning (continuing anyway):", middlewareHealth.message);
+      return ok({ success: false, message: middlewareHealth.message, results: [] });
     } else if (middlewareHealth?.health) {
       console.log("DMS middleware ready:", JSON.stringify({
         middlewareVersion: middlewareHealth.health.middlewareVersion,
@@ -186,18 +189,24 @@ serve(async (req) => {
 
     const results: DmsResult[] = [];
 
-    for (const vid of vendorIds) {
+    const targets = vendorIds.length > 0
+      ? vendorIds.map((vendorId) => ({ vendorId, BP_LIFNR: null as string | null }))
+      : vendorCodes.map((BP_LIFNR) => ({ vendorId: null as string | null, BP_LIFNR }));
+
+    for (const target of targets) {
       const { data: vendor } = await supabase
-        .from("vendors").select("*").eq("id", vid).single();
+        .from("vendors").select("*")
+        .eq(target.vendorId ? "id" : "sap_vendor_code", target.vendorId || target.BP_LIFNR)
+        .single();
 
       if (!vendor) {
-        results.push({ vendorId: vid, success: false, message: "Vendor not found", uploadedCount: 0, skipped: [], sap: null });
+        results.push({ BP_LIFNR: target.BP_LIFNR || "", success: false, message: "Vendor not found for BP_LIFNR", uploadedCount: 0, skipped: [], sap: null });
         continue;
       }
 
       if (!vendor.sap_vendor_code) {
         results.push({
-          vendorId: vid,
+          BP_LIFNR: vendor.sap_vendor_code || target.BP_LIFNR || "",
           success: false,
           message: "Vendor not yet synced to SAP (missing BP_LIFNR)",
           uploadedCount: 0,
@@ -221,7 +230,7 @@ serve(async (req) => {
         const { data: docs } = await supabase
           .from("vendor_documents")
           .select("document_type, file_name, file_path, file_size")
-          .eq("vendor_id", vid);
+          .eq("vendor_id", vendor.id);
 
         for (const d of docs || []) {
           try {
@@ -360,10 +369,10 @@ serve(async (req) => {
         await supabase.from("vendors").update({
           status: "dms_synced",
           dms_synced_at: new Date().toISOString(),
-        }).eq("id", vid);
+        }).eq("id", vendor.id);
 
         await supabase.from("audit_logs").insert({
-          vendor_id: vid,
+          vendor_id: vendor.id,
           user_id: auth.user.id,
           action: "dms_sync",
           details: {
@@ -377,14 +386,14 @@ serve(async (req) => {
         });
       }
 
-      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow, sapRows: allSapRows });
+      results.push({ BP_LIFNR: vendor.sap_vendor_code, success, message, uploadedCount: uploads.length, skipped, sap: sapRow, sapRows: allSapRows });
     }
 
 
     const successCount = results.filter(r => r.success).length;
     return ok({
       success: successCount > 0,
-      message: `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
+      message: `${successCount}/${targetCount} vendor(s) uploaded to DMS`,
       results,
     });
   } catch (error: any) {
