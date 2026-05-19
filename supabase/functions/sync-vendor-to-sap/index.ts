@@ -454,14 +454,27 @@ serve(async (req) => {
       console.error("SAP fetch error:", raw);
     }
 
-    if (networkError) return fail(networkError, { sapResponse: sapResponse ?? [] });
+    if (networkError) return fail(networkError, { sapResponse: sapResponse ?? [], ACC_RES: [] });
 
-    const successItem = (sapResponse || []).find(
-      (it: any) => it?.MSGTYP === "S" && typeof it?.MSG === "string" && it.MSG.toLowerCase().includes("business partner created"),
-    );
-    const sapVendorCode = successItem?.BP_LIFNR || (sapResponse || []).find((i: any) => i?.BP_LIFNR)?.BP_LIFNR || null;
+    // SAP wraps the result as [{ ACC_RES: [...], TOT_RES: [...] }].
+    // ACC_RES is the authoritative success block (BP creation confirmation).
+    let accRes: any[] = [];
+    const firstItem = (sapResponse || [])[0];
+    if (firstItem && typeof firstItem === "object" && Array.isArray(firstItem.ACC_RES)) {
+      accRes = firstItem.ACC_RES;
+    } else {
+      // Legacy/flat shape fallback — synthesize an ACC_RES-shaped row so the UI still renders.
+      const flat = sapResponse || [];
+      const s = flat.find((it: any) => it?.MSGTYP === "S" && it?.BP_LIFNR);
+      const e = flat.find((it: any) => it?.MSGTYP === "E");
+      if (s) accRes = [{ MSGTYP: "S", BP_LIFNR: s.BP_LIFNR, LONGMSG: s.MSG || "Business Partner created", BPNAME: s.BPNAME }];
+      else if (e) accRes = [{ MSGTYP: "E", BP_LIFNR: e.BP_LIFNR || "", LONGMSG: e.MSG || "SAP returned an error", BPNAME: e.BPNAME }];
+    }
 
-    if (successItem && sapVendorCode) {
+    const successRow = accRes.find((r: any) => r?.MSGTYP === "S" && r?.BP_LIFNR);
+    const sapVendorCode = successRow?.BP_LIFNR || null;
+
+    if (successRow && sapVendorCode) {
       const refNo = String(vendor.id || "").slice(0, 8).toUpperCase();
       await supabase.from("vendors").update({
         sap_vendor_code: sapVendorCode,
@@ -469,11 +482,23 @@ serve(async (req) => {
         sap_synced_at: new Date().toISOString(),
         status: "dms_sync_pending",
       }).eq("id", vendorId);
-      return ok({ success: true, sapVendorCode, sapReferenceNo: refNo, message: "Vendor successfully synced to SAP", sapResponse });
+      return ok({
+        success: true,
+        sapVendorCode,
+        sapReferenceNo: refNo,
+        message: successRow.LONGMSG || successRow.MSG || "Vendor successfully synced to SAP",
+        ACC_RES: accRes,
+        sapResponse,
+      });
     }
 
-    const errorItem = (sapResponse || []).find((it: any) => it?.MSGTYP === "E");
-    return ok({ success: false, message: errorItem?.MSG || "SAP did not confirm Business Partner creation", sapResponse: sapResponse || [] });
+    const errorRow = accRes.find((r: any) => r?.MSGTYP !== "S");
+    return ok({
+      success: false,
+      message: errorRow?.LONGMSG || errorRow?.MSG || (accRes.length === 0 ? "SAP returned no ACC_RES rows" : "SAP did not return a success row"),
+      ACC_RES: accRes,
+      sapResponse: sapResponse || [],
+    });
   } catch (error: any) {
     console.error("sync-vendor-to-sap error:", error);
     return ok({ success: false, message: error.message || "Unexpected error", sapResponse: [] });
