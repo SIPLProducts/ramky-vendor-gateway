@@ -106,7 +106,7 @@ curl -s -X POST http://localhost:3002/sap/bp/create \
 
 ## Redeploy after body-limit / DMS changes
 
-If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running middleware is using an older body limit. The current default is **200 MB**. Redeploy:
+If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running middleware is using an older body limit. The current default is **500 MB**. Redeploy:
 
 1. Stop the Windows service (or the `node server.js` process).
 2. Replace `server.js` (and `package.json` if changed) with the latest from this repo in `D:\middleware (2)\middleware`.
@@ -116,10 +116,10 @@ If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running m
    ```
    curl http://localhost:3002/health
    ```
-   The response should include `"bodyLimit": "200mb"`. The startup log should also print `Body limit: 200mb`.
+   The response should include `"bodyLimit": "500mb"` and `"middlewareVersion": "dms-large-upload-v3"`.
 6. Re-run the DMS upload from the portal.
 
-Optional: override with `MIDDLEWARE_BODY_LIMIT=500mb` in `.env` for very large document batches. Oversized requests now return JSON (with the active `bodyLimit`) instead of the HTML 413 page, so the portal surfaces a clear error.
+Optional: override with `MIDDLEWARE_BODY_LIMIT=1gb` in `.env` for very large document batches. The cloud DMS sync also splits documents into ~40 MB batches automatically, so single requests should rarely hit the limit.
 
 
 ## Repeated 413 "request entity too large" fix
