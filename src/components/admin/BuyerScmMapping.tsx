@@ -37,6 +37,8 @@ export function BuyerScmMapping({ tenantId }: Props) {
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [scmId, setScmId] = useState('');
   const [buyerId, setBuyerId] = useState('');
+  const [includeScm, setIncludeScm] = useState(true);
+
 
   const loadData = async () => {
     setLoading(true);
