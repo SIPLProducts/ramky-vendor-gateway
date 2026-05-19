@@ -648,20 +648,8 @@ export default function VendorRegistration() {
   const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
   const handleEditStep = (step: number) => setCurrentStep(step);
 
-  // ----- Vendor type switching with reset-confirm -----
-  const [pendingTypeSwitch, setPendingTypeSwitch] = useState<VendorOriginType | null>(null);
+  // ----- Vendor type switching -----
 
-  const hasDomesticData = () => {
-    const o = formData.organization;
-    const s = formData.statutory;
-    const b = formData.bank;
-    return !!(o.legalName || o.tradeName || o.industryType || s.pan || s.gstin || b.accountNumber || formData.address.registeredAddress || formData.contact.ceoName);
-  };
-  const hasInternationalData = () => {
-    const i = formData.international;
-    if (!i) return false;
-    return !!(i.company.companyName || i.company.companyAddress || i.company.country || i.bank.accountNumber || i.bank.swiftCode || i.bank.ibanNumber || i.documents.registrationCopyFile || i.documents.swiftIbanFile || (i.classification.materialGroupVendor?.length || 0) > 0);
-  };
 
   const purgeVendorArtifacts = async (vId: string) => {
     try {
