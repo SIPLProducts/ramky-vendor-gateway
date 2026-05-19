@@ -130,7 +130,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
         } else throw error;
       } else {
         toast({ title: 'Mapping saved' });
-        setScmId(''); setBuyerId('');
+        setScmId(''); setBuyerId(''); setIncludeScm(true);
         await loadData();
       }
     } catch (err: any) {
