@@ -86,11 +86,22 @@ serve(async (req) => {
         .from("vendors").select("*").eq("id", vid).single();
 
       if (!vendor) {
-        results.push({ vendorId: vid, success: false, message: "Vendor not found", uploadedCount: 0, skipped: [] });
+        results.push({ vendorId: vid, success: false, message: "Vendor not found", uploadedCount: 0, skipped: [], sap: null });
         continue;
       }
 
-      // Build document array
+      if (!vendor.sap_vendor_code) {
+        results.push({
+          vendorId: vid,
+          success: false,
+          message: "Vendor not yet synced to SAP (missing BP_LIFNR)",
+          uploadedCount: 0,
+          skipped: [],
+          sap: null,
+        });
+        continue;
+      }
+
       const { data: docs } = await supabase
         .from("vendor_documents")
         .select("document_type, file_name, file_path, file_size")
@@ -108,31 +119,28 @@ serve(async (req) => {
             .from("vendor-documents").download(d.file_path);
           if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
           const base64 = await blobToBase64(blob);
-          uploads.push({
-            FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
-            FILE: base64,
-            FILE_PATH: d.file_path,
-          });
+          uploads.push({ FILE: base64, FILE_PATH: d.file_path });
         } catch (e: any) {
           skipped.push(`${d.file_name} (${e?.message || "error"})`);
         }
       }
 
+      // SAP DMS payload shape
       const payload = {
-        BP_LIFNR: vendor.sap_vendor_code || "",
-        idnum: vendor.sap_reference_no || String(vendor.id || "").slice(0, 8).toUpperCase(),
-        BPNAME: vendor.legal_name || vendor.trade_name || "",
-        UPLOAD: uploads,
+        BP_LIFNR: vendor.sap_vendor_code,
+        FILE_UPLOAD: uploads,
       };
 
-      // POST to DMS endpoint if configured; otherwise mark as simulated success.
       let success = false;
       let message = "";
+      let sapRow: any = null;
 
       if (!dmsUrl) {
-        // Simulation mode (no DMS endpoint configured)
         success = true;
         message = `Simulated DMS upload (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
+      } else if (uploads.length === 0) {
+        success = false;
+        message = "No uploadable documents found for this vendor";
       } else {
         try {
           const controller = new AbortController();
@@ -147,17 +155,31 @@ serve(async (req) => {
           });
           clearTimeout(timer);
           const text = await res.text();
-          if (res.ok) {
+          console.log(`DMS raw status: ${res.status} body: ${text.slice(0, 500)}`);
+
+          let inner: any = null;
+          try {
+            const parsed = JSON.parse(text);
+            inner = parsed && typeof parsed === "object" && "sapResponse" in parsed
+              ? parsed.sapResponse
+              : parsed;
+          } catch {
+            inner = null;
+          }
+
+          const rows: any[] = Array.isArray(inner)
+            ? inner
+            : (inner && typeof inner === "object" ? [inner] : []);
+          sapRow = rows.find((r: any) => r?.MSGTYP === "S") || rows[0] || null;
+
+          if (res.ok && sapRow?.MSGTYP === "S") {
             success = true;
-            try {
-              const parsed = JSON.parse(text);
-              message = parsed?.message || parsed?.LONGMSG || `DMS upload OK (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
-            } catch {
-              message = `DMS upload OK (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
-            }
+            message = sapRow.MSG || `DMS upload OK (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
           } else {
             success = false;
-            message = `DMS upload failed (HTTP ${res.status}): ${text.slice(0, 200)}`;
+            message = sapRow?.MSG
+              ? `SAP DMS error: ${sapRow.MSG}`
+              : `DMS upload failed (HTTP ${res.status}): ${text.slice(0, 200)}`;
           }
         } catch (e: any) {
           success = false;
@@ -175,12 +197,19 @@ serve(async (req) => {
           vendor_id: vid,
           user_id: auth.user.id,
           action: "dms_sync",
-          details: { message, uploaded_count: uploads.length, skipped },
+          details: {
+            message,
+            uploaded_count: uploads.length,
+            skipped,
+            sap_vendor_code: vendor.sap_vendor_code,
+            sap: sapRow,
+          },
         });
       }
 
-      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped });
+      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow });
     }
+
 
     const successCount = results.filter(r => r.success).length;
     return ok({
