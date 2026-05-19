@@ -1,71 +1,78 @@
-## Diagnosis
+## What is actually happening
 
-1. The request you see in browser Inspect is currently the portal calling Lovable Cloud with:
+- The DMS upload is now sending a browser-visible request that contains `{ vendorId, payload }`. That is why the vendor ID still appears in the request/response wrapper.
+- The 413 is happening before SAP receives the request. Latest logs show the middleware is still an old running process:
 
-```json
-{ "vendorIds": ["..."] }
+```text
+Old middleware is running. /health must show middlewareVersion dms-large-upload-v3+ and bodyLimit. Current: {}
+DMS SAP payload batch 1/1: BP_LIFNR=1061307 files=3 approx=1.51 MB
+DMS batch 1/1 status=413 PayloadTooLargeError
 ```
 
-That is why you do not see this SAP payload in Inspect:
+- Since only ~1.51 MB is rejected, the live middleware is using Express default/small body limits, not the updated 500mb middleware.
+
+## Implementation plan
+
+1. Change the browser-visible DMS request to use SAP code only
+   - Update the frontend DMS sync flow to send:
 
 ```json
 {
-  "BP_LIFNR": "1061301",
-  "FILE_UPLOAD": [
-    { "FILE": "BASE64", "FILE_PATH": "PATH1" },
-    { "FILE": "BASE64", "FILE_PATH": "PATH2" }
-  ]
-}
-```
-
-The SAP payload is already built inside `sync-vendor-to-dms` and sent server-side to `/sap/dms/upload`, so browser Inspect cannot show it unless we change the frontend to call a separate backend function with the prepared payload.
-
-2. The response confirms the live Windows middleware is still old:
-
-```json
-"Old middleware is running. /health must show middlewareVersion dms-large-upload-v3+ and bodyLimit. Current: {}"
-```
-
-The live `/health` response does not contain `middlewareVersion` and `bodyLimit`, which means the running process is not the updated `server.js` with `dms-large-upload-v4` and `500mb`.
-
-## Fix plan
-
-1. Add a new DMS payload prepare step
-   - Create/adjust backend function behavior so the portal can first request the exact SAP DMS payload shape:
-
-```json
-{
-  "BP_LIFNR": "1061301",
+  "BP_LIFNR": "1061307",
   "FILE_UPLOAD": [
     { "FILE": "BASE64", "FILE_PATH": "PATH1" }
   ]
 }
 ```
 
-   - This lets browser Inspect show the payload in the requested format before upload.
-   - Keep base64 generated server-side from `vendor-documents`, not from the browser.
+   - Remove `vendorId` from the visible upload request body.
+   - The backend will identify the vendor by `BP_LIFNR` instead of `vendorId`.
 
-2. Change frontend DMS sync request flow
-   - Instead of sending only `{ vendorIds }` for the visible DMS call, send the prepared payload to the upload function so Inspect shows `BP_LIFNR` and `FILE_UPLOAD`.
-   - For multiple vendors, handle each vendor payload separately.
+2. Stop returning vendor ID in the DMS result payload
+   - Update `sync-vendor-to-dms` response so each result returns SAP-oriented fields only, for example:
 
-3. Keep safe upload batching internally
-   - Even though Inspect can show the requested payload shape, the actual upload should still split large `FILE_UPLOAD` arrays into smaller batches to avoid 413.
-   - Keep the SAP/middleware request body exactly as `{ BP_LIFNR, FILE_UPLOAD }` for every batch.
+```json
+{
+  "BP_LIFNR": "1061307",
+  "success": true,
+  "message": "File(s) Uploaded Successfully",
+  "uploadedCount": 3,
+  "sapRows": []
+}
+```
 
-4. Make the old middleware error clearer and actionable
-   - If `/health` does not return `middlewareVersion` and `bodyLimit`, show a direct message that the Windows process on port `3002` is not the latest file.
-   - Include the exact expected health output: `middlewareVersion: dms-large-upload-v4`, `bodyLimit: 500mb`.
+   - Keep internal vendor lookup for status updates/audit logs, but do not expose `vendorId` in the API response.
 
-5. Verify deployment
-   - Deploy the updated DMS backend function.
-   - Confirm the function accepts the new frontend payload format and still supports the existing `{ vendorIds }` format if needed.
+3. Remove the extra prepare response bloat
+   - Keep `prepare-dms-payload` only for building the exact SAP payload.
+   - The upload function will accept direct `{ BP_LIFNR, FILE_UPLOAD }`, so browser Inspect will show exactly the SAP payload shape instead of a wrapper.
 
-## What you still must do on Windows middleware
+4. Tighten payload sizing to avoid 413
+   - Lower the per-request DMS batch limit further from 8 MB to a safer small limit.
+   - Keep batching in the backend so each call to the middleware remains:
 
-After code changes, you must restart the correct middleware folder on the Windows machine. The current response proves Cloud is reaching an old middleware instance.
+```json
+{
+  "BP_LIFNR": "1061307",
+  "FILE_UPLOAD": [...]
+}
+```
 
-Run in PowerShell as Administrator:
+   - If a single file is too large for the current path, return a clear message instead of retrying a guaranteed 413.
+
+5. Restore strict middleware detection
+   - Because the logs prove the old middleware is still running, make the error actionable again when `/health` does not expose `middlewareVersion` and `bodyLimit`.
+   - This avoids sending payloads into an old Express parser that will always fail.
+
+6. Update the DMS result dialog
+   - Show `BP_LIFNR` / SAP code instead of vendor UUID.
+   - Keep uploaded count, skipped documents, and SAP response rows visible.
+
+## Required Windows middleware action
+
+Even after code changes, the 413 will continue if the old Windows process is still running. The current live log proves that port 3002 is not serving the updated middleware.
+
+Run on the Windows middleware machine:
 
 ```powershell
 Get-NetTCPConnection -LocalPort 3002 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
@@ -94,5 +101,3 @@ It must include:
   "bodyLimit": "500mb"
 }
 ```
-
-If this is missing, the app will continue blocking DMS upload because the live middleware is still old.
