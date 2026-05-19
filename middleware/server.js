@@ -359,7 +359,11 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
 // ---------- Start ----------
 
 app.listen(PORT, () => {
+  console.log(`========================================`);
   console.log(`Sharvi SAP middleware listening on :${PORT}`);
+  console.log(`Middleware build: ${MIDDLEWARE_VERSION}`);
+  console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT in .env)`);
+  console.log(`========================================`);
   console.log(`SAP target: ${SAP_BP_API_URL || "(not configured)"}`);
   console.log(`CORS origins: ${CORS_ORIGINS.join(", ")}`);
   console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT)`);
