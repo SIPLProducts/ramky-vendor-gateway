@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Link2, Plus, Loader2 } from 'lucide-react';
+
 
 interface Props { tenantId: string | null; }
 interface UserOpt { id: string; full_name: string | null; email: string; }
@@ -15,10 +17,12 @@ interface MappingRow {
   id: string;
   buyer_user_id: string;
   scm_manager_user_id: string;
+  include_scm_stages: boolean;
   created_at: string;
   buyer?: UserOpt;
   scm?: UserOpt;
 }
+
 
 const SCM_ROLE = 'SCM Manager';
 const BUYER_ROLE = 'Buyer';
@@ -33,6 +37,8 @@ export function BuyerScmMapping({ tenantId }: Props) {
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [scmId, setScmId] = useState('');
   const [buyerId, setBuyerId] = useState('');
+  const [includeScm, setIncludeScm] = useState(true);
+
 
   const loadData = async () => {
     setLoading(true);
@@ -114,15 +120,17 @@ export function BuyerScmMapping({ tenantId }: Props) {
         tenant_id: tenantId,
         buyer_user_id: buyerId,
         scm_manager_user_id: scmId,
+        include_scm_stages: includeScm,
         created_by: user?.id,
       });
+
       if (error) {
         if (error.code === '23505') {
           toast({ title: 'Mapping already exists', variant: 'destructive' });
         } else throw error;
       } else {
         toast({ title: 'Mapping saved' });
-        setScmId(''); setBuyerId('');
+        setScmId(''); setBuyerId(''); setIncludeScm(true);
         await loadData();
       }
     } catch (err: any) {
@@ -143,6 +151,19 @@ export function BuyerScmMapping({ tenantId }: Props) {
     await loadData();
   };
 
+  const handleToggleScm = async (id: string, next: boolean) => {
+    setMappings((prev) => prev.map((m) => (m.id === id ? { ...m, include_scm_stages: next } : m)));
+    const { error } = await supabase
+      .from('buyer_scm_mappings')
+      .update({ include_scm_stages: next })
+      .eq('id', id);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+      await loadData();
+    }
+  };
+
+
   const label = (u?: UserOpt) => (u ? (u.full_name || u.email) : '—');
 
   return (
@@ -159,7 +180,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
             <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM Manager Mapping
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
             <div>
               <label className="text-xs text-muted-foreground">SCM Manager</label>
@@ -190,7 +211,19 @@ export function BuyerScmMapping({ tenantId }: Props) {
               Save Mapping
             </Button>
           </div>
+          <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+            <Switch id="include-scm" checked={includeScm} onCheckedChange={setIncludeScm} />
+            <div className="space-y-0.5">
+              <label htmlFor="include-scm" className="text-sm font-medium cursor-pointer">
+                Include SCM Manager / SCM Head in approval flow
+              </label>
+              <p className="text-xs text-muted-foreground">
+                When off, vendors invited by this buyer skip SCM stages and go directly to Finance 1.
+              </p>
+            </div>
+          </div>
         </CardContent>
+
       </Card>
 
       <Card>
@@ -211,6 +244,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                 <TableRow>
                   <TableHead>SCM Manager</TableHead>
                   <TableHead>Buyer</TableHead>
+                  <TableHead className="w-56">Include SCM in flow</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -220,6 +254,17 @@ export function BuyerScmMapping({ tenantId }: Props) {
                   <TableRow key={m.id}>
                     <TableCell>{label(m.scm)}</TableCell>
                     <TableCell>{label(m.buyer)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={m.include_scm_stages}
+                          onCheckedChange={(v) => handleToggleScm(m.id, v)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {m.include_scm_stages ? 'With SCM' : 'Skip SCM → Finance 1'}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(m.created_at).toLocaleDateString()}
                     </TableCell>
@@ -232,6 +277,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                 ))}
               </TableBody>
             </Table>
+
           )}
         </CardContent>
       </Card>

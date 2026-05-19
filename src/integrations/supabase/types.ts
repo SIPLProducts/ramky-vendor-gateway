@@ -379,6 +379,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          include_scm_stages: boolean
           scm_manager_user_id: string
           tenant_id: string
         }
@@ -387,6 +388,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          include_scm_stages?: boolean
           scm_manager_user_id: string
           tenant_id: string
         }
@@ -395,6 +397,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          include_scm_stages?: boolean
           scm_manager_user_id?: string
           tenant_id?: string
         }
