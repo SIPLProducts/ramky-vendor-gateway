@@ -1,61 +1,75 @@
-## Goal
-Make the DMS upload flow send exactly the SAP payload shape you shared and treat the SAP success response array as the final successful upload result.
+## What is actually happening
 
-## What I will change
+- The browser payload in your screenshot is expected: `{"vendorIds": [...]}` is only the portal calling the backend function.
+- The SAP DMS payload is created inside `sync-vendor-to-dms` and then sent from the backend to middleware as:
 
-1. **Keep your app request body as-is**
-   - The frontend/backend function can continue receiving:
-     ```json
-     { "vendorIds": ["7fc4723c-3a26-43e6-a0e0-2aff76727ac3"] }
-     ```
-   - The DMS sync function will fetch that vendor and its uploaded documents, then build the SAP payload automatically.
+```json
+{
+  "BP_LIFNR": "1061301",
+  "FILE_UPLOAD": [
+    { "FILE": "BASE64", "FILE_PATH": "PATH1" },
+    { "FILE": "BASE64", "FILE_PATH": "PATH2" }
+  ]
+}
+```
 
-2. **Build the exact SAP DMS payload**
-   - Send this format to the middleware/SAP endpoint:
-     ```json
-     {
-       "BP_LIFNR": "1061301",
-       "FILE_UPLOAD": [
-         { "FILE": "BASE64", "FILE_PATH": "PATH1" },
-         { "FILE": "BASE64", "FILE_PATH": "PATH2" }
-       ]
-     }
-     ```
-   - Normalize `BP_LIFNR` so the response can support SAP’s padded value like `0001061303`.
+- The recurring 413 is not because the browser payload is wrong. The latest logs show the middleware returned an old HTML Express error page:
 
-3. **Return SAP success response cleanly**
-   - If SAP returns:
-     ```json
-     [
-       {
-         "BP_LIFNR": "0001061303",
-         "MSGTYP": "S",
-         "MSGNR": "200",
-         "MSG": "File(s) Uploaded Successfully"
-       }
-     ]
-     ```
-   - The DMS sync result will mark the vendor upload as successful, save the SAP response in audit logs, and expose that SAP row back in the result.
+```text
+PayloadTooLargeError: request entity too large
+```
 
-4. **Reduce repeated 413 payload failures at the source**
-   - Instead of sending all documents in one very large JSON request, split documents into smaller batches before calling `/sap/dms/upload`.
-   - This avoids hitting Express JSON parser limits even when multiple files exist.
-   - Keep each batch under a safe request-size threshold and still upload all documents for the vendor.
+That means the Windows middleware currently running on port `3002` is still an old instance/version. The new middleware should return JSON with `code: "PAYLOAD_TOO_LARGE"`, `middlewareVersion`, and `bodyLimit`; your log does not show that.
 
-5. **Improve middleware response passthrough**
-   - Keep middleware accepting the exact DMS payload.
-   - Preserve SAP’s response array under `sapResponse` so the cloud function can parse success correctly.
-   - Improve error details for `PAYLOAD_TOO_LARGE` so the portal shows whether the failure happened before SAP or inside SAP.
+## Fix plan
 
-6. **Update middleware docs/env example**
-   - Add `MIDDLEWARE_BODY_LIMIT=500mb` to `.env.example` so future Windows copies are configured correctly.
-   - Correct README text that still says 200 MB, so the instructions match the current 500 MB code.
+1. **Make the SAP DMS payload explicit and verifiable**
+   - Keep the portal request as `vendorIds`, because the frontend does not have the base64 documents.
+   - In `sync-vendor-to-dms`, continue building the exact SAP payload with `BP_LIFNR` and `FILE_UPLOAD`.
+   - Add safe debug output that logs `BP_LIFNR`, file count, file paths, batch number, and approximate MB size without printing base64 content.
 
-## Technical notes
-- Files to update:
-  - `supabase/functions/sync-vendor-to-dms/index.ts`
-  - `middleware/server.js`
-  - `middleware/.env.example`
-  - `middleware/README.md`
-- No database schema changes are required.
-- The current Windows log still suggests an old middleware copy may be running if it does not print `Middleware build: dms-large-upload-v3` and `Body limit: 500mb`.
+2. **Make uploads smaller to avoid 413 even on older limits**
+   - Reduce DMS batch size from about `40 MB` JSON to a much smaller safer value, around `8 MB`, because base64 increases file size and some old middleware/server layers may still have lower body limits.
+   - If one single file is too large, return a clear message identifying that file instead of repeatedly failing the whole vendor sync.
+
+3. **Improve middleware `/sap/dms/upload` validation and logs**
+   - Validate the incoming body shape:
+     - `BP_LIFNR` required
+     - `FILE_UPLOAD` must be an array
+     - each item must contain `FILE` and `FILE_PATH`
+   - Log only safe metadata: vendor code, number of files, file paths, and estimated payload size.
+   - Preserve SAP response exactly under `sapResponse`, so the success response like `File(s) Uploaded Successfully` is passed back cleanly.
+
+4. **Add a health/version check before DMS upload**
+   - Before uploading, call middleware `/health`.
+   - If it does not show the expected new middleware version/body limit, return a clear message that the Windows middleware must be restarted/copied correctly instead of sending another large request that fails with HTML 413.
+
+5. **Update Windows troubleshooting instructions**
+   - Add exact commands to confirm the active middleware version and body limit:
+     - open `/health`
+     - confirm `middlewareVersion`
+     - confirm `bodyLimit`
+   - Add restart guidance for killing stale Node processes on port `3002`.
+
+## Expected result after implementation
+
+- In Chrome DevTools, the browser request will still show:
+
+```json
+{ "vendorIds": ["..."] }
+```
+
+- In backend/middleware logs, the actual SAP payload will be confirmed as:
+
+```json
+{
+  "BP_LIFNR": "1061301",
+  "FILE_UPLOAD": [
+    { "FILE": "<base64 omitted from logs>", "FILE_PATH": "PATH1" }
+  ]
+}
+```
+
+- The app will avoid large single requests by sending small batches.
+- If Windows is still running the old middleware, the app will tell you that directly before upload.
+- SAP success rows will be returned back in the DMS result, including messages like `File(s) Uploaded Successfully`.
