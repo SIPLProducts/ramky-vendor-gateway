@@ -2,11 +2,9 @@ import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Award } from 'lucide-react';
 import { InternationalClassification } from '@/types/vendor';
-import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
+import { ClassificationField } from '@/components/vendor/ClassificationField';
 
 const schema = z.object({
   materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
@@ -23,18 +21,10 @@ interface Props {
   onLiveUpdate?: (data: InternationalClassification) => void;
 }
 
-const sapOptions = (rows: SapMasterRow[] | undefined) =>
-  (rows || []).map((r) => ({ value: r.code, label: r.description ? `${r.code} — ${r.description}` : r.code }));
-
 const asArr = (v: unknown): string[] =>
   Array.isArray(v) ? (v as string[]) : (v ? [String(v)] : []);
 
 export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) {
-  const { data: sapMatGrp } = useSapMasterData('material_group_vendor');
-  const { data: sapVendorCat } = useSapMasterData('vendor_category');
-  const { data: sapVendorLoc } = useSapMasterData('vendor_location');
-  const { data: sapIdSource } = useSapMasterData('identification_source');
-
   const { control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -67,38 +57,6 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
     });
   };
 
-  const renderField = (
-    name: keyof FormValues,
-    label: string,
-    required: boolean,
-    rows: SapMasterRow[] | undefined,
-    placeholderEmpty: string,
-    placeholderFull: string,
-  ) => (
-    <div className="grid gap-1.5">
-      <Label>
-        {label}{required && <span className="text-destructive ml-0.5">*</span>}
-      </Label>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field }) => (
-          <MultiSelect
-            options={sapOptions(rows)}
-            selected={(field.value as string[]) || []}
-            onChange={field.onChange}
-            placeholder={rows && rows.length ? placeholderFull : placeholderEmpty}
-            className={errors[name] ? 'border-destructive' : ''}
-          />
-        )}
-      />
-      {errors[name] && <p className="text-xs text-destructive">{(errors[name] as any)?.message as string}</p>}
-      {(!rows || rows.length === 0) && (
-        <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
-      )}
-    </div>
-  );
-
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="form-section">
@@ -111,10 +69,64 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
         </p>
 
         <div className="grid md:grid-cols-2 gap-5">
-          {renderField('materialGroupVendor', 'Material Group for Vendors', true, sapMatGrp, 'No SAP values — sync SAP master data', 'Select material groups')}
-          {renderField('vendorLocation', 'Vendor Location', true, sapVendorLoc, 'No SAP values — sync SAP master data', 'Select locations')}
-          {renderField('vendorCategory', 'Vendor Category', false, sapVendorCat, 'No SAP values — sync SAP master data', 'Select vendor categories')}
-          {renderField('identificationSource', 'Vendor Identification Source', false, sapIdSource, 'No SAP values — sync SAP master data', 'Select identification sources')}
+          <Controller
+            name="materialGroupVendor"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Material Group for Vendors"
+                required
+                masterType="material_group_vendor"
+                value={(field.value as string[]) || []}
+                onChange={field.onChange}
+                errorText={errors.materialGroupVendor?.message as string}
+                selectPlaceholder="Select material groups"
+              />
+            )}
+          />
+          <Controller
+            name="vendorLocation"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Vendor Location"
+                required
+                masterType="vendor_location"
+                value={(field.value as string[]) || []}
+                onChange={field.onChange}
+                errorText={errors.vendorLocation?.message as string}
+                selectPlaceholder="Select locations"
+              />
+            )}
+          />
+          <Controller
+            name="vendorCategory"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Vendor Category"
+                masterType="vendor_category"
+                value={(field.value as string[]) || []}
+                onChange={field.onChange}
+                errorText={errors.vendorCategory?.message as string}
+                selectPlaceholder="Select vendor categories"
+              />
+            )}
+          />
+          <Controller
+            name="identificationSource"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Vendor Identification Source"
+                masterType="identification_source"
+                value={(field.value as string[]) || []}
+                onChange={field.onChange}
+                errorText={errors.identificationSource?.message as string}
+                selectPlaceholder="Select identification sources"
+              />
+            )}
+          />
         </div>
       </div>
     </form>

@@ -17,6 +17,7 @@ import { FileUpload } from '@/components/vendor/FileUpload';
 import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
+import { ClassificationField } from '@/components/vendor/ClassificationField';
 import {
   OrganizationDetails,
   StatutoryDetails,
@@ -461,97 +462,65 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
               Classification
             </h4>
             <div className="grid md:grid-cols-2 gap-5">
-              <div className="grid gap-1.5">
-                <Label>Material Group for Vendors *</Label>
-                <Controller
-                  name="materialGroupVendor"
-                  control={control}
-                  render={({ field }) => (
-                    <MultiSelect
-                      options={sapOptions(sapMatGrp)}
-                      selected={(field.value as string[]) || []}
-                      onChange={field.onChange}
-                      placeholder={sapMatGrp && sapMatGrp.length ? 'Select material groups' : 'No SAP values — sync SAP master data'}
-                      className={errors.materialGroupVendor ? 'border-destructive' : ''}
-                    />
-                  )}
-                />
-                {errors.materialGroupVendor && (
-                  <p className="text-xs text-destructive">{errors.materialGroupVendor.message as string}</p>
+              <Controller
+                name="materialGroupVendor"
+                control={control}
+                render={({ field }) => (
+                  <ClassificationField
+                    label="Material Group for Vendors"
+                    required
+                    masterType="material_group_vendor"
+                    value={(field.value as string[]) || []}
+                    onChange={field.onChange}
+                    errorText={errors.materialGroupVendor?.message as string}
+                    selectPlaceholder="Select material groups"
+                  />
                 )}
-                {(!sapMatGrp || sapMatGrp.length === 0) && (
-                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
+              />
+              <Controller
+                name="vendorCategory"
+                control={control}
+                render={({ field }) => (
+                  <ClassificationField
+                    label="Vendor Category"
+                    required
+                    masterType="vendor_category"
+                    value={(field.value as string[]) || []}
+                    onChange={field.onChange}
+                    errorText={errors.vendorCategory?.message as string}
+                    selectPlaceholder="Select vendor categories"
+                  />
                 )}
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Vendor Category *</Label>
-                <Controller
-                  name="vendorCategory"
-                  control={control}
-                  render={({ field }) => (
-                    <MultiSelect
-                      options={sapOptions(sapVendorCat)}
-                      selected={(field.value as string[]) || []}
-                      onChange={field.onChange}
-                      placeholder={sapVendorCat && sapVendorCat.length ? 'Select vendor categories' : 'No SAP values — sync SAP master data'}
-                      className={errors.vendorCategory ? 'border-destructive' : ''}
-                    />
-                  )}
-                />
-                {errors.vendorCategory && (
-                  <p className="text-xs text-destructive">{errors.vendorCategory.message as string}</p>
+              />
+              <Controller
+                name="vendorLocation"
+                control={control}
+                render={({ field }) => (
+                  <ClassificationField
+                    label="Vendor Location"
+                    required
+                    masterType="vendor_location"
+                    value={(field.value as string[]) || []}
+                    onChange={field.onChange}
+                    errorText={errors.vendorLocation?.message as string}
+                    selectPlaceholder="Select locations"
+                  />
                 )}
-                {(!sapVendorCat || sapVendorCat.length === 0) && (
-                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
+              />
+              <Controller
+                name="identificationSource"
+                control={control}
+                render={({ field }) => (
+                  <ClassificationField
+                    label="Vendor Identification Source"
+                    masterType="identification_source"
+                    value={(field.value as string[]) || []}
+                    onChange={field.onChange}
+                    errorText={errors.identificationSource?.message as string}
+                    selectPlaceholder="Select identification sources"
+                  />
                 )}
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Vendor Location *</Label>
-                <Controller
-                  name="vendorLocation"
-                  control={control}
-                  render={({ field }) => (
-                    <MultiSelect
-                      options={sapOptions(sapVendorLoc)}
-                      selected={(field.value as string[]) || []}
-                      onChange={field.onChange}
-                      placeholder={sapVendorLoc && sapVendorLoc.length ? 'Select locations' : 'No SAP values — sync SAP master data'}
-                      className={errors.vendorLocation ? 'border-destructive' : ''}
-                    />
-                  )}
-                />
-                {errors.vendorLocation && (
-                  <p className="text-xs text-destructive">{errors.vendorLocation.message as string}</p>
-                )}
-                {(!sapVendorLoc || sapVendorLoc.length === 0) && (
-                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
-                )}
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Vendor Identification Source</Label>
-                <Controller
-                  name="identificationSource"
-                  control={control}
-                  render={({ field }) => (
-                    <MultiSelect
-                      options={sapOptions(sapIdSource)}
-                      selected={(field.value as string[]) || []}
-                      onChange={field.onChange}
-                      placeholder={sapIdSource && sapIdSource.length ? 'Select identification sources' : 'No SAP values — sync SAP master data'}
-                      className={errors.identificationSource ? 'border-destructive' : ''}
-                    />
-                  )}
-                />
-                {errors.identificationSource && (
-                  <p className="text-xs text-destructive">{errors.identificationSource.message as string}</p>
-                )}
-                {(!sapIdSource || sapIdSource.length === 0) && (
-                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
-                )}
-              </div>
+              />
             </div>
           </div>
         </div>
