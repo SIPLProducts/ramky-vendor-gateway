@@ -565,14 +565,38 @@ export default function SAPSync() {
           <ScrollArea className="flex-1 max-h-[65vh] pr-4">
             <div className="space-y-3 py-4">
               {(dmsResult?.results || []).map((r: any, i: number) => (
-                <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                  <div className="flex items-center justify-between">
+                <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-2">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{r.message}</span>
                     <Badge variant={r.success ? 'default' : 'destructive'}>
                       {r.success ? 'Success' : 'Failed'}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">Vendor: <span className="font-mono">{r.vendorId.slice(0, 8)}</span> • Uploaded: {r.uploadedCount}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Vendor: <span className="font-mono">{r.vendorId.slice(0, 8)}</span> • Uploaded: {r.uploadedCount}
+                  </p>
+                  {r.sap && (
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs bg-background rounded-md p-2 border">
+                      {r.sap.BP_LIFNR && (
+                        <div><span className="text-muted-foreground">BP_LIFNR:</span> <span className="font-mono font-medium">{r.sap.BP_LIFNR}</span></div>
+                      )}
+                      {r.sap.MSGTYP && (
+                        <div><span className="text-muted-foreground">Type:</span> <span className="font-mono">{r.sap.MSGTYP}</span></div>
+                      )}
+                      {r.sap.ERDAT && (
+                        <div><span className="text-muted-foreground">Date:</span> <span className="font-mono">{r.sap.ERDAT}</span></div>
+                      )}
+                      {r.sap.UZEIT && (
+                        <div><span className="text-muted-foreground">Time:</span> <span className="font-mono">{r.sap.UZEIT}</span></div>
+                      )}
+                      {r.sap.UNAME && (
+                        <div className="col-span-2"><span className="text-muted-foreground">User:</span> <span className="font-mono">{r.sap.UNAME}</span></div>
+                      )}
+                      {r.sap.MSG && (
+                        <div className="col-span-2"><span className="text-muted-foreground">SAP MSG:</span> <span>{r.sap.MSG}</span></div>
+                      )}
+                    </div>
+                  )}
                   {r.skipped?.length > 0 && (
                     <p className="text-xs text-amber-600">Skipped: {r.skipped.join(', ')}</p>
                   )}
