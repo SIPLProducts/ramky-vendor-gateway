@@ -120,8 +120,10 @@ export function BuyerScmMapping({ tenantId }: Props) {
         tenant_id: tenantId,
         buyer_user_id: buyerId,
         scm_manager_user_id: scmId,
+        include_scm_stages: includeScm,
         created_by: user?.id,
       });
+
       if (error) {
         if (error.code === '23505') {
           toast({ title: 'Mapping already exists', variant: 'destructive' });
