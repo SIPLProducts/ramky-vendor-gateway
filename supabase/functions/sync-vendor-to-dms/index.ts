@@ -158,9 +158,13 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
+    // Health check is informational only — never block uploads on it.
+    // Some middleware deployments (older builds, ngrok, reverse proxies) don't
+    // expose middlewareVersion/bodyLimit. We still attempt the upload and let
+    // the actual /sap/dms/upload response decide success/failure.
     const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
     if (middlewareHealth && !middlewareHealth.ok) {
-      console.error("DMS middleware health check failed:", middlewareHealth.message, middlewareHealth.health || null);
+      console.warn("DMS middleware health warning (continuing anyway):", middlewareHealth.message);
     } else if (middlewareHealth?.health) {
       console.log("DMS middleware ready:", JSON.stringify({
         middlewareVersion: middlewareHealth.health.middlewareVersion,
