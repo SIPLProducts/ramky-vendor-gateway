@@ -284,6 +284,7 @@ export interface InternationalBankDetails {
   bankName: string;
   bankBranch: string;
   ibanNumber: string;
+  bankCountry?: string;
 }
 
 export interface InternationalClassification {
