@@ -57,7 +57,7 @@ if (!SHARED_SECRET) {
   console.warn("[WARN] MIDDLEWARE_SHARED_SECRET is not set — refusing all authenticated requests.");
 }
 
-const MIDDLEWARE_VERSION = "dms-large-upload-v3";
+const MIDDLEWARE_VERSION = "dms-large-upload-v4";
 const app = express();
 app.use(helmet());
 const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "500mb";
@@ -110,6 +110,17 @@ function redact(obj) {
   if (clone.password) clone.password = "***";
   if (clone.Authorization) clone.Authorization = "Basic ***";
   return clone;
+}
+
+function estimateDmsPayloadBytes(body) {
+  const uploads = Array.isArray(body?.FILE_UPLOAD) ? body.FILE_UPLOAD : [];
+  return uploads.reduce((sum, item) => {
+    return sum + String(item?.FILE || "").length + String(item?.FILE_PATH || "").length + 96;
+  }, String(body?.BP_LIFNR || "").length + 128);
+}
+
+function formatMb(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 async function forwardToSap({ url, method, headers, body }) {
