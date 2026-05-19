@@ -165,8 +165,9 @@ app.get("/", (_req, res) => {
     ok: true,
     service: "sharvi-sap-middleware",
     message: "Sharvi SAP middleware is running. Try GET /health or POST /sap/bp/create.",
-    endpoints: ["GET /health", "POST /sap/bp/create", "POST /sap/proxy"],
+    endpoints: ["GET /health", "POST /sap/bp/create", "POST /sap/dms/upload", "POST /sap/proxy"],
     sapConfigured: Boolean(SAP_BP_API_URL && SAP_BP_USERNAME && SAP_BP_PASSWORD),
+    dmsConfigured: Boolean(SAP_DMS_API_URL && SAP_BP_USERNAME && SAP_BP_PASSWORD),
     secretConfigured: Boolean(SHARED_SECRET),
   });
 });
