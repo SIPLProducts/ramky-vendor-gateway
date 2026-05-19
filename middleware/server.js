@@ -198,7 +198,9 @@ app.get("/health", (_req, res) => {
     ok: true,
     service: "sharvi-sap-middleware",
     sapTarget: SAP_BP_API_URL ? new URL(SAP_BP_API_URL).host : null,
+    middlewareVersion: MIDDLEWARE_VERSION,
     bodyLimit: BODY_LIMIT,
+    dmsEndpoint: "/sap/dms/upload",
     timeouts: {
       requestMs: TIMEOUT_MS,
       connectMs: CONNECT_TIMEOUT_MS,
