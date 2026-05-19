@@ -106,12 +106,18 @@ curl -s -X POST http://localhost:3002/sap/bp/create \
 
 ## Redeploy after body-limit / DMS changes
 
-If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, your running middleware predates the 50 MB body limit. Redeploy:
+If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running middleware is using an older body limit. The current default is **200 MB**. Redeploy:
 
-1. Stop the Windows service (or `node server.js` process).
-2. Replace `server.js` (and `package.json` if changed) with the latest from this repo.
+1. Stop the Windows service (or the `node server.js` process).
+2. Replace `server.js` (and `package.json` if changed) with the latest from this repo in `D:\middleware (2)\middleware`.
 3. Run `npm install` in the middleware folder.
-4. Restart the service.
-5. Verify: `curl http://localhost:3002/health` and re-run a DMS upload from the portal.
+4. Restart the service (`node server.js`).
+5. Verify the active limit:
+   ```
+   curl http://localhost:3002/health
+   ```
+   The response should include `"bodyLimit": "200mb"`. The startup log should also print `Body limit: 200mb`.
+6. Re-run the DMS upload from the portal.
 
-Optional: set `MIDDLEWARE_BODY_LIMIT=100mb` in `.env` to bump the limit further without code edits.
+Optional: override with `MIDDLEWARE_BODY_LIMIT=500mb` in `.env` for very large document batches. Oversized requests now return JSON (with the active `bodyLimit`) instead of the HTML 413 page, so the portal surfaces a clear error.
+

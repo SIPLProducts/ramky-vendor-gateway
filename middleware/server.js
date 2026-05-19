@@ -59,9 +59,24 @@ if (!SHARED_SECRET) {
 
 const app = express();
 app.use(helmet());
-const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "50mb";
+const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "200mb";
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
+
+// Friendly JSON for oversized payloads instead of HTML 413 page
+app.use((err, _req, res, next) => {
+  if (err && (err.type === "entity.too.large" || err.status === 413 || err.name === "PayloadTooLargeError")) {
+    return res.status(413).json({
+      ok: false,
+      error: `Payload too large. Current middleware body limit is ${BODY_LIMIT}. ` +
+             `Increase MIDDLEWARE_BODY_LIMIT in middleware .env and restart, ` +
+             `or reduce the size/number of documents in a single upload.`,
+      bodyLimit: BODY_LIMIT,
+      code: "PAYLOAD_TOO_LARGE",
+    });
+  }
+  return next(err);
+});
 app.use(morgan("tiny"));
 app.use(
   cors({
@@ -179,6 +194,7 @@ app.get("/health", (_req, res) => {
     ok: true,
     service: "sharvi-sap-middleware",
     sapTarget: SAP_BP_API_URL ? new URL(SAP_BP_API_URL).host : null,
+    bodyLimit: BODY_LIMIT,
     timeouts: {
       requestMs: TIMEOUT_MS,
       connectMs: CONNECT_TIMEOUT_MS,
@@ -340,6 +356,7 @@ app.listen(PORT, () => {
   console.log(`Sharvi SAP middleware listening on :${PORT}`);
   console.log(`SAP target: ${SAP_BP_API_URL || "(not configured)"}`);
   console.log(`CORS origins: ${CORS_ORIGINS.join(", ")}`);
+  console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT)`);
   console.log(`Timeouts (ms): request=${TIMEOUT_MS}, connect=${CONNECT_TIMEOUT_MS}, headers=${HEADERS_TIMEOUT_MS}, body=${BODY_TIMEOUT_MS}`);
   if (ALLOW_INSECURE_TLS) console.log("TLS verification: DISABLED (ALLOW_INSECURE_TLS=1)");
 });
