@@ -1282,27 +1282,6 @@ export default function VendorRegistration() {
           </div>
         </main>
       </div>
-      <AlertDialog open={!!pendingTypeSwitch} onOpenChange={(o) => { if (!o) setPendingTypeSwitch(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Switch vendor type?</AlertDialogTitle>
-            <AlertDialogDescription>
-              All entered {pendingTypeSwitch === 'international' ? 'Domestic' : 'International'} data will be cleared and you'll restart from Step 1.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingTypeSwitch(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingTypeSwitch) applyVendorTypeSwitch(pendingTypeSwitch);
-                setPendingTypeSwitch(null);
-              }}
-            >
-              Yes, switch
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}
