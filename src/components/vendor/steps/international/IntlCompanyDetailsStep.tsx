@@ -5,10 +5,11 @@ import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { InternationalCompanyDetails } from '@/types/vendor';
-import { useSapMasterData } from '@/hooks/useSapMasterData';
+import { useEnsureSapMaster } from '@/hooks/useSapMasterData';
 
 const schema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required'),
@@ -31,8 +32,8 @@ interface Props {
 }
 
 export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
-  const { data: countries } = useSapMasterData('country');
-  const { data: regions } = useSapMasterData('region');
+  const { rows: countries, fetching: countriesFetching, errorMessage: countriesError, retry: retryCountries } = useEnsureSapMaster('country');
+  const { rows: regions, fetching: regionsFetching, errorMessage: regionsError, retry: retryRegions } = useEnsureSapMaster('region');
 
   const {
     register, control, handleSubmit, watch, setValue,
@@ -60,6 +61,7 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
   }, [regions, selectedCountry]);
 
   const hasCountries = !!(countries && countries.length > 0);
+  const countryDisabled = countriesFetching || !!countriesError || !hasCountries;
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -97,10 +99,18 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
                       field.onChange(v);
                       setValue('region', '');
                     }}
-                    disabled={!hasCountries}
+                    disabled={countryDisabled}
                   >
                     <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
-                      <SelectValue placeholder={hasCountries ? 'Select country' : 'No SAP values — sync SAP master data'} />
+                      <SelectValue placeholder={
+                        countriesFetching
+                          ? 'Fetching country from SAP…'
+                          : countriesError
+                          ? 'Country fetch failed'
+                          : hasCountries
+                          ? 'Select country'
+                          : 'No SAP values — click Sync now'
+                      } />
                     </SelectTrigger>
                     <SelectContent>
                       {(countries || []).map((c) => (
@@ -113,8 +123,29 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
                 )}
               />
               {errors.country && <p className="text-xs text-destructive">{errors.country.message}</p>}
-              {!hasCountries && (
-                <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
+              {countriesFetching && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching country from SAP…
+                </p>
+              )}
+              {!countriesFetching && countriesError && (
+                <div className="text-xs text-destructive flex items-start gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p>Country fetch failed — {countriesError}</p>
+                    <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={retryCountries}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!countriesFetching && !countriesError && !hasCountries && (
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <span>No SAP values returned.</span>
+                  <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={retryCountries}>
+                    <RefreshCw className="h-3 w-3 mr-1" /> Sync now
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -125,17 +156,22 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
                 control={control}
                 render={({ field }) => {
                   const hasRegions = regionsForCountry.length > 0;
+                  const regionDisabled = !selectedCountry || regionsFetching || !!regionsError || !hasRegions;
                   return (
                     <Select
                       value={field.value}
                       onValueChange={field.onChange}
-                      disabled={!selectedCountry || !hasRegions}
+                      disabled={regionDisabled}
                     >
                       <SelectTrigger className={errors.region ? 'border-destructive' : ''}>
                         <SelectValue
                           placeholder={
                             !selectedCountry
                               ? 'Select country first'
+                              : regionsFetching
+                              ? 'Fetching region from SAP…'
+                              : regionsError
+                              ? 'Region fetch failed'
                               : hasRegions
                               ? 'Select region'
                               : 'No SAP regions for this country'
@@ -158,8 +194,25 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
                 }}
               />
               {errors.region && <p className="text-xs text-destructive">{errors.region.message}</p>}
+              {regionsFetching && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching region from SAP…
+                </p>
+              )}
+              {!regionsFetching && regionsError && (
+                <div className="text-xs text-destructive flex items-start gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p>Region fetch failed — {regionsError}</p>
+                    <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={retryRegions}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
