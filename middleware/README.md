@@ -126,7 +126,9 @@ Optional: override with `MIDDLEWARE_BODY_LIMIT=1gb` in `.env` for very large doc
 
 If you keep seeing `PayloadTooLargeError: request entity too large` on Windows, it means an **old `server.js` is still running**. The new build prints a version banner on startup — if you don't see it, you're running the old file.
 
-The browser DevTools payload for `sync-vendor-to-dms` will only show `{"vendorIds":[...]}`. That is correct: the portal sends only vendor IDs to Lovable Cloud, and Lovable Cloud then builds the SAP DMS payload server-side as `{ "BP_LIFNR": "...", "FILE_UPLOAD": [...] }` before calling this middleware.
+The browser DevTools payload for `sync-vendor-to-dms` shows the exact SAP DMS shape: `{ "BP_LIFNR": "...", "FILE_UPLOAD": [{ "FILE": "<base64>", "FILE_PATH": "..." }] }`. Lovable Cloud forwards that payload to this middleware on `POST /sap/dms/upload`, which calls SAP and returns SAP's response verbatim under `sapResponse`.
+
+If the middleware returns `Cannot POST /sap/dms/upload` (HTML 404), the running `server.js` is OLD. Restart with the latest file — the new build returns a JSON 404 listing `availableEndpoints` and includes `middlewareVersion` in the response, and `/health` lists `POST /sap/dms/upload` under `availableEndpoints`.
 
 ### Steps (run in PowerShell as Administrator)
 

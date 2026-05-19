@@ -212,6 +212,12 @@ app.get("/health", (_req, res) => {
     middlewareVersion: MIDDLEWARE_VERSION,
     bodyLimit: BODY_LIMIT,
     dmsEndpoint: "/sap/dms/upload",
+    availableEndpoints: [
+      "GET /health",
+      "POST /sap/bp/create",
+      "POST /sap/dms/upload",
+      "POST /sap/proxy",
+    ],
     timeouts: {
       requestMs: TIMEOUT_MS,
       connectMs: CONNECT_TIMEOUT_MS,
@@ -383,6 +389,31 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
       target: url,
     });
   }
+});
+
+// Alias routes — handle common path mistakes so we never return raw HTML 404.
+app.post(["/dms/upload", "/sap/dms", "/sap/upload"], authGuard, (req, res, next) => {
+  console.log(`[alias] redirecting ${req.path} -> /sap/dms/upload`);
+  req.url = "/sap/dms/upload";
+  return app._router.handle(req, res, next);
+});
+
+// JSON 404 fallback so callers get a dynamic, machine-readable response
+// instead of Express' default "Cannot POST ..." HTML page.
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: `No route for ${req.method} ${req.originalUrl}`,
+    middlewareVersion: MIDDLEWARE_VERSION,
+    bodyLimit: BODY_LIMIT,
+    availableEndpoints: [
+      "GET /health",
+      "POST /sap/bp/create",
+      "POST /sap/dms/upload",
+      "POST /sap/proxy",
+    ],
+    hint: "If you expected /sap/dms/upload, confirm the running server.js is the latest build (see startup banner).",
+  });
 });
 
 // ---------- Start ----------

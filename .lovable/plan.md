@@ -1,33 +1,92 @@
+## Why this is happening
+
+Your latest logs show:
+
+```text
+GET /health 200
+POST /sap/dms/upload 404
+Cannot POST /sap/dms/upload
+```
+
+That means Lovable Cloud is reaching the middleware, but the **running middleware process does not have the `/sap/dms/upload` route registered**. So this is not a SAP success/failure response yet; it is Express returning 404 before forwarding to SAP.
+
+The desired dynamic response can only come after the request reaches the middleware DMS route and the middleware forwards it to SAP.
+
 ## Plan
 
-1. **Remove the hardcoded old-middleware blocker**
-   - In `sync-vendor-to-dms`, stop returning this fixed message before upload:
-     `Old middleware is running. /health must show middlewareVersion...`
-   - Keep `/health` as diagnostic information only, so the upload response is based on the real `/sap/dms/upload` result.
+1. **Make the middleware route more robust**
+   - Keep `POST /sap/dms/upload`.
+   - Add safe alias routes for common deployment/path mistakes, such as `POST /dms/upload` and `POST /sap/dms`.
+   - Add a JSON 404 handler that returns available endpoints and middleware version instead of an HTML `Cannot POST ...` page.
+   - This makes future errors clear and dynamic instead of browser/Express HTML.
 
-2. **Make the DMS response dynamic**
-   - If middleware `/health` returns `{}` or has missing fields, include that information in logs/metadata, but do not fail immediately.
-   - Return the actual middleware/SAP response for each upload batch, including real HTTP status and error body when available.
-   - Preserve SAP-oriented response fields like `BP_LIFNR`; do not expose internal vendor UUIDs in the result.
+2. **Return SAP DMS rows directly in the middleware**
+   - When SAP returns the array:
+     ```json
+     [{ "BP_LIFNR": "0001061303", "MSGTYP": "S", "MSG": "File(s) Uploaded Successfully" }]
+     ```
+   - The middleware response will preserve that array under `sapResponse` and expose diagnostic metadata only outside it.
 
-3. **Improve too-large-payload handling**
-   - Keep batching, but make payload-size errors come from the actual request result instead of a pre-check version gate.
-   - When a batch is too large, return a clear dynamic message showing which batch failed, status `413`, and the middleware error body if it exists.
+3. **Improve Edge Function parsing and result output**
+   - Keep sending payload as:
+     ```json
+     { "BP_LIFNR": "1061307", "FILE_UPLOAD": [...] }
+     ```
+   - Parse middleware `sapResponse` dynamically.
+   - If SAP returns success rows, mark the vendor success and include the exact SAP row in `sap` / `sapRows`.
+   - If middleware returns 404/413/502, show the real status and body, but no longer expose internal vendor UUIDs.
 
-4. **Clean the middleware docs if needed**
-   - Update the README wording that currently says the browser payload only shows `vendorIds`, because the current flow is intended to show the SAP-format payload.
+4. **Fix outdated configuration normalization**
+   - Update frontend middleware URL cleanup to strip `/sap/dms/upload` too, so saving a full endpoint URL does not accidentally create wrong paths later.
+
+5. **Update troubleshooting docs**
+   - Remove the outdated README line that says browser Inspect only shows `vendorIds`.
+   - Document that current DMS flow sends the SAP-format payload in Inspect.
+   - Add a clear verification step: `/health` must list `POST /sap/dms/upload` or the running middleware file is old/wrong.
 
 ## Expected result
 
-Browser Inspect will send/show the SAP DMS shape:
+After implementing and restarting the middleware with the updated `server.js`, `/health` and 404 responses will clearly show whether DMS route exists. A successful DMS sync will return dynamic SAP data like:
 
 ```json
 {
-  "BP_LIFNR": "1061301",
-  "FILE_UPLOAD": [
-    { "FILE": "BASE64", "FILE_PATH": "PATH1" }
+  "success": true,
+  "message": "1/1 vendor(s) uploaded to DMS",
+  "results": [
+    {
+      "BP_LIFNR": "0001061303",
+      "success": true,
+      "message": "File(s) Uploaded Successfully",
+      "sap": {
+        "BP_LIFNR": "0001061303",
+        "MSGTYP": "S",
+        "MSGNR": "200",
+        "ERDAT": "2026-05-18",
+        "UZEIT": "18:57:22",
+        "UNAME": "22000208",
+        "MSG": "File(s) Uploaded Successfully"
+      },
+      "sapRows": [
+        {
+          "BP_LIFNR": "0001061303",
+          "MSGTYP": "S",
+          "MSGNR": "200",
+          "MSG": "File(s) Uploaded Successfully"
+        }
+      ]
+    }
   ]
 }
 ```
 
-And the response will be dynamic from the upload attempt, not the hardcoded old-middleware message.
+## Important operational note
+
+Because your middleware console currently shows only:
+
+```text
+Sharvi SAP middleware listening on :3002
+SAP target: ...
+CORS origins: *
+```
+
+and does **not** show the newer startup banner with middleware build/body limit, Windows is almost certainly running an older `server.js` or a different folder. The code change will help, but the server must be restarted from the updated middleware folder for `/sap/dms/upload` to exist.
