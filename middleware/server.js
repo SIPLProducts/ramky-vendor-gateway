@@ -20,6 +20,7 @@ const { Agent, setGlobalDispatcher, fetch: undiciFetch } = require("undici");
 const PORT = parseInt(process.env.PORT || "3002", 10);
 const SHARED_SECRET = process.env.MIDDLEWARE_SHARED_SECRET || "";
 const SAP_BP_API_URL = process.env.SAP_BP_API_URL || "";
+const SAP_DMS_API_URL = process.env.SAP_DMS_API_URL || SAP_BP_API_URL;
 const SAP_BP_USERNAME = process.env.SAP_BP_USERNAME || "";
 const SAP_BP_PASSWORD = process.env.SAP_BP_PASSWORD || "";
 const TIMEOUT_MS = parseInt(process.env.SAP_REQUEST_TIMEOUT_MS || "30000", 10);
