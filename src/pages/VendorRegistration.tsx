@@ -106,6 +106,7 @@ export default function VendorRegistration() {
   const [isTokenMode, setIsTokenMode] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const formDataLoadedRef = useRef(false);
+  const [resetNonce, setResetNonce] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
