@@ -170,16 +170,22 @@ serve(async (req) => {
           const rows: any[] = Array.isArray(inner)
             ? inner
             : (inner && typeof inner === "object" ? [inner] : []);
-          sapRow = rows.find((r: any) => r?.MSGTYP === "S") || rows[0] || null;
 
-          if (res.ok && sapRow?.MSGTYP === "S") {
+          const allSuccess = rows.length > 0 && rows.every((r: any) => r?.MSGTYP === "S");
+          const firstError = rows.find((r: any) => r?.MSGTYP && r.MSGTYP !== "S");
+          sapRow = rows[0] || null;
+
+          if (res.ok && allSuccess) {
             success = true;
-            message = sapRow.MSG || `DMS upload OK (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
+            message = rows[0]?.MSG || `DMS upload OK (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
+          } else if (res.ok && rows.length > 0) {
+            success = false;
+            message = firstError?.MSG
+              ? `SAP DMS error: ${firstError.MSG}`
+              : `SAP DMS returned no success rows`;
           } else {
             success = false;
-            message = sapRow?.MSG
-              ? `SAP DMS error: ${sapRow.MSG}`
-              : `DMS upload failed (HTTP ${res.status}): ${text.slice(0, 200)}`;
+            message = `DMS upload failed (HTTP ${res.status}): ${text.slice(0, 200)}`;
           }
         } catch (e: any) {
           success = false;
