@@ -218,15 +218,15 @@ serve(async (req) => {
       let skipped = 0;
       const rows: any[] = [];
       for (const item of arr) {
-        const code = item?.[mapping.code];
-        if (code === undefined || code === null || String(code).trim() === "") {
+        const codeRaw = mapping.codeFn ? mapping.codeFn(item) : item?.[mapping.code];
+        if (codeRaw === undefined || codeRaw === null || String(codeRaw).trim() === "") {
           skipped++;
           continue;
         }
         const desc = mapping.desc ? (item?.[mapping.desc] ?? null) : null;
         rows.push({
           master_type: mapping.type,
-          code: String(code),
+          code: String(codeRaw),
           description: desc == null ? null : String(desc),
           extra: item,
           source: "sap",
