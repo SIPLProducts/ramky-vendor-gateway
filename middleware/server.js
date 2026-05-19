@@ -212,6 +212,12 @@ app.get("/health", (_req, res) => {
     middlewareVersion: MIDDLEWARE_VERSION,
     bodyLimit: BODY_LIMIT,
     dmsEndpoint: "/sap/dms/upload",
+    availableEndpoints: [
+      "GET /health",
+      "POST /sap/bp/create",
+      "POST /sap/dms/upload",
+      "POST /sap/proxy",
+    ],
     timeouts: {
       requestMs: TIMEOUT_MS,
       connectMs: CONNECT_TIMEOUT_MS,

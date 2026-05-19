@@ -66,6 +66,7 @@ function normalizeMiddlewareBase(raw: string | null | undefined): string | null 
   if (!raw) return null;
   let v = String(raw).replace(/\s+/g, "").trim().replace(/\/+$/, "");
   v = v.replace(/\/sap\/bp\/create$/i, "")
+       .replace(/\/sap\/dms\/upload$/i, "")
        .replace(/\/sap\/proxy$/i, "")
        .replace(/\/health$/i, "")
        .replace(/\/+$/, "");
