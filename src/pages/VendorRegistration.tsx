@@ -23,7 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileText, Building2 as Building2Icon, Landmark, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useVendorRegistration } from '@/hooks/useVendorRegistration';
-import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert } from 'lucide-react';
+import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
@@ -662,37 +662,58 @@ export default function VendorRegistration() {
     return !!(i.company.companyName || i.company.companyAddress || i.company.country || i.bank.accountNumber || i.bank.swiftCode || i.bank.ibanNumber || i.documents.registrationCopyFile || i.documents.swiftIbanFile || (i.classification.materialGroupVendor?.length || 0) > 0);
   };
 
-  const applyVendorTypeSwitch = (next: VendorOriginType) => {
-    setFormData((prev) => {
-      if (next === 'international') {
-        return {
-          ...prev,
-          vendorType: 'international',
-          ...EMPTY_DOMESTIC_SLICES,
-          international: prev.international ?? EMPTY_INTERNATIONAL_DATA,
-        };
+  const purgeVendorArtifacts = async (vId: string) => {
+    try {
+      // List & delete all files under the vendor's storage folder
+      const { data: folders } = await supabase.storage.from('vendor-documents').list(vId);
+      if (folders && folders.length) {
+        const allPaths: string[] = [];
+        for (const entry of folders) {
+          // Each entry is a subfolder (document_type). List files inside.
+          const { data: files } = await supabase.storage.from('vendor-documents').list(`${vId}/${entry.name}`);
+          if (files) {
+            for (const f of files) allPaths.push(`${vId}/${entry.name}/${f.name}`);
+          }
+        }
+        if (allPaths.length) {
+          await supabase.storage.from('vendor-documents').remove(allPaths);
+        }
       }
-      return {
-        ...prev,
-        vendorType: 'domestic',
-        international: EMPTY_INTERNATIONAL_DATA,
-      };
-    });
+      // Delete document rows
+      await supabase.from('vendor_documents').delete().eq('vendor_id', vId);
+    } catch (err) {
+      console.error('purgeVendorArtifacts failed', err);
+    }
+  };
+
+  const applyVendorTypeSwitch = (next: VendorOriginType) => {
+    setFormData((prev) => ({
+      ...prev,
+      vendorType: next,
+      ...EMPTY_DOMESTIC_SLICES,
+      international: EMPTY_INTERNATIONAL_DATA,
+      declaration: { selfDeclared: false, termsAccepted: false },
+    }));
     setCompletedSteps([]);
     setCurrentStep(1);
     setVerifiedData(undefined);
+    setCustomFieldValues({});
+    setPendingChoiceType(next);
     latestStep1DataRef.current = null;
+    if (vendorId) {
+      void purgeVendorArtifacts(vendorId);
+    }
+    toast({
+      title: `Switched to ${next === 'international' ? 'International' : 'Domestic'}`,
+      description: 'Previous data has been cleared.',
+    });
   };
 
   const handleVendorTypeChange = (next: VendorOriginType) => {
     if (next === formData.vendorType) return;
-    const abandonedHasData = next === 'international' ? hasDomesticData() : hasInternationalData();
-    if (abandonedHasData) {
-      setPendingTypeSwitch(next);
-      return;
-    }
     applyVendorTypeSwitch(next);
   };
+
 
   // ----- International step setters -----
   const setIntlSlice = <K extends keyof InternationalData>(key: K, value: InternationalData[K]) => {
@@ -1097,14 +1118,19 @@ export default function VendorRegistration() {
             </div>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs rounded-lg gap-1.5"
               disabled={isSubmitting}
-              onClick={() => { setPendingChoiceType(formData.vendorType); setVendorTypeChosen(false); }}
+              onClick={() => {
+                setPendingChoiceType(formData.vendorType);
+                setVendorTypeChosen(false);
+              }}
             >
-              Change
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back
             </Button>
+
           </div>
         )}
 

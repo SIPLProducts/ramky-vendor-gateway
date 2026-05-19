@@ -1,31 +1,49 @@
-## Root cause
+# Vendor Registration — Back Button + Full Reset on Type Switch
 
-`supabase/functions/sap-master-fetch/index.ts` requires roles `admin / sharvi_admin / customer_admin / finance / SAP Team`. Vendors filling the registration form don't have any of these roles, so `supabase.functions.invoke("sap-master-fetch")` returns **HTTP 403** — surfaced in the UI as *"Classification fetch failed — Edge Function returned a non-2xx status code."*
+## 1. Replace "Change" with "Back" button
 
-The Country / Region dropdowns on the International Company Details step hit the exact same wall and additionally have **no retry UI** at all — they just sit disabled with "No SAP values — sync SAP master data".
+File: `src/pages/VendorRegistration.tsx` (lines ~1091–1109)
 
-## Changes
+- Replace the ghost "Change" button next to the "Vendor Type: …" chip with a **Back** button that matches the reference screenshot:
+  - Label: `Back`
+  - Left `ArrowLeft` icon (lucide-react)
+  - Outline/ghost style, rounded, small size, right-aligned (same position)
+- Click behaviour unchanged in intent: returns user to the Vendor Type selector (`setVendorTypeChosen(false)` + `setPendingChoiceType(formData.vendorType)`), but now also triggers the full reset flow below so data does not leak across types.
 
-### 1. `supabase/functions/sap-master-fetch/index.ts`
-- Remove the role allowlist on `requireAuthenticatedUser`. Keep authentication required (any signed-in user), drop the role check.
-  - Before: `requireAuthenticatedUser(req, ["admin","sharvi_admin","customer_admin","finance","SAP Team"])`
-  - After: `requireAuthenticatedUser(req)`
-- Safe because the function only **reads** from SAP and **upserts** into `sap_master_data`, which is already a vendor-readable shared cache. No destructive operations exist.
-- Redeploy the function.
+## 2. Auto-refresh all data when switching vendor type
 
-### 2. `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`
-- Swap `useSapMasterData('country')` → `useEnsureSapMaster('country')` and `useSapMasterData('region')` → `useEnsureSapMaster('region')`.
-- For both Country and Region, render the same status pattern already used by `ClassificationField`:
-  - `fetching` → disable `Select`, placeholder "Fetching country/region from SAP…", show spinner + helper text.
-  - `errorMessage` → red helper text "Country/Region fetch failed — {reason}" with a **Retry** button (`RefreshCw` icon) wired to `retry()`.
-  - empty (not fetching, no error, zero rows) → existing "No SAP values" hint + **Sync now** button calling `retry()`.
-- Country `Select` is disabled while `fetching || errorMessage || empty`. Region keeps its "Select country first" gating in addition to its own loading/error/empty states.
-- Keep all logic inline in this file (single usage — no new shared component).
+Today `applyVendorTypeSwitch` only clears the in-memory slice of the *other* type. The user reports that after going back and switching Domestic ↔ International, previously entered fields and **uploaded documents** still appear. Fix:
 
-### 3. Out of scope
-- `ClassificationField`, `OrganizationStep`, `IntlClassificationStep`, `useSapMasterData`, RLS, schema, and the SAP API Settings page are unchanged.
+File: `src/pages/VendorRegistration.tsx`
 
-## Result
+- In `applyVendorTypeSwitch(next)`:
+  1. Reset **both** slices to empty, not just the abandoned one:
+     - Spread `EMPTY_DOMESTIC_SLICES` and set `international: EMPTY_INTERNATIONAL_DATA` regardless of `next`.
+  2. Reset auxiliary state already handled (`completedSteps`, `currentStep`, `verifiedData`, `latestStep1DataRef`), plus:
+     - `setCustomFieldValues({})` if present
+     - `setPendingChoiceType(next)` so the selector reflects the new choice
+  3. If a `vendorId` exists (draft was saved), call a new helper `purgeVendorArtifacts(vendorId)` that:
+     - Deletes all rows from `vendor_documents` for that vendor
+     - Deletes the corresponding files from the `vendor-documents` storage bucket (list by `${vendorId}/` prefix, then `storage.remove`)
+     - Deletes vendor verification rows (`vendor_validations` / `verified_documents` if used by Step 1)
+     - Updates the `vendors` row: set `vendor_type = next`, null out all type-specific columns (legal_name, pan, gstin, bank_*, international fields, etc.) using a single update with the empty payload derived from `EMPTY_DOMESTIC_SLICES` / `EMPTY_INTERNATIONAL_DATA`.
+     - Errors are toasted but do not block the UI reset.
+  4. Show a toast: "Switched to {Domestic|International}. Previous data cleared."
 
-- Vendors opening **Organization Profile** or **International → Company Details** auto-trigger the SAP F4 fetch successfully (no more 403).
-- If the SAP/VPN side actually fails (timeout, 401 to SAP, middleware down), all 6 fields (4 classifications + Country + Region) show the same clear flow: *"… fetching from SAP…" → "… fetch failed — {reason}" → **Retry***.
+- Drop the confirmation `AlertDialog` for the type switch (lines 971 and 1264) **only when triggered by the Back button**, because the user explicitly wants automatic refresh. Keep behaviour: clicking Back always returns to selector; selecting a different type always purges. Selecting the same type is a no-op.
+
+## 3. Reset uploaded-file UI state
+
+- After purge, ensure `IntlDocumentsStep` and Step 1 (`DocumentVerificationStep`) reset their internal previews because `data.registrationCopyFile` / `data.swiftIbanFile` / `verifiedData` are now empty. Already handled via props — confirm by passing fresh empty objects.
+
+## Out of scope
+
+- No schema changes.
+- No edge function changes.
+- KYC/SAP/approval logic untouched.
+- Other steps unchanged.
+
+## Files touched
+
+- `src/pages/VendorRegistration.tsx` — button swap + reset/purge logic + helper
+- (Optional) small helper in same file; no new files required
