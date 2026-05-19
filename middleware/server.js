@@ -281,8 +281,26 @@ app.post("/sap/dms/upload", authGuard, async (req, res) => {
     });
   }
 
+  if (!req.body?.BP_LIFNR || !Array.isArray(req.body?.FILE_UPLOAD)) {
+    return res.status(400).json({
+      ok: false,
+      error: "Invalid DMS payload. Expected { BP_LIFNR: string, FILE_UPLOAD: [{ FILE, FILE_PATH }] }.",
+      middlewareVersion: MIDDLEWARE_VERSION,
+    });
+  }
+
+  const invalidIndex = req.body.FILE_UPLOAD.findIndex((item) => !item?.FILE || !item?.FILE_PATH);
+  if (invalidIndex >= 0) {
+    return res.status(400).json({
+      ok: false,
+      error: `Invalid DMS payload at FILE_UPLOAD[${invalidIndex}]. FILE and FILE_PATH are required.`,
+      middlewareVersion: MIDDLEWARE_VERSION,
+    });
+  }
+
   const fileCount = Array.isArray(req.body?.FILE_UPLOAD) ? req.body.FILE_UPLOAD.length : 0;
-  console.log(`[dms/upload] BP_LIFNR=${req.body?.BP_LIFNR} files=${fileCount}`);
+  const paths = req.body.FILE_UPLOAD.map((item) => item.FILE_PATH).join(", ");
+  console.log(`[dms/upload] BP_LIFNR=${req.body?.BP_LIFNR} files=${fileCount} approx=${formatMb(estimateDmsPayloadBytes(req.body))} paths=${paths}`);
 
   try {
     const result = await forwardToSap({
