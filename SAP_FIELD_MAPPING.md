@@ -196,3 +196,46 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 - If SAP API fails: Returns 400 with SAP error details
 - If mapping fails: Returns 500 with error message
 - All errors are logged to console and shown to user
+
+---
+
+## SAP DMS Document Upload
+
+After a vendor is created in SAP (BP_LIFNR assigned), documents uploaded during registration are pushed to SAP DMS via the on-premise middleware.
+
+### Endpoint
+- **Middleware:** `POST {MIDDLEWARE_URL}/sap/dms/upload`
+- **SAP upstream:** `SAP_DMS_API_URL` (defaults to `SAP_BP_API_URL`, e.g. `http://10.200.1.2:8000/vendor/bp/create?sap-client=300`)
+- **Auth:** middleware uses the same Basic Auth credentials as BP create
+
+### Request payload
+```json
+{
+  "BP_LIFNR": "0001061303",
+  "FILE_UPLOAD": [
+    { "FILE": "<base64>", "FILE_PATH": "vendor-id/pan_card.pdf" },
+    { "FILE": "<base64>", "FILE_PATH": "vendor-id/gst.pdf" }
+  ]
+}
+```
+
+### Response (array)
+```json
+[
+  {
+    "BP_LIFNR": "0001061303",
+    "MSGTYP": "S",
+    "MSGNR": "200",
+    "ERDAT": "2026-05-18",
+    "UZEIT": "18:57:22",
+    "UNAME": "22000208",
+    "MSG": "File(s) Uploaded Successfully",
+    "BP_LIFNRX": "",
+    "BPNAME": "",
+    "PERNR": 0,
+    "EXCEL_ROW": 0
+  }
+]
+```
+
+Success = any row with `MSGTYP === "S"`. On success `vendors.status` becomes `dms_synced`, `dms_synced_at` is stamped, and the SAP row is persisted in `audit_logs.details.sap`.
