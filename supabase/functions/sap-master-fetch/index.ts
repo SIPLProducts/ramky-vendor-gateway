@@ -8,13 +8,27 @@ const corsHeaders = {
 };
 
 // Map SAP master JSON keys -> our master_type + (codeField, descField)
-const MASTER_MAP: Record<string, { type: string; code: string; desc?: string }> = {
-  VENDOR_ACC_GRP: { type: "vendor_account_group", code: "KTOKK", desc: "TXT30" },
-  COMPANY_CODE:   { type: "company_code",        code: "BUKRS", desc: "BUTXT" },
-  PLANNING_GROUP: { type: "planning_group",      code: "GRUPP" },
-  RECON_ACCOUNT:  { type: "recon_account",       code: "SAKNR", desc: "TXT20" },
-  PURCHASE_ORG:   { type: "purchase_org",        code: "EKORG", desc: "EKOTX" },
-  CURRENCY:       { type: "currency",            code: "WAERS", desc: "LTEXT" },
+// `codeFn` lets us build composite codes (e.g. REGION = LAND1_BLAND since BLAND repeats across countries).
+const MASTER_MAP: Record<string, { type: string; code: string; desc?: string; codeFn?: (item: any) => string | null }> = {
+  VENDOR_ACC_GRP:     { type: "vendor_account_group",     code: "KTOKK", desc: "TXT30" },
+  COMPANY_CODE:       { type: "company_code",             code: "BUKRS", desc: "BUTXT" },
+  PLANNING_GROUP:     { type: "planning_group",           code: "GRUPP" },
+  RECON_ACCOUNT:      { type: "recon_account",            code: "SAKNR", desc: "TXT20" },
+  PURCHASE_ORG:       { type: "purchase_org",             code: "EKORG", desc: "EKOTX" },
+  CURRENCY:           { type: "currency",                 code: "WAERS", desc: "LTEXT" },
+  COUNTRY:            { type: "country",                  code: "LAND1", desc: "LANDX" },
+  REGION:             {
+    type: "region", code: "BLAND", desc: "BEZEI",
+    codeFn: (item) => {
+      const l = item?.LAND1; const b = item?.BLAND;
+      if (l == null || b == null || String(l).trim() === "" || String(b).trim() === "") return null;
+      return `${String(l)}_${String(b)}`;
+    },
+  },
+  MAT_GRP_VENDOR:     { type: "material_group_vendor",    code: "ATWRT", desc: "ATWTB" },
+  CAT_VENDOR:         { type: "vendor_category",          code: "ATWRT", desc: "ATWTB" },
+  LOCATION_VENDOR:    { type: "vendor_location",          code: "ATWRT", desc: "ATWTB" },
+  ID_SOURCE_VENDOR:   { type: "identification_source",    code: "ATWRT", desc: "ATWTB" },
 };
 
 function ok(body: any, status = 200) {
