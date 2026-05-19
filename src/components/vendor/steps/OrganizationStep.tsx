@@ -117,7 +117,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
   const { data: sapVendorLoc } = useSapMasterData('vendor_location');
   const { data: sapIdSource } = useSapMasterData('identification_source');
 
-
+  const {
     register,
     handleSubmit,
     control,
