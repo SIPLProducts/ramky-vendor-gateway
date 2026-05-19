@@ -30,6 +30,19 @@ const DOC_NAME_MAP: Record<string, string> = {
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DMS_BATCH_MAX_BYTES = 8 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
+const MIN_MIDDLEWARE_BODY_LIMIT_BYTES = 10 * 1024 * 1024;
+const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 3;
+
+type DmsResult = {
+  vendorId: string;
+  success: boolean;
+  message: string;
+  uploadedCount: number;
+  skipped: string[];
+  sap?: any;
+  sapRows?: any[];
+};
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = new Uint8Array(await blob.arrayBuffer());
@@ -50,6 +63,72 @@ function normalizeMiddlewareBase(raw: string): string {
   v = v.replace(/\/sap\/proxy$/i, "");
   v = v.replace(/\/health$/i, "");
   return v.replace(/\/+$/, "");
+}
+
+function estimateUploadBytes(upload: any): number {
+  return (upload?.FILE?.length || 0) + (upload?.FILE_PATH?.length || 0) + 96;
+}
+
+function formatMb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function parseSizeToBytes(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const match = value.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/);
+  if (!match) return null;
+  const n = Number(match[1]);
+  const unit = match[2] || "b";
+  const factors: Record<string, number> = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 };
+  return Math.floor(n * factors[unit]);
+}
+
+function middlewareMajorVersion(version: unknown): number | null {
+  if (typeof version !== "string") return null;
+  const match = version.match(/dms-large-upload-v(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+async function checkDmsMiddlewareHealth(middlewareUrl: string): Promise<{ ok: boolean; message: string; health?: any }> {
+  const healthUrl = `${middlewareUrl}/health`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const res = await fetch(healthUrl, { method: "GET", signal: controller.signal });
+    const text = await res.text();
+    let health: any = null;
+    try { health = JSON.parse(text); } catch { /* non-JSON health response */ }
+
+    if (!res.ok || !health || typeof health !== "object") {
+      return { ok: false, message: `Middleware health check failed at /health (HTTP ${res.status}). Please restart the latest middleware before DMS upload.` };
+    }
+
+    const major = middlewareMajorVersion(health.middlewareVersion);
+    const bodyLimitBytes = parseSizeToBytes(health.bodyLimit);
+
+    if (!major || major < MIN_SUPPORTED_MIDDLEWARE_MAJOR || !bodyLimitBytes) {
+      return {
+        ok: false,
+        health,
+        message: `Old middleware is running. /health must show middlewareVersion dms-large-upload-v${MIN_SUPPORTED_MIDDLEWARE_MAJOR}+ and bodyLimit. Current: ${JSON.stringify({ middlewareVersion: health.middlewareVersion, bodyLimit: health.bodyLimit })}`,
+      };
+    }
+
+    if (bodyLimitBytes < MIN_MIDDLEWARE_BODY_LIMIT_BYTES) {
+      return {
+        ok: false,
+        health,
+        message: `Middleware body limit is too small for DMS upload (${health.bodyLimit}). Set MIDDLEWARE_BODY_LIMIT=500mb and restart middleware.`,
+      };
+    }
+
+    return { ok: true, message: "Middleware ready", health };
+  } catch (e: any) {
+    return { ok: false, message: `Could not reach middleware /health before DMS upload: ${e?.message || "network error"}` };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 serve(async (req) => {
