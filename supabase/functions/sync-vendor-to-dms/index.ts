@@ -30,6 +30,19 @@ const DOC_NAME_MAP: Record<string, string> = {
 };
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DMS_BATCH_MAX_BYTES = 8 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
+const MIN_MIDDLEWARE_BODY_LIMIT_BYTES = 10 * 1024 * 1024;
+const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 3;
+
+type DmsResult = {
+  vendorId: string;
+  success: boolean;
+  message: string;
+  uploadedCount: number;
+  skipped: string[];
+  sap?: any;
+  sapRows?: any[];
+};
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = new Uint8Array(await blob.arrayBuffer());
@@ -50,6 +63,72 @@ function normalizeMiddlewareBase(raw: string): string {
   v = v.replace(/\/sap\/proxy$/i, "");
   v = v.replace(/\/health$/i, "");
   return v.replace(/\/+$/, "");
+}
+
+function estimateUploadBytes(upload: any): number {
+  return (upload?.FILE?.length || 0) + (upload?.FILE_PATH?.length || 0) + 96;
+}
+
+function formatMb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function parseSizeToBytes(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const match = value.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/);
+  if (!match) return null;
+  const n = Number(match[1]);
+  const unit = match[2] || "b";
+  const factors: Record<string, number> = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 };
+  return Math.floor(n * factors[unit]);
+}
+
+function middlewareMajorVersion(version: unknown): number | null {
+  if (typeof version !== "string") return null;
+  const match = version.match(/dms-large-upload-v(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+async function checkDmsMiddlewareHealth(middlewareUrl: string): Promise<{ ok: boolean; message: string; health?: any }> {
+  const healthUrl = `${middlewareUrl}/health`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const res = await fetch(healthUrl, { method: "GET", signal: controller.signal });
+    const text = await res.text();
+    let health: any = null;
+    try { health = JSON.parse(text); } catch { /* non-JSON health response */ }
+
+    if (!res.ok || !health || typeof health !== "object") {
+      return { ok: false, message: `Middleware health check failed at /health (HTTP ${res.status}). Please restart the latest middleware before DMS upload.` };
+    }
+
+    const major = middlewareMajorVersion(health.middlewareVersion);
+    const bodyLimitBytes = parseSizeToBytes(health.bodyLimit);
+
+    if (!major || major < MIN_SUPPORTED_MIDDLEWARE_MAJOR || !bodyLimitBytes) {
+      return {
+        ok: false,
+        health,
+        message: `Old middleware is running. /health must show middlewareVersion dms-large-upload-v${MIN_SUPPORTED_MIDDLEWARE_MAJOR}+ and bodyLimit. Current: ${JSON.stringify({ middlewareVersion: health.middlewareVersion, bodyLimit: health.bodyLimit })}`,
+      };
+    }
+
+    if (bodyLimitBytes < MIN_MIDDLEWARE_BODY_LIMIT_BYTES) {
+      return {
+        ok: false,
+        health,
+        message: `Middleware body limit is too small for DMS upload (${health.bodyLimit}). Set MIDDLEWARE_BODY_LIMIT=500mb and restart middleware.`,
+      };
+    }
+
+    return { ok: true, message: "Middleware ready", health };
+  } catch (e: any) {
+    return { ok: false, message: `Could not reach middleware /health before DMS upload: ${e?.message || "network error"}` };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 serve(async (req) => {
@@ -79,7 +158,18 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
-    const results: Array<{ vendorId: string; success: boolean; message: string; uploadedCount: number; skipped: string[] }> = [];
+    const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
+    if (middlewareHealth && !middlewareHealth.ok) {
+      console.error("DMS middleware health check failed:", middlewareHealth.message, middlewareHealth.health || null);
+    } else if (middlewareHealth?.health) {
+      console.log("DMS middleware ready:", JSON.stringify({
+        middlewareVersion: middlewareHealth.health.middlewareVersion,
+        bodyLimit: middlewareHealth.health.bodyLimit,
+        dmsEndpoint: middlewareHealth.health.dmsEndpoint,
+      }));
+    }
+
+    const results: DmsResult[] = [];
 
     for (const vid of vendorIds) {
       const { data: vendor } = await supabase
@@ -136,17 +226,22 @@ serve(async (req) => {
       } else if (uploads.length === 0) {
         success = false;
         message = "No uploadable documents found for this vendor";
+      } else if (middlewareHealth && !middlewareHealth.ok) {
+        success = false;
+        message = middlewareHealth.message;
       } else {
         // Split into batches to avoid 413 PayloadTooLarge at the middleware.
-        // Each batch keeps total approximate JSON size under BATCH_MAX_BYTES.
-        const BATCH_MAX_BYTES = 40 * 1024 * 1024; // ~40MB per request
+        // Each batch keeps total approximate JSON size under DMS_BATCH_MAX_BYTES.
         const batches: any[][] = [];
         let current: any[] = [];
         let currentBytes = 0;
         for (const u of uploads) {
-          // base64 length is the dominant cost; approximate ~1 byte per char
-          const sz = (u.FILE?.length || 0) + (u.FILE_PATH?.length || 0) + 64;
-          if (current.length > 0 && currentBytes + sz > BATCH_MAX_BYTES) {
+          const sz = estimateUploadBytes(u);
+          if (sz > DMS_BATCH_MAX_BYTES) {
+            skipped.push(`${u.FILE_PATH || "document"} (${formatMb(sz)} exceeds safe per-request DMS limit ${formatMb(DMS_BATCH_MAX_BYTES)})`);
+            continue;
+          }
+          if (current.length > 0 && currentBytes + sz > DMS_BATCH_MAX_BYTES) {
             batches.push(current);
             current = [];
             currentBytes = 0;
@@ -156,6 +251,11 @@ serve(async (req) => {
         }
         if (current.length > 0) batches.push(current);
 
+        if (uploads.length > 0 && batches.length === 0) {
+          success = false;
+          message = `No documents fit the safe DMS request size of ${formatMb(DMS_BATCH_MAX_BYTES)}. ${skipped.join("; ")}`;
+        }
+
         let batchErrors = 0;
         let lastErrorMessage = "";
 
@@ -164,6 +264,8 @@ serve(async (req) => {
             BP_LIFNR: vendor.sap_vendor_code,
             FILE_UPLOAD: batches[i],
           };
+          const payloadBytes = batches[i].reduce((sum, item) => sum + estimateUploadBytes(item), 0);
+          console.log(`DMS SAP payload batch ${i + 1}/${batches.length}: BP_LIFNR=${payload.BP_LIFNR} files=${batches[i].length} approx=${formatMb(payloadBytes)} paths=${batches[i].map((x) => x.FILE_PATH).join(", ")}`);
 
           try {
             const controller = new AbortController();
@@ -221,7 +323,9 @@ serve(async (req) => {
 
         sapRow = allSapRows.find((r) => r?.MSGTYP === "S") || allSapRows[0] || null;
 
-        if (batchErrors === 0) {
+        if (success === false && batches.length === 0) {
+          // Message already set above for oversized single-file cases.
+        } else if (batchErrors === 0) {
           success = true;
           message = sapRow?.MSG || `File(s) Uploaded Successfully (${uploads.length} document${uploads.length === 1 ? '' : 's'})`;
         } else {
@@ -246,11 +350,12 @@ serve(async (req) => {
             skipped,
             sap_vendor_code: vendor.sap_vendor_code,
             sap: sapRow,
+            sap_rows: allSapRows,
           },
         });
       }
 
-      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow });
+      results.push({ vendorId: vid, success, message, uploadedCount: uploads.length, skipped, sap: sapRow, sapRows: allSapRows });
     }
 
 

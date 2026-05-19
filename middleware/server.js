@@ -57,7 +57,7 @@ if (!SHARED_SECRET) {
   console.warn("[WARN] MIDDLEWARE_SHARED_SECRET is not set — refusing all authenticated requests.");
 }
 
-const MIDDLEWARE_VERSION = "dms-large-upload-v3";
+const MIDDLEWARE_VERSION = "dms-large-upload-v4";
 const app = express();
 app.use(helmet());
 const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "500mb";
@@ -110,6 +110,17 @@ function redact(obj) {
   if (clone.password) clone.password = "***";
   if (clone.Authorization) clone.Authorization = "Basic ***";
   return clone;
+}
+
+function estimateDmsPayloadBytes(body) {
+  const uploads = Array.isArray(body?.FILE_UPLOAD) ? body.FILE_UPLOAD : [];
+  return uploads.reduce((sum, item) => {
+    return sum + String(item?.FILE || "").length + String(item?.FILE_PATH || "").length + 96;
+  }, String(body?.BP_LIFNR || "").length + 128);
+}
+
+function formatMb(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 async function forwardToSap({ url, method, headers, body }) {
@@ -270,8 +281,26 @@ app.post("/sap/dms/upload", authGuard, async (req, res) => {
     });
   }
 
+  if (!req.body?.BP_LIFNR || !Array.isArray(req.body?.FILE_UPLOAD)) {
+    return res.status(400).json({
+      ok: false,
+      error: "Invalid DMS payload. Expected { BP_LIFNR: string, FILE_UPLOAD: [{ FILE, FILE_PATH }] }.",
+      middlewareVersion: MIDDLEWARE_VERSION,
+    });
+  }
+
+  const invalidIndex = req.body.FILE_UPLOAD.findIndex((item) => !item?.FILE || !item?.FILE_PATH);
+  if (invalidIndex >= 0) {
+    return res.status(400).json({
+      ok: false,
+      error: `Invalid DMS payload at FILE_UPLOAD[${invalidIndex}]. FILE and FILE_PATH are required.`,
+      middlewareVersion: MIDDLEWARE_VERSION,
+    });
+  }
+
   const fileCount = Array.isArray(req.body?.FILE_UPLOAD) ? req.body.FILE_UPLOAD.length : 0;
-  console.log(`[dms/upload] BP_LIFNR=${req.body?.BP_LIFNR} files=${fileCount}`);
+  const paths = req.body.FILE_UPLOAD.map((item) => item.FILE_PATH).join(", ");
+  console.log(`[dms/upload] BP_LIFNR=${req.body?.BP_LIFNR} files=${fileCount} approx=${formatMb(estimateDmsPayloadBytes(req.body))} paths=${paths}`);
 
   try {
     const result = await forwardToSap({

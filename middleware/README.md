@@ -116,15 +116,17 @@ If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running m
    ```
    curl http://localhost:3002/health
    ```
-   The response should include `"bodyLimit": "500mb"` and `"middlewareVersion": "dms-large-upload-v3"`.
+   The response should include `"bodyLimit": "500mb"` and `"middlewareVersion": "dms-large-upload-v4"`.
 6. Re-run the DMS upload from the portal.
 
-Optional: override with `MIDDLEWARE_BODY_LIMIT=1gb` in `.env` for very large document batches. The cloud DMS sync also splits documents into ~40 MB batches automatically, so single requests should rarely hit the limit.
+Optional: override with `MIDDLEWARE_BODY_LIMIT=1gb` in `.env` for very large document batches. The cloud DMS sync also splits documents into ~8 MB batches automatically, so single requests should rarely hit the limit.
 
 
 ## Repeated 413 "request entity too large" fix
 
 If you keep seeing `PayloadTooLargeError: request entity too large` on Windows, it means an **old `server.js` is still running**. The new build prints a version banner on startup — if you don't see it, you're running the old file.
+
+The browser DevTools payload for `sync-vendor-to-dms` will only show `{"vendorIds":[...]}`. That is correct: the portal sends only vendor IDs to Lovable Cloud, and Lovable Cloud then builds the SAP DMS payload server-side as `{ "BP_LIFNR": "...", "FILE_UPLOAD": [...] }` before calling this middleware.
 
 ### Steps (run in PowerShell as Administrator)
 
@@ -147,13 +149,19 @@ If you keep seeing `PayloadTooLargeError: request entity too large` on Windows, 
    ```
    You **must** see:
    ```
-   Middleware build: dms-large-upload-v3
+   Middleware build: dms-large-upload-v4
    Body limit: 500mb (override with MIDDLEWARE_BODY_LIMIT in .env)
    ```
 6. Verify from another terminal:
    ```powershell
    curl http://localhost:3002/health
    ```
-   The JSON response must include `"middlewareVersion": "dms-large-upload-v3"` and `"bodyLimit": "500mb"` (or your override).
+   The JSON response must include `"middlewareVersion": "dms-large-upload-v4"` and `"bodyLimit": "500mb"` (or your override).
+7. Confirm the DMS endpoint accepts the SAP payload shape:
+   ```powershell
+   curl -Method POST http://localhost:3002/sap/dms/upload `
+     -Headers @{ "Content-Type" = "application/json"; "x-middleware-key" = $env:MIDDLEWARE_SHARED_SECRET } `
+     -Body '{"BP_LIFNR":"1061301","FILE_UPLOAD":[{"FILE":"BASE64","FILE_PATH":"PATH1"}]}'
+   ```
 
 If the banner or `/health` fields are missing, Windows is still running an older `server.js` from a different folder or a stale `node` process — repeat step 1.
