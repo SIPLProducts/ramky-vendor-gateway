@@ -16,6 +16,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
 import {
   OrganizationDetails,
   StatutoryDetails,
@@ -29,10 +30,11 @@ import {
   CERTIFICATION_OPTIONS,
   OPERATIONAL_NETWORKS,
   INDIAN_STATES,
-  VENDOR_CATEGORIES,
-  IDENTIFICATION_SOURCES,
   ACCOUNTING_GROUPS,
 } from '@/types/vendor';
+
+const sapOptions = (rows: SapMasterRow[] | undefined) =>
+  (rows || []).map((r) => ({ value: r.code, label: r.description ? `${r.code} — ${r.description}` : r.code }));
 
 const schema = z.object({
   buyerCompanyId: z.string().min(1, 'Buyer company is required'),
