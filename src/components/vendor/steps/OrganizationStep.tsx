@@ -468,16 +468,19 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   control={control}
                   render={({ field }) => (
                     <MultiSelect
-                      options={PRODUCT_CATEGORIES.map((c) => ({ label: c.toUpperCase(), value: c }))}
+                      options={sapOptions(sapMatGrp)}
                       selected={(field.value as string[]) || []}
                       onChange={field.onChange}
-                      placeholder="Select material groups"
+                      placeholder={sapMatGrp && sapMatGrp.length ? 'Select material groups' : 'No SAP values — sync SAP master data'}
                       className={errors.materialGroupVendor ? 'border-destructive' : ''}
                     />
                   )}
                 />
                 {errors.materialGroupVendor && (
                   <p className="text-xs text-destructive">{errors.materialGroupVendor.message as string}</p>
+                )}
+                {(!sapMatGrp || sapMatGrp.length === 0) && (
+                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
                 )}
               </div>
 
@@ -488,16 +491,19 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   control={control}
                   render={({ field }) => (
                     <MultiSelect
-                      options={VENDOR_CATEGORIES.map((c) => ({ label: c, value: c }))}
+                      options={sapOptions(sapVendorCat)}
                       selected={(field.value as string[]) || []}
                       onChange={field.onChange}
-                      placeholder="Select vendor categories"
+                      placeholder={sapVendorCat && sapVendorCat.length ? 'Select vendor categories' : 'No SAP values — sync SAP master data'}
                       className={errors.vendorCategory ? 'border-destructive' : ''}
                     />
                   )}
                 />
                 {errors.vendorCategory && (
                   <p className="text-xs text-destructive">{errors.vendorCategory.message as string}</p>
+                )}
+                {(!sapVendorCat || sapVendorCat.length === 0) && (
+                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
                 )}
               </div>
 
@@ -508,16 +514,19 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   control={control}
                   render={({ field }) => (
                     <MultiSelect
-                      options={INDIAN_STATES.map((s) => ({ label: s.toUpperCase(), value: s.toUpperCase() }))}
+                      options={sapOptions(sapVendorLoc)}
                       selected={(field.value as string[]) || []}
                       onChange={field.onChange}
-                      placeholder="Select locations"
+                      placeholder={sapVendorLoc && sapVendorLoc.length ? 'Select locations' : 'No SAP values — sync SAP master data'}
                       className={errors.vendorLocation ? 'border-destructive' : ''}
                     />
                   )}
                 />
                 {errors.vendorLocation && (
                   <p className="text-xs text-destructive">{errors.vendorLocation.message as string}</p>
+                )}
+                {(!sapVendorLoc || sapVendorLoc.length === 0) && (
+                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
                 )}
               </div>
 
@@ -528,16 +537,19 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                   control={control}
                   render={({ field }) => (
                     <MultiSelect
-                      options={IDENTIFICATION_SOURCES.map((s) => ({ label: s, value: s }))}
+                      options={sapOptions(sapIdSource)}
                       selected={(field.value as string[]) || []}
                       onChange={field.onChange}
-                      placeholder="Select identification sources"
+                      placeholder={sapIdSource && sapIdSource.length ? 'Select identification sources' : 'No SAP values — sync SAP master data'}
                       className={errors.identificationSource ? 'border-destructive' : ''}
                     />
                   )}
                 />
                 {errors.identificationSource && (
                   <p className="text-xs text-destructive">{errors.identificationSource.message as string}</p>
+                )}
+                {(!sapIdSource || sapIdSource.length === 0) && (
+                  <p className="text-xs text-muted-foreground">No SAP values — sync SAP master data.</p>
                 )}
               </div>
             </div>
