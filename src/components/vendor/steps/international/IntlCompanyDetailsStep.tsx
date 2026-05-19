@@ -32,8 +32,8 @@ interface Props {
 }
 
 export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
-  const { data: countries } = useSapMasterData('country');
-  const { data: regions } = useSapMasterData('region');
+  const { rows: countries, fetching: countriesFetching, errorMessage: countriesError, retry: retryCountries } = useEnsureSapMaster('country');
+  const { rows: regions, fetching: regionsFetching, errorMessage: regionsError, retry: retryRegions } = useEnsureSapMaster('region');
 
   const {
     register, control, handleSubmit, watch, setValue,
