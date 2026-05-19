@@ -32,7 +32,7 @@ const DOC_NAME_MAP: Record<string, string> = {
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const DMS_BATCH_MAX_BYTES = 1 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
 const MIN_MIDDLEWARE_BODY_LIMIT_BYTES = 10 * 1024 * 1024;
-const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 3;
+const MIN_SUPPORTED_MIDDLEWARE_MAJOR = 4;
 
 type DmsResult = {
   BP_LIFNR: string;
