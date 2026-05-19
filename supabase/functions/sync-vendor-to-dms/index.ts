@@ -381,7 +381,7 @@ serve(async (req) => {
 
         await supabase.from("audit_logs").insert({
           vendor_id: vendor.id,
-          user_id: auth.user.id,
+          user_id: auth.userId,
           action: "dms_sync",
           details: {
             message,
