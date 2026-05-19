@@ -207,10 +207,7 @@ serve(async (req) => {
         continue;
       }
 
-      const { data: docs } = await supabase
-        .from("vendor_documents")
-        .select("document_type, file_name, file_path, file_size")
-        .eq("vendor_id", vid);
+
 
       const uploads: any[] = [];
       const skipped: string[] = [];
