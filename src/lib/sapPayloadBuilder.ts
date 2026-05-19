@@ -162,10 +162,14 @@ export async function buildSapPayload(
     .from("vendors").select("*").eq("id", vendorId).single();
   if (vErr || !vendor) throw new Error(`Vendor not found: ${vErr?.message || ""}`);
 
-  if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
-    throw new Error(
-      `Vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for IN.`,
-    );
+  const isInternational = (vendor as any).vendor_type === 'international';
+
+  if (!isInternational) {
+    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+      throw new Error(
+        `Vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for IN.`,
+      );
+    }
   }
 
   // Merge tenant defaults
@@ -252,6 +256,72 @@ export async function buildSapPayload(
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
     row.idtype2 = "ZMSMEN";
     row.idnum2 = (vendor as any).msme_number ? String((vendor as any).msme_number).slice(0, 20) : "";
+
+    // Always emit new international bank keys (empty for domestic, populated for intl below)
+    if (row.swift_code === undefined) row.swift_code = "";
+    if (row.iban === undefined) row.iban = "";
+    if (row.iban2 === undefined) row.iban2 = "";
+
+    if (isInternational) {
+      const intl = ((vendor as any).international_data || {}) as any;
+      const company = intl.company || {};
+      const bank = intl.bank || {};
+      const trunc = (v: any, n: number) => (v == null ? "" : String(v).slice(0, n));
+
+      const intlOverrides: Record<string, any> = {
+        name1: trunc(company.companyName, 40),
+        name2: "",
+        name3: "",
+        sterm1: trunc(company.companyName, 20),
+        sterm2: "",
+        street: trunc(company.companyAddress, 60),
+        house_no: "",
+        str_suppl1: trunc(company.companyAddress, 40),
+        str_suppl2: "",
+        str_suppl3: "",
+        location: "",
+        district: "",
+        city: "",
+        postl_cod1: trunc(company.pincode, 10),
+        country: trunc(company.country, 3),
+        region: trunc(company.region, 3),
+        langu: "EN",
+        tel_number: trunc(company.contact2, 30),
+        mob_number: trunc(company.contact1, 30),
+        smtp_addr: trunc(company.email1, 241),
+        taxtype: "IN5",
+        taxnumxl: "",
+        j_1ipanno: "",
+        partn_grp: "ZIMP",
+        msme: "",
+        idnum2: "",
+        // Bank
+        bank_ctry: trunc(bank.bankCountry || company.country, 3),
+        bank_key: "",
+        bank_acct: trunc(bank.accountNumber, 18),
+        accountholder: trunc(bank.companyName, 60),
+        bankaccountname: trunc(bank.bankName, 60),
+        swift_code: trunc(bank.swiftCode, 11),
+        iban: trunc(bank.ibanNumber, 34),
+        iban2: "",
+      };
+
+      Object.assign(row, intlOverrides);
+
+      if (Array.isArray(row.vendors) && row.vendors[0] && typeof row.vendors[0] === "object") {
+        // Apply applicable subset to nested vendors[0]
+        const vendorBlockKeys = [
+          "name1","name2","name3","sterm1","sterm2","street","house_no",
+          "str_suppl1","str_suppl2","str_suppl3","location","district","city",
+          "postl_cod1","country","region","langu","tel_number","mob_number",
+          "smtp_addr","taxtype","taxnumxl","j_1ipanno","msme",
+        ];
+        for (const k of vendorBlockKeys) {
+          if (k in intlOverrides) row.vendors[0][k] = intlOverrides[k];
+        }
+        row.vendors[0].partn_grp = "ZIMP";
+      }
+    }
   }
 
   return { payload: [row], uploadsCount: uploads.length, skipped };
