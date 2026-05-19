@@ -615,13 +615,13 @@ export function useDMSSync() {
           }
 
           const upload = await supabase.functions.invoke('sync-vendor-to-dms', {
-            body: { vendorId, payload },
+            body: payload,
           });
           if (upload.error) throw new Error(upload.error.message);
           const r = (upload.data as any)?.results?.[0];
-          results.push(r || { vendorId, success: false, message: 'No result' });
+          results.push(r || { BP_LIFNR: payload.BP_LIFNR, success: false, message: 'No result' });
         } catch (e: any) {
-          results.push({ vendorId, success: false, message: e?.message || 'Failed' });
+          results.push({ BP_LIFNR: '', success: false, message: e?.message || 'Failed' });
         }
       }
       const successCount = results.filter((r) => r.success).length;
