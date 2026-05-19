@@ -136,19 +136,44 @@ Deno.serve(async (req) => {
         .from('vendors').select('is_msme_registered').eq('id', progress.vendor_id).single();
       const isMsme = !!vendorRow?.is_msme_registered;
 
+      let skipScm = false;
+      const { data: invite } = await admin
+        .from('vendor_invitations')
+        .select('created_by')
+        .eq('vendor_id', progress.vendor_id)
+        .order('created_at', { ascending: false })
+        .limit(1).maybeSingle();
+      if (invite?.created_by) {
+        const { data: mappings } = await admin
+          .from('buyer_scm_mappings')
+          .select('include_scm_stages')
+          .eq('tenant_id', level.tenant_id)
+          .eq('buyer_user_id', invite.created_by);
+        skipScm = (mappings ?? []).some((m: any) => m.include_scm_stages === false);
+      }
+
       const { data: activeLevels } = await admin
         .from('approval_matrix_levels')
         .select('id, level_number, stage, requires_msme')
         .eq('tenant_id', level.tenant_id)
         .eq('is_active', true);
 
+      const levelIds = (activeLevels ?? []).map((l: any) => l.id);
+      const { data: approverRows } = levelIds.length > 0
+        ? await admin.from('approval_matrix_approvers').select('level_id').in('level_id', levelIds)
+        : { data: [] as any[] };
+      const stagesWithApprovers = new Set((approverRows ?? []).map((a: any) => a.level_id));
+
       const STAGE_ORDER: Record<string, number> = {
         SCM_MANAGER: 1, SCM_HEAD: 2, FINANCE_1: 3, FINANCE_2: 4, CEO_OFFICE: 5,
       };
       const eligible = (activeLevels ?? [])
         .filter((l: any) => !(l.requires_msme && !isMsme))
+        .filter((l: any) => !(skipScm && (l.stage === 'SCM_MANAGER' || l.stage === 'SCM_HEAD')))
+        .filter((l: any) => stagesWithApprovers.has(l.id))
         .sort((a: any, b: any) => (STAGE_ORDER[a.stage] ?? 99) - (STAGE_ORDER[b.stage] ?? 99)
           || (a.level_number ?? 0) - (b.level_number ?? 0));
+
 
       const existingLevelIds = new Set((remainingProgress ?? []).map((p: any) => p.level_id));
       const maxNum = (remainingProgress ?? []).reduce((m: number, p: any) => Math.max(m, p.level_number ?? 0), 0);
