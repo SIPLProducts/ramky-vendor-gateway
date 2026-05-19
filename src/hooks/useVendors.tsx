@@ -599,9 +599,8 @@ export function useDMSSync() {
 
   return useMutation({
     mutationFn: async ({ vendorIds }: { vendorIds: string[] }) => {
-      // For each vendor, first build the exact SAP DMS payload
-      // ({ BP_LIFNR, FILE_UPLOAD: [...] }) — this request+response is visible
-      // in browser DevTools — then post that payload to the upload function.
+      // For each vendor, first build the exact SAP DMS payload, then post that
+      // payload directly so browser DevTools shows { BP_LIFNR, FILE_UPLOAD }.
       const results: any[] = [];
       for (const vendorId of vendorIds) {
         try {
