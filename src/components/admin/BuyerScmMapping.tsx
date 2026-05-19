@@ -151,6 +151,19 @@ export function BuyerScmMapping({ tenantId }: Props) {
     await loadData();
   };
 
+  const handleToggleScm = async (id: string, next: boolean) => {
+    setMappings((prev) => prev.map((m) => (m.id === id ? { ...m, include_scm_stages: next } : m)));
+    const { error } = await supabase
+      .from('buyer_scm_mappings')
+      .update({ include_scm_stages: next })
+      .eq('id', id);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+      await loadData();
+    }
+  };
+
+
   const label = (u?: UserOpt) => (u ? (u.full_name || u.email) : '—');
 
   return (
