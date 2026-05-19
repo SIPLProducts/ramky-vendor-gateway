@@ -138,9 +138,20 @@ serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendorIds } = await req.json();
-    if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
-      return ok({ success: false, message: "vendorIds (array) is required", results: [] });
+    const reqBody = await req.json();
+    // Accept two shapes:
+    //  A) { vendorIds: string[] }  — legacy multi-vendor flow
+    //  B) { vendorId, payload: { BP_LIFNR, FILE_UPLOAD } } — explicit single-vendor
+    //     payload (visible in browser Inspect).
+    const explicitPayload = (reqBody && reqBody.payload && Array.isArray(reqBody.payload.FILE_UPLOAD))
+      ? reqBody.payload as { BP_LIFNR: string; FILE_UPLOAD: any[] }
+      : null;
+    const vendorIds: string[] = explicitPayload && reqBody.vendorId
+      ? [reqBody.vendorId]
+      : (Array.isArray(reqBody?.vendorIds) ? reqBody.vendorIds : []);
+
+    if (vendorIds.length === 0) {
+      return ok({ success: false, message: "vendorIds (array) or { vendorId, payload } is required", results: [] });
     }
 
     const supabase = createClient(
@@ -158,9 +169,13 @@ serve(async (req) => {
     const middlewareKey = (config?.proxy_secret || Deno.env.get("SAP_MIDDLEWARE_KEY") || "").trim();
     const dmsUrl = middlewareUrl ? `${middlewareUrl}/sap/dms/upload` : "";
 
+    // Health check is informational only — never block uploads on it.
+    // Some middleware deployments (older builds, ngrok, reverse proxies) don't
+    // expose middlewareVersion/bodyLimit. We still attempt the upload and let
+    // the actual /sap/dms/upload response decide success/failure.
     const middlewareHealth = middlewareUrl ? await checkDmsMiddlewareHealth(middlewareUrl) : null;
     if (middlewareHealth && !middlewareHealth.ok) {
-      console.error("DMS middleware health check failed:", middlewareHealth.message, middlewareHealth.health || null);
+      console.warn("DMS middleware health warning (continuing anyway):", middlewareHealth.message);
     } else if (middlewareHealth?.health) {
       console.log("DMS middleware ready:", JSON.stringify({
         middlewareVersion: middlewareHealth.health.middlewareVersion,
@@ -192,26 +207,36 @@ serve(async (req) => {
         continue;
       }
 
-      const { data: docs } = await supabase
-        .from("vendor_documents")
-        .select("document_type, file_name, file_path, file_size")
-        .eq("vendor_id", vid);
+
 
       const uploads: any[] = [];
       const skipped: string[] = [];
-      for (const d of docs || []) {
-        try {
-          if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-            skipped.push(`${d.file_name} (>10MB)`);
-            continue;
+
+      if (explicitPayload && explicitPayload.BP_LIFNR === vendor.sap_vendor_code) {
+        // Use the payload sent from the browser as-is (already contains base64 + paths).
+        for (const item of explicitPayload.FILE_UPLOAD) {
+          if (item?.FILE && item?.FILE_PATH) uploads.push({ FILE: item.FILE, FILE_PATH: item.FILE_PATH });
+        }
+      } else {
+        const { data: docs } = await supabase
+          .from("vendor_documents")
+          .select("document_type, file_name, file_path, file_size")
+          .eq("vendor_id", vid);
+
+        for (const d of docs || []) {
+          try {
+            if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+              skipped.push(`${d.file_name} (>10MB)`);
+              continue;
+            }
+            const { data: blob, error: dlErr } = await supabase.storage
+              .from("vendor-documents").download(d.file_path);
+            if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
+            const base64 = await blobToBase64(blob);
+            uploads.push({ FILE: base64, FILE_PATH: d.file_path });
+          } catch (e: any) {
+            skipped.push(`${d.file_name} (${e?.message || "error"})`);
           }
-          const { data: blob, error: dlErr } = await supabase.storage
-            .from("vendor-documents").download(d.file_path);
-          if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
-          const base64 = await blobToBase64(blob);
-          uploads.push({ FILE: base64, FILE_PATH: d.file_path });
-        } catch (e: any) {
-          skipped.push(`${d.file_name} (${e?.message || "error"})`);
         }
       }
 
@@ -226,9 +251,6 @@ serve(async (req) => {
       } else if (uploads.length === 0) {
         success = false;
         message = "No uploadable documents found for this vendor";
-      } else if (middlewareHealth && !middlewareHealth.ok) {
-        success = false;
-        message = middlewareHealth.message;
       } else {
         // Split into batches to avoid 413 PayloadTooLarge at the middleware.
         // Each batch keeps total approximate JSON size under DMS_BATCH_MAX_BYTES.

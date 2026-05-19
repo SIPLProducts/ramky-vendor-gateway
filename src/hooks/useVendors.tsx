@@ -599,12 +599,37 @@ export function useDMSSync() {
 
   return useMutation({
     mutationFn: async ({ vendorIds }: { vendorIds: string[] }) => {
-      const { data, error } = await supabase.functions.invoke('sync-vendor-to-dms', {
-        body: { vendorIds },
-      });
-      if (error) throw new Error(`DMS sync failed: ${error.message}`);
-      if (!data) throw new Error('No response from DMS sync function');
-      return data;
+      // For each vendor, first build the exact SAP DMS payload
+      // ({ BP_LIFNR, FILE_UPLOAD: [...] }) — this request+response is visible
+      // in browser DevTools — then post that payload to the upload function.
+      const results: any[] = [];
+      for (const vendorId of vendorIds) {
+        try {
+          const prep = await supabase.functions.invoke('prepare-dms-payload', {
+            body: { vendorId },
+          });
+          if (prep.error) throw new Error(prep.error.message);
+          const payload = (prep.data as any)?.payload;
+          if (!payload || !payload.BP_LIFNR) {
+            throw new Error((prep.data as any)?.error || 'Failed to prepare DMS payload');
+          }
+
+          const upload = await supabase.functions.invoke('sync-vendor-to-dms', {
+            body: { vendorId, payload },
+          });
+          if (upload.error) throw new Error(upload.error.message);
+          const r = (upload.data as any)?.results?.[0];
+          results.push(r || { vendorId, success: false, message: 'No result' });
+        } catch (e: any) {
+          results.push({ vendorId, success: false, message: e?.message || 'Failed' });
+        }
+      }
+      const successCount = results.filter((r) => r.success).length;
+      return {
+        success: successCount > 0,
+        message: `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
+        results,
+      };
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
