@@ -76,20 +76,28 @@ export function VendorSubmissionPreviewDialog({
 }: Props) {
   const [vendor, setVendor] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filingRows, setFilingRows] = useState<FilingStatusRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     if (!open || !vendorId) {
       setVendor(null);
+      setFilingRows([]);
       return;
     }
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('*')
-        .eq('id', vendorId)
-        .maybeSingle();
+      const [{ data, error }, { data: gstVal }] = await Promise.all([
+        supabase.from('vendors').select('*').eq('id', vendorId).maybeSingle(),
+        supabase
+          .from('vendor_validations')
+          .select('details')
+          .eq('vendor_id', vendorId)
+          .eq('validation_type', 'gst')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
       if (cancelled) return;
       if (error) {
         console.error('Failed to load vendor for preview', error);
@@ -97,12 +105,14 @@ export function VendorSubmissionPreviewDialog({
       } else {
         setVendor(data);
       }
+      setFilingRows(normalizeFilingStatus((gstVal as any)?.details?.filing_status));
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
   }, [vendorId, open]);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
