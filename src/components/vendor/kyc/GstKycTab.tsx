@@ -365,15 +365,48 @@ export function GstKycTab(props: GstKycTabProps) {
         </div>
       )}
 
-      {props.isGstRegistered && filingStatusRows.length > 0 && (
-        <div className="space-y-2">
-          {latestFiled && (
-            <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm text-success">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Latest GST return has been filed.</span>
+      {props.isGstRegistered && verifiedGstData && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm">GST Filing Status Check</h4>
             </div>
+            <div className="flex items-center gap-2">
+              {filingChecked && latestFiled === true && (
+                <Badge className="bg-success text-success-foreground hover:bg-success">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  GST Filing: COMPLIANT
+                </Badge>
+              )}
+              {filingChecked && latestFiled === false && (
+                <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  GST Not Filed for Last Month
+                </Badge>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => runFilingStatusCheck(verifiedGstData)}
+                disabled={filingChecking}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-2 ${filingChecking ? 'animate-spin' : ''}`} />
+                {filingChecked ? 'Refresh Filing Status' : 'Check GST Filing Status'}
+              </Button>
+            </div>
+          </div>
+
+          {filingStatusRows.length > 0 ? (
+            <GstFilingStatusTable rows={filingStatusRows} />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {filingChecking
+                ? 'Fetching latest filing status from GSTN…'
+                : 'Click "Check GST Filing Status" to fetch the last 3 months of returns.'}
+            </p>
           )}
-          <GstFilingStatusTable rows={filingStatusRows} />
         </div>
       )}
 
