@@ -76,6 +76,31 @@ export default function FinanceReview() {
   const financeAction = useFinanceAction();
   const runValidations = useRunValidations();
   const { data: approvalTrail = [], isLoading: isTrailLoading } = useVendorApprovalTrail(selectedVendor?.id);
+  const [gstFilingRows, setGstFilingRows] = useState<FilingStatusRow[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedVendor?.id || !showDetails) {
+      setGstFilingRows([]);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('vendor_validations')
+        .select('details')
+        .eq('vendor_id', selectedVendor.id)
+        .eq('validation_type', 'gst')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      setGstFilingRows(normalizeFilingStatus((data as any)?.details?.filing_status));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVendor?.id, showDetails]);
+
 
   const filteredVendors = pendingVendors?.filter((vendor) => {
     const matchesSearch =
