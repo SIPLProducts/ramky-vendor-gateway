@@ -399,7 +399,7 @@ export function GstKycTab(props: GstKycTabProps) {
           </div>
 
           {filingStatusRows.length > 0 ? (
-            <GstFilingStatusTable rows={filingStatusRows} />
+            <GstFilingStatusTable rows={filingStatusRows} limit={3} />
           ) : (
             <p className="text-xs text-muted-foreground">
               {filingChecking
