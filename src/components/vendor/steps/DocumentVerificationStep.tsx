@@ -24,6 +24,10 @@ import {
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
+import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
+import { Badge } from "@/components/ui/badge";
+import { FileUpload } from "@/components/vendor/FileUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Maps the registration step's document type → the provider_name configured
