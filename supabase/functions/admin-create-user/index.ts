@@ -40,9 +40,32 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, password, full_name, role, tenant_ids, custom_role_ids } = body ?? {};
+    const { email, password, full_name, role, custom_role_ids } = body ?? {};
+    let tenant_ids: string[] = Array.isArray(body?.tenant_ids) ? [...body.tenant_ids] : [];
+    const sap_tenants: { code: string; name: string }[] = Array.isArray(body?.sap_tenants) ? body.sap_tenants : [];
     if (!email || !password || !role) {
       return new Response(JSON.stringify({ error: 'email, password and role are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Upsert SAP-sourced tenants into local tenants table and add their ids to tenant_ids
+    if (sap_tenants.length > 0) {
+      const rows = sap_tenants
+        .filter((t) => t && t.code)
+        .map((t) => ({ code: String(t.code), name: String(t.name || t.code), is_active: true }));
+      if (rows.length > 0) {
+        const { error: upErr } = await admin
+          .from('tenants')
+          .upsert(rows, { onConflict: 'code', ignoreDuplicates: false });
+        if (upErr) throw upErr;
+        const codes = rows.map((r) => r.code);
+        const { data: tRows, error: tFetchErr } = await admin
+          .from('tenants').select('id, code').in('code', codes);
+        if (tFetchErr) throw tFetchErr;
+        const resolvedIds = (tRows ?? []).map((r) => r.id);
+        for (const id of resolvedIds) {
+          if (!tenant_ids.includes(id)) tenant_ids.push(id);
+        }
+      }
     }
 
     // Create user (auto-confirm)
