@@ -85,7 +85,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
         name: String(t.name || t.code),
       }));
       setSapTenants(list);
-      setSelectedCodes([]);
+      setSelectedCodes(list.map((t) => t.code));
       setSapFetched(true);
       if (list.length === 0) {
         toast({ title: 'No tenants', description: 'SAP returned no tenants for this email.' });
