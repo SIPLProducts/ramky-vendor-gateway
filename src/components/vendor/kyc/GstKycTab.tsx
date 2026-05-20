@@ -316,6 +316,28 @@ export function GstKycTab(props: GstKycTabProps) {
         </div>
       )}
 
+      {props.isGstRegistered && filingStatusRows.length > 0 && (
+        <div className="space-y-2">
+          {latestFiled && (
+            <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Latest GST return has been filed.</span>
+            </div>
+          )}
+          <GstFilingStatusTable rows={filingStatusRows} />
+        </div>
+      )}
+
+      <GstDeclarationDialog
+        open={declarationDialogOpen}
+        onOpenChange={setDeclarationDialogOpen}
+        currentFile={props.gstSelfDeclarationFile}
+        onFileChange={props.onGstSelfDeclarationFileChange}
+        onConfirm={confirmDeclarationUpload}
+        vendorId={props.vendorId}
+      />
+
+
       {props.isGstRegistered ? null : (
         <div className="space-y-4">
           <Alert>
