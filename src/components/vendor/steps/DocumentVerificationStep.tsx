@@ -70,6 +70,8 @@ export interface VerifiedDocumentData {
     additionalPlaces?: string[];
     jurisdictionCentre?: string;
     jurisdictionState?: string;
+    filing_status?: any;
+    filingCompliant?: boolean;
   };
   manualLegalName?: string;
   manualAddress?: { address: string; city: string; state: string; pincode: string };
