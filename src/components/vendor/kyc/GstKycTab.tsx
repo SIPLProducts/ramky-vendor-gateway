@@ -5,7 +5,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Download, FileText, Pencil, Upload } from 'lucide-react';
+import { Download, FileText, Pencil, Upload, RefreshCw, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
@@ -57,6 +58,9 @@ export function GstKycTab(props: GstKycTabProps) {
   const [latestFiled, setLatestFiled] = useState<boolean | null>(null);
   const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
   const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
+  const [verifiedGstData, setVerifiedGstData] = useState<Record<string, any> | null>(null);
+  const [filingChecking, setFilingChecking] = useState(false);
+  const [filingChecked, setFilingChecked] = useState(false);
 
   const persistGstValidation = async (data: Record<string, any>, message: string) => {
     if (!props.vendorId) return;
@@ -78,17 +82,41 @@ export function GstKycTab(props: GstKycTabProps) {
     }
   };
 
-  const handleFilingStatusAfterVerify = (data: Record<string, any>) => {
-    const rows = normalizeFilingStatus(data?.filing_status);
-    setFilingStatusRows(rows);
-    const filed = isLatestPeriodFiled(rows);
-    setLatestFiled(filed);
-    if (!filed) {
-      setPendingVerifiedData(data);
-      setDeclarationDialogOpen(true);
-      return false;
+  /**
+   * Calls the dedicated GST_FILING provider and evaluates compliance.
+   * - All last-3-months filed  -> auto-advance to next tab (PAN).
+   * - Any missing/not filed    -> open self-declaration dialog; advance only after upload.
+   */
+  const runFilingStatusCheck = async (baseGstData: Record<string, any>) => {
+    const gstin = String(baseGstData?.gstin || props.gstin || '').toUpperCase().trim();
+    if (!gstin) return;
+    setFilingChecking(true);
+    try {
+      const r = await callProvider({
+        providerName: 'GST_FILING',
+        input: { gstin, id_number: gstin },
+      });
+      // If the dedicated provider isn't configured, fall back to the filing_status
+      // that the GST Validation call already returned.
+      const filingSrc = r.found && r.ok && r.data
+        ? (r.data.filing_status ?? baseGstData.filing_status)
+        : baseGstData.filing_status;
+      const rows = normalizeFilingStatus(filingSrc);
+      setFilingStatusRows(rows);
+      setFilingChecked(true);
+      const filed = isLatestPeriodFiled(rows);
+      setLatestFiled(filed);
+      const merged = { ...baseGstData, filing_status: filingSrc };
+      if (filed) {
+        props.onVerifiedDetails?.(merged);
+        void persistGstValidation(merged, 'GST verified — filing compliant');
+      } else {
+        setPendingVerifiedData(merged);
+        setDeclarationDialogOpen(true);
+      }
+    } finally {
+      setFilingChecking(false);
     }
-    return true;
   };
 
   const confirmDeclarationUpload = () => {
@@ -146,11 +174,9 @@ export function GstKycTab(props: GstKycTabProps) {
       },
     });
     if (r.ok) {
-      const ok = handleFilingStatusAfterVerify(r.data || {});
-      if (ok) {
-        props.onVerifiedDetails?.(r.data || {});
-        void persistGstValidation(r.data || {}, r.message || 'GSTIN verified');
-      }
+      const data = r.data || {};
+      setVerifiedGstData(data);
+      void runFilingStatusCheck(data);
     }
   };
 
@@ -245,11 +271,8 @@ export function GstKycTab(props: GstKycTabProps) {
       return { ok: false, message: check.message, apiData: merged, apiResult: verify };
     }
 
-    const ok = handleFilingStatusAfterVerify(merged);
-    if (ok) {
-      props.onVerifiedDetails?.(merged);
-      void persistGstValidation(merged, check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`);
-    }
+    setVerifiedGstData(merged);
+    void runFilingStatusCheck(merged);
     return {
       ok: true,
       message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
@@ -342,15 +365,48 @@ export function GstKycTab(props: GstKycTabProps) {
         </div>
       )}
 
-      {props.isGstRegistered && filingStatusRows.length > 0 && (
-        <div className="space-y-2">
-          {latestFiled && (
-            <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm text-success">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Latest GST return has been filed.</span>
+      {props.isGstRegistered && verifiedGstData && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm">GST Filing Status Check</h4>
             </div>
+            <div className="flex items-center gap-2">
+              {filingChecked && latestFiled === true && (
+                <Badge className="bg-success text-success-foreground hover:bg-success">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  GST Filing: COMPLIANT
+                </Badge>
+              )}
+              {filingChecked && latestFiled === false && (
+                <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  GST Not Filed for Last Month
+                </Badge>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => runFilingStatusCheck(verifiedGstData)}
+                disabled={filingChecking}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-2 ${filingChecking ? 'animate-spin' : ''}`} />
+                {filingChecked ? 'Refresh Filing Status' : 'Check GST Filing Status'}
+              </Button>
+            </div>
+          </div>
+
+          {filingStatusRows.length > 0 ? (
+            <GstFilingStatusTable rows={filingStatusRows} />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {filingChecking
+                ? 'Fetching latest filing status from GSTN…'
+                : 'Click "Check GST Filing Status" to fetch the last 3 months of returns.'}
+            </p>
           )}
-          <GstFilingStatusTable rows={filingStatusRows} />
         </div>
       )}
 

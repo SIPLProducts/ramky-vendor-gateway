@@ -87,6 +87,15 @@ const TEMPLATES: Array<{
       principal_mobile: "data.contact_details.principal.mobile",
       filing_status: "data.filing_status.0",
     } },
+  { provider_name: "GST_FILING", display_name: "GST Filing Status", category: "VALIDATION",
+    base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/corporate/gstin-advanced",
+    request_mode: "json", request_body_template: { id_number: "{{id_number}}", filing_status_get: true },
+    response_data_mapping: {
+      gstin: "data.gstin",
+      legal_name: "data.legal_name",
+      filing_status: "data.filing_status",
+      filing_frequency: "data.filing_frequency",
+    } },
   { provider_name: "MSME", display_name: "MSME / Udyam Manual", category: "VALIDATION",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/corporate/udyog-aadhaar",
     request_mode: "json", request_body_template: { id_number: "{{id_number}}" },
@@ -168,18 +177,40 @@ export default function KycApiSettings() {
   };
 
   const addFromTemplate = async (t: typeof TEMPLATES[number]) => {
-    const created = await create.mutateAsync({
-      provider_name: t.provider_name,
-      display_name: t.display_name,
-      category: t.category,
-      base_url: t.base_url,
-      endpoint_path: t.endpoint_path,
-      request_mode: t.request_mode,
-      file_field_name: t.file_field_name ?? null,
-      request_body_template: t.request_body_template,
-      execution_order: (providers?.length || 0) + 1,
-    });
-    if (created?.id) navigate(`/admin/kyc-api-settings/${created.id}`);
+    // Avoid the "duplicate key" error from api_providers_tenant_provider_uniq:
+    // if this provider is already configured for the tenant, just open its editor.
+    const existing = (providers || []).find((p) => p.provider_name === t.provider_name);
+    if (existing) {
+      toast({
+        title: "Already configured",
+        description: `${t.display_name} is already configured — opening it for editing.`,
+      });
+      navigate(`/admin/kyc-api-settings/${existing.id}`);
+      return;
+    }
+    try {
+      const created = await create.mutateAsync({
+        provider_name: t.provider_name,
+        display_name: t.display_name,
+        category: t.category,
+        base_url: t.base_url,
+        endpoint_path: t.endpoint_path,
+        request_mode: t.request_mode,
+        file_field_name: t.file_field_name ?? null,
+        request_body_template: t.request_body_template,
+        response_data_mapping: t.response_data_mapping ?? {},
+        execution_order: (providers?.length || 0) + 1,
+      });
+      if (created?.id) navigate(`/admin/kyc-api-settings/${created.id}`);
+    } catch (e: any) {
+      // Race: another tab/user added it between our check and insert.
+      if (String(e?.message || "").toLowerCase().includes("duplicate key")) {
+        toast({
+          title: "Already configured",
+          description: `${t.display_name} already exists. Refresh to see it in the list.`,
+        });
+      }
+    }
   };
 
   return (
