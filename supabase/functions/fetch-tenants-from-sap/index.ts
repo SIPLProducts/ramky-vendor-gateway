@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
 
     let sapJson: any = null;
     let networkError: string | null = null;
-    const requestBody = { email };
+    const requestBody = { UMAIL: email };
 
     try {
       const controller = new AbortController();
