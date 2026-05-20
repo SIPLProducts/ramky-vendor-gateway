@@ -24,6 +24,10 @@ import {
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
+import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
+import { Badge } from "@/components/ui/badge";
+import { FileUpload } from "@/components/vendor/FileUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Maps the registration step's document type → the provider_name configured
@@ -66,6 +70,8 @@ export interface VerifiedDocumentData {
     additionalPlaces?: string[];
     jurisdictionCentre?: string;
     jurisdictionState?: string;
+    filing_status?: any;
+    filingCompliant?: boolean;
   };
   manualLegalName?: string;
   manualAddress?: { address: string; city: string; state: string; pincode: string };
@@ -294,6 +300,22 @@ export function DocumentVerificationStep({
 
   const [gstDeclarationFile, setGstDeclarationFile] = useState<File | null>(initialData?.gstSelfDeclarationFile ?? null);
   const [gstDeclarationReason, setGstDeclarationReason] = useState<string>(initialData?.gstDeclarationReason ?? "");
+
+  // GST Filing Status (post-validation) — last 3 months from GST_FILING
+  const [gstFilingRows, setGstFilingRows] = useState<FilingStatusRow[]>(
+    () => normalizeFilingStatus((initialData?.gst as any)?.filing_status),
+  );
+  const [gstFilingChecked, setGstFilingChecked] = useState<boolean>(
+    () => normalizeFilingStatus((initialData?.gst as any)?.filing_status).length > 0,
+  );
+  const [gstFilingChecking, setGstFilingChecking] = useState(false);
+  const [gstLatestFiled, setGstLatestFiled] = useState<boolean | null>(
+    () => {
+      const rows = normalizeFilingStatus((initialData?.gst as any)?.filing_status);
+      return rows.length ? isLatestPeriodFiled(rows) : null;
+    },
+  );
+
   const [msmeDeclarationFile, setMsmeDeclarationFile] = useState<File | null>(initialData?.msmeSelfDeclarationFile ?? null);
   const [msmeDeclarationReason, setMsmeDeclarationReason] = useState<string>(initialData?.msmeDeclarationReason ?? "");
   const [manualLegalName, setManualLegalName] = useState<string>(initialData?.manualLegalName ?? "");
@@ -975,7 +997,58 @@ export function DocumentVerificationStep({
     return undefined;
   }, [isGstRegistered, gstDoc, manualLegalName]);
 
+  // Calls the GST_FILING provider to fetch last-3-months filing status,
+  // saves it onto the vendor_validations row, and updates local state.
+  const runGstFilingStatusCheck = async (baseGstData: Record<string, any>) => {
+    const gstin = String(baseGstData?.gstin || "").toUpperCase().trim();
+    if (!gstin) return;
+    setGstFilingChecking(true);
+    try {
+      const r = await callProvider({
+        providerName: "GST_FILING",
+        input: { id_number: gstin, gstin },
+      });
+      // Prefer the dedicated GST_FILING response, fall back to the
+      // filing_status returned by the main GST validation call.
+      const filingSrc =
+        r.found && r.ok && r.data
+          ? (r.data.filing_status ?? baseGstData.filing_status)
+          : baseGstData.filing_status;
+      const rows = normalizeFilingStatus(filingSrc);
+      setGstFilingRows(rows);
+      setGstFilingChecked(true);
+      const filed = rows.length ? isLatestPeriodFiled(rows) : false;
+      setGstLatestFiled(filed);
+      // Persist the filing status onto the vendor_validations GST row so the
+      // View Details "GST Compliance Report" popup can render the real table.
+      if (vendorId) {
+        try {
+          await supabase
+            .from("vendor_validations")
+            .delete()
+            .eq("vendor_id", vendorId)
+            .eq("validation_type", "gst");
+          await supabase.from("vendor_validations").insert({
+            vendor_id: vendorId,
+            validation_type: "gst",
+            status: "passed",
+            message: filed ? "GST verified — filing compliant" : "GST verified — latest month not filed",
+            details: { ...baseGstData, filing_status: filingSrc },
+          });
+        } catch (err) {
+          console.warn("[GST_FILING] Failed to persist filing status", err);
+        }
+      }
+    } finally {
+      setGstFilingChecking(false);
+    }
+  };
+
   const handleGstUpload = (file: File) => {
+    // Reset filing-status state for the new upload
+    setGstFilingRows([]);
+    setGstFilingChecked(false);
+    setGstLatestFiled(null);
     // Clear stale address up front so a previous upload's value can never
     // bleed through if the new registry response is missing the field.
     setEditablePrincipalPlace("");
@@ -993,6 +1066,10 @@ export function DocumentVerificationStep({
         } else {
           const ocrAddress = prev.ocrData?.principal_place_of_business || prev.ocrData?.address;
           if (ocrAddress) setEditablePrincipalPlace(ocrAddress);
+        }
+        // Chain GST_FILING right after GSTIN validation succeeds.
+        if (prev.status === "verified" && prev.ocrData?.gstin) {
+          void runGstFilingStatusCheck(prev.ocrData);
         }
         return prev;
       });
@@ -1411,9 +1488,13 @@ export function DocumentVerificationStep({
   }, [gstDoc.status, gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName]);
 
   // ---------- Gating ----------
+  // GST stage requires: validation verified AND filing check completed AND
+  // (latest month filed OR a self-declaration was uploaded).
+  const gstFilingOk =
+    gstFilingChecked && (gstLatestFiled === true || !!gstDeclarationFile);
   const stage1Done =
     isGstRegistered === true
-      ? gstDoc.status === "verified"
+      ? gstDoc.status === "verified" && gstFilingOk
       : isGstRegistered === false
         ? !!gstDeclarationFile
         : false;
@@ -1446,7 +1527,14 @@ export function DocumentVerificationStep({
         additionalPlaces: Array.isArray(gstDoc.ocrData.additional_places) ? gstDoc.ocrData.additional_places : undefined,
         jurisdictionCentre: gstDoc.ocrData.jurisdiction_centre,
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
+        filing_status: gstFilingRows.length ? gstFilingRows : undefined,
+        filingCompliant: gstLatestFiled ?? undefined,
       };
+      // If GST filing was not compliant and a self-declaration was uploaded,
+      // carry the file through so the parent saves it under gst_self_declaration.
+      if (gstLatestFiled === false && gstDeclarationFile) {
+        out.gstSelfDeclarationFile = gstDeclarationFile;
+      }
     } else if (isGstRegistered === false) {
       out.gstDeclarationReason = gstDeclarationReason;
       out.gstSelfDeclarationFile = gstDeclarationFile;
@@ -1515,7 +1603,7 @@ export function DocumentVerificationStep({
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstLatestFiled]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
@@ -1691,8 +1779,87 @@ export function DocumentVerificationStep({
                         text={`Name match score: ${gstDoc.nameMatchScore}%`}
                       />
                     )}
+
+                    {/* GST Filing Status — runs after GSTIN Validation */}
+                    {gstDoc.status === "verified" && (
+                      <div className="rounded-lg border bg-card p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {gstFilingChecked && gstLatestFiled === true && (
+                              <Badge className="bg-success text-success-foreground hover:bg-success">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Filed up to last month
+                              </Badge>
+                            )}
+                            {gstFilingChecked && gstLatestFiled === false && (
+                              <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Not filed for last month
+                              </Badge>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => runGstFilingStatusCheck(gstDoc.ocrData || {})}
+                              disabled={gstFilingChecking}
+                            >
+                              <RotateCcw className={`h-3.5 w-3.5 mr-2 ${gstFilingChecking ? "animate-spin" : ""}`} />
+                              {gstFilingChecked ? "Refresh" : "Check Filing Status"}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {gstFilingRows.length > 0 ? (
+                          <GstFilingStatusTable rows={gstFilingRows} limit={3} />
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {gstFilingChecking
+                              ? "Fetching latest filing status from GSTN…"
+                              : "Click \"Check Filing Status\" to fetch the last 3 months of returns."}
+                          </p>
+                        )}
+
+                        {/* Non-compliant -> require self-declaration upload */}
+                        {gstFilingChecked && gstLatestFiled === false && (
+                          <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50/60 p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                              <div className="text-sm text-amber-900">
+                                GST return for the last month has not been filed. Please download the
+                                GST Returns Declaration, sign it, and upload the signed copy to continue.
+                              </div>
+                            </div>
+                            <Button asChild type="button" variant="outline" size="sm">
+                              <a
+                                href="/templates/gst-self-declaration.docx"
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download GST Returns Declaration
+                              </a>
+                            </Button>
+                            <FileUpload
+                              label="Signed GST Returns Declaration *"
+                              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                              documentType="gst_self_declaration"
+                              onFileSelect={setGstDeclarationFile}
+                              currentFile={gstDeclarationFile}
+                              vendorId={vendorId}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
+
 
                 {/* NO path */}
                 {isGstRegistered === false && (
