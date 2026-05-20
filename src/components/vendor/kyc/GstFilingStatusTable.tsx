@@ -78,14 +78,15 @@ function dedupeByPeriod(rows: FilingStatusRow[]): FilingStatusRow[] {
   return Array.from(byKey.values());
 }
 
-export function GstFilingStatusTable({ rows }: { rows: FilingStatusRow[] }) {
+export function GstFilingStatusTable({ rows, limit }: { rows: FilingStatusRow[]; limit?: number }) {
   if (!rows || rows.length === 0) return null;
 
-  const sorted = dedupeByPeriod(rows).sort((a, b) => {
+  const sortedAll = dedupeByPeriod(rows).sort((a, b) => {
     const da = a.date_of_filing || "";
     const db = b.date_of_filing || "";
     return db.localeCompare(da);
   });
+  const sorted = typeof limit === "number" ? sortedAll.slice(0, limit) : sortedAll;
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
