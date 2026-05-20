@@ -231,12 +231,35 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
                 <p className="text-sm text-muted-foreground">Enter the email above and press Enter to load tenants from SAP.</p>
               ) : sapTenants.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No tenants returned by SAP for this email.</p>
-              ) : sapTenants.map((t) => (
-                <label key={t.code} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={selectedCodes.includes(t.code)} onCheckedChange={() => toggleCode(t.code)} />
-                  <span className="text-sm">{t.name} <span className="text-xs text-muted-foreground">({t.code})</span></span>
-                </label>
-              ))}
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 cursor-pointer pb-2 mb-1 border-b sticky top-0 bg-background">
+                    <Checkbox
+                      checked={
+                        selectedCodes.length === sapTenants.length
+                          ? true
+                          : selectedCodes.length === 0
+                          ? false
+                          : ('indeterminate' as any)
+                      }
+                      onCheckedChange={() => {
+                        if (selectedCodes.length === sapTenants.length) setSelectedCodes([]);
+                        else setSelectedCodes(sapTenants.map((t) => t.code));
+                      }}
+                    />
+                    <span className="text-sm font-medium">Select All</span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      ({selectedCodes.length}/{sapTenants.length})
+                    </span>
+                  </label>
+                  {sapTenants.map((t) => (
+                    <label key={t.code} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox checked={selectedCodes.includes(t.code)} onCheckedChange={() => toggleCode(t.code)} />
+                      <span className="text-sm">{t.name} <span className="text-xs text-muted-foreground">({t.code})</span></span>
+                    </label>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>
