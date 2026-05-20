@@ -105,22 +105,10 @@ const buildGstComplianceReport = (vendor: any, validation: any | null): GstCompl
   const lastFiledReturn: string = details.lastFiledReturn || fmtMonthYear(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
   const realRows = normalizeFilingStatus(details.filing_status);
-  let filingRows = dedupeAndTrim(realRows);
-  if (filingRows.length === 0) {
-    filingRows = [0, 1, 2].map((i) => {
-      const period = new Date(now.getFullYear(), now.getMonth() - (i + 1), 1);
-      const filedOn = new Date(period.getFullYear(), period.getMonth(), 18 + i);
-      const fyStartYear = period.getMonth() >= 3 ? period.getFullYear() : period.getFullYear() - 1;
-      return {
-        financial_year: `${fyStartYear}-${fyStartYear + 1}`,
-        tax_period: FULL_MONTHS[period.getMonth()],
-        date_of_filing: fmtDmy(filedOn),
-        status: 'Filed',
-      };
-    });
-  }
+  const filingRows = dedupeAndTrim(realRows);
 
   return { complianceScore: score, status, riskLevel, registrationDate, filingStatus: filingStatusText, lastFiledReturn, filingRows };
+
 };
 
 interface VendorReviewDialogProps {
@@ -499,34 +487,41 @@ export function VendorReviewDialog({
 
                     <div>
                       <h4 className="font-semibold mb-3 text-primary">Recent Returns Filed</h4>
-                      <div className="border rounded-md">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Financial Year</TableHead>
-                              <TableHead>Tax Period</TableHead>
-                              <TableHead>Date of filing</TableHead>
-                              <TableHead>Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {gstReport.filingRows.map((r, idx) => {
-                              const filed = r.status.toLowerCase() === 'filed';
-                              return (
-                                <TableRow key={idx}>
-                                  <TableCell>{r.financial_year}</TableCell>
-                                  <TableCell>{r.tax_period}</TableCell>
-                                  <TableCell>{r.date_of_filing}</TableCell>
-                                  <TableCell className={filed ? '' : 'text-destructive font-medium'}>
-                                    {r.status}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      {gstReport.filingRows.length === 0 ? (
+                        <p className="text-sm text-muted-foreground border rounded-md p-4">
+                          No filing data captured for this vendor.
+                        </p>
+                      ) : (
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Financial Year</TableHead>
+                                <TableHead>Tax Period</TableHead>
+                                <TableHead>Date of filing</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {gstReport.filingRows.map((r, idx) => {
+                                const filed = r.status.toLowerCase() === 'filed';
+                                return (
+                                  <TableRow key={idx}>
+                                    <TableCell>{r.financial_year}</TableCell>
+                                    <TableCell>{r.tax_period}</TableCell>
+                                    <TableCell>{r.date_of_filing}</TableCell>
+                                    <TableCell className={filed ? '' : 'text-destructive font-medium'}>
+                                      {r.status}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
                     </div>
+
 
                     <Separator />
 
