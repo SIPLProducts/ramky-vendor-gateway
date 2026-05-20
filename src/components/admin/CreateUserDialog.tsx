@@ -26,6 +26,8 @@ interface Props {
   onCreated: () => void;
 }
 
+interface SapTenant { code: string; name: string; }
+
 function generatePassword() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
   const symbols = '!@#$%';
@@ -35,74 +37,100 @@ function generatePassword() {
   return pw;
 }
 
-export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = [], defaultTenantId = null, onCreated }: Props) {
+export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreated }: Props) {
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  // selectedRole = built-in AppRole OR "custom:<custom_role_id>"
   const [selectedRole, setSelectedRole] = useState<string>('vendor');
-  const [tenantIds, setTenantIds] = useState<string[]>(defaultTenantId ? [defaultTenantId] : []);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (open && defaultTenantId && tenantIds.length === 0) {
-      setTenantIds([defaultTenantId]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, defaultTenantId]);
+  // SAP tenants state
+  const [sapTenants, setSapTenants] = useState<SapTenant[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [fetchingSap, setFetchingSap] = useState(false);
+  const [sapFetched, setSapFetched] = useState(false);
+  const [sapError, setSapError] = useState<string | null>(null);
 
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setSelectedRole('vendor');
-    setTenantIds(defaultTenantId ? [defaultTenantId] : []); setShowPw(false);
+    setShowPw(false);
+    setSapTenants([]); setSelectedCodes([]); setSapFetched(false); setSapError(null); setFetchingSap(false);
   };
 
-  const toggleTenant = (id: string) => {
-    setTenantIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
+  useEffect(() => { if (!open) reset(); /* eslint-disable-next-line */ }, [open]);
+
+  const toggleCode = (code: string) => {
+    setSelectedCodes((prev) => prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]);
+  };
+
+  const fetchSapTenants = async () => {
+    const trimmed = email.trim();
+    if (!trimmed || !/.+@.+\..+/.test(trimmed)) {
+      setSapError('Please enter a valid email first.');
+      setSapFetched(true);
+      setSapTenants([]);
+      return;
+    }
+    setFetchingSap(true); setSapError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-tenants-from-sap', {
+        body: { email: trimmed },
+      });
+      if (error) throw error;
+      if (!(data as any)?.success) throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+      const list: SapTenant[] = ((data as any).tenants ?? []).map((t: any) => ({
+        code: String(t.code),
+        name: String(t.name || t.code),
+      }));
+      setSapTenants(list);
+      setSelectedCodes([]);
+      setSapFetched(true);
+      if (list.length === 0) {
+        toast({ title: 'No tenants', description: 'SAP returned no tenants for this email.' });
+      }
+    } catch (err: any) {
+      setSapError(err.message ?? String(err));
+      setSapTenants([]);
+      setSapFetched(true);
+    } finally {
+      setFetchingSap(false);
+    }
   };
 
   const isCustom = selectedRole.startsWith('custom:');
   const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
-  // Built-in role to actually persist in user_roles. For custom selection we use 'approver'
-  // purely as a non-vendor placeholder — it grants no built-in screen permissions; the
-  // assigned custom role remains the sole source of truth for what the user can access.
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
 
   const handleSubmit = async () => {
     if (!fullName.trim()) {
-      toast({ title: 'Full name required', description: 'Please enter the user\'s full name', variant: 'destructive' });
-      return;
+      toast({ title: 'Full name required', variant: 'destructive' }); return;
     }
     if (!email || !password || !selectedRole) {
-      toast({ title: 'Missing fields', description: 'Email, password and role are required', variant: 'destructive' });
-      return;
+      toast({ title: 'Missing fields', description: 'Email, password and role are required', variant: 'destructive' }); return;
     }
     if (password.length < 8) {
-      toast({ title: 'Weak password', description: 'Password must be at least 8 characters', variant: 'destructive' });
-      return;
+      toast({ title: 'Weak password', description: 'Password must be at least 8 characters', variant: 'destructive' }); return;
     }
-    if (tenantIds.length === 0) {
-      toast({ title: 'Tenant required', description: 'Please assign at least one tenant to the user', variant: 'destructive' });
-      return;
+    if (selectedCodes.length === 0) {
+      toast({ title: 'Tenant required', description: 'Please select at least one tenant from SAP', variant: 'destructive' }); return;
     }
     setSaving(true);
     try {
+      const chosen = sapTenants.filter((t) => selectedCodes.includes(t.code));
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email: email.trim(), password, full_name: fullName.trim() || null,
           role: builtInRole,
-          tenant_ids: tenantIds,
+          tenant_ids: [],
+          sap_tenants: chosen,
           custom_role_ids: customRoleId ? [customRoleId] : [],
         },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-
-      const roleLabel = isCustom
-        ? (customRoles.find((c) => c.id === customRoleId)?.name ?? 'custom role')
-        : builtInRole;
-      toast({ title: 'User created', description: `${email} added as ${roleLabel}` });
+      toast({ title: 'User created', description: `${email} added` });
       reset();
       onOpenChange(false);
       onCreated();
@@ -127,7 +155,15 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
           </div>
           <div className="space-y-2">
             <Label>Email *</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" />
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setSapFetched(false); setSapTenants([]); setSelectedCodes([]); setSapError(null); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchSapTenants(); } }}
+              onBlur={() => { if (email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
+              placeholder="user@example.com"
+            />
+            <p className="text-xs text-muted-foreground">Press Enter to load tenants for this email from SAP.</p>
           </div>
           <div className="space-y-2">
             <Label>Password *</Label>
@@ -173,14 +209,32 @@ export function CreateUserDialog({ open, onOpenChange, tenants, customRoles = []
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Tenants *</Label>
+            <div className="flex items-center justify-between">
+              <Label>Tenants * <span className="text-xs font-normal text-muted-foreground">(from SAP)</span></Label>
+              <Button
+                type="button" variant="ghost" size="sm"
+                onClick={fetchSapTenants}
+                disabled={fetchingSap || !email.trim()}
+              >
+                {fetchingSap ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                Refresh
+              </Button>
+            </div>
             <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-              {tenants.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tenants available</p>
-              ) : tenants.map((t) => (
-                <label key={t.id} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={tenantIds.includes(t.id)} onCheckedChange={() => toggleTenant(t.id)} />
-                  <span className="text-sm">{t.name}</span>
+              {fetchingSap ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Fetching tenants from SAP…
+                </div>
+              ) : sapError ? (
+                <p className="text-sm text-destructive">{sapError}</p>
+              ) : !sapFetched ? (
+                <p className="text-sm text-muted-foreground">Enter the email above and press Enter to load tenants from SAP.</p>
+              ) : sapTenants.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No tenants returned by SAP for this email.</p>
+              ) : sapTenants.map((t) => (
+                <label key={t.code} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={selectedCodes.includes(t.code)} onCheckedChange={() => toggleCode(t.code)} />
+                  <span className="text-sm">{t.name} <span className="text-xs text-muted-foreground">({t.code})</span></span>
                 </label>
               ))}
             </div>
