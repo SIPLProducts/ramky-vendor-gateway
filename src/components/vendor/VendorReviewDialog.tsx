@@ -487,34 +487,41 @@ export function VendorReviewDialog({
 
                     <div>
                       <h4 className="font-semibold mb-3 text-primary">Recent Returns Filed</h4>
-                      <div className="border rounded-md">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Financial Year</TableHead>
-                              <TableHead>Tax Period</TableHead>
-                              <TableHead>Date of filing</TableHead>
-                              <TableHead>Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {gstReport.filingRows.map((r, idx) => {
-                              const filed = r.status.toLowerCase() === 'filed';
-                              return (
-                                <TableRow key={idx}>
-                                  <TableCell>{r.financial_year}</TableCell>
-                                  <TableCell>{r.tax_period}</TableCell>
-                                  <TableCell>{r.date_of_filing}</TableCell>
-                                  <TableCell className={filed ? '' : 'text-destructive font-medium'}>
-                                    {r.status}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      {gstReport.filingRows.length === 0 ? (
+                        <p className="text-sm text-muted-foreground border rounded-md p-4">
+                          No filing data captured for this vendor.
+                        </p>
+                      ) : (
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Financial Year</TableHead>
+                                <TableHead>Tax Period</TableHead>
+                                <TableHead>Date of filing</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {gstReport.filingRows.map((r, idx) => {
+                                const filed = r.status.toLowerCase() === 'filed';
+                                return (
+                                  <TableRow key={idx}>
+                                    <TableCell>{r.financial_year}</TableCell>
+                                    <TableCell>{r.tax_period}</TableCell>
+                                    <TableCell>{r.date_of_filing}</TableCell>
+                                    <TableCell className={filed ? '' : 'text-destructive font-medium'}>
+                                      {r.status}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
                     </div>
+
 
                     <Separator />
 
