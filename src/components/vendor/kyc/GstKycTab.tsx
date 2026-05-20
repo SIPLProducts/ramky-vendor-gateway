@@ -58,6 +58,26 @@ export function GstKycTab(props: GstKycTabProps) {
   const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
   const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
 
+  const persistGstValidation = async (data: Record<string, any>, message: string) => {
+    if (!props.vendorId) return;
+    try {
+      await supabase
+        .from('vendor_validations')
+        .delete()
+        .eq('vendor_id', props.vendorId)
+        .eq('validation_type', 'gst');
+      await supabase.from('vendor_validations').insert({
+        vendor_id: props.vendorId,
+        validation_type: 'gst',
+        status: 'passed',
+        message,
+        details: data,
+      });
+    } catch (e) {
+      console.warn('[GstKycTab] Failed to persist GST validation', e);
+    }
+  };
+
   const handleFilingStatusAfterVerify = (data: Record<string, any>) => {
     const rows = normalizeFilingStatus(data?.filing_status);
     setFilingStatusRows(rows);
@@ -75,6 +95,7 @@ export function GstKycTab(props: GstKycTabProps) {
     setDeclarationDialogOpen(false);
     if (pendingVerifiedData) {
       props.onVerifiedDetails?.(pendingVerifiedData);
+      void persistGstValidation(pendingVerifiedData, 'GST verified (filing declaration uploaded)');
       setPendingVerifiedData(null);
     }
   };
