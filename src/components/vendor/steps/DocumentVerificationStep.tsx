@@ -300,6 +300,22 @@ export function DocumentVerificationStep({
 
   const [gstDeclarationFile, setGstDeclarationFile] = useState<File | null>(initialData?.gstSelfDeclarationFile ?? null);
   const [gstDeclarationReason, setGstDeclarationReason] = useState<string>(initialData?.gstDeclarationReason ?? "");
+
+  // GST Filing Status (post-validation) — last 3 months from GST_FILING
+  const [gstFilingRows, setGstFilingRows] = useState<FilingStatusRow[]>(
+    () => normalizeFilingStatus((initialData?.gst as any)?.filing_status),
+  );
+  const [gstFilingChecked, setGstFilingChecked] = useState<boolean>(
+    () => normalizeFilingStatus((initialData?.gst as any)?.filing_status).length > 0,
+  );
+  const [gstFilingChecking, setGstFilingChecking] = useState(false);
+  const [gstLatestFiled, setGstLatestFiled] = useState<boolean | null>(
+    () => {
+      const rows = normalizeFilingStatus((initialData?.gst as any)?.filing_status);
+      return rows.length ? isLatestPeriodFiled(rows) : null;
+    },
+  );
+
   const [msmeDeclarationFile, setMsmeDeclarationFile] = useState<File | null>(initialData?.msmeSelfDeclarationFile ?? null);
   const [msmeDeclarationReason, setMsmeDeclarationReason] = useState<string>(initialData?.msmeDeclarationReason ?? "");
   const [manualLegalName, setManualLegalName] = useState<string>(initialData?.manualLegalName ?? "");
