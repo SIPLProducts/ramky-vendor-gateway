@@ -1,47 +1,52 @@
 ## Goal
 
-In the **View Details** dialog (`VendorReviewDialog`), update the existing **GST Compliance Report** tab so the returns table shows columns matching the vendor-side filing-status table:
+Make the **GST Compliance Report** tab in View Details show the **real** Financial Year / Tax Period / Date of filing / Status rows returned by Surepass during vendor registration, instead of the synthetic placeholder rows that appear today.
 
-```text
-Financial Year | Tax Period | Date of filing | Status
-```
+## Root cause
 
-…and populate it from the real GST filing data captured during validation, with a graceful fallback when none is present.
+- `GstKycTab` calls the configured GST provider (Surepass) via `kyc-api-execute` and receives `filing_status` in the response, but only stores it in local React state (`filingStatusRows`). Nothing is written to `vendor_validations`.
+- Later, `useVendorRegistration.runValidations()` calls the `validate-gst` edge function (simulator) and inserts a `vendor_validations` row with `validation_type='gst'` whose `details` payload has no `filing_status` key.
+- `VendorReviewDialog` reads `vendor_validations.details.filing_status`, finds nothing, and falls back to the synthetic 3-row generator in `buildGstComplianceReport`.
+
+Net effect: the table renders, but every row is fake.
 
 ## Changes
 
-### `src/components/vendor/VendorReviewDialog.tsx`
+### 1. Persist the Surepass GST response on inline verify
+**File:** `src/components/vendor/kyc/GstKycTab.tsx`
 
-1. **Reuse normalizer** — import `normalizeFilingStatus` from `@/components/vendor/kyc/GstFilingStatusTable` to parse both nested-array and flat-array shapes that Surepass returns.
+- After `handleManualVerify` / `handleOcrVerify` succeed AND `props.vendorId` is set, upsert one row into `vendor_validations`:
+  - `vendor_id`: `props.vendorId`
+  - `validation_type`: `'gst'`
+  - `status`: `'passed'`
+  - `message`: verified message
+  - `details`: the **full provider data** (`r.data` from `useProviderVerify`), which already contains `filing_status`, `legal_name`, `gstin`, etc.
+- Delete any older `gst` row for the same vendor first (mirrors existing pattern used elsewhere) so the new row wins ordering.
+- Wrap in try/catch — failure to persist must not block the registration flow.
 
-2. **Extend `GstComplianceReport`** — replace `returnsFiled` with:
-   ```ts
-   filingRows: Array<{
-     financial_year: string;
-     tax_period: string;
-     date_of_filing: string; // DD/MM/YYYY
-     status: string;
-   }>
-   ```
+### 2. Stop overwriting the rich row during final submit
+**File:** `src/hooks/useVendorRegistration.tsx` (around lines 980-1010, the `validate-gst` branch)
 
-3. **`buildGstComplianceReport`** — derive `filingRows`:
-   - Read `gstValidation.details.filing_status` (saved by the verify step) and run it through `normalizeFilingStatus`.
-   - Dedupe per `financial_year + tax_period`, preferring **GSTR3B** over **GSTR1** (same rule used on the vendor tab).
-   - Sort by `date_of_filing` desc, keep the **last 3** rows.
-   - Format `date_of_filing` as `DD/MM/YYYY`.
-   - If no real rows exist, fall back to the current 3-month synthetic placeholder mapped to the new column shape (so older vendors without stored filing data still render something).
+- Before invoking `verify-gst`/`validate-gst`, call `hasRecentValidation('gst')` — this already exists. Extend the "reuse existing" branch so that when the existing row's `details.filing_status` is present, we **do not** re-run the simulator and do **not** insert a new row (the inline Surepass row stays as the source of truth).
+- Only run the legacy simulator when no inline verification result exists.
 
-4. **Table markup** under "Recent Returns Filed":
-   - Headers: Financial Year, Tax Period, Date of filing, Status.
-   - Status cell: plain text — "Filed" neutral, anything else in `text-destructive` (matches vendor-side styling). Drop the Badge.
+### 3. Optional: surface real `complianceScore` / `lastFiledReturn`
+**File:** `src/components/vendor/VendorReviewDialog.tsx`
 
-5. **No other tab/section changes.** The tab trigger, score cards, GSTIN/registration block, and compliance document list stay as-is.
+- `buildGstComplianceReport` already prefers real data when present. Once step 1 lands, `details.filing_status` populates and the synthetic fallback no longer triggers — no code change required here.
+- Keep the existing fallback so vendors registered before this change still render something.
 
-### No DB / edge / route changes
+### 4. No DB migration, no edge function change
+- `vendor_validations.details` is already `jsonb`; storing the Surepass payload as-is is supported.
+- No new tables, no new providers.
 
-Filing data is already in `vendor_validations.details` (written by the GST verify step). No migration needed.
+## Files touched
 
-## Out of scope
+- `src/components/vendor/kyc/GstKycTab.tsx` — persist Surepass `r.data` into `vendor_validations` after successful inline verify.
+- `src/hooks/useVendorRegistration.tsx` — skip the simulator overwrite when a real `gst` validation row already exists.
 
-- No changes to the vendor-side `GstFilingStatusTable` (already in correct format).
-- No new tab — the **GST Compliance Report** tab already exists in `VendorReviewDialog`; only its table is being updated.
+## Verification
+
+1. Register a vendor with a real GSTIN, complete the GST tab. Confirm a `vendor_validations` row of type `gst` exists with `details.filing_status` populated.
+2. Open **View Details → GST Compliance Report**. The table should show the actual Financial Year / Tax Period / Date of filing / Status rows from Surepass (last 3 periods, GSTR3B preferred), not the synthetic ones.
+3. Open an older vendor (registered before the change) — the synthetic fallback still renders so the tab is never empty.
