@@ -260,8 +260,8 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
                       <span className="text-sm">{t.name} <span className="text-xs text-muted-foreground">({t.code})</span></span>
                     </label>
                   ))
-                </>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
