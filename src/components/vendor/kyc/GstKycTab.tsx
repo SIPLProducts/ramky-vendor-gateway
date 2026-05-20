@@ -147,7 +147,10 @@ export function GstKycTab(props: GstKycTabProps) {
     });
     if (r.ok) {
       const ok = handleFilingStatusAfterVerify(r.data || {});
-      if (ok) props.onVerifiedDetails?.(r.data || {});
+      if (ok) {
+        props.onVerifiedDetails?.(r.data || {});
+        void persistGstValidation(r.data || {}, r.message || 'GSTIN verified');
+      }
     }
   };
 
