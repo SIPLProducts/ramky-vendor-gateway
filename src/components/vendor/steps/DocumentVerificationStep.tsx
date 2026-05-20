@@ -997,7 +997,58 @@ export function DocumentVerificationStep({
     return undefined;
   }, [isGstRegistered, gstDoc, manualLegalName]);
 
+  // Calls the GST_FILING provider to fetch last-3-months filing status,
+  // saves it onto the vendor_validations row, and updates local state.
+  const runGstFilingStatusCheck = async (baseGstData: Record<string, any>) => {
+    const gstin = String(baseGstData?.gstin || "").toUpperCase().trim();
+    if (!gstin) return;
+    setGstFilingChecking(true);
+    try {
+      const r = await callProvider({
+        providerName: "GST_FILING",
+        input: { id_number: gstin, gstin },
+      });
+      // Prefer the dedicated GST_FILING response, fall back to the
+      // filing_status returned by the main GST validation call.
+      const filingSrc =
+        r.found && r.ok && r.data
+          ? (r.data.filing_status ?? baseGstData.filing_status)
+          : baseGstData.filing_status;
+      const rows = normalizeFilingStatus(filingSrc);
+      setGstFilingRows(rows);
+      setGstFilingChecked(true);
+      const filed = rows.length ? isLatestPeriodFiled(rows) : false;
+      setGstLatestFiled(filed);
+      // Persist the filing status onto the vendor_validations GST row so the
+      // View Details "GST Compliance Report" popup can render the real table.
+      if (vendorId) {
+        try {
+          await supabase
+            .from("vendor_validations")
+            .delete()
+            .eq("vendor_id", vendorId)
+            .eq("validation_type", "gst");
+          await supabase.from("vendor_validations").insert({
+            vendor_id: vendorId,
+            validation_type: "gst",
+            status: "passed",
+            message: filed ? "GST verified — filing compliant" : "GST verified — latest month not filed",
+            details: { ...baseGstData, filing_status: filingSrc },
+          });
+        } catch (err) {
+          console.warn("[GST_FILING] Failed to persist filing status", err);
+        }
+      }
+    } finally {
+      setGstFilingChecking(false);
+    }
+  };
+
   const handleGstUpload = (file: File) => {
+    // Reset filing-status state for the new upload
+    setGstFilingRows([]);
+    setGstFilingChecked(false);
+    setGstLatestFiled(null);
     // Clear stale address up front so a previous upload's value can never
     // bleed through if the new registry response is missing the field.
     setEditablePrincipalPlace("");
@@ -1015,6 +1066,10 @@ export function DocumentVerificationStep({
         } else {
           const ocrAddress = prev.ocrData?.principal_place_of_business || prev.ocrData?.address;
           if (ocrAddress) setEditablePrincipalPlace(ocrAddress);
+        }
+        // Chain GST_FILING right after GSTIN validation succeeds.
+        if (prev.status === "verified" && prev.ocrData?.gstin) {
+          void runGstFilingStatusCheck(prev.ocrData);
         }
         return prev;
       });
