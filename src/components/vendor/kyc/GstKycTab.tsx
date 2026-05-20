@@ -58,6 +58,9 @@ export function GstKycTab(props: GstKycTabProps) {
   const [latestFiled, setLatestFiled] = useState<boolean | null>(null);
   const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
   const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
+  const [verifiedGstData, setVerifiedGstData] = useState<Record<string, any> | null>(null);
+  const [filingChecking, setFilingChecking] = useState(false);
+  const [filingChecked, setFilingChecked] = useState(false);
 
   const persistGstValidation = async (data: Record<string, any>, message: string) => {
     if (!props.vendorId) return;
@@ -79,17 +82,41 @@ export function GstKycTab(props: GstKycTabProps) {
     }
   };
 
-  const handleFilingStatusAfterVerify = (data: Record<string, any>) => {
-    const rows = normalizeFilingStatus(data?.filing_status);
-    setFilingStatusRows(rows);
-    const filed = isLatestPeriodFiled(rows);
-    setLatestFiled(filed);
-    if (!filed) {
-      setPendingVerifiedData(data);
-      setDeclarationDialogOpen(true);
-      return false;
+  /**
+   * Calls the dedicated GST_FILING provider and evaluates compliance.
+   * - All last-3-months filed  -> auto-advance to next tab (PAN).
+   * - Any missing/not filed    -> open self-declaration dialog; advance only after upload.
+   */
+  const runFilingStatusCheck = async (baseGstData: Record<string, any>) => {
+    const gstin = String(baseGstData?.gstin || props.gstin || '').toUpperCase().trim();
+    if (!gstin) return;
+    setFilingChecking(true);
+    try {
+      const r = await callProvider({
+        providerName: 'GST_FILING',
+        input: { gstin, id_number: gstin },
+      });
+      // If the dedicated provider isn't configured, fall back to the filing_status
+      // that the GST Validation call already returned.
+      const filingSrc = r.found && r.ok && r.data
+        ? (r.data.filing_status ?? baseGstData.filing_status)
+        : baseGstData.filing_status;
+      const rows = normalizeFilingStatus(filingSrc);
+      setFilingStatusRows(rows);
+      setFilingChecked(true);
+      const filed = isLatestPeriodFiled(rows);
+      setLatestFiled(filed);
+      const merged = { ...baseGstData, filing_status: filingSrc };
+      if (filed) {
+        props.onVerifiedDetails?.(merged);
+        void persistGstValidation(merged, 'GST verified — filing compliant');
+      } else {
+        setPendingVerifiedData(merged);
+        setDeclarationDialogOpen(true);
+      }
+    } finally {
+      setFilingChecking(false);
     }
-    return true;
   };
 
   const confirmDeclarationUpload = () => {
