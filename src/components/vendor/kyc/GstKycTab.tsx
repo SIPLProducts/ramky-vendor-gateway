@@ -15,6 +15,7 @@ import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
 import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled } from './GstFilingStatusTable';
 import { GstDeclarationDialog } from './GstDeclarationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 import {
   evaluateCrossNameMatch,
@@ -57,6 +58,26 @@ export function GstKycTab(props: GstKycTabProps) {
   const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
   const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
 
+  const persistGstValidation = async (data: Record<string, any>, message: string) => {
+    if (!props.vendorId) return;
+    try {
+      await supabase
+        .from('vendor_validations')
+        .delete()
+        .eq('vendor_id', props.vendorId)
+        .eq('validation_type', 'gst');
+      await supabase.from('vendor_validations').insert({
+        vendor_id: props.vendorId,
+        validation_type: 'gst',
+        status: 'passed',
+        message,
+        details: data,
+      });
+    } catch (e) {
+      console.warn('[GstKycTab] Failed to persist GST validation', e);
+    }
+  };
+
   const handleFilingStatusAfterVerify = (data: Record<string, any>) => {
     const rows = normalizeFilingStatus(data?.filing_status);
     setFilingStatusRows(rows);
@@ -74,6 +95,7 @@ export function GstKycTab(props: GstKycTabProps) {
     setDeclarationDialogOpen(false);
     if (pendingVerifiedData) {
       props.onVerifiedDetails?.(pendingVerifiedData);
+      void persistGstValidation(pendingVerifiedData, 'GST verified (filing declaration uploaded)');
       setPendingVerifiedData(null);
     }
   };
@@ -125,7 +147,10 @@ export function GstKycTab(props: GstKycTabProps) {
     });
     if (r.ok) {
       const ok = handleFilingStatusAfterVerify(r.data || {});
-      if (ok) props.onVerifiedDetails?.(r.data || {});
+      if (ok) {
+        props.onVerifiedDetails?.(r.data || {});
+        void persistGstValidation(r.data || {}, r.message || 'GSTIN verified');
+      }
     }
   };
 
@@ -223,6 +248,7 @@ export function GstKycTab(props: GstKycTabProps) {
     const ok = handleFilingStatusAfterVerify(merged);
     if (ok) {
       props.onVerifiedDetails?.(merged);
+      void persistGstValidation(merged, check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`);
     }
     return {
       ok: true,
