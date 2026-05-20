@@ -13,6 +13,8 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
+import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled } from './GstFilingStatusTable';
+import { GstDeclarationDialog } from './GstDeclarationDialog';
 
 import {
   evaluateCrossNameMatch,
