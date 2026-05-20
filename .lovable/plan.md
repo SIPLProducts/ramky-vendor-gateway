@@ -1,26 +1,37 @@
-## Problem
+## Tenants Select All + Default-Selected
 
-The SAP endpoint `POST http://10.200.1.2:8000/vendor/bp/create?sap-client=300` expects:
-```json
-{ "UMAIL": "divyabharathi.dogga@ramky.com" }
+Update the Create User dialog so SAP-fetched tenants are easier to manage in bulk.
+
+### Changes (frontend only)
+
+**File:** `src/components/admin/CreateUserDialog.tsx`
+
+1. **Auto-select all on fetch** — In `fetchSapTenants`, after setting `sapTenants`, initialize `selectedCodes` to all returned codes (`list.map(t => t.code)`) instead of `[]`.
+
+2. **Add "Select All" row** — Above the tenant checkbox list (only when `sapTenants.length > 0`), render a sticky row with:
+   - A `Checkbox` whose state is:
+     - checked → all selected
+     - unchecked → none selected
+     - indeterminate → partial (use Radix `data-state="indeterminate"` via `checked="indeterminate"`)
+   - Label "Select All" + a small count `({selectedCodes.length}/{sapTenants.length})`
+   - onCheckedChange: if currently all selected → clear; otherwise → select all codes.
+
+3. **Preserve individual toggles** — Existing `toggleCode` behavior remains; users can deselect/reselect any tenant.
+
+4. **Refresh behavior** — When user clicks Refresh or re-fetches, the new list is again fully selected by default.
+
+No backend/edge function changes needed — `admin-create-user` already accepts the selected `sap_tenants` array.
+
+### Visual
+
+```text
+Tenants * (from SAP)                     [Refresh]
+┌──────────────────────────────────────┐
+│ [✓] Select All            (10/10)    │
+│ ────────────────────────────────────  │
+│ [✓] SAP A.G. (0001)                  │
+│ [✓] Ramky Infrastructure Ltd (1000)  │
+│ [✓] BLOCKED NOT IN USE (1101)        │
+│ ...                                  │
+└──────────────────────────────────────┘
 ```
-…and returns a top-level array `[{ "BUKRS": "0001", "BUTXT": "SAP A.G." }, ...]`.
-
-The current edge function sends `{ "email": "..." }`, which SAP doesn't recognize, so it returns an empty/non-JSON body → UI shows "SAP response not JSON:".
-
-## Fix
-
-**`supabase/functions/fetch-tenants-from-sap/index.ts`** — change the outgoing payload key from `email` to `UMAIL`:
-
-```ts
-const requestBody = { UMAIL: email };
-```
-
-No other changes needed:
-- Response parser (`extractTenants`) already handles a top-level array and already maps `BUKRS → code`, `BUTXT → name`.
-- `admin-create-user` already upserts `{code, name}` rows into `tenants` and assigns them to the user.
-- Dialog UI already renders the checkbox list from `tenants[]`.
-
-## Verification
-
-After deploy, enter `divyabharathi.dogga@ramky.com` in Create User → press Enter → expect the 10 BUKRS/BUTXT rows to appear as checkboxes.
