@@ -1779,8 +1779,87 @@ export function DocumentVerificationStep({
                         text={`Name match score: ${gstDoc.nameMatchScore}%`}
                       />
                     )}
+
+                    {/* GST Filing Status — runs after GSTIN Validation */}
+                    {gstDoc.status === "verified" && (
+                      <div className="rounded-lg border bg-card p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {gstFilingChecked && gstLatestFiled === true && (
+                              <Badge className="bg-success text-success-foreground hover:bg-success">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Filed up to last month
+                              </Badge>
+                            )}
+                            {gstFilingChecked && gstLatestFiled === false && (
+                              <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Not filed for last month
+                              </Badge>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => runGstFilingStatusCheck(gstDoc.ocrData || {})}
+                              disabled={gstFilingChecking}
+                            >
+                              <RotateCcw className={`h-3.5 w-3.5 mr-2 ${gstFilingChecking ? "animate-spin" : ""}`} />
+                              {gstFilingChecked ? "Refresh" : "Check Filing Status"}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {gstFilingRows.length > 0 ? (
+                          <GstFilingStatusTable rows={gstFilingRows} limit={3} />
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {gstFilingChecking
+                              ? "Fetching latest filing status from GSTN…"
+                              : "Click \"Check Filing Status\" to fetch the last 3 months of returns."}
+                          </p>
+                        )}
+
+                        {/* Non-compliant -> require self-declaration upload */}
+                        {gstFilingChecked && gstLatestFiled === false && (
+                          <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50/60 p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                              <div className="text-sm text-amber-900">
+                                GST return for the last month has not been filed. Please download the
+                                GST Returns Declaration, sign it, and upload the signed copy to continue.
+                              </div>
+                            </div>
+                            <Button asChild type="button" variant="outline" size="sm">
+                              <a
+                                href="/templates/gst-self-declaration.docx"
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download GST Returns Declaration
+                              </a>
+                            </Button>
+                            <FileUpload
+                              label="Signed GST Returns Declaration *"
+                              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                              documentType="gst_self_declaration"
+                              onFileSelect={setGstDeclarationFile}
+                              currentFile={gstDeclarationFile}
+                              vendorId={vendorId}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
+
 
                 {/* NO path */}
                 {isGstRegistered === false && (
