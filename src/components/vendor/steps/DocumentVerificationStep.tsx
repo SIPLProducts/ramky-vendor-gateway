@@ -1527,7 +1527,14 @@ export function DocumentVerificationStep({
         additionalPlaces: Array.isArray(gstDoc.ocrData.additional_places) ? gstDoc.ocrData.additional_places : undefined,
         jurisdictionCentre: gstDoc.ocrData.jurisdiction_centre,
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
+        filing_status: gstFilingRows.length ? gstFilingRows : undefined,
+        filingCompliant: gstLatestFiled ?? undefined,
       };
+      // If GST filing was not compliant and a self-declaration was uploaded,
+      // carry the file through so the parent saves it under gst_self_declaration.
+      if (gstLatestFiled === false && gstDeclarationFile) {
+        out.gstSelfDeclarationFile = gstDeclarationFile;
+      }
     } else if (isGstRegistered === false) {
       out.gstDeclarationReason = gstDeclarationReason;
       out.gstSelfDeclarationFile = gstDeclarationFile;
