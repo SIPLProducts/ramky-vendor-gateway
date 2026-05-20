@@ -503,25 +503,26 @@ export function VendorReviewDialog({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Period</TableHead>
-                              <TableHead>Return Type</TableHead>
-                              <TableHead>Filed On</TableHead>
+                              <TableHead>Financial Year</TableHead>
+                              <TableHead>Tax Period</TableHead>
+                              <TableHead>Date of filing</TableHead>
                               <TableHead>Status</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {gstReport.returnsFiled.map((r, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell>{r.period}</TableCell>
-                                <TableCell>{r.type}</TableCell>
-                                <TableCell>{r.filedOn}</TableCell>
-                                <TableCell>
-                                  <Badge variant={r.status === 'Filed' ? 'default' : r.status === 'Late' ? 'destructive' : 'secondary'}>
+                            {gstReport.filingRows.map((r, idx) => {
+                              const filed = r.status.toLowerCase() === 'filed';
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell>{r.financial_year}</TableCell>
+                                  <TableCell>{r.tax_period}</TableCell>
+                                  <TableCell>{r.date_of_filing}</TableCell>
+                                  <TableCell className={filed ? '' : 'text-destructive font-medium'}>
                                     {r.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
