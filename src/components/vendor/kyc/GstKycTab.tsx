@@ -13,6 +13,8 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
+import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled } from './GstFilingStatusTable';
+import { GstDeclarationDialog } from './GstDeclarationDialog';
 
 import {
   evaluateCrossNameMatch,
@@ -50,6 +52,31 @@ export function GstKycTab(props: GstKycTabProps) {
     useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
   const [legalNameCheckMessage, setLegalNameCheckMessage] = useState<string>('');
   const [verifiedLegalName, setVerifiedLegalName] = useState<string>('');
+  const [filingStatusRows, setFilingStatusRows] = useState<any[]>([]);
+  const [latestFiled, setLatestFiled] = useState<boolean | null>(null);
+  const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
+  const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
+
+  const handleFilingStatusAfterVerify = (data: Record<string, any>) => {
+    const rows = normalizeFilingStatus(data?.filing_status);
+    setFilingStatusRows(rows);
+    const filed = isLatestPeriodFiled(rows);
+    setLatestFiled(filed);
+    if (!filed) {
+      setPendingVerifiedData(data);
+      setDeclarationDialogOpen(true);
+      return false;
+    }
+    return true;
+  };
+
+  const confirmDeclarationUpload = () => {
+    setDeclarationDialogOpen(false);
+    if (pendingVerifiedData) {
+      props.onVerifiedDetails?.(pendingVerifiedData);
+      setPendingVerifiedData(null);
+    }
+  };
 
   if (props.onStatusChange) {
     const status = !props.isGstRegistered
@@ -96,7 +123,10 @@ export function GstKycTab(props: GstKycTabProps) {
         };
       },
     });
-    if (r.ok) props.onVerifiedDetails?.(r.data || {});
+    if (r.ok) {
+      const ok = handleFilingStatusAfterVerify(r.data || {});
+      if (ok) props.onVerifiedDetails?.(r.data || {});
+    }
   };
 
   // Run the admin-configured GST_OCR provider as the "OCR" step.
@@ -190,7 +220,10 @@ export function GstKycTab(props: GstKycTabProps) {
       return { ok: false, message: check.message, apiData: merged, apiResult: verify };
     }
 
-    props.onVerifiedDetails?.(merged);
+    const ok = handleFilingStatusAfterVerify(merged);
+    if (ok) {
+      props.onVerifiedDetails?.(merged);
+    }
     return {
       ok: true,
       message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
@@ -282,6 +315,28 @@ export function GstKycTab(props: GstKycTabProps) {
           </div>
         </div>
       )}
+
+      {props.isGstRegistered && filingStatusRows.length > 0 && (
+        <div className="space-y-2">
+          {latestFiled && (
+            <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Latest GST return has been filed.</span>
+            </div>
+          )}
+          <GstFilingStatusTable rows={filingStatusRows} />
+        </div>
+      )}
+
+      <GstDeclarationDialog
+        open={declarationDialogOpen}
+        onOpenChange={setDeclarationDialogOpen}
+        currentFile={props.gstSelfDeclarationFile}
+        onFileChange={props.onGstSelfDeclarationFileChange}
+        onConfirm={confirmDeclarationUpload}
+        vendorId={props.vendorId}
+      />
+
 
       {props.isGstRegistered ? null : (
         <div className="space-y-4">
