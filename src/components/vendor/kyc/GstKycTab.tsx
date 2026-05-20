@@ -271,11 +271,8 @@ export function GstKycTab(props: GstKycTabProps) {
       return { ok: false, message: check.message, apiData: merged, apiResult: verify };
     }
 
-    const ok = handleFilingStatusAfterVerify(merged);
-    if (ok) {
-      props.onVerifiedDetails?.(merged);
-      void persistGstValidation(merged, check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`);
-    }
+    setVerifiedGstData(merged);
+    void runFilingStatusCheck(merged);
     return {
       ok: true,
       message: check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`,
