@@ -52,6 +52,31 @@ export function GstKycTab(props: GstKycTabProps) {
     useState<'idle' | 'passed' | 'failed' | 'skipped'>('idle');
   const [legalNameCheckMessage, setLegalNameCheckMessage] = useState<string>('');
   const [verifiedLegalName, setVerifiedLegalName] = useState<string>('');
+  const [filingStatusRows, setFilingStatusRows] = useState<any[]>([]);
+  const [latestFiled, setLatestFiled] = useState<boolean | null>(null);
+  const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
+  const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
+
+  const handleFilingStatusAfterVerify = (data: Record<string, any>) => {
+    const rows = normalizeFilingStatus(data?.filing_status);
+    setFilingStatusRows(rows);
+    const filed = isLatestPeriodFiled(rows);
+    setLatestFiled(filed);
+    if (!filed) {
+      setPendingVerifiedData(data);
+      setDeclarationDialogOpen(true);
+      return false;
+    }
+    return true;
+  };
+
+  const confirmDeclarationUpload = () => {
+    setDeclarationDialogOpen(false);
+    if (pendingVerifiedData) {
+      props.onVerifiedDetails?.(pendingVerifiedData);
+      setPendingVerifiedData(null);
+    }
+  };
 
   if (props.onStatusChange) {
     const status = !props.isGstRegistered
