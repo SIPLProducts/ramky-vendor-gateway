@@ -1,81 +1,47 @@
-# Why it still looks like the "old API"
+## Goal
 
-The endpoint is already switched correctly — `api_providers` row for `GST` points to:
+In the **View Details** dialog (`VendorReviewDialog`), update the existing **GST Compliance Report** tab so the returns table shows columns matching the vendor-side filing-status table:
 
-```
-POST https://kyc-api.surepass.app/api/v1/corporate/gstin-advanced
-{ "id_number": "{{id_number}}", "filing_status_get": true }
-```
-
-and the network tab confirms the frontend calls `kyc-api-execute` (which uses that row). So the **URL** is new, but the **response shown in the UI** is wrong because `response_data_mapping` for the `GST` row is corrupted.
-
-Today the column holds a mix of:
-- a few correct JSON path strings (`"filing_status": "data.filing_status.0"`, `"annual_turnover": "data.annual_turnover"`, …), **plus**
-- the entire sample response was accidentally merged in, so keys like `legal_name`, `business_name`, `gstin_status`, `date_of_registration`, `taxpayer_type`, `constitution_of_business`, `center_jurisdiction`, `state_jurisdiction`, `pan_number`, `nature_bus_activities`, `contact_details`, `data`, `success`, `status_code`, `message_code` are stored as **literal values** (strings or objects), not as JSON paths.
-
-What `kyc-api-execute` then does:
-- For each entry whose value is a string it calls `getPath(parsed, value)`. So `getPath(parsed, "SHARVI INFOTECH PRIVATE LIMITED")` returns `undefined` → `data.legal_name` is blank.
-- Object/array values are skipped with a warning.
-- Net effect: only `filing_status`, `promoters`, `annual_turnover`, `annual_turnover_fy`, `aadhaar_validation*`, `nature_bus_activities`, `principal_email/mobile/address` come through. `legal_name`, `business_name`, `gstin`, `gstin_status`, `date_of_registration`, `taxpayer_type`, `constitution_of_business`, jurisdictions, `pan_number` come through as `undefined`.
-
-That's why the screen still looks like the old verification (and why legal-name cross-check + the filing-status filed banner can mis-evaluate).
-
-# Fix
-
-Single SQL migration that **replaces** `api_providers.response_data_mapping` for `provider_name = 'GST'` with a clean path-only object — no source change needed, no UI change needed, no edge-function change needed.
-
-Clean mapping to write:
-
-```json
-{
-  "gstin":                    "data.gstin",
-  "pan_number":               "data.pan_number",
-  "legal_name":               "data.legal_name",
-  "business_name":            "data.business_name",
-  "trade_name":               "data.business_name",
-  "gstin_status":             "data.gstin_status",
-  "date_of_registration":     "data.date_of_registration",
-  "date_of_cancellation":     "data.date_of_cancellation",
-  "taxpayer_type":            "data.taxpayer_type",
-  "constitution_of_business": "data.constitution_of_business",
-  "center_jurisdiction":      "data.center_jurisdiction",
-  "state_jurisdiction":       "data.state_jurisdiction",
-  "nature_bus_activities":    "data.nature_bus_activities",
-  "field_visit_conducted":    "data.field_visit_conducted",
-  "annual_turnover":          "data.annual_turnover",
-  "annual_turnover_fy":       "data.annual_turnover_fy",
-  "percentage_in_cash":       "data.percentage_in_cash",
-  "percentage_in_cash_fy":    "data.percentage_in_cash_fy",
-  "aadhaar_validation":       "data.aadhaar_validation",
-  "aadhaar_validation_date":  "data.aadhaar_validation_date",
-  "einvoice_status":          "data.einvoice_status",
-  "promoters":                "data.promoters",
-  "principal_address":        "data.contact_details.principal.address",
-  "principal_email":          "data.contact_details.principal.email",
-  "principal_mobile":         "data.contact_details.principal.mobile",
-  "principal_nature_of_business": "data.contact_details.principal.nature_of_business",
-  "filing_status":            "data.filing_status.0"
-}
+```text
+Financial Year | Tax Period | Date of filing | Status
 ```
 
-Notes:
-- `data.filing_status.0` already resolves the outer `[[ … ]]` wrapper into the flat array the table component (`normalizeFilingStatus` / `GstFilingStatusTable`) expects.
-- Keeping `legal_name` + `business_name` populated re-enables the cross-name check banner and the "GSTIN is verified — <name>" success message.
-- No frontend code is touched; the existing `GstKycTab` flow (auto-advance to PAN on filed, declaration dialog on not-filed) keeps working.
+…and populate it from the real GST filing data captured during validation, with a graceful fallback when none is present.
 
-# Out of scope
+## Changes
 
-- The OCR (`GST_OCR`) provider — unchanged.
-- The legacy `supabase/functions/validate-gst/index.ts` — no longer in the call path, leave it alone.
-- UI / table / declaration dialog — no changes (table format already matches the reference from the previous turn).
+### `src/components/vendor/VendorReviewDialog.tsx`
 
-# Technical detail
+1. **Reuse normalizer** — import `normalizeFilingStatus` from `@/components/vendor/kyc/GstFilingStatusTable` to parse both nested-array and flat-array shapes that Surepass returns.
 
-One migration:
+2. **Extend `GstComplianceReport`** — replace `returnsFiled` with:
+   ```ts
+   filingRows: Array<{
+     financial_year: string;
+     tax_period: string;
+     date_of_filing: string; // DD/MM/YYYY
+     status: string;
+   }>
+   ```
 
-```sql
-UPDATE public.api_providers
-SET response_data_mapping = '<json above>'::jsonb,
-    updated_at = now()
-WHERE provider_name = 'GST';
-```
+3. **`buildGstComplianceReport`** — derive `filingRows`:
+   - Read `gstValidation.details.filing_status` (saved by the verify step) and run it through `normalizeFilingStatus`.
+   - Dedupe per `financial_year + tax_period`, preferring **GSTR3B** over **GSTR1** (same rule used on the vendor tab).
+   - Sort by `date_of_filing` desc, keep the **last 3** rows.
+   - Format `date_of_filing` as `DD/MM/YYYY`.
+   - If no real rows exist, fall back to the current 3-month synthetic placeholder mapped to the new column shape (so older vendors without stored filing data still render something).
+
+4. **Table markup** under "Recent Returns Filed":
+   - Headers: Financial Year, Tax Period, Date of filing, Status.
+   - Status cell: plain text — "Filed" neutral, anything else in `text-destructive` (matches vendor-side styling). Drop the Badge.
+
+5. **No other tab/section changes.** The tab trigger, score cards, GSTIN/registration block, and compliance document list stay as-is.
+
+### No DB / edge / route changes
+
+Filing data is already in `vendor_validations.details` (written by the GST verify step). No migration needed.
+
+## Out of scope
+
+- No changes to the vendor-side `GstFilingStatusTable` (already in correct format).
+- No new tab — the **GST Compliance Report** tab already exists in `VendorReviewDialog`; only its table is being updated.
