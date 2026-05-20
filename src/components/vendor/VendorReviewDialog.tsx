@@ -105,22 +105,10 @@ const buildGstComplianceReport = (vendor: any, validation: any | null): GstCompl
   const lastFiledReturn: string = details.lastFiledReturn || fmtMonthYear(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
   const realRows = normalizeFilingStatus(details.filing_status);
-  let filingRows = dedupeAndTrim(realRows);
-  if (filingRows.length === 0) {
-    filingRows = [0, 1, 2].map((i) => {
-      const period = new Date(now.getFullYear(), now.getMonth() - (i + 1), 1);
-      const filedOn = new Date(period.getFullYear(), period.getMonth(), 18 + i);
-      const fyStartYear = period.getMonth() >= 3 ? period.getFullYear() : period.getFullYear() - 1;
-      return {
-        financial_year: `${fyStartYear}-${fyStartYear + 1}`,
-        tax_period: FULL_MONTHS[period.getMonth()],
-        date_of_filing: fmtDmy(filedOn),
-        status: 'Filed',
-      };
-    });
-  }
+  const filingRows = dedupeAndTrim(realRows);
 
   return { complianceScore: score, status, riskLevel, registrationDate, filingStatus: filingStatusText, lastFiledReturn, filingRows };
+
 };
 
 interface VendorReviewDialogProps {

@@ -1,60 +1,40 @@
-## What I found
+## Goal
 
-The screen in your screenshot is using `src/components/vendor/steps/DocumentVerificationStep.tsx`, not the older `GstKycTab.tsx` flow. The older file has `GST_FILING`, but the active vendor registration flow only calls:
+Show the saved GST Filing Status table (last 3 months) inside every "View Details" / preview popup for a vendor, using the data already persisted during registration.
 
-```text
-GST_OCR -> GST
-```
+## Current state
 
-It never calls `GST_FILING`, so no filing table is rendered and `stage1Done` becomes true immediately after GST validation. That is why PAN unlocks before the filing status table appears.
+- During vendor registration, `DocumentVerificationStep.tsx` already saves `filing_status` into `vendor_validations.details` for the `gst` row (verified at lines 1027–1037).
+- `VendorReviewDialog.tsx` already reads `details.filing_status` and renders the table in its "GST Compliance Report" tab — but falls back to dummy rows when none are stored.
+- Other View Details surfaces do NOT show the filing table:
+  - `VendorSubmissionPreviewDialog.tsx` (used by Approvals → Preview, SAP Sync → Preview)
+  - `FinanceReview.tsx` (inline "Vendor Details" dialog opened from "View Details" button)
 
 ## Plan
 
-1. Add GST Filing Status state to the active vendor registration step
-   - Track filing rows, checking status, latest-month filed result, and declaration requirement in `DocumentVerificationStep.tsx`.
-   - Extend `VerifiedDocumentData.gst` to carry `filing_status` so it can be saved and used in View Details.
+1. **`VendorSubmissionPreviewDialog.tsx`**
+   - Alongside loading the vendor, also fetch the latest `vendor_validations` row where `validation_type = 'gst'` for that vendor.
+   - Normalize `details.filing_status` via existing `normalizeFilingStatus`.
+   - When rows exist, render a new "GST Return Filing Status (Last 3 Months)" section using the shared `GstFilingStatusTable` with `limit={3}`. Show only when vendor has a GSTIN; otherwise hide.
 
-2. Chain the API calls in the correct order
-   - After GST OCR and GSTIN Validation succeeds, automatically call:
+2. **`FinanceReview.tsx` — inline Vendor Details dialog**
+   - In the same data-fetch path used for the dialog (or on dialog open), fetch the `gst` `vendor_validations` row for `selectedVendor.id`.
+   - Add a new card/section under the "Statutory" card (or as a full-width row below the 2-col grid) titled "GST Return Filing Status (Last 3 Months)" rendering `GstFilingStatusTable` with `limit={3}` when rows exist.
 
-```text
-GST_FILING
-```
+3. **`VendorReviewDialog.tsx` — remove sample fallback**
+   - In `buildGstComplianceReport`, keep the real rows path but stop generating synthetic "Filed" placeholder rows when `filing_status` is empty. Instead show a small "No filing data captured for this vendor" empty state inside the GST Compliance Report tab. This guarantees View Details always reflects stored data, not mock data.
 
-   - Request payload will be:
-
-```text
-{ id_number: gstin, gstin: gstin }
-```
-
-   - If `GST_FILING` is not configured or returns no rows, fallback to `filing_status` from the GST validation response if present.
-
-3. Show the table inside the GST tab before PAN unlocks
-   - Render `GstFilingStatusTable` below GST verified details.
-   - Show only the latest 3 months.
-   - Keep headers as requested:
-
-```text
-Financial Year | Tax Period | Date of filing | Status
-```
-
-4. Correct the business gating
-   - GST stage will be considered complete only when:
-     - GST validation is verified, and
-     - GST filing check has completed, and
-     - latest month is filed, or declaration file is uploaded.
-   - This prevents auto-moving to PAN until the table/message/declaration decision is finished.
-
-5. Add filed/not-filed message
-   - If latest month is filed: show success message like “GST returns filed up to last month” and then unlock/move to PAN.
-   - If latest month is not filed: show warning “GST return not filed for last month”, show the GST Returns Declaration template download and upload field, then unlock/move to PAN only after upload.
-
-6. Save table data for View Details
-   - Include `filing_status` in the Step 1 output and save it into the existing `vendor_validations` GST record during registration save.
-   - The existing View Details popup already has the “GST Compliance Report” tab and table renderer; after saving real `filing_status`, it will show those latest 3 months instead of fallback/sample rows.
+4. **No schema changes**
+   - All required data is already in `vendor_validations.details.filing_status`. No migration needed.
+   - No edge-function changes needed.
 
 ## Files to change
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-- `src/pages/VendorRegistration.tsx`
-- possibly `src/hooks/useVendorRegistration.tsx` only if the final save path needs an additional validation insert/update for GST filing details.
+- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — fetch GST validation + render table section.
+- `src/pages/FinanceReview.tsx` — fetch GST validation for selected vendor + render table section in Details tab.
+- `src/components/vendor/VendorReviewDialog.tsx` — drop sample-row fallback, show empty state when no rows.
+
+## Out of scope
+
+- The registration GST flow itself (already implemented and visible in screenshot).
+- Any backend / SAP-sync changes.
