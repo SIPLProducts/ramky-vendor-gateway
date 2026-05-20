@@ -419,7 +419,24 @@ export default function FinanceReview() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {selectedVendor.gstin && gstFilingRows.length > 0 && (
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                          <Shield className="h-4 w-4 text-primary" />
+                        </div>
+                        GST Return Filing Status (Last 3 Months)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <GstFilingStatusTable rows={gstFilingRows} limit={3} />
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
+
 
               {/* Purchase / SCM Approval Trail */}
               <TabsContent value="approval-trail" className="space-y-4 mt-6">
