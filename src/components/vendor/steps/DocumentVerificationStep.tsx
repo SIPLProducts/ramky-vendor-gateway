@@ -1488,9 +1488,13 @@ export function DocumentVerificationStep({
   }, [gstDoc.status, gstDoc.ocrData?.legal_name, gstDoc.apiData?.legalName]);
 
   // ---------- Gating ----------
+  // GST stage requires: validation verified AND filing check completed AND
+  // (latest month filed OR a self-declaration was uploaded).
+  const gstFilingOk =
+    gstFilingChecked && (gstLatestFiled === true || !!gstDeclarationFile);
   const stage1Done =
     isGstRegistered === true
-      ? gstDoc.status === "verified"
+      ? gstDoc.status === "verified" && gstFilingOk
       : isGstRegistered === false
         ? !!gstDeclarationFile
         : false;
