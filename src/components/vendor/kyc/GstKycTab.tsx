@@ -123,7 +123,10 @@ export function GstKycTab(props: GstKycTabProps) {
         };
       },
     });
-    if (r.ok) props.onVerifiedDetails?.(r.data || {});
+    if (r.ok) {
+      const ok = handleFilingStatusAfterVerify(r.data || {});
+      if (ok) props.onVerifiedDetails?.(r.data || {});
+    }
   };
 
   // Run the admin-configured GST_OCR provider as the "OCR" step.
