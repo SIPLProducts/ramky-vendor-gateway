@@ -1,23 +1,22 @@
-## Fix tenant list alignment & scrolling
+## Add an outer scrollbar to the Create User dialog body (keep inner tenants scroll)
 
-**Problem:** In the Create User dialog, the "Select All" row uses `sticky top-0` inside the same scroll container as the tenant checkboxes. As the user scrolls, tenant items render *over* the sticky row (z-index / background bleed from `space-y-2` gaps), causing the overlap visible in the screenshot. The scroll area is also cramped (`max-h-40` ≈ 160px) for 159 tenants.
+The user wants the full dialog body (Full Name → Email → Password → Role → Tenants) to scroll as a single surface, while keeping the existing inner scroll inside the tenants list.
 
-**Fix (frontend only — `src/components/admin/CreateUserDialog.tsx`, lines ~223–261):**
+### Changes (only `src/components/admin/CreateUserDialog.tsx`)
 
-1. **Split into two containers** instead of one:
-   - Outer wrapper: `border rounded-md` (keeps the framed look).
-   - **Header row** (Select All) rendered *outside* the scroll area, with `px-3 py-2 border-b bg-muted/30` — no longer sticky, always visible, full-width, properly aligned.
-   - **Scrollable list** below it: `max-h-64 overflow-y-auto p-3 space-y-2` — taller (256px) for better usability, with its own padding so items don't touch edges.
+1. **Make `DialogContent` a bounded flex column**
+   - Update wrapper: `max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden`.
+   - Wrap `DialogHeader` in a fixed top region: `px-6 pt-6 pb-2`.
+   - Wrap `DialogFooter` in a fixed bottom region: `px-6 py-4 border-t`.
 
-2. **Header alignment polish:**
-   - Use `flex items-center gap-2` with the count pushed right via `ml-auto`.
-   - Add subtle background (`bg-muted/30`) so it reads as a header band.
-   - Remove `sticky top-0` (no longer needed — it's outside the scroller).
+2. **Add the outer scroll on the form body**
+   - Wrap the existing `<div className="space-y-4 py-2">…</div>` in a scrollable container:
+     `flex-1 overflow-y-auto px-6 py-4` with thin styled scrollbar using design tokens
+     (`[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-thumb]:rounded-full`).
 
-3. **List item alignment:**
-   - Keep `flex items-center gap-2` on each row.
-   - Add `pr-2` to the scroll container so the scrollbar doesn't overlap text.
+3. **Keep the inner tenants scroll as-is**
+   - The tenants list keeps its `max-h-64 overflow-y-auto p-3 pr-2 space-y-2` container and the Select All header above it. No changes to tenants behavior.
 
-4. **Loading / empty / error states** keep rendering inside the scroll container (centered, padded) — unchanged behavior, just inside the new structure.
-
-No logic, state, or backend changes. Pure layout restructure of the tenants section.
+### Out of scope
+- No logic, validation, fetch, Select All, or backend changes.
+- No changes to other dialogs or the shared `Dialog` primitive.
