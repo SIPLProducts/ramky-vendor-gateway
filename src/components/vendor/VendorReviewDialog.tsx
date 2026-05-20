@@ -37,6 +37,13 @@ import {
   Eye,
 } from 'lucide-react';
 
+interface GstFilingRow {
+  financial_year: string;
+  tax_period: string;
+  date_of_filing: string;
+  status: string;
+}
+
 interface GstComplianceReport {
   complianceScore: number;
   status: string;
@@ -44,15 +51,44 @@ interface GstComplianceReport {
   registrationDate: string;
   filingStatus: string;
   lastFiledReturn: string;
-  returnsFiled: Array<{ period: string; type: string; filedOn: string; status: string }>;
+  filingRows: GstFilingRow[];
 }
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const FULL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const fmtMonthYear = (d: Date) => `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 const fmtDmy = (d: Date) => {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   return `${dd}/${mm}/${d.getFullYear()}`;
+};
+const formatDateDMY = (value?: string): string => {
+  if (!value) return '-';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return value;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+};
+
+const dedupeAndTrim = (rows: FilingStatusRow[]): GstFilingRow[] => {
+  const priority: Record<string, number> = { GSTR3B: 0, GSTR1: 1 };
+  const byKey = new Map<string, FilingStatusRow>();
+  for (const r of rows) {
+    const key = `${r.financial_year || ''}|${r.tax_period || ''}`;
+    const existing = byKey.get(key);
+    if (!existing) { byKey.set(key, r); continue; }
+    const pNew = priority[(r.return_type || '').toUpperCase()] ?? 99;
+    const pOld = priority[(existing.return_type || '').toUpperCase()] ?? 99;
+    if (pNew < pOld) byKey.set(key, r);
+  }
+  return Array.from(byKey.values())
+    .sort((a, b) => (b.date_of_filing || '').localeCompare(a.date_of_filing || ''))
+    .slice(0, 3)
+    .map((r) => ({
+      financial_year: r.financial_year || '-',
+      tax_period: r.tax_period || '-',
+      date_of_filing: formatDateDMY(r.date_of_filing),
+      status: r.status || '-',
+    }));
 };
 
 const buildGstComplianceReport = (vendor: any, validation: any | null): GstComplianceReport => {
@@ -61,20 +97,30 @@ const buildGstComplianceReport = (vendor: any, validation: any | null): GstCompl
   const score: number = typeof details.complianceScore === 'number'
     ? details.complianceScore
     : (isPassed ? 87 : vendor?.gstin ? 70 : 40);
-  const status: string = details.gstStatus || (isPassed ? 'Active' : vendor?.gstin ? 'Active' : 'Inactive');
+  const status: string = details.gstStatus || details.gstin_status || (isPassed ? 'Active' : vendor?.gstin ? 'Active' : 'Inactive');
   const riskLevel: string = details.riskLevel || (score >= 80 ? 'Low' : score >= 50 ? 'Medium' : 'High');
-  const filingStatus: string = details.filingStatus || (score >= 70 ? 'Regular' : score >= 50 ? 'Delayed' : 'Defaulter');
-  const registrationDate: string = details.registrationDate || '2019-07-01';
+  const filingStatusText: string = details.filingStatus || (score >= 70 ? 'Regular' : score >= 50 ? 'Delayed' : 'Defaulter');
+  const registrationDate: string = details.registrationDate || details.date_of_registration || '2019-07-01';
   const now = new Date();
   const lastFiledReturn: string = details.lastFiledReturn || fmtMonthYear(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const returnsFiled: GstComplianceReport['returnsFiled'] = Array.isArray(details.returnsFiled) && details.returnsFiled.length
-    ? details.returnsFiled
-    : [0, 1, 2].map((i) => {
-        const period = new Date(now.getFullYear(), now.getMonth() - (i + 1), 1);
-        const filedOn = new Date(period.getFullYear(), period.getMonth(), 18 + i);
-        return { period: fmtMonthYear(period), type: 'GSTR-3B', filedOn: fmtDmy(filedOn), status: 'Filed' };
-      });
-  return { complianceScore: score, status, riskLevel, registrationDate, filingStatus, lastFiledReturn, returnsFiled };
+
+  const realRows = normalizeFilingStatus(details.filing_status);
+  let filingRows = dedupeAndTrim(realRows);
+  if (filingRows.length === 0) {
+    filingRows = [0, 1, 2].map((i) => {
+      const period = new Date(now.getFullYear(), now.getMonth() - (i + 1), 1);
+      const filedOn = new Date(period.getFullYear(), period.getMonth(), 18 + i);
+      const fyStartYear = period.getMonth() >= 3 ? period.getFullYear() : period.getFullYear() - 1;
+      return {
+        financial_year: `${fyStartYear}-${fyStartYear + 1}`,
+        tax_period: FULL_MONTHS[period.getMonth()],
+        date_of_filing: fmtDmy(filedOn),
+        status: 'Filed',
+      };
+    });
+  }
+
+  return { complianceScore: score, status, riskLevel, registrationDate, filingStatus: filingStatusText, lastFiledReturn, filingRows };
 };
 
 interface VendorReviewDialogProps {
