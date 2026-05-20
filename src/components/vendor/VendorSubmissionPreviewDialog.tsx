@@ -217,6 +217,16 @@ export function VendorSubmissionPreviewDialog({
                 </div>
               </div>
 
+              {/* GST Filing Status */}
+              {vendor.gstin && filingRows.length > 0 && (
+                <div className="form-section">
+                  <SectionHeader icon={Shield} title="GST Return Filing Status (Last 3 Months)" />
+                  <GstFilingStatusTable rows={filingRows} limit={3} />
+                </div>
+              )}
+
+
+
               {/* Bank */}
               <div className="form-section">
                 <SectionHeader icon={Landmark} title="Bank Details" />
