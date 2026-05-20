@@ -19,7 +19,14 @@ import {
   Landmark,
   TrendingUp,
   Eye,
+  Shield,
 } from 'lucide-react';
+import {
+  GstFilingStatusTable,
+  normalizeFilingStatus,
+  type FilingStatusRow,
+} from '@/components/vendor/kyc/GstFilingStatusTable';
+
 
 interface Props {
   vendorId: string | null;
