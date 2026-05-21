@@ -16,7 +16,7 @@ type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
 
 // Fetch all vendors (for admin/finance/purchase) with offline support
 export function useVendors(statuses?: VendorStatus[]) {
-  const { tenantIds, activeTenantId } = useTenantFilter();
+  const { tenantIds, activeTenantId, vendorIds } = useTenantFilter();
   const cacheKey = statuses ? `vendors_${statuses.join('_')}` : 'vendors_all';
   const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<VendorRow[]>({
     key: cacheKey,
@@ -24,7 +24,7 @@ export function useVendors(statuses?: VendorStatus[]) {
   });
 
   const query = useQuery({
-    queryKey: ['vendors', statuses, activeTenantId, tenantIds],
+    queryKey: ['vendors', statuses, activeTenantId, tenantIds, vendorIds],
     queryFn: async () => {
       let q = supabase
         .from('vendors')
@@ -35,14 +35,17 @@ export function useVendors(statuses?: VendorStatus[]) {
         q = q.in('status', statuses);
       }
 
-      if (activeTenantId) {
+      if (vendorIds !== null) {
+        // SCM Manager scoping: restrict to vendors invited by mapped buyers.
+        if (vendorIds.length === 0) return [] as VendorRow[];
+        q = q.in('id', vendorIds);
+      } else if (activeTenantId) {
         q = q.eq('tenant_id', activeTenantId);
       } else if (tenantIds !== null) {
-        // Restricted user: filter to their tenants. Empty list -> no results.
         if (tenantIds.length === 0) return [] as VendorRow[];
         q = q.in('tenant_id', tenantIds);
       }
-      // tenantIds === null && !activeTenantId -> super admin viewing all tenants
+      // Otherwise -> super admin / cross-tenant reviewer: see everything.
 
       const { data, error } = await q;
       if (error) throw error;
