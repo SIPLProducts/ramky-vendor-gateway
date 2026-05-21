@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { HelpCircle, Phone, Mail, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,8 +19,18 @@ interface EnterpriseHeaderProps {
 }
 
 export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
-  const { myTenants, activeTenantId, setActiveTenantId, isSuperAdmin } = useTenantContext();
-  const showSwitcher = myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0);
+  const {
+    myTenants, activeTenantId, setActiveTenantId,
+    isSuperAdmin, isCrossTenantReviewer, isScmManager,
+  } = useTenantContext();
+  const hidePicker = isCrossTenantReviewer || isScmManager;
+  const showSwitcher = !hidePicker && (myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0));
+
+  // Clear any pinned tenant for roles that should always see all data.
+  useEffect(() => {
+    if (hidePicker && activeTenantId !== null) setActiveTenantId(null);
+  }, [hidePicker, activeTenantId, setActiveTenantId]);
+
 
   return (
     <header className="h-12 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-enterprise-sm">
