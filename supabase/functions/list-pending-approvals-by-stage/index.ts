@@ -90,7 +90,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    const vendorIds = [...new Set(progress.map((p: any) => p.vendor_id))];
+    let filteredProgress = progress;
+
+    // SCM Manager: restrict to vendors invited by a buyer mapped to this user
+    // via buyer_scm_mappings ("SCM - Buyer Relation"). This mirrors the RLS
+    // rule scm_manager_can_see_vendor so the list never contains vendors the
+    // user cannot actually open.
+    if (stage === 'SCM_MANAGER') {
+      const { data: mappings, error: mErr } = await admin
+        .from('buyer_scm_mappings')
+        .select('buyer_user_id')
+        .eq('scm_manager_user_id', auth.userId);
+      if (mErr) throw mErr;
+      const buyerIds = Array.from(
+        new Set((mappings ?? []).map((m: any) => m.buyer_user_id).filter(Boolean)),
+      );
+      if (buyerIds.length === 0) {
+        return new Response(JSON.stringify({ items: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const progressVendorIds = Array.from(new Set(progress.map((p: any) => p.vendor_id)));
+      const { data: invites, error: iErr } = await admin
+        .from('vendor_invitations')
+        .select('vendor_id')
+        .in('created_by', buyerIds)
+        .in('vendor_id', progressVendorIds);
+      if (iErr) throw iErr;
+      const allowed = new Set(
+        (invites ?? []).map((r: any) => r.vendor_id).filter(Boolean),
+      );
+      filteredProgress = progress.filter((p: any) => allowed.has(p.vendor_id));
+      if (filteredProgress.length === 0) {
+        return new Response(JSON.stringify({ items: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const vendorIds = [...new Set(filteredProgress.map((p: any) => p.vendor_id))];
+
 
     // 3. Full progress chain (service role bypasses RLS)
     const { data: allProgress } = await admin

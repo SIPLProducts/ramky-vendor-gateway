@@ -1,54 +1,43 @@
-# Cross-tenant visibility for approver roles
+## Root cause
 
-## Problem
+Two things are misaligned:
 
-Vendors / buyers spanning 30+ tenants (companies) can't be reviewed end-to-end because RLS on `vendors` and friends restricts the `approver` placeholder role to tenants the user is mapped into via `user_tenants`. The frontend (`useVendors`, `useTenantContext`) also forces a tenant filter on every query.
+1. **Approval pending list** (`list-pending-approvals-by-stage` edge function) lists any vendor where the user appears in the approval matrix at that stage. It does **not** consult `buyer_scm_mappings`. So an SCM Manager configured in the matrix for tenant T sees vendors invited by any buyer in T, including buyers not mapped to them.
+2. **RLS on `vendors` / validations / documents / progress / audit_logs / ocr_extractions`** for SCM Manager is already correct and strict (`scm_manager_can_see_vendor` → buyer-mapped only). So when the user clicks "View" on an unmapped vendor, the dialog loads nothing.
 
-Approval listing (the edge function `list-pending-approvals-by-stage`) already runs with service role and is unaffected — but once the user clicks into a vendor, opens "All Vendors", "SAP Sync", dashboards, etc., they hit RLS + frontend tenant filters and rows disappear.
+Concrete example from the DB:
+- IAIR Sources is in tenant `43eaa06a…`, invited by buyer `c4024715…`.
+- `buyer_scm_mappings` maps that buyer to SCM Manager `68b1a63d…`, not to Soumendu (`8538e25e…`).
+- Soumendu only appears in the approval matrix for that tenant, so he wrongly sees IAIR in the pending list. RLS then (correctly) hides the data.
 
-## Target rules
+## Fix (scope: SCM Manager only)
 
-| Custom role | Visibility |
-|---|---|
-| SCM Head, Finance 1, Finance 2, Finance Approval, CEO Office, SAP Team | **All vendors, all tenants** |
-| SCM Manager | **Only vendors invited by a buyer mapped to this SCM Manager** in `buyer_scm_mappings` |
-| Buyer (existing) | Unchanged — tenant restricted as today |
-| Vendor / Customer Admin / Sharvi Admin / built-in finance/purchase | Unchanged |
+Keep RLS as-is. Tighten the pending-list edge function so SCM Manager pending = matrix membership AND buyer-mapped.
 
-## Backend (single migration)
+### 1. Edge function — `supabase/functions/list-pending-approvals-by-stage/index.ts`
 
-1. New SECURITY DEFINER helpers in `public`:
-   - `has_custom_role(_user_id uuid, _name text) returns boolean` — checks `user_custom_roles → custom_roles.name` (active only).
-   - `is_cross_tenant_reviewer(_user_id uuid) returns boolean` — true if user has any of the 6 names above.
-   - `scm_manager_can_see_vendor(_user_id uuid, _vendor_id uuid) returns boolean` — true if there exists a row in `buyer_scm_mappings` where `scm_manager_user_id = _user_id` and `buyer_user_id` = `vendor_invitations.created_by` for that vendor (latest invite).
-2. Add SELECT policies (additive, do NOT remove existing ones — vendors keep seeing their own row, finance/purchase/customer_admin keep their tenant scope):
-   - `vendors` — `Cross-tenant reviewers view all vendors` USING `is_cross_tenant_reviewer(auth.uid())`.
-   - `vendors` — `SCM Manager views mapped buyer vendors` USING `has_custom_role(auth.uid(),'SCM Manager') AND scm_manager_can_see_vendor(auth.uid(), id)`.
-   - Same two policies replicated for: `vendor_validations`, `vendor_documents`, `vendor_approval_progress`, `audit_logs`, `ocr_extractions` (joining on `vendor_id`).
-3. No table or schema changes; no removal of existing policies; SAP/master/config tables untouched.
+After building `stageLevelIds` and fetching `progress`, when `stage === 'SCM_MANAGER'`:
+- Load `buyer_scm_mappings` for `scm_manager_user_id = auth.userId` → set of `buyer_user_id`.
+- Load `vendor_invitations` for those `created_by` → set of allowed `vendor_id`.
+- Filter `progress` to those vendor ids before building `items`.
+- If the user has no mappings, return `{ items: [] }`.
 
-## Frontend
+No change for other stages (SCM_HEAD, FINANCE_1/2, CEO_OFFICE) — they keep current behavior.
 
-1. `src/hooks/useTenantContext.tsx` — extend `isSuperAdmin` concept: add `isCrossTenantReviewer` (loaded once from `user_custom_roles` join `custom_roles.name`). When true, tenant picker becomes optional and `useTenantFilter()` returns `{ tenantIds: null }` (no filter), exactly like sharvi_admin today. When the user picks a specific tenant from the dropdown, the filter still applies (so they can narrow voluntarily).
-2. `src/hooks/useVendors.tsx` — no logic change needed; it already respects `tenantIds === null` as "no filter". The change in `useTenantFilter` propagates automatically to dashboards, lists, SAP Sync, etc.
-3. SCM Manager scoping in the UI: extend `useTenantFilter` so that when the user only has the `SCM Manager` custom role, instead of returning tenant ids it returns a new `vendorIds` array sourced from `buyer_scm_mappings → vendor_invitations.vendor_id`. Apply this in:
-   - `useVendors` (`.in('id', vendorIds)` when present)
-   - `useVendors` status counts (line ~659)
-   - `VendorList.tsx`, `SAPSync.tsx` lists — they consume the same hook, so no per-page edit needed beyond the hook change.
-   RLS already blocks anything outside the allowed set, so this is purely a UX/perf filter.
-4. Buyer-company filter (`getBuyerCompanyName` etc.) keeps working — those reviewers now see every tenant in the dropdown via the existing `tenants` table SELECT policy (`is_active = true` already allows all authenticated users).
+### 2. Frontend — `src/hooks/useTenantContext.tsx`
 
-## Out of scope
+No code change to RLS scoping, but **remove the dependence of `scmManagerVendorIds` on `isCrossTenantReviewer && !isSuperAdmin` masking**. Result is already correct (`isScmManager && !cross && !super`); leave hook intact. If after the edge-function fix the All-Vendors list for an SCM Manager still feels stale, no extra change needed — `useVendors` already applies `vendorIds`.
 
-- No change to how vendors / buyers / customer_admin see data.
-- No change to approval routing or the edge function listing pending approvals.
-- No change to SAP payload, DMS sync, or master data.
-- No change to the buyer-company assignment requirement during vendor registration.
+### Verification
 
-## Verification
+- As Soumendu (SCM Manager, mapped only to buyer `43f55e6d…` in tenant `fed695a0…`): pending list at `/approvals/scm-manager` shows only vendors invited by that buyer. IAIR Sources disappears (correct — he is not the mapped SCM Manager for that vendor's buyer).
+- As SCM Manager `68b1a63d…` (mapped to buyer `c4024715…` who invited IAIR): IAIR Sources appears in pending list AND the View dialog loads all submitted steps, validations, and documents.
+- SCM Head / Finance 1 / Finance 2 / CEO Office / SAP Team: unchanged — still see all vendors across all tenants (already handled by `is_cross_tenant_reviewer` policies + `useTenantFilter` returning `tenantIds: null`).
+- Buyer who sent the invite: unchanged — already sees their tenant's vendors via existing tenant-scoped policies.
+- Approval flow itself: unchanged. Same `process-approval-action` path, same matrix, same notifications.
 
-- As an SCM Head mapped to tenant A only: open All Vendors → see vendors from tenants A, B, C…; open a vendor from tenant C → detail loads; SAP Sync list shows cross-tenant rows.
-- As Finance 1 / Finance 2 / CEO Office / SAP Team: same as above.
-- As an SCM Manager mapped to Buyer X (who invited vendors V1, V2): All Vendors shows only V1, V2 even if those vendors live in different tenants; vendors invited by other buyers are hidden.
-- As an existing Buyer / Customer Admin / Finance (built-in) / Purchase: behaviour unchanged, still tenant restricted.
-- As a Vendor: still sees only their own record.
+### Out of scope
+
+- No RLS changes.
+- No changes to other stages, SAP sync, master data, buyer/customer-admin/vendor behavior, or the buyer-company assignment requirement.
+- No UI changes — the existing pending screen and review dialog work once the list is correctly scoped.
