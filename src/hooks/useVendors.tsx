@@ -198,12 +198,15 @@ export function useReRouteApproval() {
 // Count of vendors stuck in purchase_review with NO approval progress rows.
 // Used by the admin dashboard widget to surface missing matrix configuration.
 export function useStuckApprovalVendors() {
-  const { tenantIds, activeTenantId } = useTenantFilter();
+  const { tenantIds, activeTenantId, vendorIds } = useTenantFilter();
   return useQuery({
-    queryKey: ['stuck-approval-vendors', activeTenantId, tenantIds],
+    queryKey: ['stuck-approval-vendors', activeTenantId, tenantIds, vendorIds],
     queryFn: async () => {
       let q = supabase.from('vendors').select('id, tenant_id').eq('status', 'purchase_review');
-      if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
+      if (vendorIds !== null) {
+        if (vendorIds.length === 0) return 0;
+        q = q.in('id', vendorIds);
+      } else if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
       else if (tenantIds !== null) {
         if (tenantIds.length === 0) return 0;
         q = q.in('tenant_id', tenantIds);
