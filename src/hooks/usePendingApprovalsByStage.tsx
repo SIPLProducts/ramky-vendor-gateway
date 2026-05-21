@@ -16,6 +16,12 @@ export interface StageApprovalItem {
   approvalMode: string;
   stage: ApprovalStage;
   blockedByPrevious: boolean;
+  vendorCompany?: string | null;
+  invitationCompany?: string | null;
+  companyMismatch?: boolean;
+  buyerName?: string | null;
+  buyerEmail?: string | null;
+  mappedScmManagers?: Array<{ name: string | null; email: string | null }>;
 }
 
 /**

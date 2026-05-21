@@ -144,12 +144,52 @@ Deno.serve(async (req) => {
       allByVendor.set(p.vendor_id, arr);
     });
 
-    // 4. Vendor info
+    // 4. Vendor info + invitation/buyer/tenant context
     const { data: vendors } = await admin
       .from('vendors')
-      .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type')
+      .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, tenant_id')
       .in('id', vendorIds);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
+
+    const { data: invites } = await admin
+      .from('vendor_invitations')
+      .select('vendor_id, created_by, tenant_id, created_at')
+      .in('vendor_id', vendorIds)
+      .order('created_at', { ascending: false });
+    const inviteByVendor = new Map<string, any>();
+    (invites ?? []).forEach((inv: any) => {
+      if (!inviteByVendor.has(inv.vendor_id)) inviteByVendor.set(inv.vendor_id, inv);
+    });
+
+    const tenantIds = Array.from(new Set([
+      ...(vendors ?? []).map((v: any) => v.tenant_id).filter(Boolean),
+      ...(invites ?? []).map((i: any) => i.tenant_id).filter(Boolean),
+    ]));
+    const { data: tenantsRows } = tenantIds.length
+      ? await admin.from('tenants').select('id, name, code').in('id', tenantIds)
+      : { data: [] as any[] } as any;
+    const tMap = new Map((tenantsRows ?? []).map((t: any) => [t.id, t]));
+
+    const buyerIds = Array.from(new Set((invites ?? []).map((i: any) => i.created_by).filter(Boolean)));
+    const { data: buyerProfiles } = buyerIds.length
+      ? await admin.from('profiles').select('id, full_name, email').in('id', buyerIds)
+      : { data: [] as any[] } as any;
+    const buyerMap = new Map((buyerProfiles ?? []).map((p: any) => [p.id, p]));
+
+    const { data: scmMaps } = buyerIds.length
+      ? await admin.from('buyer_scm_mappings').select('buyer_user_id, scm_manager_user_id').in('buyer_user_id', buyerIds)
+      : { data: [] as any[] } as any;
+    const scmByBuyer = new Map<string, string[]>();
+    (scmMaps ?? []).forEach((m: any) => {
+      const arr = scmByBuyer.get(m.buyer_user_id) ?? [];
+      arr.push(m.scm_manager_user_id);
+      scmByBuyer.set(m.buyer_user_id, arr);
+    });
+    const scmIds = Array.from(new Set((scmMaps ?? []).map((m: any) => m.scm_manager_user_id).filter(Boolean)));
+    const { data: scmProfiles } = scmIds.length
+      ? await admin.from('profiles').select('id, full_name, email').in('id', scmIds)
+      : { data: [] as any[] } as any;
+    const scmMap = new Map((scmProfiles ?? []).map((p: any) => [p.id, p]));
 
     const items = filteredProgress.map((p: any) => {
       const v: any = vMap.get(p.vendor_id);
@@ -159,6 +199,12 @@ Deno.serve(async (req) => {
         (r) => r.level_number < p.level_number && r.status !== 'approved',
       );
       const isInternational = v?.vendor_type === 'international';
+      const inv = inviteByVendor.get(p.vendor_id);
+      const buyer = inv?.created_by ? buyerMap.get(inv.created_by) : null;
+      const vendorTenant = v?.tenant_id ? tMap.get(v.tenant_id) : null;
+      const inviteTenant = inv?.tenant_id ? tMap.get(inv.tenant_id) : null;
+      const scms = (inv?.created_by ? scmByBuyer.get(inv.created_by) : []) ?? [];
+      const mappedScm = scms.map((id: string) => scmMap.get(id)).filter(Boolean);
       return {
         progressId: p.id,
         vendorId: p.vendor_id,
@@ -171,6 +217,12 @@ Deno.serve(async (req) => {
         approvalMode: lvl?.approval_mode ?? 'ANY',
         stage,
         blockedByPrevious,
+        vendorCompany: vendorTenant ? `${vendorTenant.name}${vendorTenant.code ? ` (${vendorTenant.code})` : ''}` : null,
+        invitationCompany: inviteTenant ? `${inviteTenant.name}${inviteTenant.code ? ` (${inviteTenant.code})` : ''}` : null,
+        companyMismatch: !!(vendorTenant && inviteTenant && v?.tenant_id !== inv?.tenant_id),
+        buyerName: buyer?.full_name ?? null,
+        buyerEmail: buyer?.email ?? null,
+        mappedScmManagers: mappedScm.map((s: any) => ({ name: s.full_name, email: s.email })),
       };
     });
 
