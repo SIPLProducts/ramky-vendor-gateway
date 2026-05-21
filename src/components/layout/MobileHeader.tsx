@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, Bell, LogOut, Settings, User, X, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -44,8 +44,16 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const { isSubscribed, subscribe, permission } = usePushNotifications();
   const [notificationLoading, setNotificationLoading] = useState(false);
-  const { myTenants, activeTenantId, setActiveTenantId, isSuperAdmin } = useTenantContext();
-  const showSwitcher = myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0);
+  const {
+    myTenants, activeTenantId, setActiveTenantId,
+    isSuperAdmin, isCrossTenantReviewer, isScmManager,
+  } = useTenantContext();
+  const hidePicker = isCrossTenantReviewer || isScmManager;
+  const showSwitcher = !hidePicker && (myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0));
+
+  useEffect(() => {
+    if (hidePicker && activeTenantId !== null) setActiveTenantId(null);
+  }, [hidePicker, activeTenantId, setActiveTenantId]);
 
   const handleNotificationClick = async () => {
     if (!isSubscribed && permission !== 'denied') {
