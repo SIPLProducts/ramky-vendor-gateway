@@ -240,12 +240,13 @@ export default function UserManagement() {
     }
   };
 
-  const handleAssignTenant = async (tenantId: string) => {
-    if (!tenantDialog) return;
+  const handleAssignTenant = async (tenantIds: string[]) => {
+    if (!tenantDialog || tenantIds.length === 0) return;
     try {
-      const { error } = await supabase.from('user_tenants').insert({ user_id: tenantDialog.id, tenant_id: tenantId });
+      const rows = tenantIds.map((tid) => ({ user_id: tenantDialog.id, tenant_id: tid }));
+      const { error } = await supabase.from('user_tenants').insert(rows);
       if (error) throw error;
-      toast({ title: 'Tenant assigned' });
+      toast({ title: `Assigned ${tenantIds.length} tenant${tenantIds.length === 1 ? '' : 's'}` });
       await loadData();
     } catch (err: any) {
       toast({ title: 'Assignment failed', description: err.message, variant: 'destructive' });
