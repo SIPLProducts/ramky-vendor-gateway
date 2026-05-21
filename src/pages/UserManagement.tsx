@@ -614,16 +614,6 @@ export default function UserManagement() {
           onConfirm={handleChangeRole}
         />
       )}
-      {tenantDialog && (
-        <AssignTenantDialog
-          open={!!tenantDialog}
-          onOpenChange={(o) => !o && setTenantDialog(null)}
-          tenants={tenants}
-          currentTenantIds={tenantDialog.tenants.map((t) => t.id)}
-          userName={tenantDialog.full_name ?? tenantDialog.email}
-          onConfirm={handleAssignTenant}
-        />
-      )}
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
