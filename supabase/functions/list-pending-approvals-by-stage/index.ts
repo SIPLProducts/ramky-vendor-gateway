@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       .in('id', vendorIds);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
-    const items = progress.map((p: any) => {
+    const items = filteredProgress.map((p: any) => {
       const v: any = vMap.get(p.vendor_id);
       const lvl = levelMeta.get(p.level_id);
       const chain = allByVendor.get(p.vendor_id) ?? [];
