@@ -10,6 +10,7 @@ export interface StageApprovalItem {
   vendorName: string;
   submittedAt: string | null;
   isMsme: boolean;
+  isInternational?: boolean;
   levelNumber: number;
   levelName: string;
   approvalMode: string;
