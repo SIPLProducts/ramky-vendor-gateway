@@ -14,7 +14,7 @@ import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, S
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BuyerScmMapping } from '@/components/admin/BuyerScmMapping';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
-import { AssignTenantDialog } from '@/components/admin/AssignTenantDialog';
+
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
