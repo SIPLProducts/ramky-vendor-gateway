@@ -450,10 +450,13 @@ export default function UserManagement() {
                               ) : (
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 gap-1">
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center gap-1 rounded-full border border-input bg-background px-2.5 py-0.5 text-xs font-semibold transition-colors hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
                                       <Building2 className="h-3 w-3" />
                                       {u.tenants.length} tenant{u.tenants.length === 1 ? '' : 's'}
-                                    </Badge>
+                                    </button>
                                   </PopoverTrigger>
                                   <PopoverContent align="start" className="w-72 p-0">
                                     <div className="px-3 py-2 border-b text-xs text-muted-foreground">
