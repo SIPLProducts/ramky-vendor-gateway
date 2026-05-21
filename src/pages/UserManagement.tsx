@@ -448,12 +448,37 @@ export default function UserManagement() {
                               {u.tenants.length === 0 ? (
                                 <span className="text-muted-foreground text-xs">None</span>
                               ) : (
-                                u.tenants.map((t) => (
-                                  <Badge key={t.id} variant="outline" className="cursor-pointer hover:bg-destructive/10"
-                                    onClick={() => handleRemoveTenant(u.id, t.id)} title="Click to remove">
-                                    {t.name} ×
-                                  </Badge>
-                                ))
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 gap-1">
+                                      <Building2 className="h-3 w-3" />
+                                      {u.tenants.length} tenant{u.tenants.length === 1 ? '' : 's'}
+                                    </Badge>
+                                  </PopoverTrigger>
+                                  <PopoverContent align="start" className="w-72 p-0">
+                                    <div className="px-3 py-2 border-b text-xs text-muted-foreground">
+                                      Assigned tenants ({u.tenants.length})
+                                    </div>
+                                    <div className="max-h-80 overflow-y-auto p-1">
+                                      {u.tenants.map((t) => (
+                                        <div
+                                          key={t.id}
+                                          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-sm hover:bg-muted text-sm"
+                                        >
+                                          <span className="truncate">{t.name}</span>
+                                          <button
+                                            type="button"
+                                            className="text-muted-foreground hover:text-destructive shrink-0"
+                                            title="Remove tenant"
+                                            onClick={() => handleRemoveTenant(u.id, t.id)}
+                                          >
+                                            <X className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               )}
                             </div>
                           </TableCell>
