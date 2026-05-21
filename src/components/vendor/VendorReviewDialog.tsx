@@ -179,6 +179,10 @@ export function VendorReviewDialog({
   const [loading, setLoading] = useState(false);
   const [gstValidation, setGstValidation] = useState<any | null>(null);
   const [complianceDocs, setComplianceDocs] = useState<any[]>([]);
+  const [liveFilingRows, setLiveFilingRows] = useState<FilingStatusRow[] | null>(null);
+  const [filingFetching, setFilingFetching] = useState(false);
+  const [filingFetched, setFilingFetched] = useState(false);
+  const { callProvider } = useConfiguredKycApi();
 
   useEffect(() => {
     let cancelled = false;
@@ -186,6 +190,9 @@ export function VendorReviewDialog({
       setVendor(null);
       setGstValidation(null);
       setComplianceDocs([]);
+      setLiveFilingRows(null);
+      setFilingFetched(false);
+      setFilingFetching(false);
       return;
     }
     setLoading(true);
@@ -222,8 +229,53 @@ export function VendorReviewDialog({
     };
   }, [vendorId, open]);
 
+  // If nothing was persisted, fetch the filing status live from the configured
+  // GST_FILING provider so the Compliance Report tab isn't blank.
+  useEffect(() => {
+    if (!open || !vendor?.gstin) return;
+    const persisted = normalizeFilingStatus(gstValidation?.details?.filing_status);
+    if (persisted.length > 0) {
+      setFilingFetched(true);
+      return;
+    }
+    if (filingFetching || filingFetched) return;
+    let cancelled = false;
+    setFilingFetching(true);
+    (async () => {
+      try {
+        const gstin = String(vendor.gstin).toUpperCase().trim();
+        const r = await callProvider({
+          providerName: 'GST_FILING',
+          input: { gstin, id_number: gstin },
+        });
+        const rows = (r.found && r.ok && r.data)
+          ? normalizeFilingStatus(r.data.filing_status)
+          : [];
+        if (cancelled) return;
+        setLiveFilingRows(rows);
+        setFilingFetched(true);
+        if (rows.length > 0 && vendor.id) {
+          try {
+            await supabase.from('vendor_validations').insert({
+              vendor_id: vendor.id,
+              validation_type: 'gst',
+              status: 'passed',
+              message: 'GST filing status fetched on review',
+              details: { filing_status: rows },
+            });
+          } catch (e) {
+            console.warn('[VendorReviewDialog] Failed to persist live filing status', e);
+          }
+        }
+      } finally {
+        if (!cancelled) setFilingFetching(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, vendor?.id, vendor?.gstin, gstValidation, filingFetched, filingFetching, callProvider]);
+
   const validations = getValidationsFromVendor(vendor);
-  const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation) : null;
+  const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation, liveFilingRows) : null;
 
   const openDocument = async (filePath: string) => {
     const { data } = await supabase.storage.from('vendor-documents').createSignedUrl(filePath, 3600);
