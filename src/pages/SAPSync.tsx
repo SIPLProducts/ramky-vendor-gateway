@@ -417,19 +417,21 @@ export default function SAPSync() {
                                 <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setSelectedVendor(v); setShowDetails(true); }}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant={isSynced ? 'outline' : 'default'}
-                                  className={isSynced ? 'rounded-lg' : 'rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600'}
-                                  onClick={() => handleDmsSync([v.id])}
-                                  disabled={dmsSync.isPending}
-                                >
-                                  {dmsSync.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <><FolderUp className="h-4 w-4 mr-1" />{isSynced ? 'Resync to DMS' : 'Sync to DMS'}</>
-                                  )}
-                                </Button>
+                                {!isSynced && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+                                    onClick={() => handleDmsSync([v.id])}
+                                    disabled={dmsSync.isPending}
+                                  >
+                                    {dmsSync.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <><FolderUp className="h-4 w-4 mr-1" />Sync to DMS</>
+                                    )}
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
