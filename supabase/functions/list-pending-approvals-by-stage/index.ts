@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
     // 4. Vendor info
     const { data: vendors } = await admin
       .from('vendors')
-      .select('id, legal_name, trade_name, submitted_at, is_msme_registered')
+      .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type')
       .in('id', vendorIds);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
@@ -119,12 +119,14 @@ Deno.serve(async (req) => {
       const blockedByPrevious = chain.some(
         (r) => r.level_number < p.level_number && r.status !== 'approved',
       );
+      const isInternational = v?.vendor_type === 'international';
       return {
         progressId: p.id,
         vendorId: p.vendor_id,
         vendorName: v?.legal_name ?? v?.trade_name ?? p.vendor_id.slice(0, 8),
         submittedAt: v?.submitted_at ?? null,
-        isMsme: !!v?.is_msme_registered,
+        isMsme: isInternational ? false : !!v?.is_msme_registered,
+        isInternational,
         levelNumber: p.level_number,
         levelName: lvl?.level_name ?? '—',
         approvalMode: lvl?.approval_mode ?? 'ANY',
