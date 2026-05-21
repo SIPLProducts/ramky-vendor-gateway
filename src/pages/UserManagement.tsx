@@ -14,7 +14,7 @@ import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, S
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BuyerScmMapping } from '@/components/admin/BuyerScmMapping';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
-import { AssignTenantDialog } from '@/components/admin/AssignTenantDialog';
+
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
@@ -56,7 +56,6 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [scopeTenantId, setScopeTenantId] = useState<string>(ALL_TENANTS);
   const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
-  const [tenantDialog, setTenantDialog] = useState<UserRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingCustomRole, setEditingCustomRole] = useState<CustomRoleData | null>(null);
   const [customRoleDialogOpen, setCustomRoleDialogOpen] = useState(false);
@@ -240,19 +239,6 @@ export default function UserManagement() {
     }
   };
 
-  const handleAssignTenant = async (tenantIds: string[]) => {
-    if (!tenantDialog || tenantIds.length === 0) return;
-    try {
-      const rows = tenantIds.map((tid) => ({ user_id: tenantDialog.id, tenant_id: tid }));
-      const { error } = await supabase.from('user_tenants').insert(rows);
-      if (error) throw error;
-      toast({ title: `Assigned ${tenantIds.length} tenant${tenantIds.length === 1 ? '' : 's'}` });
-      await loadData();
-    } catch (err: any) {
-      toast({ title: 'Assignment failed', description: err.message, variant: 'destructive' });
-      throw err;
-    }
-  };
 
   const handleRemoveTenant = async (userId: string, tenantId: string) => {
     try {
@@ -496,9 +482,6 @@ export default function UserManagement() {
                                 title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
                                 <UserCog className="h-4 w-4 mr-1" /> Role
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setTenantDialog(u)}>
-                                <Building2 className="h-4 w-4 mr-1" /> Tenant
-                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -629,16 +612,6 @@ export default function UserManagement() {
           customRoles={scopedCustomRoles}
           currentCustomRoleIds={roleDialog.customRoles.map((c) => c.id)}
           onConfirm={handleChangeRole}
-        />
-      )}
-      {tenantDialog && (
-        <AssignTenantDialog
-          open={!!tenantDialog}
-          onOpenChange={(o) => !o && setTenantDialog(null)}
-          tenants={tenants}
-          currentTenantIds={tenantDialog.tenants.map((t) => t.id)}
-          userName={tenantDialog.full_name ?? tenantDialog.email}
-          onConfirm={handleAssignTenant}
         />
       )}
       <CreateUserDialog
