@@ -482,9 +482,6 @@ export default function UserManagement() {
                                 title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
                                 <UserCog className="h-4 w-4 mr-1" /> Role
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setTenantDialog(u)}>
-                                <Building2 className="h-4 w-4 mr-1" /> Tenant
-                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
