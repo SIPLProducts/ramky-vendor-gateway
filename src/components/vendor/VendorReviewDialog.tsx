@@ -546,7 +546,11 @@ export function VendorReviewDialog({
                       <h4 className="font-semibold mb-3 text-primary">Recent Returns Filed</h4>
                       {gstReport.filingRows.length === 0 ? (
                         <p className="text-sm text-muted-foreground border rounded-md p-4">
-                          No filing data captured for this vendor.
+                          {filingFetching
+                            ? 'Fetching latest filing status from GSTN…'
+                            : filingFetched
+                              ? 'No filing data returned by GSTN for this GSTIN.'
+                              : 'No filing data captured for this vendor.'}
                         </p>
                       ) : (
                         <div className="border rounded-md">
