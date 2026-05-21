@@ -92,7 +92,11 @@ const dedupeAndTrim = (rows: FilingStatusRow[]): GstFilingRow[] => {
     }));
 };
 
-const buildGstComplianceReport = (vendor: any, validation: any | null): GstComplianceReport => {
+const buildGstComplianceReport = (
+  vendor: any,
+  validation: any | null,
+  liveFilingRows?: FilingStatusRow[] | null,
+): GstComplianceReport => {
   const details = validation?.details || {};
   const isPassed = validation?.status === 'passed';
   const score: number = typeof details.complianceScore === 'number'
@@ -105,11 +109,11 @@ const buildGstComplianceReport = (vendor: any, validation: any | null): GstCompl
   const now = new Date();
   const lastFiledReturn: string = details.lastFiledReturn || fmtMonthYear(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
-  const realRows = normalizeFilingStatus(details.filing_status);
-  const filingRows = dedupeAndTrim(realRows);
+  const persistedRows = normalizeFilingStatus(details.filing_status);
+  const sourceRows = persistedRows.length > 0 ? persistedRows : (liveFilingRows || []);
+  const filingRows = dedupeAndTrim(sourceRows);
 
   return { complianceScore: score, status, riskLevel, registrationDate, filingStatus: filingStatusText, lastFiledReturn, filingRows };
-
 };
 
 interface VendorReviewDialogProps {
