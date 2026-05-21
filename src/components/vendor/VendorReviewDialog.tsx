@@ -378,8 +378,60 @@ export function VendorReviewDialog({
             <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-[50vh] pr-4">
                 <div className="space-y-6">
-                  {/* Organization */}
-                  <div className="space-y-3">
+                  {/* Routing / Invitation */}
+                  {routing && (
+                    <>
+                      <div className="space-y-3">
+                        <h4 className="font-semibold flex items-center gap-2 text-primary">
+                          <Shield className="h-4 w-4" />
+                          Routing & Invitation
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="space-y-1">
+                            <p className="text-muted-foreground">Buyer Company (on vendor)</p>
+                            <p className="font-medium">{routing.vendorCompany || '-'}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-muted-foreground">Invitation Company</p>
+                            <p className="font-medium">{routing.invitationCompany || '-'}</p>
+                            {routing.companyMismatch && (
+                              <p className="text-xs text-amber-600">
+                                Vendor selected a different company than the invitation.
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-muted-foreground">Invited By (Buyer)</p>
+                            <p className="font-medium">{routing.buyerName || '-'}</p>
+                            {routing.buyerEmail && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Mail className="h-3 w-3" /> {routing.buyerEmail}
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-muted-foreground">Mapped SCM Manager(s)</p>
+                            {routing.mappedScm.length === 0 ? (
+                              <p className="font-medium">-</p>
+                            ) : (
+                              routing.mappedScm.map((s, i) => (
+                                <div key={i}>
+                                  <p className="font-medium">{s.name || '-'}</p>
+                                  {s.email && (
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Mail className="h-3 w-3" /> {s.email}
+                                    </p>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
+
                     <h4 className="font-semibold flex items-center gap-2 text-primary">
                       <Building2 className="h-4 w-4" />
                       Organization Details
