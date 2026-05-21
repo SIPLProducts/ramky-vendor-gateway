@@ -239,19 +239,6 @@ export default function UserManagement() {
     }
   };
 
-  const handleAssignTenant = async (tenantIds: string[]) => {
-    if (!tenantDialog || tenantIds.length === 0) return;
-    try {
-      const rows = tenantIds.map((tid) => ({ user_id: tenantDialog.id, tenant_id: tid }));
-      const { error } = await supabase.from('user_tenants').insert(rows);
-      if (error) throw error;
-      toast({ title: `Assigned ${tenantIds.length} tenant${tenantIds.length === 1 ? '' : 's'}` });
-      await loadData();
-    } catch (err: any) {
-      toast({ title: 'Assignment failed', description: err.message, variant: 'destructive' });
-      throw err;
-    }
-  };
 
   const handleRemoveTenant = async (userId: string, tenantId: string) => {
     try {
