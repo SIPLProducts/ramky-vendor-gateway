@@ -297,7 +297,7 @@ export async function buildSapPayload(
         idnum2: "",
         // Bank
         bank_ctry: trunc(bank.bankCountry || company.country, 3),
-        bank_key: "",
+        bank_key: trunc(bank.swiftCode || bank.ibanNumber || "", 15),
         bank_acct: trunc(bank.accountNumber, 18),
         accountholder: trunc(bank.companyName, 60),
         bankaccountname: trunc(bank.bankName, 60),
