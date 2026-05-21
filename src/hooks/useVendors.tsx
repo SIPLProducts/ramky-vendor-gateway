@@ -16,7 +16,7 @@ type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
 
 // Fetch all vendors (for admin/finance/purchase) with offline support
 export function useVendors(statuses?: VendorStatus[]) {
-  const { tenantIds, activeTenantId } = useTenantFilter();
+  const { tenantIds, activeTenantId, vendorIds } = useTenantFilter();
   const cacheKey = statuses ? `vendors_${statuses.join('_')}` : 'vendors_all';
   const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<VendorRow[]>({
     key: cacheKey,
@@ -24,7 +24,7 @@ export function useVendors(statuses?: VendorStatus[]) {
   });
 
   const query = useQuery({
-    queryKey: ['vendors', statuses, activeTenantId, tenantIds],
+    queryKey: ['vendors', statuses, activeTenantId, tenantIds, vendorIds],
     queryFn: async () => {
       let q = supabase
         .from('vendors')
@@ -35,14 +35,17 @@ export function useVendors(statuses?: VendorStatus[]) {
         q = q.in('status', statuses);
       }
 
-      if (activeTenantId) {
+      if (vendorIds !== null) {
+        // SCM Manager scoping: restrict to vendors invited by mapped buyers.
+        if (vendorIds.length === 0) return [] as VendorRow[];
+        q = q.in('id', vendorIds);
+      } else if (activeTenantId) {
         q = q.eq('tenant_id', activeTenantId);
       } else if (tenantIds !== null) {
-        // Restricted user: filter to their tenants. Empty list -> no results.
         if (tenantIds.length === 0) return [] as VendorRow[];
         q = q.in('tenant_id', tenantIds);
       }
-      // tenantIds === null && !activeTenantId -> super admin viewing all tenants
+      // Otherwise -> super admin / cross-tenant reviewer: see everything.
 
       const { data, error } = await q;
       if (error) throw error;
@@ -195,12 +198,15 @@ export function useReRouteApproval() {
 // Count of vendors stuck in purchase_review with NO approval progress rows.
 // Used by the admin dashboard widget to surface missing matrix configuration.
 export function useStuckApprovalVendors() {
-  const { tenantIds, activeTenantId } = useTenantFilter();
+  const { tenantIds, activeTenantId, vendorIds } = useTenantFilter();
   return useQuery({
-    queryKey: ['stuck-approval-vendors', activeTenantId, tenantIds],
+    queryKey: ['stuck-approval-vendors', activeTenantId, tenantIds, vendorIds],
     queryFn: async () => {
       let q = supabase.from('vendors').select('id, tenant_id').eq('status', 'purchase_review');
-      if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
+      if (vendorIds !== null) {
+        if (vendorIds.length === 0) return 0;
+        q = q.in('id', vendorIds);
+      } else if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
       else if (tenantIds !== null) {
         if (tenantIds.length === 0) return 0;
         q = q.in('tenant_id', tenantIds);
@@ -647,18 +653,27 @@ export function useDMSSync() {
 
 // Vendor statistics with offline support
 export function useVendorStats() {
-  const { tenantIds, activeTenantId } = useTenantFilter();
+  const { tenantIds, activeTenantId, vendorIds } = useTenantFilter();
   const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<any>({
     key: 'vendor_stats',
     ttl: 6 * 60 * 60 * 1000 // 6 hours
   });
 
   const query = useQuery({
-    queryKey: ['vendor-stats', activeTenantId, tenantIds],
+    queryKey: ['vendor-stats', activeTenantId, tenantIds, vendorIds],
     queryFn: async () => {
       let q = supabase.from('vendors').select('status, tenant_id');
 
-      if (activeTenantId) {
+      if (vendorIds !== null) {
+        if (vendorIds.length === 0) {
+          return {
+            total: 0, pendingFinance: 0, pendingPurchase: 0, pendingSAPSync: 0,
+            approved: 0, validationFailed: 0, draft: 0, submitted: 0,
+            pendingVerification: 0, activeVendors: 0, byCompany: {},
+          };
+        }
+        q = q.in('id', vendorIds);
+      } else if (activeTenantId) {
         q = q.eq('tenant_id', activeTenantId);
       } else if (tenantIds !== null) {
         if (tenantIds.length === 0) {

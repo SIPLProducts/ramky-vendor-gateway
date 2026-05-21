@@ -1,40 +1,54 @@
-## Issue
-For international vendors, SAP creates the vendor but the bank record is dropped. Domestic works because `bank_key` is populated with IFSC. In the international branch of `src/lib/sapPayloadBuilder.ts` (line 300), `bank_key` is hard-coded to `""`, so SAP receives:
+# Cross-tenant visibility for approver roles
 
-```json
-"bank_key": "",
-"bank_acct": "1714348594",
-"swift_code": "KKBK0...",
-"iban": "DE89..."
-```
+## Problem
 
-SAP's BAPI requires a non-empty `bank_key` (BANKL) to create a bank entry — when empty, it silently skips persisting the bank. SWIFT/IBAN alone are not enough.
+Vendors / buyers spanning 30+ tenants (companies) can't be reviewed end-to-end because RLS on `vendors` and friends restricts the `approver` placeholder role to tenants the user is mapped into via `user_tenants`. The frontend (`useVendors`, `useTenantContext`) also forces a tenant filter on every query.
 
-The user's reference payload confirms expectation: international rows should carry the same `bank_key`/`bank_acct`/`bank_ctry`/`accountholder`/`bankaccountname` keys as domestic, with `iban` (and `swift_code`) added on top.
+Approval listing (the edge function `list-pending-approvals-by-stage`) already runs with service role and is unaffected — but once the user clicks into a vendor, opens "All Vendors", "SAP Sync", dashboards, etc., they hit RLS + frontend tenant filters and rows disappear.
 
-## Fix
-**File:** `src/lib/sapPayloadBuilder.ts` (lines 298–306, international `intlOverrides` block)
+## Target rules
 
-Populate `bank_key` for international vendors using SWIFT as the bank key (fallback to IBAN, then empty). Keep all other bank fields as already mapped.
+| Custom role | Visibility |
+|---|---|
+| SCM Head, Finance 1, Finance 2, Finance Approval, CEO Office, SAP Team | **All vendors, all tenants** |
+| SCM Manager | **Only vendors invited by a buyer mapped to this SCM Manager** in `buyer_scm_mappings` |
+| Buyer (existing) | Unchanged — tenant restricted as today |
+| Vendor / Customer Admin / Sharvi Admin / built-in finance/purchase | Unchanged |
 
-```ts
-bank_ctry: trunc(bank.bankCountry || company.country, 3),
-bank_key: trunc(bank.swiftCode || bank.ibanNumber || "", 15),
-bank_acct: trunc(bank.accountNumber, 18),
-accountholder: trunc(bank.companyName, 60),
-bankaccountname: trunc(bank.bankName, 60),
-swift_code: trunc(bank.swiftCode, 11),
-iban: trunc(bank.ibanNumber, 34),
-iban2: "",
-```
+## Backend (single migration)
 
-Also ensure `bankdetailid` stays `"0001"` (already from template, no change needed).
+1. New SECURITY DEFINER helpers in `public`:
+   - `has_custom_role(_user_id uuid, _name text) returns boolean` — checks `user_custom_roles → custom_roles.name` (active only).
+   - `is_cross_tenant_reviewer(_user_id uuid) returns boolean` — true if user has any of the 6 names above.
+   - `scm_manager_can_see_vendor(_user_id uuid, _vendor_id uuid) returns boolean` — true if there exists a row in `buyer_scm_mappings` where `scm_manager_user_id = _user_id` and `buyer_user_id` = `vendor_invitations.created_by` for that vendor (latest invite).
+2. Add SELECT policies (additive, do NOT remove existing ones — vendors keep seeing their own row, finance/purchase/customer_admin keep their tenant scope):
+   - `vendors` — `Cross-tenant reviewers view all vendors` USING `is_cross_tenant_reviewer(auth.uid())`.
+   - `vendors` — `SCM Manager views mapped buyer vendors` USING `has_custom_role(auth.uid(),'SCM Manager') AND scm_manager_can_see_vendor(auth.uid(), id)`.
+   - Same two policies replicated for: `vendor_validations`, `vendor_documents`, `vendor_approval_progress`, `audit_logs`, `ocr_extractions` (joining on `vendor_id`).
+3. No table or schema changes; no removal of existing policies; SAP/master/config tables untouched.
+
+## Frontend
+
+1. `src/hooks/useTenantContext.tsx` — extend `isSuperAdmin` concept: add `isCrossTenantReviewer` (loaded once from `user_custom_roles` join `custom_roles.name`). When true, tenant picker becomes optional and `useTenantFilter()` returns `{ tenantIds: null }` (no filter), exactly like sharvi_admin today. When the user picks a specific tenant from the dropdown, the filter still applies (so they can narrow voluntarily).
+2. `src/hooks/useVendors.tsx` — no logic change needed; it already respects `tenantIds === null` as "no filter". The change in `useTenantFilter` propagates automatically to dashboards, lists, SAP Sync, etc.
+3. SCM Manager scoping in the UI: extend `useTenantFilter` so that when the user only has the `SCM Manager` custom role, instead of returning tenant ids it returns a new `vendorIds` array sourced from `buyer_scm_mappings → vendor_invitations.vendor_id`. Apply this in:
+   - `useVendors` (`.in('id', vendorIds)` when present)
+   - `useVendors` status counts (line ~659)
+   - `VendorList.tsx`, `SAPSync.tsx` lists — they consume the same hook, so no per-page edit needed beyond the hook change.
+   RLS already blocks anything outside the allowed set, so this is purely a UX/perf filter.
+4. Buyer-company filter (`getBuyerCompanyName` etc.) keeps working — those reviewers now see every tenant in the dropdown via the existing `tenants` table SELECT policy (`is_active = true` already allows all authenticated users).
 
 ## Out of scope
-- No template change, no schema change, no second bank record support (`bankdetailid2`) — the user's sample shows two banks but current UI only collects one international bank; leaving that as-is.
-- No change to domestic flow.
 
-## Verify
-1. Submit/sync an international vendor with SWIFT + IBAN + account number.
-2. Open the SAP payload preview (or edge function log) — confirm root-level `bank_key` is non-empty (= SWIFT), `bank_acct` populated, `iban` populated, `bank_ctry` correct.
-3. Confirm SAP response now contains the bank record under the created vendor.
+- No change to how vendors / buyers / customer_admin see data.
+- No change to approval routing or the edge function listing pending approvals.
+- No change to SAP payload, DMS sync, or master data.
+- No change to the buyer-company assignment requirement during vendor registration.
+
+## Verification
+
+- As an SCM Head mapped to tenant A only: open All Vendors → see vendors from tenants A, B, C…; open a vendor from tenant C → detail loads; SAP Sync list shows cross-tenant rows.
+- As Finance 1 / Finance 2 / CEO Office / SAP Team: same as above.
+- As an SCM Manager mapped to Buyer X (who invited vendors V1, V2): All Vendors shows only V1, V2 even if those vendors live in different tenants; vendors invited by other buyers are hidden.
+- As an existing Buyer / Customer Admin / Finance (built-in) / Purchase: behaviour unchanged, still tenant restricted.
+- As a Vendor: still sees only their own record.

@@ -2325,6 +2325,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      has_custom_role: {
+        Args: { _name: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2332,6 +2336,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_cross_tenant_reviewer: { Args: { _user_id: string }; Returns: boolean }
       list_smtp_configs: {
         Args: never
         Returns: {
@@ -2362,6 +2367,10 @@ export type Database = {
           used_at: string
           vendor_name: string
         }[]
+      }
+      scm_manager_can_see_vendor: {
+        Args: { _user_id: string; _vendor_id: string }
+        Returns: boolean
       }
       seed_vendor_approval_progress: {
         Args: { _vendor_id: string }
