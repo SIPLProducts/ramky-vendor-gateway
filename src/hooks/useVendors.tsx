@@ -653,18 +653,27 @@ export function useDMSSync() {
 
 // Vendor statistics with offline support
 export function useVendorStats() {
-  const { tenantIds, activeTenantId } = useTenantFilter();
+  const { tenantIds, activeTenantId, vendorIds } = useTenantFilter();
   const { isOnline, cachedData, saveToCache, getCacheAge } = useOfflineCache<any>({
     key: 'vendor_stats',
     ttl: 6 * 60 * 60 * 1000 // 6 hours
   });
 
   const query = useQuery({
-    queryKey: ['vendor-stats', activeTenantId, tenantIds],
+    queryKey: ['vendor-stats', activeTenantId, tenantIds, vendorIds],
     queryFn: async () => {
       let q = supabase.from('vendors').select('status, tenant_id');
 
-      if (activeTenantId) {
+      if (vendorIds !== null) {
+        if (vendorIds.length === 0) {
+          return {
+            total: 0, pendingFinance: 0, pendingPurchase: 0, pendingSAPSync: 0,
+            approved: 0, validationFailed: 0, draft: 0, submitted: 0,
+            pendingVerification: 0, activeVendors: 0, byCompany: {},
+          };
+        }
+        q = q.in('id', vendorIds);
+      } else if (activeTenantId) {
         q = q.eq('tenant_id', activeTenantId);
       } else if (tenantIds !== null) {
         if (tenantIds.length === 0) {
