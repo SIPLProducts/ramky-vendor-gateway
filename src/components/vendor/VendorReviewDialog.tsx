@@ -256,13 +256,13 @@ export function VendorReviewDialog({
         setFilingFetched(true);
         if (rows.length > 0 && vendor.id) {
           try {
-            await supabase.from('vendor_validations').insert({
+            await supabase.from('vendor_validations').insert([{
               vendor_id: vendor.id,
               validation_type: 'gst',
               status: 'passed',
               message: 'GST filing status fetched on review',
-              details: { filing_status: rows },
-            });
+              details: { filing_status: rows } as any,
+            }]);
           } catch (e) {
             console.warn('[VendorReviewDialog] Failed to persist live filing status', e);
           }
