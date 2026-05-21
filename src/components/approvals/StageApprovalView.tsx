@@ -81,6 +81,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               <TableHeader>
                 <TableRow>
                   <TableHead>Vendor</TableHead>
+                  <TableHead>Buyer Company</TableHead>
+                  <TableHead>Invited By</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>MSME</TableHead>
                   <TableHead>Submitted</TableHead>
@@ -90,10 +92,10 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                   ))
                 ) : items.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     <div>No pending approvals</div>
                     <div className="text-xs mt-2">
                       Only vendors whose approval matrix lists you as an approver for this stage appear here.
@@ -108,6 +110,20 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                           <div className="text-xs text-amber-600 mt-1">
                             The previous approver has not approved yet.
                           </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <div>{it.vendorCompany ?? '—'}</div>
+                        {it.companyMismatch && it.invitationCompany && (
+                          <div className="text-xs text-amber-600 mt-1">
+                            Invitation: {it.invitationCompany}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <div>{it.buyerName ?? '—'}</div>
+                        {it.buyerEmail && (
+                          <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
                         )}
                       </TableCell>
                       <TableCell><Badge variant="outline">{it.levelName}</Badge></TableCell>
