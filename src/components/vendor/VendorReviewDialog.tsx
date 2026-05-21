@@ -182,6 +182,15 @@ export function VendorReviewDialog({
   const [liveFilingRows, setLiveFilingRows] = useState<FilingStatusRow[] | null>(null);
   const [filingFetching, setFilingFetching] = useState(false);
   const [filingFetched, setFilingFetched] = useState(false);
+  const [routing, setRouting] = useState<{
+    vendorCompany: string | null;
+    invitationCompany: string | null;
+    companyMismatch: boolean;
+    buyerName: string | null;
+    buyerEmail: string | null;
+    mappedScm: Array<{ name: string | null; email: string | null }>;
+    invitedAt: string | null;
+  } | null>(null);
   const { callProvider } = useConfiguredKycApi();
 
   useEffect(() => {
@@ -193,6 +202,7 @@ export function VendorReviewDialog({
       setLiveFilingRows(null);
       setFilingFetched(false);
       setFilingFetching(false);
+      setRouting(null);
       return;
     }
     setLoading(true);
@@ -222,6 +232,63 @@ export function VendorReviewDialog({
       }
       setGstValidation(gst || null);
       setComplianceDocs(docs || []);
+
+      // Load routing/invitation context
+      try {
+        const { data: inv } = await supabase
+          .from('vendor_invitations')
+          .select('created_by, tenant_id, created_at')
+          .eq('vendor_id', vendorId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const tenantIds = Array.from(new Set([v?.tenant_id, inv?.tenant_id].filter(Boolean))) as string[];
+        const { data: tens } = tenantIds.length
+          ? await supabase.from('tenants').select('id, name, code').in('id', tenantIds)
+          : { data: [] as any[] };
+        const tMap = new Map((tens ?? []).map((t: any) => [t.id, t]));
+
+        let buyer: any = null;
+        let mappedScm: Array<{ name: string | null; email: string | null }> = [];
+        if (inv?.created_by) {
+          const { data: bp } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('id', inv.created_by)
+            .maybeSingle();
+          buyer = bp;
+          const { data: maps } = await supabase
+            .from('buyer_scm_mappings')
+            .select('scm_manager_user_id')
+            .eq('buyer_user_id', inv.created_by);
+          const scmIds = (maps ?? []).map((m: any) => m.scm_manager_user_id).filter(Boolean);
+          if (scmIds.length) {
+            const { data: sp } = await supabase
+              .from('profiles')
+              .select('id, full_name, email')
+              .in('id', scmIds);
+            mappedScm = (sp ?? []).map((p: any) => ({ name: p.full_name, email: p.email }));
+          }
+        }
+
+        const vt = v?.tenant_id ? tMap.get(v.tenant_id) : null;
+        const it = inv?.tenant_id ? tMap.get(inv.tenant_id) : null;
+        if (!cancelled) {
+          setRouting({
+            vendorCompany: vt ? `${vt.name}${vt.code ? ` (${vt.code})` : ''}` : null,
+            invitationCompany: it ? `${it.name}${it.code ? ` (${it.code})` : ''}` : null,
+            companyMismatch: !!(vt && it && v?.tenant_id !== inv?.tenant_id),
+            buyerName: buyer?.full_name ?? null,
+            buyerEmail: buyer?.email ?? null,
+            mappedScm,
+            invitedAt: inv?.created_at ?? null,
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load vendor routing context', e);
+      }
+
       setLoading(false);
     })();
     return () => {
