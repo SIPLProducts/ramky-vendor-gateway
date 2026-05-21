@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ValidationStatus } from '@/components/vendor/ValidationStatus';
 import { normalizeFilingStatus, type FilingStatusRow } from '@/components/vendor/kyc/GstFilingStatusTable';
+import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationResult } from '@/types/vendor';
 import {
@@ -91,7 +92,11 @@ const dedupeAndTrim = (rows: FilingStatusRow[]): GstFilingRow[] => {
     }));
 };
 
-const buildGstComplianceReport = (vendor: any, validation: any | null): GstComplianceReport => {
+const buildGstComplianceReport = (
+  vendor: any,
+  validation: any | null,
+  liveFilingRows?: FilingStatusRow[] | null,
+): GstComplianceReport => {
   const details = validation?.details || {};
   const isPassed = validation?.status === 'passed';
   const score: number = typeof details.complianceScore === 'number'
@@ -104,11 +109,11 @@ const buildGstComplianceReport = (vendor: any, validation: any | null): GstCompl
   const now = new Date();
   const lastFiledReturn: string = details.lastFiledReturn || fmtMonthYear(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
-  const realRows = normalizeFilingStatus(details.filing_status);
-  const filingRows = dedupeAndTrim(realRows);
+  const persistedRows = normalizeFilingStatus(details.filing_status);
+  const sourceRows = persistedRows.length > 0 ? persistedRows : (liveFilingRows || []);
+  const filingRows = dedupeAndTrim(sourceRows);
 
   return { complianceScore: score, status, riskLevel, registrationDate, filingStatus: filingStatusText, lastFiledReturn, filingRows };
-
 };
 
 interface VendorReviewDialogProps {
@@ -174,6 +179,10 @@ export function VendorReviewDialog({
   const [loading, setLoading] = useState(false);
   const [gstValidation, setGstValidation] = useState<any | null>(null);
   const [complianceDocs, setComplianceDocs] = useState<any[]>([]);
+  const [liveFilingRows, setLiveFilingRows] = useState<FilingStatusRow[] | null>(null);
+  const [filingFetching, setFilingFetching] = useState(false);
+  const [filingFetched, setFilingFetched] = useState(false);
+  const { callProvider } = useConfiguredKycApi();
 
   useEffect(() => {
     let cancelled = false;
@@ -181,6 +190,9 @@ export function VendorReviewDialog({
       setVendor(null);
       setGstValidation(null);
       setComplianceDocs([]);
+      setLiveFilingRows(null);
+      setFilingFetched(false);
+      setFilingFetching(false);
       return;
     }
     setLoading(true);
@@ -217,8 +229,53 @@ export function VendorReviewDialog({
     };
   }, [vendorId, open]);
 
+  // If nothing was persisted, fetch the filing status live from the configured
+  // GST_FILING provider so the Compliance Report tab isn't blank.
+  useEffect(() => {
+    if (!open || !vendor?.gstin) return;
+    const persisted = normalizeFilingStatus(gstValidation?.details?.filing_status);
+    if (persisted.length > 0) {
+      setFilingFetched(true);
+      return;
+    }
+    if (filingFetching || filingFetched) return;
+    let cancelled = false;
+    setFilingFetching(true);
+    (async () => {
+      try {
+        const gstin = String(vendor.gstin).toUpperCase().trim();
+        const r = await callProvider({
+          providerName: 'GST_FILING',
+          input: { gstin, id_number: gstin },
+        });
+        const rows = (r.found && r.ok && r.data)
+          ? normalizeFilingStatus(r.data.filing_status)
+          : [];
+        if (cancelled) return;
+        setLiveFilingRows(rows);
+        setFilingFetched(true);
+        if (rows.length > 0 && vendor.id) {
+          try {
+            await supabase.from('vendor_validations').insert([{
+              vendor_id: vendor.id,
+              validation_type: 'gst',
+              status: 'passed',
+              message: 'GST filing status fetched on review',
+              details: { filing_status: rows } as any,
+            }]);
+          } catch (e) {
+            console.warn('[VendorReviewDialog] Failed to persist live filing status', e);
+          }
+        }
+      } finally {
+        if (!cancelled) setFilingFetching(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, vendor?.id, vendor?.gstin, gstValidation, filingFetched, filingFetching, callProvider]);
+
   const validations = getValidationsFromVendor(vendor);
-  const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation) : null;
+  const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation, liveFilingRows) : null;
 
   const openDocument = async (filePath: string) => {
     const { data } = await supabase.storage.from('vendor-documents').createSignedUrl(filePath, 3600);
@@ -489,7 +546,11 @@ export function VendorReviewDialog({
                       <h4 className="font-semibold mb-3 text-primary">Recent Returns Filed</h4>
                       {gstReport.filingRows.length === 0 ? (
                         <p className="text-sm text-muted-foreground border rounded-md p-4">
-                          No filing data captured for this vendor.
+                          {filingFetching
+                            ? 'Fetching latest filing status from GSTN…'
+                            : filingFetched
+                              ? 'No filing data returned by GSTN for this GSTIN.'
+                              : 'No filing data captured for this vendor.'}
                         </p>
                       ) : (
                         <div className="border rounded-md">

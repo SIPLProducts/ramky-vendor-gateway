@@ -1,65 +1,56 @@
-## Problem
+## Why the table is empty
 
-When a vendor is submitted as **International**, the approval routing still treats them as MSME-registered, so after Finance 2 approval they get routed to the **CEO Office** stage instead of going directly to **SAP Sync**.
+The "GST Compliance Report" tab in the vendor review dialog (`src/components/vendor/VendorReviewDialog.tsx`) reads its rows from one place only:
 
-International vendors should bypass the MSME-gated CEO stage entirely (treated as MSME = No for routing purposes), regardless of what was filled in `is_msme_registered`.
-
-## Root cause
-
-Two places decide which approval stages are eligible based on `is_msme_registered`:
-
-1. **DB function** `public.seed_vendor_approval_progress(_vendor_id)` — runs at submission time and seeds the approval chain.
-2. **Edge function** `supabase/functions/process-approval-action/index.ts` — runs the auto-extend block when new matrix levels are added after submission.
-
-Both read `vendors.is_msme_registered` only. Neither considers `vendors.vendor_type = 'international'`.
-
-## Changes
-
-### 1. Migration: update `seed_vendor_approval_progress`
-
-Change the MSME read so international vendors are forced to non-MSME:
-
-```sql
-SELECT tenant_id,
-       CASE WHEN COALESCE(vendor_type, 'domestic') = 'international'
-            THEN false
-            ELSE COALESCE(is_msme_registered, false)
-       END
-  INTO v_tenant, v_msme
-FROM public.vendors WHERE id = _vendor_id;
+```
+vendor_validations.details.filing_status   (validation_type = 'gst')
 ```
 
-Rest of the function is unchanged. The existing filter `(l.requires_msme = false OR v_msme = true)` will then exclude CEO_OFFICE for international vendors.
+For this vendor (`BRICKWORK RATINGS INDIA PRIVATE LIMITED`, GSTIN `29AADCB3136C1Z3`) there is **no `vendor_validations` row at all** — confirmed against the DB:
 
-### 2. `supabase/functions/process-approval-action/index.ts` (lines ~135–137)
-
-Also select `vendor_type` and derive `isMsme` the same way:
-
-```ts
-const { data: vendorRow } = await admin
-  .from('vendors')
-  .select('is_msme_registered, vendor_type')
-  .eq('id', progress.vendor_id).single();
-const isMsme = vendorRow?.vendor_type === 'international'
-  ? false
-  : !!vendorRow?.is_msme_registered;
+```
+legal_name                                    status  filing_status length
+BRICKWORK RATINGS INDIA PRIVATE LIMITED       NULL    0
+Brickwork Ratings India Private Limited       NULL    0
 ```
 
-So when Finance 2 approves an international vendor and the function looks for the next pending level, CEO_OFFICE is filtered out and the vendor proceeds straight to SAP sync.
+So `gstReport.filingRows.length === 0` and the dialog renders the placeholder "No filing data captured for this vendor."
 
-### 3. Finance 2 UI note (optional, `src/pages/approvals/Finance2Approval.tsx`)
+The header tiles (Compliance Score 70%, GST Status Active, Last Filed Return Apr 2026, etc.) look populated only because `buildGstComplianceReport` has hard‑coded fallbacks for those scalar fields — but it intentionally does not fabricate filing rows.
 
-The extra panel currently shows "MSME registered: Yes — will route to CEO Office" based on `item.isMsme`. For international vendors, override the label to **"International vendor — will route to SAP Sync"** so the approver isn't misled.
+Why the registration GST tab shows a table while this dialog does not:
+- During registration, `GstKycTab` calls the GST_FILING provider live and renders whatever the API returns — it does not depend on the DB.
+- `GstKycTab.persistGstValidation` only writes the row when `props.vendorId` is set **and** the user actually clicks Verify in this session. Vendors that were seeded, imported, or whose KYC was run before the persistence step existed have no row, so the dialog can't find anything.
 
-## Out of scope
+## Fix
 
-- No change to MSME registration capture in the registration form.
-- No change to the Finance 2 stage itself or rejection paths.
-- Existing already-seeded vendors are unaffected unless re-routed; this fix applies to new submissions and to auto-extend after the migration.
+Make the Compliance Report dialog self‑healing: if the persisted `filing_status` is empty, fetch it live (same provider the GST tab uses) and render the result.
 
-## Verification
+### Changes (UI / presentation only)
 
-1. Submit a new vendor as **International** with MSME = Yes.
-2. Approve through SCM Manager → SCM Head → Finance 1 → Finance 2.
-3. After Finance 2 approval, vendor status should become **SAP Sync** (not CEO Office), and no CEO_OFFICE row should exist in `vendor_approval_progress`.
-4. Repeat with a **Domestic + MSME** vendor → CEO Office stage still appears (regression check).
+1. **`src/components/vendor/VendorReviewDialog.tsx`**
+   - After loading `gstValidation`, if `normalizeFilingStatus(details.filing_status)` is empty **and** `vendor.gstin` is present, call the configured provider:
+     ```ts
+     useConfiguredKycApi().callProvider({
+       providerName: 'GST_FILING',
+       input: { gstin: vendor.gstin, id_number: vendor.gstin },
+     })
+     ```
+   - Hold the result in a new `liveFilingRows` state; pass it into `buildGstComplianceReport` as a third argument (or merge into a local `effectiveFilingStatus`).
+   - Show a small inline "Fetching latest filing status…" placeholder while the call is in flight, and "No filing data returned by GSTN." only after the live call completes empty (so the message is accurate).
+   - Best‑effort persist the fetched rows back into `vendor_validations` (insert a row with `validation_type='gst'`, `status='passed'`, `details: { filing_status: <rows> }`) so subsequent opens are instant. Guarded by `vendor.id`; failures logged, not surfaced.
+
+2. **No changes to** `GstKycTab`, `GstFilingStatusTable`, `useConfiguredKycApi`, edge functions, schema, or approval logic. Scalar fallbacks (score, status, dates) stay as they are.
+
+### Verification
+
+- Open SAP Sync → BRICKWORK vendor → "GST Compliance Report" tab → should show 3 most recent returns from the live provider instead of the placeholder.
+- Re‑open immediately: should render from the freshly persisted `vendor_validations` row without a second network call.
+- Vendor with no GSTIN: still renders the placeholder (nothing to query).
+- Vendor that already has `filing_status` persisted (e.g. just finished registration): behaviour unchanged — no extra API call.
+
+### Out of scope
+
+- Backfilling historical vendors in bulk.
+- Changing how the registration step persists GST data.
+- Compliance score / risk‑level computation.
