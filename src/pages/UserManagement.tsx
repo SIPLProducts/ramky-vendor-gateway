@@ -240,12 +240,13 @@ export default function UserManagement() {
     }
   };
 
-  const handleAssignTenant = async (tenantId: string) => {
-    if (!tenantDialog) return;
+  const handleAssignTenant = async (tenantIds: string[]) => {
+    if (!tenantDialog || tenantIds.length === 0) return;
     try {
-      const { error } = await supabase.from('user_tenants').insert({ user_id: tenantDialog.id, tenant_id: tenantId });
+      const rows = tenantIds.map((tid) => ({ user_id: tenantDialog.id, tenant_id: tid }));
+      const { error } = await supabase.from('user_tenants').insert(rows);
       if (error) throw error;
-      toast({ title: 'Tenant assigned' });
+      toast({ title: `Assigned ${tenantIds.length} tenant${tenantIds.length === 1 ? '' : 's'}` });
       await loadData();
     } catch (err: any) {
       toast({ title: 'Assignment failed', description: err.message, variant: 'destructive' });
@@ -450,10 +451,13 @@ export default function UserManagement() {
                               ) : (
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 gap-1">
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center gap-1 rounded-full border border-input bg-background px-2.5 py-0.5 text-xs font-semibold transition-colors hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
                                       <Building2 className="h-3 w-3" />
                                       {u.tenants.length} tenant{u.tenants.length === 1 ? '' : 's'}
-                                    </Badge>
+                                    </button>
                                   </PopoverTrigger>
                                   <PopoverContent align="start" className="w-72 p-0">
                                     <div className="px-3 py-2 border-b text-xs text-muted-foreground">
