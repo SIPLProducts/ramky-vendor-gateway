@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, Link2 } from 'lucide-react';
+import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, Link2, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BuyerScmMapping } from '@/components/admin/BuyerScmMapping';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 import { AssignTenantDialog } from '@/components/admin/AssignTenantDialog';
