@@ -133,8 +133,10 @@ Deno.serve(async (req) => {
     // instead of short-circuiting to SAP sync.
     if (stillPending.length === 0 && level?.tenant_id) {
       const { data: vendorRow } = await admin
-        .from('vendors').select('is_msme_registered').eq('id', progress.vendor_id).single();
-      const isMsme = !!vendorRow?.is_msme_registered;
+        .from('vendors').select('is_msme_registered, vendor_type').eq('id', progress.vendor_id).single();
+      const isMsme = vendorRow?.vendor_type === 'international'
+        ? false
+        : !!vendorRow?.is_msme_registered;
 
       let skipScm = false;
       const { data: invite } = await admin
