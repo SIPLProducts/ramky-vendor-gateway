@@ -691,8 +691,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
-      // Ensure tenant_id is populated from the invitation when the form didn't carry one
-      if (!vendorData.tenant_id && (invitation as any)?.tenant_id) {
+      // When the vendor is registering via an invitation, the invitation's company
+      // is the source of truth for approval routing. Always force it so the vendor
+      // cannot accidentally pick a different Buyer Company that has no approval matrix.
+      if ((invitation as any)?.tenant_id) {
         vendorData.tenant_id = (invitation as any).tenant_id;
       }
       // Persist link to the invitation so notification emails can find the inviter

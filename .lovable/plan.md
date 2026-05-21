@@ -1,43 +1,49 @@
-## What's happening
+Explanation:
+- The vendor company is picked from the vendor registration **Buyer Company** dropdown: `formData.organization.buyerCompanyId`.
+- That value is saved into `vendors.tenant_id`.
+- Approval routing currently looks at `vendors.tenant_id` to find the approval matrix.
+- For this vendor, the selected/saved company became `ADIPL-RAMKY JV`, but the invite was sent under `Ramky Energy and Environm` by buyer `Vidya sagar`.
+- `ADIPL-RAMKY JV` has no approval matrix, so no `vendor_approval_progress` rows were created. That is why SCM Head, Finance 1, Finance 2, CEO, and SAP queues cannot see it.
+- The mapped SCM Manager is not picked from the vendor company. It is picked from `buyer_scm_mappings`, using the inviter/buyer from `vendor_invitations.created_by`.
 
-Rajaman (SCM Manager) shows Pending (0) because he currently has zero rows in `buyer_scm_mappings` and zero invited vendors from any mapped buyer — the list is correctly empty. The bigger UX issue you're pointing at is the **tenant picker** in the header ("Pithampur IWM Pvt Ltd …") that still appears for SCM Manager / SCM Head / Finance 1 / Finance 2 / CEO Office / SAP Team. For these roles, data should not depend on tenant selection at all.
+Plan:
+1. Repair the current stuck vendor
+   - For vendor `4931737e-ff8a-45cf-a521-22b64f39fabd`, align routing to the invitation company `Ramky Energy and Environm`.
+   - Re-run approval routing so SCM Manager, SCM Head, Finance 1, Finance 2, and CEO approval rows are created.
+   - Confirm mapped SCM Manager is `Rajaman` because buyer `Vidya sagar` is mapped to him.
 
-Right now:
-- SCM Head / Finance 1 / Finance 2 / CEO Office / SAP Team: `useTenantFilter` already returns `tenantIds: null` (no filter), but the header still shows a tenant dropdown that *can* narrow data when they pick one.
-- SCM Manager: `useTenantFilter` already returns `vendorIds` (buyer-mapped) and ignores the picker, but the dropdown is still visible.
+2. Prevent future wrong-company routing
+   - When a vendor is registering from an invitation, use the invitation company as the workflow company.
+   - Do not let a different selected Buyer Company break approval routing.
+   - Keep the existing approval flow order unchanged.
 
-## Fix (UI-only, no RLS / no edge function changes)
+3. Show routing details in approval tables/cards
+   - In SCM Manager, SCM Head, Finance 1, Finance 2, and CEO approval screens, show:
+     - Vendor name
+     - Vendor company / buyer company
+     - Buyer / invited by
+     - Mapped SCM Manager where relevant
+   - If the vendor selected company and invitation company differ, show a clear warning/status so admins can identify the mismatch.
 
-### 1. Hide the tenant picker for these roles
+4. Show buyer/company details in View Details popup
+   - In `VendorReviewDialog`, add a top “Routing / Invitation Details” section with:
+     - Vendor company saved on vendor record
+     - Invitation company
+     - Buyer / invited by name and email
+     - Mapped SCM Manager name and email
+     - Current approval stage/status
+   - Add the same summary to the read-only submission preview where useful.
 
-In `src/components/layout/EnterpriseHeader.tsx` and `src/components/layout/MobileHeader.tsx`:
+5. Show buyer/company details in SAP Team view
+   - In SAP Sync cards/table, show buyer company and buyer/invited-by so SAP Team can identify who invited the vendor before sync.
 
-- Pull `isCrossTenantReviewer` and `isScmManager` from `useTenantContext()`.
-- Set `showSwitcher = false` when `isCrossTenantReviewer || isScmManager`.
+6. Backend/data changes needed
+   - Extend `list-pending-approvals-by-stage` response to include buyer company, invitation company, buyer, and mapped SCM Manager metadata.
+   - Add safe lookup logic from `vendor_invitations`, `tenants`, `profiles`, and `buyer_scm_mappings`.
+   - Add a routing fallback so invitation tenant is used for approval matrix seeding when an invited vendor’s saved company does not match the invitation company.
 
-Sharvi/customer admin and the built-in `purchase` (Buyer) role keep the picker exactly as today.
-
-### 2. Force "All" while picker is hidden
-
-Same two files: on mount, if `(isCrossTenantReviewer || isScmManager) && activeTenantId !== null`, call `setActiveTenantId(null)` once so any previously-stored tenant id from `localStorage` is cleared and queries truly run across all tenants.
-
-`useTenantContext` already defaults to "All" for cross-tenant reviewers; we just need to guarantee it for SCM Manager too (today an SCM Manager could have a stale `localStorage` value pinning them to one tenant — even though `useTenantFilter` ignores it for them, clearing it prevents confusion and keeps the rest of the app consistent).
-
-### 3. No data-layer change required
-
-- `useTenantFilter` already returns `tenantIds: null` for cross-tenant reviewers and `{ vendorIds }` for SCM Manager — both are tenant-agnostic.
-- RLS already allows: cross-tenant reviewers → all rows; SCM Manager → buyer-mapped rows; buyer/customer-admin/vendor unchanged.
-- Edge function `list-pending-approvals-by-stage` already enforces buyer-mapping for SCM Manager and is matrix-based (no tenant filter) for the other reviewer roles.
-
-## Verification
-
-- Login as Rajaman (SCM Manager): no tenant dropdown in header. All Vendors lists every vendor invited by any buyer mapped to him, across all tenants. Pending list at `/approvals/scm-manager` shows only those vendors at SCM-Manager stage.
-- Login as an SCM Head / Finance 1 / Finance 2 / CEO Office / SAP Team user: no tenant dropdown; All Vendors / SAP Sync / dashboards show vendors from every tenant.
-- Login as a Buyer / Customer Admin / Sharvi Admin / Vendor: behavior and header unchanged.
-- Approval flow itself: unchanged.
-
-## Out of scope
-
-- No RLS changes.
-- No changes to approval matrix, SAP sync, master data, buyer-company assignment.
-- No change for any role outside the six listed.
+Verification:
+- Naresh Babu appears for Rajaman at SCM Manager stage after repair.
+- After SCM Manager approval, the same vendor moves to SCM Head, Finance 1, Finance 2, and CEO as per the existing flow.
+- SCM Head, Finance 1, Finance 2, CEO, and SAP Team see all vendor data without tenant restriction.
+- Approval table/card and View Details popup clearly show vendor company and buyer/invited-by.
