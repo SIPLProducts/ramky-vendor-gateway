@@ -1,61 +1,54 @@
 ## Problem
 
-`./deploy-vms-server.sh` fails at the "Start Supabase stack" step:
+Deploy fails at the `docker compose up -d` step because **two containers want host port 5432**:
+- `db` (Postgres) — bound to 5432 via our override
+- `supabase-pooler` (Supavisor) — also defaults to publishing 5432 on the host
 
-```
-failed to bind host port 127.0.0.1:8000/tcp: address already in use
-```
+Our `docker-compose.override.yml` only remaps `kong`, `studio`, and `db`, so the pooler keeps its upstream port mappings and collides.
 
-Port `8000` (Kong) is already bound on the host because a previous run of the script left the Supabase containers (or an orphan `supabase-kong`) running. The current script in `scripts/lib/20-supabase.sh` jumps straight to `docker compose up -d` without first stopping anything that's already there, so re-runs hit this conflict. Ports `3000` (Studio) and `5432` (Postgres) can hit the same issue.
+## Fix
 
-## Fix (only `scripts/lib/20-supabase.sh`)
+Update `scripts/lib/20-supabase.sh` to:
 
-Before `docker compose pull` / `up -d`, add a "clean previous stack" step that:
+1. **Add `POOLER_PROXY_PORT_TRANSACTION` config** (default `6543`) and export it. Also add `POOLER_DB_PORT` (host port for the pooler's session-mode 5432, default `5433`) so it never clashes with `db`.
 
-1. Runs `docker compose down --remove-orphans` in `$BACKEND_DIR` (safe no-op on first run, releases ports on re-runs). Volumes are preserved — no data loss.
-2. Force-removes any stray containers named `supabase-kong`, `supabase-studio`, `supabase-db`, `supabase-rest`, `supabase-auth`, `supabase-storage`, `supabase-meta`, `supabase-functions`, `realtime-dev.supabase-realtime`, `supabase-analytics`, `supabase-vector`, `supabase-pooler` (covers the case where compose project name changed between runs and `down` doesn't see them).
-3. For each of `KONG_HTTP_PORT (8000)`, `KONG_HTTPS_PORT (8443)`, `STUDIO_PORT (3000)`, `POSTGRES_PORT (5432)`:
-   - Check with `ss -ltnp` whether `127.0.0.1:<port>` is still bound.
-   - If still bound by a non-Docker process, abort with a clear message naming the process so the user can free it.
-   - If free, continue.
-4. Then run the existing `docker compose pull` and `docker compose up -d`.
+2. **Extend `docker-compose.override.yml`** to pin the pooler to localhost and to non-conflicting host ports:
+   ```yaml
+   supavisor:           # service name in supabase compose
+     ports:
+       - "127.0.0.1:${POOLER_DB_PORT}:5432/tcp"
+       - "127.0.0.1:${POOLER_PROXY_PORT_TRANSACTION}:6543/tcp"
+   ```
+   (Service is `supavisor` in upstream compose; container name is `supabase-pooler`.)
 
-Also add a small `--force-recreate` flag (optional, default off via env) — not strictly needed for this bug; the `down` step is enough. Skipping to keep the change minimal.
+3. **Pre-flight free the ports**: before `docker compose up`, in addition to the existing stray-container loop, run a small helper that, for each of `KONG_HTTP_PORT`, `KONG_HTTPS_PORT`, `STUDIO_PORT`, `POSTGRES_PORT`, `POOLER_DB_PORT`, `POOLER_PROXY_PORT_TRANSACTION`:
+   - find any leftover `docker-proxy` / container publishing that port (`docker ps --filter "publish=<port>" -q`) and `docker rm -f` it.
+   - then run the existing `check_port` guard.
 
-No changes to secrets, `.env`, override file, migrations, functions, middleware, frontend, or nginx steps. No data loss: `down` without `-v` keeps volumes.
+4. **Add the new ports** (`5433`, `6543`) to `check_port` calls and (optionally) include `supavisor` in the stray-container cleanup list.
 
-## Technical detail
+5. **Also set the pooler env vars** in `.env` via `set_env` so the upstream compose picks them up:
+   - `POOLER_PROXY_PORT_TRANSACTION=6543`
+   - `POOLER_DEFAULT_POOL_SIZE`, `POOLER_MAX_CLIENT_CONN` — leave defaults.
 
-Patch location: `scripts/lib/20-supabase.sh`, immediately before the existing `log "Pulling images"` block.
+## What the user does after the fix
 
+Re-sync and re-run:
 ```bash
-log "Stopping any previous Supabase stack (safe on first run)"
-( cd "$BACKEND_DIR" && docker compose down --remove-orphans ) || true
+# on dev machine
+rsync -av --delete --exclude node_modules --exclude dist --exclude .git \
+  ./ root@10.200.1.7:/opt/Ramky_Applications/DEV/VMS/source/
 
-# Belt-and-braces: remove stray containers from older compose project names
-for c in supabase-kong supabase-studio supabase-db supabase-rest \
-         supabase-auth supabase-storage supabase-meta supabase-functions \
-         supabase-analytics supabase-vector supabase-pooler \
-         realtime-dev.supabase-realtime; do
-  if docker ps -a --format '{{.Names}}' | grep -qx "$c"; then
-    echo "Removing stray container: $c"
-    docker rm -f "$c" >/dev/null || true
-  fi
-done
-
-log "Checking host ports are free"
-check_port() {
-  local port="$1" label="$2"
-  if ss -ltn "( sport = :$port )" | tail -n +2 | grep -q .; then
-    echo "ERROR: port $port ($label) is still in use after stopping the stack."
-    echo "Run: sudo ss -ltnp | grep :$port    to see what is holding it."
-    exit 1
-  fi
-}
-check_port "$KONG_HTTP_PORT"  "Kong HTTP"
-check_port "$KONG_HTTPS_PORT" "Kong HTTPS"
-check_port "$STUDIO_PORT"     "Studio"
-check_port "$POSTGRES_PORT"   "Postgres"
+# on server
+cd /opt/Ramky_Applications/DEV/VMS/source
+sudo bash scripts/deploy-vms-server.sh
 ```
 
-After this, the existing `docker compose pull` / `up -d` / Kong readiness loop runs unchanged, so a second `./deploy-vms-server.sh` invocation will succeed instead of failing on the bound port.
+The pooler will now publish on `127.0.0.1:6543` (transaction mode) and `127.0.0.1:5433` (session mode), leaving `127.0.0.1:5432` to the `db` container.
+
+## Files to change
+
+- `scripts/lib/20-supabase.sh` — add pooler port vars, extend override YAML, extend port pre-flight + check, extend stray-container list.
+- `scripts/deploy-vms-server.sh` — export `POOLER_DB_PORT` and `POOLER_PROXY_PORT_TRANSACTION` defaults at the top alongside the other `*_PORT` exports.
+
+No application code changes.
