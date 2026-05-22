@@ -1,49 +1,61 @@
-Explanation:
-- The vendor company is picked from the vendor registration **Buyer Company** dropdown: `formData.organization.buyerCompanyId`.
-- That value is saved into `vendors.tenant_id`.
-- Approval routing currently looks at `vendors.tenant_id` to find the approval matrix.
-- For this vendor, the selected/saved company became `ADIPL-RAMKY JV`, but the invite was sent under `Ramky Energy and Environm` by buyer `Vidya sagar`.
-- `ADIPL-RAMKY JV` has no approval matrix, so no `vendor_approval_progress` rows were created. That is why SCM Head, Finance 1, Finance 2, CEO, and SAP queues cannot see it.
-- The mapped SCM Manager is not picked from the vendor company. It is picked from `buyer_scm_mappings`, using the inviter/buyer from `vendor_invitations.created_by`.
+## Problem
 
-Plan:
-1. Repair the current stuck vendor
-   - For vendor `4931737e-ff8a-45cf-a521-22b64f39fabd`, align routing to the invitation company `Ramky Energy and Environm`.
-   - Re-run approval routing so SCM Manager, SCM Head, Finance 1, Finance 2, and CEO approval rows are created.
-   - Confirm mapped SCM Manager is `Rajaman` because buyer `Vidya sagar` is mapped to him.
+`./deploy-vms-server.sh` fails at the "Start Supabase stack" step:
 
-2. Prevent future wrong-company routing
-   - When a vendor is registering from an invitation, use the invitation company as the workflow company.
-   - Do not let a different selected Buyer Company break approval routing.
-   - Keep the existing approval flow order unchanged.
+```
+failed to bind host port 127.0.0.1:8000/tcp: address already in use
+```
 
-3. Show routing details in approval tables/cards
-   - In SCM Manager, SCM Head, Finance 1, Finance 2, and CEO approval screens, show:
-     - Vendor name
-     - Vendor company / buyer company
-     - Buyer / invited by
-     - Mapped SCM Manager where relevant
-   - If the vendor selected company and invitation company differ, show a clear warning/status so admins can identify the mismatch.
+Port `8000` (Kong) is already bound on the host because a previous run of the script left the Supabase containers (or an orphan `supabase-kong`) running. The current script in `scripts/lib/20-supabase.sh` jumps straight to `docker compose up -d` without first stopping anything that's already there, so re-runs hit this conflict. Ports `3000` (Studio) and `5432` (Postgres) can hit the same issue.
 
-4. Show buyer/company details in View Details popup
-   - In `VendorReviewDialog`, add a top “Routing / Invitation Details” section with:
-     - Vendor company saved on vendor record
-     - Invitation company
-     - Buyer / invited by name and email
-     - Mapped SCM Manager name and email
-     - Current approval stage/status
-   - Add the same summary to the read-only submission preview where useful.
+## Fix (only `scripts/lib/20-supabase.sh`)
 
-5. Show buyer/company details in SAP Team view
-   - In SAP Sync cards/table, show buyer company and buyer/invited-by so SAP Team can identify who invited the vendor before sync.
+Before `docker compose pull` / `up -d`, add a "clean previous stack" step that:
 
-6. Backend/data changes needed
-   - Extend `list-pending-approvals-by-stage` response to include buyer company, invitation company, buyer, and mapped SCM Manager metadata.
-   - Add safe lookup logic from `vendor_invitations`, `tenants`, `profiles`, and `buyer_scm_mappings`.
-   - Add a routing fallback so invitation tenant is used for approval matrix seeding when an invited vendor’s saved company does not match the invitation company.
+1. Runs `docker compose down --remove-orphans` in `$BACKEND_DIR` (safe no-op on first run, releases ports on re-runs). Volumes are preserved — no data loss.
+2. Force-removes any stray containers named `supabase-kong`, `supabase-studio`, `supabase-db`, `supabase-rest`, `supabase-auth`, `supabase-storage`, `supabase-meta`, `supabase-functions`, `realtime-dev.supabase-realtime`, `supabase-analytics`, `supabase-vector`, `supabase-pooler` (covers the case where compose project name changed between runs and `down` doesn't see them).
+3. For each of `KONG_HTTP_PORT (8000)`, `KONG_HTTPS_PORT (8443)`, `STUDIO_PORT (3000)`, `POSTGRES_PORT (5432)`:
+   - Check with `ss -ltnp` whether `127.0.0.1:<port>` is still bound.
+   - If still bound by a non-Docker process, abort with a clear message naming the process so the user can free it.
+   - If free, continue.
+4. Then run the existing `docker compose pull` and `docker compose up -d`.
 
-Verification:
-- Naresh Babu appears for Rajaman at SCM Manager stage after repair.
-- After SCM Manager approval, the same vendor moves to SCM Head, Finance 1, Finance 2, and CEO as per the existing flow.
-- SCM Head, Finance 1, Finance 2, CEO, and SAP Team see all vendor data without tenant restriction.
-- Approval table/card and View Details popup clearly show vendor company and buyer/invited-by.
+Also add a small `--force-recreate` flag (optional, default off via env) — not strictly needed for this bug; the `down` step is enough. Skipping to keep the change minimal.
+
+No changes to secrets, `.env`, override file, migrations, functions, middleware, frontend, or nginx steps. No data loss: `down` without `-v` keeps volumes.
+
+## Technical detail
+
+Patch location: `scripts/lib/20-supabase.sh`, immediately before the existing `log "Pulling images"` block.
+
+```bash
+log "Stopping any previous Supabase stack (safe on first run)"
+( cd "$BACKEND_DIR" && docker compose down --remove-orphans ) || true
+
+# Belt-and-braces: remove stray containers from older compose project names
+for c in supabase-kong supabase-studio supabase-db supabase-rest \
+         supabase-auth supabase-storage supabase-meta supabase-functions \
+         supabase-analytics supabase-vector supabase-pooler \
+         realtime-dev.supabase-realtime; do
+  if docker ps -a --format '{{.Names}}' | grep -qx "$c"; then
+    echo "Removing stray container: $c"
+    docker rm -f "$c" >/dev/null || true
+  fi
+done
+
+log "Checking host ports are free"
+check_port() {
+  local port="$1" label="$2"
+  if ss -ltn "( sport = :$port )" | tail -n +2 | grep -q .; then
+    echo "ERROR: port $port ($label) is still in use after stopping the stack."
+    echo "Run: sudo ss -ltnp | grep :$port    to see what is holding it."
+    exit 1
+  fi
+}
+check_port "$KONG_HTTP_PORT"  "Kong HTTP"
+check_port "$KONG_HTTPS_PORT" "Kong HTTPS"
+check_port "$STUDIO_PORT"     "Studio"
+check_port "$POSTGRES_PORT"   "Postgres"
+```
+
+After this, the existing `docker compose pull` / `up -d` / Kong readiness loop runs unchanged, so a second `./deploy-vms-server.sh` invocation will succeed instead of failing on the bound port.
