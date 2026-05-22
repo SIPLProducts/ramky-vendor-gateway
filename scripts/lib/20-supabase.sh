@@ -147,11 +147,41 @@ services:
       - "127.0.0.1:${POSTGRES_PORT}:5432/tcp"
 EOF
 
+log "Stopping any previous Supabase stack (safe on first run)"
+( cd "$BACKEND_DIR" && docker compose down --remove-orphans ) || true
+
+# Belt-and-braces: remove stray containers from older compose project names
+for c in supabase-kong supabase-studio supabase-db supabase-rest \
+         supabase-auth supabase-storage supabase-meta supabase-functions \
+         supabase-analytics supabase-vector supabase-pooler \
+         realtime-dev.supabase-realtime; do
+  if docker ps -a --format '{{.Names}}' | grep -qx "$c"; then
+    echo "Removing stray container: $c"
+    docker rm -f "$c" >/dev/null || true
+  fi
+done
+
+log "Checking host ports are free"
+check_port() {
+  local port="$1" label="$2"
+  if ss -ltn "( sport = :$port )" 2>/dev/null | tail -n +2 | grep -q .; then
+    echo "ERROR: port $port ($label) is still in use after stopping the stack."
+    echo "Run: sudo ss -ltnp | grep :$port    to see what is holding it,"
+    echo "then stop that process (or change the *_PORT env var) and re-run."
+    exit 1
+  fi
+}
+check_port "$KONG_HTTP_PORT"  "Kong HTTP"
+check_port "$KONG_HTTPS_PORT" "Kong HTTPS"
+check_port "$STUDIO_PORT"     "Studio"
+check_port "$POSTGRES_PORT"   "Postgres"
+
 log "Pulling images"
 ( cd "$BACKEND_DIR" && docker compose pull )
 
 log "Starting Supabase stack"
 ( cd "$BACKEND_DIR" && docker compose up -d )
+
 
 log "Waiting for Kong on 127.0.0.1:${KONG_HTTP_PORT} (up to 180s)"
 ready=0
