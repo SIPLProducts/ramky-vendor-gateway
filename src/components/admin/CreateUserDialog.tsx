@@ -171,11 +171,13 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setSapFetched(false); setSapTenants([]); setSelectedCodes([]); setSapError(null); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchSapTenants(); } }}
-              onBlur={() => { if (email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !tenantOptional) { e.preventDefault(); fetchSapTenants(); } }}
+              onBlur={() => { if (!tenantOptional && email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
               placeholder="user@example.com"
             />
-            <p className="text-xs text-muted-foreground">Press Enter to load tenants for this email from SAP.</p>
+            {!tenantOptional && (
+              <p className="text-xs text-muted-foreground">Press Enter to load tenants for this email from SAP.</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Password *</Label>
