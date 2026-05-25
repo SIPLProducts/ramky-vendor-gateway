@@ -1,51 +1,82 @@
-## Goal
-Eliminate the misleading "Edge Function returned a non-2xx status code" error in the Create User dialog when the selected role is `sharvi_admin` or `admin`, since tenants are not required for those roles.
+# Why your server doesn't show the fix
 
-## File
-`src/components/admin/CreateUserDialog.tsx`
+The `CreateUserDialog` change is **frontend code**. On Lovable's preview it updates automatically, but your self-hosted server is serving a **pre-built `dist/`** from nginx — until you rebuild and redeploy that `dist/`, users keep seeing the old bundle.
 
-## Changes
+Your repo already has a deploy script for exactly this (`scripts/lib/60-frontend.sh`).
 
-1. **Guard `fetchSapTenants()`** — early-return when `tenantOptional` is true so the SAP lookup never fires for admin roles:
-   ```ts
-   const fetchSapTenants = async () => {
-     if (tenantOptional) return;
-     // ...existing body
-   };
+---
+
+## Part 1 — Redeploy the frontend on your server
+
+Run on the self-hosted box (as the user that owns the repo):
+
+```bash
+cd /path/to/repo                       # the folder containing package.json
+git pull                               # pull the latest code (CreateUserDialog fix etc.)
+
+# Build with the same env the installer uses
+npm ci || npm install
+npm run build                          # produces ./dist
+
+# Deploy to nginx web root (path used by your installer)
+sudo rsync -a --delete ./dist/ /var/www/sharvi/dist/
+
+# Force browser + nginx to drop the old bundle
+sudo nginx -s reload
+```
+
+Then **hard-refresh** the browser (Ctrl+F5) or open in incognito — Vite hashes filenames so a normal refresh is usually enough, but service workers / browser cache can still serve the old `index.html`.
+
+If you used the bundled installer, you can also re-run just the frontend step:
+
+```bash
+sudo bash scripts/deploy-vms-server.sh --only frontend
+```
+
+(Adjust the flag name to whatever your `deploy-vms-server.sh` exposes — the lib step is `60-frontend.sh`.)
+
+### How to confirm the new code is live
+1. Open the User Management → Create User dialog
+2. Pick role **sharvi_admin** or **admin**
+3. The Tenants section should now show the grey note *"Admin roles have global access — no tenant selection required."* instead of the red SAP error box.
+
+If you still see the old UI after a hard refresh, nginx is serving a cached `index.html` — clear `/var/cache/nginx/` or check that `rsync --delete` actually overwrote `dist/`.
+
+---
+
+## Part 2 — Email Configuration not saving
+
+You mentioned both tabs fail but didn't share the exact error. To fix this I need one of:
+
+- The **error toast text** shown when you click Save on each tab, **or**
+- The browser **Network tab** response for the failing request (status code + response body), **or**
+- The edge function log:
+  ```bash
+  # on the self-hosted box
+  docker logs supabase-edge-functions 2>&1 | grep -E "smtp-config-save|noreply" | tail -50
+  ```
+
+Likely culprits (will confirm once we see the error):
+
+1. **`smtp-config-save` / no-reply edge function not deployed on your server.** Self-hosted Supabase doesn't auto-deploy functions like Lovable Cloud does. Fix:
+   ```bash
+   cd /path/to/repo
+   supabase functions deploy smtp-config-save --no-verify-jwt
+   supabase functions deploy smtp-config-test
+   supabase functions deploy smtp-config-delete
+   # plus any no-reply function name used by NoReplyEmailConfig
    ```
+   Or re-run the installer's functions step (`40-functions.sh`).
 
-2. **Guard the email `onBlur` and `onKeyDown`** so they don't trigger SAP fetch for admin roles:
-   ```tsx
-   onKeyDown={(e) => { if (e.key === 'Enter' && !tenantOptional) { e.preventDefault(); fetchSapTenants(); } }}
-   onBlur={() => { if (!tenantOptional && email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
-   ```
+2. **RLS / role check failing** — `smtp-config-save` requires the caller to have role `sharvi_admin`, `admin`, or `customer_admin` in `user_roles`. If your logged-in user only has `vendor`, save returns 403.
 
-3. **Clear stale SAP state when role switches to an admin role.** Add a `useEffect` on `selectedRole`:
-   ```ts
-   useEffect(() => {
-     if (tenantOptional) {
-       setSapTenants([]); setSelectedCodes([]); setSapError(null); setSapFetched(false); setFetchingSap(false);
-     }
-   }, [selectedRole]);
-   ```
+3. **Missing `SUPABASE_SERVICE_ROLE_KEY` env** in the edge-functions container — causes a generic 500.
 
-4. **Replace the Tenants section with a simple info note when `tenantOptional`:**
-   ```tsx
-   {tenantOptional ? (
-     <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-       Admin roles have global access — no tenant selection required.
-     </div>
-   ) : (
-     /* existing Tenants label + list block unchanged */
-   )}
-   ```
+---
 
-5. **Update the email helper text** to hide the "Press Enter to load tenants" hint when `tenantOptional`.
+## What I'll do next (after you approve)
 
-## Out of scope
-- No backend / edge function changes
-- No changes to `handleSubmit` (already sends empty `sap_tenants` for admin roles)
-- No changes to other roles or other dialogs
+1. Document the redeploy procedure inline in `DEPLOYMENT_WINDOWS.md` / `SELFHOST_LINUX_HTTP.md` so you don't have to ask again.
+2. Once you paste the email-save error, patch the specific cause (deploy the function, fix role check, or whatever the log shows).
 
-## Follow-up (separate)
-If the `Create failed` toast still appears after these changes, the failure is inside the self-hosted `admin-create-user` edge function. Share `supabase functions logs admin-create-user` (or Docker logs for `supabase-edge-functions`) so we can debug — likely culprits: missing `SUPABASE_SERVICE_ROLE_KEY`, RLS rejecting `user_roles` / `audit_logs` inserts, or the `handle_new_user` trigger erroring.
+No code changes are required for Part 1 — it's purely a server-side rebuild. Part 2 is gated on the error you see.
