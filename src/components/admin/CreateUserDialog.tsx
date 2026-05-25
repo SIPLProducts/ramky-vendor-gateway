@@ -102,6 +102,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const isCustom = selectedRole.startsWith('custom:');
   const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
+  const tenantOptional = selectedRole === 'sharvi_admin' || selectedRole === 'admin';
 
   const handleSubmit = async () => {
     if (!fullName.trim()) {
@@ -113,7 +114,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
     if (password.length < 8) {
       toast({ title: 'Weak password', description: 'Password must be at least 8 characters', variant: 'destructive' }); return;
     }
-    if (selectedCodes.length === 0) {
+    if (!tenantOptional && selectedCodes.length === 0) {
       toast({ title: 'Tenant required', description: 'Please select at least one tenant from SAP', variant: 'destructive' }); return;
     }
     setSaving(true);
