@@ -286,6 +286,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
               </div>
             </div>
           </div>
+          )}
          </div>
         </div>
         <div className="px-6 py-4 border-t">
