@@ -1,23 +1,51 @@
 ## Goal
-In the Create User dialog (User Management), make the Tenants selection optional when the chosen role is `sharvi_admin` or `admin`. For all other roles it stays mandatory as today.
+Eliminate the misleading "Edge Function returned a non-2xx status code" error in the Create User dialog when the selected role is `sharvi_admin` or `admin`, since tenants are not required for those roles.
+
+## File
+`src/components/admin/CreateUserDialog.tsx`
 
 ## Changes
-File: `src/components/admin/CreateUserDialog.tsx`
 
-1. Add a derived flag:
+1. **Guard `fetchSapTenants()`** — early-return when `tenantOptional` is true so the SAP lookup never fires for admin roles:
    ```ts
-   const tenantOptional = selectedRole === 'sharvi_admin' || selectedRole === 'admin';
+   const fetchSapTenants = async () => {
+     if (tenantOptional) return;
+     // ...existing body
+   };
    ```
 
-2. In `handleSubmit`, skip the "at least one tenant" check when `tenantOptional` is true:
-   ```ts
-   if (!tenantOptional && selectedCodes.length === 0) { ...toast... return; }
+2. **Guard the email `onBlur` and `onKeyDown`** so they don't trigger SAP fetch for admin roles:
+   ```tsx
+   onKeyDown={(e) => { if (e.key === 'Enter' && !tenantOptional) { e.preventDefault(); fetchSapTenants(); } }}
+   onBlur={() => { if (!tenantOptional && email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
    ```
 
-3. Update the Tenants label so the asterisk only shows when required:
-   - `Tenants *` → `Tenants{tenantOptional ? '' : ' *'}` with helper text "(optional for admin roles)" when `tenantOptional`.
+3. **Clear stale SAP state when role switches to an admin role.** Add a `useEffect` on `selectedRole`:
+   ```ts
+   useEffect(() => {
+     if (tenantOptional) {
+       setSapTenants([]); setSelectedCodes([]); setSapError(null); setSapFetched(false); setFetchingSap(false);
+     }
+   }, [selectedRole]);
+   ```
 
-4. No backend / edge function changes — `admin-create-user` already receives `sap_tenants` and can accept an empty array.
+4. **Replace the Tenants section with a simple info note when `tenantOptional`:**
+   ```tsx
+   {tenantOptional ? (
+     <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+       Admin roles have global access — no tenant selection required.
+     </div>
+   ) : (
+     /* existing Tenants label + list block unchanged */
+   )}
+   ```
+
+5. **Update the email helper text** to hide the "Press Enter to load tenants" hint when `tenantOptional`.
 
 ## Out of scope
-- No changes to the role list, other dialogs, or backend logic.
+- No backend / edge function changes
+- No changes to `handleSubmit` (already sends empty `sap_tenants` for admin roles)
+- No changes to other roles or other dialogs
+
+## Follow-up (separate)
+If the `Create failed` toast still appears after these changes, the failure is inside the self-hosted `admin-create-user` edge function. Share `supabase functions logs admin-create-user` (or Docker logs for `supabase-edge-functions`) so we can debug — likely culprits: missing `SUPABASE_SERVICE_ROLE_KEY`, RLS rejecting `user_roles` / `audit_logs` inserts, or the `handle_new_user` trigger erroring.

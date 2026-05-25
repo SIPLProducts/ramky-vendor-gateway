@@ -66,6 +66,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   };
 
   const fetchSapTenants = async () => {
+    if (tenantOptional) return;
     const trimmed = email.trim();
     if (!trimmed || !/.+@.+\..+/.test(trimmed)) {
       setSapError('Please enter a valid email first.');
