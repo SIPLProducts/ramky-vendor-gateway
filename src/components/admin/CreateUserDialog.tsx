@@ -102,6 +102,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const isCustom = selectedRole.startsWith('custom:');
   const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
+  const tenantOptional = selectedRole === 'sharvi_admin' || selectedRole === 'admin';
 
   const handleSubmit = async () => {
     if (!fullName.trim()) {
@@ -113,7 +114,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
     if (password.length < 8) {
       toast({ title: 'Weak password', description: 'Password must be at least 8 characters', variant: 'destructive' }); return;
     }
-    if (selectedCodes.length === 0) {
+    if (!tenantOptional && selectedCodes.length === 0) {
       toast({ title: 'Tenant required', description: 'Please select at least one tenant from SAP', variant: 'destructive' }); return;
     }
     setSaving(true);
@@ -213,7 +214,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Tenants * <span className="text-xs font-normal text-muted-foreground">(from SAP)</span></Label>
+              <Label>Tenants{tenantOptional ? '' : ' *'} <span className="text-xs font-normal text-muted-foreground">{tenantOptional ? '(optional for admin roles)' : '(from SAP)'}</span></Label>
               <Button
                 type="button" variant="ghost" size="sm"
                 onClick={fetchSapTenants}
