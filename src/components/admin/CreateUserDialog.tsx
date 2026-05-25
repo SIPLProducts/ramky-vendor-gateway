@@ -66,6 +66,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   };
 
   const fetchSapTenants = async () => {
+    if (tenantOptional) return;
     const trimmed = email.trim();
     if (!trimmed || !/.+@.+\..+/.test(trimmed)) {
       setSapError('Please enter a valid email first.');
@@ -103,6 +104,13 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
   const tenantOptional = selectedRole === 'sharvi_admin' || selectedRole === 'admin';
+
+  useEffect(() => {
+    if (tenantOptional) {
+      setSapTenants([]); setSelectedCodes([]); setSapError(null); setSapFetched(false); setFetchingSap(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole]);
 
   const handleSubmit = async () => {
     if (!fullName.trim()) {
@@ -163,11 +171,13 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setSapFetched(false); setSapTenants([]); setSelectedCodes([]); setSapError(null); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchSapTenants(); } }}
-              onBlur={() => { if (email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !tenantOptional) { e.preventDefault(); fetchSapTenants(); } }}
+              onBlur={() => { if (!tenantOptional && email.trim() && !sapFetched && !fetchingSap) fetchSapTenants(); }}
               placeholder="user@example.com"
             />
-            <p className="text-xs text-muted-foreground">Press Enter to load tenants for this email from SAP.</p>
+            {!tenantOptional && (
+              <p className="text-xs text-muted-foreground">Press Enter to load tenants for this email from SAP.</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Password *</Label>
@@ -212,6 +222,14 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
               </SelectContent>
             </Select>
           </div>
+          {tenantOptional ? (
+          <div className="space-y-2">
+            <Label>Tenants <span className="text-xs font-normal text-muted-foreground">(not required)</span></Label>
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              Admin roles have global access — no tenant selection required.
+            </div>
+          </div>
+          ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Tenants{tenantOptional ? '' : ' *'} <span className="text-xs font-normal text-muted-foreground">{tenantOptional ? '(optional for admin roles)' : '(from SAP)'}</span></Label>
@@ -268,6 +286,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
               </div>
             </div>
           </div>
+          )}
          </div>
         </div>
         <div className="px-6 py-4 border-t">
