@@ -80,6 +80,7 @@ const navItems: NavItem[] = [
   { label: 'Scheduled Checks', href: '/compliance/scheduled', icon: ClipboardCheck, screenKey: 'scheduled_checks' },
   { label: 'Audit Logs', href: '/audit-logs', icon: History, screenKey: 'audit_logs' },
   { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
+  { label: 'Custom Roles', href: '/admin/custom-roles', icon: ShieldCheck, screenKey: 'custom_roles' },
   { label: 'Email Configuration', href: '/admin/email-config', icon: Mail, screenKey: 'email_configuration' },
   { label: 'Help & Support', href: '/support', icon: HelpCircle, screenKey: 'support' },
 ];
