@@ -222,6 +222,14 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
               </SelectContent>
             </Select>
           </div>
+          {tenantOptional ? (
+          <div className="space-y-2">
+            <Label>Tenants <span className="text-xs font-normal text-muted-foreground">(not required)</span></Label>
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              Admin roles have global access — no tenant selection required.
+            </div>
+          </div>
+          ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Tenants{tenantOptional ? '' : ' *'} <span className="text-xs font-normal text-muted-foreground">{tenantOptional ? '(optional for admin roles)' : '(from SAP)'}</span></Label>
