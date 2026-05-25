@@ -1,82 +1,42 @@
-# Why your server doesn't show the fix
+## Why these screens don't appear
 
-The `CreateUserDialog` change is **frontend code**. On Lovable's preview it updates automatically, but your self-hosted server is serving a **pre-built `dist/`** from nginx — until you rebuild and redeploy that `dist/`, users keep seeing the old bundle.
+Nothing is hardcoded against `sharvi_admin`. The sidebar is fully permission-driven: each item is shown only if `useScreenPermissions().can(screenKey)` returns true, which reads from `role_screen_permissions`.
 
-Your repo already has a deploy script for exactly this (`scripts/lib/60-frontend.sh`).
+The bug: the sidebar references screen keys that **don't exist** in the matrix definition (`SCREENS` in `src/pages/RolePermissions.tsx`). Because they're never listed, they're never inserted into `role_screen_permissions` for any role — so `can()` always returns false, for sharvi_admin too.
 
----
+Keys used by the sidebar but missing from `SCREENS`:
+- `sap_api_settings` (SAP API Settings)
+- `kyc_api_settings` (KYC API Settings)
+- `email_configuration` (Email Configuration)
+- `form_builder` (Form Builder)
 
-## Part 1 — Redeploy the frontend on your server
+`custom_roles` is in `SCREENS` but has no sidebar entry — minor gap, fixed in the same pass.
 
-Run on the self-hosted box (as the user that owns the repo):
+## Fix
 
-```bash
-cd /path/to/repo                       # the folder containing package.json
-git pull                               # pull the latest code (CreateUserDialog fix etc.)
-
-# Build with the same env the installer uses
-npm ci || npm install
-npm run build                          # produces ./dist
-
-# Deploy to nginx web root (path used by your installer)
-sudo rsync -a --delete ./dist/ /var/www/sharvi/dist/
-
-# Force browser + nginx to drop the old bundle
-sudo nginx -s reload
+### 1. Add the missing rows to `SCREENS`
+`src/pages/RolePermissions.tsx` — append:
 ```
-
-Then **hard-refresh** the browser (Ctrl+F5) or open in incognito — Vite hashes filenames so a normal refresh is usually enough, but service workers / browser cache can still serve the old `index.html`.
-
-If you used the bundled installer, you can also re-run just the frontend step:
-
-```bash
-sudo bash scripts/deploy-vms-server.sh --only frontend
+{ key: 'form_builder',        label: 'Form Builder' },
+{ key: 'sap_api_settings',    label: 'SAP API Settings' },
+{ key: 'kyc_api_settings',    label: 'KYC API Settings' },
+{ key: 'email_configuration', label: 'Email Configuration' },
 ```
+So they appear in the Role & Screen Permissions matrix and admins can toggle them per role/tenant.
 
-(Adjust the flag name to whatever your `deploy-vms-server.sh` exposes — the lib step is `60-frontend.sh`.)
+### 2. Add a sidebar entry for Custom Roles
+`src/components/layout/Sidebar.tsx` — add nav item with `screenKey: 'custom_roles'` pointing to `/admin/custom-roles` (route already exists).
 
-### How to confirm the new code is live
-1. Open the User Management → Create User dialog
-2. Pick role **sharvi_admin** or **admin**
-3. The Tenants section should now show the grey note *"Admin roles have global access — no tenant selection required."* instead of the red SAP error box.
+### 3. Seed defaults via data insert
+Insert `can_access = true` rows in `role_screen_permissions` (tenant_id NULL = global default) using `ON CONFLICT DO NOTHING` so existing admin choices are preserved:
+- `sharvi_admin`: all 4 new screens + `custom_roles`
+- `admin` / `customer_admin`: `email_configuration`, `form_builder`, `sap_api_settings`, `kyc_api_settings`, `custom_roles`
+- Other built-in roles: not granted by default (admins can flip on per tenant)
 
-If you still see the old UI after a hard refresh, nginx is serving a cached `index.html` — clear `/var/cache/nginx/` or check that `rsync --delete` actually overwrote `dist/`.
+### 4. Verify on the server
+After rebuilding `dist` locally with the fix and deploying:
+- Log in as Sharvi Admin → sidebar should now show **SAP API Settings**, **KYC API Settings**, **Email Configuration**, **Form Builder**, **Custom Roles**.
+- Open **User Management → Role Permissions** → new rows visible and toggleable.
 
----
-
-## Part 2 — Email Configuration not saving
-
-You mentioned both tabs fail but didn't share the exact error. To fix this I need one of:
-
-- The **error toast text** shown when you click Save on each tab, **or**
-- The browser **Network tab** response for the failing request (status code + response body), **or**
-- The edge function log:
-  ```bash
-  # on the self-hosted box
-  docker logs supabase-edge-functions 2>&1 | grep -E "smtp-config-save|noreply" | tail -50
-  ```
-
-Likely culprits (will confirm once we see the error):
-
-1. **`smtp-config-save` / no-reply edge function not deployed on your server.** Self-hosted Supabase doesn't auto-deploy functions like Lovable Cloud does. Fix:
-   ```bash
-   cd /path/to/repo
-   supabase functions deploy smtp-config-save --no-verify-jwt
-   supabase functions deploy smtp-config-test
-   supabase functions deploy smtp-config-delete
-   # plus any no-reply function name used by NoReplyEmailConfig
-   ```
-   Or re-run the installer's functions step (`40-functions.sh`).
-
-2. **RLS / role check failing** — `smtp-config-save` requires the caller to have role `sharvi_admin`, `admin`, or `customer_admin` in `user_roles`. If your logged-in user only has `vendor`, save returns 403.
-
-3. **Missing `SUPABASE_SERVICE_ROLE_KEY` env** in the edge-functions container — causes a generic 500.
-
----
-
-## What I'll do next (after you approve)
-
-1. Document the redeploy procedure inline in `DEPLOYMENT_WINDOWS.md` / `SELFHOST_LINUX_HTTP.md` so you don't have to ask again.
-2. Once you paste the email-save error, patch the specific cause (deploy the function, fix role check, or whatever the log shows).
-
-No code changes are required for Part 1 — it's purely a server-side rebuild. Part 2 is gated on the error you see.
+## Note on your self-hosted server
+The seed insert (step 3) runs against the Lovable Cloud database. Your self-hosted backend at `10.200.1.7/supabase` is a separate Postgres — you'll need to apply the same SQL there (or re-run your migration pipeline) for the rows to exist in the self-hosted DB after deploy.
