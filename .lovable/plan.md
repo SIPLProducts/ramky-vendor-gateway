@@ -1,42 +1,40 @@
-## Why these screens don't appear
+## Goal
 
-Nothing is hardcoded against `sharvi_admin`. The sidebar is fully permission-driven: each item is shown only if `useScreenPermissions().can(screenKey)` returns true, which reads from `role_screen_permissions`.
+Export all SAP API Settings data from Lovable Cloud as a runnable SQL seed script, so you can apply it on the self-hosted Postgres (10.200.1.7) — same pattern used for KYC.
 
-The bug: the sidebar references screen keys that **don't exist** in the matrix definition (`SCREENS` in `src/pages/RolePermissions.tsx`). Because they're never listed, they're never inserted into `role_screen_permissions` for any role — so `can()` always returns false, for sharvi_admin too.
+## What gets exported
 
-Keys used by the sidebar but missing from `SCREENS`:
-- `sap_api_settings` (SAP API Settings)
-- `kyc_api_settings` (KYC API Settings)
-- `email_configuration` (Email Configuration)
-- `form_builder` (Form Builder)
+All 4 SAP config tables, in dependency order:
 
-`custom_roles` is in `SCREENS` but has no sidebar entry — minor gap, fixed in the same pass.
+1. `public.sap_api_configs` — 5 rows (Create vendor in SAP, SAP Fields F4, Documents Uploading, Classification F4s, Tenants From SAP)
+2. `public.sap_api_credentials` — username + password per config
+3. `public.sap_api_request_fields` — request payload field mappings
+4. `public.sap_api_response_fields` — response field mappings
 
-## Fix
+## Output
 
-### 1. Add the missing rows to `SCREENS`
-`src/pages/RolePermissions.tsx` — append:
+A single file: `scripts/seed-sap-api-settings.sql`
+
+Contents:
+- `BEGIN;` … `COMMIT;` wrapper
+- One `INSERT … ON CONFLICT (id) DO UPDATE SET …` per row for `sap_api_configs` (idempotent — safe to re-run, will refresh values if rows already exist)
+- `DELETE FROM sap_api_request_fields WHERE config_id IN (...); INSERT …` for request/response fields (full replace per config, matches `useReplaceSapRequestFields` semantics)
+- `INSERT … ON CONFLICT (config_id) DO UPDATE` for credentials
+
+All real UUIDs, URLs, middleware URL (`https://curfew-thinning-shadow.ngrok-free.dev`), proxy secrets, and credentials are preserved as-is from the cloud DB.
+
+## How you run it on the server
+
+```bash
+psql -h 10.200.1.7 -p 5432 -U postgres -d postgres -f scripts/seed-sap-api-settings.sql
 ```
-{ key: 'form_builder',        label: 'Form Builder' },
-{ key: 'sap_api_settings',    label: 'SAP API Settings' },
-{ key: 'kyc_api_settings',    label: 'KYC API Settings' },
-{ key: 'email_configuration', label: 'Email Configuration' },
-```
-So they appear in the Role & Screen Permissions matrix and admins can toggle them per role/tenant.
 
-### 2. Add a sidebar entry for Custom Roles
-`src/components/layout/Sidebar.tsx` — add nav item with `screenKey: 'custom_roles'` pointing to `/admin/custom-roles` (route already exists).
+(or whatever connection string your self-hosted Supabase Postgres uses — same one you used for the KYC seed)
 
-### 3. Seed defaults via data insert
-Insert `can_access = true` rows in `role_screen_permissions` (tenant_id NULL = global default) using `ON CONFLICT DO NOTHING` so existing admin choices are preserved:
-- `sharvi_admin`: all 4 new screens + `custom_roles`
-- `admin` / `customer_admin`: `email_configuration`, `form_builder`, `sap_api_settings`, `kyc_api_settings`, `custom_roles`
-- Other built-in roles: not granted by default (admins can flip on per tenant)
+## Notes
 
-### 4. Verify on the server
-After rebuilding `dist` locally with the fix and deploying:
-- Log in as Sharvi Admin → sidebar should now show **SAP API Settings**, **KYC API Settings**, **Email Configuration**, **Form Builder**, **Custom Roles**.
-- Open **User Management → Role Permissions** → new rows visible and toggleable.
+- `created_by` is nulled out on insert (the cloud user UUID won't exist in the self-hosted `auth.users`), avoiding FK violations.
+- Script is read-only against your cloud DB — it just generates a `.sql` file. Nothing changes in Lovable Cloud.
+- After applying, log in as Sharvi Admin on the self-hosted UI → SAP API Settings → all 5 configs + their field mappings + credentials should appear.
 
-## Note on your self-hosted server
-The seed insert (step 3) runs against the Lovable Cloud database. Your self-hosted backend at `10.200.1.7/supabase` is a separate Postgres — you'll need to apply the same SQL there (or re-run your migration pipeline) for the rows to exist in the self-hosted DB after deploy.
+Approve and I'll generate the file.
