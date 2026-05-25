@@ -214,7 +214,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Tenants * <span className="text-xs font-normal text-muted-foreground">(from SAP)</span></Label>
+              <Label>Tenants{tenantOptional ? '' : ' *'} <span className="text-xs font-normal text-muted-foreground">{tenantOptional ? '(optional for admin roles)' : '(from SAP)'}</span></Label>
               <Button
                 type="button" variant="ghost" size="sm"
                 onClick={fetchSapTenants}
