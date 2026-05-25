@@ -229,3 +229,32 @@ curl http://10.200.1.7/sap/  # should hit middleware (401 without key is OK)
 | Nginx 502 on `/sap/` | middleware not running — `systemctl status vms-middleware` |
 | Browser shows blank page | `frontend/` is empty or built without correct `VITE_SUPABASE_URL` — rebuild and redeploy |
 | Can't reach from other PCs | firewall — `sudo ufw status`, ensure 80 allowed |
+
+---
+
+## 9. Redeploying after pulling new code
+
+Whenever you pull updates from the repo, the **frontend bundle in nginx must be rebuilt** — otherwise users keep seeing the old UI.
+
+```bash
+cd /path/to/repo
+git pull
+
+# Rebuild frontend
+npm ci || npm install
+npm run build
+sudo rsync -a --delete ./dist/ /var/www/sharvi/dist/
+sudo nginx -s reload
+
+# Redeploy edge functions (self-hosted Supabase does NOT auto-deploy)
+supabase functions deploy admin-create-user --no-verify-jwt
+supabase functions deploy smtp-config-save --no-verify-jwt
+supabase functions deploy smtp-config-test --no-verify-jwt
+supabase functions deploy smtp-config-delete --no-verify-jwt
+# add any other functions you changed
+
+# Or re-run the installer's function step
+sudo bash scripts/deploy-vms-server.sh --only functions
+```
+
+Hard-refresh the browser (Ctrl+F5) or open incognito to bypass cached `index.html`.
