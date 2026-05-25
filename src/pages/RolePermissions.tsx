@@ -35,6 +35,10 @@ export const SCREENS: { key: string; label: string }[] = [
   { key: 'sharvi_admin_console', label: 'Sharvi Admin Console' },
   { key: 'vendor_invitations', label: 'Vendor Invitations' },
   { key: 'custom_roles', label: 'Custom Roles' },
+  { key: 'form_builder', label: 'Form Builder' },
+  { key: 'sap_api_settings', label: 'SAP API Settings' },
+  { key: 'kyc_api_settings', label: 'KYC API Settings' },
+  { key: 'email_configuration', label: 'Email Configuration' },
   { key: 'support', label: 'Help & Support' },
 ];
 
