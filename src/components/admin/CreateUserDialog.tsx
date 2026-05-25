@@ -105,6 +105,13 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
   const tenantOptional = selectedRole === 'sharvi_admin' || selectedRole === 'admin';
 
+  useEffect(() => {
+    if (tenantOptional) {
+      setSapTenants([]); setSelectedCodes([]); setSapError(null); setSapFetched(false); setFetchingSap(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole]);
+
   const handleSubmit = async () => {
     if (!fullName.trim()) {
       toast({ title: 'Full name required', variant: 'destructive' }); return;
