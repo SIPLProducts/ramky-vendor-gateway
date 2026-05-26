@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { safeUUID } from '@/lib/uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenants } from '@/hooks/useTenant';
@@ -137,7 +138,7 @@ export default function AdminInvitations() {
       }
 
       // Generate unique token
-      const token = crypto.randomUUID();
+      const token = safeUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
