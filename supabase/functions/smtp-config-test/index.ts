@@ -80,18 +80,42 @@ serve(async (req) => {
       replyTo = body.reply_to ? String(body.reply_to).trim() : null;
     }
 
-    // Use the exact port + encryption configured by the user.
-    // Implicit TLS only when encryption is ssl or port is 465.
-    const useImplicitTls = encryption === "ssl" || port === 465;
+    // Gmail STARTTLS on port 587 hangs on self-hosted edge-runtime (denomailer
+    // TLS upgrade stalls -> supervisor kills worker with WorkerRequestCancelled).
+    // Force Gmail to 465 implicit TLS regardless of saved port.
+    let effectivePort = port;
+    if (/(^|\.)gmail\.com$/i.test(host) && port === 587) {
+      console.warn(
+        "[smtp-config-test] Gmail 587 STARTTLS unreliable on self-host, using 465 implicit TLS",
+      );
+      effectivePort = 465;
+    }
+    const useImplicitTls = encryption === "ssl" || effectivePort === 465;
 
     const client = new SMTPClient({
       connection: {
         hostname: host,
-        port,
+        port: effectivePort,
         tls: useImplicitTls,
         auth: { username, password },
       },
     });
+
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, rej) =>
+          setTimeout(
+            () =>
+              rej(
+                new Error(
+                  `${label} timed out after ${ms / 1000}s — check firewall egress on port ${effectivePort} from server to ${host}`,
+                ),
+              ),
+            ms,
+          )
+        ),
+      ]);
 
     const cleanFromName = fromName.replace(/[<>"]/g, "");
     const from = cleanFromName ? `${cleanFromName} <${fromEmail}>` : fromEmail;
