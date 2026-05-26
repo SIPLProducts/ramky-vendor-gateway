@@ -1,58 +1,72 @@
 ## Problem
 
-The Lovable Cloud edge logs for `smtp-config-test` show:
+Email arrives correctly. When the vendor clicks **Begin Registration** (or the Direct Link), the browser goes:
 
-```
-event loop error: Error: invalid cmd
-  at SMTPConnection.assertCode (denomailer/.../connection.ts:57:13)
-smtp-config-test error BadResource: Bad resource ID
-  at Object.startTls (ext:deno_net/02_tls.js)
-  at SMTPClient.#prepareConnection (denomailer/.../client.ts:201:31)
-```
+1. `http://10.200.1.7/vendor/invite?token=…` → loads `VendorInviteAccept`
+2. The page calls the `accept-vendor-invite` edge function
+3. That function asks GoTrue for a magic link and gets back  
+   `http://10.200.1.7/auth/v1/verify?token=…&type=magiclink&redirect_to=…`
+4. The browser is redirected to that URL → **nginx returns 404** (the SPA fallback hits, no React route matches `/auth/v1/verify`)
 
-This is a known `denomailer@1.6.0` bug on the current Deno edge runtime: when doing STARTTLS on port 587, the EHLO/STARTTLS handshake aborts and the underlying TCP resource gets closed before TLS upgrade — hence both `invalid cmd` and `BadResource`. The data (587/tls) is correct; the SMTP library is broken in this runtime.
+Root cause: On the self-hosted server, Supabase is reverse-proxied under **`/supabase/…`** (nginx `location /supabase/` → Kong). GoTrue’s currently-running container, however, has `API_EXTERNAL_URL=http://10.200.1.7` (no `/supabase` suffix), so the action link it mints omits the prefix. The deploy script already writes the correct value to `.env`, but the running `auth` container was started before that change and hasn’t been restarted with the new env. On Lovable Cloud the same code works because the Supabase host has no path prefix.
 
-The previous timeout/port fix (465 → 587) was necessary but not sufficient — denomailer itself can't complete STARTTLS here.
+We can’t rely on the user always remembering to restart GoTrue with the right env, and we shouldn’t break the cloud preview either. The robust fix is to make `accept-vendor-invite` normalize the returned `action_link` so it always points through the public proxy.
 
 ## Fix
 
-Replace `denomailer` with `nodemailer` (Node-compat via `npm:` specifier), which handles Gmail STARTTLS reliably in Deno Edge Runtime and is the de-facto SMTP client.
+Single change, single file: **`supabase/functions/accept-vendor-invite/index.ts`**
 
-### Files to change (3 edge functions, ~20 lines each)
+After `admin.auth.admin.generateLink(...)` succeeds, post-process `linkData.properties.action_link`:
 
-1. **`supabase/functions/smtp-config-test/index.ts`**
-2. **`supabase/functions/send-smtp-email/index.ts`**
-3. **`supabase/functions/send-vendor-invitation/index.ts`**
+```ts
+const rawActionLink = linkData.properties.action_link as string;
+let actionLink = rawActionLink;
 
-In each:
-- Replace `import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"` with `import nodemailer from "npm:nodemailer@6.9.14"`.
-- Replace the `new SMTPClient({ connection: { hostname, port, tls, auth } })` block with:
-  ```ts
-  const transporter = nodemailer.createTransport({
-    host, port,
-    secure: encryption === "ssl",   // true for 465 implicit TLS, false for 587 STARTTLS
-    auth: { user: username, pass: password },
-  });
-  ```
-- Replace `client.send({ from, to, cc, subject, content, html })` with `transporter.sendMail({ from, to, cc, subject, text: content, html })`.
-- Remove `client.close()` (nodemailer pools clean up automatically; optional `transporter.close()` is fine).
-- Keep the existing 25 s timeout wrapper, port/encryption logic, CC fallback, and CORS — only swap the SMTP client.
+try {
+  const actionUrl = new URL(rawActionLink);
+  const originUrl = redirectOrigin ? new URL(redirectOrigin) : null;
 
-No DB migration, no config change, no secret change. After deploy, both:
-- Lovable Cloud "Send Test Email" on `/admin/email-config`
-- On-prem `send-vendor-invitation` (after they rsync the new code)
+  // Self-hosted: Supabase lives behind nginx at <origin>/supabase/.
+  // GoTrue may have been started with API_EXTERNAL_URL pointing at the
+  // bare origin, producing /auth/v1/verify (404 in the SPA). If the link
+  // host matches the frontend host and the path starts with /auth/v1/,
+  // inject the /supabase prefix so it routes through Kong.
+  if (
+    originUrl &&
+    actionUrl.host === originUrl.host &&
+    actionUrl.pathname.startsWith("/auth/v1/") &&
+    !actionUrl.pathname.startsWith("/supabase/")
+  ) {
+    actionUrl.pathname = "/supabase" + actionUrl.pathname;
+    actionLink = actionUrl.toString();
+  }
+} catch (e) {
+  console.warn("action_link normalization failed:", e);
+}
 
-will complete STARTTLS on 587 and deliver via Gmail.
+return new Response(
+  JSON.stringify({ action_link: actionLink, email, invitation_id: invite.id }),
+  { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+);
+```
+
+That is the only logic change — everything else (token validation, user provisioning, magic-link generation, redirect target) stays identical.
+
+### Why this is safe on Lovable Cloud
+
+- On Lovable Cloud the action link host is `kntaaugefxhymmrvivaj.supabase.co`, which never matches the frontend origin (`*.lovable.app` / `vms.siplproducts.com`), so the `if` branch is skipped and the link is returned unchanged.
+- Only the self-hosted case (same host, bare `/auth/v1/…`) gets the `/supabase` prefix injected.
 
 ## Verification
 
-1. Deploy the three functions.
-2. From `/admin/email-config`, click Send Test Email for each Gmail row → expect `{ success: true, sentTo: ... }` and an inbox delivery within ~5 s.
-3. Tail `smtp-config-test` logs → no more `invalid cmd` / `BadResource`.
-4. Send a vendor invitation → confirm email arrives.
+1. Redeploy `accept-vendor-invite` (Lovable Cloud auto-deploys; on-prem needs the usual `git pull` + `rsync supabase/functions/accept-vendor-invite/` + `docker compose restart functions`).
+2. Send a fresh invitation, click **Begin Registration** in the email.
+3. Browser should redirect to `http://10.200.1.7/supabase/auth/v1/verify?…`, GoTrue exchanges the magic token, then bounces back to `http://10.200.1.7/vendor/registration?token=…` signed in.
+4. No 404, registration form loads.
 
 ## Out of scope
 
-- No UI changes.
-- No change to `smtp_email_configs` rows (they are already 587/tls).
-- No change to the on-prem deployment process; they still need to `git pull` + `rsync` + `docker compose restart functions` to pick up the new code on their box.
+- No frontend changes.
+- No DB/migration/secret changes.
+- No change to the SMTP fix already shipped.
+- We are not touching the on-prem GoTrue env; the normalizer makes the system self-correcting, but the user can still optionally restart `auth` with the updated `API_EXTERNAL_URL` for a cleaner setup.
