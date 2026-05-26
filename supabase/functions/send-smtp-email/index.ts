@@ -214,14 +214,14 @@ const handler = async (req: Request): Promise<Response> => {
       : "");
 
     const trySend = async () => {
-      await client.send({
+      await transporter.sendMail({
         from,
         to: toArr,
         cc: ccArr,
         bcc: bccArr,
         replyTo: replyTo || undefined,
         subject: body.subject,
-        content: plainText,
+        text: plainText,
         html: body.html,
       });
     };
@@ -230,7 +230,7 @@ const handler = async (req: Request): Promise<Response> => {
       await withTimeout(trySend(), 25000, "SMTP send");
     } catch (sendErr: any) {
       const msg = String(sendErr?.message ?? sendErr);
-      // If denomailer still rejects something Reply-To related, retry once
+      // If the SMTP server still rejects something Reply-To related, retry once
       // without Reply-To and the extra Cc so the buyer email goes through.
       if (/reply.?to/i.test(msg) || /not a valid email/i.test(msg)) {
         console.warn(`[send-smtp-email] Retrying without Reply-To/extra Cc due to: ${msg}`);
@@ -242,7 +242,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    await client.close();
+    try { transporter.close(); } catch { /* ignore */ }
 
     // Audit log (best-effort)
     try {
