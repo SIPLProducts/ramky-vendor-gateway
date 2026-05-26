@@ -86,13 +86,11 @@ serve(async (req) => {
     const effectivePort = port;
     const useImplicitTls = encryption === "ssl";
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: host,
-        port: effectivePort,
-        tls: useImplicitTls,
-        auth: { username, password },
-      },
+    const transporter = nodemailer.createTransport({
+      host,
+      port: effectivePort,
+      secure: useImplicitTls,
+      auth: { user: username, pass: password },
     });
 
     const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
