@@ -180,7 +180,7 @@ export default function AdminInvitations() {
         },
       });
 
-      // Surface "not configured" error from edge function (returns non-2xx with JSON body)
+      // Surface error from edge function (function now always returns 200 with { success, error })
       const notConfiguredMsg = 'You are not configured in Email Configuration';
       let serverErrMsg = '';
       if (emailError) {
@@ -195,17 +195,19 @@ export default function AdminInvitations() {
           }
         } catch { /* ignore */ }
       }
-      const respErrMsg = serverErrMsg || (emailData as any)?.error || (emailError as any)?.message || '';
+      const dataObj: any = emailData ?? {};
+      const respErrMsg = serverErrMsg || dataObj?.error || (emailError as any)?.message || '';
       if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
         return { invitation, emailSent: false, notConfigured: true };
       }
 
-      if (emailError) {
-        return { invitation, emailSent: false, error: emailError };
+      if (emailError || dataObj?.success === false || respErrMsg) {
+        return { invitation, emailSent: false, error: respErrMsg || 'Failed to send email' };
       }
 
       console.log('Email sent successfully:', emailData);
       return { invitation, emailSent: true, emailData };
+
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
