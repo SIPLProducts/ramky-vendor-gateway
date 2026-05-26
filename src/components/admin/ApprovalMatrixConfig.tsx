@@ -113,10 +113,11 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
   }, [isDirty]);
 
   useEffect(() => {
-    if (activeTenants.length > 0 && !tenantId) {
-      setTenantId(activeTenants[0].id);
+    if (externallyControlled) return;
+    if (activeTenants.length > 0 && !internalTenantId) {
+      setInternalTenantId(activeTenants[0].id);
     }
-  }, [activeTenants, tenantId]);
+  }, [activeTenants, internalTenantId, externallyControlled]);
 
   useEffect(() => {
     if (!tenantId) return;
