@@ -231,11 +231,14 @@ export default function AdminInvitations() {
         });
       } else {
         toast({
-          title: 'Invitation Created',
-          description: 'Invitation created but email failed to send. You can resend it from the list.',
-          variant: 'default',
+          title: 'Email Failed',
+          description: (result as any).error
+            ? `Invitation created but email failed: ${(result as any).error}`
+            : 'Invitation created but email failed to send. You can resend it from the list.',
+          variant: 'destructive',
         });
       }
+
     },
     onError: (error: any) => {
       const msg = error?.message || 'Failed to create invitation';
