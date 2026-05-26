@@ -293,19 +293,20 @@ export default function AdminInvitations() {
           }
         } catch { /* ignore */ }
       }
-      const respErrMsg = serverErrMsg || (data as any)?.error || (error as any)?.message || '';
+      const dataObj: any = data ?? {};
+      const respErrMsg = serverErrMsg || dataObj?.error || (error as any)?.message || '';
       if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
         throw new Error(notConfiguredMsg);
       }
 
-      if (error) {
-        console.error('Edge function error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        throw new Error(serverErrMsg || error.message || 'Failed to send email');
+      if (error || dataObj?.success === false || (respErrMsg && !dataObj?.messageId && !dataObj?.simulated)) {
+        console.error('Edge function error:', error || respErrMsg);
+        throw new Error(respErrMsg || 'Failed to send email');
       }
 
       console.log('Edge function response:', data);
       return { invitation, simulated: data?.simulated, emailId: data?.emailId };
+
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
