@@ -147,22 +147,12 @@ export default function UserManagement() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Custom roles scoped to selected tenant (or global if "All")
-  const scopedCustomRoles = useMemo(() => {
-    if (scopeTenantId === ALL_TENANTS) return customRoles;
-    return customRoles.filter((c) => c.tenant_id === scopeTenantId || !c.tenant_id);
-  }, [customRoles, scopeTenantId]);
-
-  const scopedCustomRoleRows = useMemo(() => {
-    if (scopeTenantId === ALL_TENANTS) return customRoleRows;
-    return customRoleRows.filter((c) => c.tenant_id === scopeTenantId || !c.tenant_id);
-  }, [customRoleRows, scopeTenantId]);
-
-  // Users scoped to selected tenant
-  const scopedUsers = useMemo(() => {
-    if (scopeTenantId === ALL_TENANTS) return users;
-    return users.filter((u) => u.tenants.some((t) => t.id === scopeTenantId));
-  }, [users, scopeTenantId]);
+  // Users / Custom Roles / Role Permissions tabs are ALWAYS global — show everything
+  // regardless of the tenant scope picker. The scope picker only narrows
+  // Approval Matrix and Buyer ↔ SCM tabs.
+  const scopedCustomRoles = customRoles;
+  const scopedCustomRoleRows = customRoleRows;
+  const scopedUsers = users;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -178,6 +168,7 @@ export default function UserManagement() {
     scopedUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
     return { total: scopedUsers.length, counts };
   }, [scopedUsers]);
+
 
   const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
     if (!roleDialog) return;
