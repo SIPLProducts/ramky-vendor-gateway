@@ -63,13 +63,20 @@ interface DbState {
 const newRowKey = () => Math.random().toString(36).slice(2, 10);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function ApprovalMatrixConfig() {
+interface ApprovalMatrixConfigProps {
+  tenantId?: string | null;
+}
+
+export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixConfigProps = {}) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: tenants = [] } = useTenants();
   const activeTenants = useMemo(() => tenants.filter((t) => t.is_active), [tenants]);
+  const externallyControlled = tenantIdProp !== undefined;
 
-  const [tenantId, setTenantId] = useState<string>('');
+  const [internalTenantId, setInternalTenantId] = useState<string>('');
+  const tenantId = externallyControlled ? (tenantIdProp ?? '') : internalTenantId;
+  const setTenantId = (v: string) => { if (!externallyControlled) setInternalTenantId(v); };
   const [pendingTenantId, setPendingTenantId] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [activeStage, setActiveStage] = useState<Stage>('SCM_MANAGER');
