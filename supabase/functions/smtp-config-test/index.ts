@@ -127,12 +127,12 @@ serve(async (req) => {
       .filter((s) => isEmail(s) && s.toLowerCase() !== recipient.toLowerCase());
 
     const trySend = async (withCc: boolean) => {
-      await client.send({
+      await transporter.sendMail({
         from,
         to: [recipient],
         cc: withCc && ccArr.length ? ccArr : undefined,
         subject: "Sharvi Vendor Portal — SMTP Test Email",
-        content:
+        text:
           "This is a test email confirming your SMTP configuration is working.",
         html:
           "<p>This is a <strong>test email</strong> confirming your SMTP configuration is working.</p>",
@@ -145,7 +145,7 @@ serve(async (req) => {
       console.warn("smtp-config-test retry without cc:", e?.message ?? e);
       await withTimeout(trySend(false), 25000, "SMTP send");
     }
-    await client.close();
+    try { transporter.close(); } catch { /* ignore */ }
 
     return new Response(
       JSON.stringify({ success: true, sentTo: recipient }),
