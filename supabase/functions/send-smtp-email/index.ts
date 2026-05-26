@@ -137,17 +137,13 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Deno's edge runtime has issues with STARTTLS upgrade on port 587.
-    // Force implicit TLS on port 465 for Gmail/most providers for reliability.
-    const isGmail = host.toLowerCase().includes("gmail");
-    const effectivePort = isGmail && port === 587 ? 465 : port;
-    const useImplicitTls =
-      encryption === "ssl" ||
-      effectivePort === 465 ||
-      (isGmail && port === 587);
+    // Use exactly the port/encryption saved in Email Configuration.
+    // No automatic Gmail 587 -> 465 override; honor what the admin configured.
+    const effectivePort = port;
+    const useImplicitTls = encryption === "ssl" || effectivePort === 465;
 
     console.log(
-      `[send-smtp-email] Connecting host=${host} port=${effectivePort} implicitTLS=${useImplicitTls}`
+      `[send-smtp-email] Connecting host=${host} port=${effectivePort} encryption=${encryption} implicitTLS=${useImplicitTls}`
     );
 
     const client = new SMTPClient({
@@ -158,6 +154,7 @@ const handler = async (req: Request): Promise<Response> => {
         auth: { username, password },
       },
     });
+
 
     const from = fromName
       ? `${fromName.replace(/[<>"]/g, "")} <${fromEmail}>`
