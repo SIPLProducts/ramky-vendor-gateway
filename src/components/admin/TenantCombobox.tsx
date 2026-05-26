@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronsUpDown, Building2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Check, ChevronDown, Building2 } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -40,32 +39,43 @@ export function TenantCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
 
+  const selected = useMemo(() => {
+    if (allowAll && (value === null || value === ALL_VALUE)) return null;
+    return tenants.find((x) => x.id === value) ?? null;
+  }, [tenants, value, allowAll]);
+
   const selectedLabel = useMemo(() => {
     if (allowAll && (value === null || value === ALL_VALUE)) return allLabel;
-    const t = tenants.find((x) => x.id === value);
-    if (!t) return placeholder;
-    const c = userCounts?.[t.id];
-    return c != null ? `${t.name} · ${c} user${c === 1 ? '' : 's'}` : t.name;
-  }, [tenants, value, userCounts, allowAll, allLabel, placeholder]);
+    if (!selected) return placeholder;
+    const c = userCounts?.[selected.id];
+    return c != null ? `${selected.name} · ${c} user${c === 1 ? '' : 's'}` : selected.name;
+  }, [selected, value, userCounts, allowAll, allLabel, placeholder]);
+
+  const isPlaceholder = !selected && !(allowAll && (value === null || value === ALL_VALUE));
 
   return (
     <div className={className}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(o) => !disabled && setOpen(o)}>
         <PopoverTrigger asChild>
-          <Button
+          <button
             type="button"
-            variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-haspopup="listbox"
             disabled={disabled}
-            className={cn('w-full justify-between font-normal', triggerClassName)}
+            className={cn(
+              'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+              'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              triggerClassName,
+            )}
           >
-            <span className="flex items-center gap-2 truncate">
+            <span className={cn('flex items-center gap-2 truncate', isPlaceholder && 'text-muted-foreground')}>
               <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="truncate">{selectedLabel}</span>
             </span>
-            <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-          </Button>
+            <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+          </button>
         </PopoverTrigger>
         <PopoverContent className="p-0 w-[--radix-popover-trigger-width] min-w-[260px]" align="start">
           <Command>
@@ -108,3 +118,4 @@ export function TenantCombobox({
     </div>
   );
 }
+
