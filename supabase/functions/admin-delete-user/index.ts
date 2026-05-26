@@ -6,8 +6,11 @@ const corsHeaders = {
 };
 
 function jsonResponse(body: unknown, status = 200) {
+  // Always return 200 so supabase.functions.invoke surfaces our structured
+  // { ok:false, error, step } body to the UI instead of a generic
+  // "Edge Function returned a non-2xx status code" message.
   return new Response(JSON.stringify(body), {
-    status,
+    status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
