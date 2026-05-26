@@ -501,7 +501,7 @@ export default function UserManagement() {
         <TabsContent value="custom-roles" className="space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <Badge variant="outline" className="text-xs">
-              <Building2 className="h-3 w-3 mr-1" /> {tenantLabel}
+              <Building2 className="h-3 w-3 mr-1" /> All Tenants (Global)
             </Badge>
             <Button onClick={() => { setEditingCustomRole(null); setCustomRoleDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Create Role
