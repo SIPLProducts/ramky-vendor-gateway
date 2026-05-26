@@ -180,7 +180,7 @@ export default function AdminInvitations() {
         },
       });
 
-      // Surface "not configured" error from edge function (returns non-2xx with JSON body)
+      // Surface error from edge function (function now always returns 200 with { success, error })
       const notConfiguredMsg = 'You are not configured in Email Configuration';
       let serverErrMsg = '';
       if (emailError) {
@@ -195,17 +195,19 @@ export default function AdminInvitations() {
           }
         } catch { /* ignore */ }
       }
-      const respErrMsg = serverErrMsg || (emailData as any)?.error || (emailError as any)?.message || '';
+      const dataObj: any = emailData ?? {};
+      const respErrMsg = serverErrMsg || dataObj?.error || (emailError as any)?.message || '';
       if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
         return { invitation, emailSent: false, notConfigured: true };
       }
 
-      if (emailError) {
-        return { invitation, emailSent: false, error: emailError };
+      if (emailError || dataObj?.success === false || respErrMsg) {
+        return { invitation, emailSent: false, error: respErrMsg || 'Failed to send email' };
       }
 
       console.log('Email sent successfully:', emailData);
       return { invitation, emailSent: true, emailData };
+
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
@@ -229,11 +231,14 @@ export default function AdminInvitations() {
         });
       } else {
         toast({
-          title: 'Invitation Created',
-          description: 'Invitation created but email failed to send. You can resend it from the list.',
-          variant: 'default',
+          title: 'Email Failed',
+          description: (result as any).error
+            ? `Invitation created but email failed: ${(result as any).error}`
+            : 'Invitation created but email failed to send. You can resend it from the list.',
+          variant: 'destructive',
         });
       }
+
     },
     onError: (error: any) => {
       const msg = error?.message || 'Failed to create invitation';
@@ -288,19 +293,20 @@ export default function AdminInvitations() {
           }
         } catch { /* ignore */ }
       }
-      const respErrMsg = serverErrMsg || (data as any)?.error || (error as any)?.message || '';
+      const dataObj: any = data ?? {};
+      const respErrMsg = serverErrMsg || dataObj?.error || (error as any)?.message || '';
       if (typeof respErrMsg === 'string' && respErrMsg.includes(notConfiguredMsg)) {
         throw new Error(notConfiguredMsg);
       }
 
-      if (error) {
-        console.error('Edge function error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        throw new Error(serverErrMsg || error.message || 'Failed to send email');
+      if (error || dataObj?.success === false || (respErrMsg && !dataObj?.messageId && !dataObj?.simulated)) {
+        console.error('Edge function error:', error || respErrMsg);
+        throw new Error(respErrMsg || 'Failed to send email');
       }
 
       console.log('Edge function response:', data);
       return { invitation, simulated: data?.simulated, emailId: data?.emailId };
+
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });

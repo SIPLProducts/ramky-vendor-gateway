@@ -147,22 +147,12 @@ export default function UserManagement() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Custom roles scoped to selected tenant (or global if "All")
-  const scopedCustomRoles = useMemo(() => {
-    if (scopeTenantId === ALL_TENANTS) return customRoles;
-    return customRoles.filter((c) => c.tenant_id === scopeTenantId || !c.tenant_id);
-  }, [customRoles, scopeTenantId]);
-
-  const scopedCustomRoleRows = useMemo(() => {
-    if (scopeTenantId === ALL_TENANTS) return customRoleRows;
-    return customRoleRows.filter((c) => c.tenant_id === scopeTenantId || !c.tenant_id);
-  }, [customRoleRows, scopeTenantId]);
-
-  // Users scoped to selected tenant
-  const scopedUsers = useMemo(() => {
-    if (scopeTenantId === ALL_TENANTS) return users;
-    return users.filter((u) => u.tenants.some((t) => t.id === scopeTenantId));
-  }, [users, scopeTenantId]);
+  // Users / Custom Roles / Role Permissions tabs are ALWAYS global — show everything
+  // regardless of the tenant scope picker. The scope picker only narrows
+  // Approval Matrix and Buyer ↔ SCM tabs.
+  const scopedCustomRoles = customRoles;
+  const scopedCustomRoleRows = customRoleRows;
+  const scopedUsers = users;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -178,6 +168,7 @@ export default function UserManagement() {
     scopedUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
     return { total: scopedUsers.length, counts };
   }, [scopedUsers]);
+
 
   const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
     if (!roleDialog) return;
@@ -300,7 +291,7 @@ export default function UserManagement() {
   };
 
   const tenantLabel = scopeTenantId === ALL_TENANTS
-    ? 'All Tenants (Global)'
+    ? 'All Tenants'
     : tenants.find((t) => t.id === scopeTenantId)?.name ?? '';
 
   return (
@@ -311,18 +302,18 @@ export default function UserManagement() {
             <Users className="h-6 w-6" /> User Management
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage users, custom roles, screen permissions and approval matrix — scoped per tenant.
+            Users, Custom Roles and Role Permissions are global. Approval Matrix and Buyer ↔ SCM are scoped per tenant.
           </p>
         </div>
         <Card className="min-w-[280px]">
           <CardContent className="p-3 flex items-center gap-3">
             <Building2 className="h-5 w-5 text-primary" />
             <div className="flex-1">
-              <p className="text-xs text-muted-foreground">Tenant Scope</p>
+              <p className="text-xs text-muted-foreground">Tenant Scope (Approval Matrix / Buyer ↔ SCM)</p>
               <Select value={scopeTenantId} onValueChange={setScopeTenantId}>
                 <SelectTrigger className="h-8 mt-0.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_TENANTS}>All Tenants (Global)</SelectItem>
+                  <SelectItem value={ALL_TENANTS}>All Tenants</SelectItem>
                   {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -330,6 +321,7 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
+
 
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
@@ -344,7 +336,8 @@ export default function UserManagement() {
         <TabsContent value="users" className="space-y-6">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <Badge variant="outline" className="text-xs">
-              <Building2 className="h-3 w-3 mr-1" /> {tenantLabel}
+              <Building2 className="h-3 w-3 mr-1" /> All Tenants (Global)
+
             </Badge>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" /> Create User
@@ -405,7 +398,7 @@ export default function UserManagement() {
                       ))
                     ) : filtered.length === 0 ? (
                       <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        {scopeTenantId === ALL_TENANTS ? 'No users found' : 'No users in this tenant'}
+                        No users found
                       </TableCell></TableRow>
                     ) : (
                       filtered.map((u) => (
@@ -508,7 +501,7 @@ export default function UserManagement() {
         <TabsContent value="custom-roles" className="space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <Badge variant="outline" className="text-xs">
-              <Building2 className="h-3 w-3 mr-1" /> {tenantLabel}
+              <Building2 className="h-3 w-3 mr-1" /> All Tenants (Global)
             </Badge>
             <Button onClick={() => { setEditingCustomRole(null); setCustomRoleDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Create Role
@@ -517,7 +510,7 @@ export default function UserManagement() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Custom Roles {scopeTenantId !== ALL_TENANTS && <span className="text-sm text-muted-foreground font-normal">— scoped to {tenantLabel}</span>}
+                Custom Roles
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -540,7 +533,7 @@ export default function UserManagement() {
                       ))
                     ) : scopedCustomRoleRows.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No custom roles {scopeTenantId !== ALL_TENANTS ? 'in this tenant' : 'yet'}. Click "Create Role" to add one.
+                        No custom roles yet. Click "Create Role" to add one.
                       </TableCell></TableRow>
                     ) : (
                       scopedCustomRoleRows.map((r) => {
@@ -586,7 +579,7 @@ export default function UserManagement() {
 
         {/* ROLE PERMISSIONS TAB */}
         <TabsContent value="role-permissions">
-          <RolePermissions tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId} tenantLabel={tenantLabel} />
+          <RolePermissions tenantId={null} tenantLabel="All Tenants (Global)" />
         </TabsContent>
 
         {/* APPROVAL MATRIX TAB */}

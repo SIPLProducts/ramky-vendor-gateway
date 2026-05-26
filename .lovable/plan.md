@@ -1,86 +1,52 @@
-# Fix two server-side issues
 
-## 1. "crypto.randomUUID is not a function" on Create Invitation
+## 1. User Management — tab-level scoping rules
 
-**Cause:** The server is served over plain HTTP (`http://10.200.1.7/...`). Browsers only expose `crypto.randomUUID()` in **secure contexts** (HTTPS or `localhost`). On HTTP, the call throws — which is exactly the error shown in the toast.
+The screen currently applies one **Tenant Scope** selector to every tab. Goal: make scoping match the tab's purpose.
 
-**Fix:** Add a small UUID helper that falls back when `crypto.randomUUID` is unavailable, and use it in `src/pages/AdminInvitations.tsx` (line 140) wherever `crypto.randomUUID()` is called.
+**Users / Custom Roles / Role Permissions tabs — always global**
+- Hide the "Tenant Scope" card (or visually move it next to the Approval Matrix/Buyer-SCM tabs only).
+- Stop filtering `scopedUsers`, `scopedCustomRoles`, `scopedCustomRoleRows` by `scopeTenantId` for these three tabs — always show all rows.
+- Drop the "No users in this tenant" empty state for the Users tab.
+- Access is decided purely by screen permission `user-management`. Any user (built-in or custom role) granted that screen sees and can manage everything in these three tabs — no extra role check, no hardcoded admin gate.
+- Audit `RolePermissions` page + `CustomRolePermissionsMatrix` to make sure they query without `tenant_id` filter (Role Permissions config is global; tenant attribution stays in Approval Matrix only).
 
-```ts
-// src/lib/uuid.ts
-export function safeUUID(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  // RFC4122 v4 fallback using crypto.getRandomValues if available
-  const bytes = new Uint8Array(16);
-  (crypto?.getRandomValues?.(bytes)) ?? bytes.forEach((_, i) => (bytes[i] = Math.floor(Math.random() * 256)));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const h = Array.from(bytes, b => b.toString(16).padStart(2, '0'));
-  return `${h.slice(0,4).join('')}-${h.slice(4,6).join('')}-${h.slice(6,8).join('')}-${h.slice(8,10).join('')}-${h.slice(10,16).join('')}`;
-}
-```
+**Approval Matrix / Buyer SCM tabs — tenant-scoped (current behavior)**
+- Keep `tenantId` selector inside these tabs (already exists in `ApprovalMatrixConfig` and via `BuyerScmMapping` prop).
+- When picking approvers / SCM users, restrict the dropdown to users assigned to the selected tenant via `user_tenants` (Buyer-SCM already does this; verify Approval Matrix `ApproverPicker` filters by `user_tenants.tenant_id = selectedTenant`).
+- Remove the page-level `scopeTenantId` and instead let each of these tabs own its own tenant selector, defaulting to the user's first tenant or "All" for super admins.
 
-Replace `const token = crypto.randomUUID();` in `AdminInvitations.tsx` with `safeUUID()`. (Recommend later moving the site behind HTTPS, but this unblocks today.)
+## 2. Email Configuration access
 
-## 2. Users created by Sharvi Admin not visible to tenant Admin
+- Anyone whose screen permissions grant `email-configuration` should see and edit every SMTP config.
+- Update the `list_smtp_configs` SQL function to drop the `sharvi_admin / admin / customer_admin` allowlist and instead return all rows for any authenticated user (access is already gated by the route's screen permission).
+- Update RLS on `smtp_email_configs` so SELECT/INSERT/UPDATE/DELETE are allowed for any authenticated user (route guard enforces who sees the screen). Service-role edge functions are unaffected.
 
-**Cause:** Current RLS lets `admin` and `sharvi_admin` read all `profiles`, `user_roles`, `user_tenants`, `user_custom_roles`, `custom_roles`. The fact that screenshot 2 (logged in as **Admin / admin@gmail.com**) shows only the admin's own row means the **server database does not have the latest RLS policies applied** — only the "own row" policies are evaluating to true.
+## 3. Invitation send failing on self-host server
 
-Verified current cloud-DB policies are correct:
-- `profiles`: "Admins can view all profiles" → `has_role(uid,'sharvi_admin') OR has_role(uid,'admin')`
-- `user_roles`: "Admins can view all user roles" → same
-- `user_tenants`: "Admins can read all user tenants" → same
-- `user_custom_roles` / `custom_roles`: same
+The toast "Edge Function returned a non-2xx status code" comes from `send-vendor-invitation` returning 4xx/5xx on the on-prem instance (works on Lovable Cloud). The two likely causes on the self-hosted box:
 
-**Fix:** Ship a single idempotent migration that drops + re-creates these four admin-read policies, so when the self-hosted server runs migrations the gap is filled. No schema change, RLS-only.
+- **No SMTP config for the buyer's sender email** in `smtp_email_configs` on the self-hosted DB (`check_my_smtp_configured()` would return false and the function aborts), or
+- **`RESEND_API_KEY` env var not set** for the self-hosted Supabase functions runtime, so the Resend fallback path fails.
 
-```sql
--- profiles
-DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
-CREATE POLICY "Admins can view all profiles" ON public.profiles
-  FOR SELECT USING (
-    public.has_role(auth.uid(),'sharvi_admin'::app_role)
-    OR public.has_role(auth.uid(),'admin'::app_role)
-    OR id = auth.uid()
-  );
+Plan:
+1. Add explicit error responses in `send-vendor-invitation` that surface the real reason (e.g. "No SMTP config found for sender X" or "RESEND_API_KEY missing") so the UI toast shows a useful message instead of the generic non-2xx error.
+2. Surface the upstream message in the `AdminInvitations` toast (`error.context?.error || error.message`).
+3. Document in `SELFHOST_LINUX_HTTP.md` the two required pieces for the on-prem box: a row in `smtp_email_configs` for the inviter, and `RESEND_API_KEY` (optional fallback).
 
--- user_roles
-DROP POLICY IF EXISTS "Admins can view all user roles" ON public.user_roles;
-CREATE POLICY "Admins can view all user roles" ON public.user_roles
-  FOR SELECT USING (
-    public.has_role(auth.uid(),'sharvi_admin'::app_role)
-    OR public.has_role(auth.uid(),'admin'::app_role)
-    OR user_id = auth.uid()
-  );
+## Technical changes
 
--- user_tenants
-DROP POLICY IF EXISTS "Admins can read all user tenants" ON public.user_tenants;
-CREATE POLICY "Admins can read all user tenants" ON public.user_tenants
-  FOR SELECT USING (
-    public.has_role(auth.uid(),'admin'::app_role)
-    OR public.has_role(auth.uid(),'sharvi_admin'::app_role)
-    OR user_id = auth.uid()
-  );
+- `src/pages/UserManagement.tsx` — remove `scopeTenantId` filter from Users/Custom Roles/Role Permissions tabs; keep selector visible only inside Approval Matrix / Buyer-SCM tab panels.
+- `src/components/admin/ApprovalMatrixConfig.tsx` + `ApproverPicker.tsx` — keep tenant selector; ensure approver dropdown filters via `user_tenants`.
+- `src/components/admin/BuyerScmMapping.tsx` — already tenant-scoped; receive its own tenant selector inside the tab.
+- DB migration:
+  - `CREATE OR REPLACE FUNCTION list_smtp_configs` — return all rows for any authenticated user.
+  - Relax `smtp_email_configs` RLS policies similarly.
+  - (Optional) helper to confirm Users/CustomRoles/Role-Permissions RLS already allow any user with the `user-management` screen permission to read — currently they require admin; add new policies using a `has_screen_permission(auth.uid(), 'user-management')` SECURITY DEFINER function.
+- `supabase/functions/send-vendor-invitation/index.ts` — return structured `{ error, code }` JSON with HTTP 400/424 for the SMTP-missing and Resend-missing cases, instead of dropping the connection.
+- `src/pages/AdminInvitations.tsx` — show the upstream error text in the toast.
 
--- user_custom_roles
-DROP POLICY IF EXISTS "Users can view own custom role assignments" ON public.user_custom_roles;
-CREATE POLICY "Users can view own custom role assignments" ON public.user_custom_roles
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR public.has_role(auth.uid(),'sharvi_admin'::app_role)
-    OR public.has_role(auth.uid(),'admin'::app_role)
-  );
-```
+## Open question
 
-After deploying, re-run the migration step of the self-host deploy script on the server so these policies are applied to the on-prem Postgres.
+Before implementing, I need one confirmation:
 
-## Files touched
-- **New:** `src/lib/uuid.ts`
-- **Edit:** `src/pages/AdminInvitations.tsx` — replace `crypto.randomUUID()` with `safeUUID()`
-- **Migration:** re-assert the four admin-read RLS policies above
-
-## Out of scope
-- Switching the server to HTTPS (recommended separately).
-- The User Management tabs (Users / Custom Roles / Role Permissions) are already gated by the same admin/sharvi_admin RLS — once the migration above is applied, all admins with read access will see the full dataset.
+For the on-prem server, do you want **SMTP-only** sending (i.e. every buyer must configure their Gmail/Office SMTP from the Email Configuration screen before they can send invitations), or should the function fall back to **Resend** when no per-user SMTP exists (which then needs `RESEND_API_KEY` set on the self-hosted box)?
