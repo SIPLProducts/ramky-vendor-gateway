@@ -510,7 +510,7 @@ export default function UserManagement() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Custom Roles {scopeTenantId !== ALL_TENANTS && <span className="text-sm text-muted-foreground font-normal">— scoped to {tenantLabel}</span>}
+                Custom Roles
               </CardTitle>
             </CardHeader>
             <CardContent>
