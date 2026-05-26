@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { safeUUID } from '@/lib/uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenants } from '@/hooks/useTenant';
