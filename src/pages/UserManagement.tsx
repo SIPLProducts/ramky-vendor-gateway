@@ -579,7 +579,7 @@ export default function UserManagement() {
 
         {/* ROLE PERMISSIONS TAB */}
         <TabsContent value="role-permissions">
-          <RolePermissions tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId} tenantLabel={tenantLabel} />
+          <RolePermissions tenantId={null} tenantLabel="All Tenants (Global)" />
         </TabsContent>
 
         {/* APPROVAL MATRIX TAB */}
