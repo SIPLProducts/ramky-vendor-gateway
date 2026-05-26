@@ -48,6 +48,7 @@ const ALL_TENANTS = '__all__';
 
 export default function UserManagement() {
   const { user } = useAuth();
+  const { data: tenantUserCounts = {} } = useTenantUserCounts();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserRow[]>([]);
