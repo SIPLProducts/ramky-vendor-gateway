@@ -1,86 +1,55 @@
+## What's actually wrong
 
-## Point 1 — Save Mapping fails with RLS error on `buyer_scm_mappings`
+### 1. "Dropdown, not a button" for company/tenant
+`TenantCombobox` (used on User Management → Tenant Scope and inside the Create User / Assign Tenant flows) is implemented as a `<Button variant="outline">` triggering a `Popover` + `Command`. Functionally it is searchable, but visually it renders as a button — that's why you keep saying "this is a button, I want a dropdown".
 
-**Root cause:** The existing INSERT policies on `buyer_scm_mappings` only allow `sharvi_admin`, `admin`, or `customer_admin` app_roles. The "Admin" user in your server (`admin@gmail.com`) was created with the User Management screen permission but does NOT have one of those base roles — so the WITH CHECK fails. The Users / Custom Roles / Role Permissions / Approval Matrix / Buyer-SCM tabs were globalized previously, but the underlying RLS for `buyer_scm_mappings` was never relaxed to match.
+### 2. Invitation email "not going"
+- `send-vendor-invitation` looks up `smtp_email_configs` by the logged-in user's email (`senderEmail = user?.email`). If your server account's email is not exactly one of the rows in `smtp_email_configs`, it returns "No SMTP configuration found for …" and no email is sent.
+- Current rows in DB: `sunilakula1919@gmail.com`, `vidyasagar.atla@ramky.com`, `suresh.mareddy@ramky.com`. If the user clicking Send Email is logged in as anyone else (e.g. an admin), the function bails out.
+- `send-smtp-email` force-overrides Gmail port to 465 with implicit TLS, ignoring what you saved (587/TLS). That's the "465" you saw in logs — it's not hardcoded credentials, it's a port override. You asked for it to use exactly what's in Email Configuration.
+- The UI toast only shows a generic "Failed to send email" because the error chain swallows the real reason in some paths.
 
-**Fix (migration):**
-- Drop the three legacy hardcoded policies.
-- Add permission-driven policies using a SECURITY DEFINER helper `public.has_screen_permission(_user_id, _screen_key)` (create if it does not already exist) that checks `screen_permissions` / `custom_role_screen_permissions` (whichever table is in use).
-- New policies:
-  - `SELECT` — `has_screen_permission(auth.uid(),'user-management')` OR mapped user (`buyer_user_id = auth.uid()` OR `scm_manager_user_id = auth.uid()`) OR has app_role admin/sharvi_admin.
-  - `INSERT/UPDATE/DELETE` — `has_screen_permission(auth.uid(),'user-management')` OR admin/sharvi_admin.
+## Changes
 
-## Point 2 — Tenant Scope dropdown unification + search + mapped-user counts
+### A. Tenant picker → real dropdown look (`src/components/admin/TenantCombobox.tsx`)
+Replace the `<Button>` trigger with a div styled exactly like a shadcn `SelectTrigger` (same height, border, chevron, focus ring). Keep the `Popover` + `Command` search inside so it stays searchable. No behavior change — same props, same callers, just looks like a native select.
 
-**Approval Matrix tab:**
-- Remove the internal "Tenant" dropdown inside `ApprovalMatrixConfig.tsx`. Instead, accept `tenantId` as a prop driven by the page-level **Tenant Scope** selector (the existing card in the header).
-- Update `src/pages/UserManagement.tsx` to pass `tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId}` to `<ApprovalMatrixConfig />`, mirroring how `BuyerScmMapping` already receives it.
-- When `tenantId` is null, show an empty-state prompt: "Select a tenant from Tenant Scope to configure the Approval Matrix."
+### B. Create User dialog tenant picker (`src/components/admin/CreateUserDialog.tsx`)
+The current SAP-tenant section shows a checkbox list. Add a compact searchable dropdown variant on top (single or multi via the same select-styled trigger) so it matches the rest of the UI. Keep checkbox list behind a "Show all" toggle for bulk selection. (If you only want it dropdown-only, say so and I'll remove the checkbox list entirely.)
 
-**Tenant Scope dropdown (header):**
-- Convert the plain `<Select>` to a searchable Combobox (using existing `Command` + `Popover` shadcn primitives) so users can type to filter.
-- Show the mapped-user count next to each tenant name, e.g. `Ramky Infrastructure Ltd · 6 users`, using `useTenantUserCounts()` (already exists).
-- This single Tenant Scope drives both Approval Matrix and Buyer-SCM tabs.
+### C. Invitation email — actually use Email Configuration
 
-**Buyer ↔ SCM tab:**
-- No internal tenant picker exists today; it already uses the Tenant Scope. The new searchable picker with counts automatically applies.
+In `supabase/functions/send-vendor-invitation/index.ts`:
+1. Sender resolution order:
+   a. Match `smtp_email_configs.user_email` ILIKE `senderEmail` (current).
+   b. If none, fall back to **any** active `smtp_email_configs` row (deterministic: most recently updated). This makes "send works for any admin" the default.
+   c. If still none, return the friendly error and surface it in the toast.
+2. Return the **actual** SMTP error string in the response body so `AdminInvitations.tsx` shows the real reason.
 
-**All other tenant dropdowns across the app:**
-- Build a reusable `<TenantCombobox>` component (searchable, optional user-count badge) and replace existing tenant `<Select>` usages in:
-  - `UserManagement.tsx` (header scope)
-  - `ApprovalMatrixConfig.tsx` (after refactor it inherits via prop — no picker)
-  - `BuyerScmMapping.tsx` (no internal picker; n/a)
-  - `AssignTenantDialog.tsx`, `AssignUsersToTenantDialog.tsx`, `CreateUserDialog.tsx`, `ChangeRoleDialog.tsx`, `CustomRoleDialog.tsx` — wherever a tenant `<Select>` exists.
-  - Vendor invitation / approval-matrix approver tenant pickers where applicable.
+In `supabase/functions/send-smtp-email/index.ts`:
+1. **Remove the Gmail 587 → 465 override.** Use exactly the `smtp_port` and `encryption` saved in Email Configuration. (Both 465/SSL and 587/STARTTLS work with denomailer when configured correctly — your row for `sunilakula1919@gmail.com` is 587/TLS, keep it.)
+2. Keep the Gmail-username-must-be-email guard (that one's correct).
+3. Surface the raw SMTP error in the response (already mostly there — verify the 535 friendly mapping doesn't hide other 5xx codes).
 
-## Point 3 — Delete User edge function failed + "all edge functions failing"
+In `src/pages/AdminInvitations.tsx`:
+- When the toast fires, include the server `error` field verbatim so you can see what's actually failing on the server (already partially there — confirm it surfaces `respErrMsg`).
 
-**Root cause for Delete User:** `admin-delete-user` throws when a referenced FK still points at the user. Common failures observed on self-hosted:
-- `buyer_scm_mappings.buyer_user_id` / `scm_manager_user_id` / `created_by` have no `ON DELETE` action.
-- `approval_matrix_approvers.approver_id` references the user.
-- `vendor_approval_progress.actor_id` / approver references.
-- `smtp_email_configs.created_by`.
-- `notifications.user_id`, `screen_permissions.created_by`, etc.
+### D. Redeploy (you do this on your on-prem server)
+After pulling:
+- `supabase functions deploy send-vendor-invitation send-smtp-email --no-verify-jwt`
+- Rebuild and replace `dist/`
 
-The function only nullifies a few tables, so any leftover FK breaks deletion → toast shows generic "Edge Function returned a non-2xx status code".
+## Files touched
 
-**Fix:**
-1. Extend `admin-delete-user/index.ts` to also clean up:
-   - `buyer_scm_mappings` (delete rows where user is buyer/scm OR nullify `created_by`).
-   - `approval_matrix_approvers` (delete rows where `approver_id = user_id`).
-   - `vendor_approval_progress` (nullify actor columns).
-   - `smtp_email_configs` (nullify `created_by` and delete configs owned by the user's email).
-   - `custom_roles.created_by` (nullify).
-   - `audit_logs` referencing `target_user_id` in details (skip — JSONB).
-   - Any other FK references found via `information_schema`.
-2. Return structured `{ ok:false, step, error }` JSON with HTTP 200 so the toast displays the actual cause instead of "non-2xx".
-3. Update the UI toast in `UserManagement.tsx` to render the `step` + `error` returned from the function.
-
-**Edge-function audit (broader "edge function failed" issue):**
-- Sweep every function under `supabase/functions/*` and apply the same pattern: catch errors, return `200` with `{ ok:false, error, step }`, never throw raw to the client. Concrete functions to harden in this pass (most-used in flows the user mentioned):
-  - `admin-create-user`, `admin-delete-user`
-  - `send-vendor-invitation` (already done — verify)
-  - `process-approval-action`, `route-vendor-approval`
-  - `sync-vendor-to-sap`, `sync-vendor-to-dms`
-  - `notify-vendor-submission`, `notify-finance-approval`, `send-status-notification`
-  - `smtp-config-save`, `smtp-config-test`, `smtp-config-delete`
-- Investigate self-hosted edge-function logs for the failing actions and surface the specific root cause for each. Where the failure is RLS-driven (service-role client missing), switch the client to `SUPABASE_SERVICE_ROLE_KEY` for mutations after the user-context client validates the caller's permission.
-
-## Technical Notes
-
-```text
-buyer_scm_mappings  RLS (new)
-  USING / WITH CHECK = has_screen_permission(auth.uid(),'user-management')
-                      OR has_role(auth.uid(),'admin')
-                      OR has_role(auth.uid(),'sharvi_admin')
-  SELECT also OR buyer_user_id = auth.uid() OR scm_manager_user_id = auth.uid()
+```
+src/components/admin/TenantCombobox.tsx          (visual: button → select-style trigger)
+src/components/admin/CreateUserDialog.tsx        (tenant section: add dropdown)
+src/pages/AdminInvitations.tsx                   (toast: show real server error)
+supabase/functions/send-vendor-invitation/index.ts  (sender fallback + error passthrough)
+supabase/functions/send-smtp-email/index.ts      (remove Gmail port override)
 ```
 
-```text
-TenantCombobox (new)
-  props: value, onChange, tenants, userCounts?, placeholder?, allowAll?
-  uses Popover + Command (cmdk) for search
-```
+## Two quick confirmations before I implement
 
-**Open question (please confirm before I build):**
-- For Point 3's "fix all edge functions" — should I (a) only fix `admin-delete-user` now plus harden the error-response shape across all functions so any failure shows a readable message (recommended, scoped), or (b) do a deep audit/repair of every edge function's business logic which is a much larger effort? Pick (a) or (b).
+1. **Sender fallback for invitations**: OK to fall back to any active SMTP config row when the logged-in admin doesn't have their own row? (Recommended — otherwise you must add a config row for every admin who sends invites.)
+2. **Create User dialog tenants**: dropdown-only, or dropdown + keep the existing checkbox list as a secondary "select multiple" view?

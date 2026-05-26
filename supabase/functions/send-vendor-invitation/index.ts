@@ -279,31 +279,46 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    if (!senderEmail) {
-      return new Response(
-        JSON.stringify({ success: false, error: "You are not configured in Email Configuration" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } },
-      );
+    const adminClient = createClient(supabaseUrl, serviceKey);
+
+    // 1) Try to find SMTP config for the logged-in sender.
+    let smtpCfg: any = null;
+    if (senderEmail) {
+      const { data, error: smtpCfgErr } = await adminClient
+        .from("smtp_email_configs")
+        .select("smtp_host, smtp_port, encryption, smtp_username, app_password, user_email, from_name, is_active")
+        .ilike("user_email", senderEmail)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (smtpCfgErr) console.error("smtp_email_configs lookup error", smtpCfgErr);
+      smtpCfg = data;
     }
 
-    const adminClient = createClient(supabaseUrl, serviceKey);
-    const { data: smtpCfg, error: smtpCfgErr } = await adminClient
-      .from("smtp_email_configs")
-      .select("smtp_host, smtp_port, encryption, smtp_username, app_password, user_email, from_name, is_active")
-      .ilike("user_email", senderEmail)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (smtpCfgErr) {
-      console.error("smtp_email_configs lookup error", smtpCfgErr);
+    // 2) Fallback: use any active SMTP config (most recently updated)
+    //    so invitations work even when the logged-in admin has no per-user row.
+    if (!smtpCfg || !smtpCfg.app_password) {
+      const { data: fallback, error: fbErr } = await adminClient
+        .from("smtp_email_configs")
+        .select("smtp_host, smtp_port, encryption, smtp_username, app_password, user_email, from_name, is_active")
+        .eq("is_active", true)
+        .not("app_password", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (fbErr) console.error("smtp_email_configs fallback lookup error", fbErr);
+      if (fallback?.app_password) {
+        console.log(`[send-vendor-invitation] No SMTP for ${senderEmail}, using fallback ${fallback.user_email}`);
+        smtpCfg = fallback;
+      }
     }
 
     if (!smtpCfg || !smtpCfg.app_password) {
       return new Response(
-        JSON.stringify({ success: false, error: `No SMTP configuration found for ${senderEmail}. Add it under Email Configuration.` }),
+        JSON.stringify({ success: false, error: `No active SMTP configuration found. Add one under Email Configuration.` }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
+
 
 
     // Resolve sender display name — prefer the actual person's name over the SMTP mailbox display name
