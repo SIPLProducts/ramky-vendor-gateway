@@ -281,8 +281,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!senderEmail) {
       return new Response(
-        JSON.stringify({ error: "You are not configured in Email Configuration" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
+        JSON.stringify({ success: false, error: "You are not configured in Email Configuration" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
 
@@ -300,10 +300,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!smtpCfg || !smtpCfg.app_password) {
       return new Response(
-        JSON.stringify({ error: "You are not configured in Email Configuration" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
+        JSON.stringify({ success: false, error: `No SMTP configuration found for ${senderEmail}. Add it under Email Configuration.` }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
+
 
     // Resolve sender display name — prefer the actual person's name over the SMTP mailbox display name
     let senderName = "";
