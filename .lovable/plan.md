@@ -1,52 +1,86 @@
 
-## 1. User Management — tab-level scoping rules
+## Point 1 — Save Mapping fails with RLS error on `buyer_scm_mappings`
 
-The screen currently applies one **Tenant Scope** selector to every tab. Goal: make scoping match the tab's purpose.
+**Root cause:** The existing INSERT policies on `buyer_scm_mappings` only allow `sharvi_admin`, `admin`, or `customer_admin` app_roles. The "Admin" user in your server (`admin@gmail.com`) was created with the User Management screen permission but does NOT have one of those base roles — so the WITH CHECK fails. The Users / Custom Roles / Role Permissions / Approval Matrix / Buyer-SCM tabs were globalized previously, but the underlying RLS for `buyer_scm_mappings` was never relaxed to match.
 
-**Users / Custom Roles / Role Permissions tabs — always global**
-- Hide the "Tenant Scope" card (or visually move it next to the Approval Matrix/Buyer-SCM tabs only).
-- Stop filtering `scopedUsers`, `scopedCustomRoles`, `scopedCustomRoleRows` by `scopeTenantId` for these three tabs — always show all rows.
-- Drop the "No users in this tenant" empty state for the Users tab.
-- Access is decided purely by screen permission `user-management`. Any user (built-in or custom role) granted that screen sees and can manage everything in these three tabs — no extra role check, no hardcoded admin gate.
-- Audit `RolePermissions` page + `CustomRolePermissionsMatrix` to make sure they query without `tenant_id` filter (Role Permissions config is global; tenant attribution stays in Approval Matrix only).
+**Fix (migration):**
+- Drop the three legacy hardcoded policies.
+- Add permission-driven policies using a SECURITY DEFINER helper `public.has_screen_permission(_user_id, _screen_key)` (create if it does not already exist) that checks `screen_permissions` / `custom_role_screen_permissions` (whichever table is in use).
+- New policies:
+  - `SELECT` — `has_screen_permission(auth.uid(),'user-management')` OR mapped user (`buyer_user_id = auth.uid()` OR `scm_manager_user_id = auth.uid()`) OR has app_role admin/sharvi_admin.
+  - `INSERT/UPDATE/DELETE` — `has_screen_permission(auth.uid(),'user-management')` OR admin/sharvi_admin.
 
-**Approval Matrix / Buyer SCM tabs — tenant-scoped (current behavior)**
-- Keep `tenantId` selector inside these tabs (already exists in `ApprovalMatrixConfig` and via `BuyerScmMapping` prop).
-- When picking approvers / SCM users, restrict the dropdown to users assigned to the selected tenant via `user_tenants` (Buyer-SCM already does this; verify Approval Matrix `ApproverPicker` filters by `user_tenants.tenant_id = selectedTenant`).
-- Remove the page-level `scopeTenantId` and instead let each of these tabs own its own tenant selector, defaulting to the user's first tenant or "All" for super admins.
+## Point 2 — Tenant Scope dropdown unification + search + mapped-user counts
 
-## 2. Email Configuration access
+**Approval Matrix tab:**
+- Remove the internal "Tenant" dropdown inside `ApprovalMatrixConfig.tsx`. Instead, accept `tenantId` as a prop driven by the page-level **Tenant Scope** selector (the existing card in the header).
+- Update `src/pages/UserManagement.tsx` to pass `tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId}` to `<ApprovalMatrixConfig />`, mirroring how `BuyerScmMapping` already receives it.
+- When `tenantId` is null, show an empty-state prompt: "Select a tenant from Tenant Scope to configure the Approval Matrix."
 
-- Anyone whose screen permissions grant `email-configuration` should see and edit every SMTP config.
-- Update the `list_smtp_configs` SQL function to drop the `sharvi_admin / admin / customer_admin` allowlist and instead return all rows for any authenticated user (access is already gated by the route's screen permission).
-- Update RLS on `smtp_email_configs` so SELECT/INSERT/UPDATE/DELETE are allowed for any authenticated user (route guard enforces who sees the screen). Service-role edge functions are unaffected.
+**Tenant Scope dropdown (header):**
+- Convert the plain `<Select>` to a searchable Combobox (using existing `Command` + `Popover` shadcn primitives) so users can type to filter.
+- Show the mapped-user count next to each tenant name, e.g. `Ramky Infrastructure Ltd · 6 users`, using `useTenantUserCounts()` (already exists).
+- This single Tenant Scope drives both Approval Matrix and Buyer-SCM tabs.
 
-## 3. Invitation send failing on self-host server
+**Buyer ↔ SCM tab:**
+- No internal tenant picker exists today; it already uses the Tenant Scope. The new searchable picker with counts automatically applies.
 
-The toast "Edge Function returned a non-2xx status code" comes from `send-vendor-invitation` returning 4xx/5xx on the on-prem instance (works on Lovable Cloud). The two likely causes on the self-hosted box:
+**All other tenant dropdowns across the app:**
+- Build a reusable `<TenantCombobox>` component (searchable, optional user-count badge) and replace existing tenant `<Select>` usages in:
+  - `UserManagement.tsx` (header scope)
+  - `ApprovalMatrixConfig.tsx` (after refactor it inherits via prop — no picker)
+  - `BuyerScmMapping.tsx` (no internal picker; n/a)
+  - `AssignTenantDialog.tsx`, `AssignUsersToTenantDialog.tsx`, `CreateUserDialog.tsx`, `ChangeRoleDialog.tsx`, `CustomRoleDialog.tsx` — wherever a tenant `<Select>` exists.
+  - Vendor invitation / approval-matrix approver tenant pickers where applicable.
 
-- **No SMTP config for the buyer's sender email** in `smtp_email_configs` on the self-hosted DB (`check_my_smtp_configured()` would return false and the function aborts), or
-- **`RESEND_API_KEY` env var not set** for the self-hosted Supabase functions runtime, so the Resend fallback path fails.
+## Point 3 — Delete User edge function failed + "all edge functions failing"
 
-Plan:
-1. Add explicit error responses in `send-vendor-invitation` that surface the real reason (e.g. "No SMTP config found for sender X" or "RESEND_API_KEY missing") so the UI toast shows a useful message instead of the generic non-2xx error.
-2. Surface the upstream message in the `AdminInvitations` toast (`error.context?.error || error.message`).
-3. Document in `SELFHOST_LINUX_HTTP.md` the two required pieces for the on-prem box: a row in `smtp_email_configs` for the inviter, and `RESEND_API_KEY` (optional fallback).
+**Root cause for Delete User:** `admin-delete-user` throws when a referenced FK still points at the user. Common failures observed on self-hosted:
+- `buyer_scm_mappings.buyer_user_id` / `scm_manager_user_id` / `created_by` have no `ON DELETE` action.
+- `approval_matrix_approvers.approver_id` references the user.
+- `vendor_approval_progress.actor_id` / approver references.
+- `smtp_email_configs.created_by`.
+- `notifications.user_id`, `screen_permissions.created_by`, etc.
 
-## Technical changes
+The function only nullifies a few tables, so any leftover FK breaks deletion → toast shows generic "Edge Function returned a non-2xx status code".
 
-- `src/pages/UserManagement.tsx` — remove `scopeTenantId` filter from Users/Custom Roles/Role Permissions tabs; keep selector visible only inside Approval Matrix / Buyer-SCM tab panels.
-- `src/components/admin/ApprovalMatrixConfig.tsx` + `ApproverPicker.tsx` — keep tenant selector; ensure approver dropdown filters via `user_tenants`.
-- `src/components/admin/BuyerScmMapping.tsx` — already tenant-scoped; receive its own tenant selector inside the tab.
-- DB migration:
-  - `CREATE OR REPLACE FUNCTION list_smtp_configs` — return all rows for any authenticated user.
-  - Relax `smtp_email_configs` RLS policies similarly.
-  - (Optional) helper to confirm Users/CustomRoles/Role-Permissions RLS already allow any user with the `user-management` screen permission to read — currently they require admin; add new policies using a `has_screen_permission(auth.uid(), 'user-management')` SECURITY DEFINER function.
-- `supabase/functions/send-vendor-invitation/index.ts` — return structured `{ error, code }` JSON with HTTP 400/424 for the SMTP-missing and Resend-missing cases, instead of dropping the connection.
-- `src/pages/AdminInvitations.tsx` — show the upstream error text in the toast.
+**Fix:**
+1. Extend `admin-delete-user/index.ts` to also clean up:
+   - `buyer_scm_mappings` (delete rows where user is buyer/scm OR nullify `created_by`).
+   - `approval_matrix_approvers` (delete rows where `approver_id = user_id`).
+   - `vendor_approval_progress` (nullify actor columns).
+   - `smtp_email_configs` (nullify `created_by` and delete configs owned by the user's email).
+   - `custom_roles.created_by` (nullify).
+   - `audit_logs` referencing `target_user_id` in details (skip — JSONB).
+   - Any other FK references found via `information_schema`.
+2. Return structured `{ ok:false, step, error }` JSON with HTTP 200 so the toast displays the actual cause instead of "non-2xx".
+3. Update the UI toast in `UserManagement.tsx` to render the `step` + `error` returned from the function.
 
-## Open question
+**Edge-function audit (broader "edge function failed" issue):**
+- Sweep every function under `supabase/functions/*` and apply the same pattern: catch errors, return `200` with `{ ok:false, error, step }`, never throw raw to the client. Concrete functions to harden in this pass (most-used in flows the user mentioned):
+  - `admin-create-user`, `admin-delete-user`
+  - `send-vendor-invitation` (already done — verify)
+  - `process-approval-action`, `route-vendor-approval`
+  - `sync-vendor-to-sap`, `sync-vendor-to-dms`
+  - `notify-vendor-submission`, `notify-finance-approval`, `send-status-notification`
+  - `smtp-config-save`, `smtp-config-test`, `smtp-config-delete`
+- Investigate self-hosted edge-function logs for the failing actions and surface the specific root cause for each. Where the failure is RLS-driven (service-role client missing), switch the client to `SUPABASE_SERVICE_ROLE_KEY` for mutations after the user-context client validates the caller's permission.
 
-Before implementing, I need one confirmation:
+## Technical Notes
 
-For the on-prem server, do you want **SMTP-only** sending (i.e. every buyer must configure their Gmail/Office SMTP from the Email Configuration screen before they can send invitations), or should the function fall back to **Resend** when no per-user SMTP exists (which then needs `RESEND_API_KEY` set on the self-hosted box)?
+```text
+buyer_scm_mappings  RLS (new)
+  USING / WITH CHECK = has_screen_permission(auth.uid(),'user-management')
+                      OR has_role(auth.uid(),'admin')
+                      OR has_role(auth.uid(),'sharvi_admin')
+  SELECT also OR buyer_user_id = auth.uid() OR scm_manager_user_id = auth.uid()
+```
+
+```text
+TenantCombobox (new)
+  props: value, onChange, tenants, userCounts?, placeholder?, allowAll?
+  uses Popover + Command (cmdk) for search
+```
+
+**Open question (please confirm before I build):**
+- For Point 3's "fix all edge functions" — should I (a) only fix `admin-delete-user` now plus harden the error-response shape across all functions so any failure shows a readable message (recommended, scoped), or (b) do a deep audit/repair of every edge function's business logic which is a much larger effort? Pick (a) or (b).

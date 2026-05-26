@@ -6,8 +6,11 @@ const corsHeaders = {
 };
 
 function jsonResponse(body: unknown, status = 200) {
+  // Always return 200 so supabase.functions.invoke surfaces our structured
+  // { ok:false, error, step } body to the UI instead of a generic
+  // "Edge Function returned a non-2xx status code" message.
   return new Response(JSON.stringify(body), {
-    status,
+    status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
@@ -121,6 +124,18 @@ Deno.serve(async (req) => {
     }
 
     // 9. App-side role/tenant/profile cleanup
+    await run('buyer_scm_mappings.delete_as_buyer', () =>
+      admin.from('buyer_scm_mappings').delete().eq('buyer_user_id', user_id)
+    );
+    await run('buyer_scm_mappings.delete_as_scm', () =>
+      admin.from('buyer_scm_mappings').delete().eq('scm_manager_user_id', user_id)
+    );
+    await run('buyer_scm_mappings.nullify_created_by', () =>
+      admin.from('buyer_scm_mappings').update({ created_by: null }).eq('created_by', user_id)
+    );
+    await run('approval_matrix_approvers.delete', () =>
+      admin.from('approval_matrix_approvers').delete().eq('user_id', user_id)
+    );
     await run('user_custom_roles.delete', () =>
       admin.from('user_custom_roles').delete().eq('user_id', user_id)
     );

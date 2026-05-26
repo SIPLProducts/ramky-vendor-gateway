@@ -63,13 +63,20 @@ interface DbState {
 const newRowKey = () => Math.random().toString(36).slice(2, 10);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function ApprovalMatrixConfig() {
+interface ApprovalMatrixConfigProps {
+  tenantId?: string | null;
+}
+
+export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixConfigProps = {}) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: tenants = [] } = useTenants();
   const activeTenants = useMemo(() => tenants.filter((t) => t.is_active), [tenants]);
+  const externallyControlled = tenantIdProp !== undefined;
 
-  const [tenantId, setTenantId] = useState<string>('');
+  const [internalTenantId, setInternalTenantId] = useState<string>('');
+  const tenantId = externallyControlled ? (tenantIdProp ?? '') : internalTenantId;
+  const setTenantId = (v: string) => { if (!externallyControlled) setInternalTenantId(v); };
   const [pendingTenantId, setPendingTenantId] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [activeStage, setActiveStage] = useState<Stage>('SCM_MANAGER');
@@ -106,10 +113,11 @@ export function ApprovalMatrixConfig() {
   }, [isDirty]);
 
   useEffect(() => {
-    if (activeTenants.length > 0 && !tenantId) {
-      setTenantId(activeTenants[0].id);
+    if (externallyControlled) return;
+    if (activeTenants.length > 0 && !internalTenantId) {
+      setInternalTenantId(activeTenants[0].id);
     }
-  }, [activeTenants, tenantId]);
+  }, [activeTenants, internalTenantId, externallyControlled]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -618,22 +626,35 @@ export function ApprovalMatrixConfig() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-end justify-between">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Tenant</label>
-          <Select value={tenantId} onValueChange={handleTenantChange}>
-            <SelectTrigger className="w-72"><SelectValue placeholder="Select tenant" /></SelectTrigger>
-            <SelectContent>
-              {activeTenants.map((t) => {
-                const count = tenantUserCounts[t.id] ?? 0;
-                return (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name} · {count} user{count === 1 ? '' : 's'}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
+        {!externallyControlled ? (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Tenant</label>
+            <Select value={tenantId} onValueChange={handleTenantChange}>
+              <SelectTrigger className="w-72"><SelectValue placeholder="Select tenant" /></SelectTrigger>
+              <SelectContent>
+                {activeTenants.map((t) => {
+                  const count = tenantUserCounts[t.id] ?? 0;
+                  return (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} · {count} user{count === 1 ? '' : 's'}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : !tenantId ? (
+          <div className="text-sm text-muted-foreground">
+            Select a tenant from <strong>Tenant Scope</strong> above to configure the Approval Matrix.
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            Tenant: <strong className="text-foreground">{currentTenant?.name ?? '—'}</strong>
+            {tenantUserCounts[tenantId] != null && (
+              <span className="ml-2">· {tenantUserCounts[tenantId]} user{tenantUserCounts[tenantId] === 1 ? '' : 's'}</span>
+            )}
+          </div>
+        )}
         <div className="flex gap-2 items-center flex-wrap">
           {isDirty && !loading && <Badge variant="destructive" className="animate-pulse">Unsaved changes</Badge>}
           <Button variant="outline" size="sm" onClick={testWriteAccess} disabled={!tenantId || testingWrite}>

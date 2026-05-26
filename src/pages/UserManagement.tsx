@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, Link2, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BuyerScmMapping } from '@/components/admin/BuyerScmMapping';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
+import { useTenantUserCounts } from '@/hooks/useTenant';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
@@ -46,6 +48,7 @@ const ALL_TENANTS = '__all__';
 
 export default function UserManagement() {
   const { user } = useAuth();
+  const { data: tenantUserCounts = {} } = useTenantUserCounts();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -305,19 +308,16 @@ export default function UserManagement() {
             Users, Custom Roles and Role Permissions are global. Approval Matrix and Buyer ↔ SCM are scoped per tenant.
           </p>
         </div>
-        <Card className="min-w-[280px]">
-          <CardContent className="p-3 flex items-center gap-3">
-            <Building2 className="h-5 w-5 text-primary" />
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">Tenant Scope (Approval Matrix / Buyer ↔ SCM)</p>
-              <Select value={scopeTenantId} onValueChange={setScopeTenantId}>
-                <SelectTrigger className="h-8 mt-0.5"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_TENANTS}>All Tenants</SelectItem>
-                  {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+        <Card className="min-w-[320px]">
+          <CardContent className="p-3">
+            <p className="text-xs text-muted-foreground mb-1">Tenant Scope (Approval Matrix / Buyer ↔ SCM)</p>
+            <TenantCombobox
+              tenants={tenants}
+              value={scopeTenantId === ALL_TENANTS ? null : scopeTenantId}
+              onChange={(id) => setScopeTenantId(id ?? ALL_TENANTS)}
+              userCounts={tenantUserCounts}
+              allowAll
+            />
           </CardContent>
         </Card>
       </div>
@@ -584,7 +584,7 @@ export default function UserManagement() {
 
         {/* APPROVAL MATRIX TAB */}
         <TabsContent value="approval-matrix">
-          <ApprovalMatrixConfig />
+          <ApprovalMatrixConfig tenantId={scopeTenantId === ALL_TENANTS ? null : scopeTenantId} />
         </TabsContent>
 
         {/* BUYER ↔ SCM MAPPING TAB */}

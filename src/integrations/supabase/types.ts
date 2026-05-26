@@ -2336,6 +2336,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_screen_permission: {
+        Args: { _screen_key: string; _user_id: string }
+        Returns: boolean
+      }
       is_cross_tenant_reviewer: { Args: { _user_id: string }; Returns: boolean }
       list_smtp_configs: {
         Args: never
