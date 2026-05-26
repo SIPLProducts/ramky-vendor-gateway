@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
 
 
 const corsHeaders = {
@@ -359,36 +361,63 @@ const handler = async (req: Request): Promise<Response> => {
 
     const finalHtml = emailHtml.replace("Procurement Team", senderName);
 
-    const smtpResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${serviceKey}`,
+    // Send directly via SMTP (no internal HTTP hop — avoids self-hosted Kong 502s)
+    const smtpHost = String(smtpCfg.smtp_host ?? "").trim();
+    const smtpPort = Number(smtpCfg.smtp_port ?? 587);
+    const smtpEncryption = String(smtpCfg.encryption ?? "tls").toLowerCase();
+    let smtpUsername = String(smtpCfg.smtp_username ?? "").trim();
+    const smtpPassword = String(smtpCfg.app_password ?? "").replace(/\s+/g, "");
+    const smtpFromEmail = String(smtpCfg.user_email ?? smtpUsername).trim();
+    if (!smtpUsername.includes("@") && smtpFromEmail.includes("@")) {
+      smtpUsername = smtpFromEmail;
+    }
+    const cleanFromName = (smtpCfg.from_name ?? senderName ?? "").toString().replace(/[<>"]/g, "").trim();
+    const fromHeader = cleanFromName ? `${cleanFromName} <${smtpFromEmail}>` : smtpFromEmail;
+    const useImplicitTls = smtpEncryption === "ssl";
+
+    console.log(
+      `[send-vendor-invitation] SMTP connect host=${smtpHost} port=${smtpPort} encryption=${smtpEncryption} implicitTLS=${useImplicitTls}`,
+    );
+
+    const smtpClient = new SMTPClient({
+      connection: {
+        hostname: smtpHost,
+        port: smtpPort,
+        tls: useImplicitTls,
+        auth: { username: smtpUsername, password: smtpPassword },
       },
-      body: JSON.stringify({
-        to: email,
-        subject: `Vendor Registration Invitation - ${companyName}`,
-        html: finalHtml,
-        suppressReplyTo: true,
-        smtp: {
-          host: smtpCfg.smtp_host,
-          port: smtpCfg.smtp_port,
-          encryption: smtpCfg.encryption,
-          username: smtpCfg.smtp_username,
-          password: smtpCfg.app_password,
-          from_email: smtpCfg.user_email,
-          from_name: smtpCfg.from_name ?? undefined,
-        },
-      }),
     });
 
-    const smtpData = await smtpResp.json();
-    if (!smtpResp.ok || !smtpData.success) {
-      throw new Error(smtpData.error || `SMTP send failed (${smtpResp.status})`);
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, rej) =>
+          setTimeout(
+            () => rej(new Error(`${label} timed out after ${ms / 1000}s — check firewall egress on port ${smtpPort} from server to ${smtpHost}`)),
+            ms,
+          )
+        ),
+      ]);
+
+    try {
+      await withTimeout(
+        smtpClient.send({
+          from: fromHeader,
+          to: [email],
+          subject: `Vendor Registration Invitation - ${companyName}`,
+          content: finalHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+          html: finalHtml,
+        }),
+        25000,
+        "SMTP send",
+      );
+    } finally {
+      try { await smtpClient.close(); } catch { /* ignore */ }
     }
 
-    const emailResult = { messageId: smtpData.messageId || `inv-${Date.now()}` };
+    const emailResult = { messageId: `inv-${Date.now()}` };
     console.log("Email sent successfully:", emailResult.messageId);
+
 
     // Update the invitation with email tracking
     if (invitationId) {
