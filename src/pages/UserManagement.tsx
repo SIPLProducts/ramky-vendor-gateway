@@ -291,7 +291,7 @@ export default function UserManagement() {
   };
 
   const tenantLabel = scopeTenantId === ALL_TENANTS
-    ? 'All Tenants (Global)'
+    ? 'All Tenants'
     : tenants.find((t) => t.id === scopeTenantId)?.name ?? '';
 
   return (
@@ -302,18 +302,18 @@ export default function UserManagement() {
             <Users className="h-6 w-6" /> User Management
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage users, custom roles, screen permissions and approval matrix — scoped per tenant.
+            Users, Custom Roles and Role Permissions are global. Approval Matrix and Buyer ↔ SCM are scoped per tenant.
           </p>
         </div>
         <Card className="min-w-[280px]">
           <CardContent className="p-3 flex items-center gap-3">
             <Building2 className="h-5 w-5 text-primary" />
             <div className="flex-1">
-              <p className="text-xs text-muted-foreground">Tenant Scope</p>
+              <p className="text-xs text-muted-foreground">Tenant Scope (Approval Matrix / Buyer ↔ SCM)</p>
               <Select value={scopeTenantId} onValueChange={setScopeTenantId}>
                 <SelectTrigger className="h-8 mt-0.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_TENANTS}>All Tenants (Global)</SelectItem>
+                  <SelectItem value={ALL_TENANTS}>All Tenants</SelectItem>
                   {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -321,6 +321,7 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
+
 
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
