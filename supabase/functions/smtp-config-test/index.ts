@@ -80,17 +80,14 @@ serve(async (req) => {
       replyTo = body.reply_to ? String(body.reply_to).trim() : null;
     }
 
-    const isGmail = host.toLowerCase().includes("gmail");
-    const effectivePort = isGmail && port === 587 ? 465 : port;
-    const useImplicitTls =
-      encryption === "ssl" ||
-      effectivePort === 465 ||
-      (isGmail && port === 587);
+    // Use the exact port + encryption configured by the user.
+    // Implicit TLS only when encryption is ssl or port is 465.
+    const useImplicitTls = encryption === "ssl" || port === 465;
 
     const client = new SMTPClient({
       connection: {
         hostname: host,
-        port: effectivePort,
+        port,
         tls: useImplicitTls,
         auth: { username, password },
       },
