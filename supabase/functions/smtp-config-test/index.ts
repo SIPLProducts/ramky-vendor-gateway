@@ -80,17 +80,11 @@ serve(async (req) => {
       replyTo = body.reply_to ? String(body.reply_to).trim() : null;
     }
 
-    // Gmail STARTTLS on port 587 hangs on self-hosted edge-runtime (denomailer
-    // TLS upgrade stalls -> supervisor kills worker with WorkerRequestCancelled).
-    // Force Gmail to 465 implicit TLS regardless of saved port.
-    let effectivePort = port;
-    if (/(^|\.)gmail\.com$/i.test(host) && port === 587) {
-      console.warn(
-        "[smtp-config-test] Gmail 587 STARTTLS unreliable on self-host, using 465 implicit TLS",
-      );
-      effectivePort = 465;
-    }
-    const useImplicitTls = encryption === "ssl" || effectivePort === 465;
+    // Honor the admin-configured port and encryption exactly.
+    // Implicit TLS only when encryption === "ssl" (typical port 465).
+    // STARTTLS upgrade for "tls" / "starttls" (typical port 587).
+    const effectivePort = port;
+    const useImplicitTls = encryption === "ssl";
 
     const client = new SMTPClient({
       connection: {
