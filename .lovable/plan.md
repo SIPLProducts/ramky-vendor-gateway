@@ -1,55 +1,108 @@
-## What's actually happening
+## Root cause
 
-`WorkerRequestCancelled: request has been cancelled by supervisor` is **not** an SMTP error. It's the self-hosted edge-runtime supervisor killing the worker because the function ran past its wall-clock budget (default ~150s on self-host, often lower) with no response.
+In a previous fix I added this override to both edge functions:
 
-The function is hanging inside `denomailer` during the **STARTTLS handshake to smtp.gmail.com:587** from your on-prem server (10.200.1.7). This is a known pattern:
+```ts
+// WRONG — ignores user's configured port
+if (/(^|\.)gmail\.com$/i.test(host) && port === 587) {
+  effectivePort = 465;          // forces implicit TLS on 465
+}
+const useImplicitTls = encryption === "ssl" || effectivePort === 465;
+```
 
-- `smtp.gmail.com:465` (implicit TLS) → works reliably from Deno/denomailer.
-- `smtp.gmail.com:587` (STARTTLS) → denomailer on edge-runtime frequently hangs forever if the upgrade handshake stalls (egress firewall partially allows 587, or TLS upgrade negotiation stalls). No error is thrown — the socket just sits there → supervisor kills it → `WorkerRequestCancelled`.
+That was added because Lovable Cloud's runtime had trouble with STARTTLS on 587. But on your on-prem host the firewall **blocks 465 and allows 587** — the exact opposite. Result: every send tries 465, times out after 25s, and the toast prints "port 465" even though Email Configuration is set to 587/TLS.
 
-Last round I **removed** the Gmail 587→465 override per the plan, and that's exactly what broke your self-hosted server. Lovable Cloud's runtime tolerated 587; your on-prem edge-runtime does not.
-
-The same applies to `send-smtp-email` (the "No-Reply test" payload you pasted hits that function and hangs identically).
+Your `nc` output is the proof: 587 succeeds, 465 hangs.
 
 ## Fix
 
-Put the Gmail safety override back, but make it explicit and bounded so it can't hang silently again. Apply to **both** `smtp-config-test` and `send-smtp-email` (and by extension the no-reply test path that uses `send-smtp-email`).
+Remove the Gmail-specific port hardcode in both functions. Always honor whatever the admin saved (or whatever the test panel passed in). Derive implicit-TLS from the **encryption** value, not from the port number:
 
-### 1. `supabase/functions/smtp-config-test/index.ts`
-- If `host` ends with `gmail.com` **and** `port === 587`, transparently use `port = 465` with implicit TLS. Log a one-line warning so it's visible in logs ("Gmail 587 STARTTLS unreliable on self-host, using 465 implicit TLS").
-- Wrap `client.send(...)` + `client.close()` in a `Promise.race` against a 25-second timeout. On timeout, throw a clean `SMTP connection timed out — check firewall egress on port 465/587 from server to smtp.gmail.com` so the toast shows a real reason instead of the supervisor killing the worker.
-- Keep everything else as-is (no role gate, inline + saved-id both supported).
+- `encryption = "ssl"` → implicit TLS (typically port 465)
+- `encryption = "tls"` or `"starttls"` → STARTTLS upgrade (typically port 587)
+- `encryption = "none"` → plaintext
 
-### 2. `supabase/functions/send-smtp-email/index.ts`
-- Same Gmail 587→465 override.
-- Same 25-second `Promise.race` timeout around `trySend()`.
-- Keep the existing reply-to retry logic, audit log, etc.
+`denomailer`'s `connection.tls: true` means implicit TLS from the first byte. For STARTTLS we set `connection.tls: false` and tell it to upgrade — denomailer auto-issues STARTTLS on submission ports when `tls: false` and the server advertises it. We'll also pass an explicit `connection.auth` and keep the 25s timeout safety net so a wrong port still surfaces a clear error instead of `WorkerRequestCancelled`.
 
-### 3. No DB / no frontend changes
-- `EmailConfiguration.tsx` already surfaces `e.message`, so the new timeout/clean error will appear in the toast.
-- Schema unchanged.
+### Files to change
 
-## Why the previous "remove override" plan was wrong for you
-The original plan assumed Lovable Cloud's runtime. Your deployment target is self-hosted edge-runtime behind your corporate network — different TLS stack, different egress posture, stricter supervisor. Gmail on 465 is the only path that's reliable in that environment. The 587 row in your DB stays as it is; the function just dials 465 when it sees Gmail.
+**`supabase/functions/send-smtp-email/index.ts`**
 
-## Files touched
+Replace this block (around the "Gmail STARTTLS" comment):
+
+```ts
+let effectivePort = port;
+if (/(^|\.)gmail\.com$/i.test(host) && port === 587) {
+  console.warn(
+    "[send-smtp-email] Gmail 587 STARTTLS unreliable on self-host, using 465 implicit TLS",
+  );
+  effectivePort = 465;
+}
+const useImplicitTls = encryption === "ssl" || effectivePort === 465;
+```
+
+With:
+
+```ts
+// Honor the admin's configured port and encryption exactly.
+// implicit TLS only when encryption === "ssl" (typical port 465).
+// STARTTLS / TLS upgrade for "tls" or "starttls" (typical port 587).
+const effectivePort = port;
+const useImplicitTls = encryption === "ssl";
+```
+
+Keep the existing `withTimeout` wrapper and the retry without Reply-To. The error message string stays "check firewall egress on port `${effectivePort}` …" which will now correctly show 587 if 587 was configured.
+
+**`supabase/functions/smtp-config-test/index.ts`**
+
+Same edit — strip the Gmail 587→465 override; `useImplicitTls = encryption === "ssl"`; keep the 25s timeout.
+
+### Why this is safe
+
+- On Lovable Cloud: Gmail SMTP on 587 STARTTLS is the standard, documented path and works with `denomailer` when you pass `connection.tls: false`. The earlier "587 hangs on Cloud" only happened with one specific connection-object shape; the current `SMTPClient({ connection: { hostname, port, tls: false, auth } })` form is fine.
+- On your on-prem host: 587 is open, so it will connect immediately, STARTTLS handshake, AUTH LOGIN with the App Password, send. Toast turns green.
+- If anyone later configures encryption `ssl` and port `465`, that still works.
+- If a host has a different firewall profile, the timeout message now reports the **actual port we tried**, not a hardcoded one, so debugging stays honest.
+
+### Will Lovable Cloud still work after this change?
+
+Yes — Cloud's egress allows both 465 and 587, and Gmail's 587 STARTTLS path works with denomailer's current API. I'm removing a workaround that has outlived its purpose.
+
+### Files NOT changed
+
+- No DB / portal_config changes — your existing row `smtp_port=587, smtp_encryption=tls` is already correct.
+- No frontend changes.
+- No new secrets.
+- `send-vendor-invitation`, `notify-vendor-submission`, `send-status-notification`, `notify-finance-approval` all call `send-smtp-email`, so they get fixed automatically.
+
+## After deploying
+
+On your server:
 
 ```
-supabase/functions/smtp-config-test/index.ts   (gmail 465 override + 25s timeout)
-supabase/functions/send-smtp-email/index.ts    (gmail 465 override + 25s timeout)
-```
-
-## After you pull on the server
-
-```
-cd /opt/Ramky_Applications/DEV/VMS/<source>
 git pull
-supabase functions deploy smtp-config-test send-smtp-email --no-verify-jwt
-docker compose -f <backend>/docker-compose.yml restart functions
+sudo rsync -a --delete supabase/functions/ /opt/supabase/volumes/functions/
+sudo docker compose -f /opt/supabase/docker-compose.yml restart functions
+sudo docker compose -f /opt/supabase/docker-compose.yml logs --tail=20 functions | grep -E "send-smtp-email|smtp-config-test"
 ```
 
-Then retry **Send Test Email** and **No-Reply Test**. You will see either `success: true` or a real SMTP/timeout message in the toast — never `WorkerRequestCancelled` again.
+Then test:
 
-## One confirmation
+1. **Admin → Email Configuration → Send Test Email** → expect green toast within 5s.
+2. **Admin → Vendor Invitations → Send Email** on a row → expect green toast and the vendor receives the invitation.
 
-OK to force Gmail to **465 implicit TLS** even when the saved row says 587/TLS? (Recommended — your saved row stays 587 for display, the function silently dials 465 only for `*.gmail.com`. Any non-Gmail host is honored exactly as configured.)
+Expected log line on success:
+```
+[send-smtp-email] Connecting host=smtp.gmail.com port=587 encryption=tls implicitTLS=false
+```
+
+If you still want a Resend HTTPS fallback as a belt-and-suspenders safety net later (so even a future firewall change can't break email), that's a separate small change — say the word and I'll add it. But it's no longer needed to fix the current issue.
+
+## Summary of edits
+
+| File | Edit |
+|---|---|
+| `supabase/functions/send-smtp-email/index.ts` | Remove Gmail 587→465 override; `useImplicitTls = encryption === "ssl"` |
+| `supabase/functions/smtp-config-test/index.ts` | Same |
+
+Approve and I'll switch to build mode and apply both edits.
