@@ -148,10 +148,10 @@ serve(async (req) => {
     };
 
     try {
-      await trySend(true);
+      await withTimeout(trySend(true), 25000, "SMTP send");
     } catch (e: any) {
       console.warn("smtp-config-test retry without cc:", e?.message ?? e);
-      await trySend(false);
+      await withTimeout(trySend(false), 25000, "SMTP send");
     }
     await client.close();
 
