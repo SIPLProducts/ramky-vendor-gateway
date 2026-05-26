@@ -379,13 +379,11 @@ const handler = async (req: Request): Promise<Response> => {
       `[send-vendor-invitation] SMTP connect host=${smtpHost} port=${smtpPort} encryption=${smtpEncryption} implicitTLS=${useImplicitTls}`,
     );
 
-    const smtpClient = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: smtpPort,
-        tls: useImplicitTls,
-        auth: { username: smtpUsername, password: smtpPassword },
-      },
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: useImplicitTls,
+      auth: { user: smtpUsername, pass: smtpPassword },
     });
 
     const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
@@ -401,18 +399,18 @@ const handler = async (req: Request): Promise<Response> => {
 
     try {
       await withTimeout(
-        smtpClient.send({
+        transporter.sendMail({
           from: fromHeader,
           to: [email],
           subject: `Vendor Registration Invitation - ${companyName}`,
-          content: finalHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+          text: finalHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
           html: finalHtml,
         }),
         25000,
         "SMTP send",
       );
     } finally {
-      try { await smtpClient.close(); } catch { /* ignore */ }
+      try { transporter.close(); } catch { /* ignore */ }
     }
 
     const emailResult = { messageId: `inv-${Date.now()}` };
