@@ -138,7 +138,7 @@ export default function AdminInvitations() {
       }
 
       // Generate unique token
-      const token = crypto.randomUUID();
+      const token = safeUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
