@@ -137,9 +137,16 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Use exactly the port/encryption saved in Email Configuration.
-    // No automatic Gmail 587 -> 465 override; honor what the admin configured.
-    const effectivePort = port;
+    // Gmail STARTTLS on port 587 hangs on self-hosted edge-runtime (denomailer
+    // TLS upgrade stalls -> supervisor kills worker with WorkerRequestCancelled).
+    // Force Gmail to 465 implicit TLS regardless of saved port.
+    let effectivePort = port;
+    if (/(^|\.)gmail\.com$/i.test(host) && port === 587) {
+      console.warn(
+        "[send-smtp-email] Gmail 587 STARTTLS unreliable on self-host, using 465 implicit TLS",
+      );
+      effectivePort = 465;
+    }
     const useImplicitTls = encryption === "ssl" || effectivePort === 465;
 
     console.log(
@@ -154,6 +161,22 @@ const handler = async (req: Request): Promise<Response> => {
         auth: { username, password },
       },
     });
+
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, rej) =>
+          setTimeout(
+            () =>
+              rej(
+                new Error(
+                  `${label} timed out after ${ms / 1000}s — check firewall egress on port ${effectivePort} from server to ${host}`,
+                ),
+              ),
+            ms,
+          )
+        ),
+      ]);
 
 
     const from = fromName
@@ -212,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     try {
-      await trySend();
+      await withTimeout(trySend(), 25000, "SMTP send");
     } catch (sendErr: any) {
       const msg = String(sendErr?.message ?? sendErr);
       // If denomailer still rejects something Reply-To related, retry once
@@ -221,7 +244,7 @@ const handler = async (req: Request): Promise<Response> => {
         console.warn(`[send-smtp-email] Retrying without Reply-To/extra Cc due to: ${msg}`);
         replyTo = "";
         ccArr = baseCc.length ? baseCc.map(String) : undefined;
-        await trySend();
+        await withTimeout(trySend(), 25000, "SMTP send");
       } else {
         throw sendErr;
       }
