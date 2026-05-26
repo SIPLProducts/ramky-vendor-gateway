@@ -1,55 +1,55 @@
-## What's actually wrong
+## What's actually happening
 
-### 1. "Dropdown, not a button" for company/tenant
-`TenantCombobox` (used on User Management → Tenant Scope and inside the Create User / Assign Tenant flows) is implemented as a `<Button variant="outline">` triggering a `Popover` + `Command`. Functionally it is searchable, but visually it renders as a button — that's why you keep saying "this is a button, I want a dropdown".
+`WorkerRequestCancelled: request has been cancelled by supervisor` is **not** an SMTP error. It's the self-hosted edge-runtime supervisor killing the worker because the function ran past its wall-clock budget (default ~150s on self-host, often lower) with no response.
 
-### 2. Invitation email "not going"
-- `send-vendor-invitation` looks up `smtp_email_configs` by the logged-in user's email (`senderEmail = user?.email`). If your server account's email is not exactly one of the rows in `smtp_email_configs`, it returns "No SMTP configuration found for …" and no email is sent.
-- Current rows in DB: `sunilakula1919@gmail.com`, `vidyasagar.atla@ramky.com`, `suresh.mareddy@ramky.com`. If the user clicking Send Email is logged in as anyone else (e.g. an admin), the function bails out.
-- `send-smtp-email` force-overrides Gmail port to 465 with implicit TLS, ignoring what you saved (587/TLS). That's the "465" you saw in logs — it's not hardcoded credentials, it's a port override. You asked for it to use exactly what's in Email Configuration.
-- The UI toast only shows a generic "Failed to send email" because the error chain swallows the real reason in some paths.
+The function is hanging inside `denomailer` during the **STARTTLS handshake to smtp.gmail.com:587** from your on-prem server (10.200.1.7). This is a known pattern:
 
-## Changes
+- `smtp.gmail.com:465` (implicit TLS) → works reliably from Deno/denomailer.
+- `smtp.gmail.com:587` (STARTTLS) → denomailer on edge-runtime frequently hangs forever if the upgrade handshake stalls (egress firewall partially allows 587, or TLS upgrade negotiation stalls). No error is thrown — the socket just sits there → supervisor kills it → `WorkerRequestCancelled`.
 
-### A. Tenant picker → real dropdown look (`src/components/admin/TenantCombobox.tsx`)
-Replace the `<Button>` trigger with a div styled exactly like a shadcn `SelectTrigger` (same height, border, chevron, focus ring). Keep the `Popover` + `Command` search inside so it stays searchable. No behavior change — same props, same callers, just looks like a native select.
+Last round I **removed** the Gmail 587→465 override per the plan, and that's exactly what broke your self-hosted server. Lovable Cloud's runtime tolerated 587; your on-prem edge-runtime does not.
 
-### B. Create User dialog tenant picker (`src/components/admin/CreateUserDialog.tsx`)
-The current SAP-tenant section shows a checkbox list. Add a compact searchable dropdown variant on top (single or multi via the same select-styled trigger) so it matches the rest of the UI. Keep checkbox list behind a "Show all" toggle for bulk selection. (If you only want it dropdown-only, say so and I'll remove the checkbox list entirely.)
+The same applies to `send-smtp-email` (the "No-Reply test" payload you pasted hits that function and hangs identically).
 
-### C. Invitation email — actually use Email Configuration
+## Fix
 
-In `supabase/functions/send-vendor-invitation/index.ts`:
-1. Sender resolution order:
-   a. Match `smtp_email_configs.user_email` ILIKE `senderEmail` (current).
-   b. If none, fall back to **any** active `smtp_email_configs` row (deterministic: most recently updated). This makes "send works for any admin" the default.
-   c. If still none, return the friendly error and surface it in the toast.
-2. Return the **actual** SMTP error string in the response body so `AdminInvitations.tsx` shows the real reason.
+Put the Gmail safety override back, but make it explicit and bounded so it can't hang silently again. Apply to **both** `smtp-config-test` and `send-smtp-email` (and by extension the no-reply test path that uses `send-smtp-email`).
 
-In `supabase/functions/send-smtp-email/index.ts`:
-1. **Remove the Gmail 587 → 465 override.** Use exactly the `smtp_port` and `encryption` saved in Email Configuration. (Both 465/SSL and 587/STARTTLS work with denomailer when configured correctly — your row for `sunilakula1919@gmail.com` is 587/TLS, keep it.)
-2. Keep the Gmail-username-must-be-email guard (that one's correct).
-3. Surface the raw SMTP error in the response (already mostly there — verify the 535 friendly mapping doesn't hide other 5xx codes).
+### 1. `supabase/functions/smtp-config-test/index.ts`
+- If `host` ends with `gmail.com` **and** `port === 587`, transparently use `port = 465` with implicit TLS. Log a one-line warning so it's visible in logs ("Gmail 587 STARTTLS unreliable on self-host, using 465 implicit TLS").
+- Wrap `client.send(...)` + `client.close()` in a `Promise.race` against a 25-second timeout. On timeout, throw a clean `SMTP connection timed out — check firewall egress on port 465/587 from server to smtp.gmail.com` so the toast shows a real reason instead of the supervisor killing the worker.
+- Keep everything else as-is (no role gate, inline + saved-id both supported).
 
-In `src/pages/AdminInvitations.tsx`:
-- When the toast fires, include the server `error` field verbatim so you can see what's actually failing on the server (already partially there — confirm it surfaces `respErrMsg`).
+### 2. `supabase/functions/send-smtp-email/index.ts`
+- Same Gmail 587→465 override.
+- Same 25-second `Promise.race` timeout around `trySend()`.
+- Keep the existing reply-to retry logic, audit log, etc.
 
-### D. Redeploy (you do this on your on-prem server)
-After pulling:
-- `supabase functions deploy send-vendor-invitation send-smtp-email --no-verify-jwt`
-- Rebuild and replace `dist/`
+### 3. No DB / no frontend changes
+- `EmailConfiguration.tsx` already surfaces `e.message`, so the new timeout/clean error will appear in the toast.
+- Schema unchanged.
+
+## Why the previous "remove override" plan was wrong for you
+The original plan assumed Lovable Cloud's runtime. Your deployment target is self-hosted edge-runtime behind your corporate network — different TLS stack, different egress posture, stricter supervisor. Gmail on 465 is the only path that's reliable in that environment. The 587 row in your DB stays as it is; the function just dials 465 when it sees Gmail.
 
 ## Files touched
 
 ```
-src/components/admin/TenantCombobox.tsx          (visual: button → select-style trigger)
-src/components/admin/CreateUserDialog.tsx        (tenant section: add dropdown)
-src/pages/AdminInvitations.tsx                   (toast: show real server error)
-supabase/functions/send-vendor-invitation/index.ts  (sender fallback + error passthrough)
-supabase/functions/send-smtp-email/index.ts      (remove Gmail port override)
+supabase/functions/smtp-config-test/index.ts   (gmail 465 override + 25s timeout)
+supabase/functions/send-smtp-email/index.ts    (gmail 465 override + 25s timeout)
 ```
 
-## Two quick confirmations before I implement
+## After you pull on the server
 
-1. **Sender fallback for invitations**: OK to fall back to any active SMTP config row when the logged-in admin doesn't have their own row? (Recommended — otherwise you must add a config row for every admin who sends invites.)
-2. **Create User dialog tenants**: dropdown-only, or dropdown + keep the existing checkbox list as a secondary "select multiple" view?
+```
+cd /opt/Ramky_Applications/DEV/VMS/<source>
+git pull
+supabase functions deploy smtp-config-test send-smtp-email --no-verify-jwt
+docker compose -f <backend>/docker-compose.yml restart functions
+```
+
+Then retry **Send Test Email** and **No-Reply Test**. You will see either `success: true` or a real SMTP/timeout message in the toast — never `WorkerRequestCancelled` again.
+
+## One confirmation
+
+OK to force Gmail to **465 implicit TLS** even when the saved row says 587/TLS? (Recommended — your saved row stays 587 for display, the function silently dials 465 only for `*.gmail.com`. Any non-Gmail host is honored exactly as configured.)
