@@ -235,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     try {
-      await trySend();
+      await withTimeout(trySend(), 25000, "SMTP send");
     } catch (sendErr: any) {
       const msg = String(sendErr?.message ?? sendErr);
       // If denomailer still rejects something Reply-To related, retry once
@@ -244,7 +244,7 @@ const handler = async (req: Request): Promise<Response> => {
         console.warn(`[send-smtp-email] Retrying without Reply-To/extra Cc due to: ${msg}`);
         replyTo = "";
         ccArr = baseCc.length ? baseCc.map(String) : undefined;
-        await trySend();
+        await withTimeout(trySend(), 25000, "SMTP send");
       } else {
         throw sendErr;
       }
