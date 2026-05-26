@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.14";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,13 +86,11 @@ serve(async (req) => {
     const effectivePort = port;
     const useImplicitTls = encryption === "ssl";
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: host,
-        port: effectivePort,
-        tls: useImplicitTls,
-        auth: { username, password },
-      },
+    const transporter = nodemailer.createTransport({
+      host,
+      port: effectivePort,
+      secure: useImplicitTls,
+      auth: { user: username, pass: password },
     });
 
     const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
@@ -129,12 +127,12 @@ serve(async (req) => {
       .filter((s) => isEmail(s) && s.toLowerCase() !== recipient.toLowerCase());
 
     const trySend = async (withCc: boolean) => {
-      await client.send({
+      await transporter.sendMail({
         from,
         to: [recipient],
         cc: withCc && ccArr.length ? ccArr : undefined,
         subject: "Sharvi Vendor Portal — SMTP Test Email",
-        content:
+        text:
           "This is a test email confirming your SMTP configuration is working.",
         html:
           "<p>This is a <strong>test email</strong> confirming your SMTP configuration is working.</p>",
@@ -147,7 +145,7 @@ serve(async (req) => {
       console.warn("smtp-config-test retry without cc:", e?.message ?? e);
       await withTimeout(trySend(false), 25000, "SMTP send");
     }
-    await client.close();
+    try { transporter.close(); } catch { /* ignore */ }
 
     return new Response(
       JSON.stringify({ success: true, sentTo: recipient }),

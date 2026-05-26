@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.14";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -147,13 +147,11 @@ const handler = async (req: Request): Promise<Response> => {
       `[send-smtp-email] Connecting host=${host} port=${effectivePort} encryption=${encryption} implicitTLS=${useImplicitTls}`
     );
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: host,
-        port: effectivePort,
-        tls: useImplicitTls,
-        auth: { username, password },
-      },
+    const transporter = nodemailer.createTransport({
+      host,
+      port: effectivePort,
+      secure: useImplicitTls,
+      auth: { user: username, pass: password },
     });
 
     const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
@@ -216,14 +214,14 @@ const handler = async (req: Request): Promise<Response> => {
       : "");
 
     const trySend = async () => {
-      await client.send({
+      await transporter.sendMail({
         from,
         to: toArr,
         cc: ccArr,
         bcc: bccArr,
         replyTo: replyTo || undefined,
         subject: body.subject,
-        content: plainText,
+        text: plainText,
         html: body.html,
       });
     };
@@ -232,7 +230,7 @@ const handler = async (req: Request): Promise<Response> => {
       await withTimeout(trySend(), 25000, "SMTP send");
     } catch (sendErr: any) {
       const msg = String(sendErr?.message ?? sendErr);
-      // If denomailer still rejects something Reply-To related, retry once
+      // If the SMTP server still rejects something Reply-To related, retry once
       // without Reply-To and the extra Cc so the buyer email goes through.
       if (/reply.?to/i.test(msg) || /not a valid email/i.test(msg)) {
         console.warn(`[send-smtp-email] Retrying without Reply-To/extra Cc due to: ${msg}`);
@@ -244,7 +242,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    await client.close();
+    try { transporter.close(); } catch { /* ignore */ }
 
     // Audit log (best-effort)
     try {
