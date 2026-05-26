@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, Link2, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BuyerScmMapping } from '@/components/admin/BuyerScmMapping';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
+import { useTenantUserCounts } from '@/hooks/useTenant';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
