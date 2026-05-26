@@ -533,7 +533,7 @@ export default function UserManagement() {
                       ))
                     ) : scopedCustomRoleRows.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No custom roles {scopeTenantId !== ALL_TENANTS ? 'in this tenant' : 'yet'}. Click "Create Role" to add one.
+                        No custom roles yet. Click "Create Role" to add one.
                       </TableCell></TableRow>
                     ) : (
                       scopedCustomRoleRows.map((r) => {
