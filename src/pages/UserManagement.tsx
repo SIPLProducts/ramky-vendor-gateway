@@ -398,7 +398,7 @@ export default function UserManagement() {
                       ))
                     ) : filtered.length === 0 ? (
                       <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        {scopeTenantId === ALL_TENANTS ? 'No users found' : 'No users in this tenant'}
+                        No users found
                       </TableCell></TableRow>
                     ) : (
                       filtered.map((u) => (
