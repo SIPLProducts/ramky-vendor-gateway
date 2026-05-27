@@ -15,8 +15,16 @@
  */
 
 function unwrapValue(v: any): any {
-  if (v && typeof v === 'object' && !Array.isArray(v) && 'value' in v) {
-    return (v as any).value;
+  if (v == null) return v;
+  if (Array.isArray(v)) return v.map(unwrapValue);
+  if (typeof v === 'object') {
+    // Surepass shape: { value: ..., confidence: ... } — collapse to value.
+    if ('value' in v && ('confidence' in v || Object.keys(v).length <= 2)) {
+      return unwrapValue((v as any).value);
+    }
+    const out: Record<string, any> = {};
+    for (const [k, vv] of Object.entries(v)) out[k] = unwrapValue(vv);
+    return out;
   }
   return v;
 }
