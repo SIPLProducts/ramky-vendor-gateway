@@ -463,3 +463,57 @@ export function SapF4SelectField({
     </div>
   );
 }
+
+export function SapF4MultiSelectField({
+  label, masterType, value, onChange, liveItems, placeholder,
+}: {
+  label: string;
+  masterType: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  liveItems?: any[] | null;
+  placeholder?: string;
+}) {
+  const map = F4_FIELD_MAP[masterType];
+  const isLive = Array.isArray(liveItems);
+  const { data: cachedRows, isLoading } = useSapMasterData(isLive ? undefined : masterType);
+
+  const options = (() => {
+    if (isLive) {
+      return (liveItems || [])
+        .map((item) => {
+          const code = map ? item?.[map.code] : item?.code;
+          if (code === undefined || code === null || String(code).trim() === '') return null;
+          const desc = map?.desc ? item?.[map.desc] : item?.description;
+          const labelText = desc ? `${code} — ${desc}` : String(code);
+          return { value: String(code), label: labelText };
+        })
+        .filter(Boolean) as { value: string; label: string }[];
+    }
+    return (cachedRows || []).map((r: any) => {
+      const extra = r.extra || {};
+      const code = map ? (extra[map.code] ?? r.code) : r.code;
+      const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
+      const labelText = desc ? `${code} — ${desc}` : String(code);
+      return { value: String(r.code), label: labelText };
+    });
+  })();
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <MultiSelect
+        options={options}
+        selected={value || []}
+        onChange={onChange}
+        placeholder={placeholder || 'Select…'}
+      />
+      <p className="text-[11px] text-muted-foreground">
+        {isLoading
+          ? 'Loading F4 values…'
+          : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
+      </p>
+    </div>
+  );
+}
+
