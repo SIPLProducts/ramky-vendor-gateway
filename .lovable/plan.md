@@ -1,67 +1,45 @@
-## Confirmed understanding
+## Goal
 
-- **Lovable preview / `vms.siplproducts.com` is working.**
-- The issue is on your **self-hosted server deployment** (`10.200.1.7` / deployed server build).
-- So the fix must make the code work even when the server database/config is not identical to Lovable Cloud.
+Inside Step 1 (Document Verification), each stage tab — **GST → PAN → MSME → Bank** — currently has no per-tab Continue button. The user must click the next tab manually. Add a per-tab **Continue** button at the bottom of each tab that:
 
-## Actual issue
+- Stays **disabled** while that tab's verification is incomplete.
+- **Enables** as soon as that tab's stage is done (GST verified + filing OK / declaration, PAN verified, MSME verified or declaration, Bank verified).
+- On click, switches the active tab to the next stage (Bank's button advances the whole Step 1, same behavior as the outer Continue).
 
-### SAP Sync
-The SAP API is not hitting because payload building fails first:
+## Behavior per tab
 
-`No SAP payload template configured`
+| Tab | Enable when | Action |
+|---|---|---|
+| GST | `stage1Done` is true | `setActiveTab("pan")` |
+| PAN | `stage2Done` is true | `setActiveTab("msme")` |
+| MSME | `stage3Done` is true | `setActiveTab("bank")` |
+| Bank | `stage4Done` is true (and overall `allDone`) | Call existing `handleContinue()` to advance to Step 2 |
 
-That means the server database is missing or not exposing the active `sap_payload_templates` row. So the code stops before calling the configured SAP API.
+Tabs that come after the current one remain locked until their own stage prerequisites are met (the existing `tabUnlock` logic stays untouched).
 
-### GST upload
-The GST upload flow depends too much on OCR reading GSTIN from PDF. On the self-hosted server, OCR returns `No GSTIN Detected`, so the flow blocks instead of falling back to the GSTIN/manual validation path.
+## Technical change (frontend only)
 
-## Fix I will implement
+File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
 
-### 1. SAP Sync fallback for self-hosted server
-Files:
-- `src/lib/sapPayloadBuilder.ts`
-- `supabase/functions/sync-vendor-to-sap/index.ts`
+1. Add a small reusable row inside each `TabsContent` (just before its closing tag) at lines ~1908, ~2021, ~2377, ~2633:
+   ```tsx
+   <div className="mt-6 flex justify-end">
+     <Button
+       type="button"
+       onClick={() => setActiveTab("pan")}        // or next stage / handleContinue
+       disabled={!stage1Done}                      // or stage2Done / stage3Done / allDone
+     >
+       Continue
+     </Button>
+   </div>
+   ```
+2. Bank tab's button calls `handleContinue()` (already defined at line 1617) and is disabled unless `allDone`.
+3. No change to the outer Step-1 Continue at the bottom of the page — it stays as-is.
 
-Changes:
-- Keep current working template-based payload if `sap_payload_templates` exists.
-- If no active template exists, dynamically build the SAP payload from the configured **SAP API Settings → Request Fields** rows.
-- Use dynamic values from:
-  - vendor fields
-  - SAP confirmation dialog overrides
-  - tenant SAP default fields
-  - configured request-field defaults
-- Continue using the configured SAP API endpoint/middleware URL from SAP API Settings.
-- No hardcoded vendor data, endpoint, or credentials.
+## Out of scope
 
-### 2. Better SAP config selection
-Files:
-- `src/lib/sapPayloadBuilder.ts`
-- `supabase/functions/sync-vendor-to-sap/index.ts`
+- No change to verification API logic, gating math, or backend.
+- No DB / edge function / SAP changes.
+- No styling system changes — uses existing `Button` component and design tokens.
 
-Changes:
-- Prefer the config named like `Create vendor in SAP` or endpoint containing `/vendor/bp/create` / `/sap/bp/create`.
-- Avoid accidentally choosing other active SAP configs like `Tenants From SAP`.
-
-### 3. GST upload fallback
-Files:
-- `src/components/vendor/kyc/GstKycTab.tsx`
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-- `src/lib/kycExtract.ts`
-
-Changes:
-- If GST OCR cannot detect GSTIN from the PDF, use the already-entered/manual GSTIN if available and call the configured GST validation API.
-- If no GSTIN is available, show a clear message to enter GSTIN manually instead of only saying upload clearer PDF.
-- Improve extraction from Surepass OCR response so nested OCR fields are handled more safely.
-
-### 4. Server deployment safety
-I will also update the deployment/server notes if needed so the self-hosted server deploy includes:
-- latest frontend build
-- latest backend functions
-- required seed/config parity for SAP payload template when available
-
-## Expected result
-
-- SAP Sync will actually call the configured SAP API on the self-hosted server.
-- GST PDF upload will not dead-end when OCR cannot detect GSTIN.
-- Existing working behaviour on Lovable / `vms.siplproducts.com` remains unchanged.
+After approval the change must be rebuilt and redeployed on the self-hosted server (`scripts/lib/60-frontend.sh`).
