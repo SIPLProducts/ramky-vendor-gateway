@@ -211,16 +211,41 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Classification — auto-filled from vendor registration data */}
+            {/* Classification — editable here (no longer captured during registration) */}
             <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <ReadOnlyField label="Material Group for Vendors" value={(form.classify.MGV || []).join(', ')} />
-              <ReadOnlyField label="Vendor Category" value={(form.classify.CATV || []).join(', ')} />
-              <ReadOnlyField label="Vendor Location" value={(form.classify.LOCV || []).join(', ')} />
-              <ReadOnlyField label="Vendor Identification Source" value={(form.classify.IDS || []).join(', ')} />
+              <SapF4MultiSelectField
+                label="Material Group for Vendors"
+                masterType="material_group_vendor"
+                value={form.classify.MGV || []}
+                onChange={(v) => setClassify('MGV', v)}
+                placeholder="Select material groups"
+              />
+              <SapF4MultiSelectField
+                label="Vendor Category"
+                masterType="vendor_category"
+                value={form.classify.CATV || []}
+                onChange={(v) => setClassify('CATV', v)}
+                placeholder="Select vendor categories"
+              />
+              <SapF4MultiSelectField
+                label="Vendor Location"
+                masterType="vendor_location"
+                value={form.classify.LOCV || []}
+                onChange={(v) => setClassify('LOCV', v)}
+                placeholder="Select locations"
+              />
+              <SapF4MultiSelectField
+                label="Vendor Identification Source"
+                masterType="identification_source"
+                value={form.classify.IDS || []}
+                onChange={(v) => setClassify('IDS', v)}
+                placeholder="Select identification sources"
+              />
               <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
-                These values are captured from the vendor's submitted registration form and cannot be edited here.
+                Select Classification values to send to SAP. Defaults are pre-filled when available.
               </p>
             </Section>
+
 
           </div>
           )}
