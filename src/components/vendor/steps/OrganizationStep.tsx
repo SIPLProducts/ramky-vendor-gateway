@@ -467,6 +467,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
               <Input id="labourPermitNo" {...register('labourPermitNo')} placeholder="Labour permit number" />
             </div>
           </div>
+        </div>
       </div>
 
       {/* Memberships & Certifications */}
