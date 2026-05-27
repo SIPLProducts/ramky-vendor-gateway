@@ -157,10 +157,9 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={FileCheck} title="PAN & Entity Type" step={1} tab="pan" onEdit={onEditStep} />
+        <SectionHeader icon={FileCheck} title="PAN" step={1} tab="pan" onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="PAN" value={data.statutory?.pan} />
-          <DataRow label="Entity Type" value={data.statutory?.entityType} />
         </div>
       </div>
 
