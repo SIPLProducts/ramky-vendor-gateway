@@ -136,6 +136,7 @@ export default function SAPSync() {
     if (!vendor) return;
     setSyncingVendorId(vendor.id);
     try {
+      await persistClassification([vendor.id], overrides);
       const result = await sapSync.mutateAsync({ vendorId: vendor.id, overrides });
       setSapSyncResult(result.sapResponse);
       setSelectedVendor(vendor);
@@ -162,6 +163,7 @@ export default function SAPSync() {
   const handleMultipleSync = async (overrides: SapFieldOverrides) => {
     const vendorIds = selectedSapVendors.map(v => v.id);
     try {
+      await persistClassification(vendorIds, overrides);
       const result = await bulkSync.mutateAsync({ vendorIds, overrides });
       setBulkResult(result);
       setShowMultipleSync(false);
