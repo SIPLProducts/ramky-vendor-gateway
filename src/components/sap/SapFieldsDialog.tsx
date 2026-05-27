@@ -101,7 +101,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
     setForm(prev => ({ ...prev, [k]: v }));
 
-  const setClassify = (k: keyof SapFieldOverrides['classify'], v: string) =>
+  const setClassify = (k: keyof SapFieldOverrides['classify'], v: string[]) =>
     setForm(prev => ({ ...prev, classify: { ...prev.classify, [k]: v } }));
 
   return (
