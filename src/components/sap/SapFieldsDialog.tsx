@@ -377,12 +377,16 @@ function ReadOnlyField({ label, value }: { label: string; value: string | number
 }
 
 const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: string }> = {
-  vendor_account_group: { code: 'KTOKK', desc: 'TXT30' },
-  company_code:         { code: 'BUKRS', desc: 'BUTXT' },
-  planning_group:       { code: 'GRUPP' },
-  recon_account:        { code: 'SAKNR', desc: 'TXT20', prefix: 'BUKRS' },
-  purchase_org:         { code: 'EKORG', desc: 'EKOTX' },
-  currency:             { code: 'WAERS', desc: 'LTEXT' },
+  vendor_account_group:  { code: 'KTOKK', desc: 'TXT30' },
+  company_code:          { code: 'BUKRS', desc: 'BUTXT' },
+  planning_group:        { code: 'GRUPP' },
+  recon_account:         { code: 'SAKNR', desc: 'TXT20', prefix: 'BUKRS' },
+  purchase_org:          { code: 'EKORG', desc: 'EKOTX' },
+  currency:              { code: 'WAERS', desc: 'LTEXT' },
+  material_group_vendor: { code: 'ATWRT', desc: 'ATWTB' },
+  vendor_category:       { code: 'ATWRT', desc: 'ATWTB' },
+  vendor_location:       { code: 'ATWRT', desc: 'ATWTB' },
+  identification_source: { code: 'ATWRT', desc: 'ATWTB' },
 };
 
 export function SapF4SelectField({
