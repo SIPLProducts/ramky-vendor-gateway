@@ -214,10 +214,11 @@ export async function normalizeUploadToImage(
   }
 
   if (pageCanvases.length === 0) {
-    throw new Error(
-      "We couldn't render any page of this PDF. The file may be password-protected, scanned at very low quality, or corrupted. Please upload a clearer PDF or a JPG/PNG image of the document.",
-    );
+    // Fall back to the original PDF — the OCR provider may still handle it.
+    console.warn("[pdfToImage] no pages rendered, sending original PDF");
+    return file;
   }
+
 
   // Single-page PDF → emit that page directly.
   if (pageCanvases.length === 1) {
