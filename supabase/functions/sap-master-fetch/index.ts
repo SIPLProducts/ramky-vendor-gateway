@@ -56,8 +56,18 @@ function ok(body: any, status = 200) {
 }
 
 function normalizeMiddlewareBase(raw: string): string {
-  let v = String(raw || "").replace(/\s+/g, "").trim().replace(/\/+$/, "");
+  let v = String(raw || "").replace(/\s+/g, "").trim();
+  // Repair common scheme typos: "http;//host", "https;//host", "http:/host"
+  v = v.replace(/^(https?);\/\//i, "$1://");
+  v = v.replace(/^(https?):\/(?!\/)/i, "$1://");
+  // If user typed no scheme at all, default to http (self-hosted internal IPs)
+  if (!/^https?:\/\//i.test(v) && v.length > 0) {
+    v = "http://" + v.replace(/^\/+/, "");
+  }
+  v = v.replace(/\/+$/, "");
   v = v.replace(/\/sap\/bp\/create$/i, "")
+       .replace(/\/sap\/dms\/upload$/i, "")
+       .replace(/\/api\/sap\/proxy$/i, "")
        .replace(/\/sap\/proxy$/i, "")
        .replace(/\/health$/i, "")
        .replace(/\/+$/, "");
