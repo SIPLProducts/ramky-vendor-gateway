@@ -86,10 +86,14 @@ async function imageFileToJpeg(file: File): Promise<File> {
       output: { name: out.name, type: out.type, size: out.size, w: fitted.width, h: fitted.height },
     });
     return out;
+  } catch (err) {
+    console.warn("[pdfToImage] image re-encode failed, sending original", err);
+    return file;
   } finally {
     URL.revokeObjectURL(url);
   }
 }
+
 
 async function htmlToImage(html: string, baseFileName: string): Promise<File> {
   const html2canvas = (await import("html2canvas")).default;
