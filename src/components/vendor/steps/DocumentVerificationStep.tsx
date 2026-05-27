@@ -186,6 +186,8 @@ export function DocumentVerificationStep({
   onComplete,
   onStageChange,
   initialTab,
+  onSaveDraft,
+  isSavingDraft,
 }: DocumentVerificationStepProps) {
   // OCR is now exclusively driven by the admin-configured providers in
   // "KYC & Validation API Settings" (see kyc-api-execute edge function).
