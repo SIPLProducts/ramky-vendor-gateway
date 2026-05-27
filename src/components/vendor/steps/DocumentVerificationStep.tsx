@@ -1874,7 +1874,7 @@ export function DocumentVerificationStep({
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Template
+                        Template download
                       </a>
                       <InlineFilePicker
                         file={gstDeclarationFile}
@@ -2049,7 +2049,7 @@ export function DocumentVerificationStep({
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Template
+                        Template download
                       </a>
                       <InlineFilePicker
                         file={msmeDeclarationFile}
