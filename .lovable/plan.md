@@ -1,47 +1,50 @@
-## Point 1 — Review & Submit "Edit" must open the right tab (GST / PAN / MSME / Bank)
+# Fix: Buyer Company, SAP Sync, and PDF/Image OCR uploads
 
-Wiring is already in place (`onEditStep(step, tab)` → `setPendingDocTab(tab)` → `setCurrentStep(1)` → `DocumentVerificationStep initialTab`), but it is being overridden immediately after mount by the auto-advance effect in `DocumentVerificationStep.tsx` (lines 1630–1637). On a vendor whose stages are already verified, that effect runs once on mount and bumps `activeTab` from "gst"/"pan"/"msme" to the next tab, which is exactly what the user is seeing.
+Three focused fixes. No other functionality changes.
 
-Fix in `src/components/vendor/steps/DocumentVerificationStep.tsx`:
+## 1. Buyer Company should be readonly in Organization Profile
 
-1. Delete the entire auto-advance block (lines 1629–1637): the `prevDoneRef` useRef and the `useEffect` that calls `setActiveTab("pan" | "msme" | "bank")` based on `stage1Done / stage2Done / stage3Done`.
-2. Keep the existing `useEffect` (lines 1624–1627) that syncs `activeTab` from `initialTab` — this preserves Edit-deep-link behavior.
-3. Also guard `handleEditStep` in `src/pages/VendorRegistration.tsx` so that re-clicking Edit on the same tab still re-applies it. Update line 651 area to force a re-sync by clearing then setting:
-   ```ts
-   const handleEditStep = (step: number, tab?: 'gst' | 'pan' | 'msme' | 'bank') => {
-     if (step === 1) setPendingDocTab(tab);   // always update, even if same value
-     setCurrentStep(step);
-   };
-   ```
-   And in `DocumentVerificationStep.tsx`, change the sync effect to react every time the prop changes (even if the same string is passed twice in a row) by also depending on a render key — simplest is to keep behavior as-is since `setPendingDocTab` triggers a state change that re-passes the prop and the effect refires.
+**File:** `src/components/vendor/steps/OrganizationStep.tsx` (lines ~248–278)
 
-## Point 2 — Don't auto-jump to next tab after a successful validation
+The Buyer Company `<Select>` currently lets the vendor change the value. Since it is derived from the buyer context (assigned during invite/registration), it must display only.
 
-This is the same auto-advance effect removed in Point 1 (lines 1631–1637). After removing it:
+- Add `disabled` to the `<Select>` so the dropdown can't be reopened (keep the value rendered).
+- Add a small helper text "Assigned by buyer — cannot be changed".
+- Schema (`buyerCompanyId`) and the saved value remain untouched, so submit/validation still works.
 
-- Tabs remain unlocked as soon as their stage is done (`tabUnlock` map at lines 1639–1644 is unchanged).
-- The vendor must click the next tab themselves (or the existing Continue button at the bottom of the step to move to step 2).
+## 2. "Sync to SAP" not hitting the Create-vendor API
 
-No other auto-`setActiveTab` calls need to be touched — the remaining ones (lines 912, 919, 1173) only fire on FAILURE to keep the user on the failing tab, which is correct.
+**Files:** `src/pages/SAPSync.tsx`, `src/hooks/useVendors.tsx` (`useSapSync`), `supabase/functions/sync-vendor-to-sap/index.ts`
 
-The existing footer "Continue" button on the Document Verification step is already enabled when all 4 stages are done and moves to step 2 — that behavior is kept as-is.
+Symptoms from user: clicking **Sync to SAP** in `SapFieldsDialog` does nothing visible / edge function not invoked. The dialog confirm button calls `handleConfirmSync → sapSync.mutateAsync → supabase.functions.invoke('sync-vendor-to-sap', { body: { vendorId, overrides, sapPayload } })`.
 
-## Point 3 — Remove the "57% complete / Saved X mins ago" badge in the top-right of the registration header
+Steps:
 
-In `src/pages/VendorRegistration.tsx`:
+1. **Add a runtime guard + toast** in `handleConfirmSync` so failures (validation, build-payload throw, network) always surface a visible error instead of silently swallowing into the result dialog.
+2. **Log + trace** in `useSapSync.mutationFn` before/after `buildSapPayload` so we can see in the console which step is failing (payload build vs. function invoke).
+3. **Inspect `sync-vendor-to-sap` edge function logs** (via Lovable Cloud) for the failed call to identify whether the request is rejected (auth/JWT), payload validation, or upstream middleware reachability. Fix based on that diagnosis. Common causes to address:
+   - `verify_jwt` mismatch or missing auth header
+   - `buildSapPayload` throwing because a required override (e.g., `bukrs`, `akont`) is empty — surface those names in the toast
+   - Middleware URL / shared-secret env not configured on the deployed function
 
-- Desktop stepper bar (lines 1079–1085): delete the entire right-side `<div className="flex flex-col items-end gap-1 shrink-0 pl-4 border-l min-w-[120px]">…</div>` block (percentage + AutoSaveIndicator). The stepper itself stays full-width.
-- Mobile bar (lines 1089–1108): remove the percentage `<span>{completeness.overall}%</span>` (line 1099) and the progress bar `<div className="h-1 w-full bg-muted rounded-full overflow-hidden">…</div>` (lines 1101–1106). Keep "Step X of N" + step title + the AutoSaveIndicator below.
-- Top header (line 1028) already shows `<AutoSaveIndicator>` — that is the only "Saved … ago" indicator we keep, so the user still sees autosave status but no completion percentage anywhere.
-- Drop the now-unused `CompletenessRing` import (line 33) and the `completeness` const (line 502) only if no other reference remains; otherwise leave the hook call (used by step navigation gates elsewhere — verify with a grep before deleting).
+4. Ensure the response from a non-success run still triggers `setShowSapResultDialog(true)` with the actual error message (already partially there — verify the error path).
 
-## Out of scope / unchanged
+## 3. PDF / PNG / JPEG uploads must be converted to image before OCR
 
-- International flow, SAP Sync, approval workflow, edge functions, DB schema.
-- Per-tab verification logic, OCR, KYC orchestrator, validation rules.
-- AutoSaveIndicator behavior in the top header.
+**Files:** `src/lib/pdfToImage.ts`, `src/components/vendor/kyc/OcrUploadAndVerify.tsx`, `src/components/vendor/steps/DocumentVerificationStep.tsx`
 
-## Files to edit
+User network capture shows `fileMimeType: "application/pdf"` reaching `kyc-api-execute`, which causes Surepass to return `no_gstin_detected` / `invalid_image`. Today the code *tries* to convert PDFs but silently falls back to the raw PDF when pdf.js's web-worker MIME fails — that is what is happening.
 
-1. `src/components/vendor/steps/DocumentVerificationStep.tsx` — delete the auto-advance `useEffect` + `prevDoneRef` (lines 1629–1637).
-2. `src/pages/VendorRegistration.tsx` — remove the completeness % UI (desktop block lines 1079–1085; mobile % span line 1099 and progress bar lines 1101–1106); ensure `handleEditStep` always sets `pendingDocTab` for step 1; drop the `completeness` import/hook only if no other usage remains.
+Changes:
+
+1. **Default pdf.js to `disableWorker: true`** in `normalizeUploadToImage` so conversion works regardless of how the host serves `.mjs`. (We already retry without the worker on failure — make it the first attempt.)
+2. **Remove the silent "send raw PDF" fallback** in:
+   - `OcrUploadAndVerify.runPipeline` (lines ~94–101)
+   - `DocumentVerificationStep.extractFromFile` (lines ~211–216)
+   If conversion fails, show a clear error: *"Could not convert this PDF to an image. Please upload a JPG/PNG or a clearer PDF."* — and **do not** call the provider with `application/pdf`.
+3. **Always normalize images too** (PNG/JPEG/WEBP/etc.) through `normalizeUploadToImage` so the provider always receives a clean JPEG (`image/jpeg`). Today images already pass through `imageFileToJpeg`, but the call sites short-circuit when the file is already an image — change them to always call `normalizeUploadToImage` regardless of input type.
+4. Confirm `kyc-api-execute` payload after the fix shows `fileMimeType: "image/jpeg"` and a `.jpg` filename for every GST/PAN/MSME/Bank upload.
+
+## Out of scope
+
+International flow, classification UI, approval workflow, DB schema, validation rules, SAP master-data picker behavior, any other UI not listed above.
