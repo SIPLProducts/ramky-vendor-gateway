@@ -213,7 +213,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
       productCategories: values.productCategories,
       productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
       state: values.state,
-      accountingGroup: values.accountingGroup,
+      accountingGroup: values.accountingGroup || 'Domestic',
       materialGroupVendor: values.materialGroupVendor,
       vendorCategory: values.vendorCategory,
       vendorLocation: values.vendorLocation,
