@@ -104,6 +104,7 @@ interface DocumentVerificationStepProps {
   initialData?: VerifiedDocumentData;
   onComplete: (data: VerifiedDocumentData) => void;
   onStageChange?: (data: VerifiedDocumentData) => void;
+  initialTab?: "gst" | "pan" | "msme" | "bank";
 }
 
 type DocStatus = "idle" | "uploading" | "preparing" | "ocr" | "verifying" | "verified" | "failed";
@@ -182,6 +183,7 @@ export function DocumentVerificationStep({
   initialData,
   onComplete,
   onStageChange,
+  initialTab,
 }: DocumentVerificationStepProps) {
   // OCR is now exclusively driven by the admin-configured providers in
   // "KYC & Validation API Settings" (see kyc-api-execute edge function).
@@ -1617,7 +1619,13 @@ export function DocumentVerificationStep({
 
   // ---------- Tabs ----------
   type TabKey = "gst" | "pan" | "msme" | "bank";
-  const [activeTab, setActiveTab] = useState<TabKey>("gst");
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab ?? "gst");
+
+  // Re-sync when parent changes initialTab (e.g. user clicks Edit on Review).
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
+
 
   const prevDoneRef = useRef({ s1: false, s2: false, s3: false });
   useEffect(() => {
