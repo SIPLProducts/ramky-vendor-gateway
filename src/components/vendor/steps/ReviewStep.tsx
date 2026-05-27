@@ -5,18 +5,32 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { VendorFormData } from '@/types/vendor';
 
+type DocTab = 'gst' | 'pan' | 'msme' | 'bank';
+
 interface ReviewStepProps {
   data: VendorFormData;
   onSubmit: () => void;
   onBack: () => void;
-  onEditStep: (step: number) => void;
+  onEditStep: (step: number, tab?: DocTab) => void;
   onDeclarationChange?: (d: { selfDeclared: boolean; termsAccepted: boolean }) => void;
 }
 
-const SectionHeader = ({ icon: Icon, title, step, onEdit }: { icon: React.ElementType; title: string; step: number; onEdit: (step: number) => void }) => (
+const SectionHeader = ({
+  icon: Icon,
+  title,
+  step,
+  tab,
+  onEdit,
+}: {
+  icon: React.ElementType;
+  title: string;
+  step: number;
+  tab?: DocTab;
+  onEdit: (step: number, tab?: DocTab) => void;
+}) => (
   <div className="flex items-center justify-between mb-4">
     <div className="flex items-center gap-2"><Icon className="h-5 w-5 text-primary" /><h3 className="text-base font-semibold text-foreground">{title}</h3></div>
-    <Button variant="ghost" size="sm" onClick={() => onEdit(step)} className="text-primary"><Edit2 className="h-4 w-4 mr-1" />Edit</Button>
+    <Button variant="ghost" size="sm" onClick={() => onEdit(step, tab)} className="text-primary"><Edit2 className="h-4 w-4 mr-1" />Edit</Button>
   </div>
 );
 
@@ -144,10 +158,16 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={FileCheck} title="Compliance & Statutory" step={1} onEdit={onEditStep} />
+        <SectionHeader icon={FileCheck} title="PAN & Entity Type" step={1} tab="pan" onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="PAN" value={data.statutory?.pan} />
           <DataRow label="Entity Type" value={data.statutory?.entityType} />
+        </div>
+      </div>
+
+      <div className="form-section">
+        <SectionHeader icon={FileCheck} title="GST Details" step={1} tab="gst" onEdit={onEditStep} />
+        <div className="space-y-1">
           <DataRow label="GST Registered" value={data.statutory?.isGstRegistered ? 'Yes' : 'No'} />
           {data.statutory?.isGstRegistered ? (
             <>
@@ -166,6 +186,12 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
               <DataRow label="Reason" value={data.statutory?.gstDeclarationReason} />
             </>
           )}
+        </div>
+      </div>
+
+      <div className="form-section">
+        <SectionHeader icon={FileCheck} title="MSME Details" step={1} tab="msme" onEdit={onEditStep} />
+        <div className="space-y-1">
           <DataRow label="MSME Registered" value={data.statutory?.isMsmeRegistered ? 'Yes' : 'No'} />
           {data.statutory?.isMsmeRegistered ? (
             <>
@@ -182,7 +208,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={Landmark} title="Bank Details" step={1} onEdit={onEditStep} />
+        <SectionHeader icon={Landmark} title="Bank Details" step={1} tab="bank" onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="Bank Name" value={data.bank?.bankName} />
           <DataRow label="Account Number" value={data.bank?.accountNumber ? data.bank.accountNumber.replace(/./g, '•').slice(0, -4) + data.bank.accountNumber.slice(-4) : '-'} />
