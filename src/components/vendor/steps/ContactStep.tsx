@@ -65,12 +65,7 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
     maxLength: 10,
   });
 
-  // Required fields that the admin hid → seed a placeholder so zod passes
-  useEffect(() => {
-    if (!show('ceoName') && !data.ceoName) setValue('ceoName', 'N/A');
-    if (!show('ceoPhone') && !data.ceoPhone) setValue('ceoPhone', '0000000000');
-    if (!show('ceoEmail') && !data.ceoEmail) setValue('ceoEmail', 'na@example.com');
-  }, [overrides, setValue, data]);
+  // CEO/MD fields are optional — no auto-fill needed.
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">
