@@ -334,20 +334,25 @@ serve(async (req) => {
       const isMsme = !!vendor.msme_number;
 
       let template: any = null;
-      if (vendor.tenant_id) {
-        const { data: tplRow } = await supabase
-          .from("sap_payload_templates").select("template")
-          .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
-        if (tplRow?.template) template = tplRow.template;
+      try {
+        if (vendor.tenant_id) {
+          const { data: tplRow } = await supabase
+            .from("sap_payload_templates").select("template")
+            .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
+          if (tplRow?.template) template = tplRow.template;
+        }
+        if (!template) {
+          const { data: tplRow } = await supabase
+            .from("sap_payload_templates").select("template")
+            .is("tenant_id", null).eq("is_active", true).maybeSingle();
+          if (tplRow?.template) template = tplRow.template;
+        }
+      } catch (e) {
+        console.warn("sap_payload_templates lookup failed, using built-in default:", (e as any)?.message);
       }
       if (!template) {
-        const { data: tplRow } = await supabase
-          .from("sap_payload_templates").select("template")
-          .is("tenant_id", null).eq("is_active", true).maybeSingle();
-        if (tplRow?.template) template = tplRow.template;
-      }
-      if (!template) {
-        return fail("No SAP payload template configured. Please seed sap_payload_templates with a default row.");
+        console.log("Using built-in DEFAULT_SAP_PAYLOAD_TEMPLATE fallback (no DB row found)");
+        template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
       }
 
       // Document uploads are temporarily disabled to avoid SAP middleware 413 (PayloadTooLarge).
