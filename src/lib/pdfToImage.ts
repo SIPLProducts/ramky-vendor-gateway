@@ -178,10 +178,13 @@ export async function normalizeUploadToImage(
       useSystemFonts: true,
     }).promise;
   } catch (err) {
-    throw new Error(
-      `Could not open this PDF (${(err as Error)?.message || err}). Please try a different PDF or a JPG/PNG image.`,
-    );
+    // Fall back to the original PDF — many OCR providers (e.g. Surepass)
+    // accept PDFs directly. Better to let the server respond than to block
+    // the user with a generic "couldn't read" error.
+    console.warn("[pdfToImage] getDocument failed, sending original PDF", err);
+    return file;
   }
+
 
   // Render each page at a controlled, OCR-safe size.
   const pageCanvases: HTMLCanvasElement[] = [];
