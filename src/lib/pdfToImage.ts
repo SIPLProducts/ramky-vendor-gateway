@@ -132,21 +132,17 @@ export async function normalizeUploadToImage(
 
   const buf = await file.arrayBuffer();
 
-  // Try to load the PDF with the worker; if the worker fails (common when
-  // nginx serves .mjs with the wrong content-type or CSP blocks it), retry
-  // once with the worker disabled before giving up.
+  // Default to disableWorker:true. The web worker frequently fails in
+  // self-hosted deployments where nginx serves .mjs with the wrong
+  // content-type or CSP blocks workers — and the silent fallback was
+  // causing raw PDFs to leak through to the OCR provider. Run inline.
   let pdf: any;
   try {
-    pdf = await (pdfjsLib as any).getDocument({ data: buf }).promise;
+    pdf = await (pdfjsLib as any).getDocument({ data: buf, disableWorker: true }).promise;
   } catch (err) {
-    console.warn("[pdfToImage] worker getDocument failed, retrying without worker", err);
-    try {
-      pdf = await (pdfjsLib as any).getDocument({ data: buf, disableWorker: true }).promise;
-    } catch (err2) {
-      throw new Error(
-        `PDF_CONVERSION_FAILED: getDocument: ${(err2 as Error)?.message || err2}`,
-      );
-    }
+    throw new Error(
+      `PDF_CONVERSION_FAILED: getDocument: ${(err as Error)?.message || err}`,
+    );
   }
 
   const pageCanvases: HTMLCanvasElement[] = [];
