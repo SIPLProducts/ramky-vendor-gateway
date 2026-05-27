@@ -1076,13 +1076,6 @@ export default function VendorRegistration() {
                 onStepClick={handleStepClick}
               />
             </div>
-            <div className="flex flex-col items-end gap-1 shrink-0 pl-4 border-l min-w-[120px]">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-semibold text-foreground leading-none">{completeness.overall}%</span>
-                <span className="text-[11px] text-muted-foreground">complete</span>
-              </div>
-              <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} />
-            </div>
           </div>
 
           {/* Mobile: compact pill + thin progress bar */}
