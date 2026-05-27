@@ -30,7 +30,7 @@ import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
-import { useFormCompleteness } from '@/hooks/useFormCompleteness';
+
 
 // 6-step built-in registration flow — Step 1 is the OCR + verification gate.
 // Custom admin-defined tabs are inserted between step 5 (Fin/Infra) and the
