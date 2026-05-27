@@ -455,74 +455,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
             )}
           </div>
 
-          {/* SAP Classification */}
-          <div className="md:col-span-2 mt-2">
-            <h4 className="text-sm font-semibold text-primary mb-3 flex items-center gap-2">
-              <Award className="h-4 w-4" />
-              Classification
-            </h4>
-            <div className="grid md:grid-cols-2 gap-5">
-              <Controller
-                name="materialGroupVendor"
-                control={control}
-                render={({ field }) => (
-                  <ClassificationField
-                    label="Material Group for Vendors"
-                    required
-                    masterType="material_group_vendor"
-                    value={(field.value as string[]) || []}
-                    onChange={field.onChange}
-                    errorText={errors.materialGroupVendor?.message as string}
-                    selectPlaceholder="Select material groups"
-                  />
-                )}
-              />
-              <Controller
-                name="vendorCategory"
-                control={control}
-                render={({ field }) => (
-                  <ClassificationField
-                    label="Vendor Category"
-                    required
-                    masterType="vendor_category"
-                    value={(field.value as string[]) || []}
-                    onChange={field.onChange}
-                    errorText={errors.vendorCategory?.message as string}
-                    selectPlaceholder="Select vendor categories"
-                  />
-                )}
-              />
-              <Controller
-                name="vendorLocation"
-                control={control}
-                render={({ field }) => (
-                  <ClassificationField
-                    label="Vendor Location"
-                    required
-                    masterType="vendor_location"
-                    value={(field.value as string[]) || []}
-                    onChange={field.onChange}
-                    errorText={errors.vendorLocation?.message as string}
-                    selectPlaceholder="Select locations"
-                  />
-                )}
-              />
-              <Controller
-                name="identificationSource"
-                control={control}
-                render={({ field }) => (
-                  <ClassificationField
-                    label="Vendor Identification Source"
-                    masterType="identification_source"
-                    value={(field.value as string[]) || []}
-                    onChange={field.onChange}
-                    errorText={errors.identificationSource?.message as string}
-                    selectPlaceholder="Select identification sources"
-                  />
-                )}
-              />
-            </div>
-          </div>
+          {/* SAP Classification is now captured on the SAP Sync screen by the SAP Team. */}
         </div>
       </div>
 
