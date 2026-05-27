@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_SAP_PAYLOAD_TEMPLATE } from "./sapDefaultTemplate";
 
 // Indian state -> SAP T005S numeric region code for country IN.
 const stateToRegion: Record<string, string> = {
@@ -214,21 +215,29 @@ export async function buildSapPayload(
 
   const isMsme = !!(vendor as any).msme_number;
 
-  // Load template
+  // Load template — DB-first, then fall back to the built-in default so
+  // self-hosted deployments without a seeded `sap_payload_templates` row
+  // still produce a valid SAP payload.
   let template: any = null;
-  if (vendor.tenant_id) {
-    const { data: tplRow } = await supabase
-      .from("sap_payload_templates").select("template")
-      .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
-    if ((tplRow as any)?.template) template = (tplRow as any).template;
+  try {
+    if (vendor.tenant_id) {
+      const { data: tplRow } = await supabase
+        .from("sap_payload_templates").select("template")
+        .eq("tenant_id", vendor.tenant_id).eq("is_active", true).maybeSingle();
+      if ((tplRow as any)?.template) template = (tplRow as any).template;
+    }
+    if (!template) {
+      const { data: tplRow } = await supabase
+        .from("sap_payload_templates").select("template")
+        .is("tenant_id", null).eq("is_active", true).maybeSingle();
+      if ((tplRow as any)?.template) template = (tplRow as any).template;
+    }
+  } catch (e) {
+    console.warn("sap_payload_templates lookup failed, using built-in default:", (e as any)?.message);
   }
   if (!template) {
-    const { data: tplRow } = await supabase
-      .from("sap_payload_templates").select("template")
-      .is("tenant_id", null).eq("is_active", true).maybeSingle();
-    if ((tplRow as any)?.template) template = (tplRow as any).template;
+    template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
   }
-  if (!template) throw new Error("No SAP payload template configured.");
 
   const { uploads, skipped } = await buildUploads(vendorId);
 
