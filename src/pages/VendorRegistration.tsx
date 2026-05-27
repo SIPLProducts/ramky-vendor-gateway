@@ -1089,13 +1089,6 @@ export default function VendorRegistration() {
                   {registrationSteps[currentStep - 1]?.title}
                 </span>
               </div>
-              <span className="text-xs font-semibold text-foreground shrink-0">{completeness.overall}%</span>
-            </div>
-            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${completeness.overall}%` }}
-              />
             </div>
             <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} />
           </div>
