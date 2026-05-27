@@ -1,72 +1,40 @@
-## Problem
+## Goal
+Stop the "Could not convert your PDF to an image for OCR" hard-fail when a vendor uploads a PDF on the Document Verification step. Make the flow self-healing.
 
-Email arrives correctly. When the vendor clicks **Begin Registration** (or the Direct Link), the browser goes:
+## Root cause
+- `src/lib/pdfToImage.ts` (`normalizeUploadToImage`) throws on this PDF — likely pdf.js worker load issue on the self-hosted nginx (`.mjs` MIME / CSP) or a page pdf.js can't render.
+- `OcrUploadAndVerify.runPipeline` calls `normalizeUploadToImage` with **no try/catch** → UI stuck or shows generic failure.
+- `DocumentVerificationStep.extractFromFile` catches but hard-fails with the screenshot's message instead of falling back.
+- Most configured KYC providers (Surepass etc.) actually accept PDFs directly, so refusing the upload locally is unnecessary.
 
-1. `http://10.200.1.7/vendor/invite?token=…` → loads `VendorInviteAccept`
-2. The page calls the `accept-vendor-invite` edge function
-3. That function asks GoTrue for a magic link and gets back  
-   `http://10.200.1.7/auth/v1/verify?token=…&type=magiclink&redirect_to=…`
-4. The browser is redirected to that URL → **nginx returns 404** (the SPA fallback hits, no React route matches `/auth/v1/verify`)
+## Changes
 
-Root cause: On the self-hosted server, Supabase is reverse-proxied under **`/supabase/…`** (nginx `location /supabase/` → Kong). GoTrue’s currently-running container, however, has `API_EXTERNAL_URL=http://10.200.1.7` (no `/supabase` suffix), so the action link it mints omits the prefix. The deploy script already writes the correct value to `.env`, but the running `auth` container was started before that change and hasn’t been restarted with the new env. On Lovable Cloud the same code works because the Supabase host has no path prefix.
+### 1. `src/lib/pdfToImage.ts`
+- Wrap pdf.js `getDocument` in try/catch.
+- If worker init fails, retry once with `disableWorker: true` before giving up.
+- If a single `page.render(...)` throws, skip that page rather than aborting the whole stitching.
+- Throw a clearer error (`PDF_CONVERSION_FAILED: <reason>`) so callers can decide to fall back.
 
-We can’t rely on the user always remembering to restart GoTrue with the right env, and we shouldn’t break the cloud preview either. The robust fix is to make `accept-vendor-invite` normalize the returned `action_link` so it always points through the public proxy.
+### 2. `src/components/vendor/kyc/OcrUploadAndVerify.tsx`
+- Wrap the `normalizeUploadToImage(file)` call in try/catch.
+- On failure: log the error, **call `runOcr(file)` with the original PDF** as a fallback (providers usually accept PDFs).
+- Only if the provider itself also returns failure, show: *"We couldn't read this PDF. Please upload a clearer scan or a JPG/PNG image."*
 
-## Fix
+### 3. `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- In `extractFromFile`, replace the two
+  `"Could not convert your PDF to an image for OCR…"` early-returns with the same fallback: when `normalizeUploadToImage` throws or returns the original file, still call `callProvider({ providerName, file: originalPdf })`. Surface the friendly message only if the provider call also fails.
 
-Single change, single file: **`supabase/functions/accept-vendor-invite/index.ts`**
+### 4. Self-hosted deployment note (no code change)
+The error string in the screenshot only exists in `DocumentVerificationStep`, but the GST tab uses `OcrUploadAndVerify`. That means the bundle currently served from `10.200.1.7` is a stale build from before the previous "all tabs" fix. After these changes are deployed:
+- On Lovable Cloud — auto-rebuilds.
+- On the self-hosted server — re-run `scripts/lib/60-frontend.sh` (or the full `setup-selfhost.sh`) so the new `dist/` is rsynced to nginx and the browser actually loads the updated code. I'll remind the user in the follow-up message.
 
-After `admin.auth.admin.generateLink(...)` succeeds, post-process `linkData.properties.action_link`:
-
-```ts
-const rawActionLink = linkData.properties.action_link as string;
-let actionLink = rawActionLink;
-
-try {
-  const actionUrl = new URL(rawActionLink);
-  const originUrl = redirectOrigin ? new URL(redirectOrigin) : null;
-
-  // Self-hosted: Supabase lives behind nginx at <origin>/supabase/.
-  // GoTrue may have been started with API_EXTERNAL_URL pointing at the
-  // bare origin, producing /auth/v1/verify (404 in the SPA). If the link
-  // host matches the frontend host and the path starts with /auth/v1/,
-  // inject the /supabase prefix so it routes through Kong.
-  if (
-    originUrl &&
-    actionUrl.host === originUrl.host &&
-    actionUrl.pathname.startsWith("/auth/v1/") &&
-    !actionUrl.pathname.startsWith("/supabase/")
-  ) {
-    actionUrl.pathname = "/supabase" + actionUrl.pathname;
-    actionLink = actionUrl.toString();
-  }
-} catch (e) {
-  console.warn("action_link normalization failed:", e);
-}
-
-return new Response(
-  JSON.stringify({ action_link: actionLink, email, invitation_id: invite.id }),
-  { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-);
-```
-
-That is the only logic change — everything else (token validation, user provisioning, magic-link generation, redirect target) stays identical.
-
-### Why this is safe on Lovable Cloud
-
-- On Lovable Cloud the action link host is `kntaaugefxhymmrvivaj.supabase.co`, which never matches the frontend origin (`*.lovable.app` / `vms.siplproducts.com`), so the `if` branch is skipped and the link is returned unchanged.
-- Only the self-hosted case (same host, bare `/auth/v1/…`) gets the `/supabase` prefix injected.
+## Files
+- `src/lib/pdfToImage.ts`
+- `src/components/vendor/kyc/OcrUploadAndVerify.tsx`
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
 
 ## Verification
-
-1. Redeploy `accept-vendor-invite` (Lovable Cloud auto-deploys; on-prem needs the usual `git pull` + `rsync supabase/functions/accept-vendor-invite/` + `docker compose restart functions`).
-2. Send a fresh invitation, click **Begin Registration** in the email.
-3. Browser should redirect to `http://10.200.1.7/supabase/auth/v1/verify?…`, GoTrue exchanges the magic token, then bounces back to `http://10.200.1.7/vendor/registration?token=…` signed in.
-4. No 404, registration form loads.
-
-## Out of scope
-
-- No frontend changes.
-- No DB/migration/secret changes.
-- No change to the SMTP fix already shipped.
-- We are not touching the on-prem GoTrue env; the normalizer makes the system self-correcting, but the user can still optionally restart `auth` with the updated `API_EXTERNAL_URL` for a cleaner setup.
+1. Upload the same `BWR GST Certificate Bangalore (1).pdf` on the GST tab in Lovable preview — pipeline should succeed, or (if provider can't read it) show the new friendly fallback message, not the old "Could not convert…" message.
+2. Repeat on PAN, MSME, Bank tabs.
+3. After redeploying to `10.200.1.7`, repeat there.
