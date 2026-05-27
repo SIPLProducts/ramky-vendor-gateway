@@ -27,6 +27,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 async function persistClassification(vendorIds: string[], overrides: SapFieldOverrides) {
   const c = overrides?.classify || ({} as any);
