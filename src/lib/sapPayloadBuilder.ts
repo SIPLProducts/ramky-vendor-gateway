@@ -236,7 +236,6 @@ export async function buildSapPayload(
     console.warn("sap_payload_templates lookup failed, using built-in default:", (e as any)?.message);
   }
   if (!template) {
-    const { DEFAULT_SAP_PAYLOAD_TEMPLATE } = await import("./sapDefaultTemplate");
     template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
   }
 
