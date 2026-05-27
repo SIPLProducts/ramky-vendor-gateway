@@ -193,27 +193,19 @@ export function DocumentVerificationStep({
   const extractFromFile = useCallback(
     async (file: File, documentType: OcrDocumentType, _vendorId?: string) => {
       const cfg = OCR_PROVIDER_BY_KIND[documentType];
-      // Defensive: if any caller hands us a PDF, convert to a single stitched
-      // JPEG before sending to the configured OCR provider. Surepass and
-      // most OCR providers only reliably read images.
-      let fileForOcr = file;
-      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      if (isPdf) {
-        try {
-          const converted = await normalizeUploadToImage(file);
-          if (converted && converted !== file && converted.type?.startsWith("image/")) {
-            fileForOcr = converted;
-          } else {
-            // Conversion returned the original or a non-image — fall through
-            // and send the PDF straight to the provider.
-            console.warn("[KYC] PDF→image conversion returned non-image, sending raw PDF");
-          }
-        } catch (err) {
-          // pdf.js failed. Don't refuse the upload — most KYC providers
-          // accept PDFs directly. Send the raw PDF and let the provider
-          // decide.
-          console.warn("[KYC] PDF→image conversion failed, sending raw PDF", err);
-        }
+      // Always normalize uploads to a single JPEG before sending to the
+      // OCR provider. Surepass and most providers only reliably read
+      // images. If conversion fails we surface an error rather than
+      // silently sending a raw PDF.
+      let fileForOcr: File;
+      try {
+        fileForOcr = await normalizeUploadToImage(file);
+      } catch (err) {
+        console.error("[KYC] file→image conversion failed", err);
+        return {
+          success: false as const,
+          error: "Could not read this file. Please upload a clear JPG/PNG image, or a clearer PDF.",
+        };
       }
       const r = await callProvider({ providerName: cfg.provider, file: fileForOcr });
       // Surface upstream provider identity + message_code/status_code so it's

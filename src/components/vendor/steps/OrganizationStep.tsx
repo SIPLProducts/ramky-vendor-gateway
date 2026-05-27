@@ -251,7 +251,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
               name="buyerCompanyId"
               control={control}
               render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCompanies}>
+                <Select onValueChange={field.onChange} value={field.value} disabled>
                   <SelectTrigger className={errors.buyerCompanyId ? 'border-destructive' : ''}>
                     {isLoadingCompanies ? (
                       <div className="flex items-center gap-2">
@@ -272,6 +272,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
                 </Select>
               )}
             />
+            <p className="text-xs text-muted-foreground">Assigned by buyer — cannot be changed.</p>
             {errors.buyerCompanyId && (
               <p className="text-xs text-destructive">{errors.buyerCompanyId.message}</p>
             )}

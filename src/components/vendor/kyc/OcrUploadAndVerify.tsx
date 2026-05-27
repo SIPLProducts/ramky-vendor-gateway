@@ -81,24 +81,21 @@ export function OcrUploadAndVerify({
       return;
     }
 
-    // PDFs (single or multi-page) are silently rasterised + stitched into a
-    // single JPEG before being handed to the OCR provider. Images pass through
-    // unchanged. This guarantees every page's content reaches the OCR engine.
-    let normalized = file;
-    const needsConversion = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-    if (needsConversion) {
-      setPhase('preparing');
-      setMessage('Preparing document for OCR…');
-      try {
-        normalized = await normalizeUploadToImage(file);
-      } catch (convErr) {
-        // pdf.js failed (worker MIME issue, unsupported PDF, etc.). Don't
-        // hard-fail — most KYC providers accept PDFs directly, so fall
-        // back to sending the original PDF. If the provider also can't
-        // read it we'll surface a friendly message below.
-        console.warn('[OcrUploadAndVerify] PDF→image conversion failed, sending raw PDF', convErr);
-        normalized = file;
-      }
+    // Always normalize to a single JPEG before handing the file to the OCR
+    // provider. PDFs are rasterised + stitched; images are re-encoded to
+    // clean JPEG. If conversion fails we surface a clear error instead of
+    // silently sending the raw PDF (which Surepass rejects with
+    // no_gstin_detected / invalid_image).
+    setPhase('preparing');
+    setMessage('Preparing document for OCR…');
+    let normalized: File;
+    try {
+      normalized = await normalizeUploadToImage(file);
+    } catch (convErr) {
+      console.error('[OcrUploadAndVerify] file→image conversion failed', convErr);
+      setPhase('failed');
+      setMessage("Could not read this file. Please upload a clear JPG/PNG image, or a clearer PDF.");
+      return;
     }
 
     setPhase('ocr');
@@ -108,10 +105,7 @@ export function OcrUploadAndVerify({
 
     if (!ocr.success || !ocr.extracted) {
       setPhase('failed');
-      const fallbackMsg = needsConversion && normalized === file
-        ? "We couldn't read this PDF. Please upload a clearer scan or a JPG/PNG image."
-        : (ocr.error || 'Could not read the document. Please upload a clearer scan.');
-      setMessage(fallbackMsg);
+      setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
       return;
     }
 
