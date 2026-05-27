@@ -444,28 +444,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
         <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
-              <Label>Entity Type *</Label>
-              <Controller
-                name="entityType"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.entityType ? 'border-destructive' : ''}>
-                      <SelectValue placeholder="Select entity type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ENTITY_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.entityType && (
-                <p className="text-xs text-destructive">{errors.entityType.message}</p>
-              )}
-            </div>
-            <div className="grid gap-1.5">
               <Label htmlFor="firmRegistrationNo">Firm Registration No.</Label>
               <Input
                 id="firmRegistrationNo"
@@ -489,65 +467,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
               <Input id="labourPermitNo" {...register('labourPermitNo')} placeholder="Labour permit number" />
             </div>
           </div>
-
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="iecNo">IEC No. (Import/Export)</Label>
-              <Input id="iecNo" {...register('iecNo')} placeholder="IEC Number" />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="swiftIbanCode">SWIFT / IBAN Code</Label>
-              <Input
-                id="swiftIbanCode"
-                {...register('swiftIbanCode')}
-                placeholder="e.g. SBININBB123 or GB29NWBK60161331926819"
-              />
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-5">
-            <FileUpload
-              label="IEC Certificate"
-              vendorId={vendorId}
-              documentType="iec_certificate"
-              currentFile={statutoryData?.iecCertificateFile || null}
-              onFileSelect={(file) => {
-                statutoryData.iecCertificateFile = file;
-              }}
-            />
-            <FileUpload
-              label="SWIFT / IBAN Proof"
-              vendorId={vendorId}
-              documentType="swift_iban_proof"
-              currentFile={statutoryData?.swiftIbanProofFile || null}
-              onFileSelect={(file) => {
-                statutoryData.swiftIbanProofFile = file;
-              }}
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label>Operational Network</Label>
-              <Controller
-                name="operationalNetwork"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select operational network" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {OPERATIONAL_NETWORKS.map((network) => (
-                        <SelectItem key={network} value={network}>{network}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Memberships & Certifications */}
