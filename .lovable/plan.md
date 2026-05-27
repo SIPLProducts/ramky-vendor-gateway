@@ -1,57 +1,47 @@
-## Point 1 — Remove "Accounting Group" from Organization Profile
+## Point 1 — Review & Submit "Edit" must open the right tab (GST / PAN / MSME / Bank)
 
-Vendor type (Domestic / International) is already selected at the very start of registration. We derive the accounting group from that selection so the user doesn't enter it again.
+Wiring is already in place (`onEditStep(step, tab)` → `setPendingDocTab(tab)` → `setCurrentStep(1)` → `DocumentVerificationStep initialTab`), but it is being overridden immediately after mount by the auto-advance effect in `DocumentVerificationStep.tsx` (lines 1630–1637). On a vendor whose stages are already verified, that effect runs once on mount and bumps `activeTab` from "gst"/"pan"/"msme" to the next tab, which is exactly what the user is seeing.
 
-**`src/components/vendor/steps/OrganizationStep.tsx`**
-- Remove the entire `Accounting Group *` `<div>` (lines 435–456).
-- Schema change: make `accountingGroup` optional (`z.enum([...]).optional()`), remove the required error.
-- In the form's `onSubmit` / persistence handlers (lines ~178 and ~219), auto-set:
-  `accountingGroup: vendorType === 'international' ? 'Import' : 'Domestic'`
-- Drop the now-unused `ACCOUNTING_GROUPS` import if nothing else uses it.
+Fix in `src/components/vendor/steps/DocumentVerificationStep.tsx`:
 
-**`src/components/vendor/steps/ReviewStep.tsx`**
-- Remove the `<DataRow label="Accounting Group" .../>` (line 135). It's implied by the vendor type chosen in step 1.
+1. Delete the entire auto-advance block (lines 1629–1637): the `prevDoneRef` useRef and the `useEffect` that calls `setActiveTab("pan" | "msme" | "bank")` based on `stage1Done / stage2Done / stage3Done`.
+2. Keep the existing `useEffect` (lines 1624–1627) that syncs `activeTab` from `initialTab` — this preserves Edit-deep-link behavior.
+3. Also guard `handleEditStep` in `src/pages/VendorRegistration.tsx` so that re-clicking Edit on the same tab still re-applies it. Update line 651 area to force a re-sync by clearing then setting:
+   ```ts
+   const handleEditStep = (step: number, tab?: 'gst' | 'pan' | 'msme' | 'bank') => {
+     if (step === 1) setPendingDocTab(tab);   // always update, even if same value
+     setCurrentStep(step);
+   };
+   ```
+   And in `DocumentVerificationStep.tsx`, change the sync effect to react every time the prop changes (even if the same string is passed twice in a row) by also depending on a render key — simplest is to keep behavior as-is since `setPendingDocTab` triggers a state change that re-passes the prop and the effect refires.
 
-No DB change — the column still stores "Domestic" / "Import" automatically.
+## Point 2 — Don't auto-jump to next tab after a successful validation
 
-## Point 2 — Remove unused Statutory & Registrations fields
+This is the same auto-advance effect removed in Point 1 (lines 1631–1637). After removing it:
 
-**`src/components/vendor/steps/OrganizationStep.tsx`** — inside the "Statutory & Registrations" section, remove:
-1. The entire `Entity Type *` `<div>` (lines 471–492) and the wrapper `grid md:grid-cols-2` it shares with Firm Registration No. — keep Firm Registration No. on its own row.
-2. The whole `grid md:grid-cols-2` block with **IEC No.** + **SWIFT / IBAN Code** (lines 518–531).
-3. The whole `grid md:grid-cols-2` block with **IEC Certificate** + **SWIFT / IBAN Proof** FileUploads (lines 533–552).
-4. The whole `grid md:grid-cols-2` block with **Operational Network** select (lines 554–574).
+- Tabs remain unlocked as soon as their stage is done (`tabUnlock` map at lines 1639–1644 is unchanged).
+- The vendor must click the next tab themselves (or the existing Continue button at the bottom of the step to move to step 2).
 
-Schema cleanup in the same file:
-- Mark `entityType`, `iecNo`, `swiftIbanCode`, `operationalNetwork` as `.optional()` so existing data still parses but they are no longer required and no longer rendered.
-- Remove unused imports if any (`ENTITY_TYPES`, `OPERATIONAL_NETWORKS`) once references are gone.
+No other auto-`setActiveTab` calls need to be touched — the remaining ones (lines 912, 919, 1173) only fire on FAILURE to keep the user on the failing tab, which is correct.
 
-**`src/components/vendor/steps/ReviewStep.tsx`**
-- In the "PAN & Entity Type" card (lines 160–166): rename title to **"PAN"**, remove the `Entity Type` `DataRow`. Edit target stays `step 1, tab 'pan'`.
+The existing footer "Continue" button on the Document Verification step is already enabled when all 4 stages are done and moves to step 2 — that behavior is kept as-is.
 
-International flow (`IntlClassificationStep`, intl statutory) is **not touched** — Entity Type / IEC / SWIFT belong there contextually only if intl uses them, which it doesn't here.
+## Point 3 — Remove the "57% complete / Saved X mins ago" badge in the top-right of the registration header
 
-## Point 3 — Review & Submit "Edit" navigates to the right card/tab
+In `src/pages/VendorRegistration.tsx`:
 
-The deep-link wiring (`onEditStep(step, tab)` → `setPendingDocTab` → `DocumentVerificationStep.initialTab`) is already in place from the previous change. Verify and adjust per-section targets so each card edits the right place:
+- Desktop stepper bar (lines 1079–1085): delete the entire right-side `<div className="flex flex-col items-end gap-1 shrink-0 pl-4 border-l min-w-[120px]">…</div>` block (percentage + AutoSaveIndicator). The stepper itself stays full-width.
+- Mobile bar (lines 1089–1108): remove the percentage `<span>{completeness.overall}%</span>` (line 1099) and the progress bar `<div className="h-1 w-full bg-muted rounded-full overflow-hidden">…</div>` (lines 1101–1106). Keep "Step X of N" + step title + the AutoSaveIndicator below.
+- Top header (line 1028) already shows `<AutoSaveIndicator>` — that is the only "Saved … ago" indicator we keep, so the user still sees autosave status but no completion percentage anywhere.
+- Drop the now-unused `CompletenessRing` import (line 33) and the `completeness` const (line 502) only if no other reference remains; otherwise leave the hook call (used by step navigation gates elsewhere — verify with a grep before deleting).
 
-**`src/components/vendor/steps/ReviewStep.tsx`** — keep current targets:
-- Organization Details → step 2
-- Address Information → step 3
-- Contact Information → step 4
-- PAN → step 1, tab `pan`
-- GST Details → step 1, tab `gst`
-- MSME Details → step 1, tab `msme`
-- Bank Details → step 1, tab `bank`
-- Financial Information → step 5
+## Out of scope / unchanged
 
-**`src/pages/VendorRegistration.tsx`** — confirm `handleEditStep(step, tab)` calls both `setPendingDocTab(tab)` and `setCurrentStep(step)` (already done), and that `DocumentVerificationStep` receives `initialTab={pendingDocTab}` (already done). No further code change unless verification turns up a bug.
-
-## Out of scope / unaffected
-- International flow, SAP Sync screen, classification, edge functions, middleware, DB schema.
-- All other tabs, CEO field rules, template-download label, validation logic.
+- International flow, SAP Sync, approval workflow, edge functions, DB schema.
+- Per-tab verification logic, OCR, KYC orchestrator, validation rules.
+- AutoSaveIndicator behavior in the top header.
 
 ## Files to edit
-1. `src/components/vendor/steps/OrganizationStep.tsx` — remove Accounting Group, Entity Type, IEC No, SWIFT/IBAN Code, IEC Certificate, SWIFT/IBAN Proof, Operational Network; auto-derive `accountingGroup` from vendor type; relax schema.
-2. `src/components/vendor/steps/ReviewStep.tsx` — drop Accounting Group row, drop Entity Type row, rename card to "PAN".
-3. (Verification only) `src/pages/VendorRegistration.tsx` — confirm edit deep-link still works; no functional change expected.
+
+1. `src/components/vendor/steps/DocumentVerificationStep.tsx` — delete the auto-advance `useEffect` + `prevDoneRef` (lines 1629–1637).
+2. `src/pages/VendorRegistration.tsx` — remove the completeness % UI (desktop block lines 1079–1085; mobile % span line 1099 and progress bar lines 1101–1106); ensure `handleEditStep` always sets `pendingDocTab` for step 1; drop the `completeness` import/hook only if no other usage remains.
