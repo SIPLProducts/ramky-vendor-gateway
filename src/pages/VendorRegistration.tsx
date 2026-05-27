@@ -30,8 +30,7 @@ import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
-import { CompletenessRing } from '@/components/vendor/CompletenessRing';
-import { useFormCompleteness } from '@/hooks/useFormCompleteness';
+
 
 // 6-step built-in registration flow — Step 1 is the OCR + verification gate.
 // Custom admin-defined tabs are inserted between step 5 (Fin/Infra) and the
@@ -498,8 +497,6 @@ export default function VendorRegistration() {
     };
   }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor]);
 
-  // Per-step + overall completeness
-  const completeness = useFormCompleteness(formData, verifiedData);
 
 
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5]); };
@@ -1076,13 +1073,6 @@ export default function VendorRegistration() {
                 onStepClick={handleStepClick}
               />
             </div>
-            <div className="flex flex-col items-end gap-1 shrink-0 pl-4 border-l min-w-[120px]">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-semibold text-foreground leading-none">{completeness.overall}%</span>
-                <span className="text-[11px] text-muted-foreground">complete</span>
-              </div>
-              <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} />
-            </div>
           </div>
 
           {/* Mobile: compact pill + thin progress bar */}
@@ -1096,13 +1086,6 @@ export default function VendorRegistration() {
                   {registrationSteps[currentStep - 1]?.title}
                 </span>
               </div>
-              <span className="text-xs font-semibold text-foreground shrink-0">{completeness.overall}%</span>
-            </div>
-            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${completeness.overall}%` }}
-              />
             </div>
             <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} />
           </div>

@@ -1626,15 +1626,9 @@ export function DocumentVerificationStep({
     if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
 
-
-  const prevDoneRef = useRef({ s1: false, s2: false, s3: false });
-  useEffect(() => {
-    const prev = prevDoneRef.current;
-    if (stage1Done && !prev.s1 && activeTab === "gst") setActiveTab("pan");
-    else if (stage2Done && !prev.s2 && activeTab === "pan") setActiveTab("msme");
-    else if (stage3Done && !prev.s3 && activeTab === "msme") setActiveTab("bank");
-    prevDoneRef.current = { s1: stage1Done, s2: stage2Done, s3: stage3Done };
-  }, [stage1Done, stage2Done, stage3Done, activeTab]);
+  // Auto-advance between tabs after a successful verification has been
+  // intentionally removed — the user must click the next tab (or Continue)
+  // themselves once a stage turns green.
 
   const tabUnlock: Record<TabKey, boolean> = {
     gst: true,
