@@ -72,13 +72,13 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
       <div className="form-section">
         <h3 className="form-section-title">
           <User className="h-5 w-5 text-primary" />
-          CEO / Managing Director *
+          CEO / Managing Director
         </h3>
         <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
             {show('ceoName') && (
               <div className="grid gap-1.5">
-                <Label htmlFor="ceoName">Name *</Label>
+                <Label htmlFor="ceoName">Name</Label>
                 <Input id="ceoName" {...register('ceoName')} placeholder="Full name" className={errors.ceoName ? 'border-destructive' : ''} />
                 {errors.ceoName && <p className="text-xs text-destructive">{errors.ceoName.message}</p>}
               </div>
@@ -93,14 +93,14 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
           <div className="grid md:grid-cols-2 gap-5">
             {show('ceoPhone') && (
               <div className="grid gap-1.5">
-                <Label htmlFor="ceoPhone">Contact Number 1 *</Label>
+                <Label htmlFor="ceoPhone">Contact Number 1</Label>
                 <Input id="ceoPhone" {...phoneField('ceoPhone')} placeholder="10-digit mobile number" className={errors.ceoPhone ? 'border-destructive' : ''} />
                 {errors.ceoPhone && <p className="text-xs text-destructive">{errors.ceoPhone.message}</p>}
               </div>
             )}
             {show('ceoEmail') && (
               <div className="grid gap-1.5">
-                <Label htmlFor="ceoEmail">Email Address 1 *</Label>
+                <Label htmlFor="ceoEmail">Email Address 1</Label>
                 <Input id="ceoEmail" type="email" {...register('ceoEmail')} placeholder="email@company.com" className={errors.ceoEmail ? 'border-destructive' : ''} />
                 {errors.ceoEmail && <p className="text-xs text-destructive">{errors.ceoEmail.message}</p>}
               </div>
