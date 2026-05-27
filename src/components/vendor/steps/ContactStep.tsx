@@ -16,10 +16,10 @@ const phoneOptional = z
   .refine((v) => !v || /^\d{10}$/.test(v), { message: '10-digit mobile number required' });
 
 const schema = z.object({
-  ceoName: z.string().min(2, 'Name is required'),
+  ceoName: z.string().optional(),
   ceoDesignation: z.string().optional(),
-  ceoPhone: phoneRequired,
-  ceoEmail: z.string().email('Valid email required'),
+  ceoPhone: phoneOptional,
+  ceoEmail: z.string().email('Valid email required').optional().or(z.literal('')),
   ceoPhone2: phoneOptional,
   ceoEmail2: z.string().email('Valid email required').optional().or(z.literal('')),
   marketingName: z.string().optional(),
