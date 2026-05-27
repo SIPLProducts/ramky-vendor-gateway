@@ -1,6 +1,11 @@
 // Converts ANY uploaded declaration file to a single JPEG image, client-side.
-// - PDF: renders all pages and stitches them vertically into one JPEG.
-// - PNG/JPG/JPEG/WebP/BMP/GIF: re-encoded to a single JPEG via canvas.
+// - PDF: renders each page at a controlled, OCR-safe resolution. For a single
+//   page we emit that page directly. For multi-page PDFs we stitch pages
+//   vertically, but cap the master canvas to a maximum size so the resulting
+//   JPEG is not rejected by upstream OCR providers (Surepass returns
+//   `invalid_image` for huge / oddly sized images).
+// - PNG/JPG/JPEG/WebP/BMP/GIF: re-encoded to a single JPEG via canvas, also
+//   capped to a max edge so HD scans don't blow past provider limits.
 // - DOCX: rendered to HTML and captured to a single JPEG.
 // - TXT/CSV: rendered as text and captured to a single JPEG.
 // - Anything else: throws a clear error.
@@ -11,28 +16,54 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 (pdfjsLib as any).GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+// OCR-safe limits. Surepass (and most KYC providers) reject very large or
+// very tall images. Keep each page <= ~2200px on its longest edge, and the
+// final stitched master <= ~4400px tall.
+const MAX_PAGE_EDGE = 2200;
+const MAX_MASTER_HEIGHT = 4400;
+const JPEG_QUALITY = 0.9;
+
 function baseName(name: string) {
   const i = name.lastIndexOf(".");
   return i > 0 ? name.slice(0, i) : name;
 }
 
-async function canvasToImageFile(
+function logConversion(stage: string, info: Record<string, any>) {
+  try {
+    console.log(`[pdfToImage] ${stage}`, info);
+  } catch {}
+}
+
+async function canvasToJpegFile(
   canvas: HTMLCanvasElement,
   baseFileName: string,
-  mime: "image/jpeg" | "image/png",
 ): Promise<File> {
   const blob: Blob = await new Promise((resolve, reject) =>
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))),
-      mime,
-      0.92,
+      "image/jpeg",
+      JPEG_QUALITY,
     ),
   );
-  const ext = mime === "image/png" ? "png" : "jpg";
-  return new File([blob], `${baseFileName}.${ext}`, { type: mime });
+  return new File([blob], `${baseFileName}.jpg`, { type: "image/jpeg" });
 }
 
-async function imageFileToJpeg(file: File, mime: "image/jpeg" | "image/png"): Promise<File> {
+/** Downscale a source canvas in-place so its longest edge <= maxEdge. */
+function fitCanvas(src: HTMLCanvasElement, maxEdge: number): HTMLCanvasElement {
+  const longest = Math.max(src.width, src.height);
+  if (longest <= maxEdge) return src;
+  const ratio = maxEdge / longest;
+  const dst = document.createElement("canvas");
+  dst.width = Math.max(1, Math.floor(src.width * ratio));
+  dst.height = Math.max(1, Math.floor(src.height * ratio));
+  const ctx = dst.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, dst.width, dst.height);
+  ctx.drawImage(src, 0, 0, dst.width, dst.height);
+  return dst;
+}
+
+async function imageFileToJpeg(file: File): Promise<File> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -48,17 +79,19 @@ async function imageFileToJpeg(file: File, mime: "image/jpeg" | "image/png"): Pr
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
-    return await canvasToImageFile(canvas, baseName(file.name), mime);
+    const fitted = fitCanvas(canvas, MAX_PAGE_EDGE);
+    const out = await canvasToJpegFile(fitted, baseName(file.name));
+    logConversion("image→jpeg", {
+      input: { name: file.name, type: file.type, size: file.size },
+      output: { name: out.name, type: out.type, size: out.size, w: fitted.width, h: fitted.height },
+    });
+    return out;
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-async function htmlToImage(
-  html: string,
-  baseFileName: string,
-  mime: "image/jpeg" | "image/png",
-): Promise<File> {
+async function htmlToImage(html: string, baseFileName: string): Promise<File> {
   const html2canvas = (await import("html2canvas")).default;
   const container = document.createElement("div");
   container.style.position = "fixed";
@@ -80,33 +113,34 @@ async function htmlToImage(
       scale: 1.5,
       useCORS: true,
     });
-    return await canvasToImageFile(canvas, baseFileName, mime);
+    const fitted = fitCanvas(canvas, MAX_PAGE_EDGE);
+    return canvasToJpegFile(fitted, baseFileName);
   } finally {
     document.body.removeChild(container);
   }
 }
 
-async function docxToImage(file: File, mime: "image/jpeg" | "image/png"): Promise<File> {
+async function docxToImage(file: File): Promise<File> {
   const mammoth = await import("mammoth/mammoth.browser");
   const arrayBuffer = await file.arrayBuffer();
   const { value: html } = await (mammoth as any).convertToHtml({ arrayBuffer });
-  return htmlToImage(html, baseName(file.name), mime);
+  return htmlToImage(html, baseName(file.name));
 }
 
-async function textToImage(file: File, mime: "image/jpeg" | "image/png"): Promise<File> {
+async function textToImage(file: File): Promise<File> {
   const text = await file.text();
   const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   const html = `<pre style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;">${escaped}</pre>`;
-  return htmlToImage(html, baseName(file.name), mime);
+  return htmlToImage(html, baseName(file.name));
 }
 
 export async function normalizeUploadToImage(
   file: File,
-  mime: "image/jpeg" | "image/png" = "image/jpeg",
-  scale = 1.5,
+  _mime: "image/jpeg" | "image/png" = "image/jpeg",
+  _scale = 1.5,
 ): Promise<File> {
   const lowerName = file.name.toLowerCase();
   const isPdf =
@@ -121,57 +155,80 @@ export async function normalizeUploadToImage(
     file.type.startsWith("text/") ||
     /\.(txt|csv|md|log)$/i.test(lowerName);
 
-  if (isImage) return imageFileToJpeg(file, mime);
-  if (isDocx) return docxToImage(file, mime);
-  if (isText) return textToImage(file, mime);
+  if (isImage) return imageFileToJpeg(file);
+  if (isDocx) return docxToImage(file);
+  if (isText) return textToImage(file);
   if (!isPdf) {
     throw new Error(
-      "This file type can't be converted in the browser. Please upload a PDF, DOCX, image (JPG/PNG/WebP/BMP/GIF), or TXT/CSV.",
+      "Unsupported file type. Please upload a PDF, image (JPG/PNG), DOCX, or TXT/CSV.",
     );
   }
 
   const buf = await file.arrayBuffer();
 
-  // Default to disableWorker:true. The web worker frequently fails in
-  // self-hosted deployments where nginx serves .mjs with the wrong
-  // content-type or CSP blocks workers — and the silent fallback was
-  // causing raw PDFs to leak through to the OCR provider. Run inline.
+  // Run pdf.js inline (no worker). Self-hosted deployments often serve .mjs
+  // with the wrong content-type or block workers via CSP, and we don't want
+  // a silent worker failure to leak a raw PDF into the OCR provider.
   let pdf: any;
   try {
-    pdf = await (pdfjsLib as any).getDocument({ data: buf, disableWorker: true }).promise;
+    pdf = await (pdfjsLib as any).getDocument({
+      data: buf,
+      disableWorker: true,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    }).promise;
   } catch (err) {
     throw new Error(
-      `PDF_CONVERSION_FAILED: getDocument: ${(err as Error)?.message || err}`,
+      `Could not open this PDF (${(err as Error)?.message || err}). Please try a different PDF or a JPG/PNG image.`,
     );
   }
 
+  // Render each page at a controlled, OCR-safe size.
   const pageCanvases: HTMLCanvasElement[] = [];
-  let maxWidth = 0;
-  let totalHeight = 0;
-
   for (let p = 1; p <= pdf.numPages; p++) {
     try {
       const page = await pdf.getPage(p);
-      const viewport = page.getViewport({ scale });
+
+      // Pick a scale so the longer edge lands ~MAX_PAGE_EDGE px. This gives
+      // OCR enough resolution without producing giant images.
+      const baseViewport = page.getViewport({ scale: 1 });
+      const longest = Math.max(baseViewport.width, baseViewport.height) || 1;
+      const targetScale = Math.min(2.5, Math.max(1, MAX_PAGE_EDGE / longest));
+      const viewport = page.getViewport({ scale: targetScale });
+
       const canvas = document.createElement("canvas");
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
+      canvas.width = Math.max(1, Math.ceil(viewport.width));
+      canvas.height = Math.max(1, Math.ceil(viewport.height));
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: ctx, viewport }).promise;
-      pageCanvases.push(canvas);
-      maxWidth = Math.max(maxWidth, canvas.width);
-      totalHeight += canvas.height;
+
+      pageCanvases.push(fitCanvas(canvas, MAX_PAGE_EDGE));
     } catch (pageErr) {
-      // Don't abort the whole document just because one page failed.
       console.warn(`[pdfToImage] skipping page ${p} due to render error`, pageErr);
     }
   }
 
   if (pageCanvases.length === 0) {
-    throw new Error("PDF_CONVERSION_FAILED: no pages could be rendered");
+    throw new Error(
+      "We couldn't render any page of this PDF. The file may be password-protected, scanned at very low quality, or corrupted. Please upload a clearer PDF or a JPG/PNG image of the document.",
+    );
   }
+
+  // Single-page PDF → emit that page directly.
+  if (pageCanvases.length === 1) {
+    const out = await canvasToJpegFile(pageCanvases[0], baseName(file.name));
+    logConversion("pdf(1pg)→jpeg", {
+      input: { name: file.name, size: file.size, pages: pdf.numPages },
+      output: { name: out.name, type: out.type, size: out.size, w: pageCanvases[0].width, h: pageCanvases[0].height },
+    });
+    return out;
+  }
+
+  // Multi-page → stitch vertically, then cap master height.
+  const maxWidth = pageCanvases.reduce((m, c) => Math.max(m, c.width), 0);
+  const totalHeight = pageCanvases.reduce((s, c) => s + c.height, 0);
 
   const master = document.createElement("canvas");
   master.width = maxWidth;
@@ -187,7 +244,14 @@ export async function normalizeUploadToImage(
     y += c.height;
   }
 
-  return canvasToImageFile(master, baseName(file.name), mime);
+  // Cap the final master so we never produce a 10k+ px image that providers reject.
+  const capped = master.height > MAX_MASTER_HEIGHT ? fitCanvas(master, MAX_MASTER_HEIGHT) : master;
+  const out = await canvasToJpegFile(capped, baseName(file.name));
+  logConversion(`pdf(${pageCanvases.length}pg)→jpeg`, {
+    input: { name: file.name, size: file.size, pages: pdf.numPages },
+    output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
+  });
+  return out;
 }
 
 export { normalizeUploadToImage as pdfToSingleImage };
