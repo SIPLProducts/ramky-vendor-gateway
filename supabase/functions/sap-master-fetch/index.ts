@@ -124,22 +124,52 @@ async function fetchSapForConfig(
       if (!middlewareKey) {
         return { sapJson: null, error: `${config.name}: Proxy Secret is not set.` };
       }
-      const proxyUrl = `${middlewareBase}/sap/proxy`;
-      const res = await fetch(proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-middleware-key": middlewareKey,
-        },
-        body: JSON.stringify({
-          url: sapUrl,
-          method: httpMethod,
-          headers: { Accept: "application/json" },
-          useBasicAuth: true,
-        }),
-        signal: controller.signal,
-      });
-      const text = await res.text();
+      // Validate URL early so we surface a clean message
+      try { new URL(middlewareBase); } catch {
+        return { sapJson: null, error: `${config.name}: invalid middleware URL after normalization ("${middlewareBase}"). Original saved value: "${config.middleware_url}".` };
+      }
+
+      // Try /sap/proxy first (Node middleware exposed at root, e.g. ngrok or :3002).
+      // If that path 404s (nginx not routing it), retry /api/sap/proxy (self-hosted via reverse proxy).
+      const proxyPaths = ["/sap/proxy", "/api/sap/proxy"];
+      const triedUrls: string[] = [];
+      let res: Response | null = null;
+      let text = "";
+      let proxyUrl = "";
+
+      for (const p of proxyPaths) {
+        proxyUrl = `${middlewareBase}${p}`;
+        triedUrls.push(proxyUrl);
+        const r = await fetch(proxyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-middleware-key": middlewareKey,
+          },
+          body: JSON.stringify({
+            url: sapUrl,
+            method: httpMethod,
+            headers: { Accept: "application/json" },
+            useBasicAuth: true,
+          }),
+          signal: controller.signal,
+        });
+        const body = await r.text();
+        // Only fall back on a clear "route not found" signal: 404 or HTML page
+        const looksLikeMissingRoute =
+          r.status === 404 ||
+          /^\s*<(!doctype|html)/i.test(body);
+        if (looksLikeMissingRoute && p !== proxyPaths[proxyPaths.length - 1]) {
+          continue;
+        }
+        res = r;
+        text = body;
+        break;
+      }
+
+      if (!res) {
+        return { sapJson: null, error: `${config.name}: middleware not reachable at any known path. Tried: ${triedUrls.join(", ")}.` };
+      }
       if (!res.ok) {
         let detail = text.slice(0, 400);
         try {
@@ -147,9 +177,9 @@ async function fetchSapForConfig(
           detail = `${j.error || "upstream error"}${j.code ? ` [${j.code}]` : ""}${j.target ? ` -> ${j.target}` : ""}`;
         } catch { /* keep raw */ }
         if (res.status === 401) {
-          return { sapJson: null, error: `${config.name}: middleware rejected request (HTTP 401). Set MIDDLEWARE_SHARED_SECRET on the middleware at ${middlewareBase} to match the Proxy Secret.` };
+          return { sapJson: null, error: `${config.name}: middleware rejected request (HTTP 401) at ${proxyUrl}. Set MIDDLEWARE_SHARED_SECRET on the middleware to match the Proxy Secret.` };
         }
-        return { sapJson: null, error: `${config.name}: middleware HTTP ${res.status}: ${detail}` };
+        return { sapJson: null, error: `${config.name}: middleware HTTP ${res.status} at ${proxyUrl}: ${detail}` };
       }
       let wrapper: any = null;
       try { wrapper = JSON.parse(text); }
