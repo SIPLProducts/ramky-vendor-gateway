@@ -97,7 +97,6 @@ export function OcrUploadAndVerify({
       setMessage("Could not read this file. Please upload a clear JPG/PNG image, or a clearer PDF.");
       return;
     }
-    const needsConversion = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 
     setPhase('ocr');
     setMessage('Reading document via configured OCR provider…');
@@ -106,10 +105,7 @@ export function OcrUploadAndVerify({
 
     if (!ocr.success || !ocr.extracted) {
       setPhase('failed');
-      const fallbackMsg = needsConversion && normalized === file
-        ? "We couldn't read this PDF. Please upload a clearer scan or a JPG/PNG image."
-        : (ocr.error || 'Could not read the document. Please upload a clearer scan.');
-      setMessage(fallbackMsg);
+      setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
       return;
     }
 
