@@ -197,16 +197,14 @@ export function DocumentVerificationStep({
       // OCR provider. Surepass and most providers only reliably read
       // images. If conversion fails we surface an error rather than
       // silently sending a raw PDF.
-      let fileForOcr: File;
+      let fileForOcr: File = file;
       try {
         fileForOcr = await normalizeUploadToImage(file);
       } catch (err) {
-        console.error("[KYC] file→image conversion failed", err);
-        return {
-          success: false as const,
-          error: "Could not read this file. Please upload a clear JPG/PNG image, or a clearer PDF.",
-        };
+        console.warn("[KYC] file→image conversion failed, sending original to provider", err);
+        fileForOcr = file;
       }
+
       const r = await callProvider({ providerName: cfg.provider, file: fileForOcr });
       // Surface upstream provider identity + message_code/status_code so it's
       // obvious the call hit the configured provider (not Gemini).

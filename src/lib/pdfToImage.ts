@@ -86,10 +86,14 @@ async function imageFileToJpeg(file: File): Promise<File> {
       output: { name: out.name, type: out.type, size: out.size, w: fitted.width, h: fitted.height },
     });
     return out;
+  } catch (err) {
+    console.warn("[pdfToImage] image re-encode failed, sending original", err);
+    return file;
   } finally {
     URL.revokeObjectURL(url);
   }
 }
+
 
 async function htmlToImage(html: string, baseFileName: string): Promise<File> {
   const html2canvas = (await import("html2canvas")).default;
@@ -178,10 +182,13 @@ export async function normalizeUploadToImage(
       useSystemFonts: true,
     }).promise;
   } catch (err) {
-    throw new Error(
-      `Could not open this PDF (${(err as Error)?.message || err}). Please try a different PDF or a JPG/PNG image.`,
-    );
+    // Fall back to the original PDF — many OCR providers (e.g. Surepass)
+    // accept PDFs directly. Better to let the server respond than to block
+    // the user with a generic "couldn't read" error.
+    console.warn("[pdfToImage] getDocument failed, sending original PDF", err);
+    return file;
   }
+
 
   // Render each page at a controlled, OCR-safe size.
   const pageCanvases: HTMLCanvasElement[] = [];
@@ -211,47 +218,53 @@ export async function normalizeUploadToImage(
   }
 
   if (pageCanvases.length === 0) {
-    throw new Error(
-      "We couldn't render any page of this PDF. The file may be password-protected, scanned at very low quality, or corrupted. Please upload a clearer PDF or a JPG/PNG image of the document.",
-    );
+    // Fall back to the original PDF — the OCR provider may still handle it.
+    console.warn("[pdfToImage] no pages rendered, sending original PDF");
+    return file;
   }
 
-  // Single-page PDF → emit that page directly.
-  if (pageCanvases.length === 1) {
-    const out = await canvasToJpegFile(pageCanvases[0], baseName(file.name));
-    logConversion("pdf(1pg)→jpeg", {
+
+  try {
+    // Single-page PDF → emit that page directly.
+    if (pageCanvases.length === 1) {
+      const out = await canvasToJpegFile(pageCanvases[0], baseName(file.name));
+      logConversion("pdf(1pg)→jpeg", {
+        input: { name: file.name, size: file.size, pages: pdf.numPages },
+        output: { name: out.name, type: out.type, size: out.size, w: pageCanvases[0].width, h: pageCanvases[0].height },
+      });
+      return out;
+    }
+
+    // Multi-page → stitch vertically, then cap master height.
+    const maxWidth = pageCanvases.reduce((m, c) => Math.max(m, c.width), 0);
+    const totalHeight = pageCanvases.reduce((s, c) => s + c.height, 0);
+
+    const master = document.createElement("canvas");
+    master.width = maxWidth;
+    master.height = totalHeight;
+    const mctx = master.getContext("2d")!;
+    mctx.fillStyle = "#ffffff";
+    mctx.fillRect(0, 0, master.width, master.height);
+
+    let y = 0;
+    for (const c of pageCanvases) {
+      const x = Math.floor((maxWidth - c.width) / 2);
+      mctx.drawImage(c, x, y);
+      y += c.height;
+    }
+
+    const capped = master.height > MAX_MASTER_HEIGHT ? fitCanvas(master, MAX_MASTER_HEIGHT) : master;
+    const out = await canvasToJpegFile(capped, baseName(file.name));
+    logConversion(`pdf(${pageCanvases.length}pg)→jpeg`, {
       input: { name: file.name, size: file.size, pages: pdf.numPages },
-      output: { name: out.name, type: out.type, size: out.size, w: pageCanvases[0].width, h: pageCanvases[0].height },
+      output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
     });
     return out;
+  } catch (encodeErr) {
+    console.warn("[pdfToImage] encode/stitch failed, sending original PDF", encodeErr);
+    return file;
   }
-
-  // Multi-page → stitch vertically, then cap master height.
-  const maxWidth = pageCanvases.reduce((m, c) => Math.max(m, c.width), 0);
-  const totalHeight = pageCanvases.reduce((s, c) => s + c.height, 0);
-
-  const master = document.createElement("canvas");
-  master.width = maxWidth;
-  master.height = totalHeight;
-  const mctx = master.getContext("2d")!;
-  mctx.fillStyle = "#ffffff";
-  mctx.fillRect(0, 0, master.width, master.height);
-
-  let y = 0;
-  for (const c of pageCanvases) {
-    const x = Math.floor((maxWidth - c.width) / 2);
-    mctx.drawImage(c, x, y);
-    y += c.height;
-  }
-
-  // Cap the final master so we never produce a 10k+ px image that providers reject.
-  const capped = master.height > MAX_MASTER_HEIGHT ? fitCanvas(master, MAX_MASTER_HEIGHT) : master;
-  const out = await canvasToJpegFile(capped, baseName(file.name));
-  logConversion(`pdf(${pageCanvases.length}pg)→jpeg`, {
-    input: { name: file.name, size: file.size, pages: pdf.numPages },
-    output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
-  });
-  return out;
 }
+
 
 export { normalizeUploadToImage as pdfToSingleImage };

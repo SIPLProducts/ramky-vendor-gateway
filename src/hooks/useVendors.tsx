@@ -483,14 +483,33 @@ export function useSAPSync() {
 
   return useMutation({
     mutationFn: async ({ vendorId, overrides }: { vendorId: string; overrides?: Record<string, any> }) => {
-      console.log('Building SAP payload client-side for vendor:', vendorId);
+      console.log('[useSAPSync] start', { vendorId, overrides });
 
       // Build the full SAP payload on the client so it appears in the browser Network tab
-      const { buildSapPayload } = await import('@/lib/sapPayloadBuilder');
-      const { payload: sapPayload, uploadsCount, skipped } = await buildSapPayload(vendorId, overrides || {});
-      console.log('SAP payload built:', { topLevelKeys: Object.keys(sapPayload[0] || {}).length, uploadsCount, skipped });
+      let sapPayload: any;
+      let uploadsCount = 0;
+      let skipped: any;
+      try {
+        const { buildSapPayload } = await import('@/lib/sapPayloadBuilder');
+        const built = await buildSapPayload(vendorId, overrides || {});
+        sapPayload = built.payload;
+        uploadsCount = built.uploadsCount;
+        skipped = built.skipped;
+        console.log('[useSAPSync] payload built', {
+          topLevelKeys: Object.keys(sapPayload[0] || {}).length,
+          uploadsCount,
+          skipped,
+        });
+      } catch (buildErr: any) {
+        console.error('[useSAPSync] payload build failed', buildErr);
+        throw new Error(
+          `Could not build SAP payload: ${buildErr?.message || buildErr}. ` +
+          `Check the active "Create vendor in SAP" config in SAP API Settings.`,
+        );
+      }
 
       // Send fully resolved payload to edge function
+      console.log('[useSAPSync] invoking edge function sync-vendor-to-sap');
       const { data: sapResult, error: sapError } = await supabase.functions.invoke(
         'sync-vendor-to-sap',
         {
@@ -498,16 +517,17 @@ export function useSAPSync() {
         }
       );
 
-      console.log('SAP sync response:', { sapResult, sapError });
+      console.log('[useSAPSync] edge function response', { sapResult, sapError });
 
       if (sapError) {
-        console.error('SAP sync error:', sapError);
-        throw new Error(`SAP sync failed: ${sapError.message}`);
+        console.error('[useSAPSync] edge function error', sapError);
+        throw new Error(`SAP sync failed: ${sapError.message || JSON.stringify(sapError)}`);
       }
 
       if (!sapResult) {
-        throw new Error('No response from SAP sync function');
+        throw new Error('No response from SAP sync function. Check edge function logs.');
       }
+
 
       if (!sapResult.success) {
         console.error('SAP sync failed:', sapResult);

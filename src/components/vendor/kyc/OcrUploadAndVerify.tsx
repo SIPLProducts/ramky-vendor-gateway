@@ -81,22 +81,20 @@ export function OcrUploadAndVerify({
       return;
     }
 
-    // Always normalize to a single JPEG before handing the file to the OCR
-    // provider. PDFs are rasterised + stitched; images are re-encoded to
-    // clean JPEG. If conversion fails we surface a clear error instead of
-    // silently sending the raw PDF (which Surepass rejects with
-    // no_gstin_detected / invalid_image).
+    // Best-effort: normalize to a JPEG so OCR providers get a clean image.
+    // If conversion fails for any reason, fall back to the ORIGINAL file —
+    // most providers (Surepass etc.) accept PDFs directly, so we'd rather
+    // let the server respond than block the user with a generic error.
     setPhase('preparing');
     setMessage('Preparing document for OCR…');
-    let normalized: File;
+    let normalized: File = file;
     try {
       normalized = await normalizeUploadToImage(file);
     } catch (convErr) {
-      console.error('[OcrUploadAndVerify] file→image conversion failed', convErr);
-      setPhase('failed');
-      setMessage("Could not read this file. Please upload a clear JPG/PNG image, or a clearer PDF.");
-      return;
+      console.warn('[OcrUploadAndVerify] file→image conversion failed, sending original', convErr);
+      normalized = file;
     }
+
 
     setPhase('ocr');
     setMessage('Reading document via configured OCR provider…');
