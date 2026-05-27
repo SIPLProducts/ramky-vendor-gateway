@@ -429,29 +429,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
             )}
           </div>
 
-          <div className="grid gap-1.5">
-            <Label>Accounting Group *</Label>
-            <Controller
-              name="accountingGroup"
-              control={control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value || ''}>
-                  <SelectTrigger className={errors.accountingGroup ? 'border-destructive' : ''}>
-                    <SelectValue placeholder="Select accounting group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ACCOUNTING_GROUPS.map((g) => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.accountingGroup && (
-              <p className="text-xs text-destructive">{errors.accountingGroup.message as string}</p>
-            )}
-          </div>
-
+          {/* Accounting Group is derived from vendor type (Domestic / International) selected in step 1. */}
           {/* SAP Classification is now captured on the SAP Sync screen by the SAP Team. */}
         </div>
       </div>
