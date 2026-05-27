@@ -497,8 +497,6 @@ export default function VendorRegistration() {
     };
   }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor]);
 
-  // Per-step + overall completeness
-  const completeness = useFormCompleteness(formData, verifiedData);
 
 
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5]); };
