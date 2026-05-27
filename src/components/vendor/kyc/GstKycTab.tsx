@@ -211,17 +211,24 @@ export function GstKycTab(props: GstKycTabProps) {
   //  - OCR blank, API ok -> success "GSTIN populated from registry"
   // Always merge API response over OCR so any fields OCR missed get filled.
   const handleOcrVerify = async (extracted: Record<string, any>) => {
-    const ocrGstin = String(extracted.gstin || '').toUpperCase().trim();
+    let ocrGstin = String(extracted.gstin || '').toUpperCase().trim();
     reset();
 
-    // We need a GSTIN to verify against. If OCR didn't read one, we can't
-    // chain — surface that clearly to the user.
+    // If OCR couldn't read a 15-char GSTIN from the PDF (common on self-hosted
+    // servers where pdf-to-image conversion is flaky), fall back to whatever
+    // GSTIN the user has already typed in the manual field. This keeps the
+    // verification flow working instead of dead-ending with "upload clearer scan".
     if (!ocrGstin || ocrGstin.length !== 15) {
-      return {
-        ok: false,
-        message: 'Could not read a valid 15-character GSTIN from the certificate. Please upload a clearer scan.',
-        apiData: extracted,
-      };
+      const manual = String(props.gstin || '').toUpperCase().trim();
+      if (manual.length === 15) {
+        ocrGstin = manual;
+      } else {
+        return {
+          ok: false,
+          message: 'Could not read GSTIN from the certificate. Please type the 15-character GSTIN in the field above and re-upload, or click Verify after typing.',
+          apiData: extracted,
+        };
+      }
     }
 
     // Tentatively reflect OCR value in the form so the user sees what was read.
