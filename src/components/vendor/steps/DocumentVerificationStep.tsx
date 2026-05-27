@@ -1905,6 +1905,11 @@ export function DocumentVerificationStep({
                 )}
               </div>
             </StageShell>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={() => setActiveTab("pan")} disabled={!stage1Done}>
+                Continue to PAN
+              </Button>
+            </div>
           </TabsContent>
 
           {/* ============================== PAN ============================== */}
@@ -2018,6 +2023,11 @@ export function DocumentVerificationStep({
                 />
               )}
             </StageShell>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={() => setActiveTab("msme")} disabled={!stage2Done}>
+                Continue to MSME
+              </Button>
+            </div>
           </TabsContent>
 
           {/* ============================== MSME ============================== */}
@@ -2374,6 +2384,11 @@ export function DocumentVerificationStep({
 
               </div>
             </StageShell>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={() => setActiveTab("bank")} disabled={!stage3Done}>
+                Continue to Bank
+              </Button>
+            </div>
           </TabsContent>
 
           {/* ============================== BANK ============================== */}
@@ -2630,6 +2645,11 @@ export function DocumentVerificationStep({
                 )}
               </div>
             </StageShell>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={handleContinue} disabled={!allDone}>
+                Continue
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </TooltipProvider>
