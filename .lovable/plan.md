@@ -1,54 +1,61 @@
-## Why classification fails while tenants work
+## Confirmed issue
 
-Both edge functions hit `${middleware_url}/sap/proxy` with the same logic. The difference is which `sap_api_configs` row they pick.
+Your SAP API screen shows the Classification config as:
 
-- `fetch-tenants-from-sap` deterministically loads the row named **`Tenants From SAP`** → its own `middleware_url` (currently a working ngrok / `10.200.1.7`).
-- `sap-master-fetch` picks the first active row whose name matches `/f4|master/i`. In your DB there are **two** matches:
-  - `SAP Fields F4` (GET, ngrok `curfew-thinning-shadow…`)
-  - `Classification F4s` (PUT, ngrok `curfew-thinning-shadow…`)
+```text
+http://10.200.1.7
+```
 
-  So the function may grab the wrong row, send GET against a PUT-only endpoint (or vice-versa), or hit a middleware URL that's no longer live. Classification dropdowns (`MAT_GRP_VENDOR`, `CAT_VENDOR`, `LOCATION_VENDOR`, `IDENTIFICATION_SOURCE`) therefore fail while `Tenants From SAP` keeps working.
+But the registration page error is still using:
 
-Each config already carries its own `middleware_url`, so this works for both Lovable Cloud (ngrok) and self-host (`10.200.1.7`) without any path or nginx change — we just have to pick the right row.
+```text
+http;//10.200.1.7/sap/proxy
+```
 
-## Fix (edge function only, no DB, no frontend, no nginx changes)
+So the failure is **not SAP**, **not Docker**, and **not tenant API**. The classification function is still seeing or constructing a malformed middleware URL. This needs to be fixed defensively in code so it works dynamically in both Lovable Cloud and self-hosted deployments, even if a URL was previously saved with a typo.
 
-### 1. `supabase/functions/sap-master-fetch/index.ts`
+## Plan to fix without disturbing other functionality
 
-Replace the regex-based `findConfig` with deterministic, name-based lookup per master-type group:
+1. **Fix URL normalization in the classification edge function**
+   - Update `supabase/functions/sap-master-fetch/index.ts` only for SAP master/classification fetching.
+   - Normalize common middleware URL mistakes before calling middleware:
+     - `http;//10.200.1.7` → `http://10.200.1.7`
+     - `https;//...` → `https://...`
+     - `http:/10.200.1.7` → `http://10.200.1.7`
+     - remove accidental `/sap/proxy`, `/api/sap/proxy`, `/sap/bp/create`, `/health` suffixes.
+   - Validate the final proxy URL before fetch so the user gets a clear message if the config is still invalid.
 
-- Classification group → row named **`Classification F4s`**
-  Master types: `material_group_vendor`, `vendor_category`, `vendor_location`, `identification_source`.
-- General F4 group → row named **`SAP Fields F4`**
-  All other master types in `MASTER_MAP` (vendor account group, company code, planning group, recon account, purchase org, currency, country, region).
+2. **Keep it dynamic, not hardcoded**
+   - Do not hardcode `10.200.1.7`.
+   - Continue using the `middleware_url` saved in SAP API Settings for each config row.
+   - Classification will use the saved `Classification F4s` config; tenant will continue using `Tenants From SAP`.
 
-Behaviour:
+3. **Prevent the typo from being saved again**
+   - Update `src/hooks/useSapApiConfigs.tsx` so SAP API Settings auto-corrects the same URL typos whenever admins create/update SAP configs.
+   - This protects all SAP config rows going forward but does not change their behavior.
 
-1. Look at `body.master_type` / `body.master_types`. If any requested type belongs to the classification group, fetch using `Classification F4s`; if any belongs to the general group, fetch using `SAP Fields F4`. If both groups are requested (or no specific type), run **both** configs sequentially and merge `summary` + `sap_response`.
-2. For each chosen config: use that row's own `base_url`, `endpoint_path`, `http_method`, `connection_mode`, `middleware_url`, `proxy_secret`, credentials — i.e. exactly the same per-config flow `fetch-tenants-from-sap` already uses.
-3. Fall back to the previous regex behaviour only if the named row is missing, so existing single-config setups keep working.
-4. Error messages should name the config that failed (e.g. `SAP Fields F4: middleware HTTP 502 …`) so we can tell which one is misconfigured.
+4. **Support both middleware path styles safely**
+   - In `sap-master-fetch`, try `${middlewareBase}/sap/proxy` first.
+   - If that route returns 404/HTML from a reverse proxy, retry `${middlewareBase}/api/sap/proxy`.
+   - This makes the same config work across Lovable Cloud/ngrok and self-hosted server routing.
 
-No signature change for callers (`useSapMasterData`, `useRefreshSapMaster` keep invoking `sap-master-fetch` with `{ master_type }` / `{}`).
+5. **Improve classification error output**
+   - Include the config name and the URLs attempted in the error.
+   - This avoids the current misleading generic message.
 
-### 2. No changes to
+6. **Deployment after implementation**
+   - Lovable Cloud deploys automatically.
+   - On your `10.200.1.7` server, redeploy/copy the updated `sap-master-fetch` function and restart `supabase-edge-functions`.
+   - No database schema, tenant API, registration fields, upload, KYC, or vendor sync flow will be changed.
 
-- Frontend hooks/components.
-- `fetch-tenants-from-sap` or any other SAP function.
-- Database rows, RLS, or nginx/middleware routing.
-- Self-host deployment scripts.
+## Additional security note
 
-## Why this is safe
+You pasted server secrets/passwords in the chat. After the fix is deployed, rotate the middleware/shared secrets and SAP password on your server because they are now exposed in the conversation.
 
-- Same proxy URL shape (`${middleware_url}/sap/proxy`) as today and as the working tenant API — no `/api` vs `/sap` divergence.
-- Each config row already stores the correct `middleware_url` for its environment, so Lovable Cloud and self-host both keep working with their existing rows.
-- Other functionality (vendor create, document upload, tenant fetch, sync) untouched — they each load their own named config and are unaffected.
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
 
-## Deployment
-
-- Lovable Cloud: auto-deploys on save.
-- Self-host `10.200.1.7`: re-run `scripts/deploy-vms-server.sh --skip-docker --skip-migrations` (or rsync `supabase/functions/sap-master-fetch` + `docker compose restart functions`) so the self-hosted Supabase picks up the new function.
-
-## Follow-up (optional, only if user wants)
-
-Once this lands, we can also surface in SAP API Settings which config row each feature uses (Tenants / Classification / General F4 / Vendor Create / Documents) so future name changes can't silently break a feature.
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
