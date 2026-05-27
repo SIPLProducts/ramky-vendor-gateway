@@ -646,7 +646,11 @@ export default function VendorRegistration() {
 
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
   const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
-  const handleEditStep = (step: number) => setCurrentStep(step);
+  const [pendingDocTab, setPendingDocTab] = useState<'gst' | 'pan' | 'msme' | 'bank' | undefined>(undefined);
+  const handleEditStep = (step: number, tab?: 'gst' | 'pan' | 'msme' | 'bank') => {
+    if (step === 1 && tab) setPendingDocTab(tab);
+    setCurrentStep(step);
+  };
 
   // ----- Vendor type switching -----
 
@@ -866,7 +870,7 @@ export default function VendorRegistration() {
     // Built-in domestic steps 1..5
     switch (currentStep) {
       case 1:
-        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
+        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} initialTab={pendingDocTab} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
       case 2:
         return <OrganizationStep tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} onNext={handleOrganizationComplete} onLiveUpdate={(d) => setFormData((prev) => ({ ...prev, organization: d.organization, statutory: d.statutory }))} />;
       case 3:

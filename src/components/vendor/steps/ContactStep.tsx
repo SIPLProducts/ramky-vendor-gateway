@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+// react-hook-form imported above
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
@@ -9,17 +9,17 @@ import { ContactDetails } from '@/types/vendor';
 import { useBuiltInFieldOverrides, isFieldVisible } from '@/hooks/useBuiltInFieldOverrides';
 import { digitsOnly } from '@/lib/utils';
 
-const phoneRequired = z.string().regex(/^\d{10}$/, '10-digit mobile number required');
+// 10-digit phone validation handled via phoneOptional below.
 const phoneOptional = z
   .string()
   .optional()
   .refine((v) => !v || /^\d{10}$/.test(v), { message: '10-digit mobile number required' });
 
 const schema = z.object({
-  ceoName: z.string().min(2, 'Name is required'),
+  ceoName: z.string().optional(),
   ceoDesignation: z.string().optional(),
-  ceoPhone: phoneRequired,
-  ceoEmail: z.string().email('Valid email required'),
+  ceoPhone: phoneOptional,
+  ceoEmail: z.string().email('Valid email required').optional().or(z.literal('')),
   ceoPhone2: phoneOptional,
   ceoEmail2: z.string().email('Valid email required').optional().or(z.literal('')),
   marketingName: z.string().optional(),
@@ -65,25 +65,20 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
     maxLength: 10,
   });
 
-  // Required fields that the admin hid → seed a placeholder so zod passes
-  useEffect(() => {
-    if (!show('ceoName') && !data.ceoName) setValue('ceoName', 'N/A');
-    if (!show('ceoPhone') && !data.ceoPhone) setValue('ceoPhone', '0000000000');
-    if (!show('ceoEmail') && !data.ceoEmail) setValue('ceoEmail', 'na@example.com');
-  }, [overrides, setValue, data]);
+  // CEO/MD fields are optional — no auto-fill needed.
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">
           <User className="h-5 w-5 text-primary" />
-          CEO / Managing Director *
+          CEO / Managing Director
         </h3>
         <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
             {show('ceoName') && (
               <div className="grid gap-1.5">
-                <Label htmlFor="ceoName">Name *</Label>
+                <Label htmlFor="ceoName">Name</Label>
                 <Input id="ceoName" {...register('ceoName')} placeholder="Full name" className={errors.ceoName ? 'border-destructive' : ''} />
                 {errors.ceoName && <p className="text-xs text-destructive">{errors.ceoName.message}</p>}
               </div>
@@ -98,14 +93,14 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
           <div className="grid md:grid-cols-2 gap-5">
             {show('ceoPhone') && (
               <div className="grid gap-1.5">
-                <Label htmlFor="ceoPhone">Contact Number 1 *</Label>
+                <Label htmlFor="ceoPhone">Contact Number 1</Label>
                 <Input id="ceoPhone" {...phoneField('ceoPhone')} placeholder="10-digit mobile number" className={errors.ceoPhone ? 'border-destructive' : ''} />
                 {errors.ceoPhone && <p className="text-xs text-destructive">{errors.ceoPhone.message}</p>}
               </div>
             )}
             {show('ceoEmail') && (
               <div className="grid gap-1.5">
-                <Label htmlFor="ceoEmail">Email Address 1 *</Label>
+                <Label htmlFor="ceoEmail">Email Address 1</Label>
                 <Input id="ceoEmail" type="email" {...register('ceoEmail')} placeholder="email@company.com" className={errors.ceoEmail ? 'border-destructive' : ''} />
                 {errors.ceoEmail && <p className="text-xs text-destructive">{errors.ceoEmail.message}</p>}
               </div>

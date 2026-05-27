@@ -26,6 +26,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
+import { supabase } from '@/integrations/supabase/client';
+
+async function persistClassification(vendorIds: string[], overrides: SapFieldOverrides) {
+  const c = overrides?.classify || ({} as any);
+  const payload = {
+    material_group_vendors: c.MGV || [],
+    vendor_categories: c.CATV || [],
+    vendor_locations: c.LOCV || [],
+    identification_sources: c.IDS || [],
+  };
+  try {
+    await supabase.from('vendors').update(payload as any).in('id', vendorIds);
+  } catch (e) {
+    console.warn('persistClassification failed', e);
+  }
+}
 
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,6 +136,7 @@ export default function SAPSync() {
     if (!vendor) return;
     setSyncingVendorId(vendor.id);
     try {
+      await persistClassification([vendor.id], overrides);
       const result = await sapSync.mutateAsync({ vendorId: vendor.id, overrides });
       setSapSyncResult(result.sapResponse);
       setSelectedVendor(vendor);
@@ -146,6 +163,7 @@ export default function SAPSync() {
   const handleMultipleSync = async (overrides: SapFieldOverrides) => {
     const vendorIds = selectedSapVendors.map(v => v.id);
     try {
+      await persistClassification(vendorIds, overrides);
       const result = await bulkSync.mutateAsync({ vendorIds, overrides });
       setBulkResult(result);
       setShowMultipleSync(false);

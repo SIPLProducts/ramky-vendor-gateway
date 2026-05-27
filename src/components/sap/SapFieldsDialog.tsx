@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
@@ -101,7 +102,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
     setForm(prev => ({ ...prev, [k]: v }));
 
-  const setClassify = (k: keyof SapFieldOverrides['classify'], v: string) =>
+  const setClassify = (k: keyof SapFieldOverrides['classify'], v: string[]) =>
     setForm(prev => ({ ...prev, classify: { ...prev.classify, [k]: v } }));
 
   return (
@@ -211,16 +212,41 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Classification — auto-filled from vendor registration data */}
+            {/* Classification — editable here (no longer captured during registration) */}
             <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <ReadOnlyField label="Material Group for Vendors" value={(form.classify.MGV || []).join(', ')} />
-              <ReadOnlyField label="Vendor Category" value={(form.classify.CATV || []).join(', ')} />
-              <ReadOnlyField label="Vendor Location" value={(form.classify.LOCV || []).join(', ')} />
-              <ReadOnlyField label="Vendor Identification Source" value={(form.classify.IDS || []).join(', ')} />
+              <SapF4MultiSelectField
+                label="Material Group for Vendors"
+                masterType="material_group_vendor"
+                value={form.classify.MGV || []}
+                onChange={(v) => setClassify('MGV', v)}
+                placeholder="Select material groups"
+              />
+              <SapF4MultiSelectField
+                label="Vendor Category"
+                masterType="vendor_category"
+                value={form.classify.CATV || []}
+                onChange={(v) => setClassify('CATV', v)}
+                placeholder="Select vendor categories"
+              />
+              <SapF4MultiSelectField
+                label="Vendor Location"
+                masterType="vendor_location"
+                value={form.classify.LOCV || []}
+                onChange={(v) => setClassify('LOCV', v)}
+                placeholder="Select locations"
+              />
+              <SapF4MultiSelectField
+                label="Vendor Identification Source"
+                masterType="identification_source"
+                value={form.classify.IDS || []}
+                onChange={(v) => setClassify('IDS', v)}
+                placeholder="Select identification sources"
+              />
               <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
-                These values are captured from the vendor's submitted registration form and cannot be edited here.
+                Select Classification values to send to SAP. Defaults are pre-filled when available.
               </p>
             </Section>
+
 
           </div>
           )}
@@ -352,12 +378,16 @@ function ReadOnlyField({ label, value }: { label: string; value: string | number
 }
 
 const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: string }> = {
-  vendor_account_group: { code: 'KTOKK', desc: 'TXT30' },
-  company_code:         { code: 'BUKRS', desc: 'BUTXT' },
-  planning_group:       { code: 'GRUPP' },
-  recon_account:        { code: 'SAKNR', desc: 'TXT20', prefix: 'BUKRS' },
-  purchase_org:         { code: 'EKORG', desc: 'EKOTX' },
-  currency:             { code: 'WAERS', desc: 'LTEXT' },
+  vendor_account_group:  { code: 'KTOKK', desc: 'TXT30' },
+  company_code:          { code: 'BUKRS', desc: 'BUTXT' },
+  planning_group:        { code: 'GRUPP' },
+  recon_account:         { code: 'SAKNR', desc: 'TXT20', prefix: 'BUKRS' },
+  purchase_org:          { code: 'EKORG', desc: 'EKOTX' },
+  currency:              { code: 'WAERS', desc: 'LTEXT' },
+  material_group_vendor: { code: 'ATWRT', desc: 'ATWTB' },
+  vendor_category:       { code: 'ATWRT', desc: 'ATWTB' },
+  vendor_location:       { code: 'ATWRT', desc: 'ATWTB' },
+  identification_source: { code: 'ATWRT', desc: 'ATWTB' },
 };
 
 export function SapF4SelectField({
@@ -434,3 +464,57 @@ export function SapF4SelectField({
     </div>
   );
 }
+
+export function SapF4MultiSelectField({
+  label, masterType, value, onChange, liveItems, placeholder,
+}: {
+  label: string;
+  masterType: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  liveItems?: any[] | null;
+  placeholder?: string;
+}) {
+  const map = F4_FIELD_MAP[masterType];
+  const isLive = Array.isArray(liveItems);
+  const { data: cachedRows, isLoading } = useSapMasterData(isLive ? undefined : masterType);
+
+  const options = (() => {
+    if (isLive) {
+      return (liveItems || [])
+        .map((item) => {
+          const code = map ? item?.[map.code] : item?.code;
+          if (code === undefined || code === null || String(code).trim() === '') return null;
+          const desc = map?.desc ? item?.[map.desc] : item?.description;
+          const labelText = desc ? `${code} — ${desc}` : String(code);
+          return { value: String(code), label: labelText };
+        })
+        .filter(Boolean) as { value: string; label: string }[];
+    }
+    return (cachedRows || []).map((r: any) => {
+      const extra = r.extra || {};
+      const code = map ? (extra[map.code] ?? r.code) : r.code;
+      const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
+      const labelText = desc ? `${code} — ${desc}` : String(code);
+      return { value: String(r.code), label: labelText };
+    });
+  })();
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <MultiSelect
+        options={options}
+        selected={value || []}
+        onChange={onChange}
+        placeholder={placeholder || 'Select…'}
+      />
+      <p className="text-[11px] text-muted-foreground">
+        {isLoading
+          ? 'Loading F4 values…'
+          : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
+      </p>
+    </div>
+  );
+}
+
