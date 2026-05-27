@@ -44,14 +44,14 @@ const schema = z.object({
   productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
   productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
-  accountingGroup: z.enum(['Import', 'Domestic'], { required_error: 'Accounting group is required' }),
+  accountingGroup: z.enum(['Import', 'Domestic']).optional(),
   // SAP Classification — now captured on SAP Sync screen (not in registration)
   materialGroupVendor: z.array(z.string()).optional().default([]),
   vendorCategory: z.array(z.string()).optional().default([]),
   vendorLocation: z.array(z.string()).optional().default([]),
   identificationSource: z.array(z.string()).optional().default([]),
   // Statutory & Memberships (moved here from former Commercial step)
-  entityType: z.string().min(1, 'Entity type is required'),
+  entityType: z.string().optional(),
   firmRegistrationNo: z.string().optional(),
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
