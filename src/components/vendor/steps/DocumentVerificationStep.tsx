@@ -105,6 +105,8 @@ interface DocumentVerificationStepProps {
   onComplete: (data: VerifiedDocumentData) => void;
   onStageChange?: (data: VerifiedDocumentData) => void;
   initialTab?: "gst" | "pan" | "msme" | "bank";
+  onSaveDraft?: () => void | Promise<void>;
+  isSavingDraft?: boolean;
 }
 
 type DocStatus = "idle" | "uploading" | "preparing" | "ocr" | "verifying" | "verified" | "failed";
