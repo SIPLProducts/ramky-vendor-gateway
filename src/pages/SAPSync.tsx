@@ -26,6 +26,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
+import { supabase } from '@/integrations/supabase/client';
+
+async function persistClassification(vendorIds: string[], overrides: SapFieldOverrides) {
+  const c = overrides?.classify || ({} as any);
+  const payload = {
+    material_group_vendors: c.MGV || [],
+    vendor_categories: c.CATV || [],
+    vendor_locations: c.LOCV || [],
+    identification_sources: c.IDS || [],
+  };
+  try {
+    await supabase.from('vendors').update(payload as any).in('id', vendorIds);
+  } catch (e) {
+    console.warn('persistClassification failed', e);
+  }
+}
 
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
