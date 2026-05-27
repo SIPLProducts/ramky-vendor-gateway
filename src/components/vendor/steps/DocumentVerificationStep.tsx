@@ -198,21 +198,19 @@ export function DocumentVerificationStep({
       const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
       if (isPdf) {
         try {
-          fileForOcr = await normalizeUploadToImage(file);
+          const converted = await normalizeUploadToImage(file);
+          if (converted && converted !== file && converted.type?.startsWith("image/")) {
+            fileForOcr = converted;
+          } else {
+            // Conversion returned the original or a non-image — fall through
+            // and send the PDF straight to the provider.
+            console.warn("[KYC] PDF→image conversion returned non-image, sending raw PDF");
+          }
         } catch (err) {
-          console.warn("[KYC] PDF→image conversion failed", err);
-          return {
-            success: false as const,
-            error:
-              "Could not convert your PDF to an image for OCR. Please upload a JPG/PNG instead, or a clearer/smaller PDF.",
-          };
-        }
-        if (fileForOcr === file || !fileForOcr.type?.startsWith("image/")) {
-          return {
-            success: false as const,
-            error:
-              "Could not convert your PDF to an image for OCR. Please upload a JPG/PNG instead, or a clearer/smaller PDF.",
-          };
+          // pdf.js failed. Don't refuse the upload — most KYC providers
+          // accept PDFs directly. Send the raw PDF and let the provider
+          // decide.
+          console.warn("[KYC] PDF→image conversion failed, sending raw PDF", err);
         }
       }
       const r = await callProvider({ providerName: cfg.provider, file: fileForOcr });

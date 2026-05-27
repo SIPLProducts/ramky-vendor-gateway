@@ -89,7 +89,16 @@ export function OcrUploadAndVerify({
     if (needsConversion) {
       setPhase('preparing');
       setMessage('Preparing document for OCR…');
-      normalized = await normalizeUploadToImage(file);
+      try {
+        normalized = await normalizeUploadToImage(file);
+      } catch (convErr) {
+        // pdf.js failed (worker MIME issue, unsupported PDF, etc.). Don't
+        // hard-fail — most KYC providers accept PDFs directly, so fall
+        // back to sending the original PDF. If the provider also can't
+        // read it we'll surface a friendly message below.
+        console.warn('[OcrUploadAndVerify] PDF→image conversion failed, sending raw PDF', convErr);
+        normalized = file;
+      }
     }
 
     setPhase('ocr');
@@ -99,7 +108,10 @@ export function OcrUploadAndVerify({
 
     if (!ocr.success || !ocr.extracted) {
       setPhase('failed');
-      setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
+      const fallbackMsg = needsConversion && normalized === file
+        ? "We couldn't read this PDF. Please upload a clearer scan or a JPG/PNG image."
+        : (ocr.error || 'Could not read the document. Please upload a clearer scan.');
+      setMessage(fallbackMsg);
       return;
     }
 

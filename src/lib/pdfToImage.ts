@@ -131,25 +131,50 @@ export async function normalizeUploadToImage(
   }
 
   const buf = await file.arrayBuffer();
-  const pdf = await (pdfjsLib as any).getDocument({ data: buf }).promise;
+
+  // Try to load the PDF with the worker; if the worker fails (common when
+  // nginx serves .mjs with the wrong content-type or CSP blocks it), retry
+  // once with the worker disabled before giving up.
+  let pdf: any;
+  try {
+    pdf = await (pdfjsLib as any).getDocument({ data: buf }).promise;
+  } catch (err) {
+    console.warn("[pdfToImage] worker getDocument failed, retrying without worker", err);
+    try {
+      pdf = await (pdfjsLib as any).getDocument({ data: buf, disableWorker: true }).promise;
+    } catch (err2) {
+      throw new Error(
+        `PDF_CONVERSION_FAILED: getDocument: ${(err2 as Error)?.message || err2}`,
+      );
+    }
+  }
 
   const pageCanvases: HTMLCanvasElement[] = [];
   let maxWidth = 0;
   let totalHeight = 0;
 
   for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    pageCanvases.push(canvas);
-    maxWidth = Math.max(maxWidth, canvas.width);
-    totalHeight += canvas.height;
+    try {
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pageCanvases.push(canvas);
+      maxWidth = Math.max(maxWidth, canvas.width);
+      totalHeight += canvas.height;
+    } catch (pageErr) {
+      // Don't abort the whole document just because one page failed.
+      console.warn(`[pdfToImage] skipping page ${p} due to render error`, pageErr);
+    }
+  }
+
+  if (pageCanvases.length === 0) {
+    throw new Error("PDF_CONVERSION_FAILED: no pages could be rendered");
   }
 
   const master = document.createElement("canvas");
