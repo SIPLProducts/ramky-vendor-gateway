@@ -1,83 +1,57 @@
-# Fix Plan: Classification, Review navigation, CEO fields, Template label
+## Point 1 — Remove "Accounting Group" from Organization Profile
 
-No existing functionality is changed except the points below. International flow, SAP sync payload, bulk sync, and all other screens stay as-is.
+Vendor type (Domestic / International) is already selected at the very start of registration. We derive the accounting group from that selection so the user doesn't enter it again.
 
-## Point 1 — Classification handled in SAP Sync (domestic only)
+**`src/components/vendor/steps/OrganizationStep.tsx`**
+- Remove the entire `Accounting Group *` `<div>` (lines 435–456).
+- Schema change: make `accountingGroup` optional (`z.enum([...]).optional()`), remove the required error.
+- In the form's `onSubmit` / persistence handlers (lines ~178 and ~219), auto-set:
+  `accountingGroup: vendorType === 'international' ? 'Import' : 'Domestic'`
+- Drop the now-unused `ACCOUNTING_GROUPS` import if nothing else uses it.
 
-### Remove from domestic registration
-- File: `src/components/vendor/steps/OrganizationStep.tsx`
-  - Remove the entire "SAP Classification" block (lines ~458–528) including the four `ClassificationField` multi-selects (`material_group_vendor`, `vendor_category`, `vendor_location`, `identification_source`) and the section header.
-  - Keep all other fields and their state untouched. International (`IntlClassificationStep`) is NOT touched.
-- File: `src/pages/VendorRegistration.tsx`
-  - In `filledSteps` calc (~line 401) leave international step-4 detection unchanged; only stop using classification as a domestic completeness requirement (no change needed since domestic doesn't have step 4 = Classification).
-- File: `src/hooks/useVendorRegistration.tsx`
-  - Keep the columns `material_group_vendors`, `vendor_categories`, `vendor_locations`, `identification_sources` in the payload. For domestic they will simply submit as empty arrays (since the UI no longer collects them). International flow keeps populating them.
+**`src/components/vendor/steps/ReviewStep.tsx`**
+- Remove the `<DataRow label="Accounting Group" .../>` (line 135). It's implied by the vendor type chosen in step 1.
 
-### Make Classification editable on SAP Sync screen
-- File: `src/components/sap/SapFieldsDialog.tsx`
-  - Replace the four `ReadOnlyField`s in the Classification section with multi-select dropdowns backed by SAP F4 master data:
-    - `material_group_vendor` → MGV
-    - `vendor_category` → CATV
-    - `vendor_location` → LOCV
-    - `identification_source` → IDS
-  - Options come from the live F4 data already fetched (`liveF4`) or the cached `useSapMasterData` fallback — same pattern the other F4 selects already use.
-  - Reuse the existing `MultiSelect` component (`src/components/ui/multi-select.tsx`) so the user can add/remove items and the values are stored in `form.classify.{MGV|CATV|LOCV|IDS}` exactly as today.
-  - Initial values: prefer what's already on the vendor row (existing `buildDefaults` logic). For domestic vendors with no classification yet, these will start empty and the SAP Team picks them here.
-  - Update the helper note under the section to: "Select Classification values to send to SAP. Defaults are pre-filled when available."
-- File: `src/pages/SAPSync.tsx`
-  - In `handleConfirmSync` / `handleMultipleSync`, after a successful sync also persist the chosen classification arrays back to the `vendors` row so they stay associated with the vendor:
-    - `material_group_vendors = overrides.classify.MGV`
-    - `vendor_categories = overrides.classify.CATV`
-    - `vendor_locations = overrides.classify.LOCV`
-    - `identification_sources = overrides.classify.IDS`
-  - Done via a single `supabase.from('vendors').update(...).eq('id', vendor.id)` before/after the sync mutation. Bulk sync applies the same arrays to each selected vendor.
-- The edge function `sync-vendor-to-sap` already consumes `overrides.classify.*` — no changes there.
+No DB change — the column still stores "Domestic" / "Import" automatically.
 
-### CEO fields not mandatory
-- File: `src/components/vendor/steps/ContactStep.tsx`
-  - Change schema:
-    - `ceoName: z.string().optional()` (remove `min(2)`)
-    - `ceoPhone: phoneOptional`
-    - `ceoEmail: z.string().email().optional().or(z.literal(''))`
-  - Remove the red asterisks on the labels for Name, Contact Number 1, Email Address 1, and the section title "CEO / Managing Director *" → "CEO / Managing Director".
-  - Remove the placeholder N/A / dummy auto-fills (`setValue('ceoName', 'N/A')`, etc.) since the fields are now optional.
+## Point 2 — Remove unused Statutory & Registrations fields
 
-## Point 2 — Review & Submit "Edit" deep-links to the right tab
+**`src/components/vendor/steps/OrganizationStep.tsx`** — inside the "Statutory & Registrations" section, remove:
+1. The entire `Entity Type *` `<div>` (lines 471–492) and the wrapper `grid md:grid-cols-2` it shares with Firm Registration No. — keep Firm Registration No. on its own row.
+2. The whole `grid md:grid-cols-2` block with **IEC No.** + **SWIFT / IBAN Code** (lines 518–531).
+3. The whole `grid md:grid-cols-2` block with **IEC Certificate** + **SWIFT / IBAN Proof** FileUploads (lines 533–552).
+4. The whole `grid md:grid-cols-2` block with **Operational Network** select (lines 554–574).
 
-Today every Edit in the domestic Review jumps to step 1 (Document Verification) which always opens on the GST tab — that's why everything looks like it lands on PAN/GST.
+Schema cleanup in the same file:
+- Mark `entityType`, `iecNo`, `swiftIbanCode`, `operationalNetwork` as `.optional()` so existing data still parses but they are no longer required and no longer rendered.
+- Remove unused imports if any (`ENTITY_TYPES`, `OPERATIONAL_NETWORKS`) once references are gone.
 
-- File: `src/components/vendor/steps/ReviewStep.tsx`
-  - Extend the `SectionHeader` / `onEdit` API to accept an optional target tab key (`"gst" | "pan" | "msme" | "bank"`) and pass it for the relevant sections:
-    - Compliance & Statutory → step 1, tab `pan` (PAN is the entity-type/PAN data) — but split: GST sub-rows when present → tab `gst`; MSME rows → tab `msme`. Simplest: keep one "Compliance & Statutory" edit going to `pan`, and add a separate "GST Details" edit row (step 1, tab `gst`) and "MSME Details" edit row (step 1, tab `msme`) when those blocks render.
-    - Bank Details → step 1, tab `bank`.
-    - Organization, Address, Contact, Financial → existing steps 2/3/4/5 (no tab needed).
-- File: `src/pages/VendorRegistration.tsx`
-  - Update `handleEditStep` to also accept an optional tab key and stash it (e.g. `setPendingDocTab(tab)`), then `setCurrentStep(step)`.
-- File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
-  - Accept a new optional prop `initialTab?: TabKey`. In the existing `useState<TabKey>('gst')` initializer use `initialTab ?? 'gst'`. Also add a `useEffect` that re-syncs `activeTab` when `initialTab` changes (so subsequent edits jump correctly).
-  - Pass the prop through from `VendorRegistration.tsx` when rendering step 1.
+**`src/components/vendor/steps/ReviewStep.tsx`**
+- In the "PAN & Entity Type" card (lines 160–166): rename title to **"PAN"**, remove the `Entity Type` `DataRow`. Edit target stays `step 1, tab 'pan'`.
 
-No change to the existing intra-step auto-advance logic.
+International flow (`IntlClassificationStep`, intl statutory) is **not touched** — Entity Type / IEC / SWIFT belong there contextually only if intl uses them, which it doesn't here.
 
-## Point 3 — Rename "Template" → "Template download" on GST/MSME tabs
+## Point 3 — Review & Submit "Edit" navigates to the right card/tab
 
-- File: `src/components/vendor/steps/DocumentVerificationStep.tsx` lines 1877 and 2052
-  - Change the button/link label `Template` to `Template download`. No behaviour change.
+The deep-link wiring (`onEditStep(step, tab)` → `setPendingDocTab` → `DocumentVerificationStep.initialTab`) is already in place from the previous change. Verify and adjust per-section targets so each card edits the right place:
+
+**`src/components/vendor/steps/ReviewStep.tsx`** — keep current targets:
+- Organization Details → step 2
+- Address Information → step 3
+- Contact Information → step 4
+- PAN → step 1, tab `pan`
+- GST Details → step 1, tab `gst`
+- MSME Details → step 1, tab `msme`
+- Bank Details → step 1, tab `bank`
+- Financial Information → step 5
+
+**`src/pages/VendorRegistration.tsx`** — confirm `handleEditStep(step, tab)` calls both `setPendingDocTab(tab)` and `setCurrentStep(step)` (already done), and that `DocumentVerificationStep` receives `initialTab={pendingDocTab}` (already done). No further code change unless verification turns up a bug.
 
 ## Out of scope / unaffected
-- International registration (`IntlClassificationStep`) stays unchanged.
-- DB schema, RLS, edge functions, middleware, tenants/SAP API endpoints — untouched.
-- `sapPayloadBuilder`, bulk sync edge function — already read from `overrides.classify`, no change.
-- Existing vendors that already have classification values continue to pre-populate the new SAP Sync dropdowns.
+- International flow, SAP Sync screen, classification, edge functions, middleware, DB schema.
+- All other tabs, CEO field rules, template-download label, validation logic.
 
-## Technical notes
-- Files touched (frontend only):
-  1. `src/components/vendor/steps/OrganizationStep.tsx` — remove Classification block.
-  2. `src/components/vendor/steps/ContactStep.tsx` — CEO fields optional.
-  3. `src/components/vendor/steps/ReviewStep.tsx` — add tab targets in section headers; split GST/MSME edit rows.
-  4. `src/components/vendor/steps/DocumentVerificationStep.tsx` — accept `initialTab` prop; rename "Template" → "Template download" (2 places).
-  5. `src/pages/VendorRegistration.tsx` — thread `initialTab` and new `handleEditStep(step, tab?)`.
-  6. `src/components/sap/SapFieldsDialog.tsx` — replace 4 ReadOnly fields with MultiSelect F4-backed dropdowns; update helper text.
-  7. `src/pages/SAPSync.tsx` — persist chosen classification arrays to `vendors` on confirm (single + bulk).
-
-No DB migration, no edge-function change, no breakage to tenants/F4 APIs.
+## Files to edit
+1. `src/components/vendor/steps/OrganizationStep.tsx` — remove Accounting Group, Entity Type, IEC No, SWIFT/IBAN Code, IEC Certificate, SWIFT/IBAN Proof, Operational Network; auto-derive `accountingGroup` from vendor type; relax schema.
+2. `src/components/vendor/steps/ReviewStep.tsx` — drop Accounting Group row, drop Entity Type row, rename card to "PAN".
+3. (Verification only) `src/pages/VendorRegistration.tsx` — confirm edit deep-link still works; no functional change expected.
