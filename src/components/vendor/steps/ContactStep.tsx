@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+// react-hook-form imported above
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { ContactDetails } from '@/types/vendor';
 import { useBuiltInFieldOverrides, isFieldVisible } from '@/hooks/useBuiltInFieldOverrides';
 import { digitsOnly } from '@/lib/utils';
 
-const phoneRequired = z.string().regex(/^\d{10}$/, '10-digit mobile number required');
+// 10-digit phone validation handled via phoneOptional below.
 const phoneOptional = z
   .string()
   .optional()
