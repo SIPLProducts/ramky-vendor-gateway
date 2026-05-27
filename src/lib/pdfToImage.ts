@@ -220,42 +220,47 @@ export async function normalizeUploadToImage(
   }
 
 
-  // Single-page PDF → emit that page directly.
-  if (pageCanvases.length === 1) {
-    const out = await canvasToJpegFile(pageCanvases[0], baseName(file.name));
-    logConversion("pdf(1pg)→jpeg", {
+  try {
+    // Single-page PDF → emit that page directly.
+    if (pageCanvases.length === 1) {
+      const out = await canvasToJpegFile(pageCanvases[0], baseName(file.name));
+      logConversion("pdf(1pg)→jpeg", {
+        input: { name: file.name, size: file.size, pages: pdf.numPages },
+        output: { name: out.name, type: out.type, size: out.size, w: pageCanvases[0].width, h: pageCanvases[0].height },
+      });
+      return out;
+    }
+
+    // Multi-page → stitch vertically, then cap master height.
+    const maxWidth = pageCanvases.reduce((m, c) => Math.max(m, c.width), 0);
+    const totalHeight = pageCanvases.reduce((s, c) => s + c.height, 0);
+
+    const master = document.createElement("canvas");
+    master.width = maxWidth;
+    master.height = totalHeight;
+    const mctx = master.getContext("2d")!;
+    mctx.fillStyle = "#ffffff";
+    mctx.fillRect(0, 0, master.width, master.height);
+
+    let y = 0;
+    for (const c of pageCanvases) {
+      const x = Math.floor((maxWidth - c.width) / 2);
+      mctx.drawImage(c, x, y);
+      y += c.height;
+    }
+
+    const capped = master.height > MAX_MASTER_HEIGHT ? fitCanvas(master, MAX_MASTER_HEIGHT) : master;
+    const out = await canvasToJpegFile(capped, baseName(file.name));
+    logConversion(`pdf(${pageCanvases.length}pg)→jpeg`, {
       input: { name: file.name, size: file.size, pages: pdf.numPages },
-      output: { name: out.name, type: out.type, size: out.size, w: pageCanvases[0].width, h: pageCanvases[0].height },
+      output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
     });
     return out;
+  } catch (encodeErr) {
+    console.warn("[pdfToImage] encode/stitch failed, sending original PDF", encodeErr);
+    return file;
   }
-
-  // Multi-page → stitch vertically, then cap master height.
-  const maxWidth = pageCanvases.reduce((m, c) => Math.max(m, c.width), 0);
-  const totalHeight = pageCanvases.reduce((s, c) => s + c.height, 0);
-
-  const master = document.createElement("canvas");
-  master.width = maxWidth;
-  master.height = totalHeight;
-  const mctx = master.getContext("2d")!;
-  mctx.fillStyle = "#ffffff";
-  mctx.fillRect(0, 0, master.width, master.height);
-
-  let y = 0;
-  for (const c of pageCanvases) {
-    const x = Math.floor((maxWidth - c.width) / 2);
-    mctx.drawImage(c, x, y);
-    y += c.height;
-  }
-
-  // Cap the final master so we never produce a 10k+ px image that providers reject.
-  const capped = master.height > MAX_MASTER_HEIGHT ? fitCanvas(master, MAX_MASTER_HEIGHT) : master;
-  const out = await canvasToJpegFile(capped, baseName(file.name));
-  logConversion(`pdf(${pageCanvases.length}pg)→jpeg`, {
-    input: { name: file.name, size: file.size, pages: pdf.numPages },
-    output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
-  });
-  return out;
 }
+
 
 export { normalizeUploadToImage as pdfToSingleImage };
