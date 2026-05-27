@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_SAP_PAYLOAD_TEMPLATE } from "./sapDefaultTemplate";
 
 // Indian state -> SAP T005S numeric region code for country IN.
 const stateToRegion: Record<string, string> = {
