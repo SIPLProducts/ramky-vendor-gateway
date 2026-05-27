@@ -135,22 +135,29 @@ export default function SAPSync() {
   const handleConfirmSync = async (overrides: SapFieldOverrides) => {
     const vendor = pendingSyncVendor;
     if (!vendor) return;
+    console.log('[SAPSync] handleConfirmSync starting for vendor', vendor.id, overrides);
+    toast.info('Syncing vendor to SAP…', { description: vendor.legal_name || vendor.id });
     setSyncingVendorId(vendor.id);
     try {
       await persistClassification([vendor.id], overrides);
       const result = await sapSync.mutateAsync({ vendorId: vendor.id, overrides });
+      console.log('[SAPSync] sapSync result', result);
       setSapSyncResult(result.sapResponse);
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
       setSelectedSapIds(new Set());
+      toast.success('SAP sync complete');
     } catch (error: any) {
+      console.error('[SAPSync] sapSync failed', error);
+      const msg = error?.message || 'SAP sync failed';
+      toast.error('SAP sync failed', { description: msg });
       const fallback = error?.ACC_RES ?? [
-        { MSGTYP: 'E', LONGMSG: error?.message || 'SAP sync failed', BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
+        { MSGTYP: 'E', LONGMSG: msg, BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
       ];
       setSapSyncResult({
         success: false,
-        message: error?.message || 'SAP sync failed',
+        message: msg,
         ACC_RES: fallback,
       });
       setSelectedVendor(vendor);
