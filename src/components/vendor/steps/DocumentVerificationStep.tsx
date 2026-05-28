@@ -2636,11 +2636,8 @@ export function DocumentVerificationStep({
                 )}
               </div>
             </StageShell>
-            <div className="mt-4 flex justify-end">
-              <Button type="button" onClick={handleContinue} disabled={!allDone}>
-                Continue
-              </Button>
-            </div>
+
+
           </TabsContent>
         </Tabs>
       </TooltipProvider>
