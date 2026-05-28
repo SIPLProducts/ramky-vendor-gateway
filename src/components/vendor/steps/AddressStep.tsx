@@ -52,9 +52,15 @@ const schema = z.object({
   registeredEmail: z
     .string()
     .trim()
-    .min(1, 'Email is required')
+    .min(1, 'Email 1 is required')
     .email('Valid email required')
     .max(100, 'Email must be less than 100 characters'),
+  registeredContact1: z
+    .string()
+    .min(1, 'Contact 1 is required')
+    .regex(/^\d{10}$/, '10-digit mobile number required'),
+  registeredContact2: optionalPhone,
+  registeredEmail2: optionalEmail,
 
   sameAsRegistered: z.boolean(),
   manufacturingAddress: z.string().max(40, 'Maximum 40 characters allowed').optional(),
@@ -292,7 +298,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="registeredEmail">Email ID *</Label>
+              <Label htmlFor="registeredEmail">Email 1 *</Label>
               <Input
                 id="registeredEmail"
                 type="email"
@@ -305,6 +311,50 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
               )}
             </div>
           </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="registeredContact1">Contact 1 *</Label>
+              <Input
+                id="registeredContact1"
+                {...numericField('registeredContact1', 10)}
+                placeholder="10-digit mobile number"
+                className={errors.registeredContact1 ? 'border-destructive' : ''}
+              />
+              {errors.registeredContact1 && (
+                <p className="text-xs text-destructive">{errors.registeredContact1.message}</p>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="registeredContact2">Contact 2</Label>
+              <Input
+                id="registeredContact2"
+                {...numericField('registeredContact2', 10)}
+                placeholder="10-digit mobile number (optional)"
+                className={errors.registeredContact2 ? 'border-destructive' : ''}
+              />
+              {errors.registeredContact2 && (
+                <p className="text-xs text-destructive">{errors.registeredContact2.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="registeredEmail2">Email 2</Label>
+              <Input
+                id="registeredEmail2"
+                type="email"
+                {...register('registeredEmail2')}
+                placeholder="alternate@company.com (optional)"
+                className={errors.registeredEmail2 ? 'border-destructive' : ''}
+              />
+              {errors.registeredEmail2 && (
+                <p className="text-xs text-destructive">{errors.registeredEmail2.message}</p>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
 
