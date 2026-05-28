@@ -56,13 +56,45 @@ serve(async (req) => {
 
     // Force idnum/idtype per vendor row in payload so the middleware response can be correlated.
     const idnumToVendor: Record<string, any> = {};
+    const toArr = (v: any): string[] =>
+      Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
+    const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+      (arr || [])
+        .map((v) => (v == null ? "" : String(v).trim()))
+        .filter(Boolean)
+        .map((v) => ({ [key]: v }));
     const enriched = sapPayload.map((row: any, i: number) => {
       const vid = vendorIds[i];
       const vendor = (vendors || []).find((v: any) => v.id === vid);
       const refNo = String(vid || "").slice(0, 8).toUpperCase();
       idnumToVendor[refNo] = vendor;
+
+      const ovClassify = (row && row.classify) || {};
+      const classifyArrays = {
+        MGV: toArr(ovClassify.MGV).length ? toArr(ovClassify.MGV)
+          : (toArr(vendor?.material_group_vendors).length ? toArr(vendor?.material_group_vendors)
+          : (toArr(vendor?.material_group_vendor).length ? toArr(vendor?.material_group_vendor)
+          : toArr(vendor?.product_categories))),
+        CATV: toArr(ovClassify.CATV).length ? toArr(ovClassify.CATV)
+          : (toArr(vendor?.vendor_categories).length ? toArr(vendor?.vendor_categories)
+          : toArr(vendor?.vendor_category || vendor?.organization_type || vendor?.entity_type)),
+        LOCV: toArr(ovClassify.LOCV).length ? toArr(ovClassify.LOCV)
+          : (toArr(vendor?.vendor_locations).length ? toArr(vendor?.vendor_locations)
+          : toArr(vendor?.vendor_location || vendor?.registered_state)),
+        IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
+          : (toArr(vendor?.identification_sources).length ? toArr(vendor?.identification_sources)
+          : toArr(vendor?.identification_source)),
+      };
+
+      const { classify: _drop, ...rest } = row || {};
       return {
-        ...row,
+        ...rest,
+        CLASSIFY: {
+          MAT_GRP_VENDOR:        wrap(classifyArrays.MGV,  "MGV"),
+          CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
+          LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
+          IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+        },
         UPLOAD: [],
         idtype: "SOLMN1",
         idnum: refNo,
