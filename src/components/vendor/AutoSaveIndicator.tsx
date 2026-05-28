@@ -41,12 +41,13 @@ export function AutoSaveIndicator({ state, lastSavedAt, className }: AutoSaveInd
 
   if (state === 'error') {
     return (
-      <div className={cn('flex items-center gap-1.5 text-xs text-destructive', className)} aria-live="polite">
+      <div className={cn('flex items-center gap-1.5 text-xs text-muted-foreground', className)} aria-live="polite">
         <CloudOff className="h-3.5 w-3.5" />
-        <span>Couldn't save — will retry</span>
+        <span>Draft kept locally — will retry</span>
       </div>
     );
   }
+
 
   if (state === 'saved' && lastSavedAt) {
     return (
