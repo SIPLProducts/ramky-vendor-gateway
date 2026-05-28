@@ -851,9 +851,10 @@ export default function VendorRegistration() {
     if (pendingPostSubmit) {
       setIsSubmitted(true);
       setIsEditMode(false);
-      setVendorStatusState('finance_review');
+      setVendorStatusState(pendingPostSubmitStatus ?? 'scm_manager_review');
       setShowFeedback(true);
       setPendingPostSubmit(false);
+      setPendingPostSubmitStatus(null);
     }
   };
 
