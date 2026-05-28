@@ -306,22 +306,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
-    classify: (() => {
-      const v: any = vendor || {};
-      const toArr = (val: any): string[] =>
-        Array.isArray(val) ? val.filter(Boolean).map(String) : (val ? [String(val)] : []);
-      const cats = Array.isArray(v.product_categories) ? v.product_categories.filter(Boolean) : [];
-      const mgv = toArr(v.material_group_vendors);
-      const catv = toArr(v.vendor_categories);
-      const locv = toArr(v.vendor_locations);
-      const ids = toArr(v.identification_sources);
-      return {
-        MGV: mgv.length ? mgv : (v.material_group_vendor ? [v.material_group_vendor] : (cats.length ? cats : [])),
-        CATV: catv.length ? catv : (v.vendor_category ? [v.vendor_category] : (v.industry_type ? [v.industry_type] : (v.organization_type ? [v.organization_type] : []))),
-        LOCV: locv.length ? locv : (v.vendor_location ? [v.vendor_location] : (v.registered_state ? [v.registered_state] : [])),
-        IDS: ids.length ? ids : (v.identification_source ? [v.identification_source] : []),
-      };
-    })(),
+    classify: { MGV: [], CATV: [], LOCV: [], IDS: [] },
   };
 }
 
