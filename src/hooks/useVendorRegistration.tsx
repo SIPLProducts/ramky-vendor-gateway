@@ -703,9 +703,20 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       }
 
       if (vendorId) {
+        // Never overwrite user_id on update — the RLS policy requires
+        // `user_id = auth.uid()` to match the row's existing owner. Sending a
+        // (possibly stale or null) user_id from the client races with session
+        // refresh and triggers "new row violates row-level security policy".
+        const { user_id: _ignoreUserId, ...updatePayload } = vendorData as VendorRecord & { user_id?: string };
+        // Preserve tenant_id from the existing row when the form briefly clears it
+        // (e.g. before invitation/existingVendor has hydrated buyerCompanyId).
+        if (!updatePayload.tenant_id && (existingVendor as any)?.tenant_id) {
+          updatePayload.tenant_id = (existingVendor as any).tenant_id;
+        }
+
         const { data, error } = await supabase
           .from('vendors')
-          .update(vendorData)
+          .update(updatePayload)
           .eq('id', vendorId)
           .select()
           .single();
@@ -732,13 +743,24 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         return data;
       }
     },
-    onError: (error) => {
+
+    onError: (error: any) => {
+      // RLS errors during background autosave shouldn't blast a red toast at the
+      // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
+      const code = error?.code || '';
+      const msg = String(error?.message || '');
+      const isRls = code === '42501' || /row-level security/i.test(msg);
+      if (isRls) {
+        console.warn('[saveVendor] RLS denial (autosave will surface this in the indicator):', msg);
+        return;
+      }
       toast({
         title: 'Error Saving Data',
         description: error.message,
         variant: 'destructive',
       });
     },
+
   });
 
   // Submit vendor for validation

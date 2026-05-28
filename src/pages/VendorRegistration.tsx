@@ -144,11 +144,19 @@ export default function VendorRegistration() {
 
   // Hydrate custom values from existing vendor on load
   useEffect(() => {
-    const v = existingVendor as { custom_field_values?: Record<string, Record<string, unknown>> } | null;
+    const v = existingVendor as { custom_field_values?: Record<string, Record<string, unknown>>; tenant_id?: string } | null;
     if (v?.custom_field_values && Object.keys(v.custom_field_values).length > 0) {
       setCustomFieldValues(v.custom_field_values);
     }
+    // Seed Buyer Company from the existing draft so it never appears empty when
+    // the vendor reopens the invitation link.
+    if (v?.tenant_id) {
+      setFormData((prev) => prev.organization.buyerCompanyId === v.tenant_id
+        ? prev
+        : { ...prev, organization: { ...prev.organization, buyerCompanyId: v.tenant_id! } });
+    }
   }, [existingVendor]);
+
 
   // Validate token on mount and check authentication
   useEffect(() => {

@@ -96,7 +96,7 @@ interface OrganizationStepProps {
   onLiveUpdate?: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _tenantId, onNext, onLiveUpdate }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNext, onLiveUpdate }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
@@ -149,6 +149,18 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId: _ten
 
   const selectedCategories = watch('productCategories') || [];
   const showOtherInput = selectedCategories.includes('Others');
+
+  // Buyer Company is assigned by the invitation and must NOT reset to empty when
+  // the vendor reopens the link. Hydrate from tenantId/data.buyerCompanyId once
+  // either becomes available.
+  const currentBuyer = watch('buyerCompanyId');
+  useEffect(() => {
+    const next = tenantId || data?.buyerCompanyId || '';
+    if (next && next !== currentBuyer) {
+      setValue('buyerCompanyId', next, { shouldDirty: false, shouldValidate: false });
+    }
+  }, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
+
 
   // Live-push current form values up to parent so autosave persists Step-1 fields
   // (including the four classification multi-selects) without waiting for "Next".
