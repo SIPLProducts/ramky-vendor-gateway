@@ -1871,7 +1871,10 @@ export type Database = {
           registered_address_line3: string | null
           registered_address_line4: string | null
           registered_city: string | null
+          registered_contact_1: string | null
+          registered_contact_2: string | null
           registered_email: string | null
+          registered_email_2: string | null
           registered_fax: string | null
           registered_phone: string | null
           registered_pincode: string | null
@@ -2055,7 +2058,10 @@ export type Database = {
           registered_address_line3?: string | null
           registered_address_line4?: string | null
           registered_city?: string | null
+          registered_contact_1?: string | null
+          registered_contact_2?: string | null
           registered_email?: string | null
+          registered_email_2?: string | null
           registered_fax?: string | null
           registered_phone?: string | null
           registered_pincode?: string | null
@@ -2239,7 +2245,10 @@ export type Database = {
           registered_address_line3?: string | null
           registered_address_line4?: string | null
           registered_city?: string | null
+          registered_contact_1?: string | null
+          registered_contact_2?: string | null
           registered_email?: string | null
+          registered_email_2?: string | null
           registered_fax?: string | null
           registered_phone?: string | null
           registered_pincode?: string | null

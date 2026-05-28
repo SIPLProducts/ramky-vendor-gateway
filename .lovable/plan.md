@@ -1,25 +1,51 @@
-## Problem
+## Goal
 
-After submitting the vendor registration form, the success screen shows "Finance Review in Progress" with the Finance 1 stage active. After a manual reload it correctly shows "Application Submitted Successfully" with the SCM Manager Approval stage active. The post-submit UI does not match the actual saved state.
+In the Vendor Registration Form → Address tab → Address Details (registered address) section, add four new fields:
 
-## Root cause
+- Contact 1 (mandatory)
+- Contact 2 (optional)
+- Email 1 (mandatory) — rename the existing "Email ID" field to "Email 1"
+- Email 2 (optional)
 
-In `src/pages/VendorRegistration.tsx`, `handleSubmissionDialogClose` hardcodes the status after closing the success dialog:
+## Changes
 
-```ts
-setVendorStatusState('finance_review');
-```
+### 1. Database (`supabase/functions`/migrations)
+Add four columns on `public.vendors`:
+- `registered_contact_1 text`
+- `registered_contact_2 text`
+- `registered_email_2 text`
 
-However, `submitVendorMutation` in `src/hooks/useVendorRegistration.tsx` actually writes `status: 'scm_manager_review'` to the database (line 785). On reload, `vendorStatusState` is repopulated from the DB and renders correctly — hence the discrepancy between the two screenshots.
+(Reuse existing `registered_email` as Email 1; no rename needed at the DB level.)
 
-## Fix
+### 2. Types (`src/types/vendor.ts`)
+Extend `AddressDetails` with:
+- `registeredContact1: string`
+- `registeredContact2: string`
+- `registeredEmail2: string`
 
-1. In `src/pages/VendorRegistration.tsx` `handleSubmit`, capture the real status returned from `submitVendor` / `resubmitVendor` (the mutation returns the updated vendor row) and stash it alongside the existing `pendingPostSubmit` flag (e.g. add a `pendingStatus` state).
-2. In `handleSubmissionDialogClose`, call `setVendorStatusState(pendingStatus ?? <fallback>)` instead of the hardcoded `'finance_review'`. Use `'scm_manager_review'` as the fallback only if the returned row is missing a status.
-3. As a safety net, also invalidate / refetch the vendor query in `useVendorRegistration` after submission so any other consumers (and the realtime channel) see the latest row immediately. The existing realtime subscription on `vendors` already updates `vendorStatusState`, so this mainly removes the dependency on the hardcoded value.
+(`registeredEmail` continues to represent Email 1.)
 
-No backend/schema changes. No changes to the submit mutation logic itself — only fixing the UI state transition so it reflects the truth the backend already wrote.
+### 3. Form UI (`src/components/vendor/steps/AddressStep.tsx`)
+- Rename label "Email ID *" → "Email 1 *".
+- Add inputs for Contact 1 *, Contact 2, Email 2 in the Address Details grid (10-digit phone style for contacts, email validation for Email 2).
+- Zod schema:
+  - `registeredContact1`: required 10-digit phone
+  - `registeredContact2`: optional 10-digit phone
+  - `registeredEmail` (Email 1): keep required + email
+  - `registeredEmail2`: optional, valid email when provided
 
-## Files to change
+### 4. Form state defaults / load / persist (`src/hooks/useVendorRegistration.tsx`)
+- Add the three new fields to the empty form initializer and to the `loadVendor` mapper.
+- Include them in the autosave/submit payload mapping to the new DB columns.
 
-- `src/pages/VendorRegistration.tsx` — capture & apply real returned status in `handleSubmit` / `handleSubmissionDialogClose`.
+### 5. SAP payload (`src/lib/sapPayloadBuilder.ts` + edge functions `sync-vendor-to-sap`, `sync-vendors-to-sap-bulk`)
+- Expose the new fields as template variables (e.g. `vendor.registered_contact_1`, `vendor.registered_contact_2`, `vendor.registered_email_2`) so admins can map them in SAP payload templates.
+- Keep existing `registered_phone` / `primary_email` mappings untouched to avoid breaking current SAP sync; new fields are additive.
+
+### 6. Review / preview surfaces
+Update `ReviewStep.tsx` and `VendorSubmissionPreviewDialog.tsx` (only the Address section) to display the four fields with the new labels.
+
+## Out of scope
+- No changes to manufacturing / branch contact blocks.
+- No changes to ContactStep (CEO/Marketing/etc.).
+- No changes to validation orchestrator or KYC flows.
