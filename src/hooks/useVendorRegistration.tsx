@@ -744,13 +744,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       }
     },
 
-    onError: (error) => {
+    onError: (error: any) => {
+      // RLS errors during background autosave shouldn't blast a red toast at the
+      // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
+      const code = error?.code || '';
+      const msg = String(error?.message || '');
+      const isRls = code === '42501' || /row-level security/i.test(msg);
+      if (isRls) {
+        console.warn('[saveVendor] RLS denial (autosave will surface this in the indicator):', msg);
+        return;
+      }
       toast({
         title: 'Error Saving Data',
         description: error.message,
         variant: 'destructive',
       });
     },
+
   });
 
   // Submit vendor for validation
