@@ -98,6 +98,7 @@ export default function VendorRegistration() {
     errorMessage: string | null;
   }>({ open: false, inviter: null, status: 'success', vendorIdentity: null, errorMessage: null });
   const [pendingPostSubmit, setPendingPostSubmit] = useState(false);
+  const [pendingPostSubmitStatus, setPendingPostSubmitStatus] = useState<RegistrationStatus | null>(null);
   const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [tokenError, setTokenError] = useState<string | null>(null);
