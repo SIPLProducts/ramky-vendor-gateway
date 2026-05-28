@@ -1905,11 +1905,8 @@ export function DocumentVerificationStep({
                 )}
               </div>
             </StageShell>
-            <div className="mt-4 flex justify-end">
-              <Button type="button" onClick={() => setActiveTab("pan")} disabled={!stage1Done}>
-                Continue to PAN
-              </Button>
-            </div>
+
+
           </TabsContent>
 
           {/* ============================== PAN ============================== */}
