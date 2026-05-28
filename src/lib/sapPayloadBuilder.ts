@@ -251,15 +251,21 @@ export async function buildSapPayload(
 
   const row = resolveTemplate(template, ctx);
 
-  // Post-process CLASSIFY block — emit one object per selected value
-  const expand = (arr: string[], key: string) =>
-    (arr.filter(Boolean).length ? arr.filter(Boolean) : [""]).map(v => ({ [key]: v }));
+  // Post-process CLASSIFY block — emit one wrapper object per selected value,
+  // empty array when nothing selected, and never leak the lowercase `classify` shape.
+  const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+    (arr || [])
+      .map((v) => (v == null ? "" : String(v).trim()))
+      .filter(Boolean)
+      .map((v) => ({ [key]: v }));
   if (row && typeof row === "object") {
-    row.CLASSIFY = row.CLASSIFY && typeof row.CLASSIFY === "object" ? row.CLASSIFY : {};
-    row.CLASSIFY.MAT_GRP_VENDOR = expand(classifyArrays.MGV, "MGV");
-    row.CLASSIFY.CAT_VENDOR = expand(classifyArrays.CATV, "CATV");
-    row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
-    row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
+    row.CLASSIFY = {
+      MAT_GRP_VENDOR:        wrap(classifyArrays.MGV,  "MGV"),
+      CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
+      LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
+      IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+    };
+    delete (row as any).classify;
     row.UPLOAD = [];
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
