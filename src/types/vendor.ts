@@ -74,6 +74,9 @@ export interface AddressDetails {
   registeredFax: string;
   registeredWebsite: string;
   registeredEmail: string;
+  registeredContact1: string;
+  registeredContact2: string;
+  registeredEmail2: string;
   
   manufacturingAddress: string;
   manufacturingAddressLine2: string;
