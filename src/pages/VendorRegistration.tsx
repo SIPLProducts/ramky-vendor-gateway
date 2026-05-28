@@ -821,7 +821,10 @@ export default function VendorRegistration() {
 
       // Defer success-screen transition until the user closes the dialog,
       // so the popup is shown before the form is replaced.
+      // Defer success-screen transition until the user closes the dialog,
+      // so the popup is shown before the form is replaced.
       setPendingPostSubmit(true);
+      setPendingPostSubmitStatus(((vendor as any)?.status as RegistrationStatus) ?? 'scm_manager_review');
       setSubmissionSuccess({
         open: true,
         inviter,
