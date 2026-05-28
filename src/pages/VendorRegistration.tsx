@@ -98,6 +98,7 @@ export default function VendorRegistration() {
     errorMessage: string | null;
   }>({ open: false, inviter: null, status: 'success', vendorIdentity: null, errorMessage: null });
   const [pendingPostSubmit, setPendingPostSubmit] = useState(false);
+  const [pendingPostSubmitStatus, setPendingPostSubmitStatus] = useState<RegistrationStatus | null>(null);
   const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [tokenError, setTokenError] = useState<string | null>(null);
@@ -820,7 +821,10 @@ export default function VendorRegistration() {
 
       // Defer success-screen transition until the user closes the dialog,
       // so the popup is shown before the form is replaced.
+      // Defer success-screen transition until the user closes the dialog,
+      // so the popup is shown before the form is replaced.
       setPendingPostSubmit(true);
+      setPendingPostSubmitStatus(((vendor as any)?.status as RegistrationStatus) ?? 'scm_manager_review');
       setSubmissionSuccess({
         open: true,
         inviter,
@@ -847,9 +851,10 @@ export default function VendorRegistration() {
     if (pendingPostSubmit) {
       setIsSubmitted(true);
       setIsEditMode(false);
-      setVendorStatusState('finance_review');
+      setVendorStatusState(pendingPostSubmitStatus ?? 'scm_manager_review');
       setShowFeedback(true);
       setPendingPostSubmit(false);
+      setPendingPostSubmitStatus(null);
     }
   };
 
