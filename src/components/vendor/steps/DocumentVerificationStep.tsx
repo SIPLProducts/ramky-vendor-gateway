@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil, PlusCircle, Save } from "lucide-react";
+import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,8 +105,6 @@ interface DocumentVerificationStepProps {
   onComplete: (data: VerifiedDocumentData) => void;
   onStageChange?: (data: VerifiedDocumentData) => void;
   initialTab?: "gst" | "pan" | "msme" | "bank";
-  onSaveDraft?: () => void | Promise<void>;
-  isSavingDraft?: boolean;
 }
 
 type DocStatus = "idle" | "uploading" | "preparing" | "ocr" | "verifying" | "verified" | "failed";
@@ -186,8 +184,6 @@ export function DocumentVerificationStep({
   onComplete,
   onStageChange,
   initialTab,
-  onSaveDraft,
-  isSavingDraft,
 }: DocumentVerificationStepProps) {
   // OCR is now exclusively driven by the admin-configured providers in
   // "KYC & Validation API Settings" (see kyc-api-execute edge function).
