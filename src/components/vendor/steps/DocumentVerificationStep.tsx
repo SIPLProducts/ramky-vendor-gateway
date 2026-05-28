@@ -2020,11 +2020,8 @@ export function DocumentVerificationStep({
                 />
               )}
             </StageShell>
-            <div className="mt-4 flex justify-end">
-              <Button type="button" onClick={() => setActiveTab("msme")} disabled={!stage2Done}>
-                Continue to MSME
-              </Button>
-            </div>
+
+
           </TabsContent>
 
           {/* ============================== MSME ============================== */}
