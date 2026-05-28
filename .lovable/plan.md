@@ -1,42 +1,73 @@
-# Per-tab Continue buttons on Document Verification
+## Goal
 
-## Problem
+Ensure every SAP Business Partner request sends the `CLASSIFY` block in the exact shape SAP expects:
 
-Currently the bottom **Continue** button only enables when **all four** stages (GST + PAN + MSME + Bank) are verified. You want each tab to have its own Continue button that:
+```json
+"CLASSIFY": {
+  "MAT_GRP_VENDOR":        [{ "MGV":  "..." }, ...],
+  "CAT_VENDOR":            [{ "CATV": "..." }, ...],
+  "LOCATION_VENDOR":       [{ "LOCV": "..." }, ...],
+  "IDENTIFICATION_SOURCE": [{ "IDS":  "..." }, ...]
+}
+```
 
-- Is **disabled** until that tab's verification succeeds
-- **Enables** as soon as that tab is verified
-- **Advances** to the next tab (GST → PAN → MSME → Bank → Step 2)
+…with one wrapper object per selected value, and no stray lowercase `classify` key in the outgoing row.
 
-## Changes
+## Where the bug is
 
-### `src/components/vendor/steps/DocumentVerificationStep.tsx`
+Three places produce or forward the SAP row. Today they don't all guarantee the SAP-shaped `CLASSIFY`:
 
-Re-introduce four per-tab Continue buttons inside each `TabsContent`, placed at the bottom-right of the tab body (above the outer sticky bar):
+1. **`src/lib/sapPayloadBuilder.ts`** (client-side builder used by single + bulk SAP Sync) — already has a post-process at lines 254–262, but:
+   - emits `[{ MGV: "" }]` when nothing is selected (should emit `[]`),
+   - never removes the lowercase `classify` key if a custom template happens to include it,
+   - the value isn't trimmed / coerced to string.
+2. **`supabase/functions/sync-vendor-to-sap/index.ts`** legacy branch (lines 378–392) — same issues; also when the client passes a fully-resolved `sapPayload` (lines 289–298) the function uses it as-is and never re-normalizes `CLASSIFY`, so an older client or a hand-edited payload can slip through with the wrong shape.
+3. **`supabase/functions/sync-vendors-to-sap-bulk/index.ts`** (lines 59–72) — forwards each client row unchanged; needs the same final normalization so bulk sync can't send the wrong shape either.
 
-| Tab | Button label | Enabled when | On click |
-|------|--------------|--------------|----------|
-| GST | `Continue to PAN` | `stage1Done` | `setActiveTab('pan')` |
-| PAN | `Continue to MSME` | `stage2Done` | `setActiveTab('msme')` |
-| MSME | `Continue to Bank` | `stage3Done` | `setActiveTab('bank')` |
-| Bank | `Continue` | `stage4Done` | `handleContinue()` (advances to Step 2) |
+## Fix
 
-Each button uses the existing `stageXDone` flags already computed at lines 1496–1509, so no new validation logic is needed.
+Introduce one shared normalization step (inline helper, no new file) and run it in all three places just before the row is sent to SAP / the middleware.
 
-### Outer sticky `Continue` button
+```ts
+// Pseudocode — applied to every outgoing row
+const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+  (arr || [])
+    .map(v => (v == null ? "" : String(v).trim()))
+    .filter(Boolean)
+    .map(v => ({ [key]: v }));
 
-Keep the existing bottom **Continue** (gated by `allDone`) as a safety net so the user can also jump straight to Step 2 once everything is green. Update the helper banner from "Complete each stage in order: GST → PAN → MSME → Bank" to a shorter "Verify each stage to continue".
+row.CLASSIFY = {
+  MAT_GRP_VENDOR:        wrap(mgv,  "MGV"),
+  CAT_VENDOR:            wrap(catv, "CATV"),
+  LOCATION_VENDOR:       wrap(locv, "LOCV"),
+  IDENTIFICATION_SOURCE: wrap(ids,  "IDS"),
+};
+delete row.classify; // never leak the lowercase input shape
+```
 
-### Other steps (Organization, Address, Contact, Financial)
+Source arrays (`mgv`, `catv`, `locv`, `ids`) come from the existing `classifyArrays` resolution chain — overrides → vendor columns (`material_group_vendors`, `vendor_categories`, `vendor_locations`, `identification_sources`) → legacy single-value columns → `product_categories` / `registered_state` fallback. That logic already exists; only the final emission changes.
 
-These steps already use the outer **Continue** in `StickyActionBar`, gated by their own form validity (`useFormCompleteness` / step schemas). The user asked for "the same flow" — which is already in place: Continue is disabled until the step's required fields are valid. No code change needed there unless you want per-section gating inside those steps too (let me know if so).
+### Edits
 
-## Out of scope
+1. **`src/lib/sapPayloadBuilder.ts`**
+   - Replace the current `expand` helper + assignments at lines 254–262 with the `wrap`-based block above.
+   - Add `delete row.classify;` after the CLASSIFY assignment.
 
-- No changes to verification API calls, OCR, RLS, or autosave logic.
-- No DB migrations.
-- No new buttons on Organization/Address/Contact/Financial steps — their existing Continue gating already matches the requested pattern.
+2. **`supabase/functions/sync-vendor-to-sap/index.ts`**
+   - Same replacement at lines 378–392 (legacy branch).
+   - In the client-supplied-payload branch (lines 289–298), re-derive `classifyArrays` from `overrides.classify` + the loaded `vendor` row and run the same `wrap` normalization on `row.CLASSIFY`, then `delete row.classify`. This makes the edge function the single source of truth regardless of what the client sent.
 
-## Files touched
+3. **`supabase/functions/sync-vendors-to-sap-bulk/index.ts`**
+   - Inside the `sapPayload.map(...)` at lines 59–72, after spreading `...row`, apply the same `wrap`-based `CLASSIFY` rebuild using the matched `vendor` (and `overrides?.classify` if forwarded) and `delete row.classify`.
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — add 4 per-tab Continue buttons + tweak helper banner copy.
+### Out of scope
+
+- No changes to `SapFieldsDialog`, `MultipleSapSyncDialog`, vendor columns, migrations, or the `sap_payload_templates` rows. The on-the-wire shape is fixed in the builder + edge functions only; templates can keep the existing `{{classify.MGV|upper}}` placeholders because the post-process overwrites `CLASSIFY` unconditionally.
+- No UI changes on the SAP Sync screen.
+
+## Verification
+
+- Open SAP Sync → select a vendor with multiple MGV / CATV / LOCV / IDS values → click Sync → check the browser Network tab for the `sync-vendor-to-sap` request body: `sapPayload[0].CLASSIFY` must have all four uppercase keys, each as an array of `{ KEY: value }` objects, and there must be no lowercase `classify` key on the row.
+- Repeat with a vendor that has zero classification values selected → each of the four arrays must be `[]` (not `[{ MGV: "" }]`).
+- Run a bulk sync with 2+ vendors and confirm each row in the outgoing array has the same correctly shaped `CLASSIFY`.
+- Confirm SAP middleware response is `MSGTYP: "S"` and the values appear on the BP in SAP.

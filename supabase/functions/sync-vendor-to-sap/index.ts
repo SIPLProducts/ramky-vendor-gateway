@@ -287,9 +287,42 @@ serve(async (req) => {
     let row: any;
 
     if (Array.isArray(clientPayload) && clientPayload.length > 0 && typeof clientPayload[0] === "object") {
-      // Client supplied a fully-resolved SAP payload — use it as-is.
+      // Client supplied a fully-resolved SAP payload — use it but re-normalize CLASSIFY
+      // so the on-the-wire shape is always { MAT_GRP_VENDOR: [{MGV: v}], ... }.
       payload = clientPayload;
       row = clientPayload[0];
+
+      const toArr = (v: any): string[] =>
+        Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
+      const ovClassify = (overrides && overrides.classify) || {};
+      const classifyArrays = {
+        MGV: toArr(ovClassify.MGV).length ? toArr(ovClassify.MGV)
+          : (toArr(vendor.material_group_vendors).length ? toArr(vendor.material_group_vendors)
+          : (toArr(vendor.material_group_vendor).length ? toArr(vendor.material_group_vendor)
+          : toArr(vendor.product_categories))),
+        CATV: toArr(ovClassify.CATV).length ? toArr(ovClassify.CATV)
+          : (toArr(vendor.vendor_categories).length ? toArr(vendor.vendor_categories)
+          : toArr(vendor.vendor_category || vendor.organization_type || vendor.entity_type)),
+        LOCV: toArr(ovClassify.LOCV).length ? toArr(ovClassify.LOCV)
+          : (toArr(vendor.vendor_locations).length ? toArr(vendor.vendor_locations)
+          : toArr(vendor.vendor_location || vendor.registered_state)),
+        IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
+          : (toArr(vendor.identification_sources).length ? toArr(vendor.identification_sources)
+          : toArr(vendor.identification_source)),
+      };
+      const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+        (arr || [])
+          .map((v) => (v == null ? "" : String(v).trim()))
+          .filter(Boolean)
+          .map((v) => ({ [key]: v }));
+      row.CLASSIFY = {
+        MAT_GRP_VENDOR:        wrap(classifyArrays.MGV,  "MGV"),
+        CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
+        LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
+        IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+      };
+      delete (row as any).classify;
+
       row.UPLOAD = [];
       row.idtype = "SOLMN1";
       row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
@@ -375,15 +408,21 @@ serve(async (req) => {
 
       row = resolveTemplate(template, ctx);
 
-      // Post-process CLASSIFY block — emit one object per selected value
-      const expand = (arr: string[], key: string) =>
-        (arr.filter(Boolean).length ? arr.filter(Boolean) : [""]).map((v) => ({ [key]: v }));
+      // Post-process CLASSIFY — one wrapper object per value, [] when empty,
+      // and strip any lowercase `classify` key from the outgoing row.
+      const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+        (arr || [])
+          .map((v) => (v == null ? "" : String(v).trim()))
+          .filter(Boolean)
+          .map((v) => ({ [key]: v }));
       if (row && typeof row === "object") {
-        row.CLASSIFY = row.CLASSIFY && typeof row.CLASSIFY === "object" ? row.CLASSIFY : {};
-        row.CLASSIFY.MAT_GRP_VENDOR = expand(classifyArrays.MGV, "MGV");
-        row.CLASSIFY.CAT_VENDOR = expand(classifyArrays.CATV, "CATV");
-        row.CLASSIFY.LOCATION_VENDOR = expand(classifyArrays.LOCV, "LOCV");
-        row.CLASSIFY.IDENTIFICATION_SOURCE = expand(classifyArrays.IDS, "IDS");
+        row.CLASSIFY = {
+          MAT_GRP_VENDOR:        wrap(classifyArrays.MGV,  "MGV"),
+          CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
+          LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
+          IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+        };
+        delete (row as any).classify;
         row.UPLOAD = [];
         row.idtype = "SOLMN1";
         row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
