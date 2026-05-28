@@ -1,20 +1,25 @@
-# Reset Classification on SAP Sync popup open
-
 ## Problem
-When opening the SAP Sync popup (`SapFieldsDialog`), the Classification fields (Material Group, Category, Location, Identification Source) are pre-populated from vendor data (`material_group_vendors`, `vendor_categories`, `product_categories`, etc.). User wants these to always start empty so values must be selected manually each time, and only the freshly selected ones are sent to SAP.
 
-## Change
-File: `src/components/sap/SapFieldsDialog.tsx`
+After submitting the vendor registration form, the success screen shows "Finance Review in Progress" with the Finance 1 stage active. After a manual reload it correctly shows "Application Submitted Successfully" with the SCM Manager Approval stage active. The post-submit UI does not match the actual saved state.
 
-In `buildDefaults()` (lines 309–324), replace the entire `classify` initializer with empty arrays:
+## Root cause
+
+In `src/pages/VendorRegistration.tsx`, `handleSubmissionDialogClose` hardcodes the status after closing the success dialog:
 
 ```ts
-classify: { MGV: [], CATV: [], LOCV: [], IDS: [] },
+setVendorStatusState('finance_review');
 ```
 
-Remove the vendor-derived `toArr` / `cats` / `mgv` / `catv` / `locv` / `ids` logic — no longer needed for defaults.
+However, `submitVendorMutation` in `src/hooks/useVendorRegistration.tsx` actually writes `status: 'scm_manager_review'` to the database (line 785). On reload, `vendorStatusState` is repopulated from the DB and renders correctly — hence the discrepancy between the two screenshots.
 
-## Notes
-- `MultipleSapSyncDialog` already initializes with empty arrays — no change there.
-- Save/submit flow already sends only `form.classify` values, so once defaults are empty, only manually selected values reach SAP.
-- No backend / payload-builder changes needed.
+## Fix
+
+1. In `src/pages/VendorRegistration.tsx` `handleSubmit`, capture the real status returned from `submitVendor` / `resubmitVendor` (the mutation returns the updated vendor row) and stash it alongside the existing `pendingPostSubmit` flag (e.g. add a `pendingStatus` state).
+2. In `handleSubmissionDialogClose`, call `setVendorStatusState(pendingStatus ?? <fallback>)` instead of the hardcoded `'finance_review'`. Use `'scm_manager_review'` as the fallback only if the returned row is missing a status.
+3. As a safety net, also invalidate / refetch the vendor query in `useVendorRegistration` after submission so any other consumers (and the realtime channel) see the latest row immediately. The existing realtime subscription on `vendors` already updates `vendorStatusState`, so this mainly removes the dependency on the hardcoded value.
+
+No backend/schema changes. No changes to the submit mutation logic itself — only fixing the UI state transition so it reflects the truth the backend already wrote.
+
+## Files to change
+
+- `src/pages/VendorRegistration.tsx` — capture & apply real returned status in `handleSubmit` / `handleSubmissionDialogClose`.
