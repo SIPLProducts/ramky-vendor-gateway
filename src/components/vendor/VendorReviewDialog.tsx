@@ -663,46 +663,33 @@ export function VendorReviewDialog({
                       </div>
                     </div>
 
-                    <div>
-                      <h4 className="font-semibold mb-3 text-primary">Recent Returns Filed</h4>
-                      {gstReport.filingRows.length === 0 ? (
-                        <p className="text-sm text-muted-foreground border rounded-md p-4">
-                          {filingFetching
-                            ? 'Fetching latest filing status from GSTN…'
-                            : filingFetched
-                              ? 'No filing data returned by GSTN for this GSTIN.'
-                              : 'No filing data captured for this vendor.'}
-                        </p>
-                      ) : (
-                        <div className="border rounded-md">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Financial Year</TableHead>
-                                <TableHead>Tax Period</TableHead>
-                                <TableHead>Date of filing</TableHead>
-                                <TableHead>Status</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {gstReport.filingRows.map((r, idx) => {
-                                const filed = r.status.toLowerCase() === 'filed';
-                                return (
-                                  <TableRow key={idx}>
-                                    <TableCell>{r.financial_year}</TableCell>
-                                    <TableCell>{r.tax_period}</TableCell>
-                                    <TableCell>{r.date_of_filing}</TableCell>
-                                    <TableCell className={filed ? '' : 'text-destructive font-medium'}>
-                                      {r.status}
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                    {(() => {
+                      const rawRows: FilingStatusRow[] = (() => {
+                        const persisted = normalizeFilingStatus(gstValidation?.details?.filing_status);
+                        if (persisted.length > 0) return persisted;
+                        return liveFilingRows || [];
+                      })();
+                      if (!vendor?.gstin && rawRows.length === 0) return null;
+                      return (
+                        <div className="rounded-lg border bg-card p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-primary" />
+                            <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
+                          </div>
+                          {rawRows.length > 0 ? (
+                            <GstFilingStatusTable rows={rawRows} limit={3} />
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {filingFetching
+                                ? 'Fetching latest filing status from GSTN…'
+                                : filingFetched
+                                  ? 'No filing data returned by GSTN for this GSTIN.'
+                                  : 'No filing data captured for this vendor.'}
+                            </p>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
 
 
                     <Separator />
