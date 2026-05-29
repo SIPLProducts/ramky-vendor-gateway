@@ -1,51 +1,55 @@
-## Goal
+# Show the GST Filing Status card in Approvals → View
 
-In the Vendor Registration Form → Address tab → Address Details (registered address) section, add four new fields:
+## Problem
 
-- Contact 1 (mandatory)
-- Contact 2 (optional)
-- Email 1 (mandatory) — rename the existing "Email ID" field to "Email 1"
-- Email 2 (optional)
+In the Vendor Registration → GST tab, when **GST = Yes**, the vendor sees a "GST Filing Status (Last 3 Months)" card with a 4-column table (Financial Year / Tax Period / Date of filing / Status) rendered by the shared `GstFilingStatusTable` component (see screenshot).
 
-## Changes
+In **Approvals → View** (the `VendorReviewDialog` used by every stage view), the "GST Compliance Report" tab today renders its own ad-hoc "Recent Returns Filed" table, which does not visually match the registration card and — per the user report — is not appearing reliably for GST-registered vendors.
 
-### 1. Database (`supabase/functions`/migrations)
-Add four columns on `public.vendors`:
-- `registered_contact_1 text`
-- `registered_contact_2 text`
-- `registered_email_2 text`
+We want the **exact same card and table from registration** to appear in the Approvals → View dialog, populated from the GST verification response.
 
-(Reuse existing `registered_email` as Email 1; no rename needed at the DB level.)
+## Fix
 
-### 2. Types (`src/types/vendor.ts`)
-Extend `AddressDetails` with:
-- `registeredContact1: string`
-- `registeredContact2: string`
-- `registeredEmail2: string`
+Edit `src/components/vendor/VendorReviewDialog.tsx` only.
 
-(`registeredEmail` continues to represent Email 1.)
+1. Import the reusable component already used by registration:
+   ```ts
+   import { GstFilingStatusTable } from '@/components/vendor/kyc/GstFilingStatusTable';
+   ```
+   (`normalizeFilingStatus` / `FilingStatusRow` are already imported.)
 
-### 3. Form UI (`src/components/vendor/steps/AddressStep.tsx`)
-- Rename label "Email ID *" → "Email 1 *".
-- Add inputs for Contact 1 *, Contact 2, Email 2 in the Address Details grid (10-digit phone style for contacts, email validation for Email 2).
-- Zod schema:
-  - `registeredContact1`: required 10-digit phone
-  - `registeredContact2`: optional 10-digit phone
-  - `registeredEmail` (Email 1): keep required + email
-  - `registeredEmail2`: optional, valid email when provided
+2. In the `gst_compliance` `TabsContent` (currently lines ~608–746), replace the existing "Recent Returns Filed" block (the `<div>` containing the inline `<Table>` of filing rows, lines ~666–705) with a card that mirrors the registration UI:
 
-### 4. Form state defaults / load / persist (`src/hooks/useVendorRegistration.tsx`)
-- Add the three new fields to the empty form initializer and to the `loadVendor` mapper.
-- Include them in the autosave/submit payload mapping to the new DB columns.
+   ```tsx
+   {(vendor?.gstin || filingRows.length > 0) && (
+     <div className="rounded-lg border bg-card p-4 space-y-3">
+       <div className="flex items-center gap-2">
+         <Shield className="h-4 w-4 text-primary" />
+         <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
+       </div>
+       {filingRows.length > 0 ? (
+         <GstFilingStatusTable rows={filingRows} limit={3} />
+       ) : (
+         <p className="text-xs text-muted-foreground">
+           {filingFetching
+             ? 'Fetching latest filing status from GSTN…'
+             : filingFetched
+               ? 'No filing data returned by GSTN for this GSTIN.'
+               : 'No filing data captured for this vendor.'}
+         </p>
+       )}
+     </div>
+   )}
+   ```
 
-### 5. SAP payload (`src/lib/sapPayloadBuilder.ts` + edge functions `sync-vendor-to-sap`, `sync-vendors-to-sap-bulk`)
-- Expose the new fields as template variables (e.g. `vendor.registered_contact_1`, `vendor.registered_contact_2`, `vendor.registered_email_2`) so admins can map them in SAP payload templates.
-- Keep existing `registered_phone` / `primary_email` mappings untouched to avoid breaking current SAP sync; new fields are additive.
+   `filingRows` is derived from the same source the inline table uses today: persisted `vendor_validations.details.filing_status` (set during GST verification at registration) with a live `GST_FILING` provider fallback (already implemented in the `useEffect` at lines 301–342). We pass raw `FilingStatusRow[]` to `GstFilingStatusTable` so its own dedupe/sort/format logic runs — same output as registration.
 
-### 6. Review / preview surfaces
-Update `ReviewStep.tsx` and `VendorSubmissionPreviewDialog.tsx` (only the Address section) to display the four fields with the new labels.
+3. Keep everything else in the tab unchanged: the 3 summary cards (Compliance Score / GST Status / Risk Level), the 4-field grid (GSTIN / Registration Date / Filing Status / Last Filed Return), and the Compliance Document section all stay.
 
-## Out of scope
-- No changes to manufacturing / branch contact blocks.
-- No changes to ContactStep (CEO/Marketing/etc.).
-- No changes to validation orchestrator or KYC flows.
+4. No changes to data flow, schema, types, edge functions, registration code, or other components. The table renders in **View mode** because the dialog is read-only and the data source (persisted validation + live fetch) already runs whenever the dialog opens for a vendor with a GSTIN.
+
+## Why this works
+
+- Same component (`GstFilingStatusTable`) → identical look & feel to the registration screenshot.
+- Same data source (`vendor_validations` GST entry + `GST_FILING` live fallback) that the registration flow writes after the user uploads/verifies the GST certificate, so no extra plumbing is needed.
+- Gated on `vendor.gstin` so non-GST (international / unregistered) vendors don't see an empty card.
