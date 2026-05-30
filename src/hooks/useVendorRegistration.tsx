@@ -654,10 +654,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Create or update vendor
   const saveVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || null;
+      // Use getSession so we can detect/refresh expired sessions before insert.
+      // If we attempted insert/update with user_id = null, Postgres RLS denies
+      // with the misleading "new row violates row-level security policy" error.
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const refreshed = await supabase.auth.refreshSession();
+        session = refreshed.data.session ?? null;
+      }
+      if (!session?.user?.id) {
+        const err: Error & { code?: string } = new Error('Your session has expired. Please sign in again to continue.');
+        err.code = 'AUTH_REQUIRED';
+        throw err;
+      }
+      const userId = session.user.id;
 
       const baseRecord = formDataToVendorRecord(formData, userId);
+
 
       // International overrides: map intl fields onto domestic NOT NULL columns
       // so existing CHECK/NOT NULL constraints stay green. Source-of-truth for
