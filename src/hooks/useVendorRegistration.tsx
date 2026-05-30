@@ -831,6 +831,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         }
         return;
       }
+      // FK violation on user_id means the cached session points to a deleted/recreated
+      // auth user. Same remediation as session expiry — sign in fresh via the invitation.
+      const isUserFk = code === '23503' || /vendors_user_id_fkey/i.test(msg) || /violates foreign key constraint/i.test(msg);
+      if (isUserFk) {
+        toast({
+          title: 'Session out of sync',
+          description: 'Your login session is invalid. Please reopen the invitation link and sign in again.',
+          variant: 'destructive',
+        });
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
       // RLS errors during background autosave shouldn't blast a red toast at the
       // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
       const isRls = code === '42501' || /row-level security/i.test(msg);
