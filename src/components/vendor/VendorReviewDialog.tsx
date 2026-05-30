@@ -236,8 +236,10 @@ export function VendorReviewDialog({
         const d = row?.details || {};
         return d.filing_status
           ?? d?.data?.filing_status
+          ?? d?.raw?.filing_status
           ?? d?.raw?.data?.filing_status
           ?? d?.response?.filing_status
+          ?? d?.response?.data?.filing_status
           ?? null;
       };
       const rowsArr = (gstRows as any[]) || [];
