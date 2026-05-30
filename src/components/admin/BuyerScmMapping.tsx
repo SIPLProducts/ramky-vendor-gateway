@@ -40,41 +40,65 @@ export function BuyerScmMapping({ tenantId }: Props) {
   const [includeScm, setIncludeScm] = useState(true);
 
 
+  const fetchAll = async <T,>(
+    build: (from: number, to: number) => any,
+    pageSize = 1000,
+  ): Promise<T[]> => {
+    const all: T[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await build(from, from + pageSize - 1);
+      if (error) throw error;
+      const rows = (data ?? []) as T[];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [rolesRes, profilesRes, userTenantsRes, mappingsRes] = await Promise.all([
+      const [rolesRes, profilesRes, userTenantsData, mappingsRes] = await Promise.all([
         supabase.from('custom_roles').select('id,name').in('name', [SCM_ROLE, BUYER_ROLE]),
         supabase.from('profiles').select('id, full_name, email'),
-        supabase.from('user_tenants').select('user_id, tenant_id'),
+        tenantId
+          ? fetchAll<{ user_id: string; tenant_id: string }>((from, to) =>
+              supabase.from('user_tenants').select('user_id, tenant_id').eq('tenant_id', tenantId).range(from, to),
+            )
+          : fetchAll<{ user_id: string; tenant_id: string }>((from, to) =>
+              supabase.from('user_tenants').select('user_id, tenant_id').range(from, to),
+            ),
         tenantId
           ? supabase.from('buyer_scm_mappings').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })
           : supabase.from('buyer_scm_mappings').select('*').order('created_at', { ascending: false }),
       ]);
       if (rolesRes.error) throw rolesRes.error;
       if (profilesRes.error) throw profilesRes.error;
-      if (userTenantsRes.error) throw userTenantsRes.error;
       if (mappingsRes.error) throw mappingsRes.error;
 
       const scmRoleId = rolesRes.data?.find((r) => r.name === SCM_ROLE)?.id;
       const buyerRoleId = rolesRes.data?.find((r) => r.name === BUYER_ROLE)?.id;
 
-      const ucrRes = await supabase
-        .from('user_custom_roles')
-        .select('user_id, custom_role_id')
-        .in('custom_role_id', [scmRoleId, buyerRoleId].filter(Boolean) as string[]);
-      if (ucrRes.error) throw ucrRes.error;
+      const ucrData = await fetchAll<{ user_id: string; custom_role_id: string }>((from, to) =>
+        supabase
+          .from('user_custom_roles')
+          .select('user_id, custom_role_id')
+          .in('custom_role_id', [scmRoleId, buyerRoleId].filter(Boolean) as string[])
+          .range(from, to),
+      );
 
       const profileMap = new Map<string, UserOpt>(
         (profilesRes.data ?? []).map((p) => [p.id, p as UserOpt])
       );
       const tenantUserSet = tenantId
-        ? new Set((userTenantsRes.data ?? []).filter((ut) => ut.tenant_id === tenantId).map((ut) => ut.user_id))
+        ? new Set(userTenantsData.map((ut) => ut.user_id))
         : null;
 
       const scmIds = new Set<string>();
       const buyerIds = new Set<string>();
-      (ucrRes.data ?? []).forEach((r) => {
+      ucrData.forEach((r) => {
         if (r.custom_role_id === scmRoleId) scmIds.add(r.user_id);
         if (r.custom_role_id === buyerRoleId) buyerIds.add(r.user_id);
       });
