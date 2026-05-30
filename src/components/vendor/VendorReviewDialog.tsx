@@ -236,8 +236,10 @@ export function VendorReviewDialog({
         const d = row?.details || {};
         return d.filing_status
           ?? d?.data?.filing_status
+          ?? d?.raw?.filing_status
           ?? d?.raw?.data?.filing_status
           ?? d?.response?.filing_status
+          ?? d?.response?.data?.filing_status
           ?? null;
       };
       const rowsArr = (gstRows as any[]) || [];
@@ -331,13 +333,29 @@ export function VendorReviewDialog({
     (async () => {
       try {
         const gstin = String(vendor.gstin).toUpperCase().trim();
-        const r = await callProvider({
-          providerName: 'GST_FILING',
-          input: { gstin, id_number: gstin },
-        });
-        const rows = (r.found && r.ok && r.data)
-          ? normalizeFilingStatus(r.data.filing_status)
-          : [];
+        const tryProvider = async (providerName: string) => {
+          const r = await callProvider({
+            providerName,
+            input: { gstin, id_number: gstin },
+          });
+          if (!r.found || !r.ok) return [] as FilingStatusRow[];
+          const candidates = [
+            r.data?.filing_status,
+            r.raw?.data?.filing_status,
+            r.raw?.filing_status,
+          ];
+          for (const c of candidates) {
+            const n = normalizeFilingStatus(c);
+            if (n.length > 0) return n;
+          }
+          return [] as FilingStatusRow[];
+        };
+        // Try the dedicated filing provider first; fall back to GSTIN advanced
+        // (which also returns filing_status when `filing_status_get: true`).
+        let rows = await tryProvider('GST_FILING');
+        if (rows.length === 0) {
+          rows = await tryProvider('GST');
+        }
         if (cancelled) return;
         setLiveFilingRows(rows);
         setFilingFetched(true);
