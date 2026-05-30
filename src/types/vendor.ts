@@ -158,6 +158,11 @@ export interface StatutoryDetails {
   gstBusinessNature: string[];
   gstJurisdictionCentre: string;
   gstJurisdictionState: string;
+  // GST filing-status response captured during Step 1 verification.
+  // Persisted into vendor_validations on save so the Approval View can render
+  // the same table the vendor saw during registration.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  gstFilingStatus?: any[];
   // MSME registration flag + conditional fields
   isMsmeRegistered: boolean;
   msmeNumber: string;
