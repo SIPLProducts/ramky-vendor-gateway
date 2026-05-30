@@ -966,13 +966,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     onSuccess: () => {
       // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      if (error?.code === 'AUTH_REQUIRED') {
+        toast({
+          title: 'Session expired',
+          description: 'Please sign in again to submit your registration.',
+          variant: 'destructive',
+        });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
       toast({
         title: 'Submission Failed',
         description: error.message,
         variant: 'destructive',
       });
     },
+
   });
 
   // Resubmit vendor after editing
