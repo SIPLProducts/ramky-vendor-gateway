@@ -654,20 +654,27 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Create or update vendor
   const saveVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
-      // Use getSession so we can detect/refresh expired sessions before insert.
-      // If we attempted insert/update with user_id = null, Postgres RLS denies
-      // with the misleading "new row violates row-level security policy" error.
+      // Resolve the auth user with server-side validation. getSession() only
+      // returns the locally cached JWT — if that JWT's `sub` points to a user
+      // that was deleted/recreated server-side, inserting with it will violate
+      // the vendors_user_id_fkey foreign key. getUser() re-validates against
+      // the auth server and returns the live user id.
       let { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         const refreshed = await supabase.auth.refreshSession();
         session = refreshed.data.session ?? null;
       }
-      if (!session?.user?.id) {
+      let { data: userResp, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userResp?.user?.id) {
+        const refreshed = await supabase.auth.refreshSession();
+        userResp = { user: refreshed.data.user } as typeof userResp;
+      }
+      const userId = userResp?.user?.id || null;
+      if (!userId) {
         const err: Error & { code?: string } = new Error('Your session has expired. Please sign in again to continue.');
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
-      const userId = session.user.id;
 
       const baseRecord = formDataToVendorRecord(formData, userId);
 
