@@ -153,8 +153,9 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
                       stepStatus === 'failed' && "text-destructive"
                     )}>{step.label}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 hidden md:block">
-                      {stepStatus === 'active' ? 'In Progress' : step.description}
+                      {stepStatus === 'active' ? 'In Progress' : stepStatus === 'completed' ? 'Completed' : stepStatus === 'failed' ? 'Action required' : step.description}
                     </p>
+
                   </div>
                 </div>
               );
