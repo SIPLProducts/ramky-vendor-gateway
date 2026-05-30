@@ -258,31 +258,40 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
 
         <div className="grid gap-5">
           <div className="grid gap-1.5">
-            <Label>Buyer Company *</Label>
+            <Label htmlFor="buyerCompanyDisplay">Buyer Company *</Label>
             <Controller
               name="buyerCompanyId"
               control={control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value} disabled>
-                  <SelectTrigger className={errors.buyerCompanyId ? 'border-destructive' : ''}>
-                    {isLoadingCompanies ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Loading companies...</span>
-                      </div>
-                    ) : (
-                      <SelectValue placeholder="Select buyer company" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {buyerCompanies?.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name} ({company.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              render={({ field }) => {
+                const company = buyerCompanies?.find((c) => c.id === field.value);
+                const display = company
+                  ? `${company.name} (${company.code})`
+                  : '';
+                const showLoading = isLoadingCompanies && field.value && !company;
+                return (
+                  <>
+                    <input type="hidden" value={field.value || ''} readOnly />
+                    <div
+                      id="buyerCompanyDisplay"
+                      className={
+                        'flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm ' +
+                        (errors.buyerCompanyId ? 'border-destructive' : 'border-input')
+                      }
+                    >
+                      {showLoading ? (
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading company…
+                        </span>
+                      ) : display ? (
+                        <span className="font-medium text-foreground">{display}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Not assigned</span>
+                      )}
+                    </div>
+                  </>
+                );
+              }}
             />
             <p className="text-xs text-muted-foreground">Assigned by buyer — cannot be changed.</p>
             {errors.buyerCompanyId && (
