@@ -283,11 +283,15 @@ export default function VendorRegistration() {
         setIsTokenMode(true);
         setIsValidatingToken(false);
 
-        // Token is valid - enable token mode
-        setInvitationToken(token);
-        setInvitationEmail(invitation.email);
-        setIsTokenMode(true);
-        setIsValidatingToken(false);
+        // Seed Buyer Company id from the invitation immediately so Step 1 shows
+        // the assigned company and the first autosave persists tenant_id.
+        if (invitation.tenant_id) {
+          setFormData((prev) =>
+            prev.organization.buyerCompanyId === invitation.tenant_id
+              ? prev
+              : { ...prev, organization: { ...prev.organization, buyerCompanyId: invitation.tenant_id as string } },
+          );
+        }
       } catch (err) {
         console.error('Token validation error:', err);
         setTokenError('Failed to validate invitation. Please try again.');
