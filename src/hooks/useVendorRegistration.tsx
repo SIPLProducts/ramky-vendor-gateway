@@ -654,20 +654,27 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Create or update vendor
   const saveVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
-      // Use getSession so we can detect/refresh expired sessions before insert.
-      // If we attempted insert/update with user_id = null, Postgres RLS denies
-      // with the misleading "new row violates row-level security policy" error.
+      // Resolve the auth user with server-side validation. getSession() only
+      // returns the locally cached JWT — if that JWT's `sub` points to a user
+      // that was deleted/recreated server-side, inserting with it will violate
+      // the vendors_user_id_fkey foreign key. getUser() re-validates against
+      // the auth server and returns the live user id.
       let { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         const refreshed = await supabase.auth.refreshSession();
         session = refreshed.data.session ?? null;
       }
-      if (!session?.user?.id) {
+      let { data: userResp, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userResp?.user?.id) {
+        const refreshed = await supabase.auth.refreshSession();
+        userResp = { user: refreshed.data.user } as typeof userResp;
+      }
+      const userId = userResp?.user?.id || null;
+      if (!userId) {
         const err: Error & { code?: string } = new Error('Your session has expired. Please sign in again to continue.');
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
-      const userId = session.user.id;
 
       const baseRecord = formDataToVendorRecord(formData, userId);
 
@@ -809,7 +816,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       return savedVendor;
     },
 
-    onError: (error: any) => {
+    onError: async (error: any) => {
       const code = error?.code || '';
       const msg = String(error?.message || '');
       if (code === 'AUTH_REQUIRED') {
@@ -818,6 +825,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           description: 'Please sign in again to continue your registration.',
           variant: 'destructive',
         });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
+      // FK violation on user_id means the cached session points to a deleted/recreated
+      // auth user. Same remediation as session expiry — sign in fresh via the invitation.
+      const isUserFk = code === '23503' || /vendors_user_id_fkey/i.test(msg) || /violates foreign key constraint/i.test(msg);
+      if (isUserFk) {
+        toast({
+          title: 'Session out of sync',
+          description: 'Your login session is invalid. Please reopen the invitation link and sign in again.',
+          variant: 'destructive',
+        });
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
         const token = options?.invitationToken;
         if (typeof window !== 'undefined') {
           window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
@@ -966,13 +989,29 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     onSuccess: () => {
       // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
     },
-    onError: (error: any) => {
-      if (error?.code === 'AUTH_REQUIRED') {
+    onError: async (error: any) => {
+      const code = error?.code || '';
+      const msg = String(error?.message || '');
+      if (code === 'AUTH_REQUIRED') {
         toast({
           title: 'Session expired',
           description: 'Please sign in again to submit your registration.',
           variant: 'destructive',
         });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
+      const isUserFk = code === '23503' || /vendors_user_id_fkey/i.test(msg) || /violates foreign key constraint/i.test(msg);
+      if (isUserFk) {
+        toast({
+          title: 'Session out of sync',
+          description: 'Your login session is invalid. Please reopen the invitation link and sign in again.',
+          variant: 'destructive',
+        });
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
         const token = options?.invitationToken;
         if (typeof window !== 'undefined') {
           window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
