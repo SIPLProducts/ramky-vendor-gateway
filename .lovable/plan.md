@@ -1,33 +1,27 @@
-## Problem found
+Plan to fix the missing GST Filing Status table without hardcoding:
 
-The Approval Flow View opens `VendorReviewDialog`, which currently tries to read GST filing rows only from `vendor_validations.details.filing_status` or by making a live `GST_FILING` call.
+1. Confirmed current issue
+- The Approval View is querying `vendor_validations` for the selected vendor and GST type.
+- The live network response for vendor `16e6ca63-7996-4856-ae4f-1b21c829b4ab` returned an empty array.
+- A database check also shows `BADE MURALI KRISHNA / 36DPSPB7500A1Z8` has `gst_verification_status = passed`, but zero saved GST validation rows.
+- This explains why the Vendor Registration GST Upload tab can show the table from local in-screen state, while the Approval Flow view cannot reload it later.
 
-But in the live database, `vendor_validations` has no GST rows for the referenced vendor, and the configured KYC executor does not persist ad-hoc GST/GST_FILING provider responses into `vendor_validations`. That explains why the GST Upload tab can show the rows immediately from in-memory verification state, while the Approval View later has nothing reliable to bind.
+2. Persist the same dynamic GST filing response after vendor ID exists
+- Extend the Step 1 GST verification data carried into the parent form to include the normalized `filing_status` response.
+- Store this in form state as dynamic verification data, not as static mappings or hardcoded rows.
+- In `useVendorRegistration`, after `saveVendor` creates or updates the vendor and has a real vendor ID, upsert the GST `vendor_validations` row using the saved GST verification response.
+- This fixes the gap where Step 1 runs before `vendorId` exists, causing the current direct insert in the GST tab to be skipped.
 
-## Plan
+3. Stop deleting useful GST validation data during later validations
+- Ensure later submission/validation flows do not replace a GST validation row containing `filing_status` with a simpler row that lacks filing rows.
+- If a later GST response does not contain filing rows, merge it with the existing `details.filing_status` instead of removing the saved filing table data.
 
-1. **Create a shared GST filing extraction helper**
-   - Centralize the logic that can find `filing_status` in all known shapes:
-     - `details.filing_status`
-     - `details.data.filing_status`
-     - `details.raw.data.filing_status`
-     - `details.response.filing_status`
-     - direct provider response shapes if needed
-   - Reuse this in Approval View and any preview/review views instead of only checking one path.
+4. Bind Approval Flow View only to dynamic saved data
+- Update `VendorReviewDialog` to select the latest GST validation row that contains a valid `details.filing_status` array.
+- Reuse the same `normalizeFilingStatus` and `GstFilingStatusTable` component used by the Vendor Registration form.
+- Remove hardcoded fallback values such as fixed registration dates or generated last-filed months from the GST Compliance section; show values only from saved vendor fields or saved GST verification details.
 
-2. **Persist filing rows from the GST Upload verification flow**
-   - Update `GstKycTab` so when GST verification + filing check completes, the saved `vendor_validations` row always contains normalized filing rows under `details.filing_status`.
-   - Avoid deleting/replacing useful filing rows with a later GST validation that does not include filing data.
-   - Store enough GST metadata alongside the rows for the compliance summary fields.
-
-3. **Fix Approval Flow View binding**
-   - Update `VendorReviewDialog` GST Compliance tab to select all GST validation rows for the vendor, pick the most recent row that actually contains filing status data, and render the same `GstFilingStatusTable` used in the GST Upload tab.
-   - Keep the existing fallback live fetch only as a backup, but make the primary source the persisted upload/verification response.
-
-4. **Handle existing vendors already missing persisted rows**
-   - For vendors like the screenshot example where `vendor_validations` is currently empty, the Approval View fallback will still fetch GST filing status from the configured provider using the vendor GSTIN.
-   - If the provider returns rows, persist them into `vendor_validations.details.filing_status` so subsequent approvers see the table without refetching.
-
-5. **Verify the specific scenario**
-   - Check the referenced vendor `BADE MURALI KRISHNA / 36DPSPB7500A1Z8` in Approval Flow → View → GST Compliance.
-   - Confirm that when GST is registered and filing rows exist from verification or fallback fetch, the table appears with the last 3 months using the same component as GST Upload.
+5. Validation after implementation
+- Re-test the specific vendor shown in the screenshot.
+- Verify `vendor_validations` contains the GST response with `details.filing_status` after GST verification/save.
+- Verify Approval Flow → View → GST Compliance displays the table from that saved response and no longer remains stuck at “Fetching latest filing status from GSTN…”.

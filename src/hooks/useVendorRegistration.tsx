@@ -708,6 +708,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         vendorData.invitation_id = (invitation as any).id;
       }
 
+      let savedVendor: any;
       if (vendorId) {
         // Never overwrite user_id on update — the RLS policy requires
         // `user_id = auth.uid()` to match the row's existing owner. Sending a
@@ -731,8 +732,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
         // Upload documents after vendor is saved
         await uploadAllDocuments(formData, data.id);
-
-        return data;
+        savedVendor = data;
       } else {
         const { data, error } = await supabase
           .from('vendors')
@@ -745,9 +745,55 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
         // Upload documents after vendor is created
         await uploadAllDocuments(formData, data.id);
-
-        return data;
+        savedVendor = data;
       }
+
+      // Persist the GST filing-status response captured during Step 1 so the
+      // Approval View can render the same dynamic table the vendor saw during
+      // registration. Merges with any existing row so we never overwrite
+      // valuable filing rows with an empty/simpler payload.
+      try {
+        const gstin = (formData.statutory.gstin || '').trim();
+        const filingRows = formData.statutory.gstFilingStatus;
+        if (gstin && Array.isArray(filingRows) && filingRows.length > 0) {
+          const { data: existingRows } = await supabase
+            .from('vendor_validations')
+            .select('id, details')
+            .eq('vendor_id', savedVendor.id)
+            .eq('validation_type', 'gst')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const prevDetails = (existingRows?.[0] as any)?.details ?? {};
+          const mergedDetails = {
+            ...prevDetails,
+            gstin,
+            filing_status: filingRows,
+          };
+          if (existingRows && existingRows.length > 0) {
+            await supabase
+              .from('vendor_validations')
+              .update({
+                status: 'passed',
+                message: 'GST verified — filing status captured',
+                details: mergedDetails,
+                validated_at: new Date().toISOString(),
+              })
+              .eq('id', (existingRows[0] as any).id);
+          } else {
+            await supabase.from('vendor_validations').insert({
+              vendor_id: savedVendor.id,
+              validation_type: 'gst',
+              status: 'passed',
+              message: 'GST verified — filing status captured',
+              details: mergedDetails,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[saveVendor] Failed to persist GST filing status', e);
+      }
+
+      return savedVendor;
     },
 
     onError: (error: any) => {
