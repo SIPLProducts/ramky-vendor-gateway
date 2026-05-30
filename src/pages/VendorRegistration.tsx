@@ -158,6 +158,27 @@ export default function VendorRegistration() {
     }
   }, [existingVendor]);
 
+  // If the auth session is lost while the form is open, redirect back to the
+  // invite/login page so subsequent saves don't fail with confusing RLS errors.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (!session && event === 'TOKEN_REFRESHED')) {
+        toast({
+          title: 'Session expired',
+          description: 'Please sign in again to continue your registration.',
+          variant: 'destructive',
+        });
+        if (invitationToken) {
+          navigate(`/vendor/invite?token=${invitationToken}`);
+        } else {
+          navigate('/auth');
+        }
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [invitationToken, navigate, toast]);
+
+
 
   // Validate token on mount and check authentication
   useEffect(() => {
