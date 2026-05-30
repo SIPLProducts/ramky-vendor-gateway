@@ -1,28 +1,33 @@
-# Problem
+## Problem found
 
-In **User Management → Buyer ↔ SCM**, when the tenant scope is set to "Ramky Infrastructure Limited" (and some other tenants), the SCM Manager / Buyer dropdowns are empty ("No users with Buyer role…") and existing mappings show "No mappings yet", even though users with those roles are assigned to that tenant and mappings exist.
+The Approval Flow View opens `VendorReviewDialog`, which currently tries to read GST filing rows only from `vendor_validations.details.filing_status` or by making a live `GST_FILING` call.
 
-# Root cause
+But in the live database, `vendor_validations` has no GST rows for the referenced vendor, and the configured KYC executor does not persist ad-hoc GST/GST_FILING provider responses into `vendor_validations`. That explains why the GST Upload tab can show the rows immediately from in-memory verification state, while the Approval View later has nothing reliable to bind.
 
-`src/components/admin/BuyerScmMapping.tsx → loadData()` does:
+## Plan
 
-```ts
-supabase.from('user_tenants').select('user_id, tenant_id')
-```
+1. **Create a shared GST filing extraction helper**
+   - Centralize the logic that can find `filing_status` in all known shapes:
+     - `details.filing_status`
+     - `details.data.filing_status`
+     - `details.raw.data.filing_status`
+     - `details.response.filing_status`
+     - direct provider response shapes if needed
+   - Reuse this in Approval View and any preview/review views instead of only checking one path.
 
-with no `.range()` and no `.eq('tenant_id', tenantId)` filter. The `user_tenants` table currently holds **1452 rows**, but Supabase/PostgREST caps a single response at **1000 rows by default**. The first 1000 rows (in PostgREST's default order) come back; the remaining ~452 are silently dropped.
+2. **Persist filing rows from the GST Upload verification flow**
+   - Update `GstKycTab` so when GST verification + filing check completes, the saved `vendor_validations` row always contains normalized filing rows under `details.filing_status`.
+   - Avoid deleting/replacing useful filing rows with a later GST validation that does not include filing data.
+   - Store enough GST metadata alongside the rows for the compliance summary fields.
 
-The component then builds `tenantUserSet` from that truncated result and uses it to filter the role-bearing users (`filterByTenant`) shown in the SCM Manager and Buyer dropdowns. For any tenant whose `user_tenants` rows fall in the dropped window — Ramky Infrastructure Limited is one of them — `tenantUserSet` ends up empty (or partial), so the dropdowns render empty and previously-saved mappings can't be enriched with profile names either.
+3. **Fix Approval Flow View binding**
+   - Update `VendorReviewDialog` GST Compliance tab to select all GST validation rows for the vendor, pick the most recent row that actually contains filing status data, and render the same `GstFilingStatusTable` used in the GST Upload tab.
+   - Keep the existing fallback live fetch only as a backup, but make the primary source the persisted upload/verification response.
 
-This is exactly the same class of bug that was just fixed in `UserManagement.tsx`; it was missed here.
+4. **Handle existing vendors already missing persisted rows**
+   - For vendors like the screenshot example where `vendor_validations` is currently empty, the Approval View fallback will still fetch GST filing status from the configured provider using the vendor GSTIN.
+   - If the provider returns rows, persist them into `vendor_validations.details.filing_status` so subsequent approvers see the table without refetching.
 
-# Fix
-
-Frontend-only change in `src/components/admin/BuyerScmMapping.tsx`:
-
-1. Add a small paginated `fetchAll` helper (page size 1000, loop with `.range(from, from+pageSize-1)` until a short page is returned) — same shape as the one already added to `UserManagement.tsx`.
-2. Use it for `user_tenants`. When a specific `tenantId` is selected, also push the filter server-side (`.eq('tenant_id', tenantId)`) so we stay well under 1000 rows in the common case; only fall back to the full paginated fetch when scope is "All Tenants".
-3. Use the same `fetchAll` helper for `user_custom_roles` for future-proofing (currently 11 rows, but the same trap will bite later).
-4. Replace the existing `userTenantsRes.data` / `ucrRes.data` reads with the helper's return values; rest of the enrichment logic (profile map, `tenantUserSet`, role partitioning, mapping enrichment) stays unchanged.
-
-No database, RLS, edge function, or types changes are needed. After this, Ramky Infrastructure Limited (and any other tenant whose `user_tenants` rows previously fell outside the first 1000) will correctly list its Buyers and SCM Managers, and existing mappings will render with the right names.
+5. **Verify the specific scenario**
+   - Check the referenced vendor `BADE MURALI KRISHNA / 36DPSPB7500A1Z8` in Approval Flow → View → GST Compliance.
+   - Confirm that when GST is registered and filing rows exist from verification or fallback fetch, the table appears with the last 3 months using the same component as GST Upload.
