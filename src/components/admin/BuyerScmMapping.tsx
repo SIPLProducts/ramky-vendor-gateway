@@ -279,6 +279,12 @@ export function BuyerScmMapping({ tenantId }: Props) {
           Select a specific tenant in the scope above to add new mappings. Showing mappings across all tenants.
         </div>
       )}
+      {tenantId && aliasTenantNames.length > 0 && (
+        <div className="text-xs rounded-md border bg-muted/30 p-3 text-muted-foreground">
+          Including users and mappings from equivalent company record{aliasTenantNames.length === 1 ? '' : 's'}:{' '}
+          <span className="font-medium text-foreground">{aliasTenantNames.join(', ')}</span>.
+        </div>
+      )}
 
       <Card>
         <CardHeader>
