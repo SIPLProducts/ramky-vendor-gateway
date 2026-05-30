@@ -654,10 +654,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Create or update vendor
   const saveVendorMutation = useMutation({
     mutationFn: async (formData: VendorFormData) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || null;
+      // Use getSession so we can detect/refresh expired sessions before insert.
+      // If we attempted insert/update with user_id = null, Postgres RLS denies
+      // with the misleading "new row violates row-level security policy" error.
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const refreshed = await supabase.auth.refreshSession();
+        session = refreshed.data.session ?? null;
+      }
+      if (!session?.user?.id) {
+        const err: Error & { code?: string } = new Error('Your session has expired. Please sign in again to continue.');
+        err.code = 'AUTH_REQUIRED';
+        throw err;
+      }
+      const userId = session.user.id;
 
       const baseRecord = formDataToVendorRecord(formData, userId);
+
 
       // International overrides: map intl fields onto domestic NOT NULL columns
       // so existing CHECK/NOT NULL constraints stay green. Source-of-truth for
@@ -797,10 +810,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
 
     onError: (error: any) => {
-      // RLS errors during background autosave shouldn't blast a red toast at the
-      // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
       const code = error?.code || '';
       const msg = String(error?.message || '');
+      if (code === 'AUTH_REQUIRED') {
+        toast({
+          title: 'Session expired',
+          description: 'Please sign in again to continue your registration.',
+          variant: 'destructive',
+        });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
+      // RLS errors during background autosave shouldn't blast a red toast at the
+      // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
       const isRls = code === '42501' || /row-level security/i.test(msg);
       if (isRls) {
         console.warn('[saveVendor] RLS denial (autosave will surface this in the indicator):', msg);
@@ -812,6 +837,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         variant: 'destructive',
       });
     },
+
 
   });
 
@@ -940,13 +966,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     onSuccess: () => {
       // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      if (error?.code === 'AUTH_REQUIRED') {
+        toast({
+          title: 'Session expired',
+          description: 'Please sign in again to submit your registration.',
+          variant: 'destructive',
+        });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
       toast({
         title: 'Submission Failed',
         description: error.message,
         variant: 'destructive',
       });
     },
+
   });
 
   // Resubmit vendor after editing
