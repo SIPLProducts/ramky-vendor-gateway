@@ -102,16 +102,29 @@ const buildGstComplianceReport = (
   const score: number = typeof details.complianceScore === 'number'
     ? details.complianceScore
     : (isPassed ? 87 : vendor?.gstin ? 70 : 40);
-  const status: string = details.gstStatus || details.gstin_status || (isPassed ? 'Active' : vendor?.gstin ? 'Active' : 'Inactive');
+  const status: string = details.gstStatus
+    || details.gstin_status
+    || vendor?.gst_status
+    || (isPassed ? 'Active' : vendor?.gstin ? 'Active' : 'Inactive');
   const riskLevel: string = details.riskLevel || (score >= 80 ? 'Low' : score >= 50 ? 'Medium' : 'High');
-  const filingStatusText: string = details.filingStatus || (score >= 70 ? 'Regular' : score >= 50 ? 'Delayed' : 'Defaulter');
-  const registrationDate: string = details.registrationDate || details.date_of_registration || '2019-07-01';
-  const now = new Date();
-  const lastFiledReturn: string = details.lastFiledReturn || fmtMonthYear(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
   const persistedRows = normalizeFilingStatus(details.filing_status);
   const sourceRows = persistedRows.length > 0 ? persistedRows : (liveFilingRows || []);
   const filingRows = dedupeAndTrim(sourceRows);
+
+  // Derive filing status + last filed return only from real data (saved
+  // validation row, vendor record, or live response). No hardcoded defaults.
+  const latestFiled = filingRows.find((r) => (r.status || '').toLowerCase() === 'filed');
+  const filingStatusText: string = details.filingStatus
+    || (filingRows.length > 0
+        ? (latestFiled ? 'Regular' : 'Delayed')
+        : '-');
+  const registrationDate: string = details.registrationDate
+    || details.date_of_registration
+    || vendor?.gst_registration_date
+    || '-';
+  const lastFiledReturn: string = details.lastFiledReturn
+    || (latestFiled ? `${latestFiled.tax_period || ''} ${latestFiled.financial_year || ''}`.trim() : '-');
 
   return { complianceScore: score, status, riskLevel, registrationDate, filingStatus: filingStatusText, lastFiledReturn, filingRows };
 };
