@@ -337,8 +337,19 @@ export function VendorReviewDialog({
           providerName: 'GST_FILING',
           input: { gstin, id_number: gstin },
         });
-        const rows = (r.found && r.ok && r.data)
-          ? normalizeFilingStatus(r.data.filing_status)
+        const rows = (r.found && r.ok)
+          ? (() => {
+              const candidates = [
+                r.data?.filing_status,
+                r.raw?.data?.filing_status,
+                r.raw?.filing_status,
+              ];
+              for (const c of candidates) {
+                const n = normalizeFilingStatus(c);
+                if (n.length > 0) return n;
+              }
+              return [] as FilingStatusRow[];
+            })()
           : [];
         if (cancelled) return;
         setLiveFilingRows(rows);
