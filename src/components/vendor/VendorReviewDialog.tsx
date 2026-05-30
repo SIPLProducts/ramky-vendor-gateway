@@ -207,16 +207,14 @@ export function VendorReviewDialog({
     }
     setLoading(true);
     (async () => {
-      const [{ data: v, error: vErr }, { data: gst }, { data: docs }] = await Promise.all([
+      const [{ data: v, error: vErr }, { data: gstRows }, { data: docs }] = await Promise.all([
         supabase.from('vendors').select('*').eq('id', vendorId).maybeSingle(),
         supabase
           .from('vendor_validations')
           .select('*')
           .eq('vendor_id', vendorId)
           .eq('validation_type', 'gst')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .order('created_at', { ascending: false }),
         supabase
           .from('vendor_documents')
           .select('*')
@@ -230,7 +228,29 @@ export function VendorReviewDialog({
       } else {
         setVendor(v);
       }
-      setGstValidation(gst || null);
+      // Pick the most recent GST validation row that actually carries filing-status
+      // data. The post-submission `runValidationsMutation` inserts a simulated row
+      // without `filing_status`, so the newest row is often empty even though the
+      // upload-step row (created earlier) has the real Surepass response.
+      const extractFiling = (row: any) => {
+        const d = row?.details || {};
+        return d.filing_status
+          ?? d?.data?.filing_status
+          ?? d?.raw?.data?.filing_status
+          ?? d?.response?.filing_status
+          ?? null;
+      };
+      const rowsArr = (gstRows as any[]) || [];
+      const withFiling = rowsArr.find((r) => normalizeFilingStatus(extractFiling(r)).length > 0);
+      const chosen = withFiling || rowsArr[0] || null;
+      // Normalise details so downstream code can read `details.filing_status` directly.
+      if (chosen) {
+        const filing = extractFiling(chosen);
+        if (filing && !chosen.details?.filing_status) {
+          chosen.details = { ...(chosen.details || {}), filing_status: filing };
+        }
+      }
+      setGstValidation(chosen);
       setComplianceDocs(docs || []);
 
       // Load routing/invitation context
