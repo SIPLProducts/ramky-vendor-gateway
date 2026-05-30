@@ -1,21 +1,17 @@
-## Plan
+## Problem
 
-1. Update the Approval Flow View GST Compliance tab to use the same GST Filing Status table component and layout as the GST Upload tab.
+On the User Management page, Ajay Babu's Tenant column shows "None" even though many tenants are assigned in the DB.
 
-2. Fix the data lookup so the table reads filing rows from the persisted GST verification response generated during GST upload/verification, including likely shapes such as:
-   - `details.filing_status`
-   - nested raw/mapped API payload locations returned by configured providers
-   - the latest GST validation row for the vendor
+Root cause: `loadData()` in `src/pages/UserManagement.tsx` does:
+```ts
+supabase.from('user_tenants').select('user_id, tenant_id')
+```
+The `user_tenants` table currently has **1452 rows**, but Supabase/PostgREST caps a single response at **1000 rows by default**. The first 1000 rows (ordered by PostgREST's default) are returned, and Ajay Babu's mappings fall outside that window — so the in-memory `utByUser` map has no entries for his user id, and the UI renders "None".
 
-3. Ensure the table renders whenever the vendor is GST registered / has GSTIN, and only shows the fallback message when no filing rows exist after checking the saved verification data.
+The same risk applies to `user_custom_roles` as the project grows.
 
-4. Remove or de-emphasize the current live-fetch placeholder behavior in Approval View so approvers see the submitted verification result instead of a blank card saying “Fetching latest filing status from GSTN...”.
+## Fix
 
-5. Keep the change limited to frontend/view logic unless inspection during implementation proves the upload verification is not persisting the filing data correctly.
+In `src/pages/UserManagement.tsx`, replace the single-shot fetches of `user_tenants` and `user_custom_roles` with a paginated helper that loops with `.range(from, from+pageSize-1)` until fewer than `pageSize` rows come back, returning the full list. Use a page size of 1000. Apply it to both `user_tenants` and `user_custom_roles` (other tables in `loadData` are safely under 1000 rows today; tenants list is already filtered to active and well below the cap).
 
-## Technical details
-
-- Primary file: `src/components/vendor/VendorReviewDialog.tsx`.
-- Reuse `GstFilingStatusTable` and `normalizeFilingStatus` from `src/components/vendor/kyc/GstFilingStatusTable.tsx`.
-- Add a robust extractor helper in `VendorReviewDialog.tsx` to normalize GST filing status from the latest `vendor_validations.details` object and compatible nested API response paths.
-- Preserve the existing Compliance Document section and approval dialog tabs.
+No DB / RLS / backend changes — purely a frontend data-fetch fix. The tenant column will then display all assigned tenant names for every user.

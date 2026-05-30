@@ -85,42 +85,64 @@ export default function UserManagement() {
     }
   };
 
+  const fetchAll = async <T,>(
+    table: 'user_tenants' | 'user_custom_roles',
+    columns: string,
+  ): Promise<T[]> => {
+    const pageSize = 1000;
+    let from = 0;
+    const all: T[] = [];
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data, error } = await supabase
+        .from(table)
+        .select(columns)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const rows = (data ?? []) as T[];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, userTenantsRes, tenantsRes, customRolesRes, userCustomRes] = await Promise.all([
+      const [profilesRes, rolesRes, userTenantsData, tenantsRes, customRolesRes, userCustomData] = await Promise.all([
         supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
-        supabase.from('user_tenants').select('user_id, tenant_id'),
+        fetchAll<{ user_id: string; tenant_id: string }>('user_tenants', 'user_id, tenant_id'),
         supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
         supabase.from('custom_roles').select('*').order('created_at', { ascending: false }),
-        supabase.from('user_custom_roles').select('user_id, custom_role_id'),
+        fetchAll<{ user_id: string; custom_role_id: string }>('user_custom_roles', 'user_id, custom_role_id'),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
       if (rolesRes.error) throw rolesRes.error;
-      if (userTenantsRes.error) throw userTenantsRes.error;
       if (tenantsRes.error) throw tenantsRes.error;
       if (customRolesRes.error) throw customRolesRes.error;
-      if (userCustomRes.error) throw userCustomRes.error;
+
 
       const tenantMap = new Map<string, Tenant>((tenantsRes.data ?? []).map((t) => [t.id, t]));
       const customRoleMap = new Map<string, CustomRoleOpt>((customRolesRes.data ?? []).map((c: any) => [c.id, c]));
       const roleMap = new Map<string, AppRole>((rolesRes.data ?? []).map((r) => [r.user_id, r.role as AppRole]));
       const utByUser = new Map<string, string[]>();
-      (userTenantsRes.data ?? []).forEach((ut) => {
+      userTenantsData.forEach((ut) => {
         const arr = utByUser.get(ut.user_id) ?? [];
         arr.push(ut.tenant_id);
         utByUser.set(ut.user_id, arr);
       });
       const cuByUser = new Map<string, string[]>();
       const countsByRole = new Map<string, number>();
-      (userCustomRes.data ?? []).forEach((uc) => {
+      userCustomData.forEach((uc) => {
         const arr = cuByUser.get(uc.user_id) ?? [];
         arr.push(uc.custom_role_id);
         cuByUser.set(uc.user_id, arr);
         countsByRole.set(uc.custom_role_id, (countsByRole.get(uc.custom_role_id) ?? 0) + 1);
       });
+
 
       setTenants(tenantsRes.data ?? []);
       setCustomRoles((customRolesRes.data ?? []) as any);
