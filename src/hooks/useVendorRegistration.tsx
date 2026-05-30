@@ -989,13 +989,29 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     onSuccess: () => {
       // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
     },
-    onError: (error: any) => {
-      if (error?.code === 'AUTH_REQUIRED') {
+    onError: async (error: any) => {
+      const code = error?.code || '';
+      const msg = String(error?.message || '');
+      if (code === 'AUTH_REQUIRED') {
         toast({
           title: 'Session expired',
           description: 'Please sign in again to submit your registration.',
           variant: 'destructive',
         });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
+      const isUserFk = code === '23503' || /vendors_user_id_fkey/i.test(msg) || /violates foreign key constraint/i.test(msg);
+      if (isUserFk) {
+        toast({
+          title: 'Session out of sync',
+          description: 'Your login session is invalid. Please reopen the invitation link and sign in again.',
+          variant: 'destructive',
+        });
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
         const token = options?.invitationToken;
         if (typeof window !== 'undefined') {
           window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
