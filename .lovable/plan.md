@@ -1,41 +1,49 @@
-## Goal
-Wipe vendor submission and invitation data so you can re-create vendors from scratch. No schema, config, users, roles, tenants, mappings, approval matrix, branding, SAP/KYC settings, or other admin data will be touched.
+## Problem
 
-## What will be deleted
+On a fresh vendor registration opened via an invitation link, the **Buyer Company** field on Step 1 shows the empty "Select buyer company" placeholder even though the invitation carries a `tenant_id`. Reasons:
 
-From Lovable Cloud (same DB powers vms.siplproducts.com):
+1. The token validation in `src/pages/VendorRegistration.tsx` calls `get_invitation_by_token` (which returns `tenant_id`) but never seeds `formData.organization.buyerCompanyId` from it. The field only gets hydrated later from `existingVendor.tenant_id`, which doesn't exist until the first autosave — and the first autosave then writes `tenant_id: null` to the vendor row.
+2. Step 1 renders the buyer company through a `Select` whose label is resolved from the `buyerCompanies` query. Even when the id is present, if the query is still loading or the value is missing the trigger shows the placeholder instead of the company name.
 
-- `vendor_approval_progress` — 4 rows (approval chain progress)
-- `vendor_documents` — 4 rows (uploaded document references)
-- `vendor_validations` — 0 rows (KYC/GST validation history)
-- `vendor_feedback` — 0 rows
-- `ocr_extractions` — 0 rows
-- `scheduled_validations` — 0 rows
-- `audit_logs` where `vendor_id is not null` (vendor-scoped history only — login/role/admin logs preserved)
-- `invitation_email_events` — 0 rows (Resend tracking)
-- `vendor_invitations` — 28 rows
-- `vendors` — 1 row
+The user wants the buyer company assigned by the invitation to **always be shown as the company name in a read-only field**, for both domestic and international flows, and to always be persisted.
 
-Storage: objects under the `vendor-documents` bucket tied to deleted vendors will be removed.
+## Fix
 
-## What will NOT be touched
+### 1. Seed `buyerCompanyId` from the invitation (`src/pages/VendorRegistration.tsx`)
 
-- Users, profiles, roles, custom roles, user-tenant assignments
-- Tenants, buyer–SCM mappings, approval matrix levels & approvers
-- Form/field configs, branding, SMTP, API providers/credentials, SAP configs/templates/master data
-- Portal config, role permissions
-- Audit logs not tied to a vendor
+In the token validation effect, right after the invitation is fetched and accepted, set the buyer company id on `formData` immediately so it is available before any autosave:
 
-## Execution
+```ts
+if (invitation.tenant_id) {
+  setFormData((prev) =>
+    prev.organization.buyerCompanyId === invitation.tenant_id
+      ? prev
+      : { ...prev, organization: { ...prev.organization, buyerCompanyId: invitation.tenant_id } },
+  );
+}
+```
 
-Single transactional migration in dependency order:
-1. Delete from child tables (`vendor_approval_progress`, `vendor_documents`, `vendor_validations`, `vendor_feedback`, `ocr_extractions`, `scheduled_validations`)
-2. Delete vendor-scoped `audit_logs`
-3. Delete `invitation_email_events` referencing invitations being removed
-4. Delete `vendor_invitations`
-5. Delete `vendors`
-6. Remove storage objects in `vendor-documents` bucket
+Also pass `invitation.tenant_id` through as the effective `tenantId` prop (already happens via `formData.organization.buyerCompanyId` fallback on line 122 once seeded).
 
-After this runs, the Vendor List, Approvals, and Invitations screens will all be empty and ready for fresh entries.
+### 2. Make the field a true read-only display (`src/components/vendor/steps/OrganizationStep.tsx`)
 
-Confirm to proceed.
+Replace the disabled `Select` with a read-only text input that always shows the resolved **"Company Name (CODE)"** string from `buyerCompanies` lookup. Keep the hidden `Controller` so RHF validation/value still works.
+
+- While `buyerCompanies` is loading and the id is set, show a small spinner with "Loading company…".
+- When the id resolves, show `"<name> (<code>)"`.
+- If no id yet, show "Assigned by buyer — cannot be changed." muted text only.
+- Field is **always disabled** in both domestic and international flows (the international path uses the same Step 1, so this single change covers both).
+
+### 3. Persistence guarantee (`src/hooks/useVendorRegistration.tsx`)
+
+`saveVendorMutation` already writes `tenant_id: formData.organization.buyerCompanyId || null`. After step 1, since the id is now seeded from the invitation on mount, every autosave/submit will persist the correct `tenant_id`. No schema change needed.
+
+## Files touched
+
+- `src/pages/VendorRegistration.tsx` — seed buyer company id from invitation right after token validation.
+- `src/components/vendor/steps/OrganizationStep.tsx` — render buyer company as a read-only display showing the company name (+ code) instead of an empty Select.
+
+## Out of scope
+
+- No DB migration, no RLS change (`tenants` already allows authenticated reads of active rows).
+- No changes to approval flow or other steps.
