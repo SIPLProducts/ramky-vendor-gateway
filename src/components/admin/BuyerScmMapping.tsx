@@ -38,6 +38,8 @@ export function BuyerScmMapping({ tenantId }: Props) {
   const [scmId, setScmId] = useState('');
   const [buyerId, setBuyerId] = useState('');
   const [includeScm, setIncludeScm] = useState(true);
+  const [aliasTenantNames, setAliasTenantNames] = useState<string[]>([]);
+  const [effectiveSaveTenantId, setEffectiveSaveTenantId] = useState<string | null>(null);
 
 
   const fetchAll = async <T,>(
@@ -57,21 +59,76 @@ export function BuyerScmMapping({ tenantId }: Props) {
     return all;
   };
 
+  // Normalize tenant name for alias matching: lowercase, strip punctuation,
+  // and collapse common company suffix variants (limited, ltd, pvt, private, etc.).
+  const normalizeTenantName = (raw: string): string => {
+    const SUFFIXES = ['limited', 'ltd', 'private', 'pvt', 'company', 'co', 'corporation', 'corp', 'inc', 'llp', 'plc'];
+    let s = (raw || '')
+      .toLowerCase()
+      .replace(/[.,'"`()&\-_/\\]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const suf of SUFFIXES) {
+        if (s.endsWith(' ' + suf) || s === suf) {
+          s = s.slice(0, s.length - suf.length).trim();
+          changed = true;
+        }
+      }
+    }
+    return s;
+  };
+
+  const resolveTenantAliases = async (
+    selectedTenantId: string,
+  ): Promise<{ ids: string[]; aliasNames: string[] }> => {
+    const { data: all, error } = await supabase
+      .from('tenants')
+      .select('id, name, code, is_active')
+      .eq('is_active', true);
+    if (error || !all) return { ids: [selectedTenantId], aliasNames: [] };
+    const selected = all.find((t) => t.id === selectedTenantId);
+    if (!selected) return { ids: [selectedTenantId], aliasNames: [] };
+    const targetNorm = normalizeTenantName(selected.name);
+    const targetCode = (selected.code ?? '').trim().toLowerCase();
+    const matches = all.filter((t) => {
+      if (t.id === selected.id) return true;
+      const sameCode = !!targetCode && (t.code ?? '').trim().toLowerCase() === targetCode;
+      const sameNorm = !!targetNorm && normalizeTenantName(t.name) === targetNorm;
+      return sameCode || sameNorm;
+    });
+    return {
+      ids: matches.map((t) => t.id),
+      aliasNames: matches.filter((t) => t.id !== selected.id).map((t) => t.name),
+    };
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
+      let tenantIds: string[] = [];
+      let aliasNames: string[] = [];
+      if (tenantId) {
+        const r = await resolveTenantAliases(tenantId);
+        tenantIds = r.ids;
+        aliasNames = r.aliasNames;
+      }
+      setAliasTenantNames(aliasNames);
+
       const [rolesRes, profilesRes, userTenantsData, mappingsRes] = await Promise.all([
         supabase.from('custom_roles').select('id,name').in('name', [SCM_ROLE, BUYER_ROLE]),
         supabase.from('profiles').select('id, full_name, email'),
-        tenantId
+        tenantIds.length > 0
           ? fetchAll<{ user_id: string; tenant_id: string }>((from, to) =>
-              supabase.from('user_tenants').select('user_id, tenant_id').eq('tenant_id', tenantId).range(from, to),
+              supabase.from('user_tenants').select('user_id, tenant_id').in('tenant_id', tenantIds).range(from, to),
             )
           : fetchAll<{ user_id: string; tenant_id: string }>((from, to) =>
               supabase.from('user_tenants').select('user_id, tenant_id').range(from, to),
             ),
-        tenantId
-          ? supabase.from('buyer_scm_mappings').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })
+        tenantIds.length > 0
+          ? supabase.from('buyer_scm_mappings').select('*').in('tenant_id', tenantIds).order('created_at', { ascending: false })
           : supabase.from('buyer_scm_mappings').select('*').order('created_at', { ascending: false }),
       ]);
       if (rolesRes.error) throw rolesRes.error;
@@ -92,7 +149,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
       const profileMap = new Map<string, UserOpt>(
         (profilesRes.data ?? []).map((p) => [p.id, p as UserOpt])
       );
-      const tenantUserSet = tenantId
+      const tenantUserSet = tenantIds.length > 0
         ? new Set(userTenantsData.map((ut) => ut.user_id))
         : null;
 
@@ -114,6 +171,20 @@ export function BuyerScmMapping({ tenantId }: Props) {
       setScmUsers(toOpts(scmIds));
       setBuyerUsers(toOpts(buyerIds));
 
+      // Save new mappings against the tenant id that actually has assigned users.
+      let saveTenantId: string | null = tenantId ?? null;
+      if (tenantId && tenantIds.length > 1) {
+        const utCountByTenant = new Map<string, number>();
+        userTenantsData.forEach((ut) => {
+          utCountByTenant.set(ut.tenant_id, (utCountByTenant.get(ut.tenant_id) ?? 0) + 1);
+        });
+        if ((utCountByTenant.get(tenantId) ?? 0) === 0) {
+          const fallback = tenantIds.find((id) => (utCountByTenant.get(id) ?? 0) > 0);
+          if (fallback) saveTenantId = fallback;
+        }
+      }
+      setEffectiveSaveTenantId(saveTenantId);
+
       const enriched: MappingRow[] = (mappingsRes.data ?? []).map((m: any) => ({
         ...m,
         buyer: profileMap.get(m.buyer_user_id),
@@ -130,7 +201,8 @@ export function BuyerScmMapping({ tenantId }: Props) {
   useEffect(() => { loadData(); /* eslint-disable-next-line */ }, [tenantId]);
 
   const handleSave = async () => {
-    if (!tenantId) {
+    const saveTenantId = effectiveSaveTenantId ?? tenantId;
+    if (!saveTenantId) {
       toast({ title: 'Select a tenant', description: 'Mappings must be scoped to a tenant.', variant: 'destructive' });
       return;
     }
@@ -150,7 +222,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
     setSaving(true);
     try {
       const { error } = await supabase.from('buyer_scm_mappings').insert({
-        tenant_id: tenantId,
+        tenant_id: saveTenantId,
         buyer_user_id: buyerId,
         scm_manager_user_id: scmId,
         include_scm_stages: includeScm,
