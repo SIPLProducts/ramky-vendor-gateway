@@ -816,7 +816,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       return savedVendor;
     },
 
-    onError: (error: any) => {
+    onError: async (error: any) => {
       const code = error?.code || '';
       const msg = String(error?.message || '');
       if (code === 'AUTH_REQUIRED') {
