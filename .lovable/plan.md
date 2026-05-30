@@ -1,34 +1,21 @@
-## Problem
+## Plan
 
-In `RegistrationStatusTracker`, when status is `submitted` / `validation_pending`, `getActiveStepIndex` returns `1` (Document Verification) but step 0 (Submitted) is rendered as "active" with pulse and "In Progress" — because the tracker shows "Submitted – In Progress" while Document Verification looks pending.
+1. Update the Approval Flow View GST Compliance tab to use the same GST Filing Status table component and layout as the GST Upload tab.
 
-Actually the real issue is the opposite: the user expects "Submitted" to always be Completed once the form is submitted, and the active marker to sit on the current real stage:
+2. Fix the data lookup so the table reads filing rows from the persisted GST verification response generated during GST upload/verification, including likely shapes such as:
+   - `details.filing_status`
+   - nested raw/mapped API payload locations returned by configured providers
+   - the latest GST validation row for the vendor
 
-- `submitted` / `validation_pending` → Submitted=completed, Document Verification=active
-- `validation_failed` → Submitted=completed, Document Verification=failed
-- `scm_manager_review` → steps 0–1 completed, SCM Manager (2)=active
-- `scm_head_review` → 0–2 completed, SCM Head (3)=active
-- `finance_1_review` → 0–3 completed, Finance 1 (4)=active
-- `finance_2_review` / `ceo_office_review` → 0–4 completed, Finance 2 (5)=active
-- `pending_sap_sync` → 0–5 completed, SAP Sync (6)=active
-- `sap_synced` → all 7 completed
+3. Ensure the table renders whenever the vendor is GST registered / has GSTIN, and only shows the fallback message when no filing rows exist after checking the saved verification data.
 
-The current `getActiveStepIndex` values are already correct for stages ≥ 2. The bug is only at the start: the connector progress line uses `activeStepIndex / (steps-1)` so when active=1 the line fills only ~16%, and step 0 ("Submitted") renders as pending grey instead of completed.
+4. Remove or de-emphasize the current live-fetch placeholder behavior in Approval View so approvers see the submitted verification result instead of a blank card saying “Fetching latest filing status from GSTN...”.
 
-## Fix
+5. Keep the change limited to frontend/view logic unless inspection during implementation proves the upload verification is not persisting the filing data correctly.
 
-Edit `src/components/vendor/RegistrationStatusTracker.tsx`:
+## Technical details
 
-1. In `getStepStatus`, treat step 0 ("Submitted") as `completed` whenever the vendor status is anything other than `draft` (submission has happened by definition once a status exists).
-2. Keep current `activeStepIndex` mapping for `submitted` / `validation_pending` at `1` so Document Verification shows as active (pulsing) and labelled "In Progress", while Submitted shows completed with the check icon.
-3. Update the progress connector width so the filled bar reaches the active step's centre. Use `(adjustedActiveIndex / (statusSteps.length - 1)) * 100%` without the `- 40px` subtraction, or compute width per-step so step 1 active visually fills the segment from Submitted → Document Verification. Concretely: render the filled line up to the active step (inclusive of completed steps, half-way through active).
-4. For the description line under an active step, keep "In Progress"; for completed steps show the original `step.description` (or "Completed"); failed unchanged.
-5. No changes needed to backend status values — current statuses already drive the right step indexes for stages ≥ 2.
-
-## Files
-
-- `src/components/vendor/RegistrationStatusTracker.tsx` — only file touched. Pure presentation fix.
-
-## Out of scope
-
-- No edge-function, DB, or workflow-engine changes. The status values written by `seed_vendor_approval_progress` and `process-approval-action` are already correct; only the visual mapping is wrong.
+- Primary file: `src/components/vendor/VendorReviewDialog.tsx`.
+- Reuse `GstFilingStatusTable` and `normalizeFilingStatus` from `src/components/vendor/kyc/GstFilingStatusTable.tsx`.
+- Add a robust extractor helper in `VendorReviewDialog.tsx` to normalize GST filing status from the latest `vendor_validations.details` object and compatible nested API response paths.
+- Preserve the existing Compliance Document section and approval dialog tabs.
