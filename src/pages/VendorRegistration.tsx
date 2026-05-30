@@ -552,6 +552,9 @@ export default function VendorRegistration() {
         gstBusinessNature: data.gst?.businessNature ?? prev.statutory.gstBusinessNature,
         gstJurisdictionCentre: data.gst?.jurisdictionCentre || prev.statutory.gstJurisdictionCentre,
         gstJurisdictionState: data.gst?.jurisdictionState || prev.statutory.gstJurisdictionState,
+        gstFilingStatus: Array.isArray(data.gst?.filing_status) && data.gst?.filing_status.length > 0
+          ? data.gst.filing_status
+          : prev.statutory.gstFilingStatus,
         pan: data.pan?.number || prev.statutory.pan,
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
         msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
