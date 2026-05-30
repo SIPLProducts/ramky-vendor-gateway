@@ -1,55 +1,34 @@
-# Show the GST Filing Status card in Approvals → View
-
 ## Problem
 
-In the Vendor Registration → GST tab, when **GST = Yes**, the vendor sees a "GST Filing Status (Last 3 Months)" card with a 4-column table (Financial Year / Tax Period / Date of filing / Status) rendered by the shared `GstFilingStatusTable` component (see screenshot).
+In `RegistrationStatusTracker`, when status is `submitted` / `validation_pending`, `getActiveStepIndex` returns `1` (Document Verification) but step 0 (Submitted) is rendered as "active" with pulse and "In Progress" — because the tracker shows "Submitted – In Progress" while Document Verification looks pending.
 
-In **Approvals → View** (the `VendorReviewDialog` used by every stage view), the "GST Compliance Report" tab today renders its own ad-hoc "Recent Returns Filed" table, which does not visually match the registration card and — per the user report — is not appearing reliably for GST-registered vendors.
+Actually the real issue is the opposite: the user expects "Submitted" to always be Completed once the form is submitted, and the active marker to sit on the current real stage:
 
-We want the **exact same card and table from registration** to appear in the Approvals → View dialog, populated from the GST verification response.
+- `submitted` / `validation_pending` → Submitted=completed, Document Verification=active
+- `validation_failed` → Submitted=completed, Document Verification=failed
+- `scm_manager_review` → steps 0–1 completed, SCM Manager (2)=active
+- `scm_head_review` → 0–2 completed, SCM Head (3)=active
+- `finance_1_review` → 0–3 completed, Finance 1 (4)=active
+- `finance_2_review` / `ceo_office_review` → 0–4 completed, Finance 2 (5)=active
+- `pending_sap_sync` → 0–5 completed, SAP Sync (6)=active
+- `sap_synced` → all 7 completed
+
+The current `getActiveStepIndex` values are already correct for stages ≥ 2. The bug is only at the start: the connector progress line uses `activeStepIndex / (steps-1)` so when active=1 the line fills only ~16%, and step 0 ("Submitted") renders as pending grey instead of completed.
 
 ## Fix
 
-Edit `src/components/vendor/VendorReviewDialog.tsx` only.
+Edit `src/components/vendor/RegistrationStatusTracker.tsx`:
 
-1. Import the reusable component already used by registration:
-   ```ts
-   import { GstFilingStatusTable } from '@/components/vendor/kyc/GstFilingStatusTable';
-   ```
-   (`normalizeFilingStatus` / `FilingStatusRow` are already imported.)
+1. In `getStepStatus`, treat step 0 ("Submitted") as `completed` whenever the vendor status is anything other than `draft` (submission has happened by definition once a status exists).
+2. Keep current `activeStepIndex` mapping for `submitted` / `validation_pending` at `1` so Document Verification shows as active (pulsing) and labelled "In Progress", while Submitted shows completed with the check icon.
+3. Update the progress connector width so the filled bar reaches the active step's centre. Use `(adjustedActiveIndex / (statusSteps.length - 1)) * 100%` without the `- 40px` subtraction, or compute width per-step so step 1 active visually fills the segment from Submitted → Document Verification. Concretely: render the filled line up to the active step (inclusive of completed steps, half-way through active).
+4. For the description line under an active step, keep "In Progress"; for completed steps show the original `step.description` (or "Completed"); failed unchanged.
+5. No changes needed to backend status values — current statuses already drive the right step indexes for stages ≥ 2.
 
-2. In the `gst_compliance` `TabsContent` (currently lines ~608–746), replace the existing "Recent Returns Filed" block (the `<div>` containing the inline `<Table>` of filing rows, lines ~666–705) with a card that mirrors the registration UI:
+## Files
 
-   ```tsx
-   {(vendor?.gstin || filingRows.length > 0) && (
-     <div className="rounded-lg border bg-card p-4 space-y-3">
-       <div className="flex items-center gap-2">
-         <Shield className="h-4 w-4 text-primary" />
-         <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
-       </div>
-       {filingRows.length > 0 ? (
-         <GstFilingStatusTable rows={filingRows} limit={3} />
-       ) : (
-         <p className="text-xs text-muted-foreground">
-           {filingFetching
-             ? 'Fetching latest filing status from GSTN…'
-             : filingFetched
-               ? 'No filing data returned by GSTN for this GSTIN.'
-               : 'No filing data captured for this vendor.'}
-         </p>
-       )}
-     </div>
-   )}
-   ```
+- `src/components/vendor/RegistrationStatusTracker.tsx` — only file touched. Pure presentation fix.
 
-   `filingRows` is derived from the same source the inline table uses today: persisted `vendor_validations.details.filing_status` (set during GST verification at registration) with a live `GST_FILING` provider fallback (already implemented in the `useEffect` at lines 301–342). We pass raw `FilingStatusRow[]` to `GstFilingStatusTable` so its own dedupe/sort/format logic runs — same output as registration.
+## Out of scope
 
-3. Keep everything else in the tab unchanged: the 3 summary cards (Compliance Score / GST Status / Risk Level), the 4-field grid (GSTIN / Registration Date / Filing Status / Last Filed Return), and the Compliance Document section all stay.
-
-4. No changes to data flow, schema, types, edge functions, registration code, or other components. The table renders in **View mode** because the dialog is read-only and the data source (persisted validation + live fetch) already runs whenever the dialog opens for a vendor with a GSTIN.
-
-## Why this works
-
-- Same component (`GstFilingStatusTable`) → identical look & feel to the registration screenshot.
-- Same data source (`vendor_validations` GST entry + `GST_FILING` live fallback) that the registration flow writes after the user uploads/verifies the GST certificate, so no extra plumbing is needed.
-- Gated on `vendor.gstin` so non-GST (international / unregistered) vendors don't see an empty card.
+- No edge-function, DB, or workflow-engine changes. The status values written by `seed_vendor_approval_progress` and `process-approval-action` are already correct; only the visual mapping is wrong.
