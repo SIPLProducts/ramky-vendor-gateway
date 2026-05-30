@@ -96,6 +96,8 @@ const FAILED_STEP: Partial<Record<RegistrationStatus, number>> = {
 
 function getStepStatus(stepIndex: number, activeIndex: number, vendorStatus: RegistrationStatus): 'completed' | 'active' | 'pending' | 'failed' {
   if (FAILED_STEP[vendorStatus] === stepIndex) return 'failed';
+  // Submitted (step 0) is always complete once the form has been submitted.
+  if (stepIndex === 0 && vendorStatus !== 'draft') return 'completed';
   if (vendorStatus === 'rejected') return stepIndex < activeIndex ? 'completed' : 'pending';
   if (stepIndex < activeIndex) return 'completed';
   if (stepIndex === activeIndex) return 'active';
@@ -111,6 +113,11 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
   function RegistrationStatusTracker({ status, className }, ref) {
     const activeStepIndex = getActiveStepIndex(status);
     const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
+    // Fill the connector up to the centre of the active step (half-segment past last completed).
+    const totalSegments = statusSteps.length - 1;
+    const fillRatio = adjustedActiveIndex <= 0
+      ? 0
+      : Math.min(1, adjustedActiveIndex / totalSegments);
 
     return (
       <div ref={ref} className={cn("w-full", className)}>
@@ -118,8 +125,9 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
           <div className="absolute top-5 left-5 right-5 h-0.5 bg-muted" />
           <div
             className="absolute top-5 left-5 h-0.5 bg-primary transition-all duration-500"
-            style={{ width: `calc(${Math.max(0, (adjustedActiveIndex / (statusSteps.length - 1)) * 100)}% - 40px)` }}
+            style={{ width: `calc((100% - 40px) * ${fillRatio})` }}
           />
+
           <div className="relative flex justify-between">
             {statusSteps.map((step, index) => {
               const stepStatus = getStepStatus(index, adjustedActiveIndex, status);
