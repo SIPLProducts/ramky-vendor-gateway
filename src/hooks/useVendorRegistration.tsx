@@ -810,10 +810,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
 
     onError: (error: any) => {
-      // RLS errors during background autosave shouldn't blast a red toast at the
-      // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
       const code = error?.code || '';
       const msg = String(error?.message || '');
+      if (code === 'AUTH_REQUIRED') {
+        toast({
+          title: 'Session expired',
+          description: 'Please sign in again to continue your registration.',
+          variant: 'destructive',
+        });
+        const token = options?.invitationToken;
+        if (typeof window !== 'undefined') {
+          window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
+        }
+        return;
+      }
+      // RLS errors during background autosave shouldn't blast a red toast at the
+      // vendor — the AutoSaveIndicator already shows a quiet "Couldn't save" state.
       const isRls = code === '42501' || /row-level security/i.test(msg);
       if (isRls) {
         console.warn('[saveVendor] RLS denial (autosave will surface this in the indicator):', msg);
@@ -825,6 +837,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         variant: 'destructive',
       });
     },
+
 
   });
 
