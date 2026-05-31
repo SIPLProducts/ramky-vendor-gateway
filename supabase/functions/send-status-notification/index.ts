@@ -57,6 +57,11 @@ const statusMessages: Record<string, { subject: string; body: string }> = {
     subject: 'Vendor Code Generated - Onboarding Complete',
     body: 'Your vendor onboarding is complete! Your vendor code has been generated and synced to our ERP system. You can now start transacting with us.',
   },
+  returned_to_vendor: {
+    subject: 'Action Required: Your Application Was Returned',
+    body: 'Your vendor application has been returned for corrections. Please log in to the portal, review the rejection remarks, update the required information, and resubmit. Your previously entered data and uploaded documents remain saved — you only need to edit the fields highlighted in the remarks.',
+  },
+
 };
 
 function escapeHtml(s: string): string {
