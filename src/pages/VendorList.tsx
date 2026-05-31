@@ -729,6 +729,65 @@ export default function VendorList() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!returnTarget} onOpenChange={(o) => { if (!o) setReturnTarget(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Return application to vendor</DialogTitle>
+          </DialogHeader>
+          {returnTarget && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="font-medium">{returnTarget.legal_name || returnTarget.id}</div>
+                <div className="text-xs text-muted-foreground">
+                  Last rejected at: {(returnTarget as any).last_rejection_stage ?? '—'}
+                </div>
+              </div>
+              {(returnTarget as any).last_rejection_comments && (
+                <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                  <strong>Approver remarks:</strong>{'\n'}{(returnTarget as any).last_rejection_comments}
+                </div>
+              )}
+              <div>
+                <label className="text-xs text-muted-foreground">Additional buyer remarks (optional)</label>
+                <Textarea
+                  rows={4}
+                  value={returnRemarks}
+                  onChange={(e) => setReturnRemarks(e.target.value)}
+                  placeholder="Tell the vendor what they need to fix"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReturnTarget(null)}>Cancel</Button>
+            <Button
+              disabled={returnSubmitting}
+              onClick={async () => {
+                if (!returnTarget) return;
+                setReturnSubmitting(true);
+                try {
+                  const { error } = await supabase.functions.invoke('buyer-return-to-vendor', {
+                    body: { vendor_id: returnTarget.id, comments: returnRemarks.trim() || null },
+                  });
+                  if (error) throw error;
+                  toast({ title: 'Returned to vendor', description: 'The vendor has been notified.' });
+                  setReturnTarget(null);
+                  setReturnRemarks('');
+                  await refetch();
+                } catch (err: any) {
+                  toast({ title: 'Failed to return', description: err.message, variant: 'destructive' });
+                } finally {
+                  setReturnSubmitting(false);
+                }
+              }}
+            >
+              {returnSubmitting ? 'Sending…' : 'Send to vendor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
