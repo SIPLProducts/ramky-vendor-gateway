@@ -245,14 +245,14 @@ export default function VendorRegistration() {
             .maybeSingle();
 
           if (existingVendorRecord) {
-            // Check if it's a draft - allow editing
-            if (existingVendorRecord.status === 'draft') {
-              console.log('[Token] Draft vendor record found - allowing form editing');
+            // Editable statuses: vendor can continue/edit the same application.
+            const EDITABLE = ['draft', 'returned_to_vendor', 'validation_failed', 'finance_rejected'];
+            if (EDITABLE.includes(existingVendorRecord.status as string)) {
+              console.log('[Token] Editable vendor record found - allowing form editing', existingVendorRecord.status);
               setInvitationToken(token);
               setInvitationEmail(invitation.email);
               setIsTokenMode(true);
               setIsValidatingToken(false);
-              // Don't set isSubmitted - let the form load with existing data
               return;
             }
 
@@ -266,6 +266,7 @@ export default function VendorRegistration() {
             setIsValidatingToken(false);
             return;
           }
+
         }
 
         // Check if form has been submitted via invitation
@@ -417,14 +418,17 @@ export default function VendorRegistration() {
       formDataLoadedRef.current = true;
       const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
+      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected', 'returned_to_vendor'];
+      const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
         setVendorTypeChosen(true);
         setPendingChoiceType(existingFormData.vendorType);
-        // For draft status, allow user to continue from where they left off
-        // Mark steps as completed based on filled data
-        if (vendorStatus === 'draft') {
+        // For returned_to_vendor we want to land on the Review step so the
+        // vendor can immediately see remarks + resubmit after editing.
+        const isReturned = vendorStatus === 'returned_to_vendor';
+        if (vendorStatus === 'draft' || isReturned) {
           const filledSteps: number[] = [];
           if (existingFormData.vendorType === 'international') {
             const i = existingFormData.international;
@@ -435,7 +439,7 @@ export default function VendorRegistration() {
             setCompletedSteps(filledSteps);
             const allSteps = [1, 2, 3, 4, 5];
             const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-            setCurrentStep(nextStep || 5);
+            setCurrentStep(isReturned ? 5 : (nextStep || 5));
           } else {
             // Step 1 = doc verification — assume completed if we already have key fields
             if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
@@ -464,10 +468,16 @@ export default function VendorRegistration() {
             if (existingFormData.contact?.ceoName) filledSteps.push(4);
             if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
             setCompletedSteps(filledSteps);
-            // Go to the first incomplete step or step 1
-            const allSteps = [1, 2, 3, 4, 5, 6];
-            const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-            setCurrentStep(nextStep || 6);
+            // For returned_to_vendor mark all completed and jump to Review
+            if (isReturned) {
+              setCompletedSteps([1, 2, 3, 4, 5]);
+              setIsEditMode(true);
+              setCurrentStep(6);
+            } else {
+              const allSteps = [1, 2, 3, 4, 5, 6];
+              const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
+              setCurrentStep(nextStep || 6);
+            }
           }
         } else {
           setIsSubmitted(true);
@@ -480,6 +490,7 @@ export default function VendorRegistration() {
       }
     }
   }, [existingFormData, vendorStatus]);
+
 
   useEffect(() => {
     if (!vendorId) return;
