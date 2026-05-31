@@ -484,8 +484,16 @@ export default function FinanceReview() {
                                   <p className="text-xs text-muted-foreground">Awaiting action</p>
                                 )}
                                 <div className="mt-2 p-2 rounded-lg bg-muted/50">
-                                  <p className="text-xs text-muted-foreground mb-0.5">SCM comments</p>
-                                  {row.comments ? (
+                                  <p className="text-xs text-muted-foreground mb-0.5">Remarks</p>
+                                  {row.status === 'rejected' && row.comments ? (
+                                    <p className="text-sm italic text-destructive">
+                                      Rejected: "{row.comments}"
+                                    </p>
+                                  ) : row.rejection_comments ? (
+                                    <p className="text-sm italic text-amber-700">
+                                      Returned from {row.rejection_from_stage ?? 'next stage'}: "{row.rejection_comments}"
+                                    </p>
+                                  ) : row.comments ? (
                                     <p className="text-sm italic">"{row.comments}"</p>
                                   ) : (
                                     <p className="text-sm text-muted-foreground">No comments provided</p>
