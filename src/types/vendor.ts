@@ -11,7 +11,10 @@ export type VendorStatus =
   | 'purchase_review'
   | 'purchase_approved' 
   | 'purchase_rejected'
+  | 'returned_to_buyer'
+  | 'returned_to_vendor'
   | 'sap_synced';
+
 
 export type ValidationStatus = 'pending' | 'passed' | 'failed' | 'skipped';
 
