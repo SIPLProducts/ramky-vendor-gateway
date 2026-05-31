@@ -1,43 +1,37 @@
-## Goal
-When an approver (e.g. SCM Manager) rejects an application and it bounces back to the Buyer, the Buyer must clearly see the rejection remarks, be able to forward the request to the Vendor, and the Vendor must receive the remarks and be able to edit and resubmit the existing application.
+## Problem
 
-## Current state
-- Backend already moves rejected applications to `returned_to_buyer` and stores `last_rejection_comments` / `last_rejection_stage`.
-- The example vendor (`BADE MURALI KRISHNA`) is already in `returned_to_buyer` with remark `state mismatch` from `SCM_MANAGER`, linked to buyer `Ajay Babu`.
-- The `buyer-return-to-vendor` edge function and the vendor-side `returned_to_vendor` banner already exist.
-- Gap: the Buyer's primary screen (Vendor Invitations) does not surface returned applications, so the Buyer cannot act on them.
+On `/admin/invitations`, the Buyer (Ajay Babu) sees the invitation row for the returned vendor (kvvk / BADE MURALI KRISHNA), but no "Returned to Buyer" badge, no rejection remarks, and no "Send to Vendor" action button.
 
-## Implementation plan
+The UI code in `AdminInvitations.tsx` already renders all of this when `invitation.linked_vendor.status === 'returned_to_buyer'`. The query also already fetches `vendors` by `id IN (vendor_ids)`.
 
-1. **Surface returned applications on the Buyer's Vendor Invitations screen**
-   - Extend the invitation list query to also load the linked vendor record (status, name, last rejection stage, last rejection comments, last rejected at).
-   - For invitations whose linked vendor is `returned_to_buyer`, show:
-     - a clear "Returned to Buyer" status badge,
-     - the rejection stage (e.g. SCM Manager) and remarks inline under the row.
+**Root cause:** RLS on `public.vendors` has no policy that lets a Buyer (app_role `vendor`, custom role `Buyer`) read a vendor they invited. The existing SELECT policies only cover admins, finance, purchase, approvers, SCM Manager mapping, cross-tenant reviewers, and the vendor's own user. So the enrichment query returns no rows and `linked_vendor` is always `null` — the badge and action never render.
 
-2. **Add a Buyer "Review & Send to Vendor" action**
-   - For returned rows, add an action button that opens a dialog showing:
-     - vendor name,
-     - rejection stage,
-     - approver rejection remarks (read-only),
-     - an optional buyer remarks textarea.
-   - On submit, call the existing `buyer-return-to-vendor` edge function with the vendor id and combined remarks, then refresh the list.
+## Fix
 
-3. **Send a notification with rejection remarks to the Vendor**
-   - Reuse the existing `send-status-notification` invocation inside `buyer-return-to-vendor` so the email body includes both the approver's rejection remarks and the buyer's added remarks.
-   - Verify the email payload contains the full combined remarks.
+Add a single RLS SELECT policy on `public.vendors` that lets any authenticated user read vendors linked to invitations they created. Buyers will then see the returned vendor's status + remarks, and the existing UI will surface the "Send to Vendor" action that already wires to the `buyer-return-to-vendor` edge function (which already notifies the vendor with the remarks).
 
-4. **Vendor side: show remarks and allow edit + resubmit of the existing application**
-   - The vendor registration screen already shows a `returned_to_vendor` banner with `last_rejection_comments` and `last_rejection_stage`. Confirm it loads the existing application (not a new draft) and that all fields are editable.
-   - On resubmit, the existing trigger reseeds approval progress and routes back to the first approver — keep this behavior unchanged.
+### Migration
 
-5. **Validation**
-   - As the buyer (Ajay Babu), confirm `BADE MURALI KRISHNA` now appears as "Returned to Buyer" with the SCM Manager rejection remark on the Vendor Invitations screen.
-   - Use the new action to send it to the vendor; confirm the vendor's status becomes `returned_to_vendor`, an email is dispatched, and on the vendor portal the rejection remarks are visible and the form can be edited and resubmitted.
+```sql
+CREATE POLICY "Inviting users view their vendors"
+ON public.vendors
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.vendor_invitations vi
+    WHERE vi.vendor_id = vendors.id
+      AND vi.created_by = auth.uid()
+  )
+);
+```
 
-## Notes
-- No database schema changes required; all needed columns and the edge function already exist.
-- Changes are limited to:
-  - `src/pages/AdminInvitations.tsx` (Buyer screen — surface returned vendors + action)
-  - small adjustment to `buyer-return-to-vendor` if the email body needs the remarks explicitly included
-  - verification on `src/pages/VendorRegistration.tsx` that the returned-to-vendor banner + edit flow already work end-to-end.
+No code changes required — `AdminInvitations.tsx` and `buyer-return-to-vendor` already handle the rest. The vendor portal already shows `last_rejection_comments` as a banner on `returned_to_vendor` status and allows resubmission.
+
+## Validation
+
+As Ajay Babu on `/admin/invitations`:
+- The kvvk row shows a red "Returned to Buyer" badge with SCM Manager's remark ("state mismatch").
+- A "Send to Vendor" button appears in the Actions column.
+- Clicking it opens the review dialog; submitting calls `buyer-return-to-vendor`, which sets the vendor to `returned_to_vendor`, emails the vendor with the combined remarks, and the row refreshes.
+- The vendor then sees the rejection banner on their portal, edits the application, and resubmits — which reseeds approvals back to SCM Manager.
