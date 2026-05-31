@@ -1166,7 +1166,32 @@ export default function VendorRegistration() {
 
         {/* Form Card */}
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+          {/* Rejection remarks banner — shown when a buyer/approver has returned the application to the vendor */}
+          {vendorStatusState === 'returned_to_vendor' && (existingVendor as any)?.last_rejection_comments && (
+            <div className="mb-4 rounded-[10px] border border-destructive/40 bg-destructive/5 p-4">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-destructive">
+                    Application returned for corrections
+                    {(existingVendor as any)?.last_rejection_stage && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        (from {String((existingVendor as any).last_rejection_stage).replace(/_/g, ' ')})
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">
+                    {(existingVendor as any).last_rejection_comments}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Update the necessary fields and resubmit. Your previously uploaded documents are retained.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="bg-card rounded-[10px] shadow-enterprise-md border">
+
             {/* Form Header */}
             <div className="px-6 py-4 border-b">
               {isTokenMode && invitationEmail && (
