@@ -118,6 +118,12 @@ export interface ApprovalTrailRow {
   comments: string | null;
   approver_name: string | null;
   approver_email: string | null;
+  // Set when this row was reopened after a downstream rejection — carries the
+  // remarks entered by the rejecting approver so any later viewer (previous
+  // approver, buyer, vendor, audit) can see why it bounced back.
+  rejection_comments: string | null;
+  rejection_from_stage: string | null;
+  rejection_at: string | null;
 }
 
 export function useVendorApprovalTrail(vendorId: string | undefined) {
@@ -127,7 +133,7 @@ export function useVendorApprovalTrail(vendorId: string | undefined) {
       if (!vendorId) return [];
       const { data: progress, error } = await supabase
         .from('vendor_approval_progress')
-        .select('id, level_id, level_number, status, acted_at, acted_by, comments')
+        .select('id, level_id, level_number, status, acted_at, acted_by, comments, rejection_comments, rejection_from_stage, rejection_at')
         .eq('vendor_id', vendorId)
         .order('level_number', { ascending: false });
       if (error) throw error;
@@ -146,7 +152,7 @@ export function useVendorApprovalTrail(vendorId: string | undefined) {
       const lMap = new Map((levels ?? []).map(l => [l.id, l.level_name]));
       const pMap = new Map((profiles ?? []).map(p => [p.id, p]));
 
-      return progress.map(p => {
+      return progress.map((p: any) => {
         const prof = p.acted_by ? pMap.get(p.acted_by) : null;
         return {
           id: p.id,
@@ -157,6 +163,9 @@ export function useVendorApprovalTrail(vendorId: string | undefined) {
           comments: p.comments,
           approver_name: prof?.full_name ?? null,
           approver_email: prof?.email ?? null,
+          rejection_comments: p.rejection_comments ?? null,
+          rejection_from_stage: p.rejection_from_stage ?? null,
+          rejection_at: p.rejection_at ?? null,
         };
       });
     },
