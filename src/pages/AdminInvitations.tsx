@@ -676,7 +676,10 @@ export default function AdminInvitations() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedInvitations.map((invitation) => (
+                    {paginatedInvitations.map((invitation) => {
+                      const linked = (invitation as any).linked_vendor;
+                      const isReturned = linked?.status === 'returned_to_buyer';
+                      return (
                       <TableRow key={invitation.id}>
                         <TableCell>
                           {(invitation as any).vendor_name ? (
@@ -686,6 +689,27 @@ export default function AdminInvitations() {
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                          {isReturned && (
+                            <div className="mt-1 space-y-1">
+                              <Badge variant="destructive" className="gap-1">
+                                <XCircle className="h-3 w-3" />
+                                Returned to Buyer
+                              </Badge>
+                              {linked?.last_rejection_comments && (
+                                <div
+                                  className="text-xs text-amber-700 max-w-xs"
+                                  title={linked.last_rejection_comments}
+                                >
+                                  <strong>
+                                    {linked.last_rejection_stage
+                                      ? String(linked.last_rejection_stage).replace(/_/g, ' ')
+                                      : 'Approver'}:
+                                  </strong>{' '}
+                                  {linked.last_rejection_comments}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
@@ -707,6 +731,20 @@ export default function AdminInvitations() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {isReturned && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setReturnTarget(invitation);
+                                  setReturnRemarks('');
+                                }}
+                                className="gap-1"
+                              >
+                                <Send className="h-4 w-4" />
+                                Send to Vendor
+                              </Button>
+                            )}
                             {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
                               <Button
                                 variant="ghost"
@@ -728,7 +766,8 @@ export default function AdminInvitations() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
