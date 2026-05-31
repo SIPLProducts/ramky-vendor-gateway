@@ -224,7 +224,11 @@ Deno.serve(async (req) => {
         buyerName: buyer?.full_name ?? null,
         buyerEmail: buyer?.email ?? null,
         mappedScmManagers: mappedScm.map((s: any) => ({ name: s.full_name, email: s.email })),
+        rejectionComments: p.rejection_comments ?? null,
+        rejectionFromStage: p.rejection_from_stage ?? null,
+        rejectionAt: p.rejection_at ?? null,
       };
+
     });
 
     return new Response(JSON.stringify({ items }), {
