@@ -72,6 +72,8 @@ type VendorStatus =
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
   | 'sap_synced'
+  | 'returned_to_buyer'
+  | 'returned_to_vendor'
   // legacy values still in DB
   | 'finance_review'
   | 'finance_approved'
@@ -79,6 +81,7 @@ type VendorStatus =
   | 'purchase_review'
   | 'purchase_approved'
   | 'purchase_rejected';
+
 
 export default function VendorList() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,6 +176,9 @@ export default function VendorList() {
       ceo_office_rejected: { label: 'CEO Office Rejected', variant: 'destructive' },
       pending_sap_sync: { label: 'Pending SAP Sync', variant: 'default' },
       sap_synced: { label: 'SAP Synced', variant: 'default' },
+      returned_to_buyer: { label: 'Returned to Buyer', variant: 'destructive' },
+      returned_to_vendor: { label: 'Returned to Vendor', variant: 'destructive' },
+
       // legacy
       finance_review: { label: 'Finance Review', variant: 'outline' },
       finance_approved: { label: 'Finance Approved', variant: 'default' },
