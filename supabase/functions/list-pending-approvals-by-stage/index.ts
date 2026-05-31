@@ -80,9 +80,10 @@ Deno.serve(async (req) => {
     // 2. Pending progress at those levels
     const { data: progress, error: pErr } = await admin
       .from('vendor_approval_progress')
-      .select('id, vendor_id, level_id, level_number, status')
+      .select('id, vendor_id, level_id, level_number, status, rejection_comments, rejection_from_stage, rejection_from_user, rejection_at')
       .in('level_id', stageLevelIds)
       .eq('status', 'pending');
+
     if (pErr) throw pErr;
     if (!progress || progress.length === 0) {
       return new Response(JSON.stringify({ items: [] }), {
