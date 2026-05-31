@@ -784,6 +784,88 @@ export default function AdminInvitations() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!returnTarget}
+        onOpenChange={(o) => {
+          if (!o) {
+            setReturnTarget(null);
+            setReturnRemarks('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send application back to vendor</DialogTitle>
+            <DialogDescription>
+              Review the approver's rejection remarks and add any clarifications before
+              sending the application to the vendor for correction.
+            </DialogDescription>
+          </DialogHeader>
+          {returnTarget && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="font-medium">
+                  {returnTarget.linked_vendor?.legal_name ||
+                    returnTarget.vendor_name ||
+                    returnTarget.email}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Rejected at:{' '}
+                  {returnTarget.linked_vendor?.last_rejection_stage
+                    ? String(returnTarget.linked_vendor.last_rejection_stage).replace(/_/g, ' ')
+                    : '—'}
+                </div>
+              </div>
+              {returnTarget.linked_vendor?.last_rejection_comments && (
+                <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                  <strong>Approver remarks:</strong>
+                  {'\n'}
+                  {returnTarget.linked_vendor.last_rejection_comments}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="buyer-remarks" className="text-xs text-muted-foreground">
+                  Additional buyer remarks (optional)
+                </Label>
+                <textarea
+                  id="buyer-remarks"
+                  rows={4}
+                  value={returnRemarks}
+                  onChange={(e) => setReturnRemarks(e.target.value)}
+                  placeholder="Tell the vendor what they need to fix"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReturnTarget(null);
+                setReturnRemarks('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button disabled={returnSubmitting} onClick={handleSendToVendor} className="gap-2">
+              {returnSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send to Vendor
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
