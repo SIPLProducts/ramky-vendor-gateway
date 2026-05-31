@@ -416,10 +416,9 @@ export default function VendorRegistration() {
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
-      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
-      const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
       const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected', 'returned_to_vendor'];
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
+
       if (editableStatuses.includes(vendorStatus)) {
         setFormData(existingFormData);
         setVendorStatusState(vendorStatus);
