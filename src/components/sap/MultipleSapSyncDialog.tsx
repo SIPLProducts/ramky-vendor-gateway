@@ -166,7 +166,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
 
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
               <SapF4SelectField label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" required invalid={missing.includes('bukrs')} />
-              <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" required invalid={missing.includes('akont')} />
+              <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" required invalid={missing.includes('akont')} filter={{ key: 'BUKRS', value: form.bukrs, emptyHint: 'Select Company Code first' }} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
               <SapF4SelectField label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" required invalid={missing.includes('fdgrv')} />
             </Section>
