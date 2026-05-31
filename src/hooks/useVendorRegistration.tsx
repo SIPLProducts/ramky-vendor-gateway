@@ -1036,10 +1036,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
+      // When a vendor was returned for corrections, push the application back
+      // into the approval workflow (start of chain) so the DB trigger reseeds
+      // vendor_approval_progress and approvers see the updated submission.
+      const wasReturned = vendorStatus === 'returned_to_vendor';
+      const nextStatus = wasReturned ? 'scm_manager_review' : 'validation_pending';
+
       const vendorData = {
         ...formDataToVendorRecord(formData, userId),
-        status: 'validation_pending' as const,
+        status: nextStatus as VendorStatus,
         submitted_at: new Date().toISOString(),
+        // Clear stale rejection metadata once the vendor resubmits.
+        ...(wasReturned ? {
+          last_rejection_comments: null,
+          last_rejection_stage: null,
+          last_rejected_by: null,
+          last_rejected_at: null,
+        } : {}),
       };
 
       const { data, error } = await supabase
@@ -1051,15 +1064,16 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       if (error) throw error;
 
-      // Upload any new documents
+      // Upload any new documents (existing ones are retained by the dedupe logic)
       await uploadAllDocuments(formData, vendorId);
 
       await supabase.from('audit_logs').insert({
         vendor_id: vendorId,
-        action: 'vendor_resubmitted',
+        action: wasReturned ? 'vendor_resubmitted_after_return' : 'vendor_resubmitted',
         details: {
           resubmitted_by: userId || 'anonymous',
           previous_status: vendorStatus,
+          new_status: nextStatus,
           invitation_token: options?.invitationToken || null,
         },
       });
@@ -1075,7 +1089,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         console.error('[Vendor] Failed to send resubmission notification:', notifyError);
       }
 
-      setVendorStatus('validation_pending');
+      setVendorStatus(nextStatus as VendorStatus);
       await refetchVendor();
       return { ...data, _notify: notifyResult } as typeof data & { _notify: any };
     },
@@ -1090,6 +1104,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       });
     },
   });
+
 
   // Run validations
   const runValidationsMutation = useMutation({
