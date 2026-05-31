@@ -95,7 +95,10 @@ const FAILED_STEP: Partial<Record<RegistrationStatus, number>> = {
   finance_1_rejected: 4,
   finance_2_rejected: 5,
   ceo_office_rejected: 5,
+  returned_to_buyer: 2,
+  returned_to_vendor: 0,
 };
+
 
 function getStepStatus(stepIndex: number, activeIndex: number, vendorStatus: RegistrationStatus): 'completed' | 'active' | 'pending' | 'failed' {
   if (FAILED_STEP[vendorStatus] === stepIndex) return 'failed';
