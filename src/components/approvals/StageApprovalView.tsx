@@ -111,7 +111,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                             The previous approver has not approved yet.
                           </div>
                         )}
+                        {it.rejectionComments && (
+                          <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                            <strong>Returned from {it.rejectionFromStage}:</strong>{' '}
+                            {it.rejectionComments}
+                          </div>
+                        )}
                       </TableCell>
+
                       <TableCell className="text-sm">
                         <div>{it.vendorCompany ?? '—'}</div>
                         {it.companyMismatch && it.invitationCompany && (
