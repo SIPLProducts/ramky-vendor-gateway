@@ -1,39 +1,24 @@
-## What is happening
+I found the issue in the SAP popup dropdown component: `Rec-Account` uses only `SAKNR` as the select value, but the live SAP response can contain the same `SAKNR` under multiple Company Codes (`BUKRS`). That causes the select display to resolve against the wrong option or not show the selected value reliably.
 
-The current error is different from the earlier RLS issue. Now the form is authenticated, but the saved vendor row is using a `user_id` that the database cannot match in the auth users table, so the database rejects the save with:
+Plan:
 
-`insert or update on table "vendors" violates foreign key constraint "vendors_user_id_fkey"`
+1. Update the shared SAP F4 dropdown component in `SapFieldsDialog.tsx`
+   - Add support for filtering live/cached options by a parent field, e.g. `BUKRS = selected Company Code`.
+   - Keep the selected value as the actual SAP field value (`SAKNR`) so the SAP payload remains unchanged.
+   - De-duplicate options after filtering so repeated records do not break the select trigger display.
+   - Show a clear empty-state message when a dependent field needs Company Code first.
 
-This also explains why document uploads/data entry show failures: document upload runs after the vendor draft is created/updated, so if vendor save fails first, document metadata and autosave cannot complete.
+2. Fix `Rec-Account*` in the single SAP Sync popup
+   - Filter `RECON_ACCOUNT` options by the selected `Company Code`.
+   - Display the selected Rec-Account value immediately after selection.
+   - If a configured default Rec-Account is valid for the default Company Code, show it automatically when the popup opens.
+   - If the Company Code changes and the current Rec-Account is not valid for the new Company Code, clear it so the user must select a valid account.
 
-## Fix plan
+3. Apply the same dependent logic to the multiple SAP Sync popup
+   - Keep bulk sync behavior consistent with the single-vendor popup.
+   - Filter Rec-Account by Company Code and clear invalid selections when Company Code changes.
 
-1. **Harden session resolution before vendor save**
-   - In `src/hooks/useVendorRegistration.tsx`, use a single helper that calls `getUser()` after session refresh, not only `getSession()`.
-   - This ensures the app saves the real verified auth user id, not a stale/invalid local session id.
-   - If no valid user exists, stop saving and redirect back to the invitation login flow with a clear session-expired message.
-
-2. **Handle foreign-key save errors cleanly**
-   - Detect `vendors_user_id_fkey` failures in save/submit errors.
-   - Show a clear message like: “Your login session is invalid. Please reopen the invitation link and sign in again.”
-   - Redirect to `/vendor/invite?token=...` instead of letting the user continue filling a form that cannot save.
-
-3. **Fix invitation auto-login consistency**
-   - In `supabase/functions/accept-vendor-invite/index.ts`, return the generated auth user id from the invite acceptance function.
-   - If needed, ensure the invitation’s `user_id` is linked to the auth user created/found for that invited email.
-   - This keeps invitation, authenticated user, and vendor record aligned.
-
-4. **Backend safety repair for this failed invitation/data**
-   - Add a small database migration/function adjustment if needed so invitation claiming safely links the invitation to the authenticated user.
-   - No table deletion or broad data cleanup unless you explicitly ask; this only repairs the broken invitation/user link.
-
-5. **Verify**
-   - Confirm the invitation email has an auth user.
-   - Confirm the invitation token maps to the same user.
-   - Confirm vendor save/submit will use that user id and the assigned buyer company id.
-
-## Technical notes
-
-- I will not change the buyer company logic.
-- I will not delete existing vendor/invitation data unless you separately confirm that cleanup.
-- This is a targeted fix for vendor draft save, document upload save, and final submit failure.
+4. Validate the behavior
+   - Confirm Company Code selection refreshes the Rec-Account list automatically.
+   - Confirm dependent dropdowns only show records for the selected Company Code.
+   - Confirm default values display correctly when valid and do not display stale/invalid values after Company Code changes.

@@ -376,7 +376,7 @@ const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: strin
 };
 
 export function SapF4SelectField({
-  label, masterType, value, onChange, liveItems, placeholder, required, invalid,
+  label, masterType, value, onChange, liveItems, placeholder, required, invalid, filter,
 }: {
   label: string;
   masterType: string;
@@ -386,51 +386,81 @@ export function SapF4SelectField({
   placeholder?: string;
   required?: boolean;
   invalid?: boolean;
+  filter?: { key: string; value: string; emptyHint?: string };
 }) {
   const map = F4_FIELD_MAP[masterType];
   const isLive = Array.isArray(liveItems);
   const { data: cachedRows, isLoading: isLoadingCache } = useSapMasterData(isLive ? undefined : masterType);
 
+  const filterActive = !!filter;
+  const filterReady = !filter || !!String(filter.value || '').trim();
+
   const options = (() => {
+    if (!filterReady) return [] as { value: string; label: string }[];
+    const matches = (extra: any) =>
+      !filter || String(extra?.[filter.key] ?? '').trim() === String(filter.value).trim();
+
+    let raw: { value: string; label: string }[] = [];
     if (isLive) {
-      return (liveItems || [])
+      raw = (liveItems || [])
         .map((item) => {
+          if (!matches(item)) return null;
           const code = map ? item?.[map.code] : item?.code;
           if (code === undefined || code === null || String(code).trim() === '') return null;
           const desc = map?.desc ? item?.[map.desc] : item?.description;
-          const prefix = map?.prefix ? item?.[map.prefix] : null;
+          const prefix = !filter && map?.prefix ? item?.[map.prefix] : null;
           const codePart = prefix ? `${prefix} / ${code}` : String(code);
           const labelText = desc ? `${codePart} — ${desc}` : codePart;
           return { value: String(code), label: labelText };
         })
         .filter(Boolean) as { value: string; label: string }[];
+    } else {
+      raw = (cachedRows || [])
+        .map((r: any) => {
+          const extra = r.extra || {};
+          if (!matches(extra)) return null;
+          const code = map ? (extra[map.code] ?? r.code) : r.code;
+          const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
+          const prefix = !filter && map?.prefix ? extra[map.prefix] : null;
+          const codePart = prefix ? `${prefix} / ${code}` : String(code);
+          const labelText = desc ? `${codePart} — ${desc}` : codePart;
+          return { value: String(r.code ?? code), label: labelText };
+        })
+        .filter(Boolean) as { value: string; label: string }[];
     }
-    return (cachedRows || []).map((r: any) => {
-      const extra = r.extra || {};
-      const code = map ? (extra[map.code] ?? r.code) : r.code;
-      const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
-      const prefix = map?.prefix ? extra[map.prefix] : null;
-      const codePart = prefix ? `${prefix} / ${code}` : String(code);
-      const labelText = desc ? `${codePart} — ${desc}` : codePart;
-      return { value: String(r.code), label: labelText };
-    });
+    // de-duplicate by value (first wins)
+    const seen = new Set<string>();
+    return raw.filter((o) => (seen.has(o.value) ? false : (seen.add(o.value), true)));
   })();
 
+  // Clear selected value if it is no longer a valid option after filtering.
+  useEffect(() => {
+    if (!filterActive || !filterReady) return;
+    if (!value) return;
+    if (!options.some((o) => o.value === String(value))) {
+      onChange('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterActive, filterReady, options.length, value]);
+
   const isLoading = isLive ? false : isLoadingCache;
+  const showFilterHint = filterActive && !filterReady;
 
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">
         {label}{required && <span className="text-destructive ml-0.5">*</span>}
       </Label>
-      <Select value={value || undefined} onValueChange={(v) => onChange(v)}>
+      <Select value={value || undefined} onValueChange={(v) => onChange(v)} disabled={showFilterHint}>
         <SelectTrigger className={`h-9 rounded-lg ${invalid ? 'border-destructive ring-1 ring-destructive' : ''}`}>
-          <SelectValue placeholder={placeholder || 'Select…'} />
+          <SelectValue placeholder={showFilterHint ? (filter?.emptyHint || 'Select Company Code first') : (placeholder || 'Select…')} />
         </SelectTrigger>
         <SelectContent className="max-h-72">
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              {isLoading ? 'Loading F4 values…' : 'No options available.'}
+              {showFilterHint
+                ? (filter?.emptyHint || 'Select Company Code first')
+                : isLoading ? 'Loading F4 values…' : 'No options available.'}
             </div>
           ) : (
             options.map((o) => (
@@ -442,9 +472,11 @@ export function SapF4SelectField({
         </SelectContent>
       </Select>
       <p className="text-[11px] text-muted-foreground">
-        {isLoading
-          ? 'Loading F4 values…'
-          : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
+        {showFilterHint
+          ? (filter?.emptyHint || 'Select Company Code first to load options.')
+          : isLoading
+            ? 'Loading F4 values…'
+            : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
       </p>
     </div>
   );
