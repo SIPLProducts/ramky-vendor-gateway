@@ -413,7 +413,16 @@ export default function VendorList() {
                               ? `${vendor.registered_city}, ${vendor.registered_state}`
                               : '-'}
                           </TableCell>
-                          <TableCell>{getStatusBadge(vendor.status as VendorStatus)}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(vendor.status as VendorStatus)}
+                            {vendor.status === 'returned_to_buyer' && (vendor as any).last_rejection_comments && (
+                              <div className="mt-1 text-xs text-amber-700 max-w-xs truncate" title={(vendor as any).last_rejection_comments}>
+                                <strong>{(vendor as any).last_rejection_stage ?? 'Approver'}:</strong>{' '}
+                                {(vendor as any).last_rejection_comments}
+                              </div>
+                            )}
+                          </TableCell>
+
                           <TableCell className="font-mono">
                             {vendor.sap_vendor_code || '-'}
                           </TableCell>
