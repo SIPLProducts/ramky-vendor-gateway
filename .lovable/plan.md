@@ -1,60 +1,93 @@
-## Plan: fix rejection workflow reflection end-to-end
+## Diagnosis
 
-### Goal
-Make rejection move backward to the immediate previous approver, show rejection remarks at each handoff, let the original Buyer return it to the Vendor, and let the Vendor edit/resubmit the same saved application without losing documents.
+For vendor `BADE MURALI KRISHNA` (id `f829b283…`):
 
-### What I found
-The reverse approval logic is partly present, but it is not fully reflected because:
-- The Vendor registration route still treats every non-draft submitted vendor as read-only, so `returned_to_vendor` does not reopen the form from the invite link.
-- The Vendor form hydration list does not include the new workflow statuses consistently.
-- Resubmission currently sets `validation_pending`, while the approval trigger only reseeds/continues workflow when the status moves into an approval review status.
-- The Buyer list has a return action, but the remarks are only shown inside the dialog, not clearly surfaced in the row/details.
-- Status tracking does not explicitly handle `returned_to_buyer` / `returned_to_vendor`, so users may not see the correct workflow state.
+- Audit log shows `vendor_rejectd_at_finance_2` ran at 16:53.
+- `vendor_approval_progress` chain: SCM_MANAGER ✓, SCM_HEAD ✓, FINANCE_1 ✓, FINANCE_2 = **rejected**.
+- `vendors.status` = `finance_2_rejected` (legacy enum), and `last_rejection_*` columns are NULL.
 
-### Implementation steps
-1. **Vendor invite/form reopening**
-   - Update `VendorRegistration.tsx` token validation so `returned_to_vendor` behaves like an editable status, not like a completed/submitted status screen.
-   - Include `returned_to_vendor` in the editable hydration logic so existing form data is loaded back into the same application.
-   - Keep uploaded documents intact by preserving the existing `vendor_documents` flow and only replacing files if the vendor uploads a new file.
+The current source of `process-approval-action/index.ts` never sets `finance_2_rejected` and always reopens the previous progress row + sets vendor to `finance_1_review`. Nowhere else in the repo writes `_rejected` stage statuses. The only explanation is that the **deployed edge function is a stale prior version** — the recent reverse-rejection edits never re-deployed. That is why:
 
-2. **Vendor rejection remarks display**
-   - Add a prominent semantic alert/banner on the Vendor registration page when status is `returned_to_vendor`.
-   - Display `last_rejection_stage`, `last_rejection_comments`, and rejection date from the existing vendor record.
-   - Change the submit CTA context to resubmission where applicable.
+- The Finance 1 inbox is empty (no `pending` row at FINANCE_1).
+- Vendor status is the old `finance_2_rejected` instead of `finance_1_review`.
 
-3. **Correct vendor resubmission routing**
-   - Update `resubmitVendor` so when a returned vendor resubmits, status moves back into the approval workflow (`scm_manager_review` or the first routed approval status), not `validation_pending`.
-   - Clear stale return metadata only after resubmission is accepted, while preserving historical progress/audit data.
-   - Ensure approval progress is reseeded via the existing trigger/route logic so the updated application continues through approvals.
+## Fix
 
-4. **Buyer returned queue visibility**
-   - In `VendorList.tsx`, make `returned_to_buyer` vendors visibly show the rejection stage/remarks in the table/details.
-   - Keep the existing “Return to Vendor” action, but make the dialog clearly include approver remarks and buyer remarks before sending to vendor.
-   - Refresh vendor list after successful return so the status change is immediately reflected.
+### 1. Force redeploy `process-approval-action`
+Re-save (touch) `supabase/functions/process-approval-action/index.ts` so the platform redeploys the current code. Add a harmless comment change at the top so the file hash differs and the deploy pipeline picks it up. If a redeploy tool path is available it will be used instead, but a file edit reliably triggers redeployment.
 
-5. **Approval-stage reverse routing robustness**
-   - Adjust `process-approval-action` rejection branch so reopening the previous approver clears stale approval comments and carries the new rejection metadata reliably.
-   - Keep the current dynamic previous-level lookup, so it works even if SCM stages are skipped or the matrix changes.
+### 2. Data fix for the stuck vendor (one-off migration)
+For any vendor currently in a legacy `*_rejected` status whose chain has an immediately-previous `approved` level, reopen that previous level and bring the vendor back into the active review queue. SQL outline:
 
-6. **Status tracker/type cleanup**
-   - Add the missing approval statuses to `src/types/vendor.ts` so frontend logic handles the current workflow statuses consistently.
-   - Update `RegistrationStatusTracker` handling for `returned_to_buyer` and `returned_to_vendor` to show action-required/returned states instead of falling through.
+```sql
+-- For vendor f829b283... and any similarly-stuck rows:
+-- a) Reopen the immediate previous approved level as pending and stamp rejection metadata
+WITH bad AS (
+  SELECT v.id AS vendor_id, v.status::text AS s
+  FROM vendors v
+  WHERE v.status::text IN (
+    'scm_manager_rejected','scm_head_rejected',
+    'finance_1_rejected','finance_2_rejected','ceo_office_rejected'
+  )
+),
+rej AS (
+  SELECT p.*, l.stage
+  FROM vendor_approval_progress p
+  JOIN approval_matrix_levels l ON l.id=p.level_id
+  JOIN bad b ON b.vendor_id=p.vendor_id
+  WHERE p.status='rejected'
+),
+prev AS (
+  SELECT DISTINCT ON (p.vendor_id) p.*
+  FROM vendor_approval_progress p
+  JOIN rej r ON r.vendor_id=p.vendor_id AND p.level_number < r.level_number
+  ORDER BY p.vendor_id, p.level_number DESC
+)
+UPDATE vendor_approval_progress vap
+SET status='pending', acted_by=NULL, acted_at=NULL,
+    rejection_comments = r.comments,
+    rejection_from_stage = r.stage,
+    rejection_from_user  = r.acted_by,
+    rejection_at         = r.acted_at
+FROM prev pr
+JOIN rej r ON r.vendor_id = pr.vendor_id
+WHERE vap.id = pr.id;
 
-### Validation
-- Verify code paths for these scenarios:
-  - Finance 2 reject → Finance 1 pending with remarks.
-  - Finance 1 reject → SCM Head pending with remarks.
-  - SCM Head reject → SCM Manager pending with remarks.
-  - SCM Manager reject → Buyer sees returned vendor and remarks.
-  - Buyer sends to Vendor → Vendor sees remarks, existing data/documents remain, form is editable.
-  - Vendor resubmits → approval workflow starts again with updated data.
+-- b) Move vendor status to the matching review status and mirror banner fields
+UPDATE vendors v
+SET status = CASE pl.stage
+      WHEN 'SCM_MANAGER' THEN 'scm_manager_review'
+      WHEN 'SCM_HEAD'    THEN 'scm_head_review'
+      WHEN 'FINANCE_1'   THEN 'finance_1_review'
+      WHEN 'FINANCE_2'   THEN 'finance_2_review'
+      WHEN 'CEO_OFFICE'  THEN 'ceo_office_review'
+    END::vendor_status,
+    last_rejection_comments = r.comments,
+    last_rejection_stage    = r.stage,
+    last_rejected_by        = r.acted_by,
+    last_rejected_at        = r.acted_at
+FROM vendor_approval_progress vap
+JOIN approval_matrix_levels pl ON pl.id = vap.level_id
+JOIN (
+  SELECT p.vendor_id, p.comments, p.acted_by, p.acted_at, l.stage
+  FROM vendor_approval_progress p
+  JOIN approval_matrix_levels l ON l.id=p.level_id
+  WHERE p.status='rejected'
+) r ON r.vendor_id = v.id
+WHERE vap.vendor_id = v.id
+  AND vap.status   = 'pending'
+  AND v.status::text IN (
+    'scm_manager_rejected','scm_head_rejected',
+    'finance_1_rejected','finance_2_rejected','ceo_office_rejected'
+  );
+```
 
-### Files expected to change
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-- `src/pages/VendorList.tsx`
-- `src/components/vendor/RegistrationStatusTracker.tsx`
-- `src/types/vendor.ts`
-- `supabase/functions/process-approval-action/index.ts`
+For first-stage rejections (no previous level), set the vendor to `returned_to_buyer` and stamp the same metadata.
 
-No new database schema should be needed unless the current backend does not actually contain the previously added rejection columns/status values.
+### 3. Verification
+- Re-query `vendors` + `vendor_approval_progress` for `f829b283…`: status should be `finance_1_review` and the FINANCE_1 row pending with rejection comments populated.
+- Reload `/approvals/finance-1` for `Grandhi Srinivas` — the vendor must appear in Pending with a "Returned from FINANCE_2" banner.
+- Trigger a fresh Finance 2 → Reject on a test vendor and confirm the new deployment moves it back to Finance 1 directly (no `finance_2_rejected` row).
+
+## Out of scope
+No changes to UI, RLS, types, or other edge functions — the source already matches the desired behavior; only the deployment + a one-time data backfill are needed.
