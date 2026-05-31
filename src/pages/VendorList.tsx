@@ -91,6 +91,10 @@ export default function VendorList() {
   const [pageSize, setPageSize] = useState(10);
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [returnTarget, setReturnTarget] = useState<VendorRow | null>(null);
+  const [returnRemarks, setReturnRemarks] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+
 
   // Fetch all vendors from database
   const { data: vendors, isLoading, refetch } = useVendors();
