@@ -77,10 +77,13 @@ Deno.serve(async (req) => {
       try {
         await admin.functions.invoke('send-status-notification', {
           body: {
-            to: vendorEmail,
-            vendor_name: vendor.legal_name,
-            status: 'returned_to_vendor',
-            remarks: combinedRemarks,
+            vendorId: vendor_id,
+            newStatus: 'returned_to_vendor',
+            previousStatus: vendor.status,
+            vendorEmail,
+            vendorName: vendor.legal_name ?? 'Vendor',
+            comments: combinedRemarks,
+            simulationMode: false,
           },
         });
       } catch (e) {

@@ -116,10 +116,59 @@ export default function AdminInvitations() {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data;
+
+      // Enrich with linked vendor info so we can show returned-to-buyer status + rejection remarks.
+      const vendorIds = Array.from(new Set((data ?? []).map((i: any) => i.vendor_id).filter(Boolean)));
+      let vendorMap = new Map<string, any>();
+      if (vendorIds.length > 0) {
+        const { data: vendorRows } = await supabase
+          .from('vendors')
+          .select('id, legal_name, status, last_rejection_comments, last_rejection_stage, last_rejected_at, primary_email, registered_email')
+          .in('id', vendorIds);
+        vendorMap = new Map((vendorRows ?? []).map((v: any) => [v.id, v]));
+      }
+      return (data ?? []).map((inv: any) => ({
+        ...inv,
+        linked_vendor: inv.vendor_id ? vendorMap.get(inv.vendor_id) ?? null : null,
+      }));
     },
     enabled: !!user?.id,
   });
+
+  // Buyer "Send to Vendor" dialog state
+  const [returnTarget, setReturnTarget] = useState<any | null>(null);
+  const [returnRemarks, setReturnRemarks] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+
+  const handleSendToVendor = async () => {
+    if (!returnTarget?.linked_vendor?.id) return;
+    setReturnSubmitting(true);
+    try {
+      const { error } = await supabase.functions.invoke('buyer-return-to-vendor', {
+        body: {
+          vendor_id: returnTarget.linked_vendor.id,
+          comments: returnRemarks.trim() || null,
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Sent to vendor',
+        description: 'The vendor has been notified with the rejection remarks.',
+      });
+      setReturnTarget(null);
+      setReturnRemarks('');
+      queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to send',
+        description: err?.message || 'Could not send the application back to the vendor.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
 
   // Create invitation mutation
   const createInvitation = useMutation<any, Error, { email: string; vendorName: string; phoneNumber: string; expiryDays: number; tenantId: string | null }>({
@@ -627,7 +676,10 @@ export default function AdminInvitations() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedInvitations.map((invitation) => (
+                    {paginatedInvitations.map((invitation) => {
+                      const linked = (invitation as any).linked_vendor;
+                      const isReturned = linked?.status === 'returned_to_buyer';
+                      return (
                       <TableRow key={invitation.id}>
                         <TableCell>
                           {(invitation as any).vendor_name ? (
@@ -637,6 +689,27 @@ export default function AdminInvitations() {
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                          {isReturned && (
+                            <div className="mt-1 space-y-1">
+                              <Badge variant="destructive" className="gap-1">
+                                <XCircle className="h-3 w-3" />
+                                Returned to Buyer
+                              </Badge>
+                              {linked?.last_rejection_comments && (
+                                <div
+                                  className="text-xs text-amber-700 max-w-xs"
+                                  title={linked.last_rejection_comments}
+                                >
+                                  <strong>
+                                    {linked.last_rejection_stage
+                                      ? String(linked.last_rejection_stage).replace(/_/g, ' ')
+                                      : 'Approver'}:
+                                  </strong>{' '}
+                                  {linked.last_rejection_comments}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
@@ -658,6 +731,20 @@ export default function AdminInvitations() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {isReturned && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setReturnTarget(invitation);
+                                  setReturnRemarks('');
+                                }}
+                                className="gap-1"
+                              >
+                                <Send className="h-4 w-4" />
+                                Send to Vendor
+                              </Button>
+                            )}
                             {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
                               <Button
                                 variant="ghost"
@@ -679,7 +766,8 @@ export default function AdminInvitations() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -696,6 +784,88 @@ export default function AdminInvitations() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!returnTarget}
+        onOpenChange={(o) => {
+          if (!o) {
+            setReturnTarget(null);
+            setReturnRemarks('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send application back to vendor</DialogTitle>
+            <DialogDescription>
+              Review the approver's rejection remarks and add any clarifications before
+              sending the application to the vendor for correction.
+            </DialogDescription>
+          </DialogHeader>
+          {returnTarget && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="font-medium">
+                  {returnTarget.linked_vendor?.legal_name ||
+                    returnTarget.vendor_name ||
+                    returnTarget.email}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Rejected at:{' '}
+                  {returnTarget.linked_vendor?.last_rejection_stage
+                    ? String(returnTarget.linked_vendor.last_rejection_stage).replace(/_/g, ' ')
+                    : '—'}
+                </div>
+              </div>
+              {returnTarget.linked_vendor?.last_rejection_comments && (
+                <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                  <strong>Approver remarks:</strong>
+                  {'\n'}
+                  {returnTarget.linked_vendor.last_rejection_comments}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="buyer-remarks" className="text-xs text-muted-foreground">
+                  Additional buyer remarks (optional)
+                </Label>
+                <textarea
+                  id="buyer-remarks"
+                  rows={4}
+                  value={returnRemarks}
+                  onChange={(e) => setReturnRemarks(e.target.value)}
+                  placeholder="Tell the vendor what they need to fix"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReturnTarget(null);
+                setReturnRemarks('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button disabled={returnSubmitting} onClick={handleSendToVendor} className="gap-2">
+              {returnSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send to Vendor
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
