@@ -1488,6 +1488,10 @@ export type Database = {
           id: string
           level_id: string
           level_number: number
+          rejection_at: string | null
+          rejection_comments: string | null
+          rejection_from_stage: string | null
+          rejection_from_user: string | null
           status: string
           vendor_id: string
         }
@@ -1499,6 +1503,10 @@ export type Database = {
           id?: string
           level_id: string
           level_number: number
+          rejection_at?: string | null
+          rejection_comments?: string | null
+          rejection_from_stage?: string | null
+          rejection_from_user?: string | null
           status?: string
           vendor_id: string
         }
@@ -1510,6 +1518,10 @@ export type Database = {
           id?: string
           level_id?: string
           level_number?: number
+          rejection_at?: string | null
+          rejection_comments?: string | null
+          rejection_from_stage?: string | null
+          rejection_from_user?: string | null
           status?: string
           vendor_id?: string
         }
@@ -1806,6 +1818,10 @@ export type Database = {
           is_gst_registered: boolean | null
           is_msme_registered: boolean | null
           labour_permit_no: string | null
+          last_rejected_at: string | null
+          last_rejected_by: string | null
+          last_rejection_comments: string | null
+          last_rejection_stage: string | null
           lead_time_required: string | null
           legal_name: string | null
           machinery_availability: string | null
@@ -1993,6 +2009,10 @@ export type Database = {
           is_gst_registered?: boolean | null
           is_msme_registered?: boolean | null
           labour_permit_no?: string | null
+          last_rejected_at?: string | null
+          last_rejected_by?: string | null
+          last_rejection_comments?: string | null
+          last_rejection_stage?: string | null
           lead_time_required?: string | null
           legal_name?: string | null
           machinery_availability?: string | null
@@ -2180,6 +2200,10 @@ export type Database = {
           is_gst_registered?: boolean | null
           is_msme_registered?: boolean | null
           labour_permit_no?: string | null
+          last_rejected_at?: string | null
+          last_rejected_by?: string | null
+          last_rejection_comments?: string | null
+          last_rejection_stage?: string | null
           lead_time_required?: string | null
           legal_name?: string | null
           machinery_availability?: string | null
@@ -2434,6 +2458,8 @@ export type Database = {
         | "pending_sap_sync"
         | "dms_sync_pending"
         | "dms_synced"
+        | "returned_to_buyer"
+        | "returned_to_vendor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2597,6 +2623,8 @@ export const Constants = {
         "pending_sap_sync",
         "dms_sync_pending",
         "dms_synced",
+        "returned_to_buyer",
+        "returned_to_vendor",
       ],
     },
   },

@@ -19,6 +19,9 @@ export type RegistrationStatus =
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
   | 'sap_synced'
+  | 'returned_to_buyer'
+  | 'returned_to_vendor'
+
   // legacy
   | 'finance_review'
   | 'finance_approved'

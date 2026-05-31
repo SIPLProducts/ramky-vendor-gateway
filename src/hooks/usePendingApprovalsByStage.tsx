@@ -22,7 +22,11 @@ export interface StageApprovalItem {
   buyerName?: string | null;
   buyerEmail?: string | null;
   mappedScmManagers?: Array<{ name: string | null; email: string | null }>;
+  rejectionComments?: string | null;
+  rejectionFromStage?: string | null;
+  rejectionAt?: string | null;
 }
+
 
 /**
  * Returns vendors currently waiting at the given stage where the logged-in user

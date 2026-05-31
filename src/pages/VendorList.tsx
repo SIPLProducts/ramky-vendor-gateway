@@ -24,7 +24,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -72,6 +76,8 @@ type VendorStatus =
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
   | 'sap_synced'
+  | 'returned_to_buyer'
+  | 'returned_to_vendor'
   // legacy values still in DB
   | 'finance_review'
   | 'finance_approved'
@@ -80,7 +86,10 @@ type VendorStatus =
   | 'purchase_approved'
   | 'purchase_rejected';
 
+
 export default function VendorList() {
+  const { toast } = useToast();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
@@ -88,6 +97,10 @@ export default function VendorList() {
   const [pageSize, setPageSize] = useState(10);
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [returnTarget, setReturnTarget] = useState<VendorRow | null>(null);
+  const [returnRemarks, setReturnRemarks] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+
 
   // Fetch all vendors from database
   const { data: vendors, isLoading, refetch } = useVendors();
@@ -173,6 +186,9 @@ export default function VendorList() {
       ceo_office_rejected: { label: 'CEO Office Rejected', variant: 'destructive' },
       pending_sap_sync: { label: 'Pending SAP Sync', variant: 'default' },
       sap_synced: { label: 'SAP Synced', variant: 'default' },
+      returned_to_buyer: { label: 'Returned to Buyer', variant: 'destructive' },
+      returned_to_vendor: { label: 'Returned to Vendor', variant: 'destructive' },
+
       // legacy
       finance_review: { label: 'Finance Review', variant: 'outline' },
       finance_approved: { label: 'Finance Approved', variant: 'default' },
@@ -299,10 +315,13 @@ export default function VendorList() {
                 <SelectItem value="ceo_office_review">CEO Office Review</SelectItem>
                 <SelectItem value="pending_sap_sync">Pending SAP Sync</SelectItem>
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
+                <SelectItem value="returned_to_buyer">Returned to Buyer</SelectItem>
+                <SelectItem value="returned_to_vendor">Returned to Vendor</SelectItem>
                 <SelectItem value="scm_manager_rejected">SCM Manager Rejected</SelectItem>
                 <SelectItem value="scm_head_rejected">SCM Head Rejected</SelectItem>
                 <SelectItem value="finance_1_rejected">Finance 1 Rejected</SelectItem>
                 <SelectItem value="finance_2_rejected">Finance 2 Rejected</SelectItem>
+
               </SelectContent>
             </Select>
             <Select value={buyerCompanyFilter} onValueChange={handleBuyerCompanyFilterChange}>
@@ -399,17 +418,32 @@ export default function VendorList() {
                             {vendor.sap_vendor_code || '-'}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedVendor(vendor);
-                                setShowDetails(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedVendor(vendor);
+                                  setShowDetails(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {vendor.status === 'returned_to_buyer' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setReturnTarget(vendor);
+                                    setReturnRemarks('');
+                                  }}
+                                >
+                                  Return to Vendor
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
+
                         </TableRow>
                       ))
                     )}
@@ -695,6 +729,65 @@ export default function VendorList() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!returnTarget} onOpenChange={(o) => { if (!o) setReturnTarget(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Return application to vendor</DialogTitle>
+          </DialogHeader>
+          {returnTarget && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="font-medium">{returnTarget.legal_name || returnTarget.id}</div>
+                <div className="text-xs text-muted-foreground">
+                  Last rejected at: {(returnTarget as any).last_rejection_stage ?? '—'}
+                </div>
+              </div>
+              {(returnTarget as any).last_rejection_comments && (
+                <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                  <strong>Approver remarks:</strong>{'\n'}{(returnTarget as any).last_rejection_comments}
+                </div>
+              )}
+              <div>
+                <label className="text-xs text-muted-foreground">Additional buyer remarks (optional)</label>
+                <Textarea
+                  rows={4}
+                  value={returnRemarks}
+                  onChange={(e) => setReturnRemarks(e.target.value)}
+                  placeholder="Tell the vendor what they need to fix"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReturnTarget(null)}>Cancel</Button>
+            <Button
+              disabled={returnSubmitting}
+              onClick={async () => {
+                if (!returnTarget) return;
+                setReturnSubmitting(true);
+                try {
+                  const { error } = await supabase.functions.invoke('buyer-return-to-vendor', {
+                    body: { vendor_id: returnTarget.id, comments: returnRemarks.trim() || null },
+                  });
+                  if (error) throw error;
+                  toast({ title: 'Returned to vendor', description: 'The vendor has been notified.' });
+                  setReturnTarget(null);
+                  setReturnRemarks('');
+                  await refetch();
+                } catch (err: any) {
+                  toast({ title: 'Failed to return', description: err.message, variant: 'destructive' });
+                } finally {
+                  setReturnSubmitting(false);
+                }
+              }}
+            >
+              {returnSubmitting ? 'Sending…' : 'Send to vendor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

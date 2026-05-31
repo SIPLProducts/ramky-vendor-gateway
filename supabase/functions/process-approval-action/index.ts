@@ -88,13 +88,6 @@ Deno.serve(async (req) => {
       FINANCE_2: 'finance_2_review',
       CEO_OFFICE: 'ceo_office_review',
     };
-    const STAGE_TO_REJECT: Record<string, string> = {
-      SCM_MANAGER: 'scm_manager_rejected',
-      SCM_HEAD: 'scm_head_rejected',
-      FINANCE_1: 'finance_1_rejected',
-      FINANCE_2: 'finance_2_rejected',
-      CEO_OFFICE: 'ceo_office_rejected',
-    };
 
     // Look up the current level's stage
     const { data: curLevel } = await admin
@@ -103,15 +96,67 @@ Deno.serve(async (req) => {
     const curStage = curLevel?.stage ?? 'SCM_MANAGER';
 
     if (action === 'reject') {
+      // 1) Mark the current step as rejected with remarks.
+      const nowIso = new Date().toISOString();
       await admin.from('vendor_approval_progress').update({
-        status: 'rejected', acted_by: userId, acted_at: new Date().toISOString(), comments,
+        status: 'rejected', acted_by: userId, acted_at: nowIso, comments,
       }).eq('id', progress_id);
-      const rejectStatus = STAGE_TO_REJECT[curStage] ?? 'purchase_rejected';
-      await admin.from('vendors').update({ status: rejectStatus }).eq('id', progress.vendor_id);
-      return new Response(JSON.stringify({ ok: true, vendor_status: rejectStatus }), {
+
+      // 2) Find the immediate previous level in this vendor's chain.
+      const { data: chain } = await admin
+        .from('vendor_approval_progress')
+        .select('id, level_id, level_number, status')
+        .eq('vendor_id', progress.vendor_id);
+      const prev = (chain ?? [])
+        .filter((r: any) => (r.level_number ?? 0) < (progress.level_number ?? 0))
+        .sort((a: any, b: any) => (b.level_number ?? 0) - (a.level_number ?? 0))[0];
+
+      // 3) Always mirror the latest rejection on the vendor for banners.
+      const vendorRejectionPatch: Record<string, unknown> = {
+        last_rejection_comments: comments ?? null,
+        last_rejection_stage: curStage,
+        last_rejected_by: userId,
+        last_rejected_at: nowIso,
+      };
+
+      if (prev) {
+        // Reopen the previous step and carry the remarks so that approver
+        // immediately sees why it bounced back.
+        const { data: prevLvl } = await admin
+          .from('approval_matrix_levels')
+          .select('stage').eq('id', prev.level_id).single();
+        const prevStage = prevLvl?.stage ?? 'SCM_MANAGER';
+        const reviewStatus = STAGE_TO_REVIEW[prevStage] ?? 'scm_manager_review';
+
+        await admin.from('vendor_approval_progress').update({
+          status: 'pending',
+          acted_by: null,
+          acted_at: null,
+          rejection_comments: comments ?? null,
+          rejection_from_stage: curStage,
+          rejection_from_user: userId,
+          rejection_at: nowIso,
+        }).eq('id', prev.id);
+
+        await admin.from('vendors')
+          .update({ status: reviewStatus, ...vendorRejectionPatch })
+          .eq('id', progress.vendor_id);
+
+        return new Response(JSON.stringify({ ok: true, vendor_status: reviewStatus, returned_to_level: prev.level_number }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 4) No previous level — current rejecter is the first stage.
+      //    Send the application back to the inviting buyer.
+      await admin.from('vendors')
+        .update({ status: 'returned_to_buyer', ...vendorRejectionPatch })
+        .eq('id', progress.vendor_id);
+      return new Response(JSON.stringify({ ok: true, vendor_status: 'returned_to_buyer' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // APPROVE
     await admin.from('vendor_approval_progress').update({
