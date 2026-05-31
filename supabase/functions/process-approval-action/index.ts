@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+// v2: reverse-rejection routes back to the immediate previous level.
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
