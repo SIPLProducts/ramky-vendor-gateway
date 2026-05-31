@@ -305,10 +305,13 @@ export default function VendorList() {
                 <SelectItem value="ceo_office_review">CEO Office Review</SelectItem>
                 <SelectItem value="pending_sap_sync">Pending SAP Sync</SelectItem>
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
+                <SelectItem value="returned_to_buyer">Returned to Buyer</SelectItem>
+                <SelectItem value="returned_to_vendor">Returned to Vendor</SelectItem>
                 <SelectItem value="scm_manager_rejected">SCM Manager Rejected</SelectItem>
                 <SelectItem value="scm_head_rejected">SCM Head Rejected</SelectItem>
                 <SelectItem value="finance_1_rejected">Finance 1 Rejected</SelectItem>
                 <SelectItem value="finance_2_rejected">Finance 2 Rejected</SelectItem>
+
               </SelectContent>
             </Select>
             <Select value={buyerCompanyFilter} onValueChange={handleBuyerCompanyFilterChange}>
