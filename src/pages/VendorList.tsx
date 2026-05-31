@@ -412,17 +412,32 @@ export default function VendorList() {
                             {vendor.sap_vendor_code || '-'}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedVendor(vendor);
-                                setShowDetails(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedVendor(vendor);
+                                  setShowDetails(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {vendor.status === 'returned_to_buyer' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setReturnTarget(vendor);
+                                    setReturnRemarks('');
+                                  }}
+                                >
+                                  Return to Vendor
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
+
                         </TableRow>
                       ))
                     )}
