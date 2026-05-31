@@ -14,6 +14,9 @@ interface Row {
   comments: string | null;
   level_name: string;
   acted_by_name: string | null;
+  rejection_comments: string | null;
+  rejection_from_stage: string | null;
+  rejection_at: string | null;
 }
 
 export function ApprovalTimeline({ vendorId }: Props) {
@@ -24,7 +27,7 @@ export function ApprovalTimeline({ vendorId }: Props) {
     (async () => {
       const { data: progress } = await supabase
         .from('vendor_approval_progress')
-        .select('id, level_id, level_number, status, acted_at, acted_by, comments')
+        .select('id, level_id, level_number, status, acted_at, acted_by, comments, rejection_comments, rejection_from_stage, rejection_at')
         .eq('vendor_id', vendorId)
         .order('level_number', { ascending: false });
 
@@ -42,7 +45,7 @@ export function ApprovalTimeline({ vendorId }: Props) {
       const lMap = new Map((levels ?? []).map((l) => [l.id, l.level_name]));
       const pMap = new Map((profiles ?? []).map((p) => [p.id, p.full_name ?? p.email]));
 
-      setRows(progress.map((p) => ({
+      setRows(progress.map((p: any) => ({
         id: p.id,
         level_number: p.level_number,
         status: p.status,
@@ -50,6 +53,9 @@ export function ApprovalTimeline({ vendorId }: Props) {
         comments: p.comments,
         level_name: lMap.get(p.level_id) ?? '—',
         acted_by_name: p.acted_by ? (pMap.get(p.acted_by) ?? null) : null,
+        rejection_comments: p.rejection_comments ?? null,
+        rejection_from_stage: p.rejection_from_stage ?? null,
+        rejection_at: p.rejection_at ?? null,
       })));
       setLoading(false);
     })();
@@ -90,7 +96,19 @@ export function ApprovalTimeline({ vendorId }: Props) {
                       by {r.acted_by_name} · {r.acted_at ? new Date(r.acted_at).toLocaleString() : ''}
                     </p>
                   )}
-                  {r.comments && <p className="text-xs mt-1 italic">"{r.comments}"</p>}
+                  {r.status === 'rejected' && r.comments && (
+                    <p className="text-xs mt-1 italic text-destructive">
+                      Rejected: "{r.comments}"
+                    </p>
+                  )}
+                  {r.status !== 'rejected' && r.rejection_comments && (
+                    <p className="text-xs mt-1 italic text-amber-700">
+                      Returned from {r.rejection_from_stage ?? 'next stage'}: "{r.rejection_comments}"
+                    </p>
+                  )}
+                  {r.status !== 'rejected' && !r.rejection_comments && r.comments && (
+                    <p className="text-xs mt-1 italic">"{r.comments}"</p>
+                  )}
                 </div>
               </li>
             );
