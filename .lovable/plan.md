@@ -1,32 +1,43 @@
-## Plan
+## Goal
+When an approver (e.g. SCM Manager) rejects an application and it bounces back to the Buyer, the Buyer must clearly see the rejection remarks, be able to forward the request to the Vendor, and the Vendor must receive the remarks and be able to edit and resubmit the existing application.
 
-1. **Confirm the data source for remarks**
-   - The Finance 2 rejection remark is already saved in the database in two places:
-     - the rejected Finance 2 progress row: `comments`
-     - the reopened Finance 1 progress row: `rejection_comments`
-   - The pending approvals API is already returning `rejectionComments`, so Finance 1 can receive the remark.
+## Current state
+- Backend already moves rejected applications to `returned_to_buyer` and stores `last_rejection_comments` / `last_rejection_stage`.
+- The example vendor (`BADE MURALI KRISHNA`) is already in `returned_to_buyer` with remark `state mismatch` from `SCM_MANAGER`, linked to buyer `Ajay Babu`.
+- The `buyer-return-to-vendor` edge function and the vendor-side `returned_to_vendor` banner already exist.
+- Gap: the Buyer's primary screen (Vendor Invitations) does not surface returned applications, so the Buyer cannot act on them.
 
-2. **Fix the approval history/status table binding**
-   - Update the shared approval trail data hook to read both normal approval comments and rejection metadata from `vendor_approval_progress`:
-     - `comments`
-     - `rejection_comments`
-     - `rejection_from_stage`
-     - `rejection_at`
-   - For rejected rows, display `comments` as the rejection reason.
-   - For reopened previous approver rows, display `rejection_comments` as the returned/rejection reason.
+## Implementation plan
 
-3. **Update all approval tracking UI that uses this trail**
-   - Update the Finance approval trail/status table so the Remarks/Comments section shows:
-     - approval comments when approved
-     - rejection remarks when rejected
-     - “Returned from Finance 2” style context when a previous stage is reopened
-   - Update the reusable `ApprovalTimeline` component used in buyer/SCM views with the same remarks binding.
+1. **Surface returned applications on the Buyer's Vendor Invitations screen**
+   - Extend the invitation list query to also load the linked vendor record (status, name, last rejection stage, last rejection comments, last rejected at).
+   - For invitations whose linked vendor is `returned_to_buyer`, show:
+     - a clear "Returned to Buyer" status badge,
+     - the rejection stage (e.g. SCM Manager) and remarks inline under the row.
 
-4. **Ensure vendor/buyer visibility is preserved**
-   - Keep using the vendor-level `last_rejection_comments` fields for high-level banners/status.
-   - Make the detailed approval trail continue to show historical row-level remarks for audit tracking.
+2. **Add a Buyer "Review & Send to Vendor" action**
+   - For returned rows, add an action button that opens a dialog showing:
+     - vendor name,
+     - rejection stage,
+     - approver rejection remarks (read-only),
+     - an optional buyer remarks textarea.
+   - On submit, call the existing `buyer-return-to-vendor` edge function with the vendor id and combined remarks, then refresh the list.
 
-5. **Verify after implementation**
-   - Re-check the current vendor record (`BADE MURALI KRISHNA`) to confirm the DB still has Finance 2 rejection remark `state mismatch`.
-   - Verify the pending Finance 1 API response includes `rejectionComments`.
-   - Confirm the UI components are bound to the correct fields so remarks appear in the approval history/status table.
+3. **Send a notification with rejection remarks to the Vendor**
+   - Reuse the existing `send-status-notification` invocation inside `buyer-return-to-vendor` so the email body includes both the approver's rejection remarks and the buyer's added remarks.
+   - Verify the email payload contains the full combined remarks.
+
+4. **Vendor side: show remarks and allow edit + resubmit of the existing application**
+   - The vendor registration screen already shows a `returned_to_vendor` banner with `last_rejection_comments` and `last_rejection_stage`. Confirm it loads the existing application (not a new draft) and that all fields are editable.
+   - On resubmit, the existing trigger reseeds approval progress and routes back to the first approver — keep this behavior unchanged.
+
+5. **Validation**
+   - As the buyer (Ajay Babu), confirm `BADE MURALI KRISHNA` now appears as "Returned to Buyer" with the SCM Manager rejection remark on the Vendor Invitations screen.
+   - Use the new action to send it to the vendor; confirm the vendor's status becomes `returned_to_vendor`, an email is dispatched, and on the vendor portal the rejection remarks are visible and the form can be edited and resubmitted.
+
+## Notes
+- No database schema changes required; all needed columns and the edge function already exist.
+- Changes are limited to:
+  - `src/pages/AdminInvitations.tsx` (Buyer screen — surface returned vendors + action)
+  - small adjustment to `buyer-return-to-vendor` if the email body needs the remarks explicitly included
+  - verification on `src/pages/VendorRegistration.tsx` that the returned-to-vendor banner + edit flow already work end-to-end.
