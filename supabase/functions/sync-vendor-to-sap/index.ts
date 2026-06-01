@@ -239,7 +239,21 @@ serve(async (req) => {
       .from("vendors").select("*").eq("id", vendorId).single();
     if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
 
-    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+    const isIntl = String((vendor as any).vendor_type || "").toLowerCase() === "international";
+    const intlCountry = String((vendor as any).branch_country || "").trim().toUpperCase();
+
+    if (isIntl) {
+      if (!intlCountry) {
+        return fail(
+          `Cannot sync to SAP: international vendor is missing the SAP Country code. Please set the vendor's Country and retry.`,
+        );
+      }
+      if (!vendor.registered_state) {
+        return fail(
+          `Cannot sync to SAP: international vendor is missing the SAP Region code. Please set the vendor's Region and retry.`,
+        );
+      }
+    } else if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
       return fail(
         `Cannot sync to SAP: vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for country IN. Please correct the vendor's Registered State and retry.`,
       );
