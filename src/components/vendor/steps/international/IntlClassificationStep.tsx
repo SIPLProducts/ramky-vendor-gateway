@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Award } from 'lucide-react';
 import { InternationalClassification } from '@/types/vendor';
-import { ClassificationField } from '@/components/vendor/ClassificationField';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const schema = z.object({
   materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
@@ -23,6 +24,8 @@ interface Props {
 
 const asArr = (v: unknown): string[] =>
   Array.isArray(v) ? (v as string[]) : (v ? [String(v)] : []);
+
+const firstStr = (v: string[] | undefined): string => (v && v.length > 0 ? v[0] : '');
 
 export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) {
   const { control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
@@ -57,6 +60,40 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
     });
   };
 
+  const renderTextField = (
+    name: keyof FormValues,
+    label: string,
+    placeholder: string,
+    required: boolean,
+    errorText?: string,
+  ) => (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => {
+        const current = firstStr(field.value as string[]);
+        return (
+          <div className="grid gap-1.5">
+            <Label>
+              {label}
+              {required && <span className="text-destructive ml-0.5">*</span>}
+            </Label>
+            <Input
+              value={current}
+              placeholder={placeholder}
+              onChange={(e) => {
+                const val = e.target.value;
+                field.onChange(val.trim() === '' ? [] : [val]);
+              }}
+              className={errorText ? 'border-destructive' : ''}
+            />
+            {errorText && <p className="text-xs text-destructive">{errorText}</p>}
+          </div>
+        );
+      }}
+    />
+  );
+
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="form-section">
@@ -65,68 +102,38 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
           Classification
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Values are sourced from SAP master data.
+          Enter classification details manually.
         </p>
 
         <div className="grid md:grid-cols-2 gap-5">
-          <Controller
-            name="materialGroupVendor"
-            control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Material Group for Vendors"
-                required
-                masterType="material_group_vendor"
-                value={(field.value as string[]) || []}
-                onChange={field.onChange}
-                errorText={errors.materialGroupVendor?.message as string}
-                selectPlaceholder="Select material groups"
-              />
-            )}
-          />
-          <Controller
-            name="vendorLocation"
-            control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Vendor Location"
-                required
-                masterType="vendor_location"
-                value={(field.value as string[]) || []}
-                onChange={field.onChange}
-                errorText={errors.vendorLocation?.message as string}
-                selectPlaceholder="Select locations"
-              />
-            )}
-          />
-          <Controller
-            name="vendorCategory"
-            control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Vendor Category"
-                masterType="vendor_category"
-                value={(field.value as string[]) || []}
-                onChange={field.onChange}
-                errorText={errors.vendorCategory?.message as string}
-                selectPlaceholder="Select vendor categories"
-              />
-            )}
-          />
-          <Controller
-            name="identificationSource"
-            control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Vendor Identification Source"
-                masterType="identification_source"
-                value={(field.value as string[]) || []}
-                onChange={field.onChange}
-                errorText={errors.identificationSource?.message as string}
-                selectPlaceholder="Select identification sources"
-              />
-            )}
-          />
+          {renderTextField(
+            'materialGroupVendor',
+            'Material Group for Vendors',
+            'Enter material group',
+            true,
+            errors.materialGroupVendor?.message as string,
+          )}
+          {renderTextField(
+            'vendorLocation',
+            'Vendor Location',
+            'Enter vendor location',
+            true,
+            errors.vendorLocation?.message as string,
+          )}
+          {renderTextField(
+            'vendorCategory',
+            'Vendor Category',
+            'Enter vendor category',
+            false,
+            errors.vendorCategory?.message as string,
+          )}
+          {renderTextField(
+            'identificationSource',
+            'Vendor Identification Source',
+            'Enter identification source',
+            false,
+            errors.identificationSource?.message as string,
+          )}
         </div>
       </div>
     </form>
