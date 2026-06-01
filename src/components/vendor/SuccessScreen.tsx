@@ -182,7 +182,7 @@ export function SuccessScreen({
       {/* Status Tracker */}
       <div className="bg-card rounded-lg border p-6 mb-6 shadow-enterprise-sm">
         <h2 className="text-base font-semibold mb-6 text-center">Application Progress</h2>
-        <RegistrationStatusTracker status={status} />
+        <RegistrationStatusTracker status={status} approvalProgress={approvalChain} />
       </div>
 
       {/* What's Next */}
