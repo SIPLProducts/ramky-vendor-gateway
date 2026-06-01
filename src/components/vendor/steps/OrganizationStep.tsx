@@ -135,8 +135,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     },
   });
 
-  const selectedCategories = watch('productCategories') || [];
-  const showOtherInput = selectedCategories.includes('Others');
+
+
 
   // Buyer Company is assigned by the invitation and must NOT reset to empty when
   // the vendor reopens the link. Hydrate from tenantId/data.buyerCompanyId once
