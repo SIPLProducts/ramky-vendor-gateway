@@ -32,7 +32,7 @@ const schema = z.object({
   industryType: z.string().min(1, 'Industry type is required'),
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
-  productCategories: z.array(z.string()).min(1, 'Select at least one category'),
+  
   
   // Verification Fields
   gstin: z.string().min(1, 'GSTIN is required'),
