@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const schema = z.object({
-  materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
-  vendorLocation: z.array(z.string()).min(1, 'Vendor Location is required'),
+  materialGroupVendor: z.array(z.string()).optional().default([]),
+  vendorLocation: z.array(z.string()).optional().default([]),
   vendorCategory: z.array(z.string()).optional().default([]),
   identificationSource: z.array(z.string()).optional().default([]),
 });
@@ -110,14 +110,14 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
             'materialGroupVendor',
             'Material Group for Vendors',
             'Enter material group',
-            true,
+            false,
             errors.materialGroupVendor?.message as string,
           )}
           {renderTextField(
             'vendorLocation',
             'Vendor Location',
             'Enter vendor location',
-            true,
+            false,
             errors.vendorLocation?.message as string,
           )}
           {renderTextField(
