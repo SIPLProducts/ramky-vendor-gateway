@@ -306,7 +306,12 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
-    classify: { MGV: [], CATV: [], LOCV: [], IDS: [] },
+    classify: {
+      MGV: Array.isArray((vendor as any)?.material_group_vendors) ? (vendor as any).material_group_vendors : [],
+      CATV: Array.isArray((vendor as any)?.vendor_categories) ? (vendor as any).vendor_categories : [],
+      LOCV: Array.isArray((vendor as any)?.vendor_locations) ? (vendor as any).vendor_locations : [],
+      IDS: Array.isArray((vendor as any)?.identification_sources) ? (vendor as any).identification_sources : [],
+    },
   };
 }
 
