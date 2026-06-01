@@ -270,7 +270,7 @@ export default function AdminInvitations() {
       setVendorName('');
       setPhoneNumber('');
       setExpiryDays('14');
-      setSelectedTenantId('');
+      
 
       if (result.emailSent) {
         toast({
