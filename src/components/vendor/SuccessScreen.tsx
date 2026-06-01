@@ -19,6 +19,7 @@ export function SuccessScreen({
   purchaseComments,
   onEdit,
 }: SuccessScreenProps) {
+  const { rows: approvalChain } = useVendorApprovalChain(vendorId);
   const canResubmit = status === 'validation_failed' || status === 'finance_rejected' || status === 'purchase_rejected';
   
   const getStatusConfig = () => {
