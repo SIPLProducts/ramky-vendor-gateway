@@ -40,8 +40,6 @@ const schema = z.object({
   industryType: z.string().min(1, 'Industry type is required'),
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
-  productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
-  productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
   accountingGroup: z.enum(['Import', 'Domestic']).optional(),
   // SAP Classification — now captured on SAP Sync screen (not in registration)
@@ -61,14 +59,6 @@ const schema = z.object({
   enlistments: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
   operationalNetwork: z.string().optional(),
-}).superRefine((vals, ctx) => {
-  if (vals.productCategories?.includes('Others') && !vals.productCategoriesOther?.trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['productCategoriesOther'],
-      message: 'Please specify the other category/service',
-    });
-  }
 });
 
 type FormValues = OrganizationDetails & {
