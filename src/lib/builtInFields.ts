@@ -72,7 +72,7 @@ export const BUILT_IN_FIELDS: Record<string, BuiltInField[]> = {
     { field_name: 'industryType',       display_label: 'Type of Industry',          field_type: 'select',       is_mandatory: true,  group: 'Organization' },
     { field_name: 'organizationType',   display_label: 'Type of Organization',      field_type: 'select',       is_mandatory: true,  group: 'Organization' },
     { field_name: 'ownershipType',      display_label: 'Type of Ownership',         field_type: 'select',       is_mandatory: true,  group: 'Organization' },
-    { field_name: 'productCategories',  display_label: 'Product/Service Categories',field_type: 'multi-select', is_mandatory: true,  group: 'Organization' },
+    
     { field_name: 'state',              display_label: 'State',                     field_type: 'select',       is_mandatory: true,  group: 'Organization' },
 
     { field_name: 'entityType',         display_label: 'Entity Type',               field_type: 'select', is_mandatory: true,  group: 'Statutory' },
