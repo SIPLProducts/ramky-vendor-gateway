@@ -98,6 +98,8 @@ type ResolverCtx = {
   classify: Record<string, any>;
   uploads: any[];
   isMsme: boolean;
+  isIntl: boolean;
+  intlCountry: string;
 };
 
 function getPath(obj: any, path: string): any {
@@ -141,7 +143,13 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     const fn = fnMatch[1];
     const innerPath = fnMatch[2].trim();
     const inner = innerPath ? getPath(ctx, innerPath) : undefined;
-    if (fn === "region") value = resolveRegion(inner);
+    if (fn === "region") {
+      if (ctx.isIntl) {
+        value = inner == null ? "" : String(inner).trim().toUpperCase();
+      } else {
+        value = resolveRegion(inner);
+      }
+    }
     else value = "";
   } else if (head === "uploads") {
     value = ctx.uploads;
@@ -231,7 +239,21 @@ serve(async (req) => {
       .from("vendors").select("*").eq("id", vendorId).single();
     if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
 
-    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+    const isIntl = String((vendor as any).vendor_type || "").toLowerCase() === "international";
+    const intlCountry = String((vendor as any).branch_country || "").trim().toUpperCase();
+
+    if (isIntl) {
+      if (!intlCountry) {
+        return fail(
+          `Cannot sync to SAP: international vendor is missing the SAP Country code. Please set the vendor's Country and retry.`,
+        );
+      }
+      if (!vendor.registered_state) {
+        return fail(
+          `Cannot sync to SAP: international vendor is missing the SAP Region code. Please set the vendor's Region and retry.`,
+        );
+      }
+    } else if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
       return fail(
         `Cannot sync to SAP: vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for country IN. Please correct the vendor's Registered State and retry.`,
       );
@@ -404,6 +426,8 @@ serve(async (req) => {
         classify: classifyCtx,
         uploads,
         isMsme,
+        isIntl,
+        intlCountry,
       };
 
       row = resolveTemplate(template, ctx);
@@ -428,6 +452,23 @@ serve(async (req) => {
         row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
         row.idtype2 = "ZMSMEN";
         row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
+
+        // For international vendors, replace hardcoded "IN" country codes in
+        // the resolved payload with the vendor's actual SAP country code.
+        if (isIntl && intlCountry) {
+          const overrideCountry = (node: any) => {
+            if (!node || typeof node !== "object") return;
+            if (Array.isArray(node)) { node.forEach(overrideCountry); return; }
+            for (const k of Object.keys(node)) {
+              if ((k === "country" || k === "bank_ctry") && (node[k] === "IN" || node[k] === "")) {
+                node[k] = intlCountry;
+              } else if (node[k] && typeof node[k] === "object") {
+                overrideCountry(node[k]);
+              }
+            }
+          };
+          overrideCountry(row);
+        }
       }
 
       payload = [row];
