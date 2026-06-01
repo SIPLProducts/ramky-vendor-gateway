@@ -110,14 +110,14 @@ export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) 
             'materialGroupVendor',
             'Material Group for Vendors',
             'Enter material group',
-            true,
+            false,
             errors.materialGroupVendor?.message as string,
           )}
           {renderTextField(
             'vendorLocation',
             'Vendor Location',
             'Enter vendor location',
-            true,
+            false,
             errors.vendorLocation?.message as string,
           )}
           {renderTextField(
