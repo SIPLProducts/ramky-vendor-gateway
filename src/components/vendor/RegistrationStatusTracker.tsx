@@ -179,9 +179,22 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
     const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
     // Fill the connector up to the centre of the active step (half-segment past last completed).
     const totalSegments = statusSteps.length - 1;
-    const fillRatio = adjustedActiveIndex <= 0
+
+    // When using the live chain, the "fill" reaches the active step (or the
+    // last completed step if nothing is active yet).
+    let effectiveActive = adjustedActiveIndex;
+    if (hasChain) {
+      const completedIndices = Object.entries(stepOverrides)
+        .filter(([, v]) => v === 'completed')
+        .map(([k]) => Number(k));
+      const activeIdx = Object.entries(stepOverrides)
+        .find(([, v]) => v === 'active')?.[0];
+      const maxCompleted = completedIndices.length > 0 ? Math.max(...completedIndices) : 0;
+      effectiveActive = activeIdx != null ? Number(activeIdx) : maxCompleted;
+    }
+    const fillRatio = effectiveActive <= 0
       ? 0
-      : Math.min(1, adjustedActiveIndex / totalSegments);
+      : Math.min(1, effectiveActive / totalSegments);
 
     return (
       <div ref={ref} className={cn("w-full", className)}>
@@ -194,7 +207,7 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
 
           <div className="relative flex justify-between">
             {statusSteps.map((step, index) => {
-              const stepStatus = getStepStatus(index, adjustedActiveIndex, status);
+              const stepStatus = stepOverrides[index] ?? getStepStatus(index, adjustedActiveIndex, status);
               return (
                 <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / statusSteps.length}%` }}>
                   <div
