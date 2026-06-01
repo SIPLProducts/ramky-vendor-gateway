@@ -12,7 +12,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Separator } from '@/components/ui/separator';
 import { VerificationField } from '@/components/vendor/VerificationField';
 import { VerificationStatusBanner } from '@/components/vendor/VerificationStatusBanner';
@@ -20,8 +19,7 @@ import { useFieldValidation } from '@/hooks/useFieldValidation';
 import { 
   INDUSTRY_TYPES, 
   ORGANIZATION_TYPES, 
-  OWNERSHIP_TYPES, 
-  PRODUCT_CATEGORIES 
+  OWNERSHIP_TYPES,
 } from '@/types/vendor';
 
 // Combined schema for Organization + Verification
