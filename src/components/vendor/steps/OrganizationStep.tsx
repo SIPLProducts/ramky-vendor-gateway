@@ -201,7 +201,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   }, [watch, statutoryData]);
 
   const handleFormSubmit = (values: FormValues) => {
-    const includesOthers = values.productCategories?.includes('Others');
     const organization: OrganizationDetails = {
       buyerCompanyId: values.buyerCompanyId,
       legalName: values.legalName,
@@ -209,8 +208,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       industryType: values.industryType,
       organizationType: values.organizationType,
       ownershipType: values.ownershipType,
-      productCategories: values.productCategories,
-      productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
+      productCategories: data?.productCategories || [],
+      productCategoriesOther: data?.productCategoriesOther || '',
       state: values.state,
       accountingGroup: values.accountingGroup || 'Domestic',
       materialGroupVendor: values.materialGroupVendor,
