@@ -2,6 +2,7 @@ import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RegistrationStatusTracker, RegistrationStatus } from './RegistrationStatusTracker';
+import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 
 interface SuccessScreenProps {
   status: RegistrationStatus;
