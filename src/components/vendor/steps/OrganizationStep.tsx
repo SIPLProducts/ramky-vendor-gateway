@@ -17,7 +17,7 @@ import { FileUpload } from '@/components/vendor/FileUpload';
 import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
-// ClassificationField removed: classification now captured on SAP Sync screen.
+import { ClassificationField } from '@/components/vendor/ClassificationField';
 import {
   OrganizationDetails,
   StatutoryDetails,
@@ -403,9 +403,75 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           </div>
 
           {/* Accounting Group is derived from vendor type (Domestic / International) selected in step 1. */}
-          {/* SAP Classification is now captured on the SAP Sync screen by the SAP Team. */}
         </div>
       </div>
+
+      {/* SAP Classification (Domestic) — values are passed to SAP Sync popup and editable there */}
+      <div className="form-section">
+        <h3 className="form-section-title">
+          <Award className="h-5 w-5 text-primary" />
+          Classification
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Select classification values from SAP F4 search help. These values are sent to the SAP Sync screen where the SAP team can review or modify them before syncing.
+        </p>
+
+        <div className="grid md:grid-cols-2 gap-5">
+          <Controller
+            name="materialGroupVendor"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Material Group for Vendors"
+                masterType="material_group_vendor"
+                value={field.value || []}
+                onChange={field.onChange}
+                selectPlaceholder="Select material groups"
+              />
+            )}
+          />
+          <Controller
+            name="vendorCategory"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Vendor Category"
+                masterType="vendor_category"
+                value={field.value || []}
+                onChange={field.onChange}
+                selectPlaceholder="Select vendor categories"
+              />
+            )}
+          />
+          <Controller
+            name="vendorLocation"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Vendor Location"
+                masterType="vendor_location"
+                value={field.value || []}
+                onChange={field.onChange}
+                selectPlaceholder="Select locations"
+              />
+            )}
+          />
+          <Controller
+            name="identificationSource"
+            control={control}
+            render={({ field }) => (
+              <ClassificationField
+                label="Vendor Identification Source"
+                masterType="identification_source"
+                value={field.value || []}
+                onChange={field.onChange}
+                selectPlaceholder="Select identification sources"
+              />
+            )}
+          />
+        </div>
+      </div>
+
 
       {/* Statutory & Registrations (moved from Commercial Details) */}
       <div className="form-section">
