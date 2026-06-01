@@ -378,41 +378,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
             )}
           </div>
 
-          <div className="grid gap-1.5">
-            <Label>Product/Service Categories *</Label>
-            <Controller
-              name="productCategories"
-              control={control}
-              render={({ field }) => (
-                <MultiSelect
-                  options={PRODUCT_CATEGORIES.map((cat) => ({ label: cat, value: cat }))}
-                  selected={field.value}
-                  onChange={field.onChange}
-                  placeholder="Select product/service categories"
-                />
-              )}
-            />
-            {errors.productCategories && (
-              <p className="text-xs text-destructive">{errors.productCategories.message}</p>
-            )}
-          </div>
-
-          {showOtherInput && (
-            <div className="grid gap-1.5">
-              <Label htmlFor="productCategoriesOther">
-                Please specify other category/service <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="productCategoriesOther"
-                {...register('productCategoriesOther')}
-                placeholder="e.g. Drone surveying, Software licensing"
-                className={errors.productCategoriesOther ? 'border-destructive' : ''}
-              />
-              {errors.productCategoriesOther && (
-                <p className="text-xs text-destructive">{errors.productCategoriesOther.message as string}</p>
-              )}
-            </div>
-          )}
 
           <div className="grid gap-1.5">
             <Label>State *</Label>
