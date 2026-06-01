@@ -426,6 +426,8 @@ serve(async (req) => {
         classify: classifyCtx,
         uploads,
         isMsme,
+        isIntl,
+        intlCountry,
       };
 
       row = resolveTemplate(template, ctx);
@@ -450,6 +452,23 @@ serve(async (req) => {
         row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
         row.idtype2 = "ZMSMEN";
         row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
+
+        // For international vendors, replace hardcoded "IN" country codes in
+        // the resolved payload with the vendor's actual SAP country code.
+        if (isIntl && intlCountry) {
+          const overrideCountry = (node: any) => {
+            if (!node || typeof node !== "object") return;
+            if (Array.isArray(node)) { node.forEach(overrideCountry); return; }
+            for (const k of Object.keys(node)) {
+              if ((k === "country" || k === "bank_ctry") && (node[k] === "IN" || node[k] === "")) {
+                node[k] = intlCountry;
+              } else if (node[k] && typeof node[k] === "object") {
+                overrideCountry(node[k]);
+              }
+            }
+          };
+          overrideCountry(row);
+        }
       }
 
       payload = [row];
