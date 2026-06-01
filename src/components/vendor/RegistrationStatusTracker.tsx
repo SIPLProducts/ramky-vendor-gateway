@@ -110,13 +110,71 @@ function getStepStatus(stepIndex: number, activeIndex: number, vendorStatus: Reg
   return 'pending';
 }
 
+export type ApprovalStageKey = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
+
+export interface ApprovalChainEntry {
+  level_number: number;
+  status: 'pending' | 'approved' | 'rejected';
+  stage: ApprovalStageKey;
+}
+
 interface RegistrationStatusTrackerProps {
   status: RegistrationStatus;
   className?: string;
+  /**
+   * Live approval chain rows for this vendor. When supplied, the tracker
+   * derives per-step state (completed / active / pending / failed) directly
+   * from these rows so it reflects the real-time approver. Falls back to the
+   * status enum mapping when empty.
+   */
+  approvalProgress?: ApprovalChainEntry[];
 }
 
+// Map stage -> step index in `statusSteps`
+const STAGE_TO_STEP: Record<ApprovalStageKey, number> = {
+  SCM_MANAGER: 2,
+  SCM_HEAD: 3,
+  FINANCE_1: 4,
+  FINANCE_2: 5,
+  CEO_OFFICE: 5,
+};
+
 export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, RegistrationStatusTrackerProps>(
-  function RegistrationStatusTracker({ status, className }, ref) {
+  function RegistrationStatusTracker({ status, className, approvalProgress }, ref) {
+    const hasChain = (approvalProgress?.length ?? 0) > 0;
+
+    // Build per-step override map from the live chain. Each approver step is
+    // computed from its corresponding `vendor_approval_progress` row.
+    const stepOverrides: Record<number, 'completed' | 'active' | 'pending' | 'failed'> = {};
+    if (hasChain) {
+      const sorted = [...approvalProgress!].sort((a, b) => a.level_number - b.level_number);
+      const firstPending = sorted.find((r) => r.status === 'pending');
+      for (const row of sorted) {
+        const idx = STAGE_TO_STEP[row.stage];
+        if (idx == null) continue;
+        if (row.status === 'approved') {
+          stepOverrides[idx] = 'completed';
+        } else if (row.status === 'rejected') {
+          stepOverrides[idx] = 'failed';
+        } else if (row === firstPending) {
+          stepOverrides[idx] = 'active';
+        } else if (stepOverrides[idx] !== 'completed' && stepOverrides[idx] !== 'failed') {
+          stepOverrides[idx] = 'pending';
+        }
+      }
+      // Once any approval row exists, Document Verification is implicitly done.
+      if (stepOverrides[1] === undefined) stepOverrides[1] = 'completed';
+
+      // If all approver levels approved, SAP Sync becomes active (unless synced).
+      const allApproved = sorted.length > 0 && sorted.every((r) => r.status === 'approved');
+      if (allApproved && status !== 'sap_synced' && status !== 'approved') {
+        stepOverrides[6] = 'active';
+      }
+      if (status === 'sap_synced' || status === 'approved') {
+        stepOverrides[6] = 'completed';
+      }
+    }
+
     const activeStepIndex = getActiveStepIndex(status);
     const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
     // Fill the connector up to the centre of the active step (half-segment past last completed).
