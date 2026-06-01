@@ -67,7 +67,6 @@ export default function AdminInvitations() {
   const [vendorName, setVendorName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [expiryDays, setExpiryDays] = useState('14');
-  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,7 +77,7 @@ export default function AdminInvitations() {
   const queryClient = useQueryClient();
   const { data: allTenants } = useTenants();
   const { user, userRole } = useAuth();
-  const { myTenants, activeTenantId } = useTenantContext();
+  const { myTenants, activeTenantId, setActiveTenantId } = useTenantContext();
   const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
 
   // Tenants the user is allowed to invite for:
@@ -86,16 +85,22 @@ export default function AdminInvitations() {
   // - Everyone else: tenants assigned to them via user_tenants
   const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
 
-  // Default the dialog selection: prefer header's active tenant if allowed, else first allowed tenant
-  const defaultTenantId =
-    (activeTenantId && allowedTenants.some((t) => t.id === activeTenantId) ? activeTenantId : null) ||
+  // Derive the dialog's selected company from the global tenant context so it
+  // stays in two-way sync with the header tenant selector.
+  const selectedTenantId =
+    (activeTenantId && allowedTenants.some((t) => t.id === activeTenantId) ? activeTenantId : '') ||
     allowedTenants[0]?.id ||
     '';
 
-  // Initialize selectedTenantId once allowedTenants resolve
-  if (!selectedTenantId && defaultTenantId) {
-    // setState during render is safe here because it converges in one extra render
-    setSelectedTenantId(defaultTenantId);
+  // For non-super-admins keep the header in sync with the resolved tenant
+  // (super admins are allowed to keep "All Tenants" until they explicitly pick one).
+  if (
+    !isSuperAdmin &&
+    selectedTenantId &&
+    activeTenantId !== selectedTenantId &&
+    typeof queueMicrotask !== 'undefined'
+  ) {
+    queueMicrotask(() => setActiveTenantId(selectedTenantId));
   }
 
   const effectiveTenantId = selectedTenantId || null;
