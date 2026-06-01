@@ -75,6 +75,8 @@ function getActiveStepIndex(status: RegistrationStatus): number {
     case 'ceo_office_rejected':
       return 5;
     case 'pending_sap_sync':
+    case 'dms_sync_pending':
+    case 'dms_synced':
     case 'purchase_approved':
     case 'finance_approved':
       return 6;
