@@ -2,6 +2,7 @@ import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RegistrationStatusTracker, RegistrationStatus } from './RegistrationStatusTracker';
+import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 
 interface SuccessScreenProps {
   status: RegistrationStatus;
@@ -18,6 +19,7 @@ export function SuccessScreen({
   purchaseComments,
   onEdit,
 }: SuccessScreenProps) {
+  const { rows: approvalChain } = useVendorApprovalChain(vendorId);
   const canResubmit = status === 'validation_failed' || status === 'finance_rejected' || status === 'purchase_rejected';
   
   const getStatusConfig = () => {
@@ -180,7 +182,7 @@ export function SuccessScreen({
       {/* Status Tracker */}
       <div className="bg-card rounded-lg border p-6 mb-6 shadow-enterprise-sm">
         <h2 className="text-base font-semibold mb-6 text-center">Application Progress</h2>
-        <RegistrationStatusTracker status={status} />
+        <RegistrationStatusTracker status={status} approvalProgress={approvalChain} />
       </div>
 
       {/* What's Next */}
