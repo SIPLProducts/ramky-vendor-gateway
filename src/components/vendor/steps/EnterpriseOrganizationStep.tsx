@@ -12,7 +12,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Separator } from '@/components/ui/separator';
 import { VerificationField } from '@/components/vendor/VerificationField';
 import { VerificationStatusBanner } from '@/components/vendor/VerificationStatusBanner';
@@ -20,8 +19,7 @@ import { useFieldValidation } from '@/hooks/useFieldValidation';
 import { 
   INDUSTRY_TYPES, 
   ORGANIZATION_TYPES, 
-  OWNERSHIP_TYPES, 
-  PRODUCT_CATEGORIES 
+  OWNERSHIP_TYPES,
 } from '@/types/vendor';
 
 // Combined schema for Organization + Verification
@@ -32,7 +30,7 @@ const schema = z.object({
   industryType: z.string().min(1, 'Industry type is required'),
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
-  productCategories: z.array(z.string()).min(1, 'Select at least one category'),
+  
   
   // Verification Fields
   gstin: z.string().min(1, 'GSTIN is required'),
@@ -57,7 +55,7 @@ export interface EnterpriseOrganizationData {
   industryType: string;
   organizationType: string;
   ownershipType: string;
-  productCategories: string[];
+  productCategories?: string[];
   gstin: string;
   pan: string;
   msmeNumber: string;
@@ -102,7 +100,7 @@ export function EnterpriseOrganizationStep({
       industryType: data.industryType || '',
       organizationType: data.organizationType || '',
       ownershipType: data.ownershipType || '',
-      productCategories: data.productCategories || [],
+      
       gstin: data.gstin || '',
       pan: data.pan || '',
       msmeNumber: data.msmeNumber || '',
@@ -302,27 +300,6 @@ export function EnterpriseOrganizationStep({
               )}
             </div>
 
-            {/* Product Categories - Full Width */}
-            <div className="grid gap-1.5">
-              <Label>
-                Product / Service Categories <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="productCategories"
-                control={control}
-                render={({ field }) => (
-                  <MultiSelect
-                    options={PRODUCT_CATEGORIES.map((cat) => ({ label: cat, value: cat }))}
-                    selected={field.value || []}
-                    onChange={field.onChange}
-                    placeholder="Select product/service categories"
-                  />
-                )}
-              />
-              {errors.productCategories && (
-                <p className="text-xs text-destructive">{errors.productCategories.message}</p>
-              )}
-            </div>
           </div>
         </div>
 

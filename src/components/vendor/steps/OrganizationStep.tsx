@@ -24,7 +24,6 @@ import {
   INDUSTRY_TYPES,
   ORGANIZATION_TYPES,
   OWNERSHIP_TYPES,
-  PRODUCT_CATEGORIES,
   MEMBERSHIP_OPTIONS,
   ENLISTMENT_OPTIONS,
   CERTIFICATION_OPTIONS,
@@ -41,8 +40,6 @@ const schema = z.object({
   industryType: z.string().min(1, 'Industry type is required'),
   organizationType: z.string().min(1, 'Organization type is required'),
   ownershipType: z.string().min(1, 'Ownership type is required'),
-  productCategories: z.array(z.string()).min(1, 'Select at least one product category'),
-  productCategoriesOther: z.string().optional(),
   state: z.string().min(1, 'State is required'),
   accountingGroup: z.enum(['Import', 'Domestic']).optional(),
   // SAP Classification — now captured on SAP Sync screen (not in registration)
@@ -62,18 +59,9 @@ const schema = z.object({
   enlistments: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
   operationalNetwork: z.string().optional(),
-}).superRefine((vals, ctx) => {
-  if (vals.productCategories?.includes('Others') && !vals.productCategoriesOther?.trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['productCategoriesOther'],
-      message: 'Please specify the other category/service',
-    });
-  }
 });
 
 type FormValues = OrganizationDetails & {
-  productCategoriesOther: string;
   entityType: string;
   firmRegistrationNo: string;
   pfNumber: string;
@@ -128,7 +116,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       ...data,
       state: data?.state || '',
       accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
-      productCategoriesOther: data?.productCategoriesOther || '',
+      
       materialGroupVendor: Array.isArray(data?.materialGroupVendor) ? data!.materialGroupVendor as string[] : (data?.materialGroupVendor ? [data.materialGroupVendor as unknown as string] : []),
       vendorCategory: Array.isArray(data?.vendorCategory) ? data!.vendorCategory as string[] : (data?.vendorCategory ? [data.vendorCategory as unknown as string] : []),
       vendorLocation: Array.isArray(data?.vendorLocation) ? data!.vendorLocation as string[] : (data?.vendorLocation ? [data.vendorLocation as unknown as string] : []),
@@ -147,8 +135,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     },
   });
 
-  const selectedCategories = watch('productCategories') || [];
-  const showOtherInput = selectedCategories.includes('Others');
+
+
 
   // Buyer Company is assigned by the invitation and must NOT reset to empty when
   // the vendor reopens the link. Hydrate from tenantId/data.buyerCompanyId once
@@ -173,7 +161,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       if (liveUpdateTimerRef.current) clearTimeout(liveUpdateTimerRef.current);
       liveUpdateTimerRef.current = setTimeout(() => {
         const v = values as FormValues;
-        const includesOthers = v.productCategories?.includes('Others');
         const organization: OrganizationDetails = {
           buyerCompanyId: v.buyerCompanyId || '',
           legalName: v.legalName || '',
@@ -181,8 +168,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           industryType: v.industryType || '',
           organizationType: v.organizationType || '',
           ownershipType: v.ownershipType || '',
-          productCategories: v.productCategories || [],
-          productCategoriesOther: includesOthers ? (v.productCategoriesOther || '').trim() : '',
+          productCategories: data?.productCategories || [],
+          productCategoriesOther: data?.productCategoriesOther || '',
           state: v.state || '',
           accountingGroup: v.accountingGroup || 'Domestic',
           materialGroupVendor: v.materialGroupVendor || [],
@@ -214,7 +201,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   }, [watch, statutoryData]);
 
   const handleFormSubmit = (values: FormValues) => {
-    const includesOthers = values.productCategories?.includes('Others');
     const organization: OrganizationDetails = {
       buyerCompanyId: values.buyerCompanyId,
       legalName: values.legalName,
@@ -222,8 +208,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       industryType: values.industryType,
       organizationType: values.organizationType,
       ownershipType: values.ownershipType,
-      productCategories: values.productCategories,
-      productCategoriesOther: includesOthers ? (values.productCategoriesOther || '').trim() : '',
+      productCategories: data?.productCategories || [],
+      productCategoriesOther: data?.productCategoriesOther || '',
       state: values.state,
       accountingGroup: values.accountingGroup || 'Domestic',
       materialGroupVendor: values.materialGroupVendor,
@@ -392,41 +378,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
             )}
           </div>
 
-          <div className="grid gap-1.5">
-            <Label>Product/Service Categories *</Label>
-            <Controller
-              name="productCategories"
-              control={control}
-              render={({ field }) => (
-                <MultiSelect
-                  options={PRODUCT_CATEGORIES.map((cat) => ({ label: cat, value: cat }))}
-                  selected={field.value}
-                  onChange={field.onChange}
-                  placeholder="Select product/service categories"
-                />
-              )}
-            />
-            {errors.productCategories && (
-              <p className="text-xs text-destructive">{errors.productCategories.message}</p>
-            )}
-          </div>
-
-          {showOtherInput && (
-            <div className="grid gap-1.5">
-              <Label htmlFor="productCategoriesOther">
-                Please specify other category/service <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="productCategoriesOther"
-                {...register('productCategoriesOther')}
-                placeholder="e.g. Drone surveying, Software licensing"
-                className={errors.productCategoriesOther ? 'border-destructive' : ''}
-              />
-              {errors.productCategoriesOther && (
-                <p className="text-xs text-destructive">{errors.productCategoriesOther.message as string}</p>
-              )}
-            </div>
-          )}
 
           <div className="grid gap-1.5">
             <Label>State *</Label>

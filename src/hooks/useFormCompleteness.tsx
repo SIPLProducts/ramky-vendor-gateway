@@ -64,7 +64,7 @@ export function useFormCompleteness(
           o.tradeName,
           o.industryType,
           o.organizationType,
-          o.productCategories,
+          
           s.entityType,
         ]),
       },
