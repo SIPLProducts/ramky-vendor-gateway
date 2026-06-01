@@ -1,32 +1,37 @@
-# Fix: Active step missing in Application Progress tracker
+## Problem
 
-## Root cause
+On `/admin/invitations`, the Buyer (Ajay Babu) sees the invitation row for the returned vendor (kvvk / BADE MURALI KRISHNA), but no "Returned to Buyer" badge, no rejection remarks, and no "Send to Vendor" action button.
 
-The success screen on the vendor portal renders `RegistrationStatusTracker` with the vendor's current `status` from the database. For the vendor visible in the screenshot (ref `9FAE632C`), the DB status is **`dms_synced`** — a value that was added later for the DMS→SAP hand-off stage but was never added to the tracker's `getActiveStepIndex` switch.
+The UI code in `AdminInvitations.tsx` already renders all of this when `invitation.linked_vendor.status === 'returned_to_buyer'`. The query also already fetches `vendors` by `id IN (vendor_ids)`.
 
-Because `dms_synced` (and its sibling `dms_sync_pending`) aren't listed, the switch falls through to `default → return 0`. With active index 0:
+**Root cause:** RLS on `public.vendors` has no policy that lets a Buyer (app_role `vendor`, custom role `Buyer`) read a vendor they invited. The existing SELECT policies only cover admins, finance, purchase, approvers, SCM Manager mapping, cross-tenant reviewers, and the vendor's own user. So the enrichment query returns no rows and `linked_vendor` is always `null` — the badge and action never render.
 
-- Step 0 (Submitted) → rendered as "Completed" (because status is not `draft`)
-- All later steps → rendered as "pending" with no pulsing/active indicator
-- The connector line shows 0% fill
+## Fix
 
-That is exactly what the screenshot shows — Submitted is complete, but nothing afterwards lights up.
+Add a single RLS SELECT policy on `public.vendors` that lets any authenticated user read vendors linked to invitations they created. Buyers will then see the returned vendor's status + remarks, and the existing UI will surface the "Send to Vendor" action that already wires to the `buyer-return-to-vendor` edge function (which already notifies the vendor with the remarks).
 
-## Fix (single file, presentation only)
+### Migration
 
-Edit `src/components/vendor/RegistrationStatusTracker.tsx`:
+```sql
+CREATE POLICY "Inviting users view their vendors"
+ON public.vendors
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.vendor_invitations vi
+    WHERE vi.vendor_id = vendors.id
+      AND vi.created_by = auth.uid()
+  )
+);
+```
 
-1. Add `'dms_sync_pending'` and `'dms_synced'` to the `RegistrationStatus` union type.
-2. Add cases for both in `getActiveStepIndex` that return `6` (the SAP Sync step) — matching how `pending_sap_sync` is already handled, since by the time a vendor reaches DMS sync it is awaiting the final SAP vendor-code creation.
-
-No other component, hook, edge function, DB column, or workflow logic is touched. The rest of the app already understands these statuses; only the tracker was missing the mapping.
+No code changes required — `AdminInvitations.tsx` and `buyer-return-to-vendor` already handle the rest. The vendor portal already shows `last_rejection_comments` as a banner on `returned_to_vendor` status and allows resubmission.
 
 ## Validation
 
-Reload `/register` (or the success screen) for the vendor with status `dms_synced`:
-
-- The "SAP Sync" step pulses blue with the "In Progress" label.
-- The progress connector fills up to the SAP Sync node.
-- All earlier steps display as "Completed".
-
-No regression risk for other statuses — only two unhandled enum values are being added to the switch.
+As Ajay Babu on `/admin/invitations`:
+- The kvvk row shows a red "Returned to Buyer" badge with SCM Manager's remark ("state mismatch").
+- A "Send to Vendor" button appears in the Actions column.
+- Clicking it opens the review dialog; submitting calls `buyer-return-to-vendor`, which sets the vendor to `returned_to_vendor`, emails the vendor with the combined remarks, and the row refreshes.
+- The vendor then sees the rejection banner on their portal, edits the application, and resubmits — which reseeds approvals back to SCM Manager.

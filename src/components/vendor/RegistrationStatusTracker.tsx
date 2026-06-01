@@ -18,8 +18,6 @@ export type RegistrationStatus =
   | 'ceo_office_review'
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
-  | 'dms_sync_pending'
-  | 'dms_synced'
   | 'sap_synced'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
@@ -75,8 +73,6 @@ function getActiveStepIndex(status: RegistrationStatus): number {
     case 'ceo_office_rejected':
       return 5;
     case 'pending_sap_sync':
-    case 'dms_sync_pending':
-    case 'dms_synced':
     case 'purchase_approved':
     case 'finance_approved':
       return 6;
