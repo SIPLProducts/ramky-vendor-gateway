@@ -161,7 +161,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       if (liveUpdateTimerRef.current) clearTimeout(liveUpdateTimerRef.current);
       liveUpdateTimerRef.current = setTimeout(() => {
         const v = values as FormValues;
-        const includesOthers = v.productCategories?.includes('Others');
         const organization: OrganizationDetails = {
           buyerCompanyId: v.buyerCompanyId || '',
           legalName: v.legalName || '',
@@ -169,8 +168,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           industryType: v.industryType || '',
           organizationType: v.organizationType || '',
           ownershipType: v.ownershipType || '',
-          productCategories: v.productCategories || [],
-          productCategoriesOther: includesOthers ? (v.productCategoriesOther || '').trim() : '',
+          productCategories: data?.productCategories || [],
+          productCategoriesOther: data?.productCategoriesOther || '',
           state: v.state || '',
           accountingGroup: v.accountingGroup || 'Domestic',
           materialGroupVendor: v.materialGroupVendor || [],
