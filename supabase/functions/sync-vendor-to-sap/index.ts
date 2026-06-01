@@ -143,7 +143,13 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     const fn = fnMatch[1];
     const innerPath = fnMatch[2].trim();
     const inner = innerPath ? getPath(ctx, innerPath) : undefined;
-    if (fn === "region") value = resolveRegion(inner);
+    if (fn === "region") {
+      if (ctx.isIntl) {
+        value = inner == null ? "" : String(inner).trim().toUpperCase();
+      } else {
+        value = resolveRegion(inner);
+      }
+    }
     else value = "";
   } else if (head === "uploads") {
     value = ctx.uploads;
