@@ -62,7 +62,6 @@ const schema = z.object({
 });
 
 type FormValues = OrganizationDetails & {
-  productCategoriesOther: string;
   entityType: string;
   firmRegistrationNo: string;
   pfNumber: string;
