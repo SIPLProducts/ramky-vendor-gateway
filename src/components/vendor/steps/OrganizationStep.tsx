@@ -116,7 +116,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       ...data,
       state: data?.state || '',
       accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
-      productCategoriesOther: data?.productCategoriesOther || '',
+      
       materialGroupVendor: Array.isArray(data?.materialGroupVendor) ? data!.materialGroupVendor as string[] : (data?.materialGroupVendor ? [data.materialGroupVendor as unknown as string] : []),
       vendorCategory: Array.isArray(data?.vendorCategory) ? data!.vendorCategory as string[] : (data?.vendorCategory ? [data.vendorCategory as unknown as string] : []),
       vendorLocation: Array.isArray(data?.vendorLocation) ? data!.vendorLocation as string[] : (data?.vendorLocation ? [data.vendorLocation as unknown as string] : []),
