@@ -17,7 +17,7 @@ import { FileUpload } from '@/components/vendor/FileUpload';
 import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
-// ClassificationField removed: classification now captured on SAP Sync screen.
+import { ClassificationField } from '@/components/vendor/ClassificationField';
 import {
   OrganizationDetails,
   StatutoryDetails,
