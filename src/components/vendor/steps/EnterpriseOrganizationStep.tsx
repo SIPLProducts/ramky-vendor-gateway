@@ -57,7 +57,7 @@ export interface EnterpriseOrganizationData {
   industryType: string;
   organizationType: string;
   ownershipType: string;
-  productCategories: string[];
+  productCategories?: string[];
   gstin: string;
   pan: string;
   msmeNumber: string;
@@ -102,7 +102,7 @@ export function EnterpriseOrganizationStep({
       industryType: data.industryType || '',
       organizationType: data.organizationType || '',
       ownershipType: data.ownershipType || '',
-      productCategories: data.productCategories || [],
+      
       gstin: data.gstin || '',
       pan: data.pan || '',
       msmeNumber: data.msmeNumber || '',
@@ -302,27 +302,6 @@ export function EnterpriseOrganizationStep({
               )}
             </div>
 
-            {/* Product Categories - Full Width */}
-            <div className="grid gap-1.5">
-              <Label>
-                Product / Service Categories <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="productCategories"
-                control={control}
-                render={({ field }) => (
-                  <MultiSelect
-                    options={PRODUCT_CATEGORIES.map((cat) => ({ label: cat, value: cat }))}
-                    selected={field.value || []}
-                    onChange={field.onChange}
-                    placeholder="Select product/service categories"
-                  />
-                )}
-              />
-              {errors.productCategories && (
-                <p className="text-xs text-destructive">{errors.productCategories.message}</p>
-              )}
-            </div>
           </div>
         </div>
 
