@@ -98,6 +98,8 @@ type ResolverCtx = {
   classify: Record<string, any>;
   uploads: any[];
   isMsme: boolean;
+  isIntl: boolean;
+  intlCountry: string;
 };
 
 function getPath(obj: any, path: string): any {
