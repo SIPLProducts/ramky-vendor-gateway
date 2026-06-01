@@ -472,8 +472,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
         </div>
       </div>
 
-      <div className="hidden">
-        {/* spacer */}
 
       {/* Statutory & Registrations (moved from Commercial Details) */}
       <div className="form-section">
