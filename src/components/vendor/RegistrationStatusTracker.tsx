@@ -18,6 +18,8 @@ export type RegistrationStatus =
   | 'ceo_office_review'
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
+  | 'dms_sync_pending'
+  | 'dms_synced'
   | 'sap_synced'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
