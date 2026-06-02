@@ -30,6 +30,15 @@ import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTenants } from '@/hooks/useTenant';
+import { useTenantContext } from '@/hooks/useTenantContext';
+import { useAuth } from '@/hooks/useAuth';
+import { safeUUID } from '@/lib/uuid';
+import { z } from 'zod';
 
 
 // 6-step built-in registration flow — Step 1 is the OCR + verification gate.
@@ -106,11 +115,85 @@ export default function VendorRegistration() {
   const [isTokenMode, setIsTokenMode] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [onBehalfInvitationId, setOnBehalfInvitationId] = useState<string | null>(null);
+  const [needsOnBehalfBootstrap, setNeedsOnBehalfBootstrap] = useState(false);
   const formDataLoadedRef = useRef(false);
   const [resetNonce, setResetNonce] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, userRole } = useAuth();
+  const { data: allTenants } = useTenants();
+  const { myTenants } = useTenantContext();
+  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
+  const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
+
+  // On-behalf bootstrap form state
+  const [obEmail, setObEmail] = useState('');
+  const [obVendorName, setObVendorName] = useState('');
+  const [obPhone, setObPhone] = useState('');
+  const [obTenantId, setObTenantId] = useState<string>('');
+  const [obEmailError, setObEmailError] = useState<string | null>(null);
+  const [obSubmitting, setObSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!obTenantId && allowedTenants.length > 0) setObTenantId(allowedTenants[0].id);
+  }, [allowedTenants, obTenantId]);
+
+  const handleCreateOnBehalfInvitation = async () => {
+    const parse = z.string().email('Please enter a valid email address').safeParse(obEmail.trim());
+    if (!parse.success) {
+      setObEmailError(parse.error.issues[0]?.message || 'Invalid email');
+      return;
+    }
+    if (!obTenantId) {
+      toast({ title: 'Select a company', description: 'Please select a buyer company.', variant: 'destructive' });
+      return;
+    }
+    if (obPhone.length > 0 && obPhone.length !== 10) {
+      toast({ title: 'Invalid phone', description: 'Phone must be 10 digits.', variant: 'destructive' });
+      return;
+    }
+    if (!user?.id) {
+      toast({ title: 'Session loading', description: 'Please reload and try again.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setObSubmitting(true);
+      const token = safeUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 60);
+      const { data: inv, error } = await supabase
+        .from('vendor_invitations')
+        .insert({
+          email: obEmail.trim(),
+          token,
+          expires_at: expiresAt.toISOString(),
+          tenant_id: obTenantId,
+          vendor_name: obVendorName || null,
+          phone_number: obPhone || null,
+          created_by: user.id,
+          created_on_behalf: true,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      setOnBehalfInvitationId(inv.id);
+      setInvitationToken(inv.token);
+      setInvitationEmail(inv.email);
+      setFormData((prev) => ({ ...prev, organization: { ...prev.organization, buyerCompanyId: obTenantId } }));
+      setNeedsOnBehalfBootstrap(false);
+      const next = new URLSearchParams(searchParams);
+      next.delete('onBehalf');
+      next.set('onBehalfOf', inv.id);
+      setSearchParams(next, { replace: true });
+    } catch (err: any) {
+      toast({ title: 'Could not start on-behalf registration', description: err?.message || 'Failed to create invitation', variant: 'destructive' });
+    } finally {
+      setObSubmitting(false);
+    }
+  };
+
+
 
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
@@ -227,7 +310,25 @@ export default function VendorRegistration() {
         }
       }
 
+      // ─── On-behalf bootstrap (buyer launched from Vendor Invitations) ─────
+      // Buyer clicked "Create Vendor" and was navigated straight into the form.
+      // We collect the minimum prerequisites inline (vendor email, name, phone,
+      // buyer company) and create the vendor_invitations row on submit, then
+      // continue exactly as the existing onBehalfOf flow.
+      if (searchParams.get('onBehalf') === '1') {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate('/auth');
+          return;
+        }
+        setIsTokenMode(false);
+        setNeedsOnBehalfBootstrap(true);
+        setIsValidatingToken(false);
+        return;
+      }
+
       if (!token) {
+
         setTokenError('Access denied. This page requires a valid invitation link.');
         setIsValidatingToken(false);
         return;
@@ -1052,6 +1153,71 @@ export default function VendorRegistration() {
   };
 
   if (isLoadingVendor || isValidatingToken) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
+
+  // On-behalf bootstrap — collect prerequisites before unlocking the form
+  if (needsOnBehalfBootstrap) {
+    return (
+      <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
+        <header className="h-14 border-b bg-card px-6 flex items-center sticky top-0 z-50 shadow-sm">
+          <Link to="/" className="flex items-center gap-3">
+            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
+            <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+          </Link>
+        </header>
+        <Dialog open modal>
+          <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Create Vendor on Behalf of Vendor</DialogTitle>
+              <DialogDescription>
+                Enter the vendor's basic details to open the Vendor Registration Form. No email is sent.
+                The submission runs the same validations and approval workflow.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="ob-name">Vendor Name</Label>
+                <Input id="ob-name" type="text" placeholder="ACME Pvt Ltd" value={obVendorName} onChange={(e) => setObVendorName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ob-email">Vendor Email</Label>
+                <Input id="ob-email" type="email" placeholder="vendor@company.com" value={obEmail} onChange={(e) => { setObEmail(e.target.value); setObEmailError(null); }} />
+                {obEmailError && <p className="text-sm text-destructive">{obEmailError}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ob-phone">Phone Number</Label>
+                <Input id="ob-phone" type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" value={obPhone} onChange={(e) => setObPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} />
+              </div>
+              {allowedTenants.length > 1 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="ob-company">Company</Label>
+                  <Select value={obTenantId} onValueChange={setObTenantId}>
+                    <SelectTrigger id="ob-company"><SelectValue placeholder="Select a company" /></SelectTrigger>
+                    <SelectContent>
+                      {allowedTenants.map((t) => (<SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
+                    {allowedTenants[0]?.name || 'No company assigned to your account'}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => navigate('/admin/invitations')}>Cancel</Button>
+              <Button onClick={handleCreateOnBehalfInvitation} disabled={obSubmitting} className="gap-2">
+                {obSubmitting ? (<><Loader2 className="h-4 w-4 animate-spin" />Opening…</>) : (<>Continue to Form<ChevronRight className="h-4 w-4" /></>)}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
 
   // Show error if token validation failed
   if (tokenError) {
