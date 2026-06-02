@@ -1,55 +1,27 @@
-## Problem
-
-The sidebar item **Buyer Approval** (`/approvals/buyer`) is currently gated using the `vendor_invitations` screen key (see `src/components/layout/Sidebar.tsx:70`). There is no dedicated entry in **User Management → Role Permissions**, so admins cannot grant or revoke Buyer Approval independently of Vendor Invitations. This is effectively hardcoded.
+# Create Vendor → Direct Navigation
 
 ## Goal
+On the Vendor Invitations screen, clicking **Create Vendor** should navigate straight to the Vendor Registration Form (on-behalf mode), without the intermediate "Create Vendor on Behalf of Vendor" dialog that asks for email / vendor name / phone / company up front.
 
-Expose **Buyer Approval** as its own screen in the Role Permissions matrix so access is controlled per role (built-in and custom) like every other approval screen — without changing any other functionality.
+## Change (single file)
+`src/pages/AdminInvitations.tsx`
 
-## Changes
+1. Change the **Create Vendor** button's `onClick` from `setIsCreateVendorOpen(true)` to `navigate('/vendor/registration?onBehalf=1')`.
+2. Leave the existing `isCreateVendorOpen` dialog, `createVendorOnBehalf` mutation, and the per-row "Resume" action **untouched** so resuming existing on-behalf drafts still works exactly as before.
 
-### 1. Add the screen key in the permissions registry
-`src/pages/RolePermissions.tsx` — add to `SCREENS`, grouped with the other approval entries:
-```
-{ key: 'buyer_approval', label: 'Buyer Approval' },
-```
-Place it just above `scm_manager_approval` so the matrix lists approvals in flow order: Buyer → SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO.
+## Form behavior in on-behalf mode without an invitation id
+`src/pages/VendorRegistration.tsx` + `src/hooks/useVendorRegistration.tsx`
 
-### 2. Use the new key in the sidebar
-`src/components/layout/Sidebar.tsx:70` — change the Buyer Approval item from:
-```
-screenKey: 'vendor_invitations'
-```
-to:
-```
-screenKey: 'buyer_approval'
-```
-No other sidebar items change.
+- When the URL has `?onBehalf=1` (no `onBehalfOf=<id>` yet), render the form in on-behalf mode and let the buyer enter the vendor's email, name, phone, and buyer company **inside the form itself** (Step 1 / Company Details — using existing fields, no new UI).
+- On first save/auto-save, create the `vendor_invitations` row (same insert as today's `createVendorOnBehalf`: `created_on_behalf: true`, `created_by: buyer`, 60-day expiry, generated token, no email sent) and then continue using that invitation id for the rest of the session (replace URL with `?onBehalfOf=<id>` via `navigate(..., { replace: true })` so refresh/resume works).
+- If the buyer leaves before first save, no invitation row is created — matches "navigate straight to the form" intent.
 
-### 3. Seed sensible defaults (data migration via insert tool)
-So existing buyer users do not lose access the moment we deploy, insert default `role_screen_permissions` rows (tenant_id = NULL, global default) granting `buyer_approval = true` for the same built-in roles that today see the link via the old key:
-- `sharvi_admin`
-- `admin`
-- `customer_admin`
-- `purchase` (the "buyer" role in this app)
-- `approver`
-
-`vendor`, `finance` remain false. Custom roles get nothing seeded — admins tick the new column when needed.
-
-No SQL schema change is required (`role_screen_permissions` already stores arbitrary `screen_key` text), so this is a data-only insert, not a migration.
-
-### 4. Backward compatibility
-- The existing `vendor_invitations` permission is left untouched and continues to gate the Vendor Invitations page only.
-- `useScreenPermissions` already reads from `role_screen_permissions` / `custom_role_screen_permissions` by key, so no hook changes are needed.
-- The page component `BuyerApproval.tsx`, route registration, and approval workflow logic are not modified.
-
-## Files touched
-
-- `src/pages/RolePermissions.tsx` — add one entry to `SCREENS`
-- `src/components/layout/Sidebar.tsx` — change one `screenKey` value
-- Data-only insert into `role_screen_permissions` for the five default-allow roles
+## Preserved (no changes)
+- Standard "New Invitation" flow (email send) — unchanged.
+- Validations, approval workflow, buyer-stage auto-approval for on-behalf submissions — unchanged.
+- `Resume` button on existing on-behalf invitation rows — unchanged.
+- All other screens, role permissions, SAP sync — unchanged.
 
 ## Out of scope
-
-- No changes to `seed_vendor_approval_progress`, approval workflow, custom-roles UI, or other approval screens.
-- No removal of the `vendor_invitations` entry — Vendor Invitations remains its own screen.
+- No DB migration.
+- No changes to approval routing, edge functions, or other pages.
