@@ -381,6 +381,7 @@ export type Database = {
           id: string
           include_scm_stages: boolean
           scm_manager_user_id: string
+          skip_buyer_stage: boolean
           tenant_id: string
         }
         Insert: {
@@ -390,6 +391,7 @@ export type Database = {
           id?: string
           include_scm_stages?: boolean
           scm_manager_user_id: string
+          skip_buyer_stage?: boolean
           tenant_id: string
         }
         Update: {
@@ -399,6 +401,7 @@ export type Database = {
           id?: string
           include_scm_stages?: boolean
           scm_manager_user_id?: string
+          skip_buyer_stage?: boolean
           tenant_id?: string
         }
         Relationships: [
@@ -1486,12 +1489,13 @@ export type Database = {
           comments: string | null
           created_at: string
           id: string
-          level_id: string
+          level_id: string | null
           level_number: number
           rejection_at: string | null
           rejection_comments: string | null
           rejection_from_stage: string | null
           rejection_from_user: string | null
+          stage: string | null
           status: string
           vendor_id: string
         }
@@ -1501,12 +1505,13 @@ export type Database = {
           comments?: string | null
           created_at?: string
           id?: string
-          level_id: string
+          level_id?: string | null
           level_number: number
           rejection_at?: string | null
           rejection_comments?: string | null
           rejection_from_stage?: string | null
           rejection_from_user?: string | null
+          stage?: string | null
           status?: string
           vendor_id: string
         }
@@ -1516,12 +1521,13 @@ export type Database = {
           comments?: string | null
           created_at?: string
           id?: string
-          level_id?: string
+          level_id?: string | null
           level_number?: number
           rejection_at?: string | null
           rejection_comments?: string | null
           rejection_from_stage?: string | null
           rejection_from_user?: string | null
+          stage?: string | null
           status?: string
           vendor_id?: string
         }
@@ -2466,6 +2472,7 @@ export type Database = {
         | "dms_synced"
         | "returned_to_buyer"
         | "returned_to_vendor"
+        | "buyer_review"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2631,6 +2638,7 @@ export const Constants = {
         "dms_synced",
         "returned_to_buyer",
         "returned_to_vendor",
+        "buyer_review",
       ],
     },
   },
