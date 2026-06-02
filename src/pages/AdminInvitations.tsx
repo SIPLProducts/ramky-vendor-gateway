@@ -924,7 +924,18 @@ export default function AdminInvitations() {
                                 Send to Vendor
                               </Button>
                             )}
-                            {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+                            {canResumeOnBehalf && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => navigate(`/vendor/registration?onBehalfOf=${invitation.id}`)}
+                                className="gap-1"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Resume
+                              </Button>
+                            )}
+                            {!isOnBehalf && !invitation.used_at && new Date(invitation.expires_at) > new Date() && (
                               <Button
                                 variant="ghost"
                                 size="sm"
