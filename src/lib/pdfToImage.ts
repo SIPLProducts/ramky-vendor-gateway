@@ -217,9 +217,9 @@ export async function normalizeUploadToImage(
   }
 
   if (pageCanvases.length === 0) {
-    // Fall back to the original PDF — the OCR provider may still handle it.
-    console.warn("[pdfToImage] no pages rendered, sending original PDF");
-    return file;
+    throw new Error(
+      "Could not render any page of the PDF to an image. Please upload a JPG or PNG instead.",
+    );
   }
 
 
