@@ -17,6 +17,7 @@ export const SCREENS: { key: string; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'vendors', label: 'All Vendors' },
 
+  { key: 'buyer_approval', label: 'Buyer Approval' },
   { key: 'scm_manager_approval', label: 'SCM Manager Approval' },
   { key: 'scm_head_approval', label: 'SCM Head Approval' },
   { key: 'finance1_approval', label: 'Finance 1 Approval' },
