@@ -531,6 +531,28 @@ export function DocumentVerificationStep({
         return undefined;
       };
       const registryAddress = pickAddress(d) || pickAddress(rawData);
+      // Parse the structured Principal Address (Surepass returns `pradr.addr`
+      // with `city/dst/stcd/pncd`) so we can populate the Address step's
+      // City / State / PIN Code fields without the vendor re-typing them.
+      const pickAddressParts = (src: Record<string, any>): { city?: string; state?: string; pincode?: string; address?: string } => {
+        const candidates = [src.pradr, src.principal_address, src.principal_place_address, src.pradr_addr, src.address];
+        for (const c of candidates) {
+          if (c && typeof c === "object") {
+            const inner = (c as any).addr && typeof (c as any).addr === "object" ? (c as any).addr : c;
+            const city = String(inner.city || inner.loc || inner.locality || "").trim();
+            const state = String(inner.stcd || inner.state || "").trim();
+            const pincode = String(inner.pncd || inner.pincode || inner.pin || "").trim();
+            const addr = String(inner.bnm || inner.building_name || inner.st || inner.street || "").trim();
+            if (city || state || pincode) {
+              return { city: city || undefined, state: state || undefined, pincode: pincode || undefined, address: addr || undefined };
+            }
+          }
+        }
+        return {};
+      };
+      const addressParts = pickAddressParts(d).city || pickAddressParts(d).state || pickAddressParts(d).pincode
+        ? pickAddressParts(d)
+        : pickAddressParts(rawData);
       // Normalize API field names to the keys the UI reads from `ocrData`.
       const normalized: Record<string, any> = {
         gstin: apiGstin || ocrGstin,
@@ -554,6 +576,10 @@ export function DocumentVerificationStep({
         jurisdiction_centre: d.center_jurisdiction || d.jurisdiction_centre || rawData.center_jurisdiction || rawData.jurisdiction_centre,
         jurisdiction_state: d.state_jurisdiction || d.jurisdiction_state || rawData.state_jurisdiction || rawData.jurisdiction_state,
         pan_number: d.pan_number || rawData.pan_number,
+        address_city: addressParts.city,
+        address_state: addressParts.state || (d.state_jurisdiction || rawData.state_jurisdiction || "").toString().replace(/^State\s*-\s*/i, "").trim() || undefined,
+        address_pincode: addressParts.pincode,
+        address_line: addressParts.address,
       };
       return {
         ok: true as const,
