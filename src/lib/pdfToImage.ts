@@ -170,23 +170,22 @@ export async function normalizeUploadToImage(
 
   const buf = await file.arrayBuffer();
 
-  // Run pdf.js inline (no worker). Self-hosted deployments often serve .mjs
-  // with the wrong content-type or block workers via CSP, and we don't want
-  // a silent worker failure to leak a raw PDF into the OCR provider.
+  // Load the PDF via pdf.js. We do NOT silently fall back to the raw PDF —
+  // OCR providers like Surepass require an image and will return
+  // `no_gstin_detected` if they receive `application/pdf`.
   let pdf: any;
   try {
     pdf = await (pdfjsLib as any).getDocument({
       data: buf,
-      disableWorker: true,
-      isEvalSupported: false,
       useSystemFonts: true,
     }).promise;
-  } catch (err) {
-    // Fall back to the original PDF — many OCR providers (e.g. Surepass)
-    // accept PDFs directly. Better to let the server respond than to block
-    // the user with a generic "couldn't read" error.
-    console.warn("[pdfToImage] getDocument failed, sending original PDF", err);
-    return file;
+  } catch (err: any) {
+    console.error("[pdfToImage] getDocument failed", err);
+    throw new Error(
+      `PDF could not be converted to an image in this browser (${err?.message || err}). ` +
+      `Please upload a JPG or PNG of the document instead, or contact your administrator ` +
+      `to fix the PDF worker on this server.`,
+    );
   }
 
 
