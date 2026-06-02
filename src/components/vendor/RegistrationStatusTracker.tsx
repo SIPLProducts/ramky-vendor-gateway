@@ -176,10 +176,10 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
       // If all approver levels approved, SAP Sync becomes active (unless synced).
       const allApproved = sorted.length > 0 && sorted.every((r) => r.status === 'approved');
       if (allApproved && status !== 'sap_synced' && status !== 'approved') {
-        stepOverrides[6] = 'active';
+        stepOverrides[7] = 'active';
       }
       if (status === 'sap_synced' || status === 'approved') {
-        stepOverrides[6] = 'completed';
+        stepOverrides[7] = 'completed';
       }
     }
 
