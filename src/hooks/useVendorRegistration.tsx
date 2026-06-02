@@ -400,6 +400,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       ifsc_code: formData.bank.ifscCode,
       micr_code: formData.bank.micrCode || null,
       bank_address: formData.bank.bankAddress || null,
+      account_holder_name: formData.bank.accountHolderName || null,
       // Secondary Bank (optional)
       bank_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.bankName || null) : null,
       branch_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.branchName || null) : null,
