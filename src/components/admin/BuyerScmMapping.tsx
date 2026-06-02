@@ -18,6 +18,7 @@ interface MappingRow {
   buyer_user_id: string;
   scm_manager_user_id: string;
   include_scm_stages: boolean;
+  skip_buyer_stage: boolean;
   created_at: string;
   buyer?: UserOpt;
   scm?: UserOpt;
