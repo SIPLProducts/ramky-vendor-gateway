@@ -259,9 +259,12 @@ export async function normalizeUploadToImage(
       output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
     });
     return out;
-  } catch (encodeErr) {
-    console.warn("[pdfToImage] encode/stitch failed, sending original PDF", encodeErr);
-    return file;
+  } catch (encodeErr: any) {
+    console.error("[pdfToImage] encode/stitch failed", encodeErr);
+    throw new Error(
+      `PDF was rendered but could not be encoded as a JPEG (${encodeErr?.message || encodeErr}). ` +
+      `Please upload a JPG or PNG instead.`,
+    );
   }
 }
 
