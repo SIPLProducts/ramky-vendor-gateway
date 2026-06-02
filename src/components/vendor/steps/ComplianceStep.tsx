@@ -164,26 +164,36 @@ export function ComplianceStep({
     onValidationStateChange?.(isStepValid);
   }, [isStepValid, onValidationStateChange]);
 
+  // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.
+  const pickStr = (v: any): string => {
+    if (v == null) return '';
+    if (typeof v === 'string' || typeof v === 'number') return String(v);
+    if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
+    return '';
+  };
+
+  // On re-upload of any document, ALWAYS overwrite the fields that belong to
+  // that document — including clearing values that the new document doesn't
+  // contain. This guarantees the form, Approval flow, DMS and SAP Sync always
+  // see the latest extracted information instead of stale data from the
+  // previous upload. The user can still manually edit any field afterwards.
   const handleGstVerified = (d: Record<string, any>) => {
-    if (d.constitution_of_business) setValue('gstConstitutionOfBusiness', d.constitution_of_business);
-    if (d.principal_place_of_business)
-      setValue('gstPrincipalPlaceOfBusiness', d.principal_place_of_business);
-    else if (d.address) setValue('gstPrincipalPlaceOfBusiness', d.address);
-    if (d.registration_date) setValue('gstRegistrationDate', d.registration_date);
-    if (d.status || d.gst_status) setValue('gstStatus', d.status || d.gst_status);
-    if (d.taxpayer_type) setValue('gstTaxpayerType', d.taxpayer_type);
-    if (d.jurisdiction_centre) setValue('gstJurisdictionCentre', d.jurisdiction_centre);
-    if (d.jurisdiction_state || d.state_jurisdiction)
-      setValue('gstJurisdictionState', d.jurisdiction_state || d.state_jurisdiction);
+    setValue('gstConstitutionOfBusiness', pickStr(d.constitution_of_business));
+    setValue(
+      'gstPrincipalPlaceOfBusiness',
+      pickStr(d.principal_place_of_business) || pickStr(d.address),
+    );
+    setValue('gstRegistrationDate', pickStr(d.registration_date));
+    setValue('gstStatus', pickStr(d.status) || pickStr(d.gst_status));
+    setValue('gstTaxpayerType', pickStr(d.taxpayer_type));
+    setValue('gstJurisdictionCentre', pickStr(d.jurisdiction_centre));
+    setValue(
+      'gstJurisdictionState',
+      pickStr(d.jurisdiction_state) || pickStr(d.state_jurisdiction),
+    );
 
     // Capture PAN + legal name from GST registry — these become the
     // source-of-truth values that PAN/MSME/Bank tabs validate against.
-    const pickStr = (v: any): string => {
-      if (v == null) return '';
-      if (typeof v === 'string' || typeof v === 'number') return String(v);
-      if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
-      return '';
-    };
     const panFromGst = pickStr(d.pan_number).toUpperCase().trim();
     if (panFromGst && panFromGst.length === 10) {
       setGstPanNumber(panFromGst);
@@ -197,74 +207,45 @@ export function ComplianceStep({
   };
 
   const handlePanVerified = (d: Record<string, any>) => {
-    const pickStr = (v: any): string => {
-      if (v == null) return '';
-      if (typeof v === 'string' || typeof v === 'number') return String(v);
-      if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
-      return '';
-    };
     const name = pickStr(d.full_name || d.holder_name || d.name).trim();
     if (name) setPanHolderName(name);
-  };
-
-  // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.
-  const pickStr = (v: any): string => {
-    if (v == null) return '';
-    if (typeof v === 'string' || typeof v === 'number') return String(v);
-    if (typeof v === 'object' && 'value' in v) return String((v as any).value ?? '');
-    return '';
   };
 
   // Populate MSME registration fields from whatever the configured provider returned.
   // Field names follow the dynamic mapping in `api_providers.response_data_mapping`.
   const handleMsmeVerified = (d: Record<string, any>) => {
-    // Mirror Udyam number into the visible MSME number field if missing.
     const udyam = pickStr(d.udyam_number);
     if (udyam) setValue('msmeNumber' as any, udyam);
 
     const enterpriseName = pickStr(d.enterprise_name || d.legal_name || d.name_of_enterprise);
-    if (enterpriseName) {
-      setValue('msmeEnterpriseName' as any, enterpriseName);
-      setMsmeEnterpriseName(enterpriseName);
-    }
-    const enterpriseType = pickStr(d.enterprise_type);
-    if (enterpriseType) setValue('msmeEnterpriseType' as any, enterpriseType);
-    const classificationYear = pickStr(d.classification_year);
-    if (classificationYear) setValue('msmeClassificationYear' as any, classificationYear);
-    const majorActivity = pickStr(d.major_activity);
-    if (majorActivity) setValue('msmeMajorActivity' as any, majorActivity);
-    const orgType = pickStr(d.organization_type);
-    if (orgType) setValue('msmeOrganizationType' as any, orgType);
-    const regDate = pickStr(d.registration_date);
-    if (regDate) setValue('msmeRegistrationDate' as any, regDate);
-    const doi = pickStr(d.date_of_incorporation || d.date_of_commencement);
-    if (doi) setValue('msmeDateOfIncorporation' as any, doi);
-    const state = pickStr(d.state);
-    if (state) setValue('msmeState' as any, state);
-    const district = pickStr(d.district);
-    if (district) setValue('msmeDistrict' as any, district);
-    const city = pickStr(d.city);
-    if (city) setValue('msmeCity' as any, city);
-    const pin = pickStr(d.pin_code);
-    if (pin) setValue('msmePinCode' as any, pin);
+    setValue('msmeEnterpriseName' as any, enterpriseName);
+    if (enterpriseName) setMsmeEnterpriseName(enterpriseName);
 
-    // Compose a single-line address from the parts the API returns.
+    setValue('msmeEnterpriseType' as any, pickStr(d.enterprise_type));
+    setValue('msmeClassificationYear' as any, pickStr(d.classification_year));
+    setValue('msmeMajorActivity' as any, pickStr(d.major_activity));
+    setValue('msmeOrganizationType' as any, pickStr(d.organization_type));
+    setValue('msmeRegistrationDate' as any, pickStr(d.registration_date));
+    setValue(
+      'msmeDateOfIncorporation' as any,
+      pickStr(d.date_of_incorporation || d.date_of_commencement),
+    );
+    setValue('msmeState' as any, pickStr(d.state));
+    setValue('msmeDistrict' as any, pickStr(d.district));
+    setValue('msmeCity' as any, pickStr(d.city));
+    setValue('msmePinCode' as any, pickStr(d.pin_code));
+
     const addressParts = [d.flat, d.name_of_building, d.road, d.village, d.block]
       .map(pickStr)
       .filter((x) => x && x !== '-');
-    const address = addressParts.join(', ');
-    if (address) setValue('msmeAddress' as any, address);
+    setValue('msmeAddress' as any, addressParts.join(', '));
 
-    const mobile = pickStr(d.mobile);
-    if (mobile) setValue('msmeMobile' as any, mobile);
-    const email = pickStr(d.email);
-    if (email) setValue('msmeEmail' as any, email);
-    const social = pickStr(d.social_category);
-    if (social) setValue('msmeSocialCategory' as any, social);
+    setValue('msmeMobile' as any, pickStr(d.mobile));
+    setValue('msmeEmail' as any, pickStr(d.email));
+    setValue('msmeSocialCategory' as any, pickStr(d.social_category));
 
-    // NIC code: prefer the most specific (5-digit), falling back gracefully.
     const nic = pickStr(d.nic_5_digit) || pickStr(d.nic_4_digit) || pickStr(d.nic_2_digit);
-    if (nic) setValue('msmeNicCode' as any, nic);
+    setValue('msmeNicCode' as any, nic);
   };
 
   const handleBankDetailsChange = (b: {
