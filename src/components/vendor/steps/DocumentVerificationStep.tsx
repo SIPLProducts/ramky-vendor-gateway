@@ -41,6 +41,68 @@ const OCR_PROVIDER_BY_KIND: Record<OcrDocumentType, { provider: string; label: s
   cheque: { provider: "BANK_OCR", label: "Bank OCR" },
 };
 
+/**
+ * Parse a plain comma-delimited Indian address string (typical KYC provider
+ * output for Principal Place of Business / MSME office address) into PIN /
+ * State / City / Address-line parts so the Address step can auto-fill them.
+ * Returns undefined parts when nothing could be parsed.
+ */
+const INDIAN_STATE_NAMES = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
+  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
+  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
+  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
+  "Uttarakhand","West Bengal","Andaman and Nicobar Islands","Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu","Delhi","Jammu and Kashmir","Ladakh",
+  "Lakshadweep","Puducherry","Orissa","Pondicherry",
+];
+const STATE_ALIASES: Record<string, string> = {
+  "orissa": "Odisha",
+  "pondicherry": "Puducherry",
+};
+function parseAddressString(raw: string): { address?: string; city?: string; state?: string; pincode?: string } {
+  if (!raw || typeof raw !== "string") return {};
+  let s = raw.replace(/\s+/g, " ").trim();
+  // PIN: trailing 6-digit number
+  let pincode: string | undefined;
+  const pinMatch = s.match(/(\d{6})(?!.*\d{6})/);
+  if (pinMatch) {
+    pincode = pinMatch[1];
+    s = s.replace(pinMatch[0], "").replace(/[,\s-]+$/g, "").trim();
+  }
+  const segments = s.split(",").map((p) => p.trim()).filter(Boolean);
+  if (!segments.length) return { pincode };
+  // State: scan from the end for a known Indian state (case-insensitive)
+  let stateIdx = -1;
+  let state: string | undefined;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    const low = seg.toLowerCase();
+    const aliased = STATE_ALIASES[low];
+    const direct = INDIAN_STATE_NAMES.find((n) => n.toLowerCase() === low);
+    if (direct || aliased) {
+      state = direct || aliased;
+      stateIdx = i;
+      break;
+    }
+  }
+  // City: segment immediately before the state (skip if it looks like a number)
+  let city: string | undefined;
+  if (stateIdx > 0) {
+    const candidate = segments[stateIdx - 1];
+    if (candidate && !/^\d+$/.test(candidate)) city = candidate;
+  } else if (segments.length >= 2) {
+    // No state detected — use last segment as city as a weak fallback
+    city = segments[segments.length - 1];
+  }
+  // Address line = everything before the city segment
+  let addressEnd = stateIdx >= 0 ? stateIdx : segments.length;
+  if (city && stateIdx > 0) addressEnd = stateIdx - 1;
+  else if (city && stateIdx < 0) addressEnd = segments.length - 1;
+  const address = segments.slice(0, addressEnd).join(", ") || undefined;
+  return { address, city, state, pincode };
+}
+
 /** Build the bank holder-name success message from the active reference labels. */
 function buildHolderNameSuccessMessage(labels: string[]): string {
   if (!labels.length) return "Account Holder Name verified successfully.";
