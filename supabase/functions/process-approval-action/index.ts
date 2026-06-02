@@ -321,10 +321,14 @@ Deno.serve(async (req) => {
     }
 
     const nextRow = stillPending.reduce((min, p) => (p.level_number < min.level_number ? p : min), stillPending[0]);
-    const { data: nextLvl } = await admin
-      .from('approval_matrix_levels')
-      .select('stage').eq('id', nextRow.level_id).single();
-    const nextStatus = STAGE_TO_REVIEW[nextLvl?.stage ?? ''] ?? 'purchase_review';
+    let nextStage: string | null = (nextRow as any).stage ?? null;
+    if (!nextStage && nextRow.level_id) {
+      const { data: nextLvl } = await admin
+        .from('approval_matrix_levels')
+        .select('stage').eq('id', nextRow.level_id).single();
+      nextStage = nextLvl?.stage ?? null;
+    }
+    const nextStatus = STAGE_TO_REVIEW[nextStage ?? ''] ?? 'purchase_review';
     await admin.from('vendors').update({ status: nextStatus }).eq('id', progress.vendor_id);
 
     return new Response(JSON.stringify({ ok: true, vendor_status: nextStatus, advanced_to_level: nextRow.level_number }), {
