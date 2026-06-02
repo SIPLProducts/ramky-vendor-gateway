@@ -419,6 +419,11 @@ export function DocumentVerificationStep({
   // Vendor types Account Number + IFSC, we re-call the configured BANK
   // provider, and on success populate the bank doc as if cheque OCR had worked.
   const chequeTargetRef = useRef<"primary" | "secondary">("primary");
+  // Track the most-recently uploaded cheque File per slot so the manual-entry
+  // popup can attach it to the verified state (otherwise re-uploads get lost
+  // and DMS keeps showing the first uploaded cheque).
+  const lastBankFileRef = useRef<File | null>(null);
+  const lastBankFile2Ref = useRef<File | null>(null);
   const [bankPopup, setBankPopup] = useState<{
     open: boolean;
     target: "primary" | "secondary";
