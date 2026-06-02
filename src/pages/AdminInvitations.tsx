@@ -450,7 +450,82 @@ export default function AdminInvitations() {
     },
   });
 
-  const handleCreateInvitation = () => {
+  const checkTenantOnboardingReadiness = async (
+    tenantId: string,
+    buyerUserId: string,
+  ): Promise<{ ok: boolean; missing: Array<'buyer_scm' | 'approval_matrix'> }> => {
+    const [scmRes, matrixRes] = await Promise.all([
+      supabase
+        .from('buyer_scm_mappings')
+        .select('id', { head: true, count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .eq('buyer_user_id', buyerUserId),
+      supabase
+        .from('approval_matrix_levels')
+        .select('id, approval_matrix_approvers!inner(id)', { head: true, count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true),
+    ]);
+    if (scmRes.error || matrixRes.error) {
+      throw scmRes.error || matrixRes.error;
+    }
+    const missing: Array<'buyer_scm' | 'approval_matrix'> = [];
+    if ((scmRes.count ?? 0) === 0) missing.push('buyer_scm');
+    if ((matrixRes.count ?? 0) === 0) missing.push('approval_matrix');
+    return { ok: missing.length === 0, missing };
+  };
+
+  const tenantNameFor = (tenantId: string) =>
+    allowedTenants.find((t) => t.id === tenantId)?.name ||
+    allTenants?.find((t) => t.id === tenantId)?.name ||
+    'the selected company';
+
+  const showReadinessToast = (tenantId: string, missing: Array<'buyer_scm' | 'approval_matrix'>) => {
+    const parts: string[] = [];
+    if (missing.includes('buyer_scm')) parts.push('Buyer–SCM mapping');
+    if (missing.includes('approval_matrix')) parts.push('Approval Matrix');
+    toast({
+      title: 'Configuration Required',
+      description: `Cannot create vendor: ${parts.join(' and ')} ${parts.length > 1 ? 'are' : 'is'} not configured for ${tenantNameFor(tenantId)}. Please configure ${parts.length > 1 ? 'them' : 'it'} in User Management → Buyer-SCM Mapping and Settings → Approval Matrix before inviting vendors.`,
+      variant: 'destructive',
+    });
+  };
+
+  const handleCreateVendorClick = async () => {
+    if (!effectiveTenantId) {
+      toast({
+        title: 'No Company Assigned',
+        description: allowedTenants.length > 0
+          ? 'Please select a company.'
+          : 'Your account is not assigned to any company. Contact your administrator.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!user?.id) {
+      toast({ title: 'Session loading', description: 'Please reload and try again.', variant: 'destructive' });
+      return;
+    }
+    setIsCheckingReadiness(true);
+    try {
+      const result = await checkTenantOnboardingReadiness(effectiveTenantId, user.id);
+      if (!result.ok) {
+        showReadinessToast(effectiveTenantId, result.missing);
+        return;
+      }
+      navigate('/vendor/registration?onBehalf=1');
+    } catch {
+      toast({
+        title: 'Verification Failed',
+        description: 'Could not verify tenant configuration. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCheckingReadiness(false);
+    }
+  };
+
+  const handleCreateInvitation = async () => {
     setEmailError(null);
 
     try {
@@ -471,6 +546,29 @@ export default function AdminInvitations() {
         variant: 'destructive',
       });
       return;
+    }
+
+    if (!user?.id) {
+      toast({ title: 'Session loading', description: 'Please reload and try again.', variant: 'destructive' });
+      return;
+    }
+
+    setIsCheckingReadiness(true);
+    try {
+      const result = await checkTenantOnboardingReadiness(effectiveTenantId, user.id);
+      if (!result.ok) {
+        showReadinessToast(effectiveTenantId, result.missing);
+        return;
+      }
+    } catch {
+      toast({
+        title: 'Verification Failed',
+        description: 'Could not verify tenant configuration. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    } finally {
+      setIsCheckingReadiness(false);
     }
 
     createInvitation.mutate({ email, vendorName, phoneNumber, expiryDays: parseInt(expiryDays), tenantId: effectiveTenantId });
