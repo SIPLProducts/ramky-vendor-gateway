@@ -842,8 +842,36 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         console.warn('[saveVendor] Failed to persist GST filing status', e);
       }
 
+      // On-behalf mode: keep the vendor_invitations row in sync with the real
+      // vendor details the buyer just entered (Step 1). The invitation was
+      // created with placeholder email/name when the buyer clicked
+      // "Create Vendor"; we overwrite it here so the Vendor Invitations list
+      // and downstream notifications show the correct vendor identity.
+      if (options?.onBehalfInvitationId) {
+        try {
+          const inviteUpdate: Record<string, unknown> = {};
+          const legal = (formData.organization.legalName || '').trim();
+          const trade = (formData.organization.tradeName || '').trim();
+          const vendorName = legal || trade;
+          const primaryEmail = (formData.contact.ceoEmail || formData.address.registeredEmail || '').trim();
+          const primaryPhone = (formData.contact.ceoPhone || formData.address.registeredPhone || '').trim();
+          if (vendorName) inviteUpdate.vendor_name = vendorName;
+          if (primaryEmail) inviteUpdate.email = primaryEmail;
+          if (primaryPhone) inviteUpdate.phone_number = primaryPhone;
+          if (Object.keys(inviteUpdate).length > 0) {
+            await supabase
+              .from('vendor_invitations')
+              .update(inviteUpdate)
+              .eq('id', options.onBehalfInvitationId);
+          }
+        } catch (e) {
+          console.warn('[saveVendor] On-behalf invitation sync failed (non-blocking)', e);
+        }
+      }
+
       return savedVendor;
     },
+
 
     onError: async (error: any) => {
       const code = error?.code || '';
