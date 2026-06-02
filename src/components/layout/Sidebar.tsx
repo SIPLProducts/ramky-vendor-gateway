@@ -23,6 +23,7 @@ import {
   Inbox,
   Layers,
   Crown,
+  UserCheck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
