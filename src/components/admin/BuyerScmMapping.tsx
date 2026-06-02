@@ -323,6 +323,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                           {m.skip_buyer_stage ? 'Skip buyer' : 'Buyer approves first'}
                         </span>
                       </div>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(m.created_at).toLocaleDateString()}
                     </TableCell>
