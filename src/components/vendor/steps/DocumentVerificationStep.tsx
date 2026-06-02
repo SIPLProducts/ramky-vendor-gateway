@@ -195,14 +195,33 @@ export function DocumentVerificationStep({
       const cfg = OCR_PROVIDER_BY_KIND[documentType];
       // Always normalize uploads to a single JPEG before sending to the
       // OCR provider. Surepass and most providers only reliably read
-      // images. If conversion fails we surface an error rather than
-      // silently sending a raw PDF.
-      let fileForOcr: File = file;
+      // images. If conversion fails we MUST NOT send the original PDF —
+      // the provider will return `no_gstin_detected` and the user will be
+      // stuck. Surface a clear error instead.
+      let fileForOcr: File;
       try {
         fileForOcr = await normalizeUploadToImage(file);
-      } catch (err) {
-        console.warn("[KYC] file→image conversion failed, sending original to provider", err);
-        fileForOcr = file;
+      } catch (err: any) {
+        console.error("[KYC] file→image conversion failed", err);
+        return {
+          success: false as const,
+          error:
+            err?.message ||
+            `Could not convert ${cfg.label} document to an image. Please upload a JPG or PNG instead.`,
+        };
+      }
+
+      const isPdf =
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (
+        isPdf &&
+        (fileForOcr.type === "application/pdf" ||
+          fileForOcr.name.toLowerCase().endsWith(".pdf"))
+      ) {
+        return {
+          success: false as const,
+          error: `PDF could not be converted to an image on this device. Please upload a JPG or PNG of the ${cfg.label} document instead.`,
+        };
       }
 
       const r = await callProvider({ providerName: cfg.provider, file: fileForOcr });
