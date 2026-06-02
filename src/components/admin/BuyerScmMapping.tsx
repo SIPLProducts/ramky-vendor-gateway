@@ -198,6 +198,18 @@ export function BuyerScmMapping({ tenantId }: Props) {
     }
   };
 
+  const handleToggleSkipBuyer = async (id: string, next: boolean) => {
+    setMappings((prev) => prev.map((m) => (m.id === id ? { ...m, skip_buyer_stage: next } : m)));
+    const { error } = await supabase
+      .from('buyer_scm_mappings')
+      .update({ skip_buyer_stage: next } as any)
+      .eq('id', id);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+      await loadData();
+    }
+  };
+
 
   const label = (u?: UserOpt) => (u ? (u.full_name || u.email) : '—');
 
