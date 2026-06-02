@@ -66,6 +66,27 @@ export function useConfiguredKycApi() {
           let fileMimeType: string | undefined;
           let fileName: string | undefined;
           if (params.file) {
+            // Backstop: OCR providers (e.g. GST_OCR / PAN_OCR / Surepass)
+            // do not accept PDFs on these endpoints — they return
+            // `no_gstin_detected`. If a raw PDF reaches this hook it means
+            // the client-side PDF→JPEG conversion failed (commonly the
+            // pdf.js worker `.mjs` not loading on the self-hosted server).
+            // Refuse to send it and surface a clear error.
+            const isOcrProvider = /(_OCR|^OCR_)/i.test(params.providerName);
+            const isPdf =
+              params.file.type === "application/pdf" ||
+              params.file.name.toLowerCase().endsWith(".pdf");
+            if (isOcrProvider && isPdf) {
+              return {
+                found: true,
+                ok: false,
+                message:
+                  "PDF could not be converted to an image in this browser. " +
+                  "Please upload a JPG or PNG of the document, or contact your administrator " +
+                  "to fix the PDF worker on this server.",
+                provider_name: params.providerName,
+              };
+            }
             fileBase64 = await fileToBase64(params.file);
             fileMimeType = params.file.type || "application/octet-stream";
             fileName = params.file.name || undefined;
