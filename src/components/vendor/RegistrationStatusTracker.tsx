@@ -44,6 +44,7 @@ interface StatusStep {
 const statusSteps: StatusStep[] = [
   { id: 'submitted',     label: 'Submitted',           description: 'Registration received',     icon: <FileCheck className="h-5 w-5" /> },
   { id: 'verification',  label: 'Document Verification', description: 'Validating your documents', icon: <Clock className="h-5 w-5" /> },
+  { id: 'buyer',         label: 'Buyer Approval',      description: 'Awaiting Buyer',            icon: <UserCheck className="h-5 w-5" /> },
   { id: 'scm_manager',   label: 'SCM Manager Approval', description: 'Awaiting SCM Manager',     icon: <ShoppingCart className="h-5 w-5" /> },
   { id: 'scm_head',      label: 'SCM Head Approval',   description: 'Awaiting SCM Head',         icon: <ShieldCheck className="h-5 w-5" /> },
   { id: 'finance_1',     label: 'Finance 1 Approval',  description: 'Awaiting Finance 1',        icon: <IndianRupee className="h-5 w-5" /> },
@@ -58,29 +59,32 @@ function getActiveStepIndex(status: RegistrationStatus): number {
     case 'validation_pending':
     case 'validation_failed':
       return 1;
+    case 'buyer_review':
+    case 'buyer_rejected':
+      return 2;
     case 'scm_manager_review':
     case 'scm_manager_rejected':
     case 'purchase_review': // legacy fallback
-      return 2;
+      return 3;
     case 'scm_head_review':
     case 'scm_head_rejected':
-      return 3;
+      return 4;
     case 'finance_1_review':
     case 'finance_1_rejected':
     case 'finance_review': // legacy fallback
-      return 4;
+      return 5;
     case 'finance_2_review':
     case 'finance_2_rejected':
     case 'ceo_office_review':
     case 'ceo_office_rejected':
-      return 5;
+      return 6;
     case 'pending_sap_sync':
     case 'purchase_approved':
     case 'finance_approved':
-      return 6;
+      return 7;
     case 'sap_synced':
     case 'approved':
-      return 7;
+      return 8;
     case 'rejected':
     case 'purchase_rejected':
     case 'finance_rejected':
@@ -92,11 +96,12 @@ function getActiveStepIndex(status: RegistrationStatus): number {
 
 const FAILED_STEP: Partial<Record<RegistrationStatus, number>> = {
   validation_failed: 1,
-  scm_manager_rejected: 2,
-  scm_head_rejected: 3,
-  finance_1_rejected: 4,
-  finance_2_rejected: 5,
-  ceo_office_rejected: 5,
+  buyer_rejected: 2,
+  scm_manager_rejected: 3,
+  scm_head_rejected: 4,
+  finance_1_rejected: 5,
+  finance_2_rejected: 6,
+  ceo_office_rejected: 6,
   returned_to_buyer: 2,
   returned_to_vendor: 0,
 };
