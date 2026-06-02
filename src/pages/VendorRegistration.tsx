@@ -550,8 +550,15 @@ export default function VendorRegistration() {
   // RULE: vendor-typed values always win. OCR only fills fields the vendor
   // has left blank. We treat "" / null / undefined as blank.
   const mergeVerifiedDataIntoForm = (prev: VendorFormData, data: VerifiedDocumentData): VendorFormData => {
+    // Fill-only-if-empty: vendor edits in later steps win over Stage-1 OCR.
     const fill = <T,>(p: T, n: T | undefined | null): T =>
       (p !== undefined && p !== null && p !== '') ? p : ((n ?? p) as T);
+    // Latest-verified wins: Stage-1 verified value (whether OCR or manual
+    // entry) overrides the previously stored value. Used for fields where
+    // the document/registry is the authoritative source so that re-verifying
+    // a document never leaves stale data in the form / vendor record / DMS.
+    const overwrite = <T,>(p: T, n: T | undefined | null): T =>
+      (n !== undefined && n !== null && (n as unknown) !== '') ? (n as T) : p;
 
     const gstYes = data.isGstRegistered === true;
     const ocrLegalName =
@@ -560,6 +567,28 @@ export default function VendorRegistration() {
       '';
     const ocrTradeName = data.gst?.tradeName || '';
     const principalPlace = data.gst?.principalPlaceOfBusiness || data.gst?.address || '';
+    // Address parts extracted from the GST registry (when GST=yes) or the
+    // MSME / manual address fallback. These auto-populate City / State /
+    // PIN Code on the Address step the first time, but never overwrite
+    // values the vendor has typed.
+    const gstAddrParts = data.gst?.addressParts;
+    const msmeAddrParts = data.msme?.addressParts;
+    const addrLineFromDoc =
+      (gstYes ? principalPlace : data.manualAddress?.address) ||
+      msmeAddrParts?.address ||
+      '';
+    const cityFromDoc =
+      (gstYes ? gstAddrParts?.city : data.manualAddress?.city) ||
+      msmeAddrParts?.city ||
+      '';
+    const stateFromDoc =
+      (gstYes ? (gstAddrParts?.state || data.gst?.jurisdictionState) : data.manualAddress?.state) ||
+      msmeAddrParts?.state ||
+      '';
+    const pinFromDoc =
+      (gstYes ? gstAddrParts?.pincode : data.manualAddress?.pincode) ||
+      msmeAddrParts?.pincode ||
+      '';
 
     // Only carry the secondary bank into form state when the vendor has
     // already opted-in OR the verified payload itself carries a bank2 (which
@@ -575,52 +604,52 @@ export default function VendorRegistration() {
       },
       address: {
         ...prev.address,
-        registeredAddress: gstYes
-          ? fill(prev.address.registeredAddress, principalPlace)
-          : fill(prev.address.registeredAddress, data.manualAddress?.address),
-        registeredCity: gstYes
-          ? prev.address.registeredCity
-          : fill(prev.address.registeredCity, data.manualAddress?.city),
-        registeredState: gstYes
-          ? prev.address.registeredState
-          : fill(prev.address.registeredState, data.manualAddress?.state),
-        registeredPincode: gstYes
-          ? prev.address.registeredPincode
-          : fill(prev.address.registeredPincode, data.manualAddress?.pincode),
+        registeredAddress: fill(prev.address.registeredAddress, addrLineFromDoc),
+        registeredCity: fill(prev.address.registeredCity, cityFromDoc),
+        registeredState: fill(prev.address.registeredState, stateFromDoc),
+        registeredPincode: fill(prev.address.registeredPincode, pinFromDoc),
+      },
+      contact: {
+        ...prev.contact,
+        // PAN holder name is a reasonable seed for the primary CEO contact;
+        // never override a name the vendor has already typed.
+        ceoName: fill(prev.contact.ceoName, data.pan?.holderName),
       },
       statutory: {
         ...prev.statutory,
         isGstRegistered: data.isGstRegistered ?? prev.statutory.isGstRegistered,
         gstDeclarationReason: fill(prev.statutory.gstDeclarationReason, data.gstDeclarationReason),
         gstSelfDeclarationFile: data.gstSelfDeclarationFile ?? prev.statutory.gstSelfDeclarationFile,
-        gstin: fill(prev.statutory.gstin, data.gst?.gstin),
-        gstConstitutionOfBusiness: fill(prev.statutory.gstConstitutionOfBusiness, data.gst?.constitutionOfBusiness),
-        gstPrincipalPlaceOfBusiness: fill(prev.statutory.gstPrincipalPlaceOfBusiness, principalPlace),
-        gstAdditionalPlaces: (Array.isArray(prev.statutory.gstAdditionalPlaces) && prev.statutory.gstAdditionalPlaces.length > 0)
-          ? prev.statutory.gstAdditionalPlaces
-          : (data.gst?.additionalPlaces ?? prev.statutory.gstAdditionalPlaces),
-        gstRegistrationDate: fill(prev.statutory.gstRegistrationDate, data.gst?.registrationDate),
-        gstStatus: fill(prev.statutory.gstStatus, data.gst?.status),
-        gstTaxpayerType: fill(prev.statutory.gstTaxpayerType, data.gst?.taxpayerType),
-        gstBusinessNature: (Array.isArray(prev.statutory.gstBusinessNature) && prev.statutory.gstBusinessNature.length > 0)
-          ? prev.statutory.gstBusinessNature
-          : (data.gst?.businessNature ?? prev.statutory.gstBusinessNature),
-        gstJurisdictionCentre: fill(prev.statutory.gstJurisdictionCentre, data.gst?.jurisdictionCentre),
-        gstJurisdictionState: fill(prev.statutory.gstJurisdictionState, data.gst?.jurisdictionState),
+        // Stage-1 verified values — always reflect the latest verification so
+        // DMS / approval / downstream validators never see stale OCR data
+        // after the vendor re-verifies (whether by re-upload or manual entry).
+        gstin: overwrite(prev.statutory.gstin, data.gst?.gstin),
+        gstConstitutionOfBusiness: overwrite(prev.statutory.gstConstitutionOfBusiness, data.gst?.constitutionOfBusiness),
+        gstPrincipalPlaceOfBusiness: overwrite(prev.statutory.gstPrincipalPlaceOfBusiness, principalPlace),
+        gstAdditionalPlaces: (Array.isArray(data.gst?.additionalPlaces) && data.gst?.additionalPlaces.length > 0)
+          ? data.gst.additionalPlaces
+          : prev.statutory.gstAdditionalPlaces,
+        gstRegistrationDate: overwrite(prev.statutory.gstRegistrationDate, data.gst?.registrationDate),
+        gstStatus: overwrite(prev.statutory.gstStatus, data.gst?.status),
+        gstTaxpayerType: overwrite(prev.statutory.gstTaxpayerType, data.gst?.taxpayerType),
+        gstBusinessNature: (Array.isArray(data.gst?.businessNature) && data.gst?.businessNature.length > 0)
+          ? data.gst.businessNature
+          : prev.statutory.gstBusinessNature,
+        gstJurisdictionCentre: overwrite(prev.statutory.gstJurisdictionCentre, data.gst?.jurisdictionCentre),
+        gstJurisdictionState: overwrite(prev.statutory.gstJurisdictionState, data.gst?.jurisdictionState),
         gstFilingStatus: Array.isArray(data.gst?.filing_status) && data.gst?.filing_status.length > 0
           ? data.gst.filing_status
           : prev.statutory.gstFilingStatus,
-        pan: fill(prev.statutory.pan, data.pan?.number),
+        pan: overwrite(prev.statutory.pan, data.pan?.number),
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
-        msmeNumber: fill(prev.statutory.msmeNumber, data.msme?.udyamNumber),
+        msmeNumber: overwrite(prev.statutory.msmeNumber, data.msme?.udyamNumber),
         msmeCategory: ((): StatutoryDetails['msmeCategory'] => {
-          if (prev.statutory.msmeCategory) return prev.statutory.msmeCategory;
           const t = (data.msme?.enterpriseType || '').toLowerCase();
           if (t === 'micro' || t === 'small' || t === 'medium') return t;
           return prev.statutory.msmeCategory;
         })(),
-        msmeEnterpriseName: fill(prev.statutory.msmeEnterpriseName, data.msme?.enterpriseName),
-        msmeMajorActivity: fill(prev.statutory.msmeMajorActivity, data.msme?.majorActivity),
+        msmeEnterpriseName: overwrite(prev.statutory.msmeEnterpriseName, data.msme?.enterpriseName),
+        msmeMajorActivity: overwrite(prev.statutory.msmeMajorActivity, data.msme?.majorActivity),
         // Carry the actual uploaded files into the form so draft saves include them
         gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
         panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
@@ -630,23 +659,26 @@ export default function VendorRegistration() {
       },
       bank: {
         ...prev.bank,
-        accountNumber: fill(prev.bank.accountNumber, data.bank?.accountNumber),
-        confirmAccountNumber: fill(prev.bank.confirmAccountNumber, data.bank?.accountNumber),
-        ifscCode: fill(prev.bank.ifscCode, data.bank?.ifsc),
-        bankName: fill(prev.bank.bankName, data.bank?.bankName),
-        branchName: fill(prev.bank.branchName, data.bank?.branchName),
+        // Same latest-verified semantics for bank fields — re-running penny
+        // drop with corrected account/IFSC must update the form, vendor row,
+        // and any downstream SAP / DMS payload.
+        accountNumber: overwrite(prev.bank.accountNumber, data.bank?.accountNumber),
+        confirmAccountNumber: overwrite(prev.bank.confirmAccountNumber, data.bank?.accountNumber),
+        ifscCode: overwrite(prev.bank.ifscCode, data.bank?.ifsc),
+        bankName: overwrite(prev.bank.bankName, data.bank?.bankName),
+        branchName: overwrite(prev.bank.branchName, data.bank?.branchName),
         accountType: (prev.bank.accountType || (data.bank?.accountType as BankDetails['accountType']) || 'current') as BankDetails['accountType'],
         bankAddress: fill(prev.bank.bankAddress, data.bank?.bankAddress),
-        accountHolderName: fill(prev.bank.accountHolderName ?? '', data.bank?.accountHolderName),
+        accountHolderName: overwrite(prev.bank.accountHolderName ?? '', data.bank?.accountHolderName),
         cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
         secondary: wantsSecondary
           ? {
               enabled: true,
-              accountNumber: fill(prev.bank.secondary?.accountNumber ?? '', data.bank2?.accountNumber),
-              ifscCode: fill(prev.bank.secondary?.ifscCode ?? '', data.bank2?.ifsc),
-              bankName: fill(prev.bank.secondary?.bankName ?? '', data.bank2?.bankName),
-              branchName: fill(prev.bank.secondary?.branchName ?? '', data.bank2?.branchName),
-              accountHolderName: fill(prev.bank.secondary?.accountHolderName ?? '', data.bank2?.accountHolderName),
+              accountNumber: overwrite(prev.bank.secondary?.accountNumber ?? '', data.bank2?.accountNumber),
+              ifscCode: overwrite(prev.bank.secondary?.ifscCode ?? '', data.bank2?.ifsc),
+              bankName: overwrite(prev.bank.secondary?.bankName ?? '', data.bank2?.bankName),
+              branchName: overwrite(prev.bank.secondary?.branchName ?? '', data.bank2?.branchName),
+              accountHolderName: overwrite(prev.bank.secondary?.accountHolderName ?? '', data.bank2?.accountHolderName),
               accountType: ((prev.bank.secondary?.accountType) || (data.bank2?.accountType as BankDetails['accountType']) || 'current') as BankDetails['accountType'],
               bankAddress: fill(prev.bank.secondary?.bankAddress ?? '', data.bank2?.bankAddress),
               micrCode: prev.bank.secondary?.micrCode || '',
@@ -656,6 +688,8 @@ export default function VendorRegistration() {
       },
     };
   };
+
+
 
 
   // Holds the most recent Step-1 snapshot from the child, even if React hasn't
