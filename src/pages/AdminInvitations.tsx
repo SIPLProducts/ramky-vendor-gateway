@@ -56,6 +56,8 @@ import {
   Building2,
   User,
   Phone,
+  UserPlus,
+  ExternalLink,
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
