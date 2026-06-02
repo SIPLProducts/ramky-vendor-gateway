@@ -861,6 +861,14 @@ export default function AdminInvitations() {
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
                           )}
+                          {isOnBehalf && (
+                            <div className="mt-1">
+                              <Badge variant="secondary" className="gap-1">
+                                <UserPlus className="h-3 w-3" />
+                                On behalf
+                              </Badge>
+                            </div>
+                          )}
                           {isReturned && (
                             <div className="mt-1 space-y-1">
                               <Badge variant="destructive" className="gap-1">
