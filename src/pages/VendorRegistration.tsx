@@ -30,6 +30,15 @@ import ramkyLogo from '@/assets/ramky-logo.png';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTenants } from '@/hooks/useTenant';
+import { useTenantContext } from '@/hooks/useTenantContext';
+import { useAuth } from '@/hooks/useAuth';
+import { safeUUID } from '@/lib/uuid';
+import { z } from 'zod';
 
 
 // 6-step built-in registration flow — Step 1 is the OCR + verification gate.
