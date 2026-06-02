@@ -82,6 +82,7 @@ export default function AdminInvitations() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [isCheckingReadiness, setIsCheckingReadiness] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: allTenants } = useTenants();
