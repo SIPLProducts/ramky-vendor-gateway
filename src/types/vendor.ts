@@ -229,6 +229,8 @@ export interface BankDetails {
   ifscCode: string;
   micrCode: string;
   bankAddress: string;
+  /** Account holder name (auto-filled from the cancelled cheque OCR). */
+  accountHolderName?: string;
   cancelledChequeFile: File | null;
   /** Optional secondary bank account — same verification flow */
   secondary?: SecondaryBankDetails;
