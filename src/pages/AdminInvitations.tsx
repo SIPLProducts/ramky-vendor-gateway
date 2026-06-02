@@ -665,7 +665,8 @@ export default function AdminInvitations() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => navigate('/vendor/registration?onBehalf=1')}
+            onClick={handleCreateVendorClick}
+            disabled={isCheckingReadiness}
           >
             <UserPlus className="h-4 w-4" />
             Create Vendor
