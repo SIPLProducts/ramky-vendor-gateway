@@ -582,6 +582,68 @@ serve(async (req) => {
         sap_synced_at: new Date().toISOString(),
         status: "dms_sync_pending",
       }).eq("id", vendorId);
+
+      // Best-effort: notify the buyer who invited/created this vendor.
+      try {
+        const { data: invite } = await supabase
+          .from("vendor_invitations")
+          .select("created_by")
+          .eq("vendor_id", vendorId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const buyerUserId = (invite as any)?.created_by;
+        if (buyerUserId) {
+          const { data: buyer } = await supabase
+            .from("profiles")
+            .select("email, full_name")
+            .eq("id", buyerUserId)
+            .maybeSingle();
+          const buyerEmail = (buyer as any)?.email;
+          const buyerName = (buyer as any)?.full_name || "Buyer";
+          if (buyerEmail) {
+            const legal = vendor.legal_name || vendor.trade_name || "Vendor";
+            const trade = vendor.trade_name || "";
+            const syncedAt = new Date().toLocaleString();
+            const subject = `Vendor ${legal} successfully created in SAP (${sapVendorCode})`;
+            const html = `
+              <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:14px;">
+                <p>Dear ${buyerName},</p>
+                <p>The vendor you onboarded has been <b>successfully created in SAP</b>.</p>
+                <table cellpadding="6" style="border-collapse:collapse;border:1px solid #e5e7eb;">
+                  <tr><td style="background:#f7f9fc;"><b>Vendor Legal Name</b></td><td>${legal}</td></tr>
+                  ${trade ? `<tr><td style="background:#f7f9fc;"><b>Trade Name</b></td><td>${trade}</td></tr>` : ""}
+                  <tr><td style="background:#f7f9fc;"><b>SAP Vendor Code</b></td><td>${sapVendorCode}</td></tr>
+                  <tr><td style="background:#f7f9fc;"><b>Reference No.</b></td><td>${refNo}</td></tr>
+                  <tr><td style="background:#f7f9fc;"><b>Synced At</b></td><td>${syncedAt}</td></tr>
+                </table>
+                <p style="margin-top:16px;">You can review this vendor in the Sharvi Vendor Portal.</p>
+                <p>Regards,<br/>Sharvi Vendor Portal</p>
+              </div>`;
+            const { error: mailErr } = await supabase.functions.invoke("send-smtp-email", {
+              body: { to: buyerEmail, subject, html },
+            });
+            if (mailErr) {
+              console.error("buyer SAP-success email failed:", mailErr);
+            } else {
+              try {
+                await supabase.from("audit_logs").insert({
+                  action: "sap_sync_buyer_notified",
+                  details: {
+                    vendor_id: vendorId,
+                    buyer_user_id: buyerUserId,
+                    buyer_email: buyerEmail,
+                    sap_vendor_code: sapVendorCode,
+                  },
+                });
+              } catch (_) { /* ignore */ }
+            }
+          }
+        }
+      } catch (notifyErr: any) {
+        console.error("buyer notification skipped:", notifyErr?.message || notifyErr);
+      }
+
       return ok({
         success: true,
         sapVendorCode,
@@ -591,6 +653,7 @@ serve(async (req) => {
         sapResponse,
       });
     }
+
 
     const errorRow = accRes.find((r: any) => r?.MSGTYP !== "S");
     return ok({
