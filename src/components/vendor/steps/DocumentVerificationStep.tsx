@@ -1261,6 +1261,7 @@ export function DocumentVerificationStep({
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
   const handleBankUpload2 = (file: File) => {
     chequeTargetRef.current = "secondary";
+    lastBankFile2Ref.current = file;
     setBankDoc2(idleDoc);
     setBankBranchAutoFilled2(false);
     return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
