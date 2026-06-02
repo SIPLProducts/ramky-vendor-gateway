@@ -1,45 +1,55 @@
+## Problem
+
+The sidebar item **Buyer Approval** (`/approvals/buyer`) is currently gated using the `vendor_invitations` screen key (see `src/components/layout/Sidebar.tsx:70`). There is no dedicated entry in **User Management → Role Permissions**, so admins cannot grant or revoke Buyer Approval independently of Vendor Invitations. This is effectively hardcoded.
+
 ## Goal
-Add a "Create Vendor" path so a buyer can fill and submit the full Vendor Registration Form on behalf of a vendor. Existing vendor-initiated flow, validations, approval chain, and SAP/DMS sync remain untouched.
 
-## UX
+Expose **Buyer Approval** as its own screen in the Role Permissions matrix so access is controlled per role (built-in and custom) like every other approval screen — without changing any other functionality.
 
-### 1. Entry point on `/admin/invitations`
-- Add a "Create Vendor" button next to the existing "Invite Vendor" button (buyer / admin roles only).
-- Opens a small dialog asking for: Buyer Company (same selector as Invite), Vendor Email (required), Vendor Name (optional), Phone (optional).
-- On submit: creates a `vendor_invitations` row marked `created_on_behalf = true` (no email sent), then navigates the buyer to `/vendor/registration?onBehalfOf=<invitationId>`.
+## Changes
 
-### 2. Registration form in "on-behalf" mode
-- Reuse the existing `VendorRegistration` page as-is.
-- When `onBehalfOf` is present and the user is a buyer/admin, show a header banner: "Filling on behalf of {vendorEmail}".
-- All steps, OCR, manual verification, document upload, dynamic tabs, validations, and Review/Submit behave exactly the same.
-- Auto-save and resume work via the linked invitation/vendor row.
-- On submit, the standard `validation-orchestrator` runs and the existing approval seeding trigger fires. Because the buyer is the submitter, the BUYER stage is auto-approved server-side (recorded with the buyer as actor) so the application moves directly to SCM Manager. Everything from SCM Manager onward — including SAP/DMS sync — is unchanged.
+### 1. Add the screen key in the permissions registry
+`src/pages/RolePermissions.tsx` — add to `SCREENS`, grouped with the other approval entries:
+```
+{ key: 'buyer_approval', label: 'Buyer Approval' },
+```
+Place it just above `scm_manager_approval` so the matrix lists approvals in flow order: Buyer → SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO.
 
-### 3. Invitations list
-- On-behalf rows get an "On behalf" badge and a "Resume / Open" action in place of "Copy link" / "Resend email".
+### 2. Use the new key in the sidebar
+`src/components/layout/Sidebar.tsx:70` — change the Buyer Approval item from:
+```
+screenKey: 'vendor_invitations'
+```
+to:
+```
+screenKey: 'buyer_approval'
+```
+No other sidebar items change.
 
-## Technical changes
+### 3. Seed sensible defaults (data migration via insert tool)
+So existing buyer users do not lose access the moment we deploy, insert default `role_screen_permissions` rows (tenant_id = NULL, global default) granting `buyer_approval = true` for the same built-in roles that today see the link via the old key:
+- `sharvi_admin`
+- `admin`
+- `customer_admin`
+- `purchase` (the "buyer" role in this app)
+- `approver`
 
-### Database (one migration)
-- `vendor_invitations`: add `created_on_behalf boolean not null default false`.
-- Update `seed_vendor_approval_progress` so that when the source invitation has `created_on_behalf = true`, the BUYER level row is inserted with status `approved` (actor = `vi.created_by`) and the first pending stage becomes SCM Manager (or whichever stage is next per the existing matrix). No other behaviour changes.
+`vendor`, `finance` remain false. Custom roles get nothing seeded — admins tick the new column when needed.
 
-### Frontend
-- `src/pages/AdminInvitations.tsx` — add "Create Vendor" button + dialog + mutation; skip email send; update list row badge/actions for on-behalf rows.
-- `src/pages/VendorRegistration.tsx` + `src/hooks/useVendorRegistration.tsx` — read `onBehalfOf` query param, load invitation, prefill email/name/phone, set `onBehalfMode` flag, show banner. No changes to step logic, validations, or submit pipeline.
-- `src/components/auth/ProtectedRoute.tsx` — allow buyer/admin roles to reach `/vendor/registration` when `onBehalfOf` is present.
+No SQL schema change is required (`role_screen_permissions` already stores arbitrary `screen_key` text), so this is a data-only insert, not a migration.
 
-### Backend / edge functions
-- `notify-vendor-submission` — when on-behalf, send the standard submission notification to buyer/approver recipients only (skip the vendor-facing copy since vendor has no account yet). No other function touched.
+### 4. Backward compatibility
+- The existing `vendor_invitations` permission is left untouched and continues to gate the Vendor Invitations page only.
+- `useScreenPermissions` already reads from `role_screen_permissions` / `custom_role_screen_permissions` by key, so no hook changes are needed.
+- The page component `BuyerApproval.tsx`, route registration, and approval workflow logic are not modified.
 
-### Out of scope
-- No changes to OCR, KYC validation, approval matrix, SAP payload builder, DMS payload builder, or existing vendor invite/registration flow.
-- No vendor login provisioning in this iteration.
+## Files touched
 
-## Files to touch
-- `supabase/migrations/<new>.sql`
-- `src/pages/AdminInvitations.tsx`
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-- `src/components/auth/ProtectedRoute.tsx`
-- `supabase/functions/notify-vendor-submission/index.ts`
+- `src/pages/RolePermissions.tsx` — add one entry to `SCREENS`
+- `src/components/layout/Sidebar.tsx` — change one `screenKey` value
+- Data-only insert into `role_screen_permissions` for the five default-allow roles
+
+## Out of scope
+
+- No changes to `seed_vendor_approval_progress`, approval workflow, custom-roles UI, or other approval screens.
+- No removal of the `vendor_invitations` entry — Vendor Invitations remains its own screen.
