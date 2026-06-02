@@ -1214,6 +1214,15 @@ export default function VendorRegistration() {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 max-w-[1280px] mx-auto w-full">
+        {onBehalfInvitationId && (
+          <div className="mx-4 sm:mx-6 mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>
+              You are filling this form on behalf of{' '}
+              <span className="font-semibold">{invitationEmail}</span>. The vendor will not receive a login until you submit; the submission follows the standard approval workflow.
+            </span>
+          </div>
+        )}
         {/* Horizontal Step Indicator (sticky bar above the form card) */}
         <div className="sticky top-14 z-40 bg-card border-b shadow-sm px-4 sm:px-6 py-3">
           {/* Desktop / tablet: full horizontal stepper */}
