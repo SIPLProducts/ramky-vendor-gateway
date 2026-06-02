@@ -382,6 +382,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       is_msme_registered: formData.statutory.isMsmeRegistered,
       msme_number: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeNumber || null) : null,
       msme_category: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeCategory || null) : null,
+      msme_enterprise_name: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeEnterpriseName || null) : null,
+      msme_major_activity: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeMajorActivity || null) : null,
       labour_permit_no: formData.statutory.labourPermitNo || null,
       iec_no: formData.statutory.iecNo || null,
       swift_iban_code: formData.statutory.swiftIbanCode || null,
