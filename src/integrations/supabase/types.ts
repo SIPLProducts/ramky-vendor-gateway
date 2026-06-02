@@ -1638,6 +1638,7 @@ export type Database = {
           access_count: number | null
           created_at: string
           created_by: string | null
+          created_on_behalf: boolean
           email: string
           email_clicked_at: string | null
           email_opened_at: string | null
@@ -1657,6 +1658,7 @@ export type Database = {
           access_count?: number | null
           created_at?: string
           created_by?: string | null
+          created_on_behalf?: boolean
           email: string
           email_clicked_at?: string | null
           email_opened_at?: string | null
@@ -1676,6 +1678,7 @@ export type Database = {
           access_count?: number | null
           created_at?: string
           created_by?: string | null
+          created_on_behalf?: boolean
           email?: string
           email_clicked_at?: string | null
           email_opened_at?: string | null
