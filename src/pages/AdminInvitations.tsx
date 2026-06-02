@@ -699,7 +699,93 @@ export default function AdminInvitations() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create Vendor on behalf dialog */}
+        <Dialog open={isCreateVendorOpen} onOpenChange={setIsCreateVendorOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Vendor on Behalf of Vendor</DialogTitle>
+              <DialogDescription>
+                Open the Vendor Registration form yourself and submit it on behalf of the vendor.
+                No email is sent. The submission runs the same validations and approval workflow.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="cv-name">Vendor Name</Label>
+                <Input
+                  id="cv-name"
+                  type="text"
+                  placeholder="ACME Pvt Ltd"
+                  value={cvVendorName}
+                  onChange={(e) => setCvVendorName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cv-email">Vendor Email</Label>
+                <Input
+                  id="cv-email"
+                  type="email"
+                  placeholder="vendor@company.com"
+                  value={cvEmail}
+                  onChange={(e) => { setCvEmail(e.target.value); setCvEmailError(null); }}
+                />
+                {cvEmailError && <p className="text-sm text-destructive">{cvEmailError}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cv-phone">Phone Number</Label>
+                <Input
+                  id="cv-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="10-digit mobile number"
+                  value={cvPhone}
+                  onChange={(e) => setCvPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                />
+              </div>
+              {allowedTenants.length > 1 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="cv-company">Company</Label>
+                  <Select value={selectedTenantId} onValueChange={(v) => setActiveTenantId(v)}>
+                    <SelectTrigger id="cv-company">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allowedTenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>{tenant.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
+                    {allowedTenants[0]?.name || 'No company assigned to your account'}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateVendorOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleCreateVendorOnBehalf}
+                disabled={createVendorOnBehalf.isPending || (cvPhone.length > 0 && cvPhone.length !== 10)}
+                className="gap-2"
+              >
+                {createVendorOnBehalf.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Opening…</>
+                ) : (
+                  <><UserPlus className="h-4 w-4" />Continue to Form</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        </div>
       </div>
+
 
       <Card>
         <CardHeader>
