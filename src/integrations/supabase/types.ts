@@ -1845,6 +1845,8 @@ export type Database = {
           micr_2: string | null
           micr_code: string | null
           msme_category: string | null
+          msme_enterprise_name: string | null
+          msme_major_activity: string | null
           msme_number: string | null
           msme_verification_status: string | null
           name_match_verification_status: string | null
@@ -2036,6 +2038,8 @@ export type Database = {
           micr_2?: string | null
           micr_code?: string | null
           msme_category?: string | null
+          msme_enterprise_name?: string | null
+          msme_major_activity?: string | null
           msme_number?: string | null
           msme_verification_status?: string | null
           name_match_verification_status?: string | null
@@ -2227,6 +2231,8 @@ export type Database = {
           micr_2?: string | null
           micr_code?: string | null
           msme_category?: string | null
+          msme_enterprise_name?: string | null
+          msme_major_activity?: string | null
           msme_number?: string | null
           msme_verification_status?: string | null
           name_match_verification_status?: string | null

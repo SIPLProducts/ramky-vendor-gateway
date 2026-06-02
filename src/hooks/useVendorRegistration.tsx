@@ -382,6 +382,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       is_msme_registered: formData.statutory.isMsmeRegistered,
       msme_number: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeNumber || null) : null,
       msme_category: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeCategory || null) : null,
+      msme_enterprise_name: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeEnterpriseName || null) : null,
+      msme_major_activity: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeMajorActivity || null) : null,
       labour_permit_no: formData.statutory.labourPermitNo || null,
       iec_no: formData.statutory.iecNo || null,
       swift_iban_code: formData.statutory.swiftIbanCode || null,
@@ -398,6 +400,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       ifsc_code: formData.bank.ifscCode,
       micr_code: formData.bank.micrCode || null,
       bank_address: formData.bank.bankAddress || null,
+      account_holder_name: formData.bank.accountHolderName || null,
       // Secondary Bank (optional)
       bank_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.bankName || null) : null,
       branch_name_2: formData.bank.secondary?.enabled ? (formData.bank.secondary.branchName || null) : null,
@@ -564,6 +567,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         isMsmeRegistered: vendor.is_msme_registered ?? false,
         msmeNumber: vendor.msme_number || '',
         msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
+        msmeEnterpriseName: (vendor as VendorRecord & { msme_enterprise_name?: string }).msme_enterprise_name || '',
+        msmeMajorActivity: (vendor as VendorRecord & { msme_major_activity?: string }).msme_major_activity || '',
         labourPermitNo: vendor.labour_permit_no || '',
         iecNo: vendor.iec_no || '',
         swiftIbanCode: (vendor as VendorRecord & { swift_iban_code?: string }).swift_iban_code || '',
@@ -590,6 +595,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         ifscCode: vendor.ifsc_code || '',
         micrCode: vendor.micr_code || '',
         bankAddress: vendor.bank_address || '',
+        accountHolderName: (vendor as VendorRecord & { account_holder_name?: string }).account_holder_name || '',
         cancelledChequeFile: null,
         secondary: vendor.account_number_2
           ? {
