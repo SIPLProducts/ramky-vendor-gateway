@@ -1,95 +1,109 @@
 ## Goal
 
-Insert **Buyer Approval** as the first stage of every vendor approval chain. After the vendor submits the form, the inviting buyer must verify and approve. Only after the buyer approves does the application move on to SCM Manager (or the next configured stage). Buyer rejection sends the application back to the vendor.
+Two fixes for the vendor registration flow:
 
-## Behavior
+1. **Latest verified data wins** — After a successful manual verification (Enter manually → Verify), DMS, the approval flow, and downstream validations must use the freshly verified values, not stale OCR data from a previously uploaded document.
+2. **OCR auto-populate** — Data extracted from uploaded documents (GST certificate, PAN card, MSME, Bank cheque) should automatically populate the corresponding fields in the Vendor Registration Form (State, City, Address line, PIN code, GST Number, PAN Number, etc.) without breaking anything else.
 
-1. Vendor submits → status becomes `buyer_review` (new) instead of jumping straight to SCM Manager / Document Verification.
-2. The **inviting buyer** (`vendor_invitations.created_by`) sees the vendor in a new "Buyer Approval" inbox and opens the standard StageApprovalView to verify details/documents.
-3. On **Approve** → status advances to the next configured stage (SCM Manager, or whichever stage is first per existing matrix logic).
-4. On **Reject** → status becomes `returned_to_vendor` with buyer remarks (mirrors today's `buyer-return-to-vendor` flow); vendor edits and resubmits.
-5. A new `buyer_scm_mappings.skip_buyer_stage` flag lets admins bypass the buyer stage per buyer (default `false` = always require buyer approval).
-6. Status tracker shows a new **Buyer Approval** node between Document Verification and SCM Manager.
+Scope is strictly the OCR/manual-verify pipeline and field mapping into the form; existing approval gating, RLS, and SAP/DMS contracts are untouched.
 
-## Changes
+---
 
-### Database (migration)
+## Option 1 — "Latest verified data wins"
 
-- Add `'BUYER'` to the `approval_matrix_levels.stage` CHECK constraint so the stage column accepts it (used only conceptually by the tracker; we don't create matrix rows for it).
-- Add column `buyer_scm_mappings.skip_buyer_stage boolean NOT NULL DEFAULT false`.
-- Add enum value `'buyer_review'` to `vendor_status` (and `'buyer_rejected'` is **not** needed — reject path reuses `returned_to_vendor`).
-- Update `seed_vendor_approval_progress(_vendor_id)`:
-  - Resolve `v_buyer` (inviting buyer) and a new `v_skip_buyer` flag from `buyer_scm_mappings.skip_buyer_stage`.
-  - When `v_buyer` is set AND NOT `v_skip_buyer`: **insert a synthetic level-1 row** in `vendor_approval_progress` with `level_id = NULL`, `stage = 'BUYER'`, `status = 'pending'`. Renumber subsequent matrix levels starting at 2.
-  - Set `vendors.status = 'buyer_review'` when the first row is the buyer row; otherwise keep current behavior.
-- Allow `vendor_approval_progress.level_id` to be NULL (already nullable? confirm; if not, drop NOT NULL). Add a `stage` text column to `vendor_approval_progress` so synthetic buyer rows carry their stage without joining `approval_matrix_levels`.
-- Update `trg_vendors_seed_approval` status check to include `'buyer_review'`.
+### Where the staleness comes from
+- `OcrUploadAndVerify` only writes verified data when the OCR path runs (`onVerified` → `onVerifiedDetails` in each KYC tab).
+- `ManualEntryAndVerify` (GST/PAN/MSME/Bank) currently calls `verify()` which updates the verify *state* but does NOT call `onVerifiedDetails` for the tab → so:
+  - The previously stored `vendor_validations` row from the older OCR run stays as the "verified" payload.
+  - The previously uploaded document in `vendor_documents` still represents the "source" for that field, even though the user has now corrected the value manually.
+- Result: DMS payload (`prepare-dms-payload` reads `vendor_documents`), approval views (vendor row + `vendor_validations`), and downstream validators all see the old document/value.
 
-### Edge function `process-approval-action`
+### Fix
+- **GST / PAN / MSME / Bank manual-verify handlers** (`GstKycTab.handleManualVerify`, `PanKycTab`, `MsmeKycTab`, `BankKycTab` — only the manual paths):
+  - On a successful manual verify, call the same `onVerifiedDetails(mergedApiData)` callback the OCR path uses, so the parent `ComplianceStep` re-maps verified fields into the form and `vendor_validations` is re-written with `source: 'manual'`.
+- **`vendor_validations` write** (`persistGstValidation` and equivalents for PAN/MSME/Bank where they exist):
+  - Always delete the existing row for `(vendor_id, validation_type)` and re-insert with the latest payload, marking `details.source = 'manual' | 'ocr'` and `details.verified_at = now()`. This guarantees readers see only the most recent verification.
+- **Stale document handling** (`useVendorRegistration.uploadAllDocuments`):
+  - When manual verification succeeds for a field AND the user has not re-uploaded a corresponding document, soft-mark the existing `vendor_documents` row with `details: { superseded_by: 'manual_verification' }` (added to existing `vendor_documents.metadata` JSONB if present, otherwise a small migration adds `metadata jsonb`). Skip the upload of any cached file that predates the manual verification timestamp.
+  - DMS edge (`prepare-dms-payload`) gets a tiny tweak: filter out docs where `metadata->>'superseded_by'` is set, so the old OCR'd file is no longer included in the FILE_UPLOAD array.
+- **Approval flow read paths** (`StageApprovalView`, vendor detail dialogs): no logic change needed — they already render `vendors` table fields (which we now keep current) and `vendor_validations` (which we now always refresh).
 
-- When the current pending row has `stage = 'BUYER'` (or `level_id IS NULL`):
-  - Authorise approver = inviting buyer of this vendor (lookup `vendor_invitations.created_by`) instead of `approval_matrix_approvers`.
-  - On **approve**: mark row approved, then advance to the next pending row using existing logic (sets `vendors.status` to the next stage's review status).
-  - On **reject**: mark row rejected, set `vendors.status = 'returned_to_vendor'`, store remarks on `vendors.last_rejection_*`, audit log, and trigger `send-status-notification` to the vendor (reuse `buyer-return-to-vendor` logic inline).
-- Update `STAGE_TO_REVIEW` to include `BUYER: 'buyer_review'`.
-- Auto-extend block: keep buyer row out of the "matrix-grown" recompute (synthetic rows have no level_id).
+### Validation
+- Upload an old GST certificate → verify (OCR) → values appear.
+- Switch to "Enter manually", type a corrected GSTIN → click Verify.
+- Confirm: form fields update, `vendor_validations.gst` row replaced, `prepare-dms-payload` returns no old certificate, approval view shows new values.
 
-### Edge function `list-pending-approvals-by-stage`
+---
 
-- Accept `stage = 'BUYER'`. For BUYER stage: return pending rows where the caller's `userId` matches `vendor_invitations.created_by` for that vendor.
-- Existing `blockedByPrevious` logic stays — buyer row is always `level_number = 1` so never blocked.
+## Option 2 — OCR auto-populate of form fields
 
-### Frontend
+### Current behavior
+- OCR data flows into the KYC tab's verify result, but `ComplianceStep.handleGstVerified` / `handleMsmeVerified` only populates GST-specific and MSME-specific compliance fields.
+- The user expects extracted data (e.g., State, City, Address, PIN code) to also fill the **Address step** and the visible **GST Number / PAN Number** fields.
 
-- **New page** `src/pages/approvals/BuyerApproval.tsx` cloned from `ScmManagerApproval.tsx`, passing `stage="BUYER"` and label "Buyer Approval".
-- **App route** `/approvals/buyer` registered in `src/App.tsx`.
-- **Sidebar** (`src/components/layout/Sidebar.tsx`) and any approver nav: add "Buyer Approval" item visible to any user who has at least one vendor where they're `vendor_invitations.created_by` (or just gate by `purchase` / `customer_admin` roles, matching how SCM Manager is gated today — confirm during implementation).
-- **`usePendingApprovalsByStage` / `useVendorApprovalChain`**: widen `ApprovalStage` type to include `'BUYER'`.
-- **`RegistrationStatusTracker.tsx`**:
-  - Insert a new step `{ id: 'buyer', label: 'Buyer Approval', icon: <UserCheck /> }` after `verification` and before `scm_manager`. Shift `STAGE_TO_STEP` indexes for SCM_MANAGER → 3, SCM_HEAD → 4, FINANCE_1 → 5, FINANCE_2/CEO_OFFICE → 6, SAP → 7. Add `STAGE_TO_STEP.BUYER = 2`.
-  - Extend `getActiveStepIndex` to map `'buyer_review'` → 2.
-  - Add `'buyer_review'` to `FAILED_STEP` mapping where appropriate (no — buyer reject = returned_to_vendor; existing mapping `returned_to_vendor → 0` keeps the tracker showing the vendor as the action owner).
-- **Status badges / labels**: extend any `STATUS_LABELS` maps (e.g. `src/pages/VendorList.tsx`, `AdminInvitations.tsx`) with `buyer_review: 'Buyer Review'`.
-- **`SubmissionSuccessDialog`**: copy update so vendors see "Your application has been sent to the buyer for verification" when buyer stage is active.
+### Mapping (added to existing `onVerifiedDetails` handlers — no schema changes)
 
-### Admin UI
+`ComplianceStep` already owns the form and has access to `setValue`. We extend its handlers and lift a new callback up to `VendorRegistration` so it can also patch the `AddressDetails` slice when the registered address is still blank.
 
-- **`BuyerScmMapping.tsx`**: add a "Skip buyer approval" switch per row, bound to the new `skip_buyer_stage` column.
-- **`ApprovalMatrixConfig.tsx`**: no change — Buyer is not a configurable matrix stage; show a read-only "Buyer Approval" badge at the top of the matrix preview describing that it always runs first unless skipped per buyer.
-
-## Non-changes
-
-- OCR / DMS / SAP sync logic unchanged.
-- Existing SCM/Finance/CEO stages, their RLS, and `approval_matrix_*` rows stay intact; buyer stage is layered in front of them.
-- `buyer-return-to-vendor` edge function stays for the legacy "return after any rejection" use case.
-
-## Technical notes
-
-```text
-Submitted vendor
-     │
-     ▼
-buyer_review  ──(buyer rejects)──►  returned_to_vendor ──► vendor edits & resubmits
-     │
-  (buyer approves)
-     │
-     ▼
-scm_manager_review (or next configured stage) → SCM Head → Finance 1 → Finance 2 → SAP Sync
+GST extracted fields → form fields:
+```
+gstin                              → statutory.gstin
+legal_name                         → organization.legalName (only if empty)
+trade_name | business_name         → organization.tradeName (only if empty)
+pan_number                         → statutory.pan
+principal_place_of_business.*      → address.registeredAddress / city / state / pincode
+                                     (only when the matching field is currently empty;
+                                      never overwrite values the user has typed)
+state_jurisdiction                 → address.registeredState fallback
 ```
 
-`vendor_approval_progress` row shapes:
-
-```text
-buyer row : { level_id: NULL, stage: 'BUYER',       level_number: 1, status: pending }
-matrix    : { level_id: <uuid>, stage: 'SCM_MANAGER', level_number: 2, status: pending }
-...
+PAN extracted fields → form fields:
+```
+pan_number                         → statutory.pan
+full_name | holder_name            → contact.ceoName (only if empty)
 ```
 
-## Validation
+MSME extracted fields → form fields (already partially wired):
+```
+state / district / city / pin_code → address.registeredState / City / Pincode (fallback only)
+flat + building + road + village   → address.registeredAddress (fallback only)
+```
 
-1. Buyer sends invitation → vendor submits → vendor status = `buyer_review`; tracker shows Buyer Approval as active.
-2. Buyer logs in → sees vendor in `/approvals/buyer` → approves → status moves to `scm_manager_review` (or next stage); SCM Manager inbox shows it.
-3. Buyer rejects with comment → vendor status = `returned_to_vendor`; vendor receives email; tracker shows "Action required".
-4. Vendor edits and resubmits → buyer sees it again (chain reseeded).
-5. Admin toggles `skip_buyer_stage` for a buyer → new submissions from that buyer's vendors skip buyer stage and go straight to SCM Manager.
-6. Regression: existing rejection flow at SCM/Finance still returns to previous stage; SAP sync still fires after final approval.
+Bank extracted fields:
+```
+account_holder_name                → already captured into vendor.bank
+bank_name / branch_name / ifsc     → already captured
+```
+
+### Implementation
+- Add a `onFormFieldsExtracted(patch: Partial<VendorFormData>)` prop to `ComplianceStep`.
+- `VendorRegistration` (parent) merges the patch into its `formData` state with a "fill-only-if-empty" rule, then the existing autosave persists it.
+- Update `GstKycTab.handleOcrVerify` / `runGstOcr` and `PanKycTab`/`MsmeKycTab` so that `onVerifiedDetails` receives the full merged extracted payload (already true for GST and PAN; verify for MSME/Bank).
+- Add a small helper `applyExtractedToForm(formData, extracted, mapping)` in `src/lib/kycExtract.ts` that performs the "fill-only-if-empty" merge using the mapping above.
+- All edits stay in frontend; no DB migration required for Option 2.
+
+### Validation
+- Upload a fresh GST certificate → after verification: GSTIN, PAN, Legal Name (if blank), Trade Name (if blank), and the registered Address/State/City/PIN are populated. Existing typed values are preserved.
+- Upload PAN card → PAN number auto-fills; CEO name fills only if blank.
+- Manual edits made after OCR remain intact on subsequent re-verifies.
+
+---
+
+## Files touched
+
+Frontend (Option 1 + Option 2)
+- `src/components/vendor/kyc/GstKycTab.tsx`
+- `src/components/vendor/kyc/PanKycTab.tsx`
+- `src/components/vendor/kyc/MsmeKycTab.tsx`
+- `src/components/vendor/kyc/BankKycTab.tsx`
+- `src/components/vendor/kyc/ManualEntryAndVerify.tsx` (only if we need to surface verified payload back)
+- `src/components/vendor/steps/ComplianceStep.tsx`
+- `src/pages/VendorRegistration.tsx` (pass-through `onFormFieldsExtracted`)
+- `src/hooks/useVendorRegistration.tsx` (mark superseded documents)
+- `src/lib/kycExtract.ts` (new `applyExtractedToForm` helper + map)
+
+Backend (Option 1 only)
+- `supabase/functions/prepare-dms-payload/index.ts` — filter out superseded documents.
+- One small migration: add `metadata jsonb default '{}'::jsonb` to `vendor_documents` if it doesn't already exist.
+
+No changes to RLS, approval workflow, SAP sync logic, or any other unrelated functionality.

@@ -72,6 +72,8 @@ export interface VerifiedDocumentData {
     jurisdictionState?: string;
     filing_status?: any;
     filingCompliant?: boolean;
+    /** Parsed parts of the principal place of business — used to auto-populate the Address step. */
+    addressParts?: { address?: string; city?: string; state?: string; pincode?: string };
   };
   manualLegalName?: string;
   manualAddress?: { address: string; city: string; state: string; pincode: string };
@@ -80,7 +82,16 @@ export interface VerifiedDocumentData {
   isMsmeRegistered?: boolean;
   msmeDeclarationReason?: string;
   msmeSelfDeclarationFile?: File | null;
-  msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
+  msme?: {
+    udyamNumber: string;
+    enterpriseName: string;
+    enterpriseType?: string;
+    majorActivity?: string;
+    apiName?: string;
+    nameMatchScore?: number;
+    /** Address fields returned by the Udyam registry — used as a fallback for the Address step. */
+    addressParts?: { address?: string; city?: string; state?: string; pincode?: string };
+  };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
@@ -520,6 +531,28 @@ export function DocumentVerificationStep({
         return undefined;
       };
       const registryAddress = pickAddress(d) || pickAddress(rawData);
+      // Parse the structured Principal Address (Surepass returns `pradr.addr`
+      // with `city/dst/stcd/pncd`) so we can populate the Address step's
+      // City / State / PIN Code fields without the vendor re-typing them.
+      const pickAddressParts = (src: Record<string, any>): { city?: string; state?: string; pincode?: string; address?: string } => {
+        const candidates = [src.pradr, src.principal_address, src.principal_place_address, src.pradr_addr, src.address];
+        for (const c of candidates) {
+          if (c && typeof c === "object") {
+            const inner = (c as any).addr && typeof (c as any).addr === "object" ? (c as any).addr : c;
+            const city = String(inner.city || inner.loc || inner.locality || "").trim();
+            const state = String(inner.stcd || inner.state || "").trim();
+            const pincode = String(inner.pncd || inner.pincode || inner.pin || "").trim();
+            const addr = String(inner.bnm || inner.building_name || inner.st || inner.street || "").trim();
+            if (city || state || pincode) {
+              return { city: city || undefined, state: state || undefined, pincode: pincode || undefined, address: addr || undefined };
+            }
+          }
+        }
+        return {};
+      };
+      const addressParts = pickAddressParts(d).city || pickAddressParts(d).state || pickAddressParts(d).pincode
+        ? pickAddressParts(d)
+        : pickAddressParts(rawData);
       // Normalize API field names to the keys the UI reads from `ocrData`.
       const normalized: Record<string, any> = {
         gstin: apiGstin || ocrGstin,
@@ -543,6 +576,10 @@ export function DocumentVerificationStep({
         jurisdiction_centre: d.center_jurisdiction || d.jurisdiction_centre || rawData.center_jurisdiction || rawData.jurisdiction_centre,
         jurisdiction_state: d.state_jurisdiction || d.jurisdiction_state || rawData.state_jurisdiction || rawData.jurisdiction_state,
         pan_number: d.pan_number || rawData.pan_number,
+        address_city: addressParts.city,
+        address_state: addressParts.state || (d.state_jurisdiction || rawData.state_jurisdiction || "").toString().replace(/^State\s*-\s*/i, "").trim() || undefined,
+        address_pincode: addressParts.pincode,
+        address_line: addressParts.address,
       };
       return {
         ok: true as const,
@@ -1543,6 +1580,14 @@ export function DocumentVerificationStep({
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
         filing_status: gstFilingRows.length ? gstFilingRows : undefined,
         filingCompliant: gstLatestFiled ?? undefined,
+        addressParts: (gstDoc.ocrData.address_city || gstDoc.ocrData.address_state || gstDoc.ocrData.address_pincode || gstDoc.ocrData.address_line)
+          ? {
+              address: gstDoc.ocrData.address_line || undefined,
+              city: gstDoc.ocrData.address_city || undefined,
+              state: gstDoc.ocrData.address_state || undefined,
+              pincode: gstDoc.ocrData.address_pincode || undefined,
+            }
+          : undefined,
       };
       // If GST filing was not compliant and a self-declaration was uploaded,
       // carry the file through so the parent saves it under gst_self_declaration.
@@ -1565,6 +1610,10 @@ export function DocumentVerificationStep({
     }
     out.isMsmeRegistered = isMsmeRegistered ?? false;
     if (isMsmeRegistered && msmeDoc.status === "verified" && msmeDoc.ocrData) {
+      const msmeAddrLine = [msmeDoc.ocrData.flat, msmeDoc.ocrData.name_of_building, msmeDoc.ocrData.road, msmeDoc.ocrData.village, msmeDoc.ocrData.block]
+        .map((v: any) => (v == null ? "" : String(v).trim()))
+        .filter((v: string) => v && v !== "-")
+        .join(", ");
       out.msme = {
         udyamNumber: msmeDoc.ocrData.udyam_number,
         enterpriseName: msmeDoc.ocrData.enterprise_name,
@@ -1572,6 +1621,14 @@ export function DocumentVerificationStep({
         majorActivity: msmeDoc.ocrData.major_activity,
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
+        addressParts: (msmeDoc.ocrData.city || msmeDoc.ocrData.state || msmeDoc.ocrData.pin_code || msmeAddrLine || msmeDoc.ocrData.office_address)
+          ? {
+              address: msmeAddrLine || msmeDoc.ocrData.office_address || undefined,
+              city: msmeDoc.ocrData.city || msmeDoc.ocrData.district || undefined,
+              state: msmeDoc.ocrData.state || undefined,
+              pincode: msmeDoc.ocrData.pin_code || undefined,
+            }
+          : undefined,
       };
     } else if (isMsmeRegistered === false) {
       out.msmeDeclarationReason = msmeDeclarationReason;
