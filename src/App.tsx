@@ -39,6 +39,7 @@ import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 
 import EmailConfiguration from "./pages/EmailConfiguration";
+import BuyerApproval from "./pages/approvals/BuyerApproval";
 import ScmManagerApproval from "./pages/approvals/ScmManagerApproval";
 import ScmHeadApproval from "./pages/approvals/ScmHeadApproval";
 import Finance1Approval from "./pages/approvals/Finance1Approval";
