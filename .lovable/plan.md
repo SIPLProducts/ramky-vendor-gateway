@@ -1,28 +1,24 @@
 ## Goal
+After a vendor is successfully created in SAP (BP_LIFNR returned), send a confirmation email to the Buyer who invited/created the vendor.
 
-Split the single "Pending" list on every stage-approval page into two tabs:
+## Where
+`supabase/functions/sync-vendor-to-sap/index.ts` — inside the `if (successRow && sapVendorCode)` block (lines 577–593), right after the `vendors` update and before returning `ok(...)`.
 
-1. **Pending Approval** — items where the logged-in approver can act now (`blockedByPrevious === false`).
-2. **Waiting for Previous Approval** — items still blocked by an earlier approver (`blockedByPrevious === true`). Approve/Reject buttons stay disabled here.
-
-When the previous approver finishes, the existing `refresh()` flow will automatically move the item into the Pending Approval tab on next refetch.
-
-## Scope
-
-Single file: `src/components/approvals/StageApprovalView.tsx`. This component powers all stage pages (SCM Manager, SCM Head, Buyer, Finance 1, Finance 2, CEO), so all of them get the change for free.
-
-Nothing else changes — no edits to data hook, edge functions, schema, or other pages.
-
-## Changes
-
-1. Add `Tabs` (shadcn) above the existing table.
-2. Derive `pendingItems = items.filter(i => !i.blockedByPrevious)` and `waitingItems = items.filter(i => i.blockedByPrevious)`.
-3. Render the same table inside each tab using a small inline helper to avoid duplication; counts in tab labels: `Pending Approval (n)` and `Waiting for Previous Approval (m)`.
-4. In the Waiting tab, keep View / Preview enabled; Approve / Reject remain disabled with the existing tooltip.
-5. Keep the existing inline amber "previous approver has not approved yet" text only in the Waiting tab (redundant in Pending tab).
-6. Default selected tab: `Pending Approval`. If it's empty but Waiting has items, still default to Pending (empty state already explains it).
+## Logic
+1. Look up the buyer for this vendor:
+   - Query `vendor_invitations` filtered by `vendor_id = vendorId`, order by `created_at desc`, limit 1, select `created_by`.
+   - If `created_by` present, fetch `profiles` (`email`, `full_name`) for that user id.
+2. If a buyer email is found, invoke the existing `send-smtp-email` edge function (already used elsewhere) with:
+   - `to`: buyer email
+   - `subject`: `Vendor ${vendor.legal_name} successfully created in SAP (${sapVendorCode})`
+   - `html`: short branded message including vendor legal/trade name, SAP Vendor Code (`BP_LIFNR`), SAP reference no, and synced timestamp.
+3. Wrap the entire notification in `try/catch` and log only — never fail or alter the SAP sync response if email fails. Also skip silently if no buyer/email is found.
+4. Best-effort `audit_logs` insert with action `sap_sync_buyer_notified` containing `{ vendor_id, buyer_user_id, buyer_email, sap_vendor_code }`.
 
 ## Out of scope
+- No DB schema changes.
+- No changes to the SAP payload, response handling, DMS flow, or UI.
+- No changes to `send-smtp-email` itself — it already reads admin SMTP config from `portal_config`.
 
-- No changes to `usePendingApprovalsByStage`, `process-approval-action`, audit logs, dialogs, or routing.
-- No realtime push — relies on the same `refresh()` already invoked after an action.
+## Files changed
+- `supabase/functions/sync-vendor-to-sap/index.ts` (single insertion ~15 lines).
