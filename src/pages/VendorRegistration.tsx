@@ -549,11 +549,19 @@ export default function VendorRegistration() {
   // Used by both live stage updates and Save Draft so they always agree.
   const mergeVerifiedDataIntoForm = (prev: VendorFormData, data: VerifiedDocumentData): VendorFormData => {
     const gstYes = data.isGstRegistered === true;
+    // When a section is present in `data` the corresponding document was just
+    // (re-)verified, so its fields become authoritative — including blanks —
+    // so a re-upload never leaves stale extracted values behind.
+    const hasGst = gstYes && !!data.gst;
+    const hasPan = !!data.pan;
+    const hasMsme = data.isMsmeRegistered === true && !!data.msme;
+    const hasBank = !!data.bank;
+
     const legalName =
       (gstYes ? data.gst?.legalName : data.manualLegalName) ||
       data.pan?.holderName ||
-      '';
-    const tradeName = data.gst?.tradeName || '';
+      prev.organization.legalName;
+    const tradeName = hasGst ? (data.gst?.tradeName ?? '') : prev.organization.tradeName;
     const principalPlace = data.gst?.principalPlaceOfBusiness || data.gst?.address || '';
 
     return {
@@ -575,30 +583,47 @@ export default function VendorRegistration() {
       statutory: {
         ...prev.statutory,
         isGstRegistered: data.isGstRegistered ?? prev.statutory.isGstRegistered,
-        gstDeclarationReason: data.gstDeclarationReason || prev.statutory.gstDeclarationReason,
+        gstDeclarationReason: data.gstDeclarationReason ?? prev.statutory.gstDeclarationReason,
         gstSelfDeclarationFile: data.gstSelfDeclarationFile ?? prev.statutory.gstSelfDeclarationFile,
-        gstin: data.gst?.gstin || prev.statutory.gstin,
-        gstConstitutionOfBusiness: data.gst?.constitutionOfBusiness || prev.statutory.gstConstitutionOfBusiness,
-        gstPrincipalPlaceOfBusiness: principalPlace || prev.statutory.gstPrincipalPlaceOfBusiness,
-        gstAdditionalPlaces: data.gst?.additionalPlaces ?? prev.statutory.gstAdditionalPlaces,
-        gstRegistrationDate: data.gst?.registrationDate || prev.statutory.gstRegistrationDate,
-        gstStatus: data.gst?.status || prev.statutory.gstStatus,
-        gstTaxpayerType: data.gst?.taxpayerType || prev.statutory.gstTaxpayerType,
-        gstBusinessNature: data.gst?.businessNature ?? prev.statutory.gstBusinessNature,
-        gstJurisdictionCentre: data.gst?.jurisdictionCentre || prev.statutory.gstJurisdictionCentre,
-        gstJurisdictionState: data.gst?.jurisdictionState || prev.statutory.gstJurisdictionState,
-        gstFilingStatus: Array.isArray(data.gst?.filing_status) && data.gst?.filing_status.length > 0
-          ? data.gst.filing_status
+        // GST section: when re-verified, take the latest values directly so
+        // empty fields from a new doc clear the previous values.
+        gstin: hasGst ? (data.gst?.gstin ?? '') : prev.statutory.gstin,
+        gstConstitutionOfBusiness: hasGst
+          ? (data.gst?.constitutionOfBusiness ?? '')
+          : prev.statutory.gstConstitutionOfBusiness,
+        gstPrincipalPlaceOfBusiness: hasGst
+          ? (principalPlace ?? '')
+          : prev.statutory.gstPrincipalPlaceOfBusiness,
+        gstAdditionalPlaces: hasGst
+          ? (data.gst?.additionalPlaces ?? [])
+          : prev.statutory.gstAdditionalPlaces,
+        gstRegistrationDate: hasGst ? (data.gst?.registrationDate ?? '') : prev.statutory.gstRegistrationDate,
+        gstStatus: hasGst ? (data.gst?.status ?? '') : prev.statutory.gstStatus,
+        gstTaxpayerType: hasGst ? (data.gst?.taxpayerType ?? '') : prev.statutory.gstTaxpayerType,
+        gstBusinessNature: hasGst ? (data.gst?.businessNature ?? []) : prev.statutory.gstBusinessNature,
+        gstJurisdictionCentre: hasGst
+          ? (data.gst?.jurisdictionCentre ?? '')
+          : prev.statutory.gstJurisdictionCentre,
+        gstJurisdictionState: hasGst
+          ? (data.gst?.jurisdictionState ?? '')
+          : prev.statutory.gstJurisdictionState,
+        gstFilingStatus: hasGst && Array.isArray(data.gst?.filing_status) && data.gst!.filing_status!.length > 0
+          ? data.gst!.filing_status
           : prev.statutory.gstFilingStatus,
-        pan: data.pan?.number || prev.statutory.pan,
+        // PAN section
+        pan: hasPan ? (data.pan?.number ?? '') : prev.statutory.pan,
+        // MSME section
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
-        msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
+        msmeNumber: hasMsme ? (data.msme?.udyamNumber ?? '') : prev.statutory.msmeNumber,
         msmeCategory: ((): StatutoryDetails['msmeCategory'] => {
+          if (!hasMsme) return prev.statutory.msmeCategory;
           const t = (data.msme?.enterpriseType || '').toLowerCase();
           if (t === 'micro' || t === 'small' || t === 'medium') return t;
           return prev.statutory.msmeCategory;
         })(),
-        // Carry the actual uploaded files into the form so draft saves include them
+        // Carry the actual uploaded files into the form so draft saves include them.
+        // These come from the per-section "latest verified file" tracked in
+        // DocumentVerificationStep — they already reflect re-uploads.
         gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
         panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
         msmeCertificateFile: data.msmeCertificateFile ?? prev.statutory.msmeCertificateFile,
@@ -607,13 +632,17 @@ export default function VendorRegistration() {
       },
       bank: {
         ...prev.bank,
-        accountNumber: data.bank?.accountNumber || prev.bank.accountNumber,
-        confirmAccountNumber: data.bank?.accountNumber || prev.bank.confirmAccountNumber,
-        ifscCode: data.bank?.ifsc || prev.bank.ifscCode,
-        bankName: data.bank?.bankName || prev.bank.bankName,
-        branchName: data.bank?.branchName || prev.bank.branchName,
-        accountType: (data.bank?.accountType as BankDetails['accountType']) || prev.bank.accountType || 'current',
-        bankAddress: data.bank?.bankAddress || prev.bank.bankAddress,
+        // Bank section: when the cheque is (re-)verified, the new extracted
+        // values become authoritative across the board.
+        accountNumber: hasBank ? (data.bank?.accountNumber ?? '') : prev.bank.accountNumber,
+        confirmAccountNumber: hasBank ? (data.bank?.accountNumber ?? '') : prev.bank.confirmAccountNumber,
+        ifscCode: hasBank ? (data.bank?.ifsc ?? '') : prev.bank.ifscCode,
+        bankName: hasBank ? (data.bank?.bankName ?? '') : prev.bank.bankName,
+        branchName: hasBank ? (data.bank?.branchName ?? '') : prev.bank.branchName,
+        accountType: hasBank
+          ? ((data.bank?.accountType as BankDetails['accountType']) || prev.bank.accountType || 'current')
+          : (prev.bank.accountType || 'current'),
+        bankAddress: hasBank ? (data.bank?.bankAddress ?? '') : prev.bank.bankAddress,
         cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
         secondary: data.bank2
           ? {
