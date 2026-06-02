@@ -64,6 +64,7 @@ type VendorStatus =
   | 'submitted'
   | 'validation_pending'
   | 'validation_failed'
+  | 'buyer_review'
   | 'scm_manager_review'
   | 'scm_manager_rejected'
   | 'scm_head_review'
