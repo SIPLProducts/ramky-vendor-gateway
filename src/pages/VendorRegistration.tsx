@@ -740,6 +740,7 @@ export default function VendorRegistration() {
         ...prev.organization,
         legalName: fill(prev.organization.legalName, ocrLegalName),
         tradeName: fill(prev.organization.tradeName, ocrTradeName),
+        state: fill(prev.organization.state, stateFromDoc),
       },
       address: {
         ...prev.address,
