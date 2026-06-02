@@ -105,6 +105,7 @@ export default function VendorRegistration() {
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [isTokenMode, setIsTokenMode] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
+  const [onBehalfInvitationId, setOnBehalfInvitationId] = useState<string | null>(null);
   const formDataLoadedRef = useRef(false);
   const [resetNonce, setResetNonce] = useState(0);
   const { toast } = useToast();
@@ -113,6 +114,7 @@ export default function VendorRegistration() {
 
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
+    onBehalfInvitationId: onBehalfInvitationId || undefined,
   });
 
   // Custom field values keyed by step_key -> field_name -> value
@@ -183,13 +185,54 @@ export default function VendorRegistration() {
   // Validate token on mount and check authentication
   useEffect(() => {
     const validateToken = async () => {
+      const onBehalfId = searchParams.get('onBehalfOf');
       const token = searchParams.get('token');
+
+      // ─── On-behalf mode (buyer fills the form for a vendor) ──────────────
+      if (onBehalfId) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            navigate('/auth');
+            return;
+          }
+          const { data: invRow, error: invErr } = await supabase
+            .from('vendor_invitations')
+            .select('id, token, email, tenant_id, expires_at, created_on_behalf, vendor_name, phone_number')
+            .eq('id', onBehalfId)
+            .maybeSingle();
+          if (invErr || !invRow) {
+            setTokenError('On-behalf invitation not found or you do not have access.');
+            setIsValidatingToken(false);
+            return;
+          }
+          setOnBehalfInvitationId(invRow.id);
+          setInvitationToken(invRow.token);
+          setInvitationEmail(invRow.email);
+          setIsTokenMode(false); // do NOT block navigation for buyer
+          setIsValidatingToken(false);
+          if (invRow.tenant_id) {
+            setFormData((prev) =>
+              prev.organization.buyerCompanyId === invRow.tenant_id
+                ? prev
+                : { ...prev, organization: { ...prev.organization, buyerCompanyId: invRow.tenant_id as string } },
+            );
+          }
+          return;
+        } catch (err) {
+          console.error('On-behalf init error:', err);
+          setTokenError('Failed to load on-behalf invitation.');
+          setIsValidatingToken(false);
+          return;
+        }
+      }
 
       if (!token) {
         setTokenError('Access denied. This page requires a valid invitation link.');
         setIsValidatingToken(false);
         return;
       }
+
 
       // Validate the token via SECURITY DEFINER RPC (avoids RLS denial)
       try {
@@ -1171,6 +1214,15 @@ export default function VendorRegistration() {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 max-w-[1280px] mx-auto w-full">
+        {onBehalfInvitationId && (
+          <div className="mx-4 sm:mx-6 mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>
+              You are filling this form on behalf of{' '}
+              <span className="font-semibold">{invitationEmail}</span>. The vendor will not receive a login until you submit; the submission follows the standard approval workflow.
+            </span>
+          </div>
+        )}
         {/* Horizontal Step Indicator (sticky bar above the form card) */}
         <div className="sticky top-14 z-40 bg-card border-b shadow-sm px-4 sm:px-6 py-3">
           {/* Desktop / tablet: full horizontal stepper */}

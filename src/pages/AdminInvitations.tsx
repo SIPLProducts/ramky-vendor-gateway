@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { safeUUID } from '@/lib/uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,6 +56,8 @@ import {
   Building2,
   User,
   Phone,
+  UserPlus,
+  ExternalLink,
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
@@ -62,7 +65,13 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 const emailSchema = z.string().email('Please enter a valid email address');
 
 export default function AdminInvitations() {
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateVendorOpen, setIsCreateVendorOpen] = useState(false);
+  const [cvEmail, setCvEmail] = useState('');
+  const [cvVendorName, setCvVendorName] = useState('');
+  const [cvPhone, setCvPhone] = useState('');
+  const [cvEmailError, setCvEmailError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [vendorName, setVendorName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -305,6 +314,65 @@ export default function AdminInvitations() {
     },
   });
 
+  // Create Vendor (on behalf) — creates an on-behalf invitation row WITHOUT sending
+  // an email, then navigates the buyer into the registration form. The form will
+  // run through the same validations and approval workflow on submit; the BUYER
+  // stage is auto-approved server-side because the buyer is the submitter.
+  const createVendorOnBehalf = useMutation<any, Error, { email: string; vendorName: string; phoneNumber: string; tenantId: string | null }>({
+    mutationFn: async ({ email, vendorName, phoneNumber, tenantId }) => {
+      if (!user?.id) throw new Error('Your session is still loading. Please reload and try again.');
+      if (!tenantId) throw new Error('Please select a company.');
+      const token = safeUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 60);
+      const { data: invitation, error } = await supabase
+        .from('vendor_invitations')
+        .insert({
+          email,
+          token,
+          expires_at: expiresAt.toISOString(),
+          tenant_id: tenantId,
+          vendor_name: vendorName || null,
+          phone_number: phoneNumber || null,
+          created_by: user.id,
+          created_on_behalf: true,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return invitation;
+    },
+    onSuccess: (invitation) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+      setIsCreateVendorOpen(false);
+      setCvEmail('');
+      setCvVendorName('');
+      setCvPhone('');
+      navigate(`/vendor/registration?onBehalfOf=${invitation.id}`);
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Could not start on-behalf registration',
+        description: err?.message || 'Failed to create on-behalf invitation',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleCreateVendorOnBehalf = () => {
+    setCvEmailError(null);
+    try { emailSchema.parse(cvEmail); } catch (err) {
+      if (err instanceof z.ZodError) { setCvEmailError(err.errors[0].message); return; }
+    }
+    if (!effectiveTenantId) {
+      toast({ title: 'No Company Assigned', description: 'Please select a company.', variant: 'destructive' });
+      return;
+    }
+    createVendorOnBehalf.mutate({ email: cvEmail, vendorName: cvVendorName, phoneNumber: cvPhone, tenantId: effectiveTenantId });
+  };
+
+
+
   // Send email mutation (uses simulation mode if RESEND_API_KEY not configured)
   const sendEmailInvitation = useMutation({
     mutationFn: async (invitationId: string) => {
@@ -494,13 +562,23 @@ export default function AdminInvitations() {
           </p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Invitation
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setIsCreateVendorOpen(true)}
+          >
+            <UserPlus className="h-4 w-4" />
+            Create Vendor
+          </Button>
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Invitation
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Vendor Invitation</DialogTitle>
@@ -621,7 +699,93 @@ export default function AdminInvitations() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create Vendor on behalf dialog */}
+        <Dialog open={isCreateVendorOpen} onOpenChange={setIsCreateVendorOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Vendor on Behalf of Vendor</DialogTitle>
+              <DialogDescription>
+                Open the Vendor Registration form yourself and submit it on behalf of the vendor.
+                No email is sent. The submission runs the same validations and approval workflow.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="cv-name">Vendor Name</Label>
+                <Input
+                  id="cv-name"
+                  type="text"
+                  placeholder="ACME Pvt Ltd"
+                  value={cvVendorName}
+                  onChange={(e) => setCvVendorName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cv-email">Vendor Email</Label>
+                <Input
+                  id="cv-email"
+                  type="email"
+                  placeholder="vendor@company.com"
+                  value={cvEmail}
+                  onChange={(e) => { setCvEmail(e.target.value); setCvEmailError(null); }}
+                />
+                {cvEmailError && <p className="text-sm text-destructive">{cvEmailError}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cv-phone">Phone Number</Label>
+                <Input
+                  id="cv-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="10-digit mobile number"
+                  value={cvPhone}
+                  onChange={(e) => setCvPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                />
+              </div>
+              {allowedTenants.length > 1 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="cv-company">Company</Label>
+                  <Select value={selectedTenantId} onValueChange={(v) => setActiveTenantId(v)}>
+                    <SelectTrigger id="cv-company">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allowedTenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>{tenant.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
+                    {allowedTenants[0]?.name || 'No company assigned to your account'}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateVendorOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleCreateVendorOnBehalf}
+                disabled={createVendorOnBehalf.isPending || (cvPhone.length > 0 && cvPhone.length !== 10)}
+                className="gap-2"
+              >
+                {createVendorOnBehalf.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Opening…</>
+                ) : (
+                  <><UserPlus className="h-4 w-4" />Continue to Form</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        </div>
       </div>
+
 
       <Card>
         <CardHeader>
@@ -684,6 +848,8 @@ export default function AdminInvitations() {
                     {paginatedInvitations.map((invitation) => {
                       const linked = (invitation as any).linked_vendor;
                       const isReturned = linked?.status === 'returned_to_buyer';
+                      const isOnBehalf = !!(invitation as any).created_on_behalf;
+                      const canResumeOnBehalf = isOnBehalf && !invitation.used_at;
                       return (
                       <TableRow key={invitation.id}>
                         <TableCell>
@@ -694,6 +860,14 @@ export default function AdminInvitations() {
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                          {isOnBehalf && (
+                            <div className="mt-1">
+                              <Badge variant="secondary" className="gap-1">
+                                <UserPlus className="h-3 w-3" />
+                                On behalf
+                              </Badge>
+                            </div>
                           )}
                           {isReturned && (
                             <div className="mt-1 space-y-1">
@@ -750,7 +924,18 @@ export default function AdminInvitations() {
                                 Send to Vendor
                               </Button>
                             )}
-                            {!invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+                            {canResumeOnBehalf && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => navigate(`/vendor/registration?onBehalfOf=${invitation.id}`)}
+                                className="gap-1"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Resume
+                              </Button>
+                            )}
+                            {!isOnBehalf && !invitation.used_at && new Date(invitation.expires_at) > new Date() && (
                               <Button
                                 variant="ghost"
                                 size="sm"
