@@ -147,6 +147,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Serialize concurrent upload runs (autosave + manual save) to avoid races on the
   // unique index (vendor_id, document_type).
   const uploadInFlight = useRef<Promise<void> | null>(null);
+  // Track File instances we've already uploaded in this session so a new
+  // File object (re-upload) is always treated as a replacement, even when
+  // the new file happens to share name/size with the previous one.
+  const uploadedFilesRef = useRef<WeakSet<File>>(new WeakSet());
 
   // Upload all documents for a vendor (deduplicated by vendor_id + document_type)
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
@@ -181,13 +185,16 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         if (!doc.file) continue;
         const existing = existingByType.get(doc.type);
 
-        // Same file already uploaded → skip entirely
-        if (existing && existing.file_name === doc.file.name && existing.file_size === doc.file.size) {
+        // Skip ONLY if this exact File instance was already uploaded in this
+        // session. Name+size matching is unreliable — re-exports/scans often
+        // collide, which previously caused the original cheque to "stick"
+        // even after a re-upload.
+        if (uploadedFilesRef.current.has(doc.file)) {
           continue;
         }
 
-        // Different file (replacement) → remove old storage object first.
-        // The metadata row is updated atomically via upsert below (no manual delete).
+        // Replacement → remove old storage object first.
+        // The metadata row is updated atomically via upsert below.
         if (existing) {
           try {
             await supabase.storage.from('vendor-documents').remove([existing.file_path]);
@@ -199,6 +206,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
         if (result) {
           await saveDocumentMetadata(vendorIdForUpload, result);
+          uploadedFilesRef.current.add(doc.file);
         }
       }
     };

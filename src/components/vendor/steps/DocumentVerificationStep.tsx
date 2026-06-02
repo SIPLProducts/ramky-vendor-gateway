@@ -419,6 +419,11 @@ export function DocumentVerificationStep({
   // Vendor types Account Number + IFSC, we re-call the configured BANK
   // provider, and on success populate the bank doc as if cheque OCR had worked.
   const chequeTargetRef = useRef<"primary" | "secondary">("primary");
+  // Track the most-recently uploaded cheque File per slot so the manual-entry
+  // popup can attach it to the verified state (otherwise re-uploads get lost
+  // and DMS keeps showing the first uploaded cheque).
+  const lastBankFileRef = useRef<File | null>(null);
+  const lastBankFile2Ref = useRef<File | null>(null);
   const [bankPopup, setBankPopup] = useState<{
     open: boolean;
     target: "primary" | "secondary";
@@ -866,18 +871,18 @@ export function DocumentVerificationStep({
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
   ) => {
     if (file.size > 5 * 1024 * 1024) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: "File must be under 5 MB" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: "File must be under 5 MB" });
       return;
     }
-    setDoc({ status: "uploading", fileName: file.name, fileSize: file.size });
+    setDoc({ status: "uploading", fileName: file.name, fileSize: file.size, file });
     const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
     if (isPdf) {
-      setDoc({ status: "preparing", fileName: file.name, fileSize: file.size });
+      setDoc({ status: "preparing", fileName: file.name, fileSize: file.size, file });
     }
-    setDoc({ status: "ocr", fileName: file.name, fileSize: file.size });
+    setDoc({ status: "ocr", fileName: file.name, fileSize: file.size, file });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: ocrRes.error || "Could not read document" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: ocrRes.error || "Could not read document" });
       if (kind === "cheque") {
         openBankManualPopup(
           chequeTargetRef.current,
@@ -888,7 +893,7 @@ export function DocumentVerificationStep({
     }
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
       if (kind === "cheque") {
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
@@ -901,11 +906,11 @@ export function DocumentVerificationStep({
       }
       return;
     }
-    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
+    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
       const msg = (v as any).message || "Verification failed";
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
       // Surface a hard popup for cross-tab name mismatches and force the
       // user back onto the offending tab so they cannot navigate forward.
       if (kind === "msme" && (v as any).isNameMismatch) {
@@ -924,7 +929,7 @@ export function DocumentVerificationStep({
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
     if (extraErr) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, apiData: v.apiData, ocrModel: ocrRes.model, errorMessage: extraErr });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, apiData: v.apiData, ocrModel: ocrRes.model, errorMessage: extraErr });
       return;
     }
     // Merge normalized API fields over OCR so missing/incorrect OCR values are
@@ -1198,6 +1203,7 @@ export function DocumentVerificationStep({
 
   const handleBankUpload = (file: File) => {
     chequeTargetRef.current = "primary";
+    lastBankFileRef.current = file;
     // Clear any previously fetched/auto-filled bank data so a fresh upload
     // never inherits stale branch / address values from the prior cheque.
     setBankDoc(idleDoc);
@@ -1255,6 +1261,7 @@ export function DocumentVerificationStep({
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
   const handleBankUpload2 = (file: File) => {
     chequeTargetRef.current = "secondary";
+    lastBankFile2Ref.current = file;
     setBankDoc2(idleDoc);
     setBankBranchAutoFilled2(false);
     return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
@@ -1363,10 +1370,16 @@ export function DocumentVerificationStep({
         account_holder_name: nameAtBank,
         branch_address: branchAddress,
       };
-      const fileName = `Manual ${apiAccount.slice(-4).padStart(apiAccount.length, "•")}`;
+      // Preserve the most recently uploaded cheque File so the post-manual
+      // verified state still carries it. Without this, the parent receives
+      // `cancelledChequeFile = null` and the older file remains in DMS.
+      const lastFile = (target === "secondary" ? lastBankFile2Ref : lastBankFileRef).current;
+      const manualFileName = `Manual ${apiAccount.slice(-4).padStart(apiAccount.length, "•")}`;
       setDoc({
         status: "verified",
-        fileName,
+        file: lastFile ?? undefined,
+        fileName: lastFile?.name || manualFileName,
+        fileSize: lastFile?.size,
         ocrData: normalized,
         originalOcrData: normalized,
         apiData: {
