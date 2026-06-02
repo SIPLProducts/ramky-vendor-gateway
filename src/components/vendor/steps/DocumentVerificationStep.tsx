@@ -1203,6 +1203,7 @@ export function DocumentVerificationStep({
 
   const handleBankUpload = (file: File) => {
     chequeTargetRef.current = "primary";
+    lastBankFileRef.current = file;
     // Clear any previously fetched/auto-filled bank data so a fresh upload
     // never inherits stale branch / address values from the prior cheque.
     setBankDoc(idleDoc);
