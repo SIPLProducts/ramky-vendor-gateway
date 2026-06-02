@@ -314,6 +314,65 @@ export default function AdminInvitations() {
     },
   });
 
+  // Create Vendor (on behalf) — creates an on-behalf invitation row WITHOUT sending
+  // an email, then navigates the buyer into the registration form. The form will
+  // run through the same validations and approval workflow on submit; the BUYER
+  // stage is auto-approved server-side because the buyer is the submitter.
+  const createVendorOnBehalf = useMutation<any, Error, { email: string; vendorName: string; phoneNumber: string; tenantId: string | null }>({
+    mutationFn: async ({ email, vendorName, phoneNumber, tenantId }) => {
+      if (!user?.id) throw new Error('Your session is still loading. Please reload and try again.');
+      if (!tenantId) throw new Error('Please select a company.');
+      const token = safeUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 60);
+      const { data: invitation, error } = await supabase
+        .from('vendor_invitations')
+        .insert({
+          email,
+          token,
+          expires_at: expiresAt.toISOString(),
+          tenant_id: tenantId,
+          vendor_name: vendorName || null,
+          phone_number: phoneNumber || null,
+          created_by: user.id,
+          created_on_behalf: true,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return invitation;
+    },
+    onSuccess: (invitation) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+      setIsCreateVendorOpen(false);
+      setCvEmail('');
+      setCvVendorName('');
+      setCvPhone('');
+      navigate(`/vendor/registration?onBehalfOf=${invitation.id}`);
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Could not start on-behalf registration',
+        description: err?.message || 'Failed to create on-behalf invitation',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleCreateVendorOnBehalf = () => {
+    setCvEmailError(null);
+    try { emailSchema.parse(cvEmail); } catch (err) {
+      if (err instanceof z.ZodError) { setCvEmailError(err.errors[0].message); return; }
+    }
+    if (!effectiveTenantId) {
+      toast({ title: 'No Company Assigned', description: 'Please select a company.', variant: 'destructive' });
+      return;
+    }
+    createVendorOnBehalf.mutate({ email: cvEmail, vendorName: cvVendorName, phoneNumber: cvPhone, tenantId: effectiveTenantId });
+  };
+
+
+
   // Send email mutation (uses simulation mode if RESEND_API_KEY not configured)
   const sendEmailInvitation = useMutation({
     mutationFn: async (invitationId: string) => {
