@@ -105,6 +105,7 @@ export default function VendorRegistration() {
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [isTokenMode, setIsTokenMode] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
+  const [onBehalfInvitationId, setOnBehalfInvitationId] = useState<string | null>(null);
   const formDataLoadedRef = useRef(false);
   const [resetNonce, setResetNonce] = useState(0);
   const { toast } = useToast();
@@ -113,6 +114,7 @@ export default function VendorRegistration() {
 
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
+    onBehalfInvitationId: onBehalfInvitationId || undefined,
   });
 
   // Custom field values keyed by step_key -> field_name -> value
