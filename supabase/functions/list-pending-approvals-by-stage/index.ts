@@ -27,6 +27,67 @@ Deno.serve(async (req) => {
 
     const email = (auth.email ?? '').trim().toLowerCase();
 
+    // ─── BUYER STAGE ──────────────────────────────────────────────────
+    // Buyer rows are synthetic (level_id IS NULL, stage='BUYER') and are
+    // authorised by matching vendor_invitations.created_by, not by approval
+    // matrix approver rows.
+    if (stage === 'BUYER') {
+      const { data: buyerInvites, error: biErr } = await admin
+        .from('vendor_invitations')
+        .select('vendor_id')
+        .eq('created_by', auth.userId);
+      if (biErr) throw biErr;
+      const buyerVendorIds = Array.from(
+        new Set((buyerInvites ?? []).map((r: any) => r.vendor_id).filter(Boolean)),
+      );
+      if (buyerVendorIds.length === 0) {
+        return new Response(JSON.stringify({ items: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: buyerProgress, error: bpErr } = await admin
+        .from('vendor_approval_progress')
+        .select('id, vendor_id, level_id, level_number, status, stage, rejection_comments, rejection_from_stage, rejection_at')
+        .eq('stage', 'BUYER')
+        .eq('status', 'pending')
+        .in('vendor_id', buyerVendorIds);
+      if (bpErr) throw bpErr;
+      if (!buyerProgress || buyerProgress.length === 0) {
+        return new Response(JSON.stringify({ items: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const vIds = buyerProgress.map((p: any) => p.vendor_id);
+      const { data: vendors } = await admin
+        .from('vendors')
+        .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, tenant_id')
+        .in('id', vIds);
+      const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
+      const items = buyerProgress.map((p: any) => {
+        const v: any = vMap.get(p.vendor_id);
+        const isInternational = v?.vendor_type === 'international';
+        return {
+          progressId: p.id,
+          vendorId: p.vendor_id,
+          vendorName: v?.legal_name ?? v?.trade_name ?? p.vendor_id.slice(0, 8),
+          submittedAt: v?.submitted_at ?? null,
+          isMsme: isInternational ? false : !!v?.is_msme_registered,
+          isInternational,
+          levelNumber: p.level_number,
+          levelName: 'Buyer Approval',
+          approvalMode: 'ANY',
+          stage: 'BUYER',
+          blockedByPrevious: false,
+          rejectionComments: p.rejection_comments ?? null,
+          rejectionFromStage: p.rejection_from_stage ?? null,
+          rejectionAt: p.rejection_at ?? null,
+        };
+      });
+      return new Response(JSON.stringify({ items }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // 1. Find all approver rows for this user — by user_id OR by email.
     // Run as two clean queries instead of a fragile PostgREST .or() string,
     // so dots/plus-aliases/punctuation in emails can never break the filter.
