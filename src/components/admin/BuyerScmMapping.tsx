@@ -313,6 +313,16 @@ export function BuyerScmMapping({ tenantId }: Props) {
                         </span>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!!m.skip_buyer_stage}
+                          onCheckedChange={(v) => handleToggleSkipBuyer(m.id, v)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {m.skip_buyer_stage ? 'Skip buyer' : 'Buyer approves first'}
+                        </span>
+                      </div>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(m.created_at).toLocaleDateString()}
                     </TableCell>
