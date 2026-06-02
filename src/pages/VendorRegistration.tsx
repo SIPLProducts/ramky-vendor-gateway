@@ -185,13 +185,54 @@ export default function VendorRegistration() {
   // Validate token on mount and check authentication
   useEffect(() => {
     const validateToken = async () => {
+      const onBehalfId = searchParams.get('onBehalfOf');
       const token = searchParams.get('token');
+
+      // ─── On-behalf mode (buyer fills the form for a vendor) ──────────────
+      if (onBehalfId) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            navigate('/auth');
+            return;
+          }
+          const { data: invRow, error: invErr } = await supabase
+            .from('vendor_invitations')
+            .select('id, token, email, tenant_id, expires_at, created_on_behalf, vendor_name, phone_number')
+            .eq('id', onBehalfId)
+            .maybeSingle();
+          if (invErr || !invRow) {
+            setTokenError('On-behalf invitation not found or you do not have access.');
+            setIsValidatingToken(false);
+            return;
+          }
+          setOnBehalfInvitationId(invRow.id);
+          setInvitationToken(invRow.token);
+          setInvitationEmail(invRow.email);
+          setIsTokenMode(false); // do NOT block navigation for buyer
+          setIsValidatingToken(false);
+          if (invRow.tenant_id) {
+            setFormData((prev) =>
+              prev.organization.buyerCompanyId === invRow.tenant_id
+                ? prev
+                : { ...prev, organization: { ...prev.organization, buyerCompanyId: invRow.tenant_id as string } },
+            );
+          }
+          return;
+        } catch (err) {
+          console.error('On-behalf init error:', err);
+          setTokenError('Failed to load on-behalf invitation.');
+          setIsValidatingToken(false);
+          return;
+        }
+      }
 
       if (!token) {
         setTokenError('Access denied. This page requires a valid invitation link.');
         setIsValidatingToken(false);
         return;
       }
+
 
       // Validate the token via SECURITY DEFINER RPC (avoids RLS denial)
       try {
