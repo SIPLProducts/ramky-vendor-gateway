@@ -926,9 +926,20 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       if (updateError) throw updateError;
 
-      // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe) BEFORE notifying,
-      // so the notification function can resolve the inviter reliably.
-      if (options?.invitationToken) {
+      // Mark invitation as used BEFORE notifying so the notification function
+      // can resolve the inviter reliably.
+      if (options?.onBehalfInvitationId) {
+        // On-behalf mode: the JWT email is the buyer's, not the vendor's, so the
+        // claim_invitation RPC (which enforces email match) would reject it.
+        // Buyer has tenant-scoped UPDATE on vendor_invitations via RLS.
+        const { error: markErr } = await supabase
+          .from('vendor_invitations')
+          .update({ used_at: new Date().toISOString(), vendor_id: vendor.id })
+          .eq('id', options.onBehalfInvitationId);
+        if (markErr) {
+          console.warn('on-behalf invitation mark-used failed (non-blocking):', markErr);
+        }
+      } else if (options?.invitationToken) {
         const { error: claimErr } = await supabase.rpc('claim_invitation', {
           _token: options.invitationToken,
           _vendor_id: vendor.id,
