@@ -550,9 +550,15 @@ export function DocumentVerificationStep({
         }
         return {};
       };
-      const addressParts = pickAddressParts(d).city || pickAddressParts(d).state || pickAddressParts(d).pincode
+      let addressParts = pickAddressParts(d).city || pickAddressParts(d).state || pickAddressParts(d).pincode
         ? pickAddressParts(d)
         : pickAddressParts(rawData);
+      // String-address fallback: when the registry returns Principal Place of
+      // Business as a plain comma-delimited string, parse PIN / State / City
+      // from the tail so the Address step can auto-fill those fields.
+      if (!addressParts.city && !addressParts.state && !addressParts.pincode && registryAddress) {
+        addressParts = parseAddressString(registryAddress);
+      }
       // Normalize API field names to the keys the UI reads from `ocrData`.
       const normalized: Record<string, any> = {
         gstin: apiGstin || ocrGstin,
