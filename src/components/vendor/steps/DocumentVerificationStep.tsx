@@ -1580,6 +1580,14 @@ export function DocumentVerificationStep({
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
         filing_status: gstFilingRows.length ? gstFilingRows : undefined,
         filingCompliant: gstLatestFiled ?? undefined,
+        addressParts: (gstDoc.ocrData.address_city || gstDoc.ocrData.address_state || gstDoc.ocrData.address_pincode || gstDoc.ocrData.address_line)
+          ? {
+              address: gstDoc.ocrData.address_line || undefined,
+              city: gstDoc.ocrData.address_city || undefined,
+              state: gstDoc.ocrData.address_state || undefined,
+              pincode: gstDoc.ocrData.address_pincode || undefined,
+            }
+          : undefined,
       };
       // If GST filing was not compliant and a self-declaration was uploaded,
       // carry the file through so the parent saves it under gst_self_declaration.
