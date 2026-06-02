@@ -72,6 +72,8 @@ export interface VerifiedDocumentData {
     jurisdictionState?: string;
     filing_status?: any;
     filingCompliant?: boolean;
+    /** Parsed parts of the principal place of business — used to auto-populate the Address step. */
+    addressParts?: { address?: string; city?: string; state?: string; pincode?: string };
   };
   manualLegalName?: string;
   manualAddress?: { address: string; city: string; state: string; pincode: string };
@@ -80,7 +82,16 @@ export interface VerifiedDocumentData {
   isMsmeRegistered?: boolean;
   msmeDeclarationReason?: string;
   msmeSelfDeclarationFile?: File | null;
-  msme?: { udyamNumber: string; enterpriseName: string; enterpriseType?: string; majorActivity?: string; apiName?: string; nameMatchScore?: number };
+  msme?: {
+    udyamNumber: string;
+    enterpriseName: string;
+    enterpriseType?: string;
+    majorActivity?: string;
+    apiName?: string;
+    nameMatchScore?: number;
+    /** Address fields returned by the Udyam registry — used as a fallback for the Address step. */
+    addressParts?: { address?: string; city?: string; state?: string; pincode?: string };
+  };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   // Step-1 uploaded files — lifted so parent draft saves include them
