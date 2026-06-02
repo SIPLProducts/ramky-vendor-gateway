@@ -81,42 +81,19 @@ export function OcrUploadAndVerify({
       return;
     }
 
-    // Normalize to a JPEG before sending. OCR providers (Surepass, etc.)
-    // require an image — if we ship a raw PDF they return `no_gstin_detected`.
-    // If conversion fails (e.g. self-hosted server cannot load pdf.js worker)
-    // we STOP the pipeline and surface a clear error instead of silently
-    // shipping the original PDF.
+    // Best-effort: normalize to a JPEG so OCR providers get a clean image.
+    // If conversion fails for any reason, fall back to the ORIGINAL file —
+    // most providers (Surepass etc.) accept PDFs directly, so we'd rather
+    // let the server respond than block the user with a generic error.
     setPhase('preparing');
     setMessage('Preparing document for OCR…');
-    const isPdf =
-      file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    let normalized: File;
+    let normalized: File = file;
     try {
       normalized = await normalizeUploadToImage(file);
-    } catch (convErr: any) {
-      console.error('[OcrUploadAndVerify] file→image conversion failed', convErr);
-      setPhase('failed');
-      setMessage(
-        convErr?.message ||
-          'Could not convert this document to an image. Please upload a JPG or PNG instead.',
-      );
-      return;
+    } catch (convErr) {
+      console.warn('[OcrUploadAndVerify] file→image conversion failed, sending original', convErr);
+      normalized = file;
     }
-
-    // Defensive: if conversion returned a PDF (shouldn't happen after the
-    // throw above, but guard against future regressions), refuse to send it.
-    if (
-      isPdf &&
-      (normalized.type === 'application/pdf' ||
-        normalized.name.toLowerCase().endsWith('.pdf'))
-    ) {
-      setPhase('failed');
-      setMessage(
-        'PDF could not be converted to an image on this device. Please upload a JPG or PNG of the document instead.',
-      );
-      return;
-    }
-
 
 
     setPhase('ocr');

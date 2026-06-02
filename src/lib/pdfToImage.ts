@@ -170,22 +170,23 @@ export async function normalizeUploadToImage(
 
   const buf = await file.arrayBuffer();
 
-  // Load the PDF via pdf.js. We do NOT silently fall back to the raw PDF —
-  // OCR providers like Surepass require an image and will return
-  // `no_gstin_detected` if they receive `application/pdf`.
+  // Run pdf.js inline (no worker). Self-hosted deployments often serve .mjs
+  // with the wrong content-type or block workers via CSP, and we don't want
+  // a silent worker failure to leak a raw PDF into the OCR provider.
   let pdf: any;
   try {
     pdf = await (pdfjsLib as any).getDocument({
       data: buf,
+      disableWorker: true,
+      isEvalSupported: false,
       useSystemFonts: true,
     }).promise;
-  } catch (err: any) {
-    console.error("[pdfToImage] getDocument failed", err);
-    throw new Error(
-      `PDF could not be converted to an image in this browser (${err?.message || err}). ` +
-      `Please upload a JPG or PNG of the document instead, or contact your administrator ` +
-      `to fix the PDF worker on this server.`,
-    );
+  } catch (err) {
+    // Fall back to the original PDF — many OCR providers (e.g. Surepass)
+    // accept PDFs directly. Better to let the server respond than to block
+    // the user with a generic "couldn't read" error.
+    console.warn("[pdfToImage] getDocument failed, sending original PDF", err);
+    return file;
   }
 
 
@@ -217,9 +218,9 @@ export async function normalizeUploadToImage(
   }
 
   if (pageCanvases.length === 0) {
-    throw new Error(
-      "Could not render any page of the PDF to an image. Please upload a JPG or PNG instead.",
-    );
+    // Fall back to the original PDF — the OCR provider may still handle it.
+    console.warn("[pdfToImage] no pages rendered, sending original PDF");
+    return file;
   }
 
 
@@ -259,12 +260,9 @@ export async function normalizeUploadToImage(
       output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
     });
     return out;
-  } catch (encodeErr: any) {
-    console.error("[pdfToImage] encode/stitch failed", encodeErr);
-    throw new Error(
-      `PDF was rendered but could not be encoded as a JPEG (${encodeErr?.message || encodeErr}). ` +
-      `Please upload a JPG or PNG instead.`,
-    );
+  } catch (encodeErr) {
+    console.warn("[pdfToImage] encode/stitch failed, sending original PDF", encodeErr);
+    return file;
   }
 }
 
