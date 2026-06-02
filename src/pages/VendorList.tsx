@@ -175,6 +175,7 @@ export default function VendorList() {
       submitted: { label: 'Submitted', variant: 'secondary' },
       validation_pending: { label: 'Validating', variant: 'outline' },
       validation_failed: { label: 'Validation Failed', variant: 'destructive' },
+      buyer_review: { label: 'Buyer Review', variant: 'outline' },
       scm_manager_review: { label: 'SCM Manager Review', variant: 'outline' },
       scm_manager_rejected: { label: 'SCM Manager Rejected', variant: 'destructive' },
       scm_head_review: { label: 'SCM Head Review', variant: 'outline' },
