@@ -147,6 +147,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Serialize concurrent upload runs (autosave + manual save) to avoid races on the
   // unique index (vendor_id, document_type).
   const uploadInFlight = useRef<Promise<void> | null>(null);
+  // Track File instances we've already uploaded in this session so a new
+  // File object (re-upload) is always treated as a replacement, even when
+  // the new file happens to share name/size with the previous one.
+  const uploadedFilesRef = useRef<WeakSet<File>>(new WeakSet());
 
   // Upload all documents for a vendor (deduplicated by vendor_id + document_type)
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
