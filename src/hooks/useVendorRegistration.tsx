@@ -6,6 +6,13 @@ import { VendorFormData, ValidationResult, VendorStatus } from '@/types/vendor';
 
 interface UseVendorRegistrationOptions {
   invitationToken?: string;
+  /**
+   * When set, the form is being filled by a buyer on behalf of a vendor.
+   * The existing-vendor lookup is scoped to this invitation_id instead of
+   * the logged-in user, so multiple on-behalf drafts created by the same
+   * buyer do not collide.
+   */
+  onBehalfInvitationId?: string;
 }
 
 // Statuses that allow editing
