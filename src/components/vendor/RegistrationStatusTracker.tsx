@@ -117,7 +117,7 @@ function getStepStatus(stepIndex: number, activeIndex: number, vendorStatus: Reg
   return 'pending';
 }
 
-export type ApprovalStageKey = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
+export type ApprovalStageKey = 'BUYER' | 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
 
 export interface ApprovalChainEntry {
   level_number: number;
@@ -139,11 +139,12 @@ interface RegistrationStatusTrackerProps {
 
 // Map stage -> step index in `statusSteps`
 const STAGE_TO_STEP: Record<ApprovalStageKey, number> = {
-  SCM_MANAGER: 2,
-  SCM_HEAD: 3,
-  FINANCE_1: 4,
-  FINANCE_2: 5,
-  CEO_OFFICE: 5,
+  BUYER: 2,
+  SCM_MANAGER: 3,
+  SCM_HEAD: 4,
+  FINANCE_1: 5,
+  FINANCE_2: 6,
+  CEO_OFFICE: 6,
 };
 
 export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, RegistrationStatusTrackerProps>(
