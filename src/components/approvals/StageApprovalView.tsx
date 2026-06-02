@@ -6,14 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
-import { FileText } from 'lucide-react';
 
 interface Props {
   stage: ApprovalStage;
@@ -34,6 +34,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [viewVendorId, setViewVendorId] = useState<string | null>(null);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
 
+  const pendingItems = items.filter((i) => !i.blockedByPrevious);
+  const waitingItems = items.filter((i) => i.blockedByPrevious);
 
   const submit = async () => {
     if (!actionItem) return;
@@ -64,6 +66,116 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     }
   };
 
+  const renderTable = (rows: StageApprovalItem[], variant: 'pending' | 'waiting') => (
+    <div className="border rounded-md">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Vendor</TableHead>
+            <TableHead>Buyer Company</TableHead>
+            <TableHead>Invited By</TableHead>
+            <TableHead>Stage</TableHead>
+            <TableHead>MSME</TableHead>
+            <TableHead>Submitted</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+            ))
+          ) : rows.length === 0 ? (
+            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              {variant === 'pending' ? (
+                <>
+                  <div>No vendors are pending your approval right now.</div>
+                  <div className="text-xs mt-2">
+                    Only vendors whose approval matrix lists you as an approver for this stage appear here.
+                  </div>
+                </>
+              ) : (
+                <div>No vendors are waiting for a previous approver.</div>
+              )}
+            </TableCell></TableRow>
+          ) : (
+            rows.map((it) => {
+              const blocked = variant === 'waiting';
+              return (
+                <TableRow key={it.progressId}>
+                  <TableCell className="font-medium">
+                    {it.vendorName}
+                    {blocked && (
+                      <div className="text-xs text-amber-600 mt-1">
+                        The previous approver has not approved yet.
+                      </div>
+                    )}
+                    {it.rejectionComments && (
+                      <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                        <strong>Returned from {it.rejectionFromStage}:</strong>{' '}
+                        {it.rejectionComments}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    <div>{it.vendorCompany ?? '—'}</div>
+                    {it.companyMismatch && it.invitationCompany && (
+                      <div className="text-xs text-amber-600 mt-1">
+                        Invitation: {it.invitationCompany}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    <div>{it.buyerName ?? '—'}</div>
+                    {it.buyerEmail && (
+                      <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
+                    )}
+                  </TableCell>
+                  <TableCell><Badge variant="outline">{it.levelName}</Badge></TableCell>
+                  <TableCell>
+                    {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {it.submittedAt ? new Date(it.submittedAt).toLocaleString() : '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
+                        <Eye className="h-4 w-4 mr-1" /> View
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
+                        <FileText className="h-4 w-4 mr-1" /> Preview
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={blocked}
+                        title={blocked ? 'The previous approver has not approved yet.' : undefined}
+                        onClick={() => setActionItem({ item: it, action: 'approve' })}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive"
+                        disabled={blocked}
+                        title={blocked ? 'The previous approver has not approved yet.' : undefined}
+                        onClick={() => setActionItem({ item: it, action: 'reject' })}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -74,107 +186,26 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Pending ({items.length})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Approvals ({items.length})</CardTitle>
+        </CardHeader>
         <CardContent>
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Buyer Company</TableHead>
-                  <TableHead>Invited By</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead>MSME</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-                  ))
-                ) : items.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    <div>No pending approvals</div>
-                    <div className="text-xs mt-2">
-                      Only vendors whose approval matrix lists you as an approver for this stage appear here.
-                    </div>
-                  </TableCell></TableRow>
-                ) : (
-                  items.map((it) => (
-                    <TableRow key={it.progressId}>
-                      <TableCell className="font-medium">
-                        {it.vendorName}
-                        {it.blockedByPrevious && (
-                          <div className="text-xs text-amber-600 mt-1">
-                            The previous approver has not approved yet.
-                          </div>
-                        )}
-                        {it.rejectionComments && (
-                          <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                            <strong>Returned from {it.rejectionFromStage}:</strong>{' '}
-                            {it.rejectionComments}
-                          </div>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="text-sm">
-                        <div>{it.vendorCompany ?? '—'}</div>
-                        {it.companyMismatch && it.invitationCompany && (
-                          <div className="text-xs text-amber-600 mt-1">
-                            Invitation: {it.invitationCompany}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div>{it.buyerName ?? '—'}</div>
-                        {it.buyerEmail && (
-                          <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
-                        )}
-                      </TableCell>
-                      <TableCell><Badge variant="outline">{it.levelName}</Badge></TableCell>
-                      <TableCell>
-                        {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {it.submittedAt ? new Date(it.submittedAt).toLocaleString() : '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
-                            <Eye className="h-4 w-4 mr-1" /> View
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
-                            <FileText className="h-4 w-4 mr-1" /> Preview
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={it.blockedByPrevious}
-                            title={it.blockedByPrevious ? 'The previous approver has not approved yet.' : undefined}
-                            onClick={() => setActionItem({ item: it, action: 'approve' })}
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive"
-                            disabled={it.blockedByPrevious}
-                            title={it.blockedByPrevious ? 'The previous approver has not approved yet.' : undefined}
-                            onClick={() => setActionItem({ item: it, action: 'reject' })}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" /> Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabs defaultValue="pending" className="w-full">
+            <TabsList>
+              <TabsTrigger value="pending">
+                Pending Approval ({pendingItems.length})
+              </TabsTrigger>
+              <TabsTrigger value="waiting">
+                Waiting for Previous Approval ({waitingItems.length})
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="pending" className="mt-4">
+              {renderTable(pendingItems, 'pending')}
+            </TabsContent>
+            <TabsContent value="waiting" className="mt-4">
+              {renderTable(waitingItems, 'waiting')}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -206,7 +237,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         </DialogContent>
       </Dialog>
 
-      {/* View Vendor Details — same popup as SAP Sync (All Details / Documents / Validations) */}
       <VendorReviewDialog
         vendorId={viewVendorId}
         open={!!viewVendorId}
