@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     // Re-check remaining pending levels AFTER this approval.
     let { data: remainingProgress } = await admin
       .from('vendor_approval_progress')
-      .select('id, level_number, level_id, status')
+      .select('id, level_number, level_id, status, stage')
       .eq('vendor_id', progress.vendor_id);
     let stillPending = (remainingProgress ?? []).filter((p) => p.status === 'pending');
 
