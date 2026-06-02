@@ -547,84 +547,108 @@ export default function VendorRegistration() {
 
   // Pure helper — merges Step-1 verified data into a form snapshot.
   // Used by both live stage updates and Save Draft so they always agree.
+  // RULE: vendor-typed values always win. OCR only fills fields the vendor
+  // has left blank. We treat "" / null / undefined as blank.
   const mergeVerifiedDataIntoForm = (prev: VendorFormData, data: VerifiedDocumentData): VendorFormData => {
+    const fill = <T,>(p: T, n: T | undefined | null): T =>
+      (p !== undefined && p !== null && p !== '') ? p : ((n ?? p) as T);
+
     const gstYes = data.isGstRegistered === true;
-    const legalName =
+    const ocrLegalName =
       (gstYes ? data.gst?.legalName : data.manualLegalName) ||
       data.pan?.holderName ||
       '';
-    const tradeName = data.gst?.tradeName || '';
+    const ocrTradeName = data.gst?.tradeName || '';
     const principalPlace = data.gst?.principalPlaceOfBusiness || data.gst?.address || '';
+
+    // Only carry the secondary bank into form state when the vendor has
+    // already opted-in OR the verified payload itself carries a bank2 (which
+    // only happens after the vendor enabled it in Step 1).
+    const wantsSecondary = prev.bank.secondary?.enabled === true || !!data.bank2;
 
     return {
       ...prev,
       organization: {
         ...prev.organization,
-        legalName: legalName || prev.organization.legalName,
-        tradeName: tradeName || prev.organization.tradeName,
+        legalName: fill(prev.organization.legalName, ocrLegalName),
+        tradeName: fill(prev.organization.tradeName, ocrTradeName),
       },
       address: {
         ...prev.address,
         registeredAddress: gstYes
-          ? (principalPlace || prev.address.registeredAddress)
-          : (data.manualAddress?.address || prev.address.registeredAddress),
-        registeredCity: gstYes ? prev.address.registeredCity : (data.manualAddress?.city || prev.address.registeredCity),
-        registeredState: gstYes ? prev.address.registeredState : (data.manualAddress?.state || prev.address.registeredState),
-        registeredPincode: gstYes ? prev.address.registeredPincode : (data.manualAddress?.pincode || prev.address.registeredPincode),
+          ? fill(prev.address.registeredAddress, principalPlace)
+          : fill(prev.address.registeredAddress, data.manualAddress?.address),
+        registeredCity: gstYes
+          ? prev.address.registeredCity
+          : fill(prev.address.registeredCity, data.manualAddress?.city),
+        registeredState: gstYes
+          ? prev.address.registeredState
+          : fill(prev.address.registeredState, data.manualAddress?.state),
+        registeredPincode: gstYes
+          ? prev.address.registeredPincode
+          : fill(prev.address.registeredPincode, data.manualAddress?.pincode),
       },
       statutory: {
         ...prev.statutory,
         isGstRegistered: data.isGstRegistered ?? prev.statutory.isGstRegistered,
-        gstDeclarationReason: data.gstDeclarationReason || prev.statutory.gstDeclarationReason,
+        gstDeclarationReason: fill(prev.statutory.gstDeclarationReason, data.gstDeclarationReason),
         gstSelfDeclarationFile: data.gstSelfDeclarationFile ?? prev.statutory.gstSelfDeclarationFile,
-        gstin: data.gst?.gstin || prev.statutory.gstin,
-        gstConstitutionOfBusiness: data.gst?.constitutionOfBusiness || prev.statutory.gstConstitutionOfBusiness,
-        gstPrincipalPlaceOfBusiness: principalPlace || prev.statutory.gstPrincipalPlaceOfBusiness,
-        gstAdditionalPlaces: data.gst?.additionalPlaces ?? prev.statutory.gstAdditionalPlaces,
-        gstRegistrationDate: data.gst?.registrationDate || prev.statutory.gstRegistrationDate,
-        gstStatus: data.gst?.status || prev.statutory.gstStatus,
-        gstTaxpayerType: data.gst?.taxpayerType || prev.statutory.gstTaxpayerType,
-        gstBusinessNature: data.gst?.businessNature ?? prev.statutory.gstBusinessNature,
-        gstJurisdictionCentre: data.gst?.jurisdictionCentre || prev.statutory.gstJurisdictionCentre,
-        gstJurisdictionState: data.gst?.jurisdictionState || prev.statutory.gstJurisdictionState,
+        gstin: fill(prev.statutory.gstin, data.gst?.gstin),
+        gstConstitutionOfBusiness: fill(prev.statutory.gstConstitutionOfBusiness, data.gst?.constitutionOfBusiness),
+        gstPrincipalPlaceOfBusiness: fill(prev.statutory.gstPrincipalPlaceOfBusiness, principalPlace),
+        gstAdditionalPlaces: (Array.isArray(prev.statutory.gstAdditionalPlaces) && prev.statutory.gstAdditionalPlaces.length > 0)
+          ? prev.statutory.gstAdditionalPlaces
+          : (data.gst?.additionalPlaces ?? prev.statutory.gstAdditionalPlaces),
+        gstRegistrationDate: fill(prev.statutory.gstRegistrationDate, data.gst?.registrationDate),
+        gstStatus: fill(prev.statutory.gstStatus, data.gst?.status),
+        gstTaxpayerType: fill(prev.statutory.gstTaxpayerType, data.gst?.taxpayerType),
+        gstBusinessNature: (Array.isArray(prev.statutory.gstBusinessNature) && prev.statutory.gstBusinessNature.length > 0)
+          ? prev.statutory.gstBusinessNature
+          : (data.gst?.businessNature ?? prev.statutory.gstBusinessNature),
+        gstJurisdictionCentre: fill(prev.statutory.gstJurisdictionCentre, data.gst?.jurisdictionCentre),
+        gstJurisdictionState: fill(prev.statutory.gstJurisdictionState, data.gst?.jurisdictionState),
         gstFilingStatus: Array.isArray(data.gst?.filing_status) && data.gst?.filing_status.length > 0
           ? data.gst.filing_status
           : prev.statutory.gstFilingStatus,
-        pan: data.pan?.number || prev.statutory.pan,
+        pan: fill(prev.statutory.pan, data.pan?.number),
         isMsmeRegistered: data.isMsmeRegistered ?? prev.statutory.isMsmeRegistered,
-        msmeNumber: data.msme?.udyamNumber || prev.statutory.msmeNumber,
+        msmeNumber: fill(prev.statutory.msmeNumber, data.msme?.udyamNumber),
         msmeCategory: ((): StatutoryDetails['msmeCategory'] => {
+          if (prev.statutory.msmeCategory) return prev.statutory.msmeCategory;
           const t = (data.msme?.enterpriseType || '').toLowerCase();
           if (t === 'micro' || t === 'small' || t === 'medium') return t;
           return prev.statutory.msmeCategory;
         })(),
+        msmeEnterpriseName: fill(prev.statutory.msmeEnterpriseName, data.msme?.enterpriseName),
+        msmeMajorActivity: fill(prev.statutory.msmeMajorActivity, data.msme?.majorActivity),
         // Carry the actual uploaded files into the form so draft saves include them
         gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
         panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
         msmeCertificateFile: data.msmeCertificateFile ?? prev.statutory.msmeCertificateFile,
         msmeSelfDeclarationFile: (data as any).msmeSelfDeclarationFile ?? prev.statutory.msmeSelfDeclarationFile ?? null,
-        msmeDeclarationReason: (data as any).msmeDeclarationReason ?? prev.statutory.msmeDeclarationReason ?? '',
+        msmeDeclarationReason: fill(prev.statutory.msmeDeclarationReason ?? '', (data as any).msmeDeclarationReason),
       },
       bank: {
         ...prev.bank,
-        accountNumber: data.bank?.accountNumber || prev.bank.accountNumber,
-        confirmAccountNumber: data.bank?.accountNumber || prev.bank.confirmAccountNumber,
-        ifscCode: data.bank?.ifsc || prev.bank.ifscCode,
-        bankName: data.bank?.bankName || prev.bank.bankName,
-        branchName: data.bank?.branchName || prev.bank.branchName,
-        accountType: (data.bank?.accountType as BankDetails['accountType']) || prev.bank.accountType || 'current',
-        bankAddress: data.bank?.bankAddress || prev.bank.bankAddress,
+        accountNumber: fill(prev.bank.accountNumber, data.bank?.accountNumber),
+        confirmAccountNumber: fill(prev.bank.confirmAccountNumber, data.bank?.accountNumber),
+        ifscCode: fill(prev.bank.ifscCode, data.bank?.ifsc),
+        bankName: fill(prev.bank.bankName, data.bank?.bankName),
+        branchName: fill(prev.bank.branchName, data.bank?.branchName),
+        accountType: (prev.bank.accountType || (data.bank?.accountType as BankDetails['accountType']) || 'current') as BankDetails['accountType'],
+        bankAddress: fill(prev.bank.bankAddress, data.bank?.bankAddress),
+        accountHolderName: fill(prev.bank.accountHolderName ?? '', data.bank?.accountHolderName),
         cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile,
-        secondary: data.bank2
+        secondary: wantsSecondary
           ? {
               enabled: true,
-              accountNumber: data.bank2.accountNumber || '',
-              ifscCode: data.bank2.ifsc || '',
-              bankName: data.bank2.bankName || '',
-              branchName: data.bank2.branchName || '',
-              accountHolderName: data.bank2.accountHolderName || '',
-              accountType: (data.bank2.accountType as BankDetails['accountType']) || 'current',
-              bankAddress: data.bank2.bankAddress || '',
+              accountNumber: fill(prev.bank.secondary?.accountNumber ?? '', data.bank2?.accountNumber),
+              ifscCode: fill(prev.bank.secondary?.ifscCode ?? '', data.bank2?.ifsc),
+              bankName: fill(prev.bank.secondary?.bankName ?? '', data.bank2?.bankName),
+              branchName: fill(prev.bank.secondary?.branchName ?? '', data.bank2?.branchName),
+              accountHolderName: fill(prev.bank.secondary?.accountHolderName ?? '', data.bank2?.accountHolderName),
+              accountType: ((prev.bank.secondary?.accountType) || (data.bank2?.accountType as BankDetails['accountType']) || 'current') as BankDetails['accountType'],
+              bankAddress: fill(prev.bank.secondary?.bankAddress ?? '', data.bank2?.bankAddress),
               micrCode: prev.bank.secondary?.micrCode || '',
               cancelledChequeFile: data.cancelledChequeFile2 ?? prev.bank.secondary?.cancelledChequeFile ?? null,
             }
@@ -632,6 +656,7 @@ export default function VendorRegistration() {
       },
     };
   };
+
 
   // Holds the most recent Step-1 snapshot from the child, even if React hasn't
   // flushed setState yet — used by Save Draft to avoid stale renders.
