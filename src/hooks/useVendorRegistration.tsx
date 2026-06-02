@@ -73,18 +73,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Fetch existing vendor data for the current user
   const { data: existingVendor, isLoading: isLoadingVendor, refetch: refetchVendor } = useQuery({
-    queryKey: ['existing-vendor'],
+    queryKey: ['existing-vendor', options?.onBehalfInvitationId || 'self'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data, error } = await supabase
+      // On-behalf mode: scope the draft to the invitation, not the buyer's user_id,
+      // so multiple in-flight on-behalf drafts created by the same buyer don't collide.
+      let query = supabase
         .from('vendors')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      if (options?.onBehalfInvitationId) {
+        query = query.eq('invitation_id', options.onBehalfInvitationId);
+      } else {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
 
