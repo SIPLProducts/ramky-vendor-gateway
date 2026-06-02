@@ -848,6 +848,8 @@ export default function AdminInvitations() {
                     {paginatedInvitations.map((invitation) => {
                       const linked = (invitation as any).linked_vendor;
                       const isReturned = linked?.status === 'returned_to_buyer';
+                      const isOnBehalf = !!(invitation as any).created_on_behalf;
+                      const canResumeOnBehalf = isOnBehalf && !invitation.used_at;
                       return (
                       <TableRow key={invitation.id}>
                         <TableCell>
