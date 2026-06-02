@@ -595,6 +595,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         ifscCode: vendor.ifsc_code || '',
         micrCode: vendor.micr_code || '',
         bankAddress: vendor.bank_address || '',
+        accountHolderName: (vendor as VendorRecord & { account_holder_name?: string }).account_holder_name || '',
         cancelledChequeFile: null,
         secondary: vendor.account_number_2
           ? {
