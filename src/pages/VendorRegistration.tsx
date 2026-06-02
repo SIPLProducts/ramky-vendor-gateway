@@ -227,7 +227,25 @@ export default function VendorRegistration() {
         }
       }
 
+      // ─── On-behalf bootstrap (buyer launched from Vendor Invitations) ─────
+      // Buyer clicked "Create Vendor" and was navigated straight into the form.
+      // We collect the minimum prerequisites inline (vendor email, name, phone,
+      // buyer company) and create the vendor_invitations row on submit, then
+      // continue exactly as the existing onBehalfOf flow.
+      if (searchParams.get('onBehalf') === '1') {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate('/auth');
+          return;
+        }
+        setIsTokenMode(false);
+        setNeedsOnBehalfBootstrap(true);
+        setIsValidatingToken(false);
+        return;
+      }
+
       if (!token) {
+
         setTokenError('Access denied. This page requires a valid invitation link.');
         setIsValidatingToken(false);
         return;
