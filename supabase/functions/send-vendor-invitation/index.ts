@@ -200,9 +200,9 @@ const handler = async (req: Request): Promise<Response> => {
 
                     <div style="margin:0 0 32px 0;">
                       <p style="margin:0 0 8px 0; font-size:11px; color:#718096; letter-spacing:0.3px; text-transform:uppercase; font-weight:600;">Direct Link</p>
-                      <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:10px 14px; font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace; font-size:11px; color:#4a5568; word-break:break-all;">
+                      <a href="${inviteLink}" target="_blank" rel="noopener noreferrer" style="display:block; background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:10px 14px; font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace; font-size:11px; color:#1e3a5f; word-break:break-all; text-decoration:underline;">
                         ${inviteLink}
-                      </div>
+                      </a>
                     </div>
 
                     <div style="height:1px; background-color:#e2e8f0; margin:0 0 24px 0; line-height:1px; font-size:0;">&nbsp;</div>
