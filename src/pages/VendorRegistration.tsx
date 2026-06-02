@@ -1147,71 +1147,9 @@ export default function VendorRegistration() {
     return null;
   };
 
-  if (isLoadingVendor || isValidatingToken) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
+  if (isLoadingVendor || isValidatingToken || isBootstrappingOnBehalf) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
 
-  // On-behalf bootstrap — collect prerequisites before unlocking the form
-  if (needsOnBehalfBootstrap) {
-    return (
-      <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
-        <header className="h-14 border-b bg-card px-6 flex items-center sticky top-0 z-50 shadow-sm">
-          <Link to="/" className="flex items-center gap-3">
-            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-            <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
-          </Link>
-        </header>
-        <Dialog open modal>
-          <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-            <DialogHeader>
-              <DialogTitle>Create Vendor on Behalf of Vendor</DialogTitle>
-              <DialogDescription>
-                Enter the vendor's basic details to open the Vendor Registration Form. No email is sent.
-                The submission runs the same validations and approval workflow.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="ob-name">Vendor Name</Label>
-                <Input id="ob-name" type="text" placeholder="ACME Pvt Ltd" value={obVendorName} onChange={(e) => setObVendorName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-email">Vendor Email</Label>
-                <Input id="ob-email" type="email" placeholder="vendor@company.com" value={obEmail} onChange={(e) => { setObEmail(e.target.value); setObEmailError(null); }} />
-                {obEmailError && <p className="text-sm text-destructive">{obEmailError}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ob-phone">Phone Number</Label>
-                <Input id="ob-phone" type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" value={obPhone} onChange={(e) => setObPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} />
-              </div>
-              {allowedTenants.length > 1 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="ob-company">Company</Label>
-                  <Select value={obTenantId} onValueChange={setObTenantId}>
-                    <SelectTrigger id="ob-company"><SelectValue placeholder="Select a company" /></SelectTrigger>
-                    <SelectContent>
-                      {allowedTenants.map((t) => (<SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Company</Label>
-                  <div className="text-sm rounded-md border bg-muted/50 px-3 py-2">
-                    {allowedTenants[0]?.name || 'No company assigned to your account'}
-                  </div>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => navigate('/admin/invitations')}>Cancel</Button>
-              <Button onClick={handleCreateOnBehalfInvitation} disabled={obSubmitting} className="gap-2">
-                {obSubmitting ? (<><Loader2 className="h-4 w-4 animate-spin" />Opening…</>) : (<>Continue to Form<ChevronRight className="h-4 w-4" /></>)}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }
+
 
 
   // Show error if token validation failed
