@@ -41,29 +41,43 @@ Deno.serve(async (req) => {
     // Get progress row + level
     const { data: progress } = await admin
       .from('vendor_approval_progress')
-      .select('id, vendor_id, level_id, level_number, status')
+      .select('id, vendor_id, level_id, level_number, status, stage')
       .eq('id', progress_id).single();
     if (!progress) throw new Error('Progress not found');
     if (progress.status !== 'pending') throw new Error('Already actioned');
 
-    // Validate user is approver for this level — either by user_id OR by matching email
-    const userEmail = (userData.user.email ?? '').trim().toLowerCase();
-    const { data: approvers } = await admin
-      .from('approval_matrix_approvers')
-      .select('id, user_id, approver_email')
-      .eq('level_id', progress.level_id);
+    const isBuyerRow = progress.stage === 'BUYER' || progress.level_id === null;
 
-    const matched = (approvers ?? []).filter((a: any) => {
-      if (a.user_id === userId) return true;
-      const e = (a.approver_email ?? '').trim().toLowerCase();
-      return !!userEmail && e === userEmail;
-    });
-    if (matched.length === 0) throw new Error('You are not an approver for this level');
+    // Validate user is approver for this level
+    if (isBuyerRow) {
+      // Authorise: caller must be the inviting buyer for this vendor.
+      const { data: invite } = await admin
+        .from('vendor_invitations')
+        .select('created_by')
+        .eq('vendor_id', progress.vendor_id)
+        .order('created_at', { ascending: false })
+        .limit(1).maybeSingle();
+      if (!invite || invite.created_by !== userId) {
+        throw new Error('You are not the buyer for this vendor');
+      }
+    } else {
+      const userEmail = (userData.user.email ?? '').trim().toLowerCase();
+      const { data: approvers } = await admin
+        .from('approval_matrix_approvers')
+        .select('id, user_id, approver_email')
+        .eq('level_id', progress.level_id);
 
-    // Auto-link user_id on rows matched by email so future lookups are exact.
-    const toLink = matched.filter((a: any) => !a.user_id).map((a: any) => a.id);
-    if (toLink.length > 0) {
-      await admin.from('approval_matrix_approvers').update({ user_id: userId }).in('id', toLink);
+      const matched = (approvers ?? []).filter((a: any) => {
+        if (a.user_id === userId) return true;
+        const e = (a.approver_email ?? '').trim().toLowerCase();
+        return !!userEmail && e === userEmail;
+      });
+      if (matched.length === 0) throw new Error('You are not an approver for this level');
+
+      const toLink = matched.filter((a: any) => !a.user_id).map((a: any) => a.id);
+      if (toLink.length > 0) {
+        await admin.from('approval_matrix_approvers').update({ user_id: userId }).in('id', toLink);
+      }
     }
 
     // Validate it is the active (lowest-numbered pending) level for the vendor
@@ -77,13 +91,16 @@ Deno.serve(async (req) => {
       throw new Error('Lower-level approval still pending');
     }
 
-    // Get level for mode
-    const { data: level } = await admin
-      .from('approval_matrix_levels')
-      .select('approval_mode, level_number, tenant_id').eq('id', progress.level_id).single();
+    // Get level for mode (skip for synthetic buyer rows)
+    const { data: level } = isBuyerRow
+      ? { data: { approval_mode: 'ANY', level_number: progress.level_number, tenant_id: null as any } }
+      : await admin
+          .from('approval_matrix_levels')
+          .select('approval_mode, level_number, tenant_id').eq('id', progress.level_id).single();
 
     // Stage -> vendor.status mapping
     const STAGE_TO_REVIEW: Record<string, string> = {
+      BUYER: 'buyer_review',
       SCM_MANAGER: 'scm_manager_review',
       SCM_HEAD: 'scm_head_review',
       FINANCE_1: 'finance_1_review',
@@ -91,11 +108,14 @@ Deno.serve(async (req) => {
       CEO_OFFICE: 'ceo_office_review',
     };
 
-    // Look up the current level's stage
-    const { data: curLevel } = await admin
-      .from('approval_matrix_levels')
-      .select('stage').eq('id', progress.level_id).single();
-    const curStage = curLevel?.stage ?? 'SCM_MANAGER';
+    // Look up the current level's stage (use synthetic stage for buyer row)
+    let curStage = progress.stage ?? 'SCM_MANAGER';
+    if (!isBuyerRow) {
+      const { data: curLevel } = await admin
+        .from('approval_matrix_levels')
+        .select('stage').eq('id', progress.level_id).single();
+      curStage = curLevel?.stage ?? 'SCM_MANAGER';
+    }
 
     if (action === 'reject') {
       // 1) Mark the current step as rejected with remarks.
