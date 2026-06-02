@@ -310,6 +310,7 @@ export default function VendorList() {
                 <SelectItem value="submitted">Submitted</SelectItem>
                 <SelectItem value="validation_pending">Validation Pending</SelectItem>
                 <SelectItem value="validation_failed">Validation Failed</SelectItem>
+                <SelectItem value="buyer_review">Buyer Review</SelectItem>
                 <SelectItem value="scm_manager_review">SCM Manager Review</SelectItem>
                 <SelectItem value="scm_head_review">SCM Head Review</SelectItem>
                 <SelectItem value="finance_1_review">Finance 1 Review</SelectItem>
