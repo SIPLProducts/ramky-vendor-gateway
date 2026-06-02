@@ -1,52 +1,42 @@
-# Create Vendor → Direct Form Navigation (No Dialog)
+# Pre-flight Check: Buyer SCM + Approval Matrix Before Creating Invitation
 
 ## Goal
-Clicking **Create Vendor** on Vendor Invitations must land the buyer directly on the Vendor Registration Form. No dialog, no popup, no pre-collection of vendor name / email / phone / company.
+Before any vendor invitation is created — both via the **New Invitation** dialog (email send) and the **Create Vendor** button (on-behalf flow) — verify that the selected Company/Tenant has:
 
-## Changes
+1. A **Buyer → SCM mapping** for the current buyer (`buyer_scm_mappings` row where `tenant_id = <selected>` AND `buyer_user_id = auth.uid()`), **and**
+2. At least one active **Approval Matrix level** with approvers configured (`approval_matrix_levels` where `tenant_id = <selected>` AND `is_active = true`, joined to `approval_matrix_approvers`).
 
-### 1. `src/pages/VendorRegistration.tsx`
-- **Remove** the on-behalf bootstrap dialog UI and all related state (`needsOnBehalfBootstrap`, `obEmail`, `obVendorName`, `obPhone`, `obTenantId`, `obEmailError`, `obSubmitting`) and the `Dialog/Input/Label/Select` imports added for it.
-- **Replace** the bootstrap with an automatic invitation row creation on mount:
-  - When URL has `?onBehalf=1` and no `?onBehalfOf=<id>`, immediately call a new helper `bootstrapOnBehalfInvitation()` inside a `useEffect` (runs once after auth + tenant context are ready).
-  - Helper inserts a `vendor_invitations` row with:
-    - `created_on_behalf: true`
-    - `created_by: user.id`
-    - `tenant_id: currentTenantId` (from `useTenantContext`; if user has multiple and none selected, fall back to first tenant from `useTenants`)
-    - `email`: placeholder `onbehalf+<shortUuid>@placeholder.local` (will be overwritten when vendor enters real email in Step 1 — see step 2)
-    - `vendor_name`: `"Draft Vendor"` placeholder
-    - `phone_number`: `null` (or empty string if NOT NULL)
-    - `token`: generated UUID
-    - `expires_at`: now + 60 days
-    - `status`: same default the existing `createVendorOnBehalf` mutation uses
-  - On success: set `onBehalfInvitationId`, replace URL with `navigate('/vendor/registration?onBehalfOf=<id>', { replace: true })`, then let the existing on-behalf flow take over.
-  - On failure: toast error and `navigate('/admin/invitations')`.
-- Show the existing loading guard (`isLoadingVendor || isValidatingToken`) while bootstrap is in flight (add the new flag to the same guard).
+If either is missing → show a destructive toast and **abort**. If both are present → proceed exactly as today (dialog opens / form navigation happens / invitation row is inserted / routing through `seed_vendor_approval_progress` runs unchanged after submission).
 
-### 2. `src/hooks/useVendorRegistration.tsx`
-- When the buyer fills Step 1 / Company Details in on-behalf mode, on auto-save / next-step, **sync** the real values back to the `vendor_invitations` row tied to `onBehalfInvitationId`:
-  - `vendor_name ← legal_name` (or trade_name fallback)
-  - `email ← primary_email`
-  - `phone_number ← primary_phone`
-- This keeps the invitation list (Vendor Invitations screen) showing correct vendor info instead of the placeholders, and keeps downstream notifications correct (`notify-vendor-submission` already reads invite first, vendor row second).
-- Single `update` against `vendor_invitations` keyed by `onBehalfInvitationId`, fired on the same save that already persists Step 1.
+Super admins (`sharvi_admin`, `admin`) and customer admins are also subject to the check — the requirement is that the tenant be properly configured before any vendor onboarding starts, regardless of who clicks the button.
 
-### 3. `src/pages/AdminInvitations.tsx`
-- No change to the existing button click (already navigates to `/vendor/registration?onBehalf=1` from the previous turn).
-- Leave the legacy `isCreateVendorOpen` dialog, its state, and the `createVendorOnBehalf` mutation **in place but unused** — safer than ripping them out and risking regressions in resume/other flows. (Optional cleanup later.)
+## Changes (single file)
 
-## Preserved (untouched)
-- Standard "New Invitation" email-send flow.
-- Per-row **Resume** action on existing on-behalf rows.
-- All validations, approval workflow, buyer-stage auto-approval, SAP/DMS sync, role permissions, other screens.
-- `notify-vendor-submission` edge function (no change needed — placeholder gets overwritten before submit).
+### `src/pages/AdminInvitations.tsx`
 
-## Out of scope
-- No DB migration.
-- No edge function changes.
-- No UI changes to Vendor Invitations list rendering.
+1. **Add a shared async preflight helper** `checkTenantOnboardingReadiness(tenantId, buyerUserId)` that runs two parallel `supabase` reads:
+   - `buyer_scm_mappings.select('id', { head:true, count:'exact' }).eq('tenant_id', tenantId).eq('buyer_user_id', buyerUserId)`
+   - `approval_matrix_levels.select('id, approval_matrix_approvers!inner(id)', { head:true, count:'exact' }).eq('tenant_id', tenantId).eq('is_active', true)`
+   Returns `{ ok: boolean, missing: ('buyer_scm' | 'approval_matrix')[] }`.
 
-## Edge cases handled
-- Buyer abandons form before Step 1 save → an invitation row with placeholder email exists but is harmless (still resumable from the list; can be cancelled like any other on-behalf draft).
-- Buyer reloads the page → URL already has `?onBehalfOf=<id>`, so the bootstrap effect skips and existing resume path runs.
-- Buyer has no tenant context → bootstrap fails fast with toast and returns to invitations list.
+2. **Wire it into the "Create Vendor" button (line 569)**:
+   - Replace the inline `onClick={() => navigate('/vendor/registration?onBehalf=1')}` with a handler that:
+     - Validates `effectiveTenantId` and `user?.id` (same guards used by `handleCreateVendorOnBehalf`).
+     - Calls `checkTenantOnboardingReadiness`. If `!ok`, show a single destructive toast listing what's missing (e.g. *"Cannot create vendor: Buyer–SCM mapping and Approval Matrix are not configured for <Tenant Name>. Please configure them in User Management → Buyer-SCM Mapping and Settings → Approval Matrix before inviting vendors."*) and return.
+     - Otherwise call `navigate('/vendor/registration?onBehalf=1')` (unchanged behavior).
+   - Use a small `useState` `isCheckingReadiness` to disable the button while the two reads are in flight.
+
+3. **Wire it into `handleCreateInvitation`** (line 453) just after the existing `effectiveTenantId` guard at line 465–474 and before `createInvitation.mutate(...)` on line 476:
+   - Same preflight call; same toast on failure; abort before mutate.
+
+4. **No change** to the legacy `handleCreateVendorOnBehalf` dialog flow (still unused after previous turn) — to keep this PR focused.
+
+## Preserved / Out of scope
+- The actual approval routing after submission is **already correct** — `seed_vendor_approval_progress` reads `buyer_scm_mappings` and `approval_matrix_levels` for the vendor's tenant and assembles the chain (BUYER → SCM_MANAGER → SCM_HEAD → FINANCE_1/2 → CEO_OFFICE). No DB or edge-function changes are needed.
+- No new tables, RLS policies, or migrations.
+- No changes to the Vendor Registration Form, the on-behalf bootstrap effect, or other pages.
+
+## Edge cases
+- **Tenant just changed in the header dropdown** — preflight runs against the current `effectiveTenantId`, so it always matches what will actually be persisted on the invitation row.
+- **Network/query error during preflight** — treated as failure with a generic destructive toast ("Could not verify tenant configuration. Please try again."); does not silently fall through and create an unroutable invitation.
+- **Buyer has a mapping but the mapped Approval Matrix is empty (no approvers)** — the inner-join on `approval_matrix_approvers` covers this, so we correctly reject.
