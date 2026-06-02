@@ -120,7 +120,80 @@ export default function VendorRegistration() {
   const [resetNonce, setResetNonce] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, userRole } = useAuth();
+  const { data: allTenants } = useTenants();
+  const { myTenants } = useTenantContext();
+  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
+  const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
+
+  // On-behalf bootstrap form state
+  const [obEmail, setObEmail] = useState('');
+  const [obVendorName, setObVendorName] = useState('');
+  const [obPhone, setObPhone] = useState('');
+  const [obTenantId, setObTenantId] = useState<string>('');
+  const [obEmailError, setObEmailError] = useState<string | null>(null);
+  const [obSubmitting, setObSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!obTenantId && allowedTenants.length > 0) setObTenantId(allowedTenants[0].id);
+  }, [allowedTenants, obTenantId]);
+
+  const handleCreateOnBehalfInvitation = async () => {
+    const parse = z.string().email('Please enter a valid email address').safeParse(obEmail.trim());
+    if (!parse.success) {
+      setObEmailError(parse.error.issues[0]?.message || 'Invalid email');
+      return;
+    }
+    if (!obTenantId) {
+      toast({ title: 'Select a company', description: 'Please select a buyer company.', variant: 'destructive' });
+      return;
+    }
+    if (obPhone.length > 0 && obPhone.length !== 10) {
+      toast({ title: 'Invalid phone', description: 'Phone must be 10 digits.', variant: 'destructive' });
+      return;
+    }
+    if (!user?.id) {
+      toast({ title: 'Session loading', description: 'Please reload and try again.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setObSubmitting(true);
+      const token = safeUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 60);
+      const { data: inv, error } = await supabase
+        .from('vendor_invitations')
+        .insert({
+          email: obEmail.trim(),
+          token,
+          expires_at: expiresAt.toISOString(),
+          tenant_id: obTenantId,
+          vendor_name: obVendorName || null,
+          phone_number: obPhone || null,
+          created_by: user.id,
+          created_on_behalf: true,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      setOnBehalfInvitationId(inv.id);
+      setInvitationToken(inv.token);
+      setInvitationEmail(inv.email);
+      setFormData((prev) => ({ ...prev, organization: { ...prev.organization, buyerCompanyId: obTenantId } }));
+      setNeedsOnBehalfBootstrap(false);
+      const next = new URLSearchParams(searchParams);
+      next.delete('onBehalf');
+      next.set('onBehalfOf', inv.id);
+      setSearchParams(next, { replace: true });
+    } catch (err: any) {
+      toast({ title: 'Could not start on-behalf registration', description: err?.message || 'Failed to create invitation', variant: 'destructive' });
+    } finally {
+      setObSubmitting(false);
+    }
+  };
+
+
 
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
