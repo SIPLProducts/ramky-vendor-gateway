@@ -1370,10 +1370,16 @@ export function DocumentVerificationStep({
         account_holder_name: nameAtBank,
         branch_address: branchAddress,
       };
-      const fileName = `Manual ${apiAccount.slice(-4).padStart(apiAccount.length, "•")}`;
+      // Preserve the most recently uploaded cheque File so the post-manual
+      // verified state still carries it. Without this, the parent receives
+      // `cancelledChequeFile = null` and the older file remains in DMS.
+      const lastFile = (target === "secondary" ? lastBankFile2Ref : lastBankFileRef).current;
+      const manualFileName = `Manual ${apiAccount.slice(-4).padStart(apiAccount.length, "•")}`;
       setDoc({
         status: "verified",
-        fileName,
+        file: lastFile ?? undefined,
+        fileName: lastFile?.name || manualFileName,
+        fileSize: lastFile?.size,
         ocrData: normalized,
         originalOcrData: normalized,
         apiData: {
