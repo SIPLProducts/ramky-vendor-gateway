@@ -7,6 +7,8 @@ export type RegistrationStatus =
   | 'submitted'
   | 'validation_pending'
   | 'validation_failed'
+  | 'buyer_review'
+  | 'buyer_rejected'
   | 'scm_manager_review'
   | 'scm_manager_rejected'
   | 'scm_head_review'
