@@ -42,8 +42,21 @@ export default function VendorInviteAccept() {
               ? 'This invitation link has expired. Please request a new one.'
               : code === 'invalid'
               ? 'Invalid invitation link. Please contact the administrator.'
+              : code === 'link_failed'
+              ? 'We could not create the secure sign-in link. Please contact the administrator.'
               : 'We could not verify your invitation. Please try again shortly.';
+          console.error('Invite accept failed:', error || data);
           setErrorMsg(msg);
+          setStatus('error');
+          return;
+        }
+
+        let actionUrl: URL;
+        try {
+          actionUrl = new URL(String(data.action_link));
+        } catch (e) {
+          console.error('Invalid invite action link:', data.action_link, e);
+          setErrorMsg('The invitation sign-in link is invalid. Please contact the administrator.');
           setStatus('error');
           return;
         }
@@ -56,7 +69,7 @@ export default function VendorInviteAccept() {
 
         setStatus('signing_in');
         // Magic link auto-signs in and redirects back to /vendor/registration?token=...
-        window.location.href = data.action_link;
+        window.location.assign(actionUrl.toString());
       } catch (err) {
         if (cancelled) return;
         console.error('Invite accept failed:', err);

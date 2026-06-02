@@ -107,23 +107,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Normalize action_link for self-hosted reverse-proxy setups where
-    // Supabase lives behind <origin>/supabase/. If GoTrue was started with
-    // API_EXTERNAL_URL set to the bare origin, the link will be
-    // /auth/v1/verify (which 404s in the SPA). Inject /supabase prefix so
-    // it routes through Kong. On Lovable Cloud the action_link host differs
-    // from the frontend origin, so this branch is skipped.
+    // Normalize action_link for self-hosted reverse-proxy setups where the
+    // auth service must be reached through <origin>/supabase/auth/v1/verify.
+    // If GoTrue returns /auth/v1/verify on the frontend host, inject the
+    // /supabase prefix so nginx routes it to Kong instead of the SPA.
     const rawActionLink = linkData.properties.action_link as string;
     let actionLink = rawActionLink;
     try {
       const actionUrl = new URL(rawActionLink);
       const originUrl = redirectOrigin ? new URL(redirectOrigin) : null;
-      if (
-        originUrl &&
-        actionUrl.host === originUrl.host &&
-        actionUrl.pathname.startsWith('/auth/v1/') &&
-        !actionUrl.pathname.startsWith('/supabase/')
-      ) {
+      if (originUrl && actionUrl.host === originUrl.host && actionUrl.pathname.startsWith('/auth/v1/')) {
         actionUrl.pathname = '/supabase' + actionUrl.pathname;
         actionLink = actionUrl.toString();
       }
