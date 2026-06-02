@@ -871,18 +871,18 @@ export function DocumentVerificationStep({
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
   ) => {
     if (file.size > 5 * 1024 * 1024) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: "File must be under 5 MB" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: "File must be under 5 MB" });
       return;
     }
-    setDoc({ status: "uploading", fileName: file.name, fileSize: file.size });
+    setDoc({ status: "uploading", fileName: file.name, fileSize: file.size, file });
     const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
     if (isPdf) {
-      setDoc({ status: "preparing", fileName: file.name, fileSize: file.size });
+      setDoc({ status: "preparing", fileName: file.name, fileSize: file.size, file });
     }
-    setDoc({ status: "ocr", fileName: file.name, fileSize: file.size });
+    setDoc({ status: "ocr", fileName: file.name, fileSize: file.size, file });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, errorMessage: ocrRes.error || "Could not read document" });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: ocrRes.error || "Could not read document" });
       if (kind === "cheque") {
         openBankManualPopup(
           chequeTargetRef.current,
@@ -893,7 +893,7 @@ export function DocumentVerificationStep({
     }
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
       if (kind === "cheque") {
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
@@ -906,11 +906,11 @@ export function DocumentVerificationStep({
       }
       return;
     }
-    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
+    setDoc({ status: "verifying", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, ocrModel: ocrRes.model });
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
       const msg = (v as any).message || "Verification failed";
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
       // Surface a hard popup for cross-tab name mismatches and force the
       // user back onto the offending tab so they cannot navigate forward.
       if (kind === "msme" && (v as any).isNameMismatch) {
