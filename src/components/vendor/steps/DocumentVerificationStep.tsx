@@ -1689,14 +1689,21 @@ export function DocumentVerificationStep({
         majorActivity: msmeDoc.ocrData.major_activity,
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
-        addressParts: (msmeDoc.ocrData.city || msmeDoc.ocrData.state || msmeDoc.ocrData.pin_code || msmeAddrLine || msmeDoc.ocrData.office_address)
-          ? {
-              address: msmeAddrLine || msmeDoc.ocrData.office_address || undefined,
-              city: msmeDoc.ocrData.city || msmeDoc.ocrData.district || undefined,
-              state: msmeDoc.ocrData.state || undefined,
-              pincode: msmeDoc.ocrData.pin_code || undefined,
-            }
-          : undefined,
+        addressParts: (() => {
+          const direct = {
+            address: msmeAddrLine || msmeDoc.ocrData.office_address || undefined,
+            city: msmeDoc.ocrData.city || msmeDoc.ocrData.district || undefined,
+            state: msmeDoc.ocrData.state || undefined,
+            pincode: msmeDoc.ocrData.pin_code || undefined,
+          };
+          if (direct.city || direct.state || direct.pincode) return direct;
+          // String fallback: parse office_address / composed line.
+          const raw = String(msmeDoc.ocrData.office_address || msmeAddrLine || "").trim();
+          if (!raw) return undefined;
+          const parsed = parseAddressString(raw);
+          if (!parsed.city && !parsed.state && !parsed.pincode && !parsed.address) return undefined;
+          return { address: parsed.address || raw, city: parsed.city, state: parsed.state, pincode: parsed.pincode };
+        })(),
       };
     } else if (isMsmeRegistered === false) {
       out.msmeDeclarationReason = msmeDeclarationReason;
