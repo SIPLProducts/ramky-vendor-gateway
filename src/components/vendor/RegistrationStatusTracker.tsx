@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CheckCircle2, Clock, FileCheck, ShoppingCart, ShieldCheck, IndianRupee, Server } from 'lucide-react';
+import { CheckCircle2, Clock, FileCheck, ShoppingCart, ShieldCheck, IndianRupee, Server, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type RegistrationStatus =
