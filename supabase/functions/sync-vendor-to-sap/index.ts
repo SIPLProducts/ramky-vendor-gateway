@@ -160,6 +160,15 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     value = String(ctx.vendor?.id || "").slice(0, 8).toUpperCase();
   } else if (head === "vendor.registered_address_line3_or_2") {
     value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
+  } else if (head === "vendor.primary_email_or_fallback") {
+    const v = ctx.vendor || {};
+    value = v.primary_email || v.registered_email || v.registered_email_2 || v.branch_email || v.manufacturing_email || "";
+  } else if (head === "vendor.primary_phone_or_fallback") {
+    const v = ctx.vendor || {};
+    value = v.primary_phone || v.registered_contact_1 || v.registered_phone || v.registered_contact_2 || "";
+  } else if (head === "vendor.account_holder_or_legal") {
+    const v = ctx.vendor || {};
+    value = v.account_holder_name || v.legal_name || "";
   } else {
     value = getPath(ctx, head);
   }
