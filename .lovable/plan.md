@@ -1,66 +1,70 @@
-## Goal
+## Root cause
 
-When any KYC document (GST / PAN / MSME / Bank cheque) is uploaded or re-uploaded, the latest OCR + verification result must:
-1. Auto-populate the corresponding fields in the Vendor Registration Form (already partially works).
-2. Remain editable by the vendor for review/correction.
-3. Replace the previous file + extracted values everywhere downstream — Documents Approval, DMS payload, and SAP Sync.
+When a vendor **re-uploads** a cancelled cheque and then completes the **manual bank verification** popup, the newly uploaded `File` reference is dropped from the form state. As a result, the **old (first) file** is what gets persisted to storage and to `vendor_documents`, which is what the Approval flow and DMS payload then read back.
 
-## What works today
+Trace:
 
-- `ComplianceStep.tsx` already wires `onVerifiedDetails` from each KYC tab into `setValue(...)` calls that fill GST / PAN / MSME / Bank fields.
-- `VendorRegistration.tsx` → `mergeVerifiedDataIntoForm` already lifts data into `formData.organization / address / statutory / bank`.
-- The earlier fix (WeakSet dedupe in `useVendorRegistration.uploadAllDocuments` + lastFileRef in `DocumentVerificationStep`) ensures the newest `File` reaches storage on re-upload.
+1. `DocumentVerificationStep.runDocFlow` (`src/components/vendor/steps/DocumentVerificationStep.tsx`)
+   - On a successful upload+verify it stores `file` on `bankDoc` (line ~937–950).
+   - On **OCR failure** / low confidence (lines ~869, 880, 891, 908) it sets `bankDoc` with only `fileName/fileSize/errorMessage` — `file` is lost.
+2. `handleBankPopupSubmit` (line ~1285–1399) — the manual-entry success path that fires after the popup. The final `setDoc({...})` at line 1367 builds a fresh state with `fileName: "Manual ****"` and never carries `file` forward. So after manual verification, `bankDoc.file` is `undefined`.
+3. `buildOutput` (line 1601): `out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null` → emits `null`.
+4. `VendorRegistration.mergeVerifiedDataIntoForm` (line 617): `cancelledChequeFile: data.cancelledChequeFile ?? prev.bank.cancelledChequeFile` → falls back to the **previously uploaded file** still in `prev`.
+5. `useVendorRegistration.uploadAllDocuments` then sees the OLD `File` and, via the dedupe check `existing.file_name === doc.file.name && existing.file_size === doc.file.size`, skips re-upload. `vendor_documents.file_path` keeps pointing to the first file, and `prepare-dms-payload` reads that old path.
 
-## What still breaks
+The same shape can affect any document where the manual flow / failed-OCR popup is used, but the cheque is where it bites first because the manual popup is the standard recovery path.
 
-1. On re-upload, the KYC tabs run a fresh OCR → verify pipeline but the merger in `VendorRegistration.tsx` uses `newValue || prevValue`. Empty-string fields returned by the new OCR keep the **old** value instead of clearing it, so stale data persists when the new doc legitimately has fewer fields.
-2. `ComplianceStep.handle*Verified` handlers use `if (value) setValue(...)` — same issue: fields the new document does not contain stay at the old extracted value.
-3. The "latest file always wins" guarantee for `vendor_documents` exists for the `DocumentVerificationStep` path but not for the new KYC-tab path (`ComplianceStep` does not push a per-doc replacement marker into `useVendorRegistration`'s `uploadedFilesRef`). Re-uploading from the KYC tab can leave a stale row pointer.
-4. `prepare-dms-payload` and `sync-vendor-to-sap` read from the latest `vendor_documents` row, so once (3) is fixed they automatically reflect the newest file.
+## Fix
 
-## Plan
+### 1. `src/components/vendor/steps/DocumentVerificationStep.tsx`
 
-### 1. Track which document was last extracted (frontend, no DB)
-In each KYC tab (`GstKycTab`, `PanKycTab`, `MsmeKycTab`, `BankKycTab`), when a new OCR pipeline run starts:
-- Stamp the verified payload with a monotonic `extractedAt: Date.now()` and the new `File` reference.
-- Pass the full extracted object (not just the few mapped fields) up via `onVerifiedDetails`.
+- Add two refs `lastBankFileRef` and `lastBankFile2Ref` (typed `useRef<File | null>(null)`).
+- In `handleBankUpload(file)` and `handleBankUpload2(file)` set `lastBankFileRef.current = file` / `lastBankFile2Ref.current = file` **before** calling `runDocFlow`. Also clear the other ref appropriately when target changes.
+- In `runDocFlow`, propagate `file` on every `setDoc({...})` call (uploading, preparing, ocr, verifying, failed branches) so the latest `File` object survives intermediate states. This is required so a re-upload that fails OCR still carries the new file forward.
+- In `handleBankPopupSubmit`, when building the verified state (line ~1367), include:
+  ```ts
+  const lastFile = (target === "secondary" ? lastBankFile2Ref : lastBankFileRef).current;
+  setDoc((prev) => ({
+    status: "verified",
+    file: lastFile ?? prev.file,        // preserve newest cheque file
+    fileName: lastFile?.name || prev.fileName || `Manual ${apiAccount.slice(-4)}`,
+    fileSize: lastFile?.size ?? prev.fileSize,
+    ocrData: normalized,
+    originalOcrData: normalized,
+    apiData: { ... },
+    nameMatchScore: nameMatchScore(effectiveLegalName, nameAtBank),
+    verifiedAt: Date.now(),
+  }));
+  ```
+- No other behavior changes; OCR-success path already attaches `file`.
 
-### 2. Make `handle*Verified` in `ComplianceStep.tsx` overwrite, not OR-merge
-Change `if (v) setValue(k, v)` to always call `setValue(k, v ?? '')` for fields that belong to the document being re-verified. This ensures a re-uploaded doc with a missing field clears the stale prior value instead of silently keeping it. Manual user edits made AFTER the latest verification are preserved because they happen later than the auto-fill.
+### 2. `src/hooks/useVendorRegistration.tsx` — make dedupe safe against same-name replacements
 
-### 3. Same overwrite semantics in `mergeVerifiedDataIntoForm`
-In `src/pages/VendorRegistration.tsx`, replace the `data.x || prev.x` pattern with explicit "if this section was just re-verified, take the new value (even if empty); otherwise keep prev." Use the per-section `status === 'verified'` flag plus a `lastExtractedAt` timestamp from `VerifiedDocumentData` to decide which section to overwrite, so re-verifying GST doesn't clear PAN fields and vice-versa.
+In `uploadAllDocuments` (line ~180), the current dedupe is:
+```ts
+if (existing && existing.file_name === doc.file.name && existing.file_size === doc.file.size) continue;
+```
+A user can easily re-upload a different cheque named `cheque.pdf` with the same byte size (camera scans, re-exports). Replace it with an **upload-session identity** check using a `WeakSet<File>`:
 
-### 4. Force the latest `File` into upload
-In `src/hooks/useVendorRegistration.tsx` `uploadAllDocuments`, additionally key the dedupe `WeakSet` by `(documentType + File identity)`. When a `documentType` appears with a NEW `File` instance, evict the old reference before upload so the same doc type can replace its row in `vendor_documents` (already a unique key on `(vendor_id, document_type)`, so the existing `upsert` overwrites `file_path`).
+- Add `const uploadedFilesRef = useRef<WeakSet<File>>(new WeakSet());` at hook scope.
+- Skip only when `uploadedFilesRef.current.has(doc.file)`. Otherwise always: remove old storage object (already done), `uploadDocument`, `saveDocumentMetadata` (upsert on `vendor_id,document_type` — already correct), then `uploadedFilesRef.current.add(doc.file)`.
+- This guarantees that any newly-selected `File` instance is treated as a replacement, while autosave running twice on the same unchanged `File` instance still skips re-uploading.
 
-### 5. Verify downstream automatically picks up the latest
-No edge-function code change is needed:
-- `prepare-dms-payload` already selects the latest `vendor_documents` row per `document_type`.
-- `sync-vendor-to-sap` reads the same row, so DMS link + SAP payload will reflect the most recent upload once (4) is in place.
+### 3. (No DB / RLS / migration / nginx changes required)
 
-Spot-check both functions to confirm there is no caching keyed off file name, and add a single `order by updated_at desc limit 1` guard if any query is ambiguous.
-
-## Files to change
-
-- `src/components/vendor/kyc/GstKycTab.tsx`
-- `src/components/vendor/kyc/PanKycTab.tsx`
-- `src/components/vendor/kyc/MsmeKycTab.tsx`
-- `src/components/vendor/kyc/BankKycTab.tsx`
-- `src/components/vendor/steps/ComplianceStep.tsx`
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-- (Read-only verify) `supabase/functions/prepare-dms-payload/index.ts`, `supabase/functions/sync-vendor-to-sap/index.ts`
-
-## Out of scope
-
-- International documents step (no OCR provider wired today).
-- DynamicStep custom file fields (no OCR mapping configured).
-- DB schema changes — none required; `vendor_documents` unique `(vendor_id, document_type)` already supports replacement via upsert.
+`vendor_documents` already has a unique `(vendor_id, document_type)` index used by the existing upsert. `prepare-dms-payload` reads the row keyed by that unique combination, so once the metadata `file_path` reflects the latest upload, DMS and the Approval flow automatically see the latest cheque.
 
 ## Validation
 
-1. Upload GST cert A → fields populate → re-upload GST cert B → fields update to B (including fields that A had but B does not — they clear).
-2. Manually edit Legal Name after auto-fill → save draft → re-open: edited value persists.
-3. Re-upload cheque → `vendor_documents.cancelled_cheque.file_path` points to new object, old storage object replaced, Documents Approval shows new file, `prepare-dms-payload` returns new bytes, SAP Sync payload references new file.
-4. Regression: uploading once, autosaving twice without changes → no duplicate storage writes (WeakSet still dedupes same `File`).
+1. Vendor registration → upload cheque A → verify OK → save.
+2. Re-upload cheque B (different content, same or different name) → if OCR fails, complete the manual entry popup → bank verification succeeds.
+3. Check:
+   - `vendor_documents` row for `cancelled_cheque` has `file_path` pointing to the **new** `Date.now()_*` object.
+   - Storage bucket no longer contains the old object (deleted in the existing replacement branch).
+   - Documents Approval view shows the new file.
+   - `prepare-dms-payload` response includes the new file’s base64 bytes.
+4. Regression: upload only once, save twice → no duplicate re-upload (WeakSet dedupes).
+
+## Scope
+
+Only the two files above change; no edge-function, schema, RLS, or nginx changes. All other registration steps and verifications are untouched.
