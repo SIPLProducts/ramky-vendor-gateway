@@ -65,7 +65,13 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 const emailSchema = z.string().email('Please enter a valid email address');
 
 export default function AdminInvitations() {
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateVendorOpen, setIsCreateVendorOpen] = useState(false);
+  const [cvEmail, setCvEmail] = useState('');
+  const [cvVendorName, setCvVendorName] = useState('');
+  const [cvPhone, setCvPhone] = useState('');
+  const [cvEmailError, setCvEmailError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [vendorName, setVendorName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
