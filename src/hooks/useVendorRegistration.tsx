@@ -567,6 +567,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         isMsmeRegistered: vendor.is_msme_registered ?? false,
         msmeNumber: vendor.msme_number || '',
         msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
+        msmeEnterpriseName: (vendor as VendorRecord & { msme_enterprise_name?: string }).msme_enterprise_name || '',
+        msmeMajorActivity: (vendor as VendorRecord & { msme_major_activity?: string }).msme_major_activity || '',
         labourPermitNo: vendor.labour_permit_no || '',
         iecNo: vendor.iec_no || '',
         swiftIbanCode: (vendor as VendorRecord & { swift_iban_code?: string }).swift_iban_code || '',
