@@ -1,42 +1,65 @@
-# Pre-flight Check: Buyer SCM + Approval Matrix Before Creating Invitation
+## Root cause
 
-## Goal
-Before any vendor invitation is created — both via the **New Invitation** dialog (email send) and the **Create Vendor** button (on-behalf flow) — verify that the selected Company/Tenant has:
+For this vendor (`AVYAKTH`), SAP shows the BP created but with no email and no bank account holder. The reason is in the active SAP payload template + the client-side payload builder:
 
-1. A **Buyer → SCM mapping** for the current buyer (`buyer_scm_mappings` row where `tenant_id = <selected>` AND `buyer_user_id = auth.uid()`), **and**
-2. At least one active **Approval Matrix level** with approvers configured (`approval_matrix_levels` where `tenant_id = <selected>` AND `is_active = true`, joined to `approval_matrix_approvers`).
+| SAP field | Template source | Vendor value sent |
+|---|---|---|
+| `smtp_addr` | `vendor.primary_email` | `""` (empty) |
+| `mob_number` | `vendor.primary_phone` | `""` (empty) |
+| `tel_number` | `vendor.registered_phone` | OK |
+| `accountholder` | `vendor.account_holder_name` | `null` → `""` |
+| `bankaccountname` | `vendor.account_holder_name` | `null` → `""` |
+| `bank_acct` | `vendor.account_number` | OK |
+| `bank_key` | `vendor.ifsc_code` | OK |
 
-If either is missing → show a destructive toast and **abort**. If both are present → proceed exactly as today (dialog opens / form navigation happens / invitation row is inserted / routing through `seed_vendor_approval_progress` runs unchanged after submission).
+The vendor record actually has the data, just under different columns:
+- `primary_email=""` but `registered_email="sureshkumar.b@sharviinfotech.com"` and `branch_email` populated
+- `primary_phone=""` but `registered_contact_1="9618888996"` populated
+- `account_holder_name=null` but `legal_name="AVYAKTH"` exists (SAP uses NAME1 as holder when blank, so the line stays empty)
 
-Super admins (`sharvi_admin`, `admin`) and customer admins are also subject to the check — the requirement is that the tenant be properly configured before any vendor onboarding starts, regardless of who clicks the button.
+So although the payload structurally contains `smtp_addr` / `accountholder` keys, the values resolve to empty strings, and SAP correctly stores nothing for those fields. No SAP integration call shape is changing — we only fix the value resolution.
 
-## Changes (single file)
+## Changes (scoped to SAP sync; no other functionality touched)
 
-### `src/pages/AdminInvitations.tsx`
+### 1. `supabase/functions/sync-vendor-to-sap/index.ts` — resolver helpers
 
-1. **Add a shared async preflight helper** `checkTenantOnboardingReadiness(tenantId, buyerUserId)` that runs two parallel `supabase` reads:
-   - `buyer_scm_mappings.select('id', { head:true, count:'exact' }).eq('tenant_id', tenantId).eq('buyer_user_id', buyerUserId)`
-   - `approval_matrix_levels.select('id, approval_matrix_approvers!inner(id)', { head:true, count:'exact' }).eq('tenant_id', tenantId).eq('is_active', true)`
-   Returns `{ ok: boolean, missing: ('buyer_scm' | 'approval_matrix')[] }`.
+Extend `resolveExpr` (or add small named helpers in the same pattern as `vendor.trade_name_first_word`) to support three fallback expressions:
 
-2. **Wire it into the "Create Vendor" button (line 569)**:
-   - Replace the inline `onClick={() => navigate('/vendor/registration?onBehalf=1')}` with a handler that:
-     - Validates `effectiveTenantId` and `user?.id` (same guards used by `handleCreateVendorOnBehalf`).
-     - Calls `checkTenantOnboardingReadiness`. If `!ok`, show a single destructive toast listing what's missing (e.g. *"Cannot create vendor: Buyer–SCM mapping and Approval Matrix are not configured for <Tenant Name>. Please configure them in User Management → Buyer-SCM Mapping and Settings → Approval Matrix before inviting vendors."*) and return.
-     - Otherwise call `navigate('/vendor/registration?onBehalf=1')` (unchanged behavior).
-   - Use a small `useState` `isCheckingReadiness` to disable the button while the two reads are in flight.
+- `vendor.primary_email_or_fallback` → first non-empty of `primary_email`, `registered_email`, `branch_email`, `manufacturing_email`
+- `vendor.primary_phone_or_fallback` → first non-empty of `primary_phone`, `registered_contact_1`, `registered_phone`
+- `vendor.account_holder_or_legal` → first non-empty of `account_holder_name`, `legal_name`
 
-3. **Wire it into `handleCreateInvitation`** (line 453) just after the existing `effectiveTenantId` guard at line 465–474 and before `createInvitation.mutate(...)` on line 476:
-   - Same preflight call; same toast on failure; abort before mutate.
+These remain inside the same template-resolver design; no schema or RFC contract change.
 
-4. **No change** to the legacy `handleCreateVendorOnBehalf` dialog flow (still unused after previous turn) — to keep this PR focused.
+### 2. `supabase/functions/sync-vendor-to-sap/index.ts` — `DEFAULT_SAP_PAYLOAD_TEMPLATE`
 
-## Preserved / Out of scope
-- The actual approval routing after submission is **already correct** — `seed_vendor_approval_progress` reads `buyer_scm_mappings` and `approval_matrix_levels` for the vendor's tenant and assembles the chain (BUYER → SCM_MANAGER → SCM_HEAD → FINANCE_1/2 → CEO_OFFICE). No DB or edge-function changes are needed.
-- No new tables, RLS policies, or migrations.
-- No changes to the Vendor Registration Form, the on-behalf bootstrap effect, or other pages.
+Update the built-in fallback template (used when no DB row exists) so it references the new keys:
 
-## Edge cases
-- **Tenant just changed in the header dropdown** — preflight runs against the current `effectiveTenantId`, so it always matches what will actually be persisted on the invitation row.
-- **Network/query error during preflight** — treated as failure with a generic destructive toast ("Could not verify tenant configuration. Please try again."); does not silently fall through and create an unroutable invitation.
-- **Buyer has a mapping but the mapped Approval Matrix is empty (no approvers)** — the inner-join on `approval_matrix_approvers` covers this, so we correctly reject.
+- top-level `smtp_addr` and `vendors[0].smtp_addr` → `{{vendor.primary_email_or_fallback|trunc:241}}`
+- top-level `mob_number` and `vendors[0].mob_number` → `{{vendor.primary_phone_or_fallback|trunc:30}}`
+- `accountholder` and `bankaccountname` → `{{vendor.account_holder_or_legal|trunc:60}}`
+
+### 3. `src/lib/sapDefaultTemplate.ts` — keep client preview in sync
+
+Mirror the same three substitutions so the client-side preview / fallback template matches what the edge function sends. International branch (intl bank, intl email) is untouched.
+
+### 4. `src/lib/sapPayloadBuilder.ts` — client resolver
+
+Add the same three helpers in `resolveExpr` (mirroring the existing `vendor.trade_name_first_word` helper) so when the client preview / submission resolves the template, the values are populated. No change to international handling.
+
+### 5. Active DB template (`sap_payload_templates`)
+
+Run a one-time data update (via the insert tool) on the single active row to replace these three placeholders so existing tenants get the fix without re-publishing the template:
+
+- `smtp_addr` (top + nested) → `{{vendor.primary_email_or_fallback|trunc:241}}`
+- `mob_number` (top + nested) → `{{vendor.primary_phone_or_fallback|trunc:30}}`
+- `accountholder`, `bankaccountname` → `{{vendor.account_holder_or_legal|trunc:60}}`
+
+## Out of scope (will not touch)
+
+- SAP endpoint, auth, middleware, payload shape, CLASSIFY/UPLOAD logic, region resolver, DMS sync, approval workflow, vendor schema.
+- Bank `BRANCH_NAME` / `BANK_NAME` / `BANK_ADDRESS` keys — current SAP template does not declare them and adding new keys could be rejected by the SAP RFC. If you want those persisted too, confirm the exact SAP key names (e.g. `banka`, `stras`, `brnch`) and I'll wire them in a follow-up.
+
+## Verification
+
+After the fix, re-trigger SAP sync for vendor `9943cbcf-…` and confirm the request payload (visible in `sync-vendor-to-sap` edge logs) shows non-empty `smtp_addr`, `mob_number`, `accountholder`, `bankaccountname`, and that SAP's BP record stores them.
