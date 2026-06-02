@@ -1610,6 +1610,10 @@ export function DocumentVerificationStep({
     }
     out.isMsmeRegistered = isMsmeRegistered ?? false;
     if (isMsmeRegistered && msmeDoc.status === "verified" && msmeDoc.ocrData) {
+      const msmeAddrLine = [msmeDoc.ocrData.flat, msmeDoc.ocrData.name_of_building, msmeDoc.ocrData.road, msmeDoc.ocrData.village, msmeDoc.ocrData.block]
+        .map((v: any) => (v == null ? "" : String(v).trim()))
+        .filter((v: string) => v && v !== "-")
+        .join(", ");
       out.msme = {
         udyamNumber: msmeDoc.ocrData.udyam_number,
         enterpriseName: msmeDoc.ocrData.enterprise_name,
@@ -1617,6 +1621,14 @@ export function DocumentVerificationStep({
         majorActivity: msmeDoc.ocrData.major_activity,
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
+        addressParts: (msmeDoc.ocrData.city || msmeDoc.ocrData.state || msmeDoc.ocrData.pin_code || msmeAddrLine || msmeDoc.ocrData.office_address)
+          ? {
+              address: msmeAddrLine || msmeDoc.ocrData.office_address || undefined,
+              city: msmeDoc.ocrData.city || msmeDoc.ocrData.district || undefined,
+              state: msmeDoc.ocrData.state || undefined,
+              pincode: msmeDoc.ocrData.pin_code || undefined,
+            }
+          : undefined,
       };
     } else if (isMsmeRegistered === false) {
       out.msmeDeclarationReason = msmeDeclarationReason;
