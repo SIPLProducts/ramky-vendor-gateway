@@ -124,16 +124,6 @@ Deno.serve(async (req) => {
         status: 'rejected', acted_by: userId, acted_at: nowIso, comments,
       }).eq('id', progress_id);
 
-      // 2) Find the immediate previous level in this vendor's chain.
-      const { data: chain } = await admin
-        .from('vendor_approval_progress')
-        .select('id, level_id, level_number, status')
-        .eq('vendor_id', progress.vendor_id);
-      const prev = (chain ?? [])
-        .filter((r: any) => (r.level_number ?? 0) < (progress.level_number ?? 0))
-        .sort((a: any, b: any) => (b.level_number ?? 0) - (a.level_number ?? 0))[0];
-
-      // 3) Always mirror the latest rejection on the vendor for banners.
       const vendorRejectionPatch: Record<string, unknown> = {
         last_rejection_comments: comments ?? null,
         last_rejection_stage: curStage,
@@ -141,14 +131,68 @@ Deno.serve(async (req) => {
         last_rejected_at: nowIso,
       };
 
+      // BUYER reject → return application to the vendor for edit & resubmit.
+      if (isBuyerRow) {
+        await admin.from('vendors')
+          .update({ status: 'returned_to_vendor', ...vendorRejectionPatch })
+          .eq('id', progress.vendor_id);
+
+        await admin.from('audit_logs').insert({
+          action: 'vendor_buyer_rejected',
+          user_id: userId,
+          vendor_id: progress.vendor_id,
+          details: { comments },
+        });
+
+        // Best-effort vendor notification.
+        try {
+          const { data: vendorRow } = await admin
+            .from('vendors')
+            .select('legal_name, primary_email, registered_email')
+            .eq('id', progress.vendor_id).single();
+          const vendorEmail = vendorRow?.primary_email || vendorRow?.registered_email;
+          if (vendorEmail) {
+            await admin.functions.invoke('send-status-notification', {
+              body: {
+                vendorId: progress.vendor_id,
+                newStatus: 'returned_to_vendor',
+                previousStatus: 'buyer_review',
+                vendorEmail,
+                vendorName: vendorRow?.legal_name ?? 'Vendor',
+                comments: comments ?? '',
+                simulationMode: false,
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('send-status-notification failed', e);
+        }
+
+        return new Response(JSON.stringify({ ok: true, vendor_status: 'returned_to_vendor' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // 2) Find the immediate previous level in this vendor's chain.
+      const { data: chain } = await admin
+        .from('vendor_approval_progress')
+        .select('id, level_id, level_number, status, stage')
+        .eq('vendor_id', progress.vendor_id);
+      const prev = (chain ?? [])
+        .filter((r: any) => (r.level_number ?? 0) < (progress.level_number ?? 0))
+        .sort((a: any, b: any) => (b.level_number ?? 0) - (a.level_number ?? 0))[0];
+
       if (prev) {
         // Reopen the previous step and carry the remarks so that approver
         // immediately sees why it bounced back.
-        const { data: prevLvl } = await admin
-          .from('approval_matrix_levels')
-          .select('stage').eq('id', prev.level_id).single();
-        const prevStage = prevLvl?.stage ?? 'SCM_MANAGER';
-        const reviewStatus = STAGE_TO_REVIEW[prevStage] ?? 'scm_manager_review';
+        let prevStage = prev.stage as string | null;
+        if (!prevStage && prev.level_id) {
+          const { data: prevLvl } = await admin
+            .from('approval_matrix_levels')
+            .select('stage').eq('id', prev.level_id).single();
+          prevStage = prevLvl?.stage ?? 'SCM_MANAGER';
+        }
+        const reviewStatus = STAGE_TO_REVIEW[prevStage ?? 'SCM_MANAGER'] ?? 'scm_manager_review';
 
         await admin.from('vendor_approval_progress').update({
           status: 'pending',
