@@ -556,7 +556,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {activeStageLevels.map((n) => (
-                              <SelectItem key={n} value={String(n)}>L{n}</SelectItem>
+                              <SelectItem key={n} value={String(n)}>{formatStageLevel(r.stage, n)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
