@@ -13,6 +13,7 @@ export type ApprovalStage =
  */
 export function formatStageLevel(stage: ApprovalStage | string, n: number): string {
   if (stage === 'SCM_MANAGER') return `SCM CO${n}`;
+  if (stage === 'SCM_HEAD') return 'SCM Head';
   return `L${n}`;
 }
 
