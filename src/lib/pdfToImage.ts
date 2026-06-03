@@ -11,10 +11,17 @@
 // - Anything else: throws a clear error.
 
 import * as pdfjsLib from "pdfjs-dist";
-// @ts-ignore - vite worker url import
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+// Vite bundles pdf.js worker as a proper module worker. This avoids the
+// runtime dynamic import() of `pdf.worker.min.mjs` that fails on some
+// self-hosted Nginx setups (MIME / module-script handling over plain HTTP).
+// @ts-ignore - vite worker import
+import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+try {
+  (pdfjsLib as any).GlobalWorkerOptions.workerPort = new PdfWorker();
+} catch (e) {
+  console.warn("[pdfToImage] failed to instantiate pdf.js worker", e);
+}
 
 // OCR-safe limits. Surepass (and most KYC providers) reject very large or
 // very tall images. Keep each page <= ~2200px on its longest edge, and the
@@ -177,7 +184,6 @@ export async function normalizeUploadToImage(
   try {
     pdf = await (pdfjsLib as any).getDocument({
       data: buf,
-      disableWorker: true,
       isEvalSupported: false,
       useSystemFonts: true,
     }).promise;
