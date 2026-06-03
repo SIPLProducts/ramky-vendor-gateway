@@ -93,23 +93,35 @@ if [[ $SKIP_FE -eq 0 ]]; then
 fi
 
 # ---------- 4. Re-seed approval progress for stuck submitted vendors ----------
-echo ">> Re-seeding approval progress for any submitted vendors missing rows"
+# Heals (a) vendors in *_review with no progress rows, and (b) vendors in
+# *_review with a buyer invitation but no BUYER stage row (created by the
+# old pre-BUYER-stage seed function). seed_vendor_approval_progress() does
+# DELETE+INSERT, so re-running it on case (b) safely rebuilds the chain
+# starting with the BUYER row so the buyer screen shows the vendor.
+echo ">> Re-seeding approval progress for stuck submitted vendors"
 docker compose -f "$COMPOSE_FILE" exec -T db \
   psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
-DECLARE
-  v record;
+DECLARE v record;
 BEGIN
   FOR v IN
-    SELECT id
-    FROM public.vendors
-    WHERE status::text IN (
+    SELECT ven.id
+    FROM public.vendors ven
+    WHERE ven.status::text IN (
       'buyer_review','scm_manager_review','scm_head_review',
       'finance_1_review','finance_2_review','ceo_office_review'
     )
-      AND NOT EXISTS (
-        SELECT 1 FROM public.vendor_approval_progress p
-        WHERE p.vendor_id = vendors.id
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM public.vendor_approval_progress p WHERE p.vendor_id = ven.id
+        )
+        OR (
+          EXISTS (SELECT 1 FROM public.vendor_invitations vi WHERE vi.vendor_id = ven.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM public.vendor_approval_progress p
+            WHERE p.vendor_id = ven.id AND p.stage = 'BUYER'
+          )
+        )
       )
   LOOP
     PERFORM public.seed_vendor_approval_progress(v.id);
