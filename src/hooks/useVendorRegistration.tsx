@@ -1108,7 +1108,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // into the approval workflow (start of chain) so the DB trigger reseeds
       // vendor_approval_progress and approvers see the updated submission.
       const wasReturned = vendorStatus === 'returned_to_vendor';
-      const nextStatus = wasReturned ? 'scm_manager_review' : 'validation_pending';
+      // After a return-to-vendor cycle, restart the approval chain from the
+      // very first stage. We set validation_pending here and explicitly
+      // invoke route-vendor-approval below to reseed vendor_approval_progress
+      // from scratch.
+      const nextStatus = 'validation_pending';
 
       const vendorData = {
         ...formDataToVendorRecord(formData, userId),
@@ -1145,6 +1149,19 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           invitation_token: options?.invitationToken || null,
         },
       });
+
+      // Reseed the approval chain from the first stage when resubmitting
+      // after a return-to-vendor cycle. route-vendor-approval calls the
+      // SECURITY DEFINER seed function which deletes existing progress rows
+      // and rebuilds the chain from level 1.
+      if (wasReturned) {
+        try {
+          await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendorId } });
+        } catch (e) {
+          console.error('[Vendor] route-vendor-approval (resubmit) failed:', e);
+        }
+      }
+
 
       // Notify the inviter that the vendor has resubmitted (best-effort)
       let notifyResult: any = null;
