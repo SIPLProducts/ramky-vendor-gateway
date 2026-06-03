@@ -1150,6 +1150,19 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         },
       });
 
+      // Reseed the approval chain from the first stage when resubmitting
+      // after a return-to-vendor cycle. route-vendor-approval calls the
+      // SECURITY DEFINER seed function which deletes existing progress rows
+      // and rebuilds the chain from level 1.
+      if (wasReturned) {
+        try {
+          await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendorId } });
+        } catch (e) {
+          console.error('[Vendor] route-vendor-approval (resubmit) failed:', e);
+        }
+      }
+
+
       // Notify the inviter that the vendor has resubmitted (best-effort)
       let notifyResult: any = null;
       try {
