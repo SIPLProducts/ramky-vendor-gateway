@@ -761,7 +761,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
               return groupsForStage.map((g) => (
                 <span key={`${stage}-${g.level_number}`} className="flex items-center gap-2">
                   <Badge>
-                    {formatStageLevel(g.stage, g.stage_level)} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
+                    {(() => { const lbl = formatStageLevel(g.stage, g.stage_level); const stg = STAGE_LABELS[g.stage]; return lbl === stg ? stg : `${lbl} · ${stg}`; })()} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
                     {isCeo ? ' (MSME only)' : ''}
                   </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
