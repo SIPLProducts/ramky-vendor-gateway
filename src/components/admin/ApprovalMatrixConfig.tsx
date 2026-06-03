@@ -749,7 +749,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
                 return [(
                   <span key={stage} className="flex items-center gap-2">
                     <Badge variant="outline" className="opacity-50">
-                      {STAGE_LABELS[stage]} · not configured{isCeo ? ' (MSME only)' : ''}
+                      {STAGE_LABELS[stage]} · not configured
                     </Badge>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </span>
@@ -758,7 +758,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
               return groupsForStage.map((g) => (
                 <span key={`${stage}-${g.level_number}`} className="flex items-center gap-2">
                   <Badge>
-                    {formatStageLevel(g.stage, g.stage_level)}{isCeo ? ' (MSME only)' : ''}
+                    {formatStageLevel(g.stage, g.stage_level)}
                   </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </span>
