@@ -1,47 +1,40 @@
-## Root cause
+## Fix PDF worker load failure on self-hosted server
 
-The browser sends a PATCH to `/rest/v1/vendors` that includes `msme_enterprise_name` (and `msme_major_activity`). PostgREST on the self-hosted server replies with `PGRST204 — Could not find the 'msme_enterprise_name' column of 'vendors' in the schema cache`.
+### Problem
+On `http://10.200.1.7`, PDF-to-image conversion fails with:
+> Setting up fake worker failed: Failed to fetch dynamically imported module: /assets/pdf.worker.min-BZ_6UHJF.mjs
 
-These two columns were added in cloud by migration `supabase/migrations/20260602093746_ed6aee96-460b-44da-b30b-aa308435bd91.sql`:
+Even with `disableWorker: true`, pdf.js v4 still does a runtime `import(workerSrc)` of the `.mjs` chunk. Over plain HTTP behind Nginx, that dynamic import is failing (MIME / module-script handling), so `getDocument` throws before any page is rendered.
 
+### Fix (single file)
+`src/lib/pdfToImage.ts` — swap the `?url` worker import for Vite's `?worker` import, and let pdf.js use it via `workerPort`. This makes Vite emit the worker as a proper module worker that Nginx serves as a normal static asset, bypassing the failing dynamic `import()`.
+
+```ts
+import * as pdfjsLib from "pdfjs-dist";
+// Vite bundles pdf.js worker and gives us a Worker constructor.
+import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
+
+(pdfjsLib as any).GlobalWorkerOptions.workerPort = new PdfWorker();
 ```
-ALTER TABLE public.vendors
-  ADD COLUMN IF NOT EXISTS msme_enterprise_name text,
-  ADD COLUMN IF NOT EXISTS msme_major_activity text;
-```
 
-On the self-hosted box one of two things is true:
-1. The deploy script (`scripts/lib/30-migrations.sh`) was not re-run after that migration was added, so the columns do not exist on the self-host Postgres; **or**
-2. The columns exist but PostgREST's schema cache was never reloaded, so it still rejects the field.
+In `getDocument(...)`:
+- Remove `disableWorker: true`
+- Keep `isEvalSupported: false` and `useSystemFonts: true`
+- Keep the existing try/catch that falls back to sending the original PDF to the OCR provider if `getDocument` ever throws.
 
-Either way, the cure is the same: re-run migrations on the self-host AND tell PostgREST to refresh its schema cache. Nothing in the frontend is wrong — the column is legitimately part of the schema.
+Everything else in the file stays exactly the same (page rendering, fit/stitch, JPEG encoding, image/DOCX/TXT branches, logging, exports).
 
-## Fix (no behaviour changes)
+### Out of scope (unchanged)
+- OCR pipeline, KYC API calls, verification flow
+- `OcrUploadAndVerify`, FileUpload, vendor steps
+- Nginx config, build scripts, `vite.config.ts`
+- Edge functions, DB, RLS, business logic
 
-1. **Add a new idempotent migration** `supabase/migrations/20260603<ts>_ensure_msme_columns_and_reload.sql` that:
-   - Re-asserts both columns with `ADD COLUMN IF NOT EXISTS` (safe no-op on cloud, fixes self-host if step 1 was skipped).
-   - Issues `NOTIFY pgrst, 'reload schema';` so PostgREST picks the columns up immediately without restarting the stack.
+### Deploy
+Rebuild and redeploy the frontend on the self-hosted server (no backend/migration work needed).
 
-   This is purely additive — no data touched, no RLS / GRANT changes, no other tables affected.
-
-2. **Self-host action** the user runs once on the VM (documented in the chat reply, not a code change):
-   - Re-run the deploy script (or just `bash scripts/lib/30-migrations.sh`) so the new migration is applied.
-   - Equivalent manual one-liner if they don't want to redeploy:
-     ```
-     docker compose -f <backend>/docker-compose.yml exec -T db \
-       psql -U postgres -d postgres -c \
-       "ALTER TABLE public.vendors
-          ADD COLUMN IF NOT EXISTS msme_enterprise_name text,
-          ADD COLUMN IF NOT EXISTS msme_major_activity text;
-        NOTIFY pgrst, 'reload schema';"
-     ```
-
-## Out of scope
-
-- No frontend changes — the PATCH payload is correct.
-- No edge function, RLS, GRANT, or other schema changes.
-- No cloud impact (migration is idempotent; cloud already has these columns).
-
-## Verification
-
-After running migrations on self-host, reload the Vendor Registration page and click Continue to PAN / MSME — the PATCH to `/rest/v1/vendors` should return `204` instead of `400 PGRST204`, and the "Error Saving Data" toast should disappear.
+### Verification
+1. Open MSME / PAN step on `http://10.200.1.7`, upload a PDF.
+2. Console: no "Setting up fake worker failed" error; `[pdfToImage] pdf(Npg)→jpeg` log appears.
+3. OCR runs and verification proceeds.
+4. JPG / PNG / DOCX / TXT uploads still convert and submit as before.
