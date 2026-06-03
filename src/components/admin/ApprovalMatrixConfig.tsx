@@ -361,7 +361,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
         const levelPayload: any = {
           tenant_id: tenantId,
           level_number: grp.level_number,
-          level_name: (() => { const lbl = formatStageLevel(grp.stage, grp.stage_level); const stg = STAGE_LABELS[grp.stage]; return lbl === stg ? stg : `${lbl} · ${stg}`; })(),
+          level_name: formatStageLevel(grp.stage, grp.stage_level),
           designation: null,
           approval_mode: grp.approval_mode,
           stage: grp.stage,
