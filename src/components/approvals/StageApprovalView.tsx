@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+import { formatStageLevel, parseLevelOrdinal } from '@/lib/approvalLabels';
 
 interface Props {
   stage: ApprovalStage;
