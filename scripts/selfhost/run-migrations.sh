@@ -63,10 +63,13 @@ CREATE TABLE IF NOT EXISTS public._vms_migrations (
 );
 SQL
 
-# ---- 2. Ownership / search_path repair for update_updated_at_column ----
-# Re-create as the migration role so subsequent CREATE OR REPLACE succeeds.
-echo ">> Repairing public.update_updated_at_column ownership"
+# ---- 2. Ownership / search_path repair for shared helper functions ----
+# Re-own functions originally created by `postgres` so subsequent
+# CREATE OR REPLACE statements in migrations (run as supabase_admin) succeed.
+echo ">> Repairing public helper function ownership"
 "${PSQL[@]}" <<'SQL'
+GRANT USAGE, CREATE ON SCHEMA public TO supabase_admin;
+
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -78,8 +81,18 @@ BEGIN
   RETURN NEW;
 END;
 $$;
--- Make sure the migration role owns it from now on.
-ALTER FUNCTION public.update_updated_at_column() OWNER TO supabase_admin;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+             WHERE n.nspname='public' AND p.proname='update_updated_at_column') THEN
+    EXECUTE 'ALTER FUNCTION public.update_updated_at_column() OWNER TO supabase_admin';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+             WHERE n.nspname='public' AND p.proname='handle_new_user') THEN
+    EXECUTE 'ALTER FUNCTION public.handle_new_user() OWNER TO supabase_admin';
+  END IF;
+END $$;
 SQL
 
 # ---- 3. Apply migrations in sorted order ----
