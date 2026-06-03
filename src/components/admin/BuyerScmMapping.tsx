@@ -18,7 +18,6 @@ interface MappingRow {
   buyer_user_id: string;
   scm_manager_user_id: string;
   include_scm_stages: boolean;
-  skip_buyer_stage?: boolean;
   created_at: string;
   buyer?: UserOpt;
   scm?: UserOpt;
@@ -198,17 +197,6 @@ export function BuyerScmMapping({ tenantId }: Props) {
     }
   };
 
-  const handleToggleSkipBuyer = async (id: string, next: boolean) => {
-    setMappings((prev) => prev.map((m) => (m.id === id ? { ...m, skip_buyer_stage: next } : m)));
-    const { error } = await supabase
-      .from('buyer_scm_mappings')
-      .update({ skip_buyer_stage: next } as any)
-      .eq('id', id);
-    if (error) {
-      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
-      await loadData();
-    }
-  };
 
 
   const label = (u?: UserOpt) => (u ? (u.full_name || u.email) : '—');
@@ -292,7 +280,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                   <TableHead>SCM Manager</TableHead>
                   <TableHead>Buyer</TableHead>
                   <TableHead className="w-56">Include SCM in flow</TableHead>
-                  <TableHead className="w-56">Skip Buyer Approval</TableHead>
+                  
                   <TableHead>Created</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -310,17 +298,6 @@ export function BuyerScmMapping({ tenantId }: Props) {
                         />
                         <span className="text-xs text-muted-foreground">
                           {m.include_scm_stages ? 'With SCM' : 'Skip SCM → Finance 1'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={!!m.skip_buyer_stage}
-                          onCheckedChange={(v) => handleToggleSkipBuyer(m.id, v)}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {m.skip_buyer_stage ? 'Skip buyer' : 'Buyer approves first'}
                         </span>
                       </div>
                     </TableCell>
