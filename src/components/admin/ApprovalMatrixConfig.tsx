@@ -23,6 +23,7 @@ import { Plus, Save, Trash2, ArrowRight, AlertTriangle, CheckCircle2, Database, 
 import { useToast } from '@/hooks/use-toast';
 import { useTenants, useTenantUserCounts } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
+import { formatStageLevel } from '@/lib/approvalLabels';
 
 type Stage = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
 
