@@ -1,13 +1,7 @@
-## Problem
-In the approval matrix config, the CEO Office stage displays "(MSME only)" more than once.
+Remove the helper sentence shown beneath the "Approvers by Stage" table.
 
-## Root Cause
-A leftover `· (MSME only)` suffix remains on line 765 of `src/components/admin/ApprovalMatrixConfig.tsx` inside the chain badge loop. Line 764 already appends `(MSME only)` for the CEO_OFFICE stage, so line 765 creates a duplicate.
+### Change
+- **`src/components/admin/ApprovalMatrixConfig.tsx`** (line 611) — Remove the helper text "Add multiple levels and multiple approvers per level. SCM Manager levels are labelled SCM CO1, SCM CO2, SCM CO3…; other stages use L1, L2, L3…. Lower level acts first within this stage." The surrounding container and the "+ Add Level" / "+ Add Approver" buttons remain unchanged.
 
-## Fix
-In `src/components/admin/ApprovalMatrixConfig.tsx`, remove the duplicate `(MSME only)` suffix on the CEO Office chain badge (line 765).
-
-## Out of Scope
-- No database migrations
-- No edge function changes
-- No other approval matrix logic changes
+### Out of scope
+No logic, workflow, routing, or other UI changes.
