@@ -184,7 +184,6 @@ export async function normalizeUploadToImage(
   try {
     pdf = await (pdfjsLib as any).getDocument({
       data: buf,
-      disableWorker: true,
       isEvalSupported: false,
       useSystemFonts: true,
     }).promise;
