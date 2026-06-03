@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+import { formatStageLevel, parseLevelOrdinal } from '@/lib/approvalLabels';
 
 interface Props {
   stage: ApprovalStage;
@@ -131,7 +132,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
                     )}
                   </TableCell>
-                  <TableCell><Badge variant="outline">{it.levelName}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{(() => { const n = parseLevelOrdinal(it.levelName); return n != null ? formatStageLevel(stage, n) : it.levelName; })()}</Badge></TableCell>
                   <TableCell>
                     {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
                   </TableCell>

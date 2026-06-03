@@ -23,6 +23,7 @@ import { Plus, Save, Trash2, ArrowRight, AlertTriangle, CheckCircle2, Database, 
 import { useToast } from '@/hooks/use-toast';
 import { useTenants, useTenantUserCounts } from '@/hooks/useTenant';
 import { cn } from '@/lib/utils';
+import { formatStageLevel } from '@/lib/approvalLabels';
 
 type Stage = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
 
@@ -360,7 +361,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
         const levelPayload: any = {
           tenant_id: tenantId,
           level_number: grp.level_number,
-          level_name: `Level ${grp.level_number} · ${STAGE_LABELS[grp.stage]}`,
+          level_name: `${formatStageLevel(grp.stage, grp.stage_level)} · ${STAGE_LABELS[grp.stage]}`,
           designation: null,
           approval_mode: grp.approval_mode,
           stage: grp.stage,
@@ -555,7 +556,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {activeStageLevels.map((n) => (
-                              <SelectItem key={n} value={String(n)}>L{n}</SelectItem>
+                              <SelectItem key={n} value={String(n)}>{formatStageLevel(r.stage, n)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -607,7 +608,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
         </Table>
         <div className="flex items-center justify-between p-3 border-t bg-muted/20">
           <div className="text-xs text-muted-foreground">
-            Add multiple levels (L1, L2, L3…) and multiple approvers per level. Lower level acts first within this stage.
+            Add multiple levels and multiple approvers per level. SCM Manager levels are labelled SCM CO1, SCM CO2, SCM CO3…; other stages use L1, L2, L3…. Lower level acts first within this stage.
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={addLevel}>
@@ -760,7 +761,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
               return groupsForStage.map((g) => (
                 <span key={`${stage}-${g.level_number}`} className="flex items-center gap-2">
                   <Badge>
-                    L{g.stage_level} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
+                    {formatStageLevel(g.stage, g.stage_level)} · {STAGE_LABELS[g.stage]} · {g.rows.length} approver{g.rows.length > 1 ? 's' : ''}
                     {isCeo ? ' (MSME only)' : ''}
                   </Badge>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />

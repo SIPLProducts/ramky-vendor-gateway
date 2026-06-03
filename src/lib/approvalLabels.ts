@@ -1,0 +1,27 @@
+export type ApprovalStage =
+  | 'BUYER'
+  | 'SCM_MANAGER'
+  | 'SCM_HEAD'
+  | 'FINANCE_1'
+  | 'FINANCE_2'
+  | 'CEO_OFFICE';
+
+/**
+ * Display label for a level within a stage.
+ * SCM Manager uses SCM CO1, SCM CO2, … per business rebrand.
+ * All other stages keep the generic L{n} label.
+ */
+export function formatStageLevel(stage: ApprovalStage | string, n: number): string {
+  if (stage === 'SCM_MANAGER') return `SCM CO${n}`;
+  return `L${n}`;
+}
+
+/** Parse a stored levelName like "L2 · ..." / "Level 2 · ..." / "SCM CO2 · ..." → 2 */
+export function parseLevelOrdinal(levelName: string | null | undefined): number | null {
+  if (!levelName) return null;
+  const m =
+    levelName.match(/^\s*SCM\s*CO\s*(\d+)/i) ||
+    levelName.match(/^\s*Level\s+(\d+)/i) ||
+    levelName.match(/^\s*L\s*(\d+)/i);
+  return m ? Number(m[1]) : null;
+}
