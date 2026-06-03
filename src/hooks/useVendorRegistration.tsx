@@ -1108,7 +1108,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // into the approval workflow (start of chain) so the DB trigger reseeds
       // vendor_approval_progress and approvers see the updated submission.
       const wasReturned = vendorStatus === 'returned_to_vendor';
-      const nextStatus = wasReturned ? 'scm_manager_review' : 'validation_pending';
+      // After a return-to-vendor cycle, restart the approval chain from the
+      // very first stage. We set validation_pending here and explicitly
+      // invoke route-vendor-approval below to reseed vendor_approval_progress
+      // from scratch.
+      const nextStatus = 'validation_pending';
 
       const vendorData = {
         ...formDataToVendorRecord(formData, userId),
