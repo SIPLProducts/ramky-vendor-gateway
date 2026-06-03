@@ -606,10 +606,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: ApprovalMatrixC
             )}
           </TableBody>
         </Table>
-        <div className="flex items-center justify-between p-3 border-t bg-muted/20">
-          <div className="text-xs text-muted-foreground">
-            Add multiple levels and multiple approvers per level. SCM Manager levels are labelled SCM CO1, SCM CO2, SCM CO3…; other stages use L1, L2, L3…. Lower level acts first within this stage.
-          </div>
+        <div className="flex items-center justify-end p-3 border-t bg-muted/20">
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={addLevel}>
               <Plus className="h-4 w-4 mr-1" /> Add Level
