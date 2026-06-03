@@ -1,66 +1,190 @@
-## Root cause
+The screenshot confirms the issue is in the self-host database data/migrations, not the UI.
 
-On the self-hosted server, the latest migrations that teach the approval engine about the **BUYER** stage (and the related `skip_buyer_stage` / `buyer_scm_mappings` columns) never applied successfully — earlier `update_updated_at_column` ownership error halted the runner, so everything after it was skipped.
+## What the screenshot means
 
-Evidence:
-- Screenshot 2 shows the vendor sitting at **SCM Manager Review** immediately after submission, with **no BUYER row** ever created. The current `seed_vendor_approval_progress()` in code always inserts a BUYER row at level 1 when an inviting buyer exists. The only way to land directly on SCM_MANAGER is the **old** version of this function (pre-BUYER-stage).
-- SCM Manager screen is also empty because `list-pending-approvals-by-stage` now filters SCM_MANAGER through `buyer_scm_mappings` — that table/columns also come from the un-applied migrations, so the filter returns zero.
-
-So: the function code on the self-host DB is stale, the helper table is missing/empty, and the buyer-stage rows are never seeded.
-
-## Fix plan
-
-### 1. Make the migration runner survive the ownership error
-Update `scripts/selfhost/run-migrations.sh` so that before applying any file it runs (as `supabase_admin`):
+Your query result shows:
 
 ```sql
-ALTER FUNCTION public.update_updated_at_column() OWNER TO supabase_admin;
-ALTER FUNCTION public.handle_new_user() OWNER TO supabase_admin;
-GRANT USAGE ON SCHEMA public TO supabase_admin;
+level_number | stage | status
+1            | NULL  | pending
+2            | NULL  | pending
+3            | NULL  | pending
+4            | NULL  | pending
 ```
 
-and connects with `-U supabase_admin -v ON_ERROR_STOP=1`. This unblocks the failing migration and lets the rest of the chain apply.
+This is why the vendor is not visible to Buyer:
 
-### 2. Re-run the full deploy
-`sudo bash scripts/selfhost/deploy-latest.sh` from the repo. With step 1 fixed, this will:
-- Apply all pending SQL migrations (including `BUYER` stage, `skip_buyer_stage`, `buyer_scm_mappings`, new `seed_vendor_approval_progress`).
-- Sync edge functions (`route-vendor-approval`, `list-pending-approvals-by-stage`, `process-approval-action`) into `backend/volumes/functions` and restart the `functions` container.
-- Rebuild + redeploy the frontend `dist/`.
-- Re-seed `vendor_approval_progress` for any vendor already stuck at `*_review` with no rows.
+- The Buyer approval screen only loads rows where `vendor_approval_progress.stage = 'BUYER'` and `status = 'pending'`.
+- On your self-host DB, all `stage` values are `NULL`.
+- That means the approval chain was created by the old approval logic or the latest BUYER-stage migration/function was not applied/re-run for this vendor.
+- The vendor status showing `SCM Manager Review` also matches this: the BUYER row was never created.
 
-### 3. Repair the one vendor already stuck (Ashish Shreevas)
-That vendor was seeded by the old function, so its chain starts at SCM_MANAGER with no BUYER row. After step 2 finishes, on the self-host DB run:
+## Immediate verification queries to run on self-host
+
+Run these in the SQL editor on `10.200.1.7`.
+
+### 1. Check whether the BUYER-stage migrations applied
 
 ```sql
-SELECT public.seed_vendor_approval_progress('5914bf9f-...'::uuid);
-UPDATE public.vendors SET status='buyer_review' WHERE id='5914bf9f-...';
+SELECT filename, applied_at
+FROM public._vms_migrations
+WHERE filename IN (
+  '20260602102818_fdf94cd7-9ad2-4caa-8092-c566459fea6f.sql',
+  '20260602115254_6c4b2d19-a882-4371-ac46-180c02f78c13.sql'
+)
+ORDER BY filename;
+```
+
+Expected: both rows should be present.
+
+### 2. Check required columns exist
+
+```sql
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'vendor_approval_progress'
+  AND column_name IN ('stage', 'level_id')
+ORDER BY column_name;
+
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'buyer_scm_mappings'
+  AND column_name IN ('skip_buyer_stage', 'include_scm_stages')
+ORDER BY column_name;
+
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'vendor_invitations'
+  AND column_name = 'created_on_behalf';
+```
+
+Expected:
+- `vendor_approval_progress.stage` exists
+- `vendor_approval_progress.level_id` allows `NULL`
+- `buyer_scm_mappings.skip_buyer_stage` exists
+- `vendor_invitations.created_on_behalf` exists
+
+### 3. Check the vendor invitation and buyer mapping
+
+```sql
+SELECT
+  v.id AS vendor_id,
+  v.status AS vendor_status,
+  v.tenant_id AS vendor_tenant_id,
+  vi.created_by AS buyer_user_id,
+  vi.tenant_id AS invite_tenant_id,
+  row_to_json(vi)->>'created_on_behalf' AS created_on_behalf,
+  m.scm_manager_user_id,
+  row_to_json(m)->>'skip_buyer_stage' AS skip_buyer_stage,
+  row_to_json(m)->>'include_scm_stages' AS include_scm_stages
+FROM public.vendors v
+LEFT JOIN public.vendor_invitations vi ON vi.vendor_id = v.id
+LEFT JOIN public.buyer_scm_mappings m
+  ON m.buyer_user_id = vi.created_by
+ AND m.tenant_id = COALESCE(vi.tenant_id, v.tenant_id)
+WHERE v.id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'
+ORDER BY vi.created_at DESC
+LIMIT 5;
+```
+
+Expected:
+- `buyer_user_id` should not be null
+- `scm_manager_user_id` should not be null
+- `skip_buyer_stage` should be `false` or null
+- If `created_on_behalf = true`, Buyer is auto-approved by design and the vendor goes directly to SCM Manager.
+
+### 4. Check actual approval chain with matrix fallback
+
+```sql
+SELECT
+  p.level_number,
+  p.stage AS raw_progress_stage,
+  l.stage AS matrix_stage,
+  COALESCE(p.stage, l.stage) AS resolved_stage,
+  p.status,
+  p.level_id
+FROM public.vendor_approval_progress p
+LEFT JOIN public.approval_matrix_levels l ON l.id = p.level_id
+WHERE p.vendor_id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'
+ORDER BY p.level_number;
+```
+
+Expected after repair:
+
+```text
+1 | BUYER       | pending
+2 | SCM_MANAGER | pending
+3 | ...         | pending
+```
+
+## Repair steps
+
+### Step 1: Run the fixed self-host deploy script
+
+From the latest repo checkout on the self-host server:
+
+```bash
+cd /opt/Ramky_Applications/DEV/VMS/<your-latest-repo-checkout>
+sudo cp scripts/selfhost/run-migrations.sh /opt/Ramky_Applications/DEV/VMS/run-migrations.sh
+sudo chmod +x /opt/Ramky_Applications/DEV/VMS/run-migrations.sh
+sudo bash scripts/selfhost/deploy-latest.sh
+```
+
+This applies the missing SQL migrations, syncs edge functions, deploys latest frontend `dist`, and re-seeds stuck approval chains.
+
+### Step 2: Manually re-seed this specific stuck vendor if still needed
+
+After Step 1 finishes, run:
+
+```sql
+SELECT *
+FROM public.seed_vendor_approval_progress('5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'::uuid);
+
 NOTIFY pgrst, 'reload schema';
 ```
 
-(deploy-latest.sh already loops this for every stuck vendor, but only for those with **zero** progress rows — this vendor has rows from the old seed, so we must delete-then-reseed; the function already does `DELETE FROM vendor_approval_progress WHERE vendor_id = _vendor_id` at the top, so a single RPC call is enough.)
-
-### 4. Verify
-On the self-host DB:
+Then check again:
 
 ```sql
--- a) latest migration is applied
-SELECT filename FROM public._vms_migrations ORDER BY filename DESC LIMIT 5;
-
--- b) BUYER row exists for the stuck vendor
-SELECT level_number, stage, status
+SELECT
+  level_number,
+  stage,
+  status,
+  level_id
 FROM public.vendor_approval_progress
-WHERE vendor_id='5914bf9f-...'
+WHERE vendor_id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'
 ORDER BY level_number;
 
--- c) buyer_scm_mappings has the buyer↔SCM link for this tenant
-SELECT * FROM public.buyer_scm_mappings WHERE tenant_id='<ramky tenant>';
+SELECT id, status
+FROM public.vendors
+WHERE id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69';
 ```
 
-Then refresh the Buyer Approval screen — the vendor should now appear there exactly like on `vms.siplproducts.com`. After buyer approves, it should move to the mapped SCM Manager.
+Expected:
 
-## Files to change
+```text
+level_number | stage       | status
+1            | BUYER       | pending
+2            | SCM_MANAGER | pending
+...
+```
 
-- `scripts/selfhost/run-migrations.sh` — connect as `supabase_admin`, re-own `update_updated_at_column()` / `handle_new_user()` before the loop, keep `ON_ERROR_STOP=1`, keep `_vms_migrations` tracking, end with `NOTIFY pgrst, 'reload schema'`.
-- `scripts/selfhost/deploy-latest.sh` — no logic change needed; relies on the fixed runner. (Optionally widen the re-seed loop to also reseed vendors whose **first** pending row is `SCM_MANAGER` while a buyer invitation exists, so vendors stuck by the old seed get healed automatically.)
+And vendor status should become:
 
-No application/UI code changes — the bug is purely on the self-host DB + functions sync.
+```text
+buyer_review
+```
+
+## If the BUYER row still does not appear
+
+Then one of these is true:
+
+1. The vendor has no row in `vendor_invitations`, so the system cannot identify the inviting buyer.
+2. `buyer_scm_mappings.skip_buyer_stage = true` for that buyer.
+3. `vendor_invitations.created_on_behalf = true`, so Buyer is auto-approved and the vendor correctly moves to SCM Manager.
+4. The latest `seed_vendor_approval_progress()` function is still not installed on self-host.
+
+The most important missing piece shown by your screenshot is: existing approval rows have `stage = NULL`; Buyer needs a pending row with `stage = 'BUYER'`.
