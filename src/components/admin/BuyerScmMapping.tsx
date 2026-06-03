@@ -280,7 +280,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                   <TableHead>SCM Manager</TableHead>
                   <TableHead>Buyer</TableHead>
                   <TableHead className="w-56">Include SCM in flow</TableHead>
-                  <TableHead className="w-56">Skip Buyer Approval</TableHead>
+                  
                   <TableHead>Created</TableHead>
                   <TableHead className="w-20 text-right">Actions</TableHead>
                 </TableRow>
@@ -298,17 +298,6 @@ export function BuyerScmMapping({ tenantId }: Props) {
                         />
                         <span className="text-xs text-muted-foreground">
                           {m.include_scm_stages ? 'With SCM' : 'Skip SCM → Finance 1'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={!!m.skip_buyer_stage}
-                          onCheckedChange={(v) => handleToggleSkipBuyer(m.id, v)}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {m.skip_buyer_stage ? 'Skip buyer' : 'Buyer approves first'}
                         </span>
                       </div>
                     </TableCell>
