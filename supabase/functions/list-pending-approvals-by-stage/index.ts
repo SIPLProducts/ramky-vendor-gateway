@@ -52,18 +52,25 @@ Deno.serve(async (req) => {
         .eq('status', 'pending')
         .in('vendor_id', buyerVendorIds);
       if (bpErr) throw bpErr;
-      if (!buyerProgress || buyerProgress.length === 0) {
-        return new Response(JSON.stringify({ items: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const vIds = buyerProgress.map((p: any) => p.vendor_id);
-      const { data: vendors } = await admin
+
+      // Also fetch rejected/returned-to-buyer vendors for this buyer.
+      const { data: rejectedVendors, error: rvErr } = await admin
         .from('vendors')
-        .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, tenant_id')
-        .in('id', vIds);
+        .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at')
+        .in('id', buyerVendorIds)
+        .eq('status', 'returned_to_buyer');
+      if (rvErr) throw rvErr;
+
+      const pendingVIds = (buyerProgress ?? []).map((p: any) => p.vendor_id);
+      const { data: vendors } = pendingVIds.length
+        ? await admin
+            .from('vendors')
+            .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, tenant_id')
+            .in('id', pendingVIds)
+        : { data: [] as any[] } as any;
       const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
-      const items = buyerProgress.map((p: any) => {
+
+      const pendingItems = (buyerProgress ?? []).map((p: any) => {
         const v: any = vMap.get(p.vendor_id);
         const isInternational = v?.vendor_type === 'international';
         return {
@@ -78,15 +85,39 @@ Deno.serve(async (req) => {
           approvalMode: 'ANY',
           stage: 'BUYER',
           blockedByPrevious: false,
+          kind: 'pending',
           rejectionComments: p.rejection_comments ?? null,
           rejectionFromStage: p.rejection_from_stage ?? null,
           rejectionAt: p.rejection_at ?? null,
         };
       });
-      return new Response(JSON.stringify({ items }), {
+
+      const rejectedItems = (rejectedVendors ?? []).map((v: any) => {
+        const isInternational = v?.vendor_type === 'international';
+        return {
+          progressId: null,
+          vendorId: v.id,
+          vendorName: v?.legal_name ?? v?.trade_name ?? v.id.slice(0, 8),
+          submittedAt: v?.submitted_at ?? null,
+          isMsme: isInternational ? false : !!v?.is_msme_registered,
+          isInternational,
+          levelNumber: 0,
+          levelName: 'Rejected',
+          approvalMode: 'ANY',
+          stage: 'BUYER',
+          blockedByPrevious: false,
+          kind: 'rejected',
+          rejectionComments: v?.last_rejection_comments ?? null,
+          rejectionFromStage: v?.last_rejection_stage ?? null,
+          rejectionAt: v?.last_rejected_at ?? null,
+        };
+      });
+
+      return new Response(JSON.stringify({ items: [...pendingItems, ...rejectedItems] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // 1. Find all approver rows for this user — by user_id OR by email.
     // Run as two clean queries instead of a fragile PostgREST .or() string,
