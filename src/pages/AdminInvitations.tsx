@@ -899,8 +899,6 @@ export default function AdminInvitations() {
                   </TableHeader>
                   <TableBody>
                     {paginatedInvitations.map((invitation) => {
-                      const linked = (invitation as any).linked_vendor;
-                      const isReturned = linked?.status === 'returned_to_buyer';
                       const isOnBehalf = !!(invitation as any).created_on_behalf;
                       const canResumeOnBehalf = isOnBehalf && !invitation.used_at;
                       return (
@@ -920,27 +918,6 @@ export default function AdminInvitations() {
                                 <UserPlus className="h-3 w-3" />
                                 On behalf
                               </Badge>
-                            </div>
-                          )}
-                          {isReturned && (
-                            <div className="mt-1 space-y-1">
-                              <Badge variant="destructive" className="gap-1">
-                                <XCircle className="h-3 w-3" />
-                                Returned to Buyer
-                              </Badge>
-                              {linked?.last_rejection_comments && (
-                                <div
-                                  className="text-xs text-amber-700 max-w-xs"
-                                  title={linked.last_rejection_comments}
-                                >
-                                  <strong>
-                                    {linked.last_rejection_stage
-                                      ? String(linked.last_rejection_stage).replace(/_/g, ' ')
-                                      : 'Approver'}:
-                                  </strong>{' '}
-                                  {linked.last_rejection_comments}
-                                </div>
-                              )}
                             </div>
                           )}
                         </TableCell>
@@ -963,20 +940,7 @@ export default function AdminInvitations() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {isReturned && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setReturnTarget(invitation);
-                                  setReturnRemarks('');
-                                }}
-                                className="gap-1"
-                              >
-                                <Send className="h-4 w-4" />
-                                Send to Vendor
-                              </Button>
-                            )}
+
                             {canResumeOnBehalf && (
                               <Button
                                 variant="default"
