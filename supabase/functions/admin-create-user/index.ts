@@ -35,7 +35,20 @@ Deno.serve(async (req) => {
       .from('user_roles').select('role').eq('user_id', callerId);
     if (roleErr) throw roleErr;
     const callerRoles = (roleRows ?? []).map((r) => r.role);
-    if (!callerRoles.includes('admin') && !callerRoles.includes('sharvi_admin')) {
+    const { data: customRoleRows } = await admin
+      .from('user_custom_roles')
+      .select('custom_roles(name, is_active)')
+      .eq('user_id', callerId);
+    const customRoleNames: string[] = (customRoleRows ?? [])
+      .map((r: any) => r?.custom_roles)
+      .filter((cr: any) => cr && cr.is_active)
+      .map((cr: any) => String(cr.name || '').toLowerCase());
+    const ADMIN_BUILTIN = ['admin', 'sharvi_admin', 'customer_admin'];
+    const ADMIN_CUSTOM = ['admin', 'sharvi admin', 'customer admin'];
+    const isAdmin =
+      callerRoles.some((r) => ADMIN_BUILTIN.includes(r)) ||
+      customRoleNames.some((n) => ADMIN_CUSTOM.includes(n));
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
