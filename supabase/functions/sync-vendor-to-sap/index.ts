@@ -601,6 +601,23 @@ serve(async (req) => {
             .maybeSingle();
           const buyerEmail = (buyer as any)?.email;
           const buyerName = (buyer as any)?.full_name || "Buyer";
+
+          // Buyer company (tenant) lookup for email content.
+          let tenantName: string | null = null;
+          let tenantCode: string | null = null;
+          if ((vendor as any)?.tenant_id) {
+            const { data: tenantRow } = await supabase
+              .from("tenants")
+              .select("name, code")
+              .eq("id", (vendor as any).tenant_id)
+              .maybeSingle();
+            tenantName = (tenantRow as any)?.name ?? null;
+            tenantCode = (tenantRow as any)?.code ?? null;
+          }
+          const buyerCompanyDisplay = tenantName
+            ? (tenantCode ? `${tenantName} (${tenantCode})` : tenantName)
+            : null;
+
           if (buyerEmail) {
             const legal = vendor.legal_name || vendor.trade_name || "Vendor";
             const trade = vendor.trade_name || "";
@@ -613,6 +630,7 @@ serve(async (req) => {
                 <table cellpadding="6" style="border-collapse:collapse;border:1px solid #e5e7eb;">
                   <tr><td style="background:#f7f9fc;"><b>Vendor Legal Name</b></td><td>${legal}</td></tr>
                   ${trade ? `<tr><td style="background:#f7f9fc;"><b>Trade Name</b></td><td>${trade}</td></tr>` : ""}
+                  ${buyerCompanyDisplay ? `<tr><td style="background:#f7f9fc;"><b>Buyer Company</b></td><td>${buyerCompanyDisplay}</td></tr>` : ""}
                   <tr><td style="background:#f7f9fc;"><b>SAP Vendor Code</b></td><td>${sapVendorCode}</td></tr>
                   <tr><td style="background:#f7f9fc;"><b>Reference No.</b></td><td>${refNo}</td></tr>
                   <tr><td style="background:#f7f9fc;"><b>Synced At</b></td><td>${syncedAt}</td></tr>
@@ -634,6 +652,9 @@ serve(async (req) => {
                     buyer_user_id: buyerUserId,
                     buyer_email: buyerEmail,
                     sap_vendor_code: sapVendorCode,
+                    tenant_id: (vendor as any)?.tenant_id ?? null,
+                    tenant_name: tenantName,
+                    tenant_code: tenantCode,
                   },
                 });
               } catch (_) { /* ignore */ }

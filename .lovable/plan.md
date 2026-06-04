@@ -1,190 +1,36 @@
-The screenshot confirms the issue is in the self-host database data/migrations, not the UI.
+## Plan
 
-## What the screenshot means
+### 1. Fix Admin role gating (User Management delete/update + other admin screens)
 
-Your query result shows:
+Currently `admin-delete-user` and `admin-create-user` only allow built-in roles `admin` and `sharvi_admin`. Users with `customer_admin` (or whose built-in role is the `approver` placeholder but who hold a custom role named "Admin / Sharvi Admin / Customer Admin") are rejected with "Forbidden: admin role required".
 
-```sql
-level_number | stage | status
-1            | NULL  | pending
-2            | NULL  | pending
-3            | NULL  | pending
-4            | NULL  | pending
-```
+Changes (backend only — frontend already gates these screens via `useScreenPermissions`):
 
-This is why the vendor is not visible to Buyer:
+- **`supabase/functions/admin-delete-user/index.ts`**: replace the role check to allow when caller has any of the built-in roles `admin`, `sharvi_admin`, `customer_admin`, OR any active custom role whose name (case-insensitive) is `admin`, `sharvi admin`, or `customer admin`. Use the same `requireAuthenticatedUser` helper used elsewhere so custom-role names are recognised.
+- **`supabase/functions/admin-create-user/index.ts`**: same expanded role check.
+- Audit other admin-only edge functions and apply the same rule where the same "admin-only" intent exists:
+  - `smtp-config-save`, `smtp-config-delete`, `smtp-config-test`: already accept any authenticated user (frontend-gated) — leave as-is.
+  - SAP sync functions (`sync-vendor-to-sap`, `sync-vendors-to-sap-bulk`, `sync-vendor-to-dms`, `prepare-dms-payload`): already allow `admin`, `sharvi_admin`, `customer_admin`, plus `finance` and custom `SAP Team` — leave as-is.
 
-- The Buyer approval screen only loads rows where `vendor_approval_progress.stage = 'BUYER'` and `status = 'pending'`.
-- On your self-host DB, all `stage` values are `NULL`.
-- That means the approval chain was created by the old approval logic or the latest BUYER-stage migration/function was not applied/re-run for this vendor.
-- The vendor status showing `SCM Manager Review` also matches this: the BUYER row was never created.
+No DB schema changes.
 
-## Immediate verification queries to run on self-host
+### 2. Include buyer company in the SAP sync notification email
 
-Run these in the SQL editor on `10.200.1.7`.
+In `supabase/functions/sync-vendor-to-sap/index.ts`, the buyer success email currently shows Vendor Legal Name, Trade Name, SAP Vendor Code, Reference No., Synced At. The vendor's buyer company is already stored as `vendors.tenant_id` (referencing `tenants` with `name` + `code`).
 
-### 1. Check whether the BUYER-stage migrations applied
+Change:
+- After resolving `vendor`, fetch the tenant by `vendor.tenant_id` (`select name, code from tenants`).
+- Add a row to the email table: **Buyer Company** → `${tenant.name} (${tenant.code})` (or just `name` if `code` missing). Render only when tenant resolves.
+- Include `tenant_id`, `tenant_name`, `tenant_code` in the `sap_sync_buyer_notified` audit log details for traceability.
 
-```sql
-SELECT filename, applied_at
-FROM public._vms_migrations
-WHERE filename IN (
-  '20260602102818_fdf94cd7-9ad2-4caa-8092-c566459fea6f.sql',
-  '20260602115254_6c4b2d19-a882-4371-ac46-180c02f78c13.sql'
-)
-ORDER BY filename;
-```
+### Out of scope
 
-Expected: both rows should be present.
+- Frontend changes (the screens already render and call these functions).
+- Schema migrations.
+- Other approval/email flows.
 
-### 2. Check required columns exist
+### Verification
 
-```sql
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND table_name = 'vendor_approval_progress'
-  AND column_name IN ('stage', 'level_id')
-ORDER BY column_name;
-
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND table_name = 'buyer_scm_mappings'
-  AND column_name IN ('skip_buyer_stage', 'include_scm_stages')
-ORDER BY column_name;
-
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND table_name = 'vendor_invitations'
-  AND column_name = 'created_on_behalf';
-```
-
-Expected:
-- `vendor_approval_progress.stage` exists
-- `vendor_approval_progress.level_id` allows `NULL`
-- `buyer_scm_mappings.skip_buyer_stage` exists
-- `vendor_invitations.created_on_behalf` exists
-
-### 3. Check the vendor invitation and buyer mapping
-
-```sql
-SELECT
-  v.id AS vendor_id,
-  v.status AS vendor_status,
-  v.tenant_id AS vendor_tenant_id,
-  vi.created_by AS buyer_user_id,
-  vi.tenant_id AS invite_tenant_id,
-  row_to_json(vi)->>'created_on_behalf' AS created_on_behalf,
-  m.scm_manager_user_id,
-  row_to_json(m)->>'skip_buyer_stage' AS skip_buyer_stage,
-  row_to_json(m)->>'include_scm_stages' AS include_scm_stages
-FROM public.vendors v
-LEFT JOIN public.vendor_invitations vi ON vi.vendor_id = v.id
-LEFT JOIN public.buyer_scm_mappings m
-  ON m.buyer_user_id = vi.created_by
- AND m.tenant_id = COALESCE(vi.tenant_id, v.tenant_id)
-WHERE v.id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'
-ORDER BY vi.created_at DESC
-LIMIT 5;
-```
-
-Expected:
-- `buyer_user_id` should not be null
-- `scm_manager_user_id` should not be null
-- `skip_buyer_stage` should be `false` or null
-- If `created_on_behalf = true`, Buyer is auto-approved by design and the vendor goes directly to SCM Manager.
-
-### 4. Check actual approval chain with matrix fallback
-
-```sql
-SELECT
-  p.level_number,
-  p.stage AS raw_progress_stage,
-  l.stage AS matrix_stage,
-  COALESCE(p.stage, l.stage) AS resolved_stage,
-  p.status,
-  p.level_id
-FROM public.vendor_approval_progress p
-LEFT JOIN public.approval_matrix_levels l ON l.id = p.level_id
-WHERE p.vendor_id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'
-ORDER BY p.level_number;
-```
-
-Expected after repair:
-
-```text
-1 | BUYER       | pending
-2 | SCM_MANAGER | pending
-3 | ...         | pending
-```
-
-## Repair steps
-
-### Step 1: Run the fixed self-host deploy script
-
-From the latest repo checkout on the self-host server:
-
-```bash
-cd /opt/Ramky_Applications/DEV/VMS/<your-latest-repo-checkout>
-sudo cp scripts/selfhost/run-migrations.sh /opt/Ramky_Applications/DEV/VMS/run-migrations.sh
-sudo chmod +x /opt/Ramky_Applications/DEV/VMS/run-migrations.sh
-sudo bash scripts/selfhost/deploy-latest.sh
-```
-
-This applies the missing SQL migrations, syncs edge functions, deploys latest frontend `dist`, and re-seeds stuck approval chains.
-
-### Step 2: Manually re-seed this specific stuck vendor if still needed
-
-After Step 1 finishes, run:
-
-```sql
-SELECT *
-FROM public.seed_vendor_approval_progress('5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'::uuid);
-
-NOTIFY pgrst, 'reload schema';
-```
-
-Then check again:
-
-```sql
-SELECT
-  level_number,
-  stage,
-  status,
-  level_id
-FROM public.vendor_approval_progress
-WHERE vendor_id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69'
-ORDER BY level_number;
-
-SELECT id, status
-FROM public.vendors
-WHERE id = '5914bf9f-2a0f-4e4b-b0a0-f8c16b128c69';
-```
-
-Expected:
-
-```text
-level_number | stage       | status
-1            | BUYER       | pending
-2            | SCM_MANAGER | pending
-...
-```
-
-And vendor status should become:
-
-```text
-buyer_review
-```
-
-## If the BUYER row still does not appear
-
-Then one of these is true:
-
-1. The vendor has no row in `vendor_invitations`, so the system cannot identify the inviting buyer.
-2. `buyer_scm_mappings.skip_buyer_stage = true` for that buyer.
-3. `vendor_invitations.created_on_behalf = true`, so Buyer is auto-approved and the vendor correctly moves to SCM Manager.
-4. The latest `seed_vendor_approval_progress()` function is still not installed on self-host.
-
-The most important missing piece shown by your screenshot is: existing approval rows have `stage = NULL`; Buyer needs a pending row with `stage = 'BUYER'`.
+- Log in as `customer_admin` (or admin user from screenshot) → delete a non-self user → succeeds; audit log entry written.
+- Create-user dialog works for the same caller.
+- Trigger a SAP sync that reaches `successRow` → buyer receives email containing a "Buyer Company" row with tenant name+code; audit row includes tenant fields.
