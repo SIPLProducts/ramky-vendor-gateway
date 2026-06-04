@@ -7,9 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye, FileText } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
@@ -25,6 +25,8 @@ interface Props {
   extraPanel?: (item: StageApprovalItem) => ReactNode;
 }
 
+type RejectedAction = 'approve' | 'send_to_vendor';
+
 export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -34,9 +36,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [submitting, setSubmitting] = useState(false);
   const [viewVendorId, setViewVendorId] = useState<string | null>(null);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
+  const [rejectedAction, setRejectedAction] = useState<{ item: StageApprovalItem; action: RejectedAction } | null>(null);
+  const [rejectedRemarks, setRejectedRemarks] = useState('');
+  const [rejectedSubmitting, setRejectedSubmitting] = useState(false);
 
-  const pendingItems = items.filter((i) => !i.blockedByPrevious);
-  const waitingItems = items.filter((i) => i.blockedByPrevious);
+  const isBuyer = stage === 'BUYER';
+  const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
+  const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
+  const rejectedItems = items.filter((i) => i.kind === 'rejected');
 
   const submit = async () => {
     if (!actionItem) return;
@@ -64,6 +71,35 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const submitRejectedAction = async () => {
+    if (!rejectedAction) return;
+    setRejectedSubmitting(true);
+    try {
+      const fnName =
+        rejectedAction.action === 'approve' ? 'buyer-reapprove-rejected' : 'buyer-return-to-vendor';
+      const { error } = await supabase.functions.invoke(fnName, {
+        body: {
+          vendor_id: rejectedAction.item.vendorId,
+          comments: rejectedRemarks.trim() || null,
+        },
+      });
+      if (error) throw error;
+      toast({
+        title:
+          rejectedAction.action === 'approve'
+            ? 'Approved — re-routed to next approver'
+            : 'Sent back to vendor',
+      });
+      setRejectedAction(null);
+      setRejectedRemarks('');
+      await refresh();
+    } catch (err: any) {
+      toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setRejectedSubmitting(false);
     }
   };
 
@@ -103,7 +139,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             rows.map((it) => {
               const blocked = variant === 'waiting';
               return (
-                <TableRow key={it.progressId}>
+                <TableRow key={it.progressId ?? it.vendorId}>
                   <TableCell className="font-medium">
                     {it.vendorName}
                     {blocked && (
@@ -177,6 +213,80 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     </div>
   );
 
+  const renderRejectedTable = (rows: StageApprovalItem[]) => (
+    <div className="border rounded-md">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Vendor</TableHead>
+            <TableHead>Rejected From</TableHead>
+            <TableHead>Remarks</TableHead>
+            <TableHead>Rejected At</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            Array.from({ length: 2 }).map((_, i) => (
+              <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+            ))
+          ) : rows.length === 0 ? (
+            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              No rejected vendors. Items returned by a downstream approver will appear here.
+            </TableCell></TableRow>
+          ) : (
+            rows.map((it) => (
+              <TableRow key={it.vendorId}>
+                <TableCell className="font-medium">{it.vendorName}</TableCell>
+                <TableCell>
+                  <Badge variant="destructive">
+                    {it.rejectionFromStage
+                      ? String(it.rejectionFromStage).replace(/_/g, ' ')
+                      : '—'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm max-w-md">
+                  {it.rejectionComments ? (
+                    <div className="whitespace-pre-wrap text-amber-900">{it.rejectionComments}</div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {it.rejectionAt ? new Date(it.rejectionAt).toLocaleString() : '—'}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
+                      <Eye className="h-4 w-4 mr-1" /> View
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
+                      <FileText className="h-4 w-4 mr-1" /> Preview
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setRejectedAction({ item: it, action: 'approve' }); setRejectedRemarks(''); }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
+                    >
+                      <Send className="h-4 w-4 mr-1" /> Send to Vendor
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -199,6 +309,11 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               <TabsTrigger value="waiting">
                 Waiting for Previous Approval ({waitingItems.length})
               </TabsTrigger>
+              {isBuyer && (
+                <TabsTrigger value="rejected">
+                  Rejected ({rejectedItems.length})
+                </TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="pending" className="mt-4">
               {renderTable(pendingItems, 'pending')}
@@ -206,6 +321,11 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <TabsContent value="waiting" className="mt-4">
               {renderTable(waitingItems, 'waiting')}
             </TabsContent>
+            {isBuyer && (
+              <TabsContent value="rejected" className="mt-4">
+                {renderRejectedTable(rejectedItems)}
+              </TabsContent>
+            )}
           </Tabs>
         </CardContent>
       </Card>
@@ -233,6 +353,51 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <Button onClick={submit} disabled={submitting}
               variant={actionItem?.action === 'reject' ? 'destructive' : 'default'}>
               {submitting ? 'Submitting...' : `Confirm ${actionItem?.action}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!rejectedAction}
+        onOpenChange={(o) => { if (!o) { setRejectedAction(null); setRejectedRemarks(''); } }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {rejectedAction?.action === 'approve'
+                ? `Approve — ${rejectedAction?.item.vendorName}`
+                : `Send back to vendor — ${rejectedAction?.item.vendorName}`}
+            </DialogTitle>
+            <DialogDescription>
+              {rejectedAction?.action === 'approve'
+                ? 'Re-routes the vendor forward through the same approval matrix, starting from the next approver after Buyer.'
+                : 'Returns the application to the vendor for correction. They will be able to edit and resubmit.'}
+            </DialogDescription>
+          </DialogHeader>
+          {rejectedAction?.item.rejectionComments && (
+            <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+              <strong>
+                {rejectedAction.item.rejectionFromStage
+                  ? String(rejectedAction.item.rejectionFromStage).replace(/_/g, ' ')
+                  : 'Approver'}
+                {' remarks: '}
+              </strong>
+              {rejectedAction.item.rejectionComments}
+            </div>
+          )}
+          <Textarea
+            placeholder="Optional remarks"
+            value={rejectedRemarks}
+            onChange={(e) => setRejectedRemarks(e.target.value)}
+            rows={4}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectedAction(null)}>Cancel</Button>
+            <Button onClick={submitRejectedAction} disabled={rejectedSubmitting}>
+              {rejectedSubmitting
+                ? 'Submitting...'
+                : rejectedAction?.action === 'approve' ? 'Confirm Approve' : 'Send to Vendor'}
             </Button>
           </DialogFooter>
         </DialogContent>
