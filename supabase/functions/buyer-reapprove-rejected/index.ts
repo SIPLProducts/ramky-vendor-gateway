@@ -68,16 +68,22 @@ Deno.serve(async (req) => {
     const fromStage = vendor.last_rejection_stage ?? null;
     const nowIso = new Date().toISOString();
 
-    // Flip vendor to buyer_review — the seed trigger re-creates the full
-    // pending approval chain (BUYER row + matrix levels) and resets the status
-    // to the first pending stage's review status.
+    // Re-seed the approval chain from scratch (BUYER row + matrix levels).
+    // The trigger only auto-seeds when coming from 'returned_to_vendor', so we
+    // call the seeding function directly to cover the 'returned_to_buyer' path.
+    const { error: seedErr } = await admin.rpc('seed_vendor_approval_progress', {
+      _vendor_id: vendor_id,
+    });
+    if (seedErr) throw seedErr;
+
+    // Clear rejection metadata on the vendor.
     await admin.from('vendors').update({
-      status: 'buyer_review',
       last_rejection_comments: null,
       last_rejection_stage: null,
       last_rejected_by: null,
       last_rejected_at: null,
     }).eq('id', vendor_id);
+
 
     // Find the freshly-seeded synthetic BUYER row and auto-approve it.
     const { data: buyerRow } = await admin
