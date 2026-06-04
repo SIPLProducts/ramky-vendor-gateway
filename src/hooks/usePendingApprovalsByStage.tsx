@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 export type ApprovalStage = 'BUYER' | 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
 
 export interface StageApprovalItem {
-  progressId: string;
+  progressId: string | null;
   vendorId: string;
   vendorName: string;
   submittedAt: string | null;
@@ -16,6 +16,7 @@ export interface StageApprovalItem {
   approvalMode: string;
   stage: ApprovalStage;
   blockedByPrevious: boolean;
+  kind?: 'pending' | 'rejected';
   vendorCompany?: string | null;
   invitationCompany?: string | null;
   companyMismatch?: boolean;
@@ -26,6 +27,7 @@ export interface StageApprovalItem {
   rejectionFromStage?: string | null;
   rejectionAt?: string | null;
 }
+
 
 
 /**
