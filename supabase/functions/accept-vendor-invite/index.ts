@@ -107,17 +107,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Normalize action_link for self-hosted reverse-proxy setups where the
-    // auth service must be reached through <origin>/supabase/auth/v1/verify.
-    // If GoTrue returns /auth/v1/verify on the frontend host, inject the
-    // /supabase prefix so nginx routes it to Kong instead of the SPA.
+    // Normalize action_link for self-hosted reverse-proxy setups.
+    // GoTrue builds links from SITE_URL / API_EXTERNAL_URL, which may point at
+    // an internal host (e.g. http://10.200.1.7) even though the vendor is
+    // browsing on a public URL. Rewrite both the action link's origin and the
+    // embedded `redirect_to` query parameter to the caller's origin, and
+    // prefix `/supabase` in front of `/auth/v1/...` so Nginx routes to Kong.
     const rawActionLink = linkData.properties.action_link as string;
     let actionLink = rawActionLink;
     try {
       const actionUrl = new URL(rawActionLink);
       const originUrl = redirectOrigin ? new URL(redirectOrigin) : null;
-      if (originUrl && actionUrl.host === originUrl.host && actionUrl.pathname.startsWith('/auth/v1/')) {
-        actionUrl.pathname = '/supabase' + actionUrl.pathname;
+      if (originUrl) {
+        actionUrl.protocol = originUrl.protocol;
+        actionUrl.host = originUrl.host; // includes port
+        if (actionUrl.pathname.startsWith('/auth/v1/')) {
+          actionUrl.pathname = '/supabase' + actionUrl.pathname;
+        }
+        const rt = actionUrl.searchParams.get('redirect_to');
+        if (rt) {
+          try {
+            const rtUrl = new URL(rt);
+            rtUrl.protocol = originUrl.protocol;
+            rtUrl.host = originUrl.host;
+            actionUrl.searchParams.set('redirect_to', rtUrl.toString());
+          } catch {
+            // leave redirect_to as-is if unparseable
+          }
+        }
         actionLink = actionUrl.toString();
       }
     } catch (e) {

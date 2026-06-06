@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
 # VMS Self-Hosted Deployment — Master Script
-# Target: Ubuntu 22.04 server at 10.200.1.7
+# Target: Ubuntu 22.04
 # Layout: /opt/Ramky_Applications/DEV/VMS/{backend,frontend,middleware,supabase,logs}
 #
 # Usage:
-#   sudo bash scripts/deploy-vms-server.sh [flags]
+#   sudo PUBLIC_BASE_URL=http://<public-host-or-ip>[:port] \
+#        bash scripts/deploy-vms-server.sh [flags]
+#
+#   (or pass HOST_IP=<ip> to build PUBLIC_BASE_URL=http://<ip>)
 #
 # Flags:
 #   --skip-docker       skip apt/docker/node/nginx install
@@ -22,7 +25,16 @@
 set -Eeuo pipefail
 
 # ---------- Config (override via env) ----------
-export HOST_IP="${HOST_IP:-10.200.1.7}"
+# Require either PUBLIC_BASE_URL (preferred — the public URL vendors actually
+# browse to, including port) or HOST_IP. Do NOT hardcode an internal LAN IP
+# here — that's what baked the wrong SITE_URL into GoTrue.
+if [[ -z "${PUBLIC_BASE_URL:-}" && -z "${HOST_IP:-}" ]]; then
+  echo "ERROR: set PUBLIC_BASE_URL=http://<public-host>[:port] (preferred)" >&2
+  echo "       or HOST_IP=<ip> before running this script." >&2
+  echo "       Example: sudo PUBLIC_BASE_URL=http://206.1.23.95:9009 bash $0" >&2
+  exit 1
+fi
+export HOST_IP="${HOST_IP:-}"
 export PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://${HOST_IP}}"
 export APP_ROOT="${APP_ROOT:-/opt/Ramky_Applications/DEV/VMS}"
 export NGINX_CONF_PATH="${NGINX_CONF_PATH:-/opt/Ramky_Applications/nginx/ramky-vms.conf}"
