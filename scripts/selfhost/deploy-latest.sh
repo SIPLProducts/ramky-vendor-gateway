@@ -134,5 +134,5 @@ SQL
 
 echo ""
 echo "Done. Verify with:"
-echo "  curl -I http://10.200.1.7/"
+echo "  curl -I ${PUBLIC_BASE_URL:-http://${HOST_IP:-127.0.0.1}}/"
 echo "  docker compose -f $COMPOSE_FILE logs -f functions"
