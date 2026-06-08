@@ -283,13 +283,30 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
-                    >
-                      <Send className="h-4 w-4 mr-1" /> Send to Vendor
-                    </Button>
+                    {it.isOnBehalf ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (!it.invitationId) {
+                            toast({ title: 'Missing invitation', description: 'Cannot open edit form for this vendor.', variant: 'destructive' });
+                            return;
+                          }
+                          navigate(`/vendor/registration?onBehalfOf=${it.invitationId}`);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 mr-1" /> Edit & Resubmit
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
+                      >
+                        <Send className="h-4 w-4 mr-1" /> Send to Vendor
+                      </Button>
+                    )}
+
                   </div>
                 </TableCell>
               </TableRow>
