@@ -13,6 +13,13 @@ interface UseVendorRegistrationOptions {
    * buyer do not collide.
    */
   onBehalfInvitationId?: string;
+  /**
+   * Set true whenever the URL indicates an on-behalf flow (?onBehalf=1 or
+   * ?onBehalfOf=...), even before `onBehalfInvitationId` resolves. Prevents
+   * the hook from falling back to the buyer's "self" vendor draft and
+   * accidentally reusing an old vendor row for a brand-new submission.
+   */
+  isOnBehalfMode?: boolean;
 }
 
 // Statuses that allow editing
