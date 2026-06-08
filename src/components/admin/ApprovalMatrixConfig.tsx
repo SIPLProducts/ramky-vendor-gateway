@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Save, ArrowRight, Loader2, UserCheck } from 'lucide-react';
+import { Save, ArrowRight, Loader2, UserCheck, Info } from 'lucide-react';
 import { useTenants } from '@/hooks/useTenant';
 
 type Stage = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
@@ -56,44 +56,47 @@ const STAGE_DEFS: Array<{
 
 interface Props { tenantId?: string | null }
 
-export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
+export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props = {}) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: tenants = [] } = useTenants();
-  const activeTenants = useMemo(() => tenants.filter((t) => t.is_active), [tenants]);
 
-  const [internalTenantId, setInternalTenantId] = useState<string>('');
-  const externallyControlled = tenantIdProp !== undefined;
-  const tenantId = externallyControlled ? (tenantIdProp ?? '') : internalTenantId;
-
-  const [buyers, setBuyers] = useState<UserOpt[]>([]);
-  const [usersByRole, setUsersByRole] = useState<Record<string, UserOpt[]>>({});
+  const [buyersAll, setBuyersAll] = useState<UserOpt[]>([]);
+  const [usersByRoleAll, setUsersByRoleAll] = useState<Record<string, UserOpt[]>>({});
+  // userId -> set of tenantIds
+  const [userTenants, setUserTenants] = useState<Map<string, Set<string>>>(new Map());
   const [buyerId, setBuyerId] = useState<string>('');
   const [flow, setFlow] = useState<FlowState>(EMPTY_FLOW);
   const [existingFlowId, setExistingFlowId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [allFlows, setAllFlows] = useState<Array<{ id: string; buyer_user_id: string; flow: FlowState }>>([]);
+  const [allFlows, setAllFlows] = useState<Array<{ id: string; buyer_user_id: string; tenant_id: string | null; flow: FlowState }>>([]);
 
-  useEffect(() => {
-    if (externallyControlled) return;
-    if (activeTenants.length > 0 && !internalTenantId) setInternalTenantId(activeTenants[0].id);
-  }, [activeTenants, internalTenantId, externallyControlled]);
+  const tenantNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    tenants.forEach((t: any) => m.set(t.id, t.name || t.code || t.id.slice(0, 8)));
+    return m;
+  }, [tenants]);
 
-  const loadUsers = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const allRoleNames = ['Buyer', ...Array.from(new Set(STAGE_DEFS.flatMap((s) => s.roleNames)))];
-      const [{ data: roles }, { data: profiles }, ut] = await Promise.all([
+      const [{ data: roles }, { data: profiles }, { data: utAll }] = await Promise.all([
         supabase.from('custom_roles').select('id, name').in('name', allRoleNames),
         supabase.from('profiles').select('id, full_name, email'),
-        tenantId
-          ? supabase.from('user_tenants').select('user_id').eq('tenant_id', tenantId)
-          : Promise.resolve({ data: null as any }),
+        supabase.from('user_tenants').select('user_id, tenant_id'),
       ]);
       const roleMap = new Map((roles ?? []).map((r: any) => [r.id, r.name as string]));
       const profileMap = new Map<string, UserOpt>((profiles ?? []).map((p: any) => [p.id, p as UserOpt]));
-      const tenantUserSet: Set<string> | null = ut?.data ? new Set((ut.data as any[]).map((r) => r.user_id)) : null;
+
+      const utMap = new Map<string, Set<string>>();
+      (utAll ?? []).forEach((r: any) => {
+        const s = utMap.get(r.user_id) ?? new Set<string>();
+        s.add(r.tenant_id);
+        utMap.set(r.user_id, s);
+      });
+      setUserTenants(utMap);
 
       const { data: ucr } = await supabase
         .from('user_custom_roles')
@@ -111,12 +114,11 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
 
       const toOpts = (ids: Set<string> | undefined) =>
         Array.from(ids ?? [])
-          .filter((id) => !tenantUserSet || tenantUserSet.has(id))
           .map((id) => profileMap.get(id))
           .filter((u): u is UserOpt => !!u)
           .sort((a, b) => (a.full_name ?? a.email).localeCompare(b.full_name ?? b.email));
 
-      setBuyers(toOpts(byRoleName.get('Buyer')));
+      setBuyersAll(toOpts(byRoleName.get('Buyer')));
 
       const grouped: Record<string, UserOpt[]> = {};
       STAGE_DEFS.forEach((def) => {
@@ -124,9 +126,8 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
         def.roleNames.forEach((rn) => byRoleName.get(rn)?.forEach((id) => merged.add(id)));
         grouped[def.stage] = toOpts(merged);
       });
-      setUsersByRole(grouped);
+      setUsersByRoleAll(grouped);
 
-      // Load existing flows for overview table
       const { data: flows } = await supabase
         .from('buyer_approval_flows')
         .select('*')
@@ -135,6 +136,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
         (flows ?? []).map((f: any) => ({
           id: f.id,
           buyer_user_id: f.buyer_user_id,
+          tenant_id: f.tenant_id,
           flow: {
             scm_manager_user_id: f.scm_manager_user_id,
             scm_head_user_id: f.scm_head_user_id,
@@ -153,17 +155,44 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, toast]);
+  }, [toast]);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Buyer's resolved tenant (first tenant assignment)
+  const buyerTenantIds = useMemo(() => Array.from(userTenants.get(buyerId) ?? []), [buyerId, userTenants]);
+  const buyerPrimaryTenantId = buyerTenantIds[0] ?? null;
+
+  // Buyers filtered by tenant dropdown (view filter only)
+  const buyers = useMemo(() => {
+    if (!filterTenantId) return buyersAll;
+    return buyersAll.filter((u) => userTenants.get(u.id)?.has(filterTenantId));
+  }, [buyersAll, filterTenantId, userTenants]);
+
+  // Approvers filtered by the BUYER's tenant (so approval chain stays scoped to the buyer's company)
+  const usersByRole = useMemo(() => {
+    if (!buyerPrimaryTenantId) return usersByRoleAll;
+    const out: Record<string, UserOpt[]> = {};
+    Object.entries(usersByRoleAll).forEach(([k, list]) => {
+      out[k] = list.filter((u) => userTenants.get(u.id)?.has(buyerPrimaryTenantId));
+    });
+    return out;
+  }, [usersByRoleAll, buyerPrimaryTenantId, userTenants]);
 
   const profileById = useMemo(() => {
     const m = new Map<string, UserOpt>();
-    [...buyers, ...Object.values(usersByRole).flat()].forEach((u) => m.set(u.id, u));
+    [...buyersAll, ...Object.values(usersByRoleAll).flat()].forEach((u) => m.set(u.id, u));
     return m;
-  }, [buyers, usersByRole]);
+  }, [buyersAll, usersByRoleAll]);
 
-  // Load buyer flow when buyer changes
+  // Clear buyer if it no longer matches the filter
+  useEffect(() => {
+    if (buyerId && filterTenantId && !userTenants.get(buyerId)?.has(filterTenantId)) {
+      setBuyerId('');
+    }
+  }, [filterTenantId, buyerId, userTenants]);
+
+  // Load buyer flow
   useEffect(() => {
     if (!buyerId) { setFlow(EMPTY_FLOW); setExistingFlowId(null); return; }
     (async () => {
@@ -201,7 +230,8 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
     try {
       const payload: any = {
         buyer_user_id: buyerId,
-        tenant_id: tenantId || null,
+        // tenant derived from the buyer's own assignment — NOT from the filter dropdown
+        tenant_id: buyerPrimaryTenantId,
         ...flow,
         created_by: user?.id,
       };
@@ -213,7 +243,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
       }
       if (error) throw error;
       toast({ title: 'Approval flow saved' });
-      await loadUsers();
+      await loadAll();
       const { data } = await supabase
         .from('buyer_approval_flows')
         .select('id').eq('buyer_user_id', buyerId).maybeSingle();
@@ -232,6 +262,22 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
     return u ? (u.full_name || u.email) : id.slice(0, 8);
   };
 
+  const tenantLabelForUser = (uid: string) => {
+    const ids = Array.from(userTenants.get(uid) ?? []);
+    if (ids.length === 0) return '—';
+    return ids.map((id) => tenantNameById.get(id) ?? id.slice(0, 8)).join(', ');
+  };
+
+  // Filtered overview table by tenant dropdown
+  const visibleFlows = useMemo(() => {
+    if (!filterTenantId) return allFlows;
+    return allFlows.filter((f) => {
+      // prefer joining via user_tenants (live) so re-assignments reflect immediately
+      const buyerTenants = userTenants.get(f.buyer_user_id);
+      return buyerTenants?.has(filterTenantId) || f.tenant_id === filterTenantId;
+    });
+  }, [allFlows, filterTenantId, userTenants]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -239,6 +285,12 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
           <CardTitle className="text-base flex items-center gap-2">
             <UserCheck className="h-4 w-4" /> Buyer-based Approval Chain
           </CardTitle>
+          <div className="text-xs text-muted-foreground flex items-start gap-1.5 mt-1">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              Approval Matrix is Buyer-based. The Tenant filter at the top only narrows which buyers and saved flows you see — the flow is automatically tied to the buyer's assigned company.
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -247,12 +299,17 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
               <Select value={buyerId} onValueChange={setBuyerId} disabled={loading}>
                 <SelectTrigger><SelectValue placeholder="Select buyer" /></SelectTrigger>
                 <SelectContent>
-                  {buyers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with the Buyer role.</div>}
+                  {buyers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No buyers in this tenant.</div>}
                   {buyers.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {buyerId && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Company: <span className="font-medium text-foreground">{tenantLabelForUser(buyerId)}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-end">
               <Button onClick={handleSave} disabled={!buyerId || saving}>
@@ -307,7 +364,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
                         >
                           <SelectTrigger><SelectValue placeholder={`Select ${def.label}`} /></SelectTrigger>
                           <SelectContent>
-                            {opts.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with this role.</div>}
+                            {opts.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with this role in the buyer's tenant.</div>}
                             {opts.map((u) => (
                               <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                             ))}
@@ -335,20 +392,21 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between">
-            <span>Configured Buyers</span>
-            <Badge variant="outline">{allFlows.length}</Badge>
+            <span>Configured Buyers{filterTenantId ? ` · ${tenantNameById.get(filterTenantId) ?? ''}` : ''}</span>
+            <Badge variant="outline">{visibleFlows.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-sm text-muted-foreground">Loading…</div>
-          ) : allFlows.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No buyer flows configured yet.</div>
+          ) : visibleFlows.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No buyer flows configured{filterTenantId ? ' for this tenant' : ''} yet.</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Buyer</TableHead>
+                  <TableHead>Company</TableHead>
                   <TableHead>SCM Mgr</TableHead>
                   <TableHead>SCM Head</TableHead>
                   <TableHead>Finance 1</TableHead>
@@ -357,7 +415,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allFlows.map((f) => {
+                {visibleFlows.map((f) => {
                   const cell = (uid: string | null, skipped: boolean) =>
                     skipped ? <span className="text-xs text-muted-foreground">skipped</span>
                       : uid ? buyerLabel(uid)
@@ -365,6 +423,7 @@ export function ApprovalMatrixConfig({ tenantId: tenantIdProp }: Props = {}) {
                   return (
                     <TableRow key={f.id} className="cursor-pointer" onClick={() => setBuyerId(f.buyer_user_id)}>
                       <TableCell className="font-medium">{buyerLabel(f.buyer_user_id)}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{tenantLabelForUser(f.buyer_user_id)}</TableCell>
                       <TableCell>{cell(f.flow.scm_manager_user_id, f.flow.skip_scm_manager)}</TableCell>
                       <TableCell>{cell(f.flow.scm_head_user_id, f.flow.skip_scm_head)}</TableCell>
                       <TableCell>{cell(f.flow.finance_1_user_id, f.flow.skip_finance_1)}</TableCell>
