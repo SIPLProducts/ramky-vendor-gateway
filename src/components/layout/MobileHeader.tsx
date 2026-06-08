@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Bell, LogOut, Settings, User, X, Building2 } from 'lucide-react';
+import { Menu, Bell, LogOut, Settings, User, X, Building2, KeyRound } from 'lucide-react';
+import { ChangePasswordDialog } from '@/components/account/ChangePasswordDialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
