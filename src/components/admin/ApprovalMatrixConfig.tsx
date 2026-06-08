@@ -8,8 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Save, ArrowRight, Loader2, UserCheck, Info } from 'lucide-react';
+import { Save, ArrowRight, Loader2, UserCheck, Info, Trash2 } from 'lucide-react';
 import { useTenants } from '@/hooks/useTenant';
+import Swal from 'sweetalert2';
 
 type Stage = 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE';
 
@@ -257,6 +258,28 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
 
   const updateFlow = (patch: Partial<FlowState>) => setFlow((f) => ({ ...f, ...patch }));
 
+  const handleDelete = async (flowId: string, label: string) => {
+    const result = await Swal.fire({
+      title: 'Are you sure want to delete?',
+      text: `Approval flow for ${label} will be removed.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes',
+      cancelButtonText: 'No',
+      confirmButtonColor: 'hsl(0 84% 60%)',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const { error } = await supabase.from('buyer_approval_flows').delete().eq('id', flowId);
+      if (error) throw error;
+      toast({ title: 'Approval flow deleted' });
+      if (existingFlowId === flowId) { setExistingFlowId(null); setBuyerId(''); setFlow(EMPTY_FLOW); }
+      await loadAll();
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const buyerLabel = (id: string) => {
     const u = profileById.get(id);
     return u ? (u.full_name || u.email) : id.slice(0, 8);
@@ -406,12 +429,12 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
               <TableHeader>
                 <TableRow>
                   <TableHead>Buyer</TableHead>
-                  <TableHead>Company</TableHead>
                   <TableHead>SCM Mgr</TableHead>
                   <TableHead>SCM Head</TableHead>
                   <TableHead>Finance 1</TableHead>
                   <TableHead>Finance 2</TableHead>
                   <TableHead>CEO Office</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -423,12 +446,21 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                   return (
                     <TableRow key={f.id} className="cursor-pointer" onClick={() => setBuyerId(f.buyer_user_id)}>
                       <TableCell className="font-medium">{buyerLabel(f.buyer_user_id)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{tenantLabelForUser(f.buyer_user_id)}</TableCell>
                       <TableCell>{cell(f.flow.scm_manager_user_id, f.flow.skip_scm_manager)}</TableCell>
                       <TableCell>{cell(f.flow.scm_head_user_id, f.flow.skip_scm_head)}</TableCell>
                       <TableCell>{cell(f.flow.finance_1_user_id, f.flow.skip_finance_1)}</TableCell>
                       <TableCell>{cell(f.flow.finance_2_user_id, f.flow.skip_finance_2)}</TableCell>
                       <TableCell>{cell(f.flow.ceo_office_user_id, false)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(f.id, buyerLabel(f.buyer_user_id)); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
