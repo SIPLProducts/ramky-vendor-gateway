@@ -947,6 +947,17 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if ((invitation as any)?.id) {
         submitUpdate.invitation_id = (invitation as any).id;
       }
+      // Defensive: ensure tenant_id is always set on submit so the vendor
+      // appears in the buyer's approval queue (international branch has no
+      // OrganizationStep, so buyerCompanyId may not have been populated).
+      const resolvedTenantId =
+        formData.organization.buyerCompanyId ||
+        (vendor as any)?.tenant_id ||
+        (invitation as any)?.tenant_id ||
+        null;
+      if (resolvedTenantId) {
+        submitUpdate.tenant_id = resolvedTenantId;
+      }
       const { error: updateError } = await supabase
         .from('vendors')
         .update(submitUpdate)
