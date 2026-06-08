@@ -26,7 +26,10 @@ export interface StageApprovalItem {
   rejectionComments?: string | null;
   rejectionFromStage?: string | null;
   rejectionAt?: string | null;
+  isOnBehalf?: boolean;
+  invitationId?: string | null;
 }
+
 
 
 

@@ -1,4 +1,5 @@
 import { useState, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil } from 'lucide-react';
+
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
@@ -30,6 +32,8 @@ type RejectedAction = 'approve' | 'send_to_vendor';
 export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
   const { items, loading, refresh } = usePendingApprovalsByStage(stage);
   const [actionItem, setActionItem] = useState<{ item: StageApprovalItem; action: 'approve' | 'reject' } | null>(null);
   const [comments, setComments] = useState('');
@@ -141,7 +145,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               return (
                 <TableRow key={it.progressId ?? it.vendorId}>
                   <TableCell className="font-medium">
-                    {it.vendorName}
+                    <div>{it.vendorName}</div>
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">ID: {it.vendorId}</div>
+
                     {blocked && (
                       <div className="text-xs text-amber-600 mt-1">
                         The previous approver has not approved yet.
@@ -237,7 +243,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           ) : (
             rows.map((it) => (
               <TableRow key={it.vendorId}>
-                <TableCell className="font-medium">{it.vendorName}</TableCell>
+                <TableCell className="font-medium">
+                  <div>{it.vendorName}</div>
+                  <div className="text-xs text-muted-foreground font-mono mt-0.5">ID: {it.vendorId}</div>
+                  {it.isOnBehalf && (
+                    <Badge variant="secondary" className="mt-1">On-behalf</Badge>
+                  )}
+                </TableCell>
+
                 <TableCell>
                   <Badge variant="destructive">
                     {it.rejectionFromStage
@@ -270,13 +283,30 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
-                    >
-                      <Send className="h-4 w-4 mr-1" /> Send to Vendor
-                    </Button>
+                    {it.isOnBehalf ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (!it.invitationId) {
+                            toast({ title: 'Missing invitation', description: 'Cannot open edit form for this vendor.', variant: 'destructive' });
+                            return;
+                          }
+                          navigate(`/vendor/registration?onBehalfOf=${it.invitationId}`);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 mr-1" /> Edit & Resubmit
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
+                      >
+                        <Send className="h-4 w-4 mr-1" /> Send to Vendor
+                      </Button>
+                    )}
+
                   </div>
                 </TableCell>
               </TableRow>

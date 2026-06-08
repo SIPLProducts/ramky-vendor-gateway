@@ -67,6 +67,17 @@ Deno.serve(async (req) => {
         .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at')
         .in('id', buyerVendorIds).eq('status', 'returned_to_buyer');
 
+      // Latest invitation per vendor (for on-behalf detection + deep-link).
+      const { data: invsForBuyer } = await admin
+        .from('vendor_invitations')
+        .select('id, vendor_id, created_on_behalf, created_at')
+        .in('vendor_id', buyerVendorIds)
+        .order('created_at', { ascending: false });
+      const invByVendor = new Map<string, any>();
+      (invsForBuyer ?? []).forEach((inv: any) => {
+        if (!invByVendor.has(inv.vendor_id)) invByVendor.set(inv.vendor_id, inv);
+      });
+
       const pendingVIds = (buyerProgress ?? []).map((p: any) => p.vendor_id);
       const { data: vendors } = pendingVIds.length
         ? await admin.from('vendors').select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type').in('id', pendingVIds)
@@ -76,6 +87,7 @@ Deno.serve(async (req) => {
       const pendingItems = (buyerProgress ?? []).map((p: any) => {
         const v: any = vMap.get(p.vendor_id);
         const isIntl = v?.vendor_type === 'international';
+        const inv = invByVendor.get(p.vendor_id);
         return {
           progressId: p.id,
           vendorId: p.vendor_id,
@@ -93,11 +105,14 @@ Deno.serve(async (req) => {
           rejectionComments: p.rejection_comments ?? null,
           rejectionFromStage: p.rejection_from_stage ?? null,
           rejectionAt: p.rejection_at ?? null,
+          isOnBehalf: !!inv?.created_on_behalf,
+          invitationId: inv?.id ?? null,
         };
       });
 
       const rejectedItems = (rejectedVendors ?? []).map((v: any) => {
         const isIntl = v?.vendor_type === 'international';
+        const inv = invByVendor.get(v.id);
         return {
           progressId: null, vendorId: v.id,
           vendorName: v?.legal_name ?? v?.trade_name ?? v.id.slice(0, 8),
@@ -109,8 +124,11 @@ Deno.serve(async (req) => {
           rejectionComments: v?.last_rejection_comments ?? null,
           rejectionFromStage: v?.last_rejection_stage ?? null,
           rejectionAt: v?.last_rejected_at ?? null,
+          isOnBehalf: !!inv?.created_on_behalf,
+          invitationId: inv?.id ?? null,
         };
       });
+
 
       return new Response(JSON.stringify({ items: [...pendingItems, ...rejectedItems] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
