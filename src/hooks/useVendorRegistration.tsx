@@ -16,7 +16,7 @@ interface UseVendorRegistrationOptions {
 }
 
 // Statuses that allow editing
-const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected', 'returned_to_vendor'];
+const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected', 'returned_to_vendor', 'returned_to_buyer'];
 
 // Document types that can be uploaded
 type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate' | 'registration_copy' | 'swift_iban_details';
@@ -1108,18 +1108,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // into the approval workflow (start of chain) so the DB trigger reseeds
       // vendor_approval_progress and approvers see the updated submission.
       const wasReturned = vendorStatus === 'returned_to_vendor';
-      // After a return-to-vendor cycle, restart the approval chain from the
-      // very first stage. We set validation_pending here and explicitly
-      // invoke route-vendor-approval below to reseed vendor_approval_progress
-      // from scratch.
-      const nextStatus = 'validation_pending';
+      const wasReturnedToBuyer = vendorStatus === 'returned_to_buyer';
+      // For returned_to_vendor (vendor self-edit) restart the chain via validation_pending.
+      // For returned_to_buyer (buyer-edited on-behalf), keep status until we call
+      // buyer-reapprove-rejected, which re-seeds the chain and advances it.
+      const nextStatus = wasReturnedToBuyer ? 'returned_to_buyer' : 'validation_pending';
 
       const vendorData = {
         ...formDataToVendorRecord(formData, userId),
         status: nextStatus as VendorStatus,
         submitted_at: new Date().toISOString(),
         // Clear stale rejection metadata once the vendor resubmits.
-        ...(wasReturned ? {
+        ...((wasReturned || wasReturnedToBuyer) ? {
           last_rejection_comments: null,
           last_rejection_stage: null,
           last_rejected_by: null,
@@ -1141,7 +1141,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       await supabase.from('audit_logs').insert({
         vendor_id: vendorId,
-        action: wasReturned ? 'vendor_resubmitted_after_return' : 'vendor_resubmitted',
+        action: wasReturnedToBuyer
+          ? 'vendor_buyer_resubmitted_after_return'
+          : (wasReturned ? 'vendor_resubmitted_after_return' : 'vendor_resubmitted'),
         details: {
           resubmitted_by: userId || 'anonymous',
           previous_status: vendorStatus,
@@ -1150,15 +1152,20 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         },
       });
 
-      // Reseed the approval chain from the first stage when resubmitting
-      // after a return-to-vendor cycle. route-vendor-approval calls the
-      // SECURITY DEFINER seed function which deletes existing progress rows
-      // and rebuilds the chain from level 1.
+      // Reseed the approval chain when resubmitting after a return cycle.
       if (wasReturned) {
         try {
           await supabase.functions.invoke('route-vendor-approval', { body: { vendor_id: vendorId } });
         } catch (e) {
           console.error('[Vendor] route-vendor-approval (resubmit) failed:', e);
+        }
+      } else if (wasReturnedToBuyer) {
+        try {
+          await supabase.functions.invoke('buyer-reapprove-rejected', {
+            body: { vendor_id: vendorId, comments: 'Buyer edited & resubmitted after downstream rejection' },
+          });
+        } catch (e) {
+          console.error('[Vendor] buyer-reapprove-rejected (resubmit) failed:', e);
         }
       }
 

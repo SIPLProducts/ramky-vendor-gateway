@@ -555,7 +555,7 @@ export default function VendorRegistration() {
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
-      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected', 'returned_to_vendor'];
+      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected', 'returned_to_vendor', 'returned_to_buyer'];
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
 
       if (editableStatuses.includes(vendorStatus)) {
@@ -565,7 +565,7 @@ export default function VendorRegistration() {
         setPendingChoiceType(existingFormData.vendorType);
         // For returned_to_vendor we want to land on the Review step so the
         // vendor can immediately see remarks + resubmit after editing.
-        const isReturned = vendorStatus === 'returned_to_vendor';
+        const isReturned = vendorStatus === 'returned_to_vendor' || vendorStatus === 'returned_to_buyer';
         if (vendorStatus === 'draft' || isReturned) {
           const filledSteps: number[] = [];
           if (existingFormData.vendorType === 'international') {
@@ -1378,7 +1378,7 @@ export default function VendorRegistration() {
         {/* Form Card */}
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           {/* Rejection remarks banner — shown when a buyer/approver has returned the application to the vendor */}
-          {vendorStatusState === 'returned_to_vendor' && (existingVendor as any)?.last_rejection_comments && (
+          {(vendorStatusState === 'returned_to_vendor' || vendorStatusState === 'returned_to_buyer') && (existingVendor as any)?.last_rejection_comments && (
             <div className="mb-4 rounded-[10px] border border-destructive/40 bg-destructive/5 p-4">
               <div className="flex items-start gap-3">
                 <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />

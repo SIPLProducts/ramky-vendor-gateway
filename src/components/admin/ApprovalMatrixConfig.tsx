@@ -328,11 +328,6 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                   ))}
                 </SelectContent>
               </Select>
-              {buyerId && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  Company: <span className="font-medium text-foreground">{tenantLabelForUser(buyerId)}</span>
-                </div>
-              )}
             </div>
             <div className="flex items-end">
               <Button onClick={handleSave} disabled={!buyerId || saving}>
