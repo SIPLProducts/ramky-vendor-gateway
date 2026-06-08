@@ -375,8 +375,17 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {actionItem?.action === 'approve' ? 'Approve' : 'Reject'} — {actionItem?.item.vendorName}
+              {actionItem?.action === 'approve'
+                ? `Approve — ${actionItem?.item.vendorName}`
+                : isBuyer
+                  ? `Send back to vendor — ${actionItem?.item.vendorName}`
+                  : `Reject — ${actionItem?.item.vendorName}`}
             </DialogTitle>
+            {actionItem?.action === 'reject' && isBuyer && (
+              <DialogDescription>
+                The vendor will receive an email and can edit the form and resubmit. Please add remarks describing what needs to be corrected.
+              </DialogDescription>
+            )}
           </DialogHeader>
           {actionItem && extraPanel && (
             <div className="border rounded-md p-3 bg-muted/30">
@@ -384,20 +393,39 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             </div>
           )}
           <Textarea
-            placeholder={actionItem?.action === 'reject' ? 'Reason for rejection (recommended)' : 'Optional comments'}
+            placeholder={
+              actionItem?.action === 'reject'
+                ? isBuyer
+                  ? 'Describe what the vendor needs to correct (required)'
+                  : 'Reason for rejection (recommended)'
+                : 'Optional comments'
+            }
             value={comments}
             onChange={(e) => setComments(e.target.value)}
             rows={4}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionItem(null)}>Cancel</Button>
-            <Button onClick={submit} disabled={submitting}
-              variant={actionItem?.action === 'reject' ? 'destructive' : 'default'}>
-              {submitting ? 'Submitting...' : `Confirm ${actionItem?.action}`}
+            <Button
+              onClick={submit}
+              disabled={
+                submitting ||
+                (actionItem?.action === 'reject' && isBuyer && !comments.trim())
+              }
+              variant={actionItem?.action === 'reject' ? 'destructive' : 'default'}
+            >
+              {submitting
+                ? 'Submitting...'
+                : actionItem?.action === 'approve'
+                  ? 'Confirm approve'
+                  : isBuyer
+                    ? 'Send Back to Vendor'
+                    : 'Confirm reject'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <Dialog
         open={!!rejectedAction}
