@@ -1,37 +1,44 @@
 ## Problem
 
-On the International on-behalf registration (`?onBehalfOf=...`), the **Buyer Company** field on Step 2 (Company Details) shows "Not assigned". It only works the very first time the buyer clicks "Create Vendor" (when `?onBehalf=1` triggers the bootstrap effect and seeds `formData.organization.buyerCompanyId`).
+On the buyer's Vendor Invitations screen, when the header tenant selector is set to **ECFM India Limited** and the buyer clicks **Create Vendor**, the registration form opens with **Buyer Company = RECEPS LIMITED (1127)** instead of ECFM. The selected header tenant is being ignored.
 
-On any later visit/refresh of the same URL — which now carries `?onBehalfOf=<inviteId>` — the bootstrap effect is skipped, so:
+## Root cause
 
-- `formData.organization.buyerCompanyId` is empty (Organization step is hidden in the international flow, so it never gets filled).
-- `existingVendor.tenant_id` may not yet be hydrated (or vendor row not yet created).
-- The `tenantId` computed in `VendorRegistration.tsx` line 209 resolves to `null`.
-- `IntlCompanyDetailsStep` receives `tenantId={null}`, the tenant query is disabled, and the field renders "Not assigned".
+`Create Vendor` navigates to `/vendor/registration?onBehalf=1`. The bootstrap effect in `src/pages/VendorRegistration.tsx` then creates the on-behalf `vendor_invitations` row using:
+
+```ts
+const tenantId = allowedTenants[0].id;
+```
+
+`allowedTenants[0]` is just the first tenant the user is mapped to — for this user that's RECEPS LIMITED. The buyer's header selection (`activeTenantId` from `useTenantContext`) is never consulted, so the invitation (and therefore the form's Buyer Company) is wrong whenever the buyer has more than one allowed tenant and the active one isn't first in the list.
+
+The other on-behalf entry point (`createVendorOnBehalf` mutation in `AdminInvitations.tsx`) already does this correctly via `effectiveTenantId`. Only the `?onBehalf=1` bootstrap path is broken.
 
 ## Fix
 
-Resolve the buyer's tenant from the **on-behalf invitation row** itself whenever we're in on-behalf mode, regardless of whether bootstrap ran in this session. Use it both to populate the display and to ensure the vendor row is saved with the correct `tenant_id`.
+Make the bootstrap effect honor the header's active tenant.
 
 ### Changes
 
-1. **`src/pages/VendorRegistration.tsx`**
-   - Add a query (keyed on `onBehalfInvitationId`) that fetches `vendor_invitations.tenant_id` whenever `isOnBehalfMode && onBehalfInvitationId` is set.
-   - When that query returns, if `formData.organization.buyerCompanyId` is empty, seed it with the invitation's `tenant_id` (mirrors what the bootstrap effect does on the first visit).
-   - Extend the `tenantId` derivation (line 209) to also fall back to the invitation's `tenant_id`:
+1. **`src/pages/VendorRegistration.tsx`** — inside the `?onBehalf=1` bootstrap effect:
+   - Resolve the tenant as:
      ```
-     existingVendor?.tenant_id
-       || formData.organization.buyerCompanyId
-       || onBehalfInvitation?.tenant_id
-       || null
+     const headerTenantId =
+       activeTenantId && allowedTenants.some((t) => t.id === activeTenantId)
+         ? activeTenantId
+         : null;
+     const tenantId = headerTenantId ?? allowedTenants[0].id;
      ```
-   - Also pick up `onBehalfInvitationId` from the URL on mount (currently only set inside the bootstrap effect), so refreshes of `?onBehalfOf=...` URLs hydrate the state and the `useVendorRegistration` hook scopes correctly.
+   - Use this `tenantId` for both the `vendor_invitations` insert (`tenant_id`) and for seeding `formData.organization.buyerCompanyId`.
+   - Add `activeTenantId` to the effect's dependency array.
+   - Guard: if the user has multiple `allowedTenants` and `activeTenantId` is null (super-admin "All Tenants" state), toast "Please select a company in the header" and abort instead of silently picking the first one.
 
-2. **No changes to** `IntlCompanyDetailsStep.tsx`, `useVendorRegistration.tsx`, or any edge function — the field already works correctly once it receives a non-null `tenantId`.
+2. **No changes to** `AdminInvitations.tsx` (already uses `effectiveTenantId`), `IntlCompanyDetailsStep.tsx`, `useVendorRegistration.tsx`, or any edge function.
 
 ### Validation
 
-- Open a fresh on-behalf URL `?onBehalf=1` → Buyer Company shows the tenant name (existing behavior, unchanged).
-- Refresh the page on the resulting `?onBehalfOf=<id>` URL → Buyer Company still shows the tenant name (was "Not assigned" before this fix).
-- Continue to Step 2 without filling anything → form blocks with required-field errors (unchanged).
-- Submit the form → vendor row's `tenant_id` matches the invitation's `tenant_id`, and SCM Manager routing continues to work as fixed in the previous turn.
+- With header set to **ECFM India Limited** → click **Create Vendor** → Buyer Company on Step 2 shows **ECFM India Limited**.
+- Switch header to **RECEPS LIMITED** → click **Create Vendor** → Buyer Company shows **RECEPS LIMITED (1127)**.
+- Refresh on `?onBehalfOf=<id>` → Buyer Company still correct (existing fix from previous turn still works because `tenant_id` is now stored correctly on the invitation row).
+- Super-admin with "All Tenants" selected → blocked with toast asking to pick a company; no silent mis-assignment.
+- Submit flow still routes to SCM Manager (unchanged).
