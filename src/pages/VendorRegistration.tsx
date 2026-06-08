@@ -190,9 +190,16 @@ export default function VendorRegistration() {
 
 
 
+  // True whenever the URL indicates we're in an on-behalf flow, even before
+  // the new invitation row finishes bootstrapping. Keeps useVendorRegistration
+  // from loading the buyer's previous "self" vendor draft into this session.
+  const isOnBehalfMode =
+    searchParams.get('onBehalf') === '1' || !!searchParams.get('onBehalfOf');
+
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
     onBehalfInvitationId: onBehalfInvitationId || undefined,
+    isOnBehalfMode,
   });
 
   // Custom field values keyed by step_key -> field_name -> value
