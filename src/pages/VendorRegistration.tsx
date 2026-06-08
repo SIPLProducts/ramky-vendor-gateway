@@ -121,7 +121,7 @@ export default function VendorRegistration() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, userRole } = useAuth();
   const { data: allTenants } = useTenants();
-  const { myTenants } = useTenantContext();
+  const { myTenants, activeTenantId } = useTenantContext();
   const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
   const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
 
