@@ -1,40 +1,37 @@
-## Root cause
+## Problem
 
-The "Approval chain not seeded" error on Create Vendor (on-behalf) submit is caused by an authorization mismatch in the `route-vendor-approval` edge function — **not** a missing approval matrix.
+On the International on-behalf registration (`?onBehalfOf=...`), the **Buyer Company** field on Step 2 (Company Details) shows "Not assigned". It only works the very first time the buyer clicks "Create Vendor" (when `?onBehalf=1` triggers the bootstrap effect and seeds `formData.organization.buyerCompanyId`).
 
-What I found in the database for the affected vendor `686173A0`:
+On any later visit/refresh of the same URL — which now carries `?onBehalfOf=<inviteId>` — the bootstrap effect is skipped, so:
 
-- Vendor row exists, `submitted_at` is set, but `status` was overwritten back to `draft` (autosave after submit) and there are **zero** rows in `vendor_approval_progress`.
-- The buyer who submitted on-behalf is `Divya bharathi` with app_role `approver` and custom role `Buyer`.
-- A valid `buyer_approval_flows` row exists for her (SCM Mgr Soumendu, SCM Head skipped, Finance 1, Finance 2, CEO Office configured).
-- `seed_vendor_approval_progress` would succeed if called — the matrix is fine.
+- `formData.organization.buyerCompanyId` is empty (Organization step is hidden in the international flow, so it never gets filled).
+- `existingVendor.tenant_id` may not yet be hydrated (or vendor row not yet created).
+- The `tenantId` computed in `VendorRegistration.tsx` line 209 resolves to `null`.
+- `IntlCompanyDetailsStep` receives `tenantId={null}`, the tenant query is disabled, and the field renders "Not assigned".
 
-The edge function `route-vendor-approval` currently requires one of these roles:
-`['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase', 'vendor']`.
+## Fix
 
-The submitting buyer has neither `approver` nor `Buyer` in that allowlist, so the call returns **403 "Forbidden — insufficient role"**. The frontend then sees no progress rows and shows the "Approval chain not seeded" toast. Because there is no DB trigger bound to `vendors` (only the trigger function exists), nothing else seeds the chain — submission silently fails to enter the workflow.
+Resolve the buyer's tenant from the **on-behalf invitation row** itself whenever we're in on-behalf mode, regardless of whether bootstrap ran in this session. Use it both to populate the display and to ensure the vendor row is saved with the correct `tenant_id`.
 
-Additionally, an autosave fires right after submit and rewrites `vendors.status` back to `draft`, masking the real status and preventing any retry from working cleanly.
+### Changes
 
-## Fix plan
+1. **`src/pages/VendorRegistration.tsx`**
+   - Add a query (keyed on `onBehalfInvitationId`) that fetches `vendor_invitations.tenant_id` whenever `isOnBehalfMode && onBehalfInvitationId` is set.
+   - When that query returns, if `formData.organization.buyerCompanyId` is empty, seed it with the invitation's `tenant_id` (mirrors what the bootstrap effect does on the first visit).
+   - Extend the `tenantId` derivation (line 209) to also fall back to the invitation's `tenant_id`:
+     ```
+     existingVendor?.tenant_id
+       || formData.organization.buyerCompanyId
+       || onBehalfInvitation?.tenant_id
+       || null
+     ```
+   - Also pick up `onBehalfInvitationId` from the URL on mount (currently only set inside the bootstrap effect), so refreshes of `?onBehalfOf=...` URLs hydrate the state and the `useVendorRegistration` hook scopes correctly.
 
-1. **Unblock approval seeding for buyers (root fix)**
-   - In `supabase/functions/route-vendor-approval/index.ts`, drop the over-restrictive role allowlist and require only an authenticated user (same pattern as `buyer-reapprove-rejected`). Seeding logic itself is a `SECURITY DEFINER` RPC scoped to the vendor id, so this is safe.
+2. **No changes to** `IntlCompanyDetailsStep.tsx`, `useVendorRegistration.tsx`, or any edge function — the field already works correctly once it receives a non-null `tenantId`.
 
-2. **Stop autosave from clobbering submitted vendors**
-   - In `src/hooks/useVendorRegistration.tsx` `saveVendorMutation`, never write `status: 'draft'` when updating an existing vendor whose current status is anything other than `draft` / `returned_to_vendor`. Read the current status (or use a guarded update) and omit the `status` field on update so a post-submit autosave cannot revert `scm_manager_review` back to `draft`.
+### Validation
 
-3. **Repair the stuck submission (`686173A0`)**
-   - Re-run `seed_vendor_approval_progress` for this vendor via the fixed edge function (or admin RPC) so it enters `SCM_MANAGER` pending for Soumendu Sen Gupta.
-   - Set `vendors.status = 'scm_manager_review'` so the UI lists it correctly.
-
-4. **Verify**
-   - Confirm `vendor_approval_progress` has rows: `BUYER approved (on-behalf)`, `SCM_MANAGER pending`, `FINANCE_1 pending`, `FINANCE_2 pending` (CEO_OFFICE only if MSME, which this vendor isn't).
-   - Open SCM Manager Approval as Soumendu and confirm `sparkle` appears in the pending list.
-   - Submit a fresh on-behalf vendor end-to-end and confirm it routes to SCM Manager without the red toast.
-
-## Files to change
-
-- `supabase/functions/route-vendor-approval/index.ts` — relax role allowlist.
-- `src/hooks/useVendorRegistration.tsx` — guard autosave so it cannot reset `status` to `draft` post-submit.
-- Data repair migration / admin call for vendor `686173A0`.
+- Open a fresh on-behalf URL `?onBehalf=1` → Buyer Company shows the tenant name (existing behavior, unchanged).
+- Refresh the page on the resulting `?onBehalfOf=<id>` URL → Buyer Company still shows the tenant name (was "Not assigned" before this fix).
+- Continue to Step 2 without filling anything → form blocks with required-field errors (unchanged).
+- Submit the form → vendor row's `tenant_id` matches the invitation's `tenant_id`, and SCM Manager routing continues to work as fixed in the previous turn.

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HorizontalStepIndicator } from '@/components/vendor/HorizontalStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
@@ -196,6 +197,45 @@ export default function VendorRegistration() {
   const isOnBehalfMode =
     searchParams.get('onBehalf') === '1' || !!searchParams.get('onBehalfOf');
 
+  // Pick up the on-behalf invitation id from the URL on mount/refresh so the
+  // hook below scopes correctly even when the bootstrap effect didn't run
+  // (e.g. user refreshed the page after the initial Create Vendor click).
+  useEffect(() => {
+    const fromUrl = searchParams.get('onBehalfOf');
+    if (fromUrl && !onBehalfInvitationId) {
+      setOnBehalfInvitationId(fromUrl);
+    }
+  }, [searchParams, onBehalfInvitationId]);
+
+  // Load the on-behalf invitation row so we can recover the buyer's tenant
+  // (Buyer Company) on refresh — the bootstrap effect only runs on the very
+  // first ?onBehalf=1 visit, after which the URL becomes ?onBehalfOf=<id>.
+  const { data: onBehalfInvitation } = useQuery({
+    queryKey: ['on-behalf-invitation', onBehalfInvitationId],
+    enabled: !!onBehalfInvitationId && isOnBehalfMode,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendor_invitations')
+        .select('id, tenant_id, email, token')
+        .eq('id', onBehalfInvitationId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Seed buyerCompanyId from the invitation once it loads, so the Buyer Company
+  // display on the international Company Details step is populated on refresh.
+  useEffect(() => {
+    const invTenantId = (onBehalfInvitation as { tenant_id?: string } | null)?.tenant_id;
+    if (!invTenantId) return;
+    setFormData((prev) =>
+      prev.organization.buyerCompanyId
+        ? prev
+        : { ...prev, organization: { ...prev.organization, buyerCompanyId: invTenantId } },
+    );
+  }, [onBehalfInvitation]);
+
   const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
     onBehalfInvitationId: onBehalfInvitationId || undefined,
@@ -206,7 +246,11 @@ export default function VendorRegistration() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, Record<string, unknown>>>({});
 
   // Pull dynamic schema for this vendor's tenant (admin-defined extra tabs)
-  const tenantId = (existingVendor as { tenant_id?: string } | null)?.tenant_id || formData.organization.buyerCompanyId || null;
+  const tenantId =
+    (existingVendor as { tenant_id?: string } | null)?.tenant_id
+    || formData.organization.buyerCompanyId
+    || (onBehalfInvitation as { tenant_id?: string } | null)?.tenant_id
+    || null;
   const { data: dynamicSchema } = useDynamicFormSchema(tenantId);
   const customSteps = dynamicSchema?.steps || [];
   const fieldsByStep = dynamicSchema?.fieldsByStep || {};
