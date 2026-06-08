@@ -141,9 +141,24 @@ Deno.serve(async (req) => {
       console.warn('action_link normalization failed:', e);
     }
 
+    // Also expose the OTP token_hash so the client can verify via the SDK
+    // (avoids browser-level hits to /auth/v1/verify which may not be
+    // proxied through Nginx on self-hosted deployments).
+    let tokenHash: string | null = null;
+    let otpType: string | null = null;
+    try {
+      const raw = new URL(linkData.properties.action_link as string);
+      tokenHash = raw.searchParams.get('token');
+      otpType = raw.searchParams.get('type');
+    } catch (e) {
+      console.warn('action_link token extraction failed:', e);
+    }
+
     return new Response(
       JSON.stringify({
         action_link: actionLink,
+        token_hash: tokenHash,
+        otp_type: otpType,
         email,
         invitation_id: invite.id,
       }),
