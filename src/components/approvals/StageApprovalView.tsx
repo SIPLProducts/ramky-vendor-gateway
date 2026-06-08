@@ -243,7 +243,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           ) : (
             rows.map((it) => (
               <TableRow key={it.vendorId}>
-                <TableCell className="font-medium">{it.vendorName}</TableCell>
+                <TableCell className="font-medium">
+                  <div>{it.vendorName}</div>
+                  <div className="text-xs text-muted-foreground font-mono mt-0.5">ID: {it.vendorId}</div>
+                  {it.isOnBehalf && (
+                    <Badge variant="secondary" className="mt-1">On-behalf</Badge>
+                  )}
+                </TableCell>
+
                 <TableCell>
                   <Badge variant="destructive">
                     {it.rejectionFromStage
