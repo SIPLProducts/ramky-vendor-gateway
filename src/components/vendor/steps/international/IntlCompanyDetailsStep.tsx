@@ -31,11 +31,26 @@ interface Props {
   data: InternationalCompanyDetails;
   onSubmit: (data: InternationalCompanyDetails) => void;
   onLiveUpdate?: (data: InternationalCompanyDetails) => void;
+  tenantId?: string | null;
 }
 
-export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
+export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId }: Props) {
   const { rows: countries, fetching: countriesFetching, errorMessage: countriesError, retry: retryCountries } = useEnsureSapMaster('country');
   const { rows: regions, fetching: regionsFetching, errorMessage: regionsError, retry: retryRegions } = useEnsureSapMaster('region');
+
+  const { data: buyerCompany, isLoading: buyerCompanyLoading } = useQuery({
+    queryKey: ['tenant-buyer-company', tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name, code')
+        .eq('id', tenantId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const {
     register, control, handleSubmit, watch, setValue,
