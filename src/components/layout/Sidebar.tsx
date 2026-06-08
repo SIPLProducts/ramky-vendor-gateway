@@ -313,6 +313,13 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                 Settings
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setChangePasswordOpen(true)}
+              className="cursor-pointer"
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Change Password
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />
@@ -320,6 +327,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 
         {/* Copyright - only show when expanded */}
         {!collapsed && (
