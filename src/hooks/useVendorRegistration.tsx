@@ -778,7 +778,14 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         // `user_id = auth.uid()` to match the row's existing owner. Sending a
         // (possibly stale or null) user_id from the client races with session
         // refresh and triggers "new row violates row-level security policy".
-        const { user_id: _ignoreUserId, ...updatePayload } = vendorData as VendorRecord & { user_id?: string };
+        const { user_id: _ignoreUserId, status: _ignoreStatus, ...updatePayload } = vendorData as VendorRecord & { user_id?: string; status?: string };
+        // Never let an autosave revert a submitted vendor back to 'draft'.
+        // Only allow status changes when the existing row is still a draft or
+        // has been explicitly returned to the vendor for edits.
+        const existingStatus = (existingVendor as any)?.status as string | undefined;
+        if (existingStatus === 'draft' || existingStatus === 'returned_to_vendor' || !existingStatus) {
+          (updatePayload as any).status = 'draft';
+        }
         // Preserve tenant_id from the existing row when the form briefly clears it
         // (e.g. before invitation/existingVendor has hydrated buyerCompanyId).
         if (!updatePayload.tenant_id && (existingVendor as any)?.tenant_id) {
