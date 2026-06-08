@@ -45,6 +45,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const { isSubscribed, subscribe, permission } = usePushNotifications();
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const {
     myTenants, activeTenantId, setActiveTenantId,
     isSuperAdmin, isCrossTenantReviewer, isScmManager,
