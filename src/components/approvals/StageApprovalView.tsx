@@ -67,7 +67,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         vendor_id: actionItem.item.vendorId,
         details: { stage, level_number: actionItem.item.levelNumber, comments },
       });
-      toast({ title: actionItem.action === 'approve' ? 'Approved' : 'Rejected' });
+      toast({
+        title:
+          actionItem.action === 'approve'
+            ? 'Approved'
+            : isBuyer
+              ? 'Sent back to vendor'
+              : 'Rejected',
+      });
       setActionItem(null);
       setComments('');
       await refresh();
