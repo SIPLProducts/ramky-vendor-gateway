@@ -1,40 +1,41 @@
 ## Goal
+When a vendor application is rejected at any stage **after the Buyer** (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office), the application is already routed back to the originating Buyer (`vendors.status = 'returned_to_buyer'`). What is missing is a **rejection email to that Buyer**. Add it, using the No-Reply SMTP sender configured in **Email Configuration → No-Reply Email**.
 
-Make it obvious to the Buyer that clicking the red action at the Buyer Approval stage will return the application to the vendor for correction (not permanently reject it). Backend behavior is already correct — only UI wording changes.
+No changes to the Buyer-stage "Send Back to Vendor" flow (that already emails the vendor).
 
-## Background
+## Where it changes
+Single file: `supabase/functions/process-approval-action/index.ts`, in the `action === 'reject'` branch for the **non-buyer** path (right after `vendors.status = 'returned_to_buyer'` is set and the audit log is written, before returning the response).
 
-When the Buyer clicks **Reject** on the Buyer Approval screen today, `process-approval-action` already:
-- Marks the buyer approval row as `rejected`
-- Sets `vendors.status = returned_to_vendor`
-- Emails the vendor via `send-status-notification` so they can log in, fix the issues, and resubmit
-- Logs `vendor_buyer_rejected` in `audit_logs`
+## Logic added
+1. Look up the originating Buyer from `vendor_invitations.created_by` (already loaded as `invite.created_by`), then fetch their email + full name from `profiles`.
+2. Fetch from `vendors`: `legal_name`, `vendor_reference_number` (or `vendor_code` / fallback to vendor id short form — pick the first non-null of `vendor_reference_number`, `vendor_code`, `id`).
+3. Fetch the rejecter's name + email from `profiles` using `userId`.
+4. Format date/time as `dd MMM yyyy, HH:mm` IST (`Asia/Kolkata`).
+5. Invoke `send-smtp-email` edge function (which already reads the No-Reply config from `portal_config.smtp_from_email` / host / password):
 
-So "Reject" at the Buyer stage **is** the "send back to vendor" flow. The label is just misleading. At later stages (SCM Manager / SCM Head / Finance / CEO) Reject means "return to the Buyer" — that behavior must stay unchanged.
+   - `to`: buyer email
+   - `subject`: `Vendor Application Rejected`
+   - `html`: clean table with these rows
+     - Vendor Name
+     - Vendor Reference Number
+     - Rejected By (Name `<email>`)
+     - Rejection Stage (human label of `curStage`)
+     - Rejection Remarks (the `comments` value)
+     - Rejection Date & Time (IST)
+     - A short line: "The application has been returned to you for correction. Please log in to the portal to review and resubmit."
 
-## Changes (UI-only, scoped to `BUYER` stage)
+6. Wrap the call in `try/catch` and `console.warn` on failure — never block the rejection response on email failure (same pattern already used for the Buyer→Vendor email).
+7. Best-effort `audit_logs` insert with `action: 'buyer_notified_rejection_email'` and details `{ buyer_email, stage, vendor_id }`.
 
-File: `src/components/approvals/StageApprovalView.tsx`
-
-1. When `stage === 'BUYER'`, render the destructive action as **"Send Back to Vendor"** with a return-arrow icon (e.g. `Undo2` or `RotateCcw`) instead of `XCircle` + "Reject". For all other stages, keep "Reject" + `XCircle` as-is.
-2. In the confirmation dialog opened by `setActionItem({ item, action: 'reject' })`:
-   - Title at Buyer stage → `Send back to vendor — {vendorName}`
-   - Body copy → "The vendor will receive an email and can edit the form and resubmit. Please add remarks describing what needs to be corrected."
-   - Make the remarks textarea **required** at Buyer stage (disable the confirm button until non-empty) — the vendor needs to know what to fix. Other stages keep the current "recommended" behavior.
-   - Confirm button label at Buyer stage → `Send Back to Vendor`. Other stages keep `Reject`.
-3. No changes to the API call — it still invokes `process-approval-action` with `action: 'reject'`. Toast message at Buyer stage updates to "Sent back to vendor".
-
-## Out of scope (not touched)
-
-- `supabase/functions/process-approval-action/index.ts` — already correct.
-- `buyer-return-to-vendor` edge function — used only from the "Rejected" tab when a downstream approver returned the vendor to the Buyer; unchanged.
+## Out of scope (do NOT touch)
+- `StageApprovalView.tsx` UI (labels, dialog).
+- Buyer-stage rejection (already emails vendor via `send-status-notification`).
 - Approval chain / matrix / seeding logic.
-- Reject behavior at SCM Manager, SCM Head, Finance 1/2, CEO Office.
-- Vendor-side resubmit flow (already works via `trg_vendors_seed_approval` on `returned_to_vendor → buyer_review`).
+- `send-smtp-email` function itself (already reads from `portal_config` No-Reply settings).
+- No new tables, no migrations.
 
 ## Verification
-
-1. Buyer approval list → click red action → dialog now says "Send back to vendor", remarks required.
-2. Submit → vendor status becomes `returned_to_vendor`, vendor receives email, item moves out of Buyer's pending list.
-3. Vendor logs in, edits, resubmits → returns to Buyer's Pending Approval tab.
-4. Confirm SCM Manager / Finance Reject buttons still say "Reject" and still return to Buyer (no regression).
+1. SCM Manager rejects a vendor → Buyer receives email titled "Vendor Application Rejected" with all 5 required fields populated.
+2. Finance 1 rejects → same email to the same Buyer.
+3. Vendor status flips to `returned_to_buyer` as before; Buyer-stage reject still emails the vendor (unchanged).
+4. Edge function logs show `send-smtp-email` invoked with the no-reply From address.
