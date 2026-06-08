@@ -137,6 +137,80 @@ Deno.serve(async (req) => {
         action: 'vendor_rejected_returned_to_buyer', user_id: userId, vendor_id: progress.vendor_id,
         details: { comments, from_stage: curStage },
       });
+
+      // Notify the originating Buyer by email (No-Reply SMTP)
+      try {
+        const stageLabels: Record<string, string> = {
+          SCM_MANAGER: 'SCM Manager',
+          SCM_HEAD: 'SCM Head',
+          FINANCE_1: 'Finance 1',
+          FINANCE_2: 'Finance 2',
+          CEO_OFFICE: 'CEO Office',
+        };
+        const buyerId = (invite as any)?.created_by ?? null;
+        if (buyerId) {
+          const [{ data: buyerProfile }, { data: rejecterProfile }, { data: vendorRow }] = await Promise.all([
+            admin.from('profiles').select('email, full_name').eq('id', buyerId).maybeSingle(),
+            admin.from('profiles').select('email, full_name').eq('id', userId).maybeSingle(),
+            admin.from('vendors')
+              .select('legal_name, vendor_reference_number, vendor_code, id')
+              .eq('id', progress.vendor_id).maybeSingle(),
+          ]);
+          const buyerEmail = (buyerProfile as any)?.email;
+          if (buyerEmail) {
+            const vendorName = (vendorRow as any)?.legal_name ?? 'Vendor';
+            const vendorRef = (vendorRow as any)?.vendor_reference_number
+              ?? (vendorRow as any)?.vendor_code
+              ?? String((vendorRow as any)?.id ?? progress.vendor_id).slice(0, 8);
+            const rejecterName = (rejecterProfile as any)?.full_name ?? 'Approver';
+            const rejecterEmail = (rejecterProfile as any)?.email ?? '';
+            const stageLabel = stageLabels[curStage] ?? curStage;
+            const rejectedAtIst = new Date(nowIso).toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', hour12: false,
+            }) + ' IST';
+            const esc = (s: string) => String(s ?? '')
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const row = (k: string, v: string) =>
+              `<tr><td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f9fafb;font-weight:600;width:38%">${esc(k)}</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(v)}</td></tr>`;
+            const html = `
+              <div style="font-family:Arial,sans-serif;color:#111;max-width:640px;margin:auto">
+                <h2 style="color:#b91c1c;margin:0 0 12px">Vendor Application Rejected</h2>
+                <p>Dear ${esc((buyerProfile as any)?.full_name ?? 'Buyer')},</p>
+                <p>The vendor application below has been <b>rejected</b> at the <b>${esc(stageLabel)}</b> stage and routed back to you for correction.</p>
+                <table style="border-collapse:collapse;width:100%;margin:12px 0;font-size:14px">
+                  ${row('Vendor Name', vendorName)}
+                  ${row('Vendor Reference Number', vendorRef)}
+                  ${row('Rejected By', `${rejecterName}${rejecterEmail ? ` <${rejecterEmail}>` : ''}`)}
+                  ${row('Rejection Stage', stageLabel)}
+                  ${row('Rejection Remarks', comments ?? '—')}
+                  ${row('Rejection Date & Time', rejectedAtIst)}
+                </table>
+                <p>Please log in to the Vendor Portal to review the remarks and resubmit the application.</p>
+                <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Sharvi Vendor Portal.</p>
+              </div>`;
+            await admin.functions.invoke('send-smtp-email', {
+              body: {
+                to: buyerEmail,
+                subject: 'Vendor Application Rejected',
+                html,
+              },
+            });
+            try {
+              await admin.from('audit_logs').insert({
+                action: 'buyer_notified_rejection_email',
+                user_id: userId,
+                vendor_id: progress.vendor_id,
+                details: { buyer_email: buyerEmail, stage: curStage },
+              });
+            } catch (_) { /* ignore */ }
+          }
+        }
+      } catch (e) {
+        console.warn('buyer rejection email failed', e);
+      }
+
       return new Response(JSON.stringify({ ok: true, vendor_status: 'returned_to_buyer', from_stage: curStage }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
