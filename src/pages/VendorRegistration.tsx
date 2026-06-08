@@ -1378,7 +1378,7 @@ export default function VendorRegistration() {
         {/* Form Card */}
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           {/* Rejection remarks banner — shown when a buyer/approver has returned the application to the vendor */}
-          {vendorStatusState === 'returned_to_vendor' && (existingVendor as any)?.last_rejection_comments && (
+          {(vendorStatusState === 'returned_to_vendor' || vendorStatusState === 'returned_to_buyer') && (existingVendor as any)?.last_rejection_comments && (
             <div className="mb-4 rounded-[10px] border border-destructive/40 bg-destructive/5 p-4">
               <div className="flex items-start gap-3">
                 <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
