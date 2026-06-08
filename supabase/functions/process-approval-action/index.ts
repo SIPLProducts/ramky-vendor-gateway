@@ -64,16 +64,19 @@ Deno.serve(async (req) => {
     const isBuyerRow = curStage === 'BUYER';
 
     // Authorise
+    let invitingBuyerId: string | null = null;
     if (isBuyerRow) {
       const { data: invite } = await admin
         .from('vendor_invitations').select('created_by').eq('vendor_id', progress.vendor_id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!invite || invite.created_by !== userId) throw new Error('You are not the buyer for this vendor');
+      invitingBuyerId = invite.created_by ?? null;
     } else {
       const { data: invite } = await admin
         .from('vendor_invitations').select('created_by').eq('vendor_id', progress.vendor_id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!invite?.created_by) throw new Error('No inviting buyer recorded for vendor');
+      invitingBuyerId = invite.created_by;
       const col = STAGE_TO_FLOW_COL[curStage];
       if (!col) throw new Error(`Unknown stage ${curStage}`);
       const { data: flow } = await admin
