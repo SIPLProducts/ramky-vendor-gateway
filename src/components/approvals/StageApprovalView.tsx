@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2 } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
