@@ -43,6 +43,10 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [rejectedAction, setRejectedAction] = useState<{ item: StageApprovalItem; action: RejectedAction } | null>(null);
   const [rejectedRemarks, setRejectedRemarks] = useState('');
   const [rejectedSubmitting, setRejectedSubmitting] = useState(false);
+  const [forceRejectPrompt, setForceRejectPrompt] = useState<
+    { item: StageApprovalItem; comments: string; error: string } | null
+  >(null);
+  const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
 
   const isBuyer = stage === 'BUYER';
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
@@ -53,7 +57,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!actionItem) return;
     setSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke('process-approval-action', {
+      const { data, error } = await supabase.functions.invoke('process-approval-action', {
         body: {
           progress_id: actionItem.item.progressId,
           action: actionItem.action,
@@ -61,20 +65,47 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         },
       });
       if (error) throw error;
+
+      // Non-buyer rejection: email may have failed → ask for confirmation.
+      if (
+        actionItem.action === 'reject' &&
+        !isBuyer &&
+        data &&
+        (data as any).requires_confirmation === true
+      ) {
+        toast({
+          title: 'Unable to send the rejection email due to a mail service issue.',
+          variant: 'destructive',
+        });
+        setForceRejectPrompt({
+          item: actionItem.item,
+          comments: comments.trim() || '',
+          error: (data as any).error ?? '',
+        });
+        return;
+      }
+
       await supabase.from('audit_logs').insert({
         action: `vendor_${actionItem.action}d_at_${stage.toLowerCase()}`,
         user_id: user?.id,
         vendor_id: actionItem.item.vendorId,
         details: { stage, level_number: actionItem.item.levelNumber, comments },
       });
-      toast({
-        title:
-          actionItem.action === 'approve'
-            ? 'Approved'
-            : isBuyer
-              ? 'Sent back to vendor'
-              : 'Rejected',
-      });
+
+      if (actionItem.action === 'reject' && !isBuyer) {
+        toast({
+          title: 'Rejection email sent successfully to the Buyer.',
+        });
+      } else {
+        toast({
+          title:
+            actionItem.action === 'approve'
+              ? 'Approved'
+              : isBuyer
+                ? 'Sent back to vendor'
+                : 'Rejected',
+        });
+      }
       setActionItem(null);
       setComments('');
       await refresh();
@@ -82,6 +113,31 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const confirmForceReject = async () => {
+    if (!forceRejectPrompt || !actionItem) return;
+    setForceRejectSubmitting(true);
+    try {
+      const { error } = await supabase.functions.invoke('process-approval-action', {
+        body: {
+          progress_id: actionItem.item.progressId,
+          action: 'reject',
+          comments: forceRejectPrompt.comments || null,
+          force: true,
+        },
+      });
+      if (error) throw error;
+      toast({ title: 'Rejected (email could not be delivered).' });
+      setForceRejectPrompt(null);
+      setActionItem(null);
+      setComments('');
+      await refresh();
+    } catch (err: any) {
+      toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setForceRejectSubmitting(false);
     }
   };
 
@@ -483,6 +539,41 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         open={!!previewVendorId}
         onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
       />
+
+      <Dialog
+        open={!!forceRejectPrompt}
+        onOpenChange={(o) => { if (!o && !forceRejectSubmitting) setForceRejectPrompt(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rejection email could not be sent</DialogTitle>
+            <DialogDescription>
+              Rejection email could not be sent. Do you still want to continue with the rejection?
+            </DialogDescription>
+          </DialogHeader>
+          {forceRejectPrompt?.error && (
+            <div className="text-xs text-muted-foreground border rounded p-2 bg-muted/30 break-words">
+              {forceRejectPrompt.error}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setForceRejectPrompt(null)}
+              disabled={forceRejectSubmitting}
+            >
+              No
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmForceReject}
+              disabled={forceRejectSubmitting}
+            >
+              {forceRejectSubmitting ? 'Rejecting...' : 'Yes, reject anyway'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

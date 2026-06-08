@@ -27,12 +27,13 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { progress_id, action, comments } = await req.json();
+    const { progress_id, action, comments, force } = await req.json();
     if (!progress_id || !['approve', 'reject'].includes(action)) {
       return new Response(JSON.stringify({ error: 'Invalid input' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    const forceReject = force === true;
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -63,16 +64,19 @@ Deno.serve(async (req) => {
     const isBuyerRow = curStage === 'BUYER';
 
     // Authorise
+    let invitingBuyerId: string | null = null;
     if (isBuyerRow) {
       const { data: invite } = await admin
         .from('vendor_invitations').select('created_by').eq('vendor_id', progress.vendor_id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!invite || invite.created_by !== userId) throw new Error('You are not the buyer for this vendor');
+      invitingBuyerId = invite.created_by ?? null;
     } else {
       const { data: invite } = await admin
         .from('vendor_invitations').select('created_by').eq('vendor_id', progress.vendor_id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (!invite?.created_by) throw new Error('No inviting buyer recorded for vendor');
+      invitingBuyerId = invite.created_by;
       const col = STAGE_TO_FLOW_COL[curStage];
       if (!col) throw new Error(`Unknown stage ${curStage}`);
       const { data: flow } = await admin
@@ -95,10 +99,6 @@ Deno.serve(async (req) => {
     const nowIso = new Date().toISOString();
 
     if (action === 'reject') {
-      await admin.from('vendor_approval_progress').update({
-        status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
-      }).eq('id', progress_id);
-
       const vendorRejectionPatch: Record<string, unknown> = {
         last_rejection_comments: comments ?? null,
         last_rejection_stage: curStage,
@@ -107,6 +107,9 @@ Deno.serve(async (req) => {
       };
 
       if (isBuyerRow) {
+        await admin.from('vendor_approval_progress').update({
+          status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
+        }).eq('id', progress_id);
         await admin.from('vendors').update({ status: 'returned_to_vendor', ...vendorRejectionPatch }).eq('id', progress.vendor_id);
         await admin.from('audit_logs').insert({
           action: 'vendor_buyer_rejected', user_id: userId, vendor_id: progress.vendor_id, details: { comments },
@@ -129,35 +132,33 @@ Deno.serve(async (req) => {
         });
       }
 
-      await admin.from('vendor_approval_progress')
-        .update({ status: 'cancelled', acted_at: nowIso, completed_at: nowIso })
-        .eq('vendor_id', progress.vendor_id).eq('status', 'pending');
-      await admin.from('vendors').update({ status: 'returned_to_buyer', ...vendorRejectionPatch }).eq('id', progress.vendor_id);
-      await admin.from('audit_logs').insert({
-        action: 'vendor_rejected_returned_to_buyer', user_id: userId, vendor_id: progress.vendor_id,
-        details: { comments, from_stage: curStage },
-      });
+      // Non-buyer stage rejection: pre-flight buyer notification email first.
+      const stageLabels: Record<string, string> = {
+        SCM_MANAGER: 'SCM Manager',
+        SCM_HEAD: 'SCM Head',
+        FINANCE_1: 'Finance 1',
+        FINANCE_2: 'Finance 2',
+        CEO_OFFICE: 'CEO Office',
+      };
 
-      // Notify the originating Buyer by email (No-Reply SMTP)
-      try {
-        const stageLabels: Record<string, string> = {
-          SCM_MANAGER: 'SCM Manager',
-          SCM_HEAD: 'SCM Head',
-          FINANCE_1: 'Finance 1',
-          FINANCE_2: 'Finance 2',
-          CEO_OFFICE: 'CEO Office',
-        };
-        const buyerId = (invite as any)?.created_by ?? null;
-        if (buyerId) {
+      let emailSent = false;
+      let emailError: string | null = null;
+      let buyerEmailUsed: string | null = null;
+
+      if (invitingBuyerId) {
+        try {
           const [{ data: buyerProfile }, { data: rejecterProfile }, { data: vendorRow }] = await Promise.all([
-            admin.from('profiles').select('email, full_name').eq('id', buyerId).maybeSingle(),
+            admin.from('profiles').select('email, full_name').eq('id', invitingBuyerId).maybeSingle(),
             admin.from('profiles').select('email, full_name').eq('id', userId).maybeSingle(),
             admin.from('vendors')
               .select('legal_name, vendor_reference_number, vendor_code, id')
               .eq('id', progress.vendor_id).maybeSingle(),
           ]);
           const buyerEmail = (buyerProfile as any)?.email;
-          if (buyerEmail) {
+          if (!buyerEmail) {
+            emailError = 'Buyer email not found in profile.';
+          } else {
+            buyerEmailUsed = buyerEmail;
             const vendorName = (vendorRow as any)?.legal_name ?? 'Vendor';
             const vendorRef = (vendorRow as any)?.vendor_reference_number
               ?? (vendorRow as any)?.vendor_code
@@ -190,30 +191,64 @@ Deno.serve(async (req) => {
                 <p>Please log in to the Vendor Portal to review the remarks and resubmit the application.</p>
                 <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Sharvi Vendor Portal.</p>
               </div>`;
-            await admin.functions.invoke('send-smtp-email', {
-              body: {
-                to: buyerEmail,
-                subject: 'Vendor Application Rejected',
-                html,
-              },
+            const { data: emailResp, error: emailInvokeErr } = await admin.functions.invoke('send-smtp-email', {
+              body: { to: buyerEmail, subject: 'Vendor Application Rejected', html },
             });
-            try {
-              await admin.from('audit_logs').insert({
-                action: 'buyer_notified_rejection_email',
-                user_id: userId,
-                vendor_id: progress.vendor_id,
-                details: { buyer_email: buyerEmail, stage: curStage },
-              });
-            } catch (_) { /* ignore */ }
+            if (emailInvokeErr) {
+              emailError = emailInvokeErr.message ?? 'SMTP invoke failed';
+            } else if (emailResp && (emailResp as any).success === false) {
+              emailError = (emailResp as any).error ?? 'SMTP send failed';
+            } else {
+              emailSent = true;
+            }
           }
+        } catch (e: any) {
+          emailError = e?.message ?? String(e);
         }
-      } catch (e) {
-        console.warn('buyer rejection email failed', e);
+      } else {
+        emailError = 'No inviting buyer recorded for vendor.';
       }
 
-      return new Response(JSON.stringify({ ok: true, vendor_status: 'returned_to_buyer', from_stage: curStage }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // If the email failed and the caller did not explicitly force, abort
+      // the rejection so the vendor stays in the current stage.
+      if (!emailSent && !forceReject) {
+        console.warn('buyer rejection email failed; awaiting confirmation', emailError);
+        return new Response(JSON.stringify({
+          ok: false,
+          email_sent: false,
+          requires_confirmation: true,
+          error: emailError ?? 'Unable to send rejection email.',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Proceed with rejection (email sent OR forced).
+      await admin.from('vendor_approval_progress').update({
+        status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
+      }).eq('id', progress_id);
+      await admin.from('vendor_approval_progress')
+        .update({ status: 'cancelled', acted_at: nowIso, completed_at: nowIso })
+        .eq('vendor_id', progress.vendor_id).eq('status', 'pending');
+      await admin.from('vendors').update({ status: 'returned_to_buyer', ...vendorRejectionPatch }).eq('id', progress.vendor_id);
+      await admin.from('audit_logs').insert({
+        action: 'vendor_rejected_returned_to_buyer', user_id: userId, vendor_id: progress.vendor_id,
+        details: { comments, from_stage: curStage },
       });
+      try {
+        await admin.from('audit_logs').insert({
+          action: emailSent ? 'buyer_notified_rejection_email' : 'buyer_rejection_email_failed',
+          user_id: userId,
+          vendor_id: progress.vendor_id,
+          details: { buyer_email: buyerEmailUsed, stage: curStage, email_error: emailError },
+        });
+      } catch (_) { /* ignore */ }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        vendor_status: 'returned_to_buyer',
+        from_stage: curStage,
+        email_sent: emailSent,
+        email_error: emailSent ? null : emailError,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // APPROVE

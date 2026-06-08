@@ -1,41 +1,41 @@
 ## Goal
-When a vendor application is rejected at any stage **after the Buyer** (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office), the application is already routed back to the originating Buyer (`vendors.status = 'returned_to_buyer'`). What is missing is a **rejection email to that Buyer**. Add it, using the No-Reply SMTP sender configured in **Email Configuration → No-Reply Email**.
+Fix the buyer-rejection email so it actually sends, and add clear UI feedback (toast + a "force reject" confirmation popup if email fails).
 
-No changes to the Buyer-stage "Send Back to Vendor" flow (that already emails the vendor).
+## 1. Edge function fix — `supabase/functions/process-approval-action/index.ts`
 
-## Where it changes
-Single file: `supabase/functions/process-approval-action/index.ts`, in the `action === 'reject'` branch for the **non-buyer** path (right after `vendors.status = 'returned_to_buyer'` is set and the audit log is written, before returning the response).
+Root cause: the rejection email block references `(invite as any)?.created_by`, but `invite` is declared only inside the authorisation `if (isBuyerRow) { ... } else { ... }` blocks. After those blocks close, `invite` is out of scope → `ReferenceError` → no email sent (vendor still flips to `returned_to_buyer`, which is why it appears in the Buyer Rejected tab).
 
-## Logic added
-1. Look up the originating Buyer from `vendor_invitations.created_by` (already loaded as `invite.created_by`), then fetch their email + full name from `profiles`.
-2. Fetch from `vendors`: `legal_name`, `vendor_reference_number` (or `vendor_code` / fallback to vendor id short form — pick the first non-null of `vendor_reference_number`, `vendor_code`, `id`).
-3. Fetch the rejecter's name + email from `profiles` using `userId`.
-4. Format date/time as `dd MMM yyyy, HH:mm` IST (`Asia/Kolkata`).
-5. Invoke `send-smtp-email` edge function (which already reads the No-Reply config from `portal_config.smtp_from_email` / host / password):
+Changes:
+- Hoist a single `let invitingBuyerId: string | null = null;` before the authorisation branches.
+- Inside both branches, assign `invitingBuyerId = invite?.created_by ?? null;` from the existing query (no extra DB call).
+- In the post-rejection email block, use `invitingBuyerId` instead of `(invite as any)?.created_by`.
+- Add a new request flag `force?: boolean` (default `false`). For non-buyer rejections:
+  - Attempt `send-smtp-email` first (before flipping vendor status).
+  - If it succeeds → proceed with status update, audit log `buyer_notified_rejection_email`, return `{ ok: true, email_sent: true }`.
+  - If it fails AND `force !== true` → DO NOT update vendor status, DO NOT cancel pending rows. Return `{ ok: false, email_sent: false, requires_confirmation: true, error: '<smtp message>' }` with HTTP 200.
+  - If it fails AND `force === true` → proceed with rejection anyway, audit log `buyer_rejection_email_failed`, return `{ ok: true, email_sent: false }`.
+- Buyer-stage "Send Back to Vendor" flow is unchanged.
 
-   - `to`: buyer email
-   - `subject`: `Vendor Application Rejected`
-   - `html`: clean table with these rows
-     - Vendor Name
-     - Vendor Reference Number
-     - Rejected By (Name `<email>`)
-     - Rejection Stage (human label of `curStage`)
-     - Rejection Remarks (the `comments` value)
-     - Rejection Date & Time (IST)
-     - A short line: "The application has been returned to you for correction. Please log in to the portal to review and resubmit."
+## 2. UI — `src/components/approvals/StageApprovalView.tsx`
 
-6. Wrap the call in `try/catch` and `console.warn` on failure — never block the rejection response on email failure (same pattern already used for the Buyer→Vendor email).
-7. Best-effort `audit_logs` insert with `action: 'buyer_notified_rejection_email'` and details `{ buyer_email, stage, vendor_id }`.
+In `submit()` for non-Buyer rejection:
+- Call `process-approval-action` and read the JSON response (use `data` from `functions.invoke`).
+- If `data.requires_confirmation === true`:
+  - Open a new `AlertDialog` (or `Dialog`) titled "Rejection email could not be sent" with body "Rejection email could not be sent. Do you still want to continue with the rejection?" and buttons **Yes** / **No**.
+  - **No** → close popup, keep action dialog open, vendor stays in current stage. Toast: `Unable to send the rejection email due to a mail service issue.` (destructive).
+  - **Yes** → re-invoke `process-approval-action` with `force: true`. On success show toast `Rejected (email could not be delivered).`
+- If `data.ok === true && data.email_sent === true` → toast `Rejection email sent successfully to the Buyer.` (success).
+- Approve flow and Buyer "Send back to vendor" flow keep their existing toasts.
 
-## Out of scope (do NOT touch)
-- `StageApprovalView.tsx` UI (labels, dialog).
-- Buyer-stage rejection (already emails vendor via `send-status-notification`).
-- Approval chain / matrix / seeding logic.
-- `send-smtp-email` function itself (already reads from `portal_config` No-Reply settings).
-- No new tables, no migrations.
+New local state: `pendingForceReject: { progressId, comments } | null` to drive the confirmation popup.
+
+## Out of scope
+- Email template content (already correct per previous turn).
+- Buyer-stage rejection-to-vendor flow.
+- Approval matrix, seeding, SMTP config screens.
+- No DB schema changes, no new tables, no migrations.
 
 ## Verification
-1. SCM Manager rejects a vendor → Buyer receives email titled "Vendor Application Rejected" with all 5 required fields populated.
-2. Finance 1 rejects → same email to the same Buyer.
-3. Vendor status flips to `returned_to_buyer` as before; Buyer-stage reject still emails the vendor (unchanged).
-4. Edge function logs show `send-smtp-email` invoked with the no-reply From address.
+1. SCM Manager rejects with SMTP working → success toast "Rejection email sent successfully to the Buyer.", vendor moves to Buyer Rejected tab, edge logs show `send-smtp-email` invoked, audit log `buyer_notified_rejection_email`.
+2. Temporarily break SMTP (wrong password) and reject → destructive toast + confirmation popup appears. Click **No** → vendor stays in SCM Manager queue (status unchanged). Click **Yes** → vendor moves to Buyer Rejected tab, audit log `buyer_rejection_email_failed`.
+3. Buyer "Send Back to Vendor" still works exactly as before.
