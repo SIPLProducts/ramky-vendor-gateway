@@ -864,14 +864,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // and downstream notifications show the correct vendor identity.
       if (options?.onBehalfInvitationId) {
         try {
+          const isIntlVendor = formData.vendorType === 'international';
+          const intlCo = formData.international?.company;
           const inviteUpdate: Record<string, unknown> = {};
           const legal = (formData.organization.legalName || '').trim();
           const trade = (formData.organization.tradeName || '').trim();
-          const vendorName = legal || trade;
-          const primaryEmail = (formData.contact.ceoEmail || formData.address.registeredEmail || '').trim();
-          const primaryPhone = (formData.contact.ceoPhone || formData.address.registeredPhone || '').trim();
+          const intlName = (intlCo?.companyName || '').trim();
+          const vendorName = isIntlVendor ? (intlName || legal || trade) : (legal || trade);
+          const intlEmail = (intlCo?.email1 || '').trim();
+          const intlPhone = (intlCo?.contact1 || '').trim();
+          const primaryEmail = isIntlVendor
+            ? (intlEmail || formData.contact.ceoEmail || formData.address.registeredEmail || '').trim()
+            : (formData.contact.ceoEmail || formData.address.registeredEmail || '').trim();
+          const primaryPhone = isIntlVendor
+            ? (intlPhone || formData.contact.ceoPhone || formData.address.registeredPhone || '').trim()
+            : (formData.contact.ceoPhone || formData.address.registeredPhone || '').trim();
           if (vendorName) inviteUpdate.vendor_name = vendorName;
-          if (primaryEmail) inviteUpdate.email = primaryEmail;
+          // Never overwrite the invite email with the on-behalf placeholder
+          if (primaryEmail && !/^onbehalf\+.*@placeholder\.local$/i.test(primaryEmail)) {
+            inviteUpdate.email = primaryEmail;
+          }
           if (primaryPhone) inviteUpdate.phone_number = primaryPhone;
           if (Object.keys(inviteUpdate).length > 0) {
             await supabase
