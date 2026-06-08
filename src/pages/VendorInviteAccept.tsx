@@ -67,8 +67,23 @@ export default function VendorInviteAccept() {
           return;
         }
 
+        // Prefer client-side OTP verification via the SDK — avoids relying
+        // on Nginx proxying /auth/v1/verify on self-hosted deployments.
+        if ((data as any).token_hash && (data as any).otp_type) {
+          setStatus('signing_in');
+          const { error: vErr } = await supabase.auth.verifyOtp({
+            token_hash: (data as any).token_hash,
+            type: (data as any).otp_type as 'magiclink',
+          });
+          if (!vErr) {
+            navigate(`/vendor/registration?token=${encodeURIComponent(token)}`, { replace: true });
+            return;
+          }
+          console.warn('verifyOtp failed, falling back to action_link redirect:', vErr);
+        }
+
         setStatus('signing_in');
-        // Magic link auto-signs in and redirects back to /vendor/registration?token=...
+        // Fallback: magic link auto-signs in and redirects back to /vendor/registration?token=...
         window.location.assign(actionUrl.toString());
       } catch (err) {
         if (cancelled) return;
