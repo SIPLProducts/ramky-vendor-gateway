@@ -1106,7 +1106,7 @@ export default function VendorRegistration() {
         case 1:
           return <IntlDocumentsStep vendorId={vendorId} data={intl.documents} onChange={(d) => setIntlSlice('documents', d)} />;
         case 2:
-          return <IntlCompanyDetailsStep data={intl.company} onSubmit={handleIntlCompanyComplete} onLiveUpdate={(d) => setIntlSlice('company', d)} />;
+          return <IntlCompanyDetailsStep tenantId={tenantId} data={intl.company} onSubmit={handleIntlCompanyComplete} onLiveUpdate={(d) => setIntlSlice('company', d)} />;
         case 3:
           return <IntlBankDetailsStep data={intl.bank} onSubmit={handleIntlBankComplete} onLiveUpdate={(d) => setIntlSlice('bank', d)} />;
         case 4:
