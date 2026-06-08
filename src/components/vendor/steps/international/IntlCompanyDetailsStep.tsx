@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { InternationalCompanyDetails } from '@/types/vendor';
 import { useEnsureSapMaster } from '@/hooks/useSapMasterData';
+import { supabase } from '@/integrations/supabase/client';
 
 const schema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required'),
@@ -29,11 +31,26 @@ interface Props {
   data: InternationalCompanyDetails;
   onSubmit: (data: InternationalCompanyDetails) => void;
   onLiveUpdate?: (data: InternationalCompanyDetails) => void;
+  tenantId?: string | null;
 }
 
-export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
+export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId }: Props) {
   const { rows: countries, fetching: countriesFetching, errorMessage: countriesError, retry: retryCountries } = useEnsureSapMaster('country');
   const { rows: regions, fetching: regionsFetching, errorMessage: regionsError, retry: retryRegions } = useEnsureSapMaster('region');
+
+  const { data: buyerCompany, isLoading: buyerCompanyLoading } = useQuery({
+    queryKey: ['tenant-buyer-company', tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name, code')
+        .eq('id', tenantId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const {
     register, control, handleSubmit, watch, setValue,
@@ -72,6 +89,28 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate }: Props) 
         </h3>
 
         <div className="grid gap-5">
+          <div className="grid gap-1.5">
+            <Label htmlFor="buyerCompanyDisplay">Buyer Company <span className="text-destructive ml-0.5">*</span></Label>
+            <div
+              id="buyerCompanyDisplay"
+              className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm"
+            >
+              {buyerCompanyLoading ? (
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading company…
+                </span>
+              ) : buyerCompany ? (
+                <span className="font-medium text-foreground">
+                  {buyerCompany.name}{buyerCompany.code ? ` (${buyerCompany.code})` : ''}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Not assigned</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Assigned by buyer — cannot be changed.</p>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="companyName">Company Name <span className="text-destructive ml-0.5">*</span></Label>
