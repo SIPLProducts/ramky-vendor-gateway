@@ -99,10 +99,6 @@ Deno.serve(async (req) => {
     const nowIso = new Date().toISOString();
 
     if (action === 'reject') {
-      await admin.from('vendor_approval_progress').update({
-        status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
-      }).eq('id', progress_id);
-
       const vendorRejectionPatch: Record<string, unknown> = {
         last_rejection_comments: comments ?? null,
         last_rejection_stage: curStage,
@@ -111,6 +107,9 @@ Deno.serve(async (req) => {
       };
 
       if (isBuyerRow) {
+        await admin.from('vendor_approval_progress').update({
+          status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
+        }).eq('id', progress_id);
         await admin.from('vendors').update({ status: 'returned_to_vendor', ...vendorRejectionPatch }).eq('id', progress.vendor_id);
         await admin.from('audit_logs').insert({
           action: 'vendor_buyer_rejected', user_id: userId, vendor_id: progress.vendor_id, details: { comments },
