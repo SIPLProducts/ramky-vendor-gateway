@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Bell, LogOut, Settings, User, X, Building2 } from 'lucide-react';
+import { Menu, Bell, LogOut, Settings, User, X, Building2, KeyRound } from 'lucide-react';
+import { ChangePasswordDialog } from '@/components/account/ChangePasswordDialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -44,6 +45,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const { isSubscribed, subscribe, permission } = usePushNotifications();
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const {
     myTenants, activeTenantId, setActiveTenantId,
     isSuperAdmin, isCrossTenantReviewer, isScmManager,
@@ -140,6 +142,13 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
                 Help & Support
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setChangePasswordOpen(true)}
+              className="cursor-pointer"
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Change Password
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />
@@ -147,6 +156,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
       </div>
     </header>
   );

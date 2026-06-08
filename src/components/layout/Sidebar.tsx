@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { ChangePasswordDialog } from '@/components/account/ChangePasswordDialog';
+import { KeyRound } from 'lucide-react';
 import {
   LayoutDashboard,
   FileText,
@@ -103,6 +106,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
   const { customRoles } = useAuth();
   const displayRole = customRoles[0]?.name ?? roleLabels[userRole];
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const filteredItems = permsLoading ? [] : navItems.filter((item) => can(item.screenKey));
 
@@ -309,6 +313,13 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                 Settings
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setChangePasswordOpen(true)}
+              className="cursor-pointer"
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Change Password
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />
@@ -316,6 +327,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 
         {/* Copyright - only show when expanded */}
         {!collapsed && (
