@@ -32,6 +32,8 @@ type RejectedAction = 'approve' | 'send_to_vendor';
 export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
   const { items, loading, refresh } = usePendingApprovalsByStage(stage);
   const [actionItem, setActionItem] = useState<{ item: StageApprovalItem; action: 'approve' | 'reject' } | null>(null);
   const [comments, setComments] = useState('');
