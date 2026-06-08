@@ -12,7 +12,10 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'purchase', 'vendor']);
+  // Authenticated-only: seeding is a SECURITY DEFINER RPC scoped to vendor_id.
+  // Buyers (custom role "Buyer", app_role "approver") must be able to invoke
+  // this on submit, so we do not restrict by role here.
+  const auth = await requireAuthenticatedUser(req);
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
