@@ -1,46 +1,31 @@
-## Goal
+Root cause found: the on-behalf Create Vendor flow can briefly load the buyer’s previous vendor draft before the new on-behalf invitation is ready. That can reuse an old vendor row, so the new submission inherits an old approval chain where SCM Manager may already be approved/rejected instead of getting a fresh pending SCM row.
 
-1. Add a read-only **Buyer Company *** field on the **International** registration form (it already exists on Domestic via `OrganizationStep`).
-2. Fix the issue where an international self-registered vendor does not appear in any approval queue after submit.
+Plan:
 
-## Root cause of #2
+1. Prevent old vendor reuse in Create Vendor flow
+   - In the vendor registration hook, add an explicit on-behalf mode guard.
+   - While a new on-behalf invitation is still being created/loaded, do not fetch the buyer’s normal “self” vendor draft.
+   - If the selected on-behalf invitation has no vendor yet, clear any stale `vendorId` so submission creates a new vendor row.
 
-The international flow has no `OrganizationStep`, so `formData.organization.buyerCompanyId` stays empty for the international branch. On submit, `useVendorRegistration.submitVendorMutation` writes `tenant_id` from that empty field, so the vendor row may be saved with `tenant_id = null`. The seed function still creates a BUYER stage (because the invitation has a `created_by`), but downstream queue queries (SCM Manager and beyond) and the Buyer Approval rendering rely on tenant joins — and the international vendor never surfaces consistently. We will both surface the value in the UI and guarantee `tenant_id` is persisted on every save/submit.
+2. Scope saves strictly to the current invitation
+   - When saving in on-behalf mode, update an existing vendor only if its `invitation_id` matches the current on-behalf invitation.
+   - Otherwise insert a new vendor linked to the current invitation.
+   - Always persist the current `invitation_id` and Buyer Company on the vendor row.
 
-## Changes
+3. Fix international on-behalf identity sync
+   - For international vendors, sync invitation name/email/phone from `international.company` fields instead of domestic-only fields.
+   - This will stop the success dialog/list from showing placeholder values like `onbehalf+...@placeholder.local` or `INTERNATIONAL VENDOR` when real international details were entered.
 
-### 1. Show Buyer Company on the International form
+4. Make approval routing prefer the vendor’s linked invitation
+   - Update the approval seeding logic so it uses `vendors.invitation_id` first, falling back to latest invitation only when no explicit link exists.
+   - This avoids wrong routing when older duplicate invitation rows already point to the same vendor.
+   - Apply the same preference in approval action authorization where needed.
 
-**`src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`**
-- Add a new prop `tenantId?: string | null`.
-- At the very top of the form (above Company Name) render a read-only Buyer Company field styled exactly like the domestic version in `OrganizationStep.tsx` (lines 246-286): muted background, name + code, helper text "Assigned by buyer — cannot be changed.", spinner while loading, "Not assigned" fallback.
-- Fetch the tenant name/code with a `useQuery` against `tenants` (`select id, name, code`) keyed on `tenantId`.
+5. Repair the currently affected submission
+   - For the affected vendor reference shown in the screenshot (`738643AE`), detach stale duplicate invitation links where safe and re-seed the approval chain from the vendor’s current invitation.
+   - Expected result: Buyer is auto-approved for on-behalf submission, and SCM Manager becomes the active pending approver.
 
-**`src/pages/VendorRegistration.tsx`** (line ~1109)
-- Pass `tenantId={tenantId}` (already computed at line 202) into `<IntlCompanyDetailsStep .../>`.
-
-### 2. Make sure `tenant_id` is always persisted
-
-**`src/hooks/useVendorRegistration.tsx`**
-- In the autosave/update path (around line 262) and in `submitVendorMutation` (around line 925-945), when building the payload compute:
-  `tenant_id = formData.organization.buyerCompanyId || (existingVendor as any)?.tenant_id || invitation?.tenant_id || null;`
-  This guarantees the international branch — where `buyerCompanyId` may not be populated — still writes the invitation's tenant.
-- Also seed `formData.organization.buyerCompanyId` from the invitation/existing vendor when the international branch is active (the domestic branch already does this; just ensure the same hydration runs regardless of `vendorType`).
-
-### 3. Verify after fix
-
-- After submitting an international self-registration, the row in `vendors` has a non-null `tenant_id`.
-- The vendor appears under **Buyer Approval** for the buyer who created the invitation (self-registration is not on-behalf, so BUYER stage is `pending` and not auto-approved).
-- On buyer approval, it cascades to SCM Manager per `buyer_approval_flows`.
-
-## Files to change
-
-- `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`
-- `src/pages/VendorRegistration.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-
-## Out of scope
-
-- No database migration.
-- No changes to the domestic form (Buyer Company already rendered read-only there).
-- No changes to approval routing rules or edge functions.
+6. Verify
+   - Confirm the vendor has a fresh approval chain: `BUYER: approved`, `SCM_MANAGER: pending`.
+   - Confirm the SCM Manager approval screen returns the vendor under Pending Approval.
+   - Confirm a new Create Vendor submission creates a separate vendor row and does not reuse a previous one.
