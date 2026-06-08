@@ -80,10 +80,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Fetch existing vendor data for the current user
   const { data: existingVendor, isLoading: isLoadingVendor, refetch: refetchVendor } = useQuery({
-    queryKey: ['existing-vendor', options?.onBehalfInvitationId || 'self'],
+    queryKey: ['existing-vendor', options?.onBehalfInvitationId || (options?.isOnBehalfMode ? 'on-behalf-pending' : 'self')],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
+
+      // On-behalf mode without a resolved invitation id yet: do NOT load the
+      // buyer's previous "self" draft — that would reuse an old vendor row and
+      // its old approval chain for the brand-new submission, which is exactly
+      // the bug where SCM Manager never sees the new vendor.
+      if (options?.isOnBehalfMode && !options?.onBehalfInvitationId) {
+        return null;
+      }
 
       // On-behalf mode: scope the draft to the invitation, not the buyer's user_id,
       // so multiple in-flight on-behalf drafts created by the same buyer don't collide.
