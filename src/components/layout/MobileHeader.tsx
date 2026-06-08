@@ -142,6 +142,13 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
                 Help & Support
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setChangePasswordOpen(true)}
+              className="cursor-pointer"
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Change Password
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />
@@ -149,6 +156,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
       </div>
     </header>
   );
