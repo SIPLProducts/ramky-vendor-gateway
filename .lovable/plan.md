@@ -1,45 +1,46 @@
-## Problem
+## Goal
 
-When a buyer self-registers a vendor (on-behalf submission) and a downstream approver (e.g. SCM Manager) rejects it, the vendor lands in the buyer's **Rejected** tab on `Buyer Approval`. Today that tab only offers **Approve** and **Send to Vendor**. Clicking **Send to Vendor**:
+1. Add a read-only **Buyer Company *** field on the **International** registration form (it already exists on Domestic via `OrganizationStep`).
+2. Fix the issue where an international self-registered vendor does not appear in any approval queue after submit.
 
-- Sets `vendors.status = 'returned_to_vendor'` and emails the vendor.
-- But on-behalf vendors have a placeholder email (`onbehalf+xxxx@placeholder.local`) and no real vendor user — the email goes nowhere and the record disappears from the buyer's screen with no way for anyone to edit/resubmit.
+## Root cause of #2
 
-Additionally, the rejected-vendors table only shows the vendor name; the user wants the vendor ID displayed underneath the name so it can be referenced.
+The international flow has no `OrganizationStep`, so `formData.organization.buyerCompanyId` stays empty for the international branch. On submit, `useVendorRegistration.submitVendorMutation` writes `tenant_id` from that empty field, so the vendor row may be saved with `tenant_id = null`. The seed function still creates a BUYER stage (because the invitation has a `created_by`), but downstream queue queries (SCM Manager and beyond) and the Buyer Approval rendering rely on tenant joins — and the international vendor never surfaces consistently. We will both surface the value in the UI and guarantee `tenant_id` is persisted on every save/submit.
 
-## Fix
+## Changes
 
-### 1. Detect on-behalf vendors in the rejected list
+### 1. Show Buyer Company on the International form
 
-In `supabase/functions/list-pending-approvals-by-stage/index.ts` (BUYER branch), join `vendor_invitations` for the returned-to-buyer vendors and return:
+**`src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`**
+- Add a new prop `tenantId?: string | null`.
+- At the very top of the form (above Company Name) render a read-only Buyer Company field styled exactly like the domestic version in `OrganizationStep.tsx` (lines 246-286): muted background, name + code, helper text "Assigned by buyer — cannot be changed.", spinner while loading, "Not assigned" fallback.
+- Fetch the tenant name/code with a `useQuery` against `tenants` (`select id, name, code`) keyed on `tenantId`.
 
-- `isOnBehalf: boolean` — from `vendor_invitations.created_on_behalf`
-- `invitationId: string | null` — the latest invitation row id (needed to deep-link the on-behalf edit form)
+**`src/pages/VendorRegistration.tsx`** (line ~1109)
+- Pass `tenantId={tenantId}` (already computed at line 202) into `<IntlCompanyDetailsStep .../>`.
 
-Extend the `StageApprovalItem` type in `src/hooks/usePendingApprovalsByStage.tsx` with these two optional fields.
+### 2. Make sure `tenant_id` is always persisted
 
-### 2. Replace "Send to Vendor" with "Edit & Resubmit" for on-behalf vendors
+**`src/hooks/useVendorRegistration.tsx`**
+- In the autosave/update path (around line 262) and in `submitVendorMutation` (around line 925-945), when building the payload compute:
+  `tenant_id = formData.organization.buyerCompanyId || (existingVendor as any)?.tenant_id || invitation?.tenant_id || null;`
+  This guarantees the international branch — where `buyerCompanyId` may not be populated — still writes the invitation's tenant.
+- Also seed `formData.organization.buyerCompanyId` from the invitation/existing vendor when the international branch is active (the domestic branch already does this; just ensure the same hydration runs regardless of `vendorType`).
 
-In `src/components/approvals/StageApprovalView.tsx`, inside `renderRejectedTable`:
+### 3. Verify after fix
 
-- If `it.isOnBehalf` is true: render an **Edit & Resubmit** button (pencil icon) that navigates the buyer to `/vendor/registration?onBehalfOf={invitationId}`. The existing on-behalf load path in `VendorRegistration.tsx` already hydrates the draft from the prior submission so the buyer can edit and resubmit.
-- Otherwise: keep the existing **Send to Vendor** button unchanged.
-
-The **Approve** action remains available in both cases (it calls `buyer-reapprove-rejected`, which already re-seeds the chain regardless of on-behalf).
-
-No backend changes needed for the edit path — `useVendorRegistration` already supports resubmission via `resubmitVendor`, and the existing vendor row will be loaded by the on-behalf invitation id.
-
-### 3. Show vendor ID under vendor name
-
-In the **Vendor** column of `renderRejectedTable` (and, for consistency, the pending/waiting tables rendered by `renderTable` in the same file), render a small `text-xs text-muted-foreground font-mono` line under the vendor name showing `it.vendorId`. Keep it copy-friendly.
+- After submitting an international self-registration, the row in `vendors` has a non-null `tenant_id`.
+- The vendor appears under **Buyer Approval** for the buyer who created the invitation (self-registration is not on-behalf, so BUYER stage is `pending` and not auto-approved).
+- On buyer approval, it cascades to SCM Manager per `buyer_approval_flows`.
 
 ## Files to change
 
-- `supabase/functions/list-pending-approvals-by-stage/index.ts` — include `isOnBehalf` and `invitationId` in BUYER branch rejected items (and pending items for symmetry).
-- `src/hooks/usePendingApprovalsByStage.tsx` — add `isOnBehalf?: boolean` and `invitationId?: string | null` to `StageApprovalItem`.
-- `src/components/approvals/StageApprovalView.tsx` — conditional **Edit & Resubmit** button for on-behalf rejected vendors; show vendor ID under vendor name.
+- `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`
+- `src/pages/VendorRegistration.tsx`
+- `src/hooks/useVendorRegistration.tsx`
 
 ## Out of scope
 
-- No DB migration. `vendor_invitations.created_on_behalf` and `vendors.status` semantics are unchanged.
-- The non-on-behalf "Send to Vendor" flow is left intact.
+- No database migration.
+- No changes to the domestic form (Buyer Company already rendered read-only there).
+- No changes to approval routing rules or edge functions.
