@@ -57,7 +57,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!actionItem) return;
     setSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke('process-approval-action', {
+      const { data, error } = await supabase.functions.invoke('process-approval-action', {
         body: {
           progress_id: actionItem.item.progressId,
           action: actionItem.action,
@@ -65,20 +65,47 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         },
       });
       if (error) throw error;
+
+      // Non-buyer rejection: email may have failed → ask for confirmation.
+      if (
+        actionItem.action === 'reject' &&
+        !isBuyer &&
+        data &&
+        (data as any).requires_confirmation === true
+      ) {
+        toast({
+          title: 'Unable to send the rejection email due to a mail service issue.',
+          variant: 'destructive',
+        });
+        setForceRejectPrompt({
+          item: actionItem.item,
+          comments: comments.trim() || '',
+          error: (data as any).error ?? '',
+        });
+        return;
+      }
+
       await supabase.from('audit_logs').insert({
         action: `vendor_${actionItem.action}d_at_${stage.toLowerCase()}`,
         user_id: user?.id,
         vendor_id: actionItem.item.vendorId,
         details: { stage, level_number: actionItem.item.levelNumber, comments },
       });
-      toast({
-        title:
-          actionItem.action === 'approve'
-            ? 'Approved'
-            : isBuyer
-              ? 'Sent back to vendor'
-              : 'Rejected',
-      });
+
+      if (actionItem.action === 'reject' && !isBuyer) {
+        toast({
+          title: 'Rejection email sent successfully to the Buyer.',
+        });
+      } else {
+        toast({
+          title:
+            actionItem.action === 'approve'
+              ? 'Approved'
+              : isBuyer
+                ? 'Sent back to vendor'
+                : 'Rejected',
+        });
+      }
       setActionItem(null);
       setComments('');
       await refresh();
@@ -86,6 +113,31 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const confirmForceReject = async () => {
+    if (!forceRejectPrompt || !actionItem) return;
+    setForceRejectSubmitting(true);
+    try {
+      const { error } = await supabase.functions.invoke('process-approval-action', {
+        body: {
+          progress_id: actionItem.item.progressId,
+          action: 'reject',
+          comments: forceRejectPrompt.comments || null,
+          force: true,
+        },
+      });
+      if (error) throw error;
+      toast({ title: 'Rejected (email could not be delivered).' });
+      setForceRejectPrompt(null);
+      setActionItem(null);
+      setComments('');
+      await refresh();
+    } catch (err: any) {
+      toast({ title: 'Action failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setForceRejectSubmitting(false);
     }
   };
 
