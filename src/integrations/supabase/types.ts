@@ -373,6 +373,68 @@ export type Database = {
           },
         ]
       }
+      buyer_approval_flows: {
+        Row: {
+          buyer_user_id: string
+          ceo_office_user_id: string | null
+          created_at: string
+          created_by: string | null
+          finance_1_user_id: string | null
+          finance_2_user_id: string | null
+          id: string
+          scm_head_user_id: string | null
+          scm_manager_user_id: string | null
+          skip_finance_1: boolean
+          skip_finance_2: boolean
+          skip_scm_head: boolean
+          skip_scm_manager: boolean
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          buyer_user_id: string
+          ceo_office_user_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          finance_1_user_id?: string | null
+          finance_2_user_id?: string | null
+          id?: string
+          scm_head_user_id?: string | null
+          scm_manager_user_id?: string | null
+          skip_finance_1?: boolean
+          skip_finance_2?: boolean
+          skip_scm_head?: boolean
+          skip_scm_manager?: boolean
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          buyer_user_id?: string
+          ceo_office_user_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          finance_1_user_id?: string | null
+          finance_2_user_id?: string | null
+          id?: string
+          scm_head_user_id?: string | null
+          scm_manager_user_id?: string | null
+          skip_finance_1?: boolean
+          skip_finance_2?: boolean
+          skip_scm_head?: boolean
+          skip_scm_manager?: boolean
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_approval_flows_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       buyer_scm_mappings: {
         Row: {
           buyer_user_id: string
@@ -1487,6 +1549,7 @@ export type Database = {
           acted_at: string | null
           acted_by: string | null
           comments: string | null
+          completed_at: string | null
           created_at: string
           id: string
           level_id: string | null
@@ -1496,6 +1559,7 @@ export type Database = {
           rejection_from_stage: string | null
           rejection_from_user: string | null
           stage: string | null
+          started_at: string | null
           status: string
           vendor_id: string
         }
@@ -1503,6 +1567,7 @@ export type Database = {
           acted_at?: string | null
           acted_by?: string | null
           comments?: string | null
+          completed_at?: string | null
           created_at?: string
           id?: string
           level_id?: string | null
@@ -1512,6 +1577,7 @@ export type Database = {
           rejection_from_stage?: string | null
           rejection_from_user?: string | null
           stage?: string | null
+          started_at?: string | null
           status?: string
           vendor_id: string
         }
@@ -1519,6 +1585,7 @@ export type Database = {
           acted_at?: string | null
           acted_by?: string | null
           comments?: string | null
+          completed_at?: string | null
           created_at?: string
           id?: string
           level_id?: string | null
@@ -1528,6 +1595,7 @@ export type Database = {
           rejection_from_stage?: string | null
           rejection_from_user?: string | null
           stage?: string | null
+          started_at?: string | null
           status?: string
           vendor_id?: string
         }
