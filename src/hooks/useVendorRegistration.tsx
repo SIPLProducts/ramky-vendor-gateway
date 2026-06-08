@@ -13,6 +13,13 @@ interface UseVendorRegistrationOptions {
    * buyer do not collide.
    */
   onBehalfInvitationId?: string;
+  /**
+   * Set true whenever the URL indicates an on-behalf flow (?onBehalf=1 or
+   * ?onBehalfOf=...), even before `onBehalfInvitationId` resolves. Prevents
+   * the hook from falling back to the buyer's "self" vendor draft and
+   * accidentally reusing an old vendor row for a brand-new submission.
+   */
+  isOnBehalfMode?: boolean;
 }
 
 // Statuses that allow editing
@@ -73,10 +80,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Fetch existing vendor data for the current user
   const { data: existingVendor, isLoading: isLoadingVendor, refetch: refetchVendor } = useQuery({
-    queryKey: ['existing-vendor', options?.onBehalfInvitationId || 'self'],
+    queryKey: ['existing-vendor', options?.onBehalfInvitationId || (options?.isOnBehalfMode ? 'on-behalf-pending' : 'self')],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
+
+      // On-behalf mode without a resolved invitation id yet: do NOT load the
+      // buyer's previous "self" draft — that would reuse an old vendor row and
+      // its old approval chain for the brand-new submission, which is exactly
+      // the bug where SCM Manager never sees the new vendor.
+      if (options?.isOnBehalfMode && !options?.onBehalfInvitationId) {
+        return null;
+      }
 
       // On-behalf mode: scope the draft to the invitation, not the buyer's user_id,
       // so multiple in-flight on-behalf drafts created by the same buyer don't collide.
@@ -849,14 +864,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // and downstream notifications show the correct vendor identity.
       if (options?.onBehalfInvitationId) {
         try {
+          const isIntlVendor = formData.vendorType === 'international';
+          const intlCo = formData.international?.company;
           const inviteUpdate: Record<string, unknown> = {};
           const legal = (formData.organization.legalName || '').trim();
           const trade = (formData.organization.tradeName || '').trim();
-          const vendorName = legal || trade;
-          const primaryEmail = (formData.contact.ceoEmail || formData.address.registeredEmail || '').trim();
-          const primaryPhone = (formData.contact.ceoPhone || formData.address.registeredPhone || '').trim();
+          const intlName = (intlCo?.companyName || '').trim();
+          const vendorName = isIntlVendor ? (intlName || legal || trade) : (legal || trade);
+          const intlEmail = (intlCo?.email1 || '').trim();
+          const intlPhone = (intlCo?.contact1 || '').trim();
+          const primaryEmail = isIntlVendor
+            ? (intlEmail || formData.contact.ceoEmail || formData.address.registeredEmail || '').trim()
+            : (formData.contact.ceoEmail || formData.address.registeredEmail || '').trim();
+          const primaryPhone = isIntlVendor
+            ? (intlPhone || formData.contact.ceoPhone || formData.address.registeredPhone || '').trim()
+            : (formData.contact.ceoPhone || formData.address.registeredPhone || '').trim();
           if (vendorName) inviteUpdate.vendor_name = vendorName;
-          if (primaryEmail) inviteUpdate.email = primaryEmail;
+          // Never overwrite the invite email with the on-behalf placeholder
+          if (primaryEmail && !/^onbehalf\+.*@placeholder\.local$/i.test(primaryEmail)) {
+            inviteUpdate.email = primaryEmail;
+          }
           if (primaryPhone) inviteUpdate.phone_number = primaryPhone;
           if (Object.keys(inviteUpdate).length > 0) {
             await supabase
