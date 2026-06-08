@@ -453,9 +453,9 @@ export default function AdminInvitations() {
     }
     setIsCheckingReadiness(true);
     try {
-      const result = await checkTenantOnboardingReadiness(effectiveTenantId, user.id);
+      const result = await checkTenantOnboardingReadiness(user.id);
       if (!result.ok) {
-        showReadinessToast(effectiveTenantId, result.missing);
+        showReadinessToast();
         return;
       }
       navigate('/vendor/registration?onBehalf=1');
