@@ -89,6 +89,28 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
         </h3>
 
         <div className="grid gap-5">
+          <div className="grid gap-1.5">
+            <Label htmlFor="buyerCompanyDisplay">Buyer Company <span className="text-destructive ml-0.5">*</span></Label>
+            <div
+              id="buyerCompanyDisplay"
+              className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm"
+            >
+              {buyerCompanyLoading ? (
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading company…
+                </span>
+              ) : buyerCompany ? (
+                <span className="font-medium text-foreground">
+                  {buyerCompany.name}{buyerCompany.code ? ` (${buyerCompany.code})` : ''}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Not assigned</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Assigned by buyer — cannot be changed.</p>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="companyName">Company Name <span className="text-destructive ml-0.5">*</span></Label>
