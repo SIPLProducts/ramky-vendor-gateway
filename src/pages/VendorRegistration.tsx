@@ -142,7 +142,22 @@ export default function VendorRegistration() {
 
     (async () => {
       try {
-        const tenantId = allowedTenants[0].id;
+        const headerTenantId =
+          activeTenantId && allowedTenants.some((t) => t.id === activeTenantId)
+            ? activeTenantId
+            : null;
+        if (!headerTenantId && allowedTenants.length > 1) {
+          onBehalfBootstrapStartedRef.current = false;
+          setIsBootstrappingOnBehalf(false);
+          toast({
+            title: 'Select a company',
+            description: 'Please select a company in the header before creating a vendor.',
+            variant: 'destructive',
+          });
+          navigate('/admin/invitations');
+          return;
+        }
+        const tenantId = headerTenantId ?? allowedTenants[0].id;
         const token = safeUUID();
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 60);
@@ -185,7 +200,7 @@ export default function VendorRegistration() {
         setIsBootstrappingOnBehalf(false);
       }
     })();
-  }, [searchParams, user?.id, allowedTenants, navigate, toast, setSearchParams]);
+  }, [searchParams, user?.id, allowedTenants, activeTenantId, navigate, toast, setSearchParams]);
 
 
 
