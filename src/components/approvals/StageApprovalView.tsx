@@ -210,10 +210,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                         variant="outline"
                         className="text-destructive"
                         disabled={blocked}
-                        title={blocked ? 'The previous approver has not approved yet.' : undefined}
+                        title={blocked ? 'The previous approver has not approved yet.' : isBuyer ? 'Return the application to the vendor for correction.' : undefined}
                         onClick={() => setActionItem({ item: it, action: 'reject' })}
                       >
-                        <XCircle className="h-4 w-4 mr-1" /> Reject
+                        {isBuyer ? (
+                          <><Undo2 className="h-4 w-4 mr-1" /> Send Back to Vendor</>
+                        ) : (
+                          <><XCircle className="h-4 w-4 mr-1" /> Reject</>
+                        )}
                       </Button>
                     </div>
                   </TableCell>
