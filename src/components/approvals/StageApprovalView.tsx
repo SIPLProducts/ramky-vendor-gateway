@@ -539,6 +539,41 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         open={!!previewVendorId}
         onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
       />
+
+      <Dialog
+        open={!!forceRejectPrompt}
+        onOpenChange={(o) => { if (!o && !forceRejectSubmitting) setForceRejectPrompt(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rejection email could not be sent</DialogTitle>
+            <DialogDescription>
+              Rejection email could not be sent. Do you still want to continue with the rejection?
+            </DialogDescription>
+          </DialogHeader>
+          {forceRejectPrompt?.error && (
+            <div className="text-xs text-muted-foreground border rounded p-2 bg-muted/30 break-words">
+              {forceRejectPrompt.error}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setForceRejectPrompt(null)}
+              disabled={forceRejectSubmitting}
+            >
+              No
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmForceReject}
+              disabled={forceRejectSubmitting}
+            >
+              {forceRejectSubmitting ? 'Rejecting...' : 'Yes, reject anyway'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
