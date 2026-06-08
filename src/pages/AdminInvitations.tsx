@@ -405,28 +405,22 @@ export default function AdminInvitations() {
   });
 
   const checkTenantOnboardingReadiness = async (
-    tenantId: string,
     buyerUserId: string,
-  ): Promise<{ ok: boolean; missing: Array<'buyer_scm' | 'approval_matrix'> }> => {
-    const [scmRes, matrixRes] = await Promise.all([
-      supabase
-        .from('buyer_scm_mappings')
-        .select('id', { head: true, count: 'exact' })
-        .eq('tenant_id', tenantId)
-        .eq('buyer_user_id', buyerUserId),
-      supabase
-        .from('approval_matrix_levels')
-        .select('id, approval_matrix_approvers!inner(id)', { head: true, count: 'exact' })
-        .eq('tenant_id', tenantId)
-        .eq('is_active', true),
-    ]);
-    if (scmRes.error || matrixRes.error) {
-      throw scmRes.error || matrixRes.error;
-    }
-    const missing: Array<'buyer_scm' | 'approval_matrix'> = [];
-    if ((scmRes.count ?? 0) === 0) missing.push('buyer_scm');
-    if ((matrixRes.count ?? 0) === 0) missing.push('approval_matrix');
-    return { ok: missing.length === 0, missing };
+  ): Promise<{ ok: boolean }> => {
+    const { data, error } = await supabase
+      .from('buyer_approval_flows')
+      .select('id, scm_manager_user_id, scm_head_user_id, finance_1_user_id, finance_2_user_id, ceo_office_user_id, skip_scm_manager, skip_scm_head, skip_finance_1, skip_finance_2')
+      .eq('buyer_user_id', buyerUserId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return { ok: false };
+    const hasAnyApprover =
+      (!!data.scm_manager_user_id && !data.skip_scm_manager) ||
+      (!!data.scm_head_user_id && !data.skip_scm_head) ||
+      (!!data.finance_1_user_id && !data.skip_finance_1) ||
+      (!!data.finance_2_user_id && !data.skip_finance_2) ||
+      !!data.ceo_office_user_id;
+    return { ok: hasAnyApprover };
   };
 
   const tenantNameFor = (tenantId: string) =>
@@ -434,13 +428,10 @@ export default function AdminInvitations() {
     allTenants?.find((t) => t.id === tenantId)?.name ||
     'the selected company';
 
-  const showReadinessToast = (tenantId: string, missing: Array<'buyer_scm' | 'approval_matrix'>) => {
-    const parts: string[] = [];
-    if (missing.includes('buyer_scm')) parts.push('Buyer–SCM mapping');
-    if (missing.includes('approval_matrix')) parts.push('Approval Matrix');
+  const showReadinessToast = () => {
     toast({
-      title: 'Configuration Required',
-      description: `Cannot create vendor: ${parts.join(' and ')} ${parts.length > 1 ? 'are' : 'is'} not configured for ${tenantNameFor(tenantId)}. Please configure ${parts.length > 1 ? 'them' : 'it'} in User Management → Buyer-SCM Mapping and Settings → Approval Matrix before inviting vendors.`,
+      title: 'Approval Flow Not Configured',
+      description: 'Your Approval Flow is not set up. Ask an admin to configure it under User Management → Approval Matrix before inviting vendors.',
       variant: 'destructive',
     });
   };
@@ -462,9 +453,9 @@ export default function AdminInvitations() {
     }
     setIsCheckingReadiness(true);
     try {
-      const result = await checkTenantOnboardingReadiness(effectiveTenantId, user.id);
+      const result = await checkTenantOnboardingReadiness(user.id);
       if (!result.ok) {
-        showReadinessToast(effectiveTenantId, result.missing);
+        showReadinessToast();
         return;
       }
       navigate('/vendor/registration?onBehalf=1');
@@ -509,9 +500,9 @@ export default function AdminInvitations() {
 
     setIsCheckingReadiness(true);
     try {
-      const result = await checkTenantOnboardingReadiness(effectiveTenantId, user.id);
+      const result = await checkTenantOnboardingReadiness(user.id);
       if (!result.ok) {
-        showReadinessToast(effectiveTenantId, result.missing);
+        showReadinessToast();
         return;
       }
     } catch {
