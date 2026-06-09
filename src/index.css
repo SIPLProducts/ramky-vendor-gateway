@@ -115,7 +115,34 @@
     --sidebar-accent: 213 27% 12%;
     --sidebar-accent-foreground: 210 20% 92%;
     --sidebar-border: 213 27% 12%;
-    --sidebar-ring: 210 100% 55%;
+    --sidebar-ring: 24 88% 56%;
+  }
+}
+
+@layer utilities {
+  /* Sidebar thin scrollbar - visible only on hover */
+  .sidebar-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 4px;
+    background: transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+    transition: background 200ms ease;
+  }
+  aside:hover .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(0 0% 100% / 0.25) transparent;
+  }
+  aside:hover .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 100% / 0.25);
+  }
+  aside:hover .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(0 0% 100% / 0.4);
   }
 }
 
