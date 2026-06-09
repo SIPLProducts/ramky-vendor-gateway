@@ -1,48 +1,24 @@
-# Add Change Password (Logged-In Users)
+## Two small changes
 
-Add a "Change Password" entry under the user avatar dropdown in the app header. Opens a modal where the user enters and confirms a new password — no current-password check, per your choice.
+### 1. Login screen — Forgot password link placement
+On `src/pages/Auth.tsx`, the "Forgot password?" link currently planned above the Sign In button will instead be placed **below** the Sign In button (centered, small text link). Clicking it opens the existing `ForgotPasswordDialog`.
 
-## Scope
+```text
+[ Email          ]
+[ Password       ]
+[   Sign In →    ]
+       Forgot password?
+```
 
-- In-app only (logged-in users).
-- Reuses Lovable Cloud auth: `supabase.auth.updateUser({ password })`.
-- No DB changes, no edge functions, no new routes.
-- Forgot Password (logged-out reset flow) is **out of scope** for this round.
+### 2. Reset Password page — success toaster
+On `src/pages/ResetPassword.tsx`, after `supabase.auth.updateUser({ password })` succeeds:
+- Show a sonner success toast: **"Password changed successfully"**
+- Then sign the user out and redirect to `/auth` so they log in with the new password.
 
-## UX
+If the update fails, show an error toast with the returned message (existing inline error stays as well).
 
-1. User clicks avatar in `EnterpriseHeader` (and `MobileHeader` for parity) → dropdown shows new item **"Change Password"** above "Sign Out".
-2. Clicking opens a modal dialog titled **"Change Password"** with:
-   - New Password (masked, show/hide toggle)
-   - Confirm New Password (masked, show/hide toggle)
-   - Inline strength hint
-   - Buttons: **Cancel**, **Update Password** (disabled until valid)
-3. On success: toast "Password changed successfully", close modal.
-4. On failure: toast with the auth error message; keep modal open.
+### Files touched
+- `src/pages/Auth.tsx` — move the link below the Sign In button inside the login form.
+- `src/pages/ResetPassword.tsx` — add `toast.success("Password changed successfully")` on successful update (import `toast` from `sonner`).
 
-## Validation (client-side, zod)
-
-- Min 8 chars
-- At least one uppercase, one lowercase, one number
-- New password === Confirm password
-- Block submit while requirements unmet
-
-## Technical Details
-
-**New files**
-- `src/components/account/ChangePasswordDialog.tsx` — controlled dialog using shadcn `Dialog`, `Input`, `Button`, `Label`; zod schema; `sonner` toasts; calls `supabase.auth.updateUser({ password })`.
-
-**Edited files**
-- `src/components/layout/EnterpriseHeader.tsx` — add "Change Password" `DropdownMenuItem` (Key icon) above Sign Out; local `open` state; render `<ChangePasswordDialog />`.
-- `src/components/layout/MobileHeader.tsx` — same dropdown item for mobile parity (if a user menu exists there; otherwise skipped).
-
-**Not changing**
-- `useAuth`, routes, DB schema, edge functions, email config.
-
-## Verification
-
-- Log in → click avatar → "Change Password" visible.
-- Submit with mismatched passwords → inline error, submit disabled.
-- Submit weak password → inline error.
-- Submit valid new password → success toast; sign out and sign back in with the new password works.
-- Old password no longer works after change.
+No backend, RLS, or edge function changes.
