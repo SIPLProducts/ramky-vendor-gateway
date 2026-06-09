@@ -143,7 +143,7 @@ export default function AdminInvitations() {
       if (seesAllInvitations) {
         let q = supabase
           .from('vendor_invitations')
-          .select('*')
+          .select('*, vendor:vendors(id, reference_number, status)')
           .order('created_at', { ascending: false });
         if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
         const { data, error } = await q;
