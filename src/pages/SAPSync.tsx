@@ -20,8 +20,10 @@ import {
   useVendors, useSAPSync, useMultipleSAPSync, useDMSSync, useBuyerCompanies, VendorRow,
 } from '@/hooks/useVendors';
 import {
-  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp,
+  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
@@ -47,7 +49,10 @@ async function persistClassification(vendorIds: string[], overrides: SapFieldOve
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'sap' | 'dms'>('sap');
+  const [activeTab, setActiveTab] = useState<'sap' | 'dms' | 'rejected'>('sap');
+  const [rejectVendor, setRejectVendor] = useState<VendorRow | null>(null);
+  const [rejectRemarks, setRejectRemarks] = useState('');
+  const [rejectingVendorId, setRejectingVendorId] = useState<string | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
@@ -68,6 +73,7 @@ export default function SAPSync() {
 
   const { data: sapVendors, isLoading, refetch } = useVendors(['pending_sap_sync', 'purchase_approved']);
   const { data: dmsVendors, isLoading: dmsLoading, refetch: refetchDms } = useVendors(['dms_sync_pending', 'dms_synced']);
+  const { data: rejectedVendors, isLoading: rejectedLoading, refetch: refetchRejected } = useVendors(['sap_team_rejected' as any]);
   const { data: buyerCompanies } = useBuyerCompanies();
   const sapSync = useSAPSync();
   const bulkSync = useMultipleSAPSync();
@@ -84,6 +90,34 @@ export default function SAPSync() {
 
   const filteredSap = (sapVendors || []).filter(filterFn);
   const filteredDms = (dmsVendors || []).filter(filterFn);
+  const filteredRejected = (rejectedVendors || []).filter(filterFn);
+
+  const refreshAllLists = () => { refetch(); refetchDms(); refetchRejected(); };
+
+  const handleConfirmReject = async () => {
+    if (!rejectVendor) return;
+    const remarks = rejectRemarks.trim();
+    if (!remarks) {
+      toast.error('Reject Remarks are required');
+      return;
+    }
+    setRejectingVendorId(rejectVendor.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
+        body: { vendorId: rejectVendor.id, remarks },
+      });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Vendor rejected', { description: rejectVendor.legal_name || rejectVendor.id });
+      setRejectVendor(null);
+      setRejectRemarks('');
+      refreshAllLists();
+    } catch (e: any) {
+      toast.error('Reject failed', { description: e?.message || 'Could not reject vendor' });
+    } finally {
+      setRejectingVendorId(null);
+    }
+  };
 
   const selectedSapVendors = useMemo(
     () => filteredSap.filter(v => selectedSapIds.has(v.id)),
@@ -196,7 +230,7 @@ export default function SAPSync() {
     }
   };
 
-  const refreshAll = () => { refetch(); refetchDms(); };
+  const refreshAll = () => { refetch(); refetchDms(); refetchRejected(); };
 
   return (
     <div className="space-y-8">
@@ -268,9 +302,10 @@ export default function SAPSync() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="sap" className="gap-2"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
           <TabsTrigger value="dms" className="gap-2"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Rejected{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
         </TabsList>
 
         {/* SAP Sync tab */}
@@ -359,6 +394,19 @@ export default function SAPSync() {
                             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing...</>
                           ) : (
                             <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => { setRejectVendor(vendor); setRejectRemarks(''); }}
+                          disabled={rejectingVendorId === vendor.id || multiMode}
+                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Reject vendor'}
+                        >
+                          {rejectingVendorId === vendor.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                          ) : (
+                            <><XCircle className="h-4 w-4 mr-2" />Reject</>
                           )}
                         </Button>
                       </div>
@@ -470,7 +518,121 @@ export default function SAPSync() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Rejected tab */}
+        <TabsContent value="rejected" className="space-y-4 mt-6">
+          <div className="grid gap-4">
+            {rejectedLoading ? (
+              [...Array(2)].map((_, i) => (
+                <Card key={i} className="border-0 shadow-md"><CardContent className="p-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+              ))
+            ) : filteredRejected.length === 0 ? (
+              <Card className="border-0 shadow-md"><CardContent className="py-16 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Ban className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold">No rejected vendors</h3>
+                <p className="text-muted-foreground mt-2">Vendors rejected by the SAP Team will appear here.</p>
+              </CardContent></Card>
+            ) : (
+              filteredRejected.map((vendor) => {
+                const remarks = (vendor as any).last_rejection_comments as string | null;
+                const rejectedAt = (vendor as any).last_rejected_at as string | null;
+                const refNo = (vendor as any).reference_number || vendor.id.slice(0, 8).toUpperCase();
+                return (
+                  <Card key={vendor.id} className="border-0 shadow-md border-l-4 border-l-red-500">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-red-500/20 to-rose-500/5 flex items-center justify-center">
+                            <Building2 className="h-7 w-7 text-red-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1 flex-wrap">
+                              <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                              <Badge className="bg-red-100 text-red-700 border-red-200">SAP Team Rejected</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
+                            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
+                              <span className="font-mono bg-muted px-2 py-0.5 rounded">Ref No: {refNo}</span>
+                              <span>GSTIN: {vendor.gstin || 'N/A'}</span>
+                              {rejectedAt && <span>Rejected: {new Date(rejectedAt).toLocaleString()}</span>}
+                            </div>
+                            {remarks && (
+                              <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
+                                <p className="text-xs font-semibold text-red-700 mb-1">Reject Remarks</p>
+                                <p className="text-sm text-red-900 whitespace-pre-wrap">{remarks}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
+                            <Eye className="h-4 w-4 mr-2" />View
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* Reject confirmation dialog */}
+      <Dialog open={!!rejectVendor} onOpenChange={(o) => { if (!o) { setRejectVendor(null); setRejectRemarks(''); } }}>
+        <DialogContent className="rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-600" />
+              Reject Vendor
+            </DialogTitle>
+            <DialogDescription>
+              The vendor will be marked as <span className="font-semibold">SAP Team Rejected</span> and moved to the Rejected tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <p className="font-semibold">{rejectVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="text-xs text-muted-foreground font-mono mt-1">
+                Ref No: {(rejectVendor as any)?.reference_number || rejectVendor?.id.slice(0, 8).toUpperCase()}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reject-remarks">
+                Reject Remarks <span className="text-red-600">*</span>
+              </Label>
+              <Textarea
+                id="reject-remarks"
+                value={rejectRemarks}
+                onChange={(e) => setRejectRemarks(e.target.value)}
+                placeholder="e.g. Vendor already exists in SAP"
+                rows={4}
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Rejected tab.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setRejectVendor(null); setRejectRemarks(''); }}>
+              Cancel
+            </Button>
+            <Button
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleConfirmReject}
+              disabled={!rejectRemarks.trim() || !!rejectingVendorId}
+            >
+              {rejectingVendorId ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+              ) : (
+                <><XCircle className="h-4 w-4 mr-2" />Confirm Reject</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <VendorReviewDialog
         vendorId={selectedVendor?.id ?? null}
