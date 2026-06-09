@@ -997,9 +997,6 @@ export default function AdminInvitations() {
                         <TableCell>
                           <VendorReferenceCell vendor={(invitation as any).vendor} />
                         </TableCell>
-                        <TableCell>
-                          <VendorStageCell vendor={(invitation as any).vendor} />
-                        </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
                         <TableCell>
                           {(invitation as any).phone_number ? (
