@@ -61,6 +61,11 @@ import {
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import {
+  VendorStageCell,
+  VendorReferenceCell,
+  STAGE_FILTER_OPTIONS,
+} from '@/components/admin/VendorStageCell';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 
