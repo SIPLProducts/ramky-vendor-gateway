@@ -1,70 +1,65 @@
-## Goal
+# Add Approval Stage Tracking to Vendor Invitations
 
-Replace the current `/dashboard` page with a simple, role-aware dashboard:
+## Problem
+The Vendor Invitations page (where "Create Vendor" lives) only shows invitation-level info (Pending / Used / Expired). Once the vendor exists, users can't tell which approval stage it's at (Buyer → SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office → SAP Sync → SAP Synced / Rejected).
 
-- 4 summary cards: Total / Pending / Approved / Rejected applications
-- Date Range filter (applied to vendor `created_at`)
-- Data table of vendors matching the filter
-- Export to Excel button (exports the currently filtered rows)
+## Solution
+Enrich each invitation row with its linked vendor's reference number, current status, and a visual progress indicator showing the approval pipeline.
 
-Role-based visibility is already enforced by `useTenantFilter` + the RLS we tightened previously, so the dashboard just consumes those hooks — no new policies needed.
+## Changes (frontend only)
 
-## Metric definitions
+### 1. Extend invitations query in `src/pages/AdminInvitations.tsx`
+Join the linked vendor so each row carries:
+- `vendor.reference_number`
+- `vendor.status`
+- `vendor.id` (for deep-link)
 
-Counts are taken from the `vendors` rows the current user can see (RLS + `useTenantFilter`), filtered by the chosen date range on `created_at`:
+Use the existing `vendor_id` FK on `vendor_invitations` → `vendors`:
+```ts
+.select('*, vendor:vendors(id, reference_number, status)')
+```
 
-- **Total Applications** — all visible vendors.
-- **Pending Applications** — `status` in any pre-SAP-Sync stage: `draft`, `submitted`, `buyer_review`, `scm_manager_review`, `scm_head_review`, `finance_1_review`, `finance_2_review`, `ceo_office_review`, `pending_sap_sync`, `validation_pending`, `returned_to_vendor`.
-- **Approved Applications** — `status = 'sap_synced'`.
-- **Rejected Applications** — `status = 'sap_team_rejected'` (the SAP Sync Rejected tab).
+### 2. New table columns
+Add two columns between "Vendor Name" and "Created":
+- **Reference #** — `vendor.reference_number` as a link to `/vendors/:id`. Shows "—" if vendor not created yet.
+- **Approval Stage** — a `StageBadge` + compact stepper.
 
-## Visibility (already in place — confirm only)
+### 3. `StageBadge` + `StageProgress` component (new file `src/components/admin/VendorStageCell.tsx`)
+Maps `vendor.status` → label and pipeline position:
 
-- Admin / Sharvi admin / Customer admin / SAP Team → all vendors (within tenant filter).
-- Buyer → only vendors from invitations they created (`buyer_visible_vendor_ids`).
-- SCM Manager → only vendors of mapped buyers (`buyer_scm_mappings`).
-- SCM Head / Finance 1 / Finance 2 / CEO Office → only vendors routed to them via `buyer_approval_flows` (`approver_visible_vendor_ids`).
+```text
+Buyer → SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office → SAP Sync → Done
+```
 
-No changes needed in RLS, helpers, or `useTenantContext`.
+Status → stage map:
+- `draft`, `submitted`, `validation_pending`, `buyer_review` → Buyer (step 1)
+- `scm_manager_review` → SCM Manager (step 2)
+- `scm_head_review` → SCM Head (step 3)
+- `finance_1_review` → Finance 1 (step 4)
+- `finance_2_review` → Finance 2 (step 5)
+- `ceo_office_review` → CEO Office (step 6)
+- `pending_sap_sync` → SAP Sync (step 7)
+- `sap_synced` → Done (green check, all steps filled)
+- `sap_team_rejected` → red "Rejected by SAP Team" badge
+- `returned_to_vendor` → amber "Returned to Vendor" badge
+- `returned_to_buyer` → amber "Returned to Buyer" badge
+- no vendor row yet → grey "Not Started" badge
 
-## Frontend changes
+Render:
+- A colored `Badge` with the current stage label
+- A horizontal dot/segment stepper (7 dots) — completed = primary, current = primary ring + pulse, future = muted. Tooltip on each dot shows its stage name.
 
-**`src/pages/Dashboard.tsx`** — rewrite to the simple layout:
+### 4. Existing "Status" (Pending/Used/Expired) badge
+Keep it — it represents the invitation lifecycle, which is different from approval stage. Move it under the email or into a smaller secondary chip so the new Approval Stage column gets visual priority.
 
-1. Use `useAuth`, `useTenantContext`, and `useTenantFilter` to scope queries (same pattern as `VendorList`).
-2. Local state: `dateFrom`, `dateTo` (default last 30 days). Use the shadcn Calendar in a Popover for each, with the `pointer-events-auto` fix.
-3. Single React Query: `['dashboard-vendors', tenantFilter, dateFrom, dateTo]` →
-   `from('vendors').select('id, reference_number, company_name, vendor_email, status, created_at, tenant_id')` with:
-   - tenant filter from `useTenantFilter` (`tenantIds` or `vendorIds` as appropriate);
-   - `.gte('created_at', dateFrom).lte('created_at', dateTo)`;
-   - `.order('created_at', { ascending: false })`.
-4. Compute the 4 counts in `useMemo` from the returned rows.
-5. Render:
-   - Header row with title + Date Range pickers + **Export to Excel** button.
-   - 4 metric `Card`s (reuse existing icons: `FileText`, `Clock`, `CheckCircle`, `XCircle`).
-   - `Table` with columns: Reference #, Company, Email, Status (badge), Created At. Row click → `/vendors/:id`.
-   - Empty state and `Skeleton` loading state.
-6. **Export to Excel** handler:
-   - Uses `xlsx` (already common in this kind of app; add dependency if missing) to build a single sheet from current rows.
-   - Filename: `vendors_<from>_to_<to>.xlsx`.
-   - No server call — exports exactly what the user can see.
-
-**Routing / nav** — no change; this replaces the existing `/dashboard` page.
+### 5. Status filter
+Extend the filter dropdown with an "Approval Stage" group (Buyer / SCM Manager / SCM Head / Finance 1 / Finance 2 / CEO Office / Pending SAP Sync / SAP Synced / Rejected / Returned) in addition to the existing invitation filters.
 
 ## Out of scope
+- No DB changes — `vendors.status` and `vendor_invitations.vendor_id` already exist.
+- No RLS changes — current `user_can_see_vendor` policy already scopes visibility per role.
+- No new edge functions.
 
-- No change to RLS, helpers, or other pages.
-- No new tables, columns, or edge functions.
-- Existing complex dashboard widgets (stuck approvals, buyer companies panel, realtime banners, etc.) are intentionally removed per "simple dashboard". If you want to keep any of those, tell me which.
-
-## Verification
-
-1. Log in as Buyer (Sriusha) → counts and table reflect only her vendors; Ajay Babu sees zero.
-2. Log in as Finance 1 mapped to Sriusha → sees only vendors routed to Finance 1 for her flow.
-3. Log in as Admin / SAP Team → sees all vendors (respecting active tenant).
-4. Change date range → cards and table both update.
-5. Export to Excel → file contains exactly the visible rows.
-
-## Question before I build
-
-Want me to **replace** the current Dashboard entirely, or add this as a **new page** (e.g. `/dashboard/summary`) and leave the existing one in place?
+## Files touched
+- `src/pages/AdminInvitations.tsx` — extend query, add columns, wire filter
+- `src/components/admin/VendorStageCell.tsx` — new component (badge + stepper + tooltip)
