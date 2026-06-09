@@ -105,8 +105,9 @@ export default function VendorStatus() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Field label="Reference #" value={vendor.reference_number ?? '—'} mono />
-                <Field label="Company Name" value={vendor.company_name ?? vendor.legal_name ?? '—'} />
-                <Field label="Email" value={vendor.vendor_email ?? '—'} />
+                <Field label="Company Name" value={vendor.legal_name ?? vendor.trade_name ?? '—'} />
+                <Field label="Email" value={vendor.primary_email ?? '—'} />
+
                 <Field label="Vendor Type" value={vendor.vendor_type ?? '—'} />
                 <Field label="Submitted On" value={format(new Date(vendor.created_at), 'dd MMM yyyy, HH:mm')} />
                 <div>
