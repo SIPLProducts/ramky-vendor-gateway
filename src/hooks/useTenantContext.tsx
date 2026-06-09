@@ -301,9 +301,15 @@ export function useTenantFilter(): {
     return { tenantIds: null, activeTenantId: null, vendorIds: null };
   }
 
-  // 2. Stage approvers + buyers — scope by routed/invited vendor ids.
-  if (isStageApprover || isBuyerRole) {
+  // 2. Stage approvers — scope by routed vendor ids.
+  if (isStageApprover && !isBuyerRole) {
     return { tenantIds: null, activeTenantId: null, vendorIds: scopedVendorIds ?? [] };
+  }
+
+  // 2b. Buyers — scope by invited vendor ids AND by tenant selection.
+  if (isBuyerRole) {
+    const tenants = activeTenantId ? [activeTenantId] : (myTenantIds.length ? myTenantIds : null);
+    return { tenantIds: tenants, activeTenantId, vendorIds: scopedVendorIds ?? [] };
   }
 
   // 3. SCM Manager scoping.
