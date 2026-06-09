@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useTenantContext } from '@/hooks/useTenantContext';
+import { ThemeColorPicker } from '@/components/layout/ThemeColorPicker';
 
 interface MobileHeaderProps {
   userName: string;
