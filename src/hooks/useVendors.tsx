@@ -9,7 +9,10 @@ import type { Database } from '@/integrations/supabase/types';
 
 // Types from database
 type VendorStatus = Database['public']['Enums']['vendor_status'];
-type VendorRow = Database['public']['Tables']['vendors']['Row'];
+export type VendorRow = Database['public']['Tables']['vendors']['Row'] & {
+  invited_by?: { name: string | null; email: string | null } | null;
+};
+
 type VendorInsert = Database['public']['Tables']['vendors']['Insert'];
 type VendorUpdate = Database['public']['Tables']['vendors']['Update'];
 type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
