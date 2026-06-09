@@ -955,6 +955,8 @@ export default function AdminInvitations() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendor Name</TableHead>
+                      <TableHead>Reference #</TableHead>
+                      <TableHead>Approval Stage</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Created</TableHead>
