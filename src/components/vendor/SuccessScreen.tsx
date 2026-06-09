@@ -7,6 +7,7 @@ import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 interface SuccessScreenProps {
   status: RegistrationStatus;
   vendorId?: string;
+  referenceNumber?: string | null;
   financeComments?: string | null;
   purchaseComments?: string | null;
   onEdit?: () => void;
