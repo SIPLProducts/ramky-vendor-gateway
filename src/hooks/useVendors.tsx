@@ -952,4 +952,4 @@ export function useScmMatrixAction() {
 }
 
 // Export types for use in components
-export type { VendorRow, VendorInsert, VendorUpdate, ValidationRow, VendorStatus };
+export type { VendorInsert, VendorUpdate, ValidationRow, VendorStatus };
