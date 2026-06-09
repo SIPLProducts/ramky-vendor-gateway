@@ -1,55 +1,43 @@
-## Goals
-
-1. **Reference # search** on Vendor Invitations must only resolve vendors the current user is allowed to see (a Buyer cannot view another Buyer's vendor by guessing a ref #).
-2. **Company / tenant pickers** (page filter on All Vendors + Invite / Create-Vendor dialogs) must be restricted to the user's own assigned tenants. Buyers must not see other tenants in any of these dropdowns.
-3. **Top-header tenant switcher** must be hidden for all approver roles (SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office). Today it is only hidden for SCM Manager + SAP Team — SCM Head / Finance / CEO still see it (second screenshot).
-
-Admin / Sharvi Admin behaviour is unchanged everywhere.
-
 ## Changes
 
-### 1. `src/pages/AdminInvitations.tsx` — secure ref # search
-Replace the `handleTrackByReference` lookup so it only navigates when the vendor falls in the user's allowed scope:
+### 1. `src/pages/AdminInvitations.tsx` — Invitation History table
+- Remove the **Reference #** column (header + the `<VendorReferenceCell>` cell + drop the now-unused import).
+- Add a **Buyer Company** column placed between Vendor Name and Email.
+  - Extend both invitations queries' `select` from `'*, vendor:vendors(id, reference_number, status)'` to `'*, vendor:vendors(id, reference_number, status), tenants(id, name)'` (the `tenant_id` FK already exists on `vendor_invitations`).
+  - Render `(invitation as any).tenants?.name ?? '—'` in the new cell.
 
-- Super-admin / SAP Team: lookup as today (any vendor).
-- Buyer: only vendors where `vendor_invitations.created_by = auth.uid()`.
-- SCM Manager: vendors invited by buyers in `buyer_scm_mappings`.
-- Stage approver (SCM Head / Finance 1 / Finance 2 / CEO Office): vendors invited by buyers in their `buyer_approval_flows` row.
+### 2. `src/components/layout/EnterpriseHeader.tsx` — Buyer "All" option
+- Currently the `All Tenants` entry is shown only for super-admin (`isSuperAdmin && <SelectItem value="__all__">`).
+- Show it whenever the switcher renders (i.e. drop the `isSuperAdmin` gate). This lets a Buyer with one or more assigned tenants pick "All Tenants" so the Dashboard / All Vendors show data across every tenant they have access to.
+- No change to who sees the switcher (Buyer / Admin / Sharvi Admin still see it; SCM / Finance / CEO remain hidden).
 
-Implementation: reuse the same `creatorIds` derivation that the page's invitations query already computes, then query
-```ts
-supabase.from('vendor_invitations')
-  .select('vendor_id, vendors!inner(id, reference_number)')
-  .in('created_by', [...creatorIds])
-  .eq('vendors.reference_number', ref)
-  .maybeSingle();
-```
-If no row → existing "Not found / no access" toast. This guarantees a Buyer cannot reach `/vendor-status/:id` for a peer's vendor.
+### 3. `src/pages/Dashboard.tsx` — date range picker
+The `DatePickerButton` currently passes `max={dateTo}` on From and `min={dateFrom}` on To, so the Calendar's `disabled` callback greys out everything outside the current range. That makes it impossible to widen the range without bouncing between the two pickers, which is the "unable to select" symptom.
 
-### 2. `src/components/layout/EnterpriseHeader.tsx` — hide switcher for approvers
-Extend `hidePicker` to cover every approver role:
-```ts
-const hidePicker = isCrossTenantReviewer || isScmManager || isStageApprover;
-```
-`isStageApprover` is already exposed by `useTenantContext` and covers SCM Head, Finance 1, Finance 2, Finance Approval, CEO Office. Sharvi Admin / Admin / Buyer keep the switcher.
+Fix:
+- Remove the `min` / `max` props from both `<DatePickerButton>` calls.
+- Wrap the setters so the range self-corrects:
+  ```ts
+  const handleFromChange = (d: Date) => {
+    setDateFrom(startOfDay(d));
+    if (d > dateTo) setDateTo(endOfDay(d));
+  };
+  const handleToChange = (d: Date) => {
+    setDateTo(endOfDay(d));
+    if (d < dateFrom) setDateFrom(startOfDay(d));
+  };
+  ```
+- In `DatePickerButton`, drop the `disabled` predicate entirely so every day in the calendar is selectable.
+- Also add a small **Clear filters** button next to the pickers that resets `dateFrom`/`dateTo` to the default (last 30 days → today). This addresses the "clear based on filtering" ask — users currently have no way to reset after they have narrowed/widened the range.
 
-### 3. `src/pages/VendorList.tsx` — restrict in-page company filter
-Replace the unscoped `buyerCompanies` query (which calls `from('tenants').select(...)` and returns every active tenant — this is what produced "ADIPL-RAMKY JV" in the SCM Manager's All Vendors screenshot) with a role-aware list:
-- Super-admin / SAP Team: keep current full list.
-- Everyone else: use `myTenants` from `useTenantContext` (i.e. tenants the user is assigned to via `user_tenants`).
-
-The filter dropdown then only renders companies the user actually has rights to filter on.
-
-### 4. Invite / Create-Vendor dialogs (same file `AdminInvitations.tsx`)
-No code change required — both dialogs already render `allowedTenants`, which is `myTenants` for non-super-admins. Confirm by re-reading the two `<Select>` blocks at the `company` and `cv-company` fields and leave them as-is. This satisfies "only one company while inviting / creating vendor" for buyers assigned to a single tenant.
+The query already keys on `fromIso`/`toIso`, so React Query refetches automatically on every change.
 
 ## Out of scope
-
-- No DB / RLS / migration changes. RLS on `vendors` and `vendor_invitations` already enforces access; these UI changes prevent the client from even attempting unauthorised lookups and tidy the dropdowns.
-- No changes to approval-stage pages, edge functions, or `VendorStatus.tsx`.
+- No DB / RLS / migration changes.
+- No edits to the approval-stage pages, edge functions, or `VendorStatus.tsx`.
+- The Invite / Create-Vendor dialogs keep their existing tenant scoping.
 
 ## Files touched
-
-- `src/pages/AdminInvitations.tsx` (ref-search scoping)
-- `src/components/layout/EnterpriseHeader.tsx` (hide switcher for stage approvers)
-- `src/pages/VendorList.tsx` (scope company filter)
+- `src/pages/AdminInvitations.tsx`
+- `src/components/layout/EnterpriseHeader.tsx`
+- `src/pages/Dashboard.tsx`
