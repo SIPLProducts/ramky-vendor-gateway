@@ -21,9 +21,9 @@ interface EnterpriseHeaderProps {
 export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
   const {
     myTenants, activeTenantId, setActiveTenantId,
-    isSuperAdmin, isCrossTenantReviewer, isScmManager,
+    isSuperAdmin, isCrossTenantReviewer, isScmManager, isStageApprover,
   } = useTenantContext();
-  const hidePicker = isCrossTenantReviewer || isScmManager;
+  const hidePicker = isCrossTenantReviewer || isScmManager || isStageApprover;
   const showSwitcher = !hidePicker && (myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0));
 
   // Clear any pinned tenant for roles that should always see all data.

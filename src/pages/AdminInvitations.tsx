@@ -641,17 +641,62 @@ export default function AdminInvitations() {
     }
     setIsTracking(true);
     try {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('reference_number', ref)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data?.id) {
+      let vendorId: string | null = null;
+
+      if (seesAllInvitations) {
+        const { data, error } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('reference_number', ref)
+          .maybeSingle();
+        if (error) throw error;
+        vendorId = data?.id ?? null;
+      } else {
+        // Build the same creator-id scope used by the invitations query.
+        const creatorIds = new Set<string>();
+        if (isBuyerRole && user?.id) creatorIds.add(user.id);
+
+        if (isStageApprover && user?.id) {
+          const { data: flows } = await supabase
+            .from('buyer_approval_flows')
+            .select('buyer_user_id')
+            .or(
+              [
+                `scm_head_user_id.eq.${user.id}`,
+                `finance_1_user_id.eq.${user.id}`,
+                `finance_2_user_id.eq.${user.id}`,
+                `ceo_office_user_id.eq.${user.id}`,
+                `scm_manager_user_id.eq.${user.id}`,
+              ].join(','),
+            );
+          (flows ?? []).forEach((f: any) => f.buyer_user_id && creatorIds.add(f.buyer_user_id));
+        }
+
+        if (isScmManager && user?.id) {
+          const { data: maps } = await supabase
+            .from('buyer_scm_mappings')
+            .select('buyer_user_id')
+            .eq('scm_manager_user_id', user.id);
+          (maps ?? []).forEach((m: any) => m.buyer_user_id && creatorIds.add(m.buyer_user_id));
+        }
+
+        if (creatorIds.size > 0) {
+          const { data, error } = await supabase
+            .from('vendor_invitations')
+            .select('vendor_id, vendors!inner(id, reference_number)')
+            .in('created_by', Array.from(creatorIds))
+            .eq('vendors.reference_number', ref)
+            .maybeSingle();
+          if (error) throw error;
+          vendorId = (data as any)?.vendor_id ?? (data as any)?.vendors?.id ?? null;
+        }
+      }
+
+      if (!vendorId) {
         toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
         return;
       }
-      navigate(`/vendor-status/${data.id}`);
+      navigate(`/vendor-status/${vendorId}`);
     } catch (e: any) {
       toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
     } finally {
