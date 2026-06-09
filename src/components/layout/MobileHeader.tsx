@@ -95,6 +95,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
             </SelectContent>
           </Select>
         )}
+        <ThemeColorPicker variant="mobile" />
         {/* Notification Bell */}
         <Button
           variant="ghost"
