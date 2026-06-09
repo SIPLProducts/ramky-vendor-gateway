@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
 
     const { data: vendors } = await admin
       .from('vendors')
-      .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, tenant_id')
+      .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, tenant_id, reference_number')
       .in('id', progressVendorIds);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
