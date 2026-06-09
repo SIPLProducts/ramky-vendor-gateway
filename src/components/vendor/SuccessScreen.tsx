@@ -142,6 +142,14 @@ export function SuccessScreen({
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
+      {onBack && (
+        <div className="mb-4">
+          <Button variant="outline" size="sm" onClick={onBack} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Button>
+        </div>
+      )}
       {/* Status Header */}
       <div className="text-center mb-8">
         <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${config.bgClass} mb-4`}>
