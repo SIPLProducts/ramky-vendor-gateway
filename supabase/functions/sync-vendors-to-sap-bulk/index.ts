@@ -194,7 +194,8 @@ serve(async (req) => {
 
     for (let i = 0; i < vendorIds.length; i++) {
       const vid = vendorIds[i];
-      const refNo = String(vid || "").slice(0, 8).toUpperCase();
+      const vendor = (vendors || []).find((v: any) => v.id === vid);
+      const refNo = String(vendor?.reference_number || vid || "").toUpperCase();
       // Try match by idnum first
       let match = accRes.find((r: any) => String(r?.idnum || "").toUpperCase() === refNo);
       // Fallback: positional
