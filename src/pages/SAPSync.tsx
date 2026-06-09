@@ -230,7 +230,7 @@ export default function SAPSync() {
     }
   };
 
-  const refreshAll = () => { refetch(); refetchDms(); };
+  const refreshAll = () => { refetch(); refetchDms(); refetchRejected(); };
 
   return (
     <div className="space-y-8">
