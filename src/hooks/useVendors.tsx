@@ -9,7 +9,10 @@ import type { Database } from '@/integrations/supabase/types';
 
 // Types from database
 type VendorStatus = Database['public']['Enums']['vendor_status'];
-type VendorRow = Database['public']['Tables']['vendors']['Row'];
+export type VendorRow = Database['public']['Tables']['vendors']['Row'] & {
+  invited_by?: { name: string | null; email: string | null } | null;
+};
+
 type VendorInsert = Database['public']['Tables']['vendors']['Insert'];
 type VendorUpdate = Database['public']['Tables']['vendors']['Update'];
 type ValidationRow = Database['public']['Tables']['vendor_validations']['Row'];
@@ -49,11 +52,51 @@ export function useVendors(statuses?: VendorStatus[]) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data as VendorRow[];
+      const rows = (data ?? []) as VendorRow[];
+
+      // Attach "invited by" buyer (most recent invitation per vendor).
+      if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
+        const { data: invites } = await supabase
+          .from('vendor_invitations')
+          .select('vendor_id, created_by, email, created_at')
+          .in('vendor_id', ids)
+          .order('created_at', { ascending: false });
+        const latest = new Map<string, { created_by: string | null; email: string | null }>();
+        (invites ?? []).forEach((inv: any) => {
+          if (inv.vendor_id && !latest.has(inv.vendor_id)) {
+            latest.set(inv.vendor_id, { created_by: inv.created_by, email: inv.email });
+          }
+        });
+        const buyerIds = Array.from(
+          new Set(Array.from(latest.values()).map((v) => v.created_by).filter(Boolean) as string[]),
+        );
+        const profMap = new Map<string, { name: string | null; email: string | null }>();
+        if (buyerIds.length > 0) {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', buyerIds);
+          (profs ?? []).forEach((p: any) =>
+            profMap.set(p.id, { name: p.full_name ?? null, email: p.email ?? null }),
+          );
+        }
+        rows.forEach((r: any) => {
+          const inv = latest.get(r.id);
+          if (!inv) { r.invited_by = null; return; }
+          const prof = inv.created_by ? profMap.get(inv.created_by) : null;
+          r.invited_by = prof
+            ? { name: prof.name, email: prof.email }
+            : { name: null, email: inv.email };
+        });
+      }
+
+      return rows;
     },
     enabled: isOnline,
     staleTime: 2 * 60 * 1000,
   });
+
 
   useEffect(() => {
     if (query.data && isOnline) {
@@ -909,4 +952,4 @@ export function useScmMatrixAction() {
 }
 
 // Export types for use in components
-export type { VendorRow, VendorInsert, VendorUpdate, ValidationRow, VendorStatus };
+export type { VendorInsert, VendorUpdate, ValidationRow, VendorStatus };

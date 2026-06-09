@@ -39,7 +39,9 @@ type VendorRow = {
   status: string;
   created_at: string;
   tenant_id: string | null;
+  invited_by?: { name: string | null; email: string | null } | null;
 };
+
 
 const PENDING_STATUSES = new Set([
   'draft',
@@ -122,9 +124,48 @@ export default function Dashboard() {
 
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as VendorRow[];
+      const rows = (data ?? []) as VendorRow[];
+
+      if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
+        const { data: invites } = await supabase
+          .from('vendor_invitations')
+          .select('vendor_id, created_by, email, created_at')
+          .in('vendor_id', ids)
+          .order('created_at', { ascending: false });
+        const latest = new Map<string, { created_by: string | null; email: string | null }>();
+        (invites ?? []).forEach((inv: any) => {
+          if (inv.vendor_id && !latest.has(inv.vendor_id)) {
+            latest.set(inv.vendor_id, { created_by: inv.created_by, email: inv.email });
+          }
+        });
+        const buyerIds = Array.from(
+          new Set(Array.from(latest.values()).map((v) => v.created_by).filter(Boolean) as string[]),
+        );
+        const profMap = new Map<string, { name: string | null; email: string | null }>();
+        if (buyerIds.length > 0) {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', buyerIds);
+          (profs ?? []).forEach((p: any) =>
+            profMap.set(p.id, { name: p.full_name ?? null, email: p.email ?? null }),
+          );
+        }
+        rows.forEach((r) => {
+          const inv = latest.get(r.id);
+          if (!inv) { r.invited_by = null; return; }
+          const prof = inv.created_by ? profMap.get(inv.created_by) : null;
+          r.invited_by = prof
+            ? { name: prof.name, email: prof.email }
+            : { name: null, email: inv.email };
+        });
+      }
+
+      return rows;
     },
   });
+
 
   const counts = useMemo(() => {
     let pending = 0, approved = 0, rejected = 0;
@@ -140,10 +181,12 @@ export default function Dashboard() {
     const rows = vendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
       'Company Name': v.legal_name ?? '',
+      'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
       Email: v.primary_email ?? '',
       Status: STATUS_LABELS[v.status]?.label ?? v.status,
       'Created At': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
     }));
+
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
@@ -233,6 +276,7 @@ export default function Dashboard() {
                 <TableRow>
                   <TableHead>Reference #</TableHead>
                   <TableHead>Company</TableHead>
+                  <TableHead>Invited By</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created At</TableHead>
@@ -242,7 +286,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-4 w-full" />
                         </TableCell>
@@ -251,7 +295,7 @@ export default function Dashboard() {
                   ))
                 ) : vendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                       No vendor applications in this date range.
                     </TableCell>
                   </TableRow>
@@ -264,11 +308,24 @@ export default function Dashboard() {
                         </Link>
                       </TableCell>
                       <TableCell>{v.legal_name ?? '—'}</TableCell>
+                      <TableCell>
+                        {v.invited_by ? (
+                          <div className="text-sm">
+                            <div className="font-medium">{v.invited_by.name ?? v.invited_by.email ?? '—'}</div>
+                            {v.invited_by.name && v.invited_by.email && (
+                              <div className="text-xs text-muted-foreground">{v.invited_by.email}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>{v.primary_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
                     </TableRow>
                   ))
+
                 )}
               </TableBody>
             </Table>

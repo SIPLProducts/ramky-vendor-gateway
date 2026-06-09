@@ -371,17 +371,19 @@ export default function VendorList() {
                     <TableRow>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Buyer Company</TableHead>
+                      <TableHead>Invited By</TableHead>
                       <TableHead>GSTIN</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>SAP Code</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
+
                   </TableHeader>
                   <TableBody>
                     {paginatedVendors.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           {activeTenantName ? (
                             <div className="space-y-2">
                               <p className="font-medium">No vendors found for {activeTenantName}</p>
@@ -414,6 +416,19 @@ export default function VendorList() {
                           <TableCell>
                             <span className="text-sm">{getBuyerCompanyName(vendor.tenant_id)}</span>
                           </TableCell>
+                          <TableCell>
+                            {vendor.invited_by ? (
+                              <div className="text-sm">
+                                <div className="font-medium">{vendor.invited_by.name ?? vendor.invited_by.email ?? '—'}</div>
+                                {vendor.invited_by.name && vendor.invited_by.email && (
+                                  <div className="text-xs text-muted-foreground">{vendor.invited_by.email}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+
                           <TableCell className="font-mono text-sm">
                             {vendor.gstin || '-'}
                           </TableCell>

@@ -1,25 +1,22 @@
-# Fix: SCM Manager sees vendors in approval queue but not in All Vendors / Dashboard
-
-## Root cause
-
-Raja Mani (SCM Manager) is wired to Ajay Babu's vendors through `buyer_approval_flows.scm_manager_user_id`, NOT through `buyer_scm_mappings` (that table has no row for him). 
-
-- The **SCM Manager Approval** page works because it uses the `list-pending-approvals-by-stage` edge function (service role, ignores RLS, walks `vendor_approval_progress`).
-- The **All Vendors** and **Dashboard** pages use `useTenantFilter()` → `scmManagerVendorIds` in `useTenantContext.tsx`, which only looks at `buyer_scm_mappings`. Result: empty list → no vendors shown.
+# Add "Invited By" column to All Vendors and Dashboard tables
 
 ## Change
 
-Update the `scm-manager-vendor-ids` query in `src/hooks/useTenantContext.tsx` to compute the buyer set from BOTH sources, then resolve invited vendors as before:
+Show the buyer who invited each vendor (name + email) in the Vendor Applications table.
 
-1. Buyers from `buyer_scm_mappings` where `scm_manager_user_id = me` (existing).
-2. Buyers from `buyer_approval_flows` where `scm_manager_user_id = me` (new).
-3. Union → fetch `vendor_invitations.vendor_id` for `created_by IN (buyers)`.
+### 1. `src/hooks/useVendors.tsx` — `useVendors`
+After fetching vendors, fetch their inviters in one round-trip:
+- Query `vendor_invitations` for `vendor_id IN (visibleIds)` → take the most recent row per vendor (`created_by`, `email`).
+- Query `profiles` for those `created_by` ids → `full_name`, `email`.
+- Attach a non-DB field `invited_by` (`{ name, email } | null`) on each vendor row before returning. Type the return as `VendorRow & { invited_by?: ... }`.
 
-No other files need changes — `VendorList`, `Dashboard`, and `useTenantFilter` already consume `scmManagerVendorIds`.
+### 2. `src/pages/VendorList.tsx`
+Add a new `<TableHead>Invited By</TableHead>` between **Buyer Company** and **GSTIN**. Render `vendor.invited_by.name` with `vendor.invited_by.email` as muted subtext, fallback `—`. Bump empty-row `colSpan` from 7 → 8.
+
+### 3. `src/pages/Dashboard.tsx`
+- Extend the `dashboard-vendors` query to also load invitations for the resulting vendor ids and join `profiles`, attaching `invited_by` to each row.
+- Add `<TableHead>Invited By</TableHead>` between **Company** and **Email**. Bump empty-row `colSpan` from 5 → 6.
+- Add the inviter to the Excel export (column "Invited By").
 
 ## Verification
-
-- As Raja Mani, open All Vendors → Ajay Babu's submitted vendors appear.
-- Dashboard counters reflect the same set.
-- SCM Manager Approval queue is unaffected (still served by the edge function).
-- Other SCM Managers (e.g. Soumendu, Shailesh) keep their existing `buyer_scm_mappings`-based scoping.
+- As an admin and as Raja Mani (SCM Manager), open All Vendors and Dashboard → new "Invited By" column shows e.g. "Ajay Babu · ajaybabu.badugu@ramky.com" for invited vendors and "—" for self-registered ones.
