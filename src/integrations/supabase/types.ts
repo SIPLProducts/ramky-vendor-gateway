@@ -2436,6 +2436,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approver_visible_vendor_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
+      buyer_visible_vendor_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       check_my_smtp_configured: { Args: never; Returns: boolean }
       claim_invitation: {
         Args: { _token: string; _vendor_id?: string }
@@ -2478,6 +2486,7 @@ export type Database = {
         Returns: boolean
       }
       is_cross_tenant_reviewer: { Args: { _user_id: string }; Returns: boolean }
+      is_sap_team: { Args: { _user_id: string }; Returns: boolean }
       list_smtp_configs: {
         Args: never
         Returns: {
@@ -2522,6 +2531,10 @@ export type Database = {
       }
       user_belongs_to_tenant: {
         Args: { _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_can_see_vendor: {
+        Args: { _user_id: string; _vendor_id: string }
         Returns: boolean
       }
       user_tenant_ids: { Args: { _user_id: string }; Returns: string[] }
