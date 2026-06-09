@@ -1,73 +1,80 @@
 
 ## Goal
 
-Refresh the visual identity with two brand colors — **#e87717 (orange)** and **#00a13a (green)** — and polish the sidebar scrollbar so it stays out of the way until needed.
-
-All color changes will be done through the semantic design tokens in `src/index.css` and `tailwind.config.ts` so the entire app updates consistently (no hardcoded colors sprinkled into components).
+1. Revert the **login page** to its previous **SAP blue** look (don't use the new orange brand color there).
+2. Add a **color picker / theme switcher** in the top navbar so any logged-in user can switch the app's accent palette on the fly.
 
 ---
 
-## 1. Color system update (`src/index.css`)
+## 1. Login page: keep the old blue
 
-Replace the current SAP-blue primary / teal accent with the new brand pair. Both colors converted to HSL for the token system:
+The login page (`src/pages/Auth.tsx`) currently uses semantic tokens like `bg-primary`, so it inherits whatever `--primary` is set to. Since we changed `--primary` globally to orange, the login screen turned orange too.
 
-- `#e87717` → `hsl(24, 82%, 50%)` — used as **primary** (buttons, active states, links, focus rings, sidebar active item, headers)
-- `#00a13a` → `hsl(137, 100%, 32%)` — used as **accent** + remapped **success** (status pills, confirmation states, secondary CTAs, highlights)
+Approach: scope a **blue override** to the login route only, instead of reverting the global tokens.
 
-Tokens updated in `:root` and `.dark`:
+- Wrap the `Auth.tsx` root container with a class `login-theme`.
+- In `src/index.css`, add a scoped block:
+  ```css
+  .login-theme {
+    --primary: 210 100% 40%;          /* SAP blue */
+    --primary-foreground: 0 0% 100%;
+    --ring: 210 100% 40%;
+    --accent: 187 85% 43%;            /* old teal accent */
+  }
+  ```
+- The "Sign In" button, "Forgot password?" link, focus rings and any branded element on the login screen will go back to blue. The rest of the app keeps the new orange + green palette.
 
-| Token | New value | Where it shows up |
-|---|---|---|
-| `--primary` | orange | Buttons, links, focus ring, active nav item |
-| `--ring` | orange | Input focus outline |
-| `--accent` | green | Highlights, badges, hover accents |
-| `--success` | green | Success toasts, verified/approved badges |
-| `--sidebar-primary` | orange | Active sidebar item background |
-| `--sidebar-ring` | orange | Sidebar focus outline |
-| Gradient helper `--gradient-brand` | orange → green | Optional for hero/header accents |
+No component logic changes.
 
-Dark mode gets slightly brighter variants of the same hues for contrast.
+## 2. Theme color picker in the navbar
 
-No component-level color classes will be rewritten — because the codebase already uses semantic tokens (`bg-primary`, `text-primary-foreground`, `bg-success`, etc.), buttons, cards, headers, sidebar, badges, and form controls will all pick up the new palette automatically.
+Add a small palette button to the top header so users can pick the app's accent color live.
 
-## 2. Tailwind config (`tailwind.config.ts`)
+### Files
 
-No structural changes needed — the existing `primary`, `accent`, `success`, `sidebar.*` color mappings already read from the CSS variables we're updating. Will only add a `brand` color group exposing the two hex values directly for any future explicit use:
+- **New** `src/hooks/useThemeColor.tsx` — React context + provider.
+  - Stores the selected palette key in `localStorage` (`portal-theme-color`).
+  - Writes the corresponding HSL values to `--primary`, `--ring`, `--sidebar-primary`, `--sidebar-ring`, and `--accent` on `document.documentElement`.
+  - Exposes `{ current, setColor, palettes }`.
 
-```ts
-brand: {
-  orange: "hsl(24 82% 50%)",
-  green:  "hsl(137 100% 32%)",
-}
-```
+- **New** `src/components/layout/ThemeColorPicker.tsx` — popover with swatches.
+  - Trigger: `Palette` icon button (lucide-react) sized to fit the header.
+  - Popover content: a 4-column grid of color swatches. Selecting one calls `setColor(key)` and shows a check mark on the active swatch.
+  - Built with existing shadcn `Popover` + `Button`.
 
-## 3. Sidebar scrollbar (`src/components/layout/Sidebar.tsx` + `src/index.css`)
+- **Edit** `src/main.tsx` (or `App.tsx`) — wrap the app tree with `<ThemeColorProvider>` so the saved color is applied before first paint.
 
-Currently the `<nav>` uses `overflow-y-auto` which shows the default browser scrollbar at all times.
+- **Edit** `src/components/layout/EnterpriseHeader.tsx` and `src/components/layout/MobileHeader.tsx` — insert `<ThemeColorPicker />` next to the existing header actions (notifications / user menu).
 
-Changes:
-- Add a new utility class `.sidebar-scroll` in `index.css` that:
-  - Sets a thin scrollbar (`scrollbar-width: thin` for Firefox, `::-webkit-scrollbar { width: 4px }` for Chromium).
-  - Uses a transparent thumb by default and a subtle white-tinted thumb only when the sidebar is hovered (`aside:hover .sidebar-scroll::-webkit-scrollbar-thumb`).
-  - Track stays transparent so the thin bar visually appears only on hover.
-- Apply `sidebar-scroll` to the `<nav>` element inside `Sidebar.tsx` alongside the existing classes.
+### Preset palettes
 
-No behavioral changes — scrolling still works the same; the bar just hides until hover.
+Each preset defines `primary` + `accent` HSL pairs:
 
-## 4. Quick visual QA
+| Key | Label | Primary | Accent |
+|---|---|---|---|
+| `brand` (default) | Sharvi Orange + Green | `24 82% 50%` | `137 100% 32%` |
+| `blue` | Classic Blue | `210 100% 40%` | `187 85% 43%` |
+| `indigo` | Indigo | `239 84% 56%` | `262 83% 58%` |
+| `emerald` | Emerald | `160 84% 32%` | `173 80% 40%` |
+| `rose` | Rose | `347 77% 50%` | `24 95% 53%` |
+| `slate` | Slate | `215 28% 25%` | `199 89% 48%` |
 
-After the edits, open the preview and verify:
-- Login screen "Sign In" button is orange.
-- Sidebar active item uses orange background.
-- Success badges / approved states use the new green.
-- Sidebar scrollbar is invisible at rest and shows as a thin bar on hover.
+(Six is a comfortable grid; final list easy to extend later.)
+
+### Login page exception
+
+Because the login route applies the `.login-theme` scoped overrides (Step 1), the theme picker won't affect the login screen — which is the intended behavior.
 
 ---
 
 ## Files touched
 
-- `src/index.css` — update CSS variables (light + dark), add `.sidebar-scroll` utility.
-- `tailwind.config.ts` — add optional `brand` color group.
-- `src/components/layout/Sidebar.tsx` — add `sidebar-scroll` class to the nav element.
+- `src/index.css` — add `.login-theme` scoped overrides.
+- `src/pages/Auth.tsx` — add `login-theme` class to root container.
+- `src/hooks/useThemeColor.tsx` — new provider + hook.
+- `src/components/layout/ThemeColorPicker.tsx` — new swatch popover.
+- `src/main.tsx` — mount `ThemeColorProvider`.
+- `src/components/layout/EnterpriseHeader.tsx` — add picker to desktop header.
+- `src/components/layout/MobileHeader.tsx` — add picker to mobile header.
 
-No component logic, routes, edge functions, or database changes.
+No backend, RLS, edge function, or DB changes. Selection is per-browser (localStorage). If you'd rather persist per-user in the database, say so and I'll add that instead.
