@@ -416,6 +416,19 @@ export default function VendorList() {
                           <TableCell>
                             <span className="text-sm">{getBuyerCompanyName(vendor.tenant_id)}</span>
                           </TableCell>
+                          <TableCell>
+                            {vendor.invited_by ? (
+                              <div className="text-sm">
+                                <div className="font-medium">{vendor.invited_by.name ?? vendor.invited_by.email ?? '—'}</div>
+                                {vendor.invited_by.name && vendor.invited_by.email && (
+                                  <div className="text-xs text-muted-foreground">{vendor.invited_by.email}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+
                           <TableCell className="font-mono text-sm">
                             {vendor.gstin || '-'}
                           </TableCell>
