@@ -25,6 +25,8 @@ import SapApiConfigEdit from "./pages/SapApiConfigEdit";
 import KycApiSettings from "./pages/KycApiSettings";
 import KycApiConfigEdit from "./pages/KycApiConfigEdit";
 import VendorList from "./pages/VendorList";
+import VendorStatus from "./pages/VendorStatus";
+
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
