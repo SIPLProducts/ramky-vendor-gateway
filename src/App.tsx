@@ -84,6 +84,8 @@ const App = () => (
                 <Route path="/admin/kyc-api-settings" element={<KycApiSettings />} />
                 <Route path="/admin/kyc-api-settings/:id" element={<KycApiConfigEdit />} />
                 <Route path="/vendors" element={<VendorList />} />
+                <Route path="/vendor-status/:id" element={<VendorStatus />} />
+
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
