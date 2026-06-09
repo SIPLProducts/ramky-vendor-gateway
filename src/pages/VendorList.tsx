@@ -105,15 +105,21 @@ export default function VendorList() {
 
   // Fetch all vendors from database
   const { data: vendors, isLoading, refetch } = useVendors();
-  const { activeTenantId, myTenants, setActiveTenantId, isSuperAdmin } = useTenantContext();
+  const { activeTenantId, myTenants, setActiveTenantId, isSuperAdmin, isCrossTenantReviewer } = useTenantContext();
   const activeTenantName = activeTenantId
     ? myTenants.find((t) => t.id === activeTenantId)?.name ?? 'selected tenant'
     : null;
 
-  // Fetch buyer companies (tenants) for filter
+  // Fetch buyer companies (tenants) for filter — restrict to tenants the user
+  // actually has access to. Super-admins and SAP Team can see all active tenants;
+  // everyone else only sees their assigned tenants.
+  const canSeeAllTenants = isSuperAdmin || isCrossTenantReviewer;
   const { data: buyerCompanies } = useQuery({
-    queryKey: ['buyer-companies'],
+    queryKey: ['buyer-companies', canSeeAllTenants ? 'all' : 'scoped', myTenants.map((t) => t.id).join(',')],
     queryFn: async () => {
+      if (!canSeeAllTenants) {
+        return myTenants.map((t) => ({ id: t.id, name: t.name, code: t.code }));
+      }
       const { data, error } = await supabase
         .from('tenants')
         .select('id, name, code')
