@@ -829,7 +829,8 @@ export default function AdminInvitations() {
               {allowedTenants.length > 1 ? (
                 <div className="space-y-2">
                   <Label htmlFor="company">Company {isSuperAdmin ? '(Tenant)' : ''}</Label>
-                  <Select value={selectedTenantId} onValueChange={(v) => setActiveTenantId(v)}>
+                  <Select value={selectedTenantId} onValueChange={(v) => setDialogTenantId(v)}>
+
                     <SelectTrigger id="company">
                       <SelectValue placeholder="Select a company" />
                     </SelectTrigger>
