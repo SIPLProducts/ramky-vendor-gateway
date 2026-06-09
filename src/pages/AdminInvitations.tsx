@@ -182,7 +182,7 @@ export default function AdminInvitations() {
 
       let q = supabase
         .from('vendor_invitations')
-        .select('*')
+        .select('*, vendor:vendors(id, reference_number, status)')
         .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
       if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
