@@ -50,6 +50,3 @@ verify_jwt = false
 
 [functions.sap-master-fetch]
 verify_jwt = false
-
-[functions.wipe-vendor-storage]
-verify_jwt = false
