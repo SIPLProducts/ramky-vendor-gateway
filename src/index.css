@@ -146,6 +146,15 @@
   }
 }
 
+/* Login page keeps the original SAP blue palette regardless of theme picker */
+.login-theme {
+  --primary: 210 100% 40%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 210 100% 40%;
+  --accent: 187 85% 43%;
+  --accent-foreground: 0 0% 100%;
+}
+
 @layer base {
   * {
     @apply border-border;

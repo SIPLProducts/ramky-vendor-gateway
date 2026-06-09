@@ -13,6 +13,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import ramkyLogo from '@/assets/ramky-logo.png';
+import { ThemeColorPicker } from '@/components/layout/ThemeColorPicker';
 
 interface EnterpriseHeaderProps {
   showHelp?: boolean;
@@ -67,6 +68,7 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
             </SelectContent>
           </Select>
         )}
+        <ThemeColorPicker variant="desktop" />
         {showHelp && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
