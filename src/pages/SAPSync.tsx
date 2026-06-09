@@ -518,7 +518,121 @@ export default function SAPSync() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Rejected tab */}
+        <TabsContent value="rejected" className="space-y-4 mt-6">
+          <div className="grid gap-4">
+            {rejectedLoading ? (
+              [...Array(2)].map((_, i) => (
+                <Card key={i} className="border-0 shadow-md"><CardContent className="p-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+              ))
+            ) : filteredRejected.length === 0 ? (
+              <Card className="border-0 shadow-md"><CardContent className="py-16 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Ban className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold">No rejected vendors</h3>
+                <p className="text-muted-foreground mt-2">Vendors rejected by the SAP Team will appear here.</p>
+              </CardContent></Card>
+            ) : (
+              filteredRejected.map((vendor) => {
+                const remarks = (vendor as any).last_rejection_comments as string | null;
+                const rejectedAt = (vendor as any).last_rejected_at as string | null;
+                const refNo = (vendor as any).reference_number || vendor.id.slice(0, 8).toUpperCase();
+                return (
+                  <Card key={vendor.id} className="border-0 shadow-md border-l-4 border-l-red-500">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-red-500/20 to-rose-500/5 flex items-center justify-center">
+                            <Building2 className="h-7 w-7 text-red-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1 flex-wrap">
+                              <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                              <Badge className="bg-red-100 text-red-700 border-red-200">SAP Team Rejected</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
+                            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
+                              <span className="font-mono bg-muted px-2 py-0.5 rounded">Ref No: {refNo}</span>
+                              <span>GSTIN: {vendor.gstin || 'N/A'}</span>
+                              {rejectedAt && <span>Rejected: {new Date(rejectedAt).toLocaleString()}</span>}
+                            </div>
+                            {remarks && (
+                              <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
+                                <p className="text-xs font-semibold text-red-700 mb-1">Reject Remarks</p>
+                                <p className="text-sm text-red-900 whitespace-pre-wrap">{remarks}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
+                            <Eye className="h-4 w-4 mr-2" />View
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* Reject confirmation dialog */}
+      <Dialog open={!!rejectVendor} onOpenChange={(o) => { if (!o) { setRejectVendor(null); setRejectRemarks(''); } }}>
+        <DialogContent className="rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-600" />
+              Reject Vendor
+            </DialogTitle>
+            <DialogDescription>
+              The vendor will be marked as <span className="font-semibold">SAP Team Rejected</span> and moved to the Rejected tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <p className="font-semibold">{rejectVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="text-xs text-muted-foreground font-mono mt-1">
+                Ref No: {(rejectVendor as any)?.reference_number || rejectVendor?.id.slice(0, 8).toUpperCase()}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reject-remarks">
+                Reject Remarks <span className="text-red-600">*</span>
+              </Label>
+              <Textarea
+                id="reject-remarks"
+                value={rejectRemarks}
+                onChange={(e) => setRejectRemarks(e.target.value)}
+                placeholder="e.g. Vendor already exists in SAP"
+                rows={4}
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Rejected tab.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setRejectVendor(null); setRejectRemarks(''); }}>
+              Cancel
+            </Button>
+            <Button
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleConfirmReject}
+              disabled={!rejectRemarks.trim() || !!rejectingVendorId}
+            >
+              {rejectingVendorId ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+              ) : (
+                <><XCircle className="h-4 w-4 mr-2" />Confirm Reject</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <VendorReviewDialog
         vendorId={selectedVendor?.id ?? null}
