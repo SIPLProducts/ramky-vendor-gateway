@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         .eq('stage', 'BUYER').eq('status', 'pending').in('vendor_id', buyerVendorIds);
       const { data: rejectedVendors } = await admin
         .from('vendors')
-        .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at')
+        .select('id, legal_name, trade_name, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number')
         .in('id', buyerVendorIds).eq('status', 'returned_to_buyer');
 
       // Latest invitation per vendor (for on-behalf detection + deep-link).
