@@ -1,436 +1,279 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useVendorStats, useVendors, useBuyerCompanies, useStuckApprovalVendors } from '@/hooks/useVendors';
-import {
-  Users,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  TrendingUp,
-  FileText,
-  ArrowRight,
-  Sparkles,
-  LayoutDashboard,
-  WifiOff,
-  Building2,
-  Server,
-  IndianRupee,
-  ShoppingCart,
-  RefreshCw,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useTenantContext } from '@/hooks/useTenantContext';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import * as XLSX from 'xlsx';
+import {
+  CalendarIcon,
+  CheckCircle,
+  Clock,
+  Download,
+  FileText,
+  XCircle,
+} from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ConnectionStatus } from '@/components/pwa/ConnectionStatus';
-import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
-import { useQueryClient } from '@tanstack/react-query';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
+import { cn } from '@/lib/utils';
+
+type VendorRow = {
+  id: string;
+  reference_number: string | null;
+  company_name: string | null;
+  vendor_email: string | null;
+  status: string;
+  created_at: string;
+  tenant_id: string | null;
+};
+
+const PENDING_STATUSES = new Set([
+  'draft',
+  'submitted',
+  'validation_pending',
+  'buyer_review',
+  'scm_manager_review',
+  'scm_head_review',
+  'finance_1_review',
+  'finance_2_review',
+  'ceo_office_review',
+  'pending_sap_sync',
+  'returned_to_vendor',
+  'returned_to_buyer',
+]);
+
+const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  draft: { label: 'Draft', variant: 'outline' },
+  submitted: { label: 'Submitted', variant: 'secondary' },
+  validation_pending: { label: 'Validating', variant: 'secondary' },
+  buyer_review: { label: 'Buyer Review', variant: 'secondary' },
+  scm_manager_review: { label: 'SCM Manager Review', variant: 'secondary' },
+  scm_head_review: { label: 'SCM Head Review', variant: 'secondary' },
+  finance_1_review: { label: 'Finance 1 Review', variant: 'secondary' },
+  finance_2_review: { label: 'Finance 2 Review', variant: 'secondary' },
+  ceo_office_review: { label: 'CEO Office Review', variant: 'secondary' },
+  pending_sap_sync: { label: 'Pending SAP Sync', variant: 'secondary' },
+  returned_to_vendor: { label: 'Returned to Vendor', variant: 'outline' },
+  returned_to_buyer: { label: 'Returned to Buyer', variant: 'outline' },
+  sap_synced: { label: 'Approved (SAP Synced)', variant: 'default' },
+  sap_team_rejected: { label: 'SAP Team Rejected', variant: 'destructive' },
+};
+
+function statusBadge(status: string) {
+  const cfg = STATUS_LABELS[status] ?? { label: status, variant: 'outline' as const };
+  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+}
 
 export default function Dashboard() {
-  const { user, userRole: authRole } = useAuth();
-  const userRole = authRole || 'vendor';
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-  const { data: stats, isLoading: statsLoading, isOffline: statsOffline, cacheAge: statsCacheAge } = useVendorStats();
-  const { data: recentVendors, isLoading: vendorsLoading, isOffline: vendorsOffline, cacheAge: vendorsCacheAge } = useVendors();
-  const { data: buyerCompanies } = useBuyerCompanies();
-  const { data: stuckCount } = useStuckApprovalVendors();
-  const isAdmin = userRole === 'admin' || userRole === 'sharvi_admin' || userRole === 'customer_admin';
-  const { activeTenantId, myTenants, setActiveTenantId, isSuperAdmin } = useTenantContext();
-  const activeTenantName = activeTenantId
-    ? myTenants.find((t) => t.id === activeTenantId)?.name ?? 'selected tenant'
-    : null;
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenantIds, vendorIds } = useTenantFilter();
+  const { isLoading: tenantLoading } = useTenantContext();
 
-  // Subscribe to real-time updates
-  const { isConnected } = useRealtimeUpdates({
-    onVendorUpdate: () => {
-      // Refresh data when vendor updates come in
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      queryClient.invalidateQueries({ queryKey: ['vendor-stats'] });
+  const [dateFrom, setDateFrom] = useState<Date>(() => startOfDay(subDays(new Date(), 30)));
+  const [dateTo, setDateTo] = useState<Date>(() => endOfDay(new Date()));
+
+  const fromIso = startOfDay(dateFrom).toISOString();
+  const toIso = endOfDay(dateTo).toISOString();
+
+  const { data: vendors = [], isLoading } = useQuery({
+    queryKey: ['dashboard-vendors', user?.id, tenantIds, vendorIds, fromIso, toIso],
+    enabled: !!user?.id && !tenantLoading,
+    queryFn: async (): Promise<VendorRow[]> => {
+      // Vendor-id scope is empty → user sees nothing.
+      if (vendorIds !== null && vendorIds.length === 0) return [];
+
+      let q = supabase
+        .from('vendors')
+        .select('id, reference_number, company_name, vendor_email, status, created_at, tenant_id')
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+        .order('created_at', { ascending: false });
+
+      if (vendorIds && vendorIds.length > 0) q = q.in('id', vendorIds);
+      else if (tenantIds && tenantIds.length > 0) q = q.in('tenant_id', tenantIds);
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as VendorRow[];
     },
-    showNotifications: true,
   });
 
-  const isOffline = statsOffline || vendorsOffline;
+  const counts = useMemo(() => {
+    let pending = 0;
+    let approved = 0;
+    let rejected = 0;
+    for (const v of vendors) {
+      if (v.status === 'sap_synced') approved++;
+      else if (v.status === 'sap_team_rejected') rejected++;
+      else if (PENDING_STATUSES.has(v.status)) pending++;
+    }
+    return { total: vendors.length, pending, approved, rejected };
+  }, [vendors]);
 
-  // Get greeting based on time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+  const handleExport = () => {
+    const rows = vendors.map((v) => ({
+      'Reference #': v.reference_number ?? '',
+      'Company Name': v.company_name ?? '',
+      Email: v.vendor_email ?? '',
+      Status: STATUS_LABELS[v.status]?.label ?? v.status,
+      'Created At': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+    const fname = `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}.xlsx`;
+    XLSX.writeFile(wb, fname);
   };
 
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; className: string }> = {
-      draft: { label: 'Draft', className: 'status-info' },
-      submitted: { label: 'Submitted', className: 'status-info' },
-      validation_pending: { label: 'Validating', className: 'status-pending' },
-      validation_failed: { label: 'Validation Failed', className: 'status-error' },
-      finance_review: { label: 'Finance Review', className: 'status-pending' },
-      finance_approved: { label: 'Finance Approved', className: 'status-success' },
-      finance_rejected: { label: 'Finance Rejected', className: 'status-error' },
-      purchase_review: { label: 'Purchase Review', className: 'status-pending' },
-      purchase_approved: { label: 'Purchase Approved', className: 'status-success' },
-      purchase_rejected: { label: 'Purchase Rejected', className: 'status-error' },
-      sap_synced: { label: 'SAP Synced', className: 'status-success' },
-    };
-    const { label, className } = config[status] || { label: status, className: 'status-info' };
-    return <span className={`status-badge ${className}`}>{label}</span>;
-  };
-
-  const displayStats = stats || {
-    total: 0,
-    pendingFinance: 0,
-    pendingPurchase: 0,
-    pendingSAPSync: 0,
-    approved: 0,
-    validationFailed: 0,
-    draft: 0,
-    submitted: 0,
-    pendingVerification: 0,
-    activeVendors: 0,
-    byCompany: {} as Record<string, { total: number; pending: number; approved: number; rejected: number }>,
-  };
-
-  const displayVendors = recentVendors?.slice(0, 5) || [];
-
-  // Get company breakdown with names
-  type CompanyStats = { total: number; pending: number; approved: number; rejected: number };
-  const byCompanyData = (displayStats.byCompany || {}) as Record<string, CompanyStats>;
-
-  const companyBreakdown = Object.entries(byCompanyData).map(([tenantId, companyData]) => {
-    const company = buyerCompanies?.find(c => c.id === tenantId);
-    return {
-      id: tenantId,
-      name: company?.name || 'Unassigned',
-      code: company?.code || '-',
-      total: companyData.total,
-      pending: companyData.pending,
-      approved: companyData.approved,
-      rejected: companyData.rejected,
-    };
-  }).sort((a, b) => b.total - a.total);
+  const cards = [
+    { label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
+    { label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
+    { label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
+    { label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Offline Alert */}
-      {isOffline && (
-        <Alert className="bg-warning/10 border-warning/30">
-          <WifiOff className="h-4 w-4 text-warning" />
-          <AlertDescription className="text-warning-foreground">
-            You're offline. Showing cached data from {statsCacheAge || vendorsCacheAge || 'earlier'}.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Page Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <LayoutDashboard className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Executive Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Real-time vendor onboarding insights</p>
-          </div>
+    <div className="space-y-6 p-4 md:p-6">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Vendor applications summary for the selected date range.
+          </p>
         </div>
-        <ConnectionStatus showLabel showLogout />
-      </div>
 
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-teal-500 to-emerald-400 p-6 text-white">
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-4 w-4" />
-            <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Welcome Back</span>
-          </div>
-          <h2 className="text-2xl font-bold mb-1">{getGreeting()}, {userName}!</h2>
-          <p className="text-sm opacity-90">Your vendor operations are running smoothly.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <DatePickerButton label="From" value={dateFrom} onChange={setDateFrom} max={dateTo} />
+          <DatePickerButton label="To" value={dateTo} onChange={setDateTo} min={dateFrom} />
+          <Button onClick={handleExport} disabled={vendors.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export to Excel
+          </Button>
         </div>
-        {/* Decorative circles */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20">
-          <div className="w-32 h-32 rounded-full border-4 border-white" />
-          <div className="w-24 h-24 rounded-full border-4 border-white absolute top-4 left-4" />
-        </div>
-      </div>
+      </header>
 
-      {/* Section Header */}
-      <div className="flex items-center gap-6 border-b">
-        <button className="pb-3 text-sm font-semibold text-foreground border-b-2 border-primary">
-          Key Metrics
-        </button>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-        <Card className="card-interactive border-0 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Vendors
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold">{displayStats.total}</div>
-                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-success" />
-                  All registered vendors
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-
-        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Purchase / SCM
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <ShoppingCart className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">{displayStats.pendingPurchase}</div>
-                <Link to="/purchase/approval">
-                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-amber-600 dark:text-amber-400">
-                    Approve <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-950/20 dark:to-emerald-950/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Finance
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-              <IndianRupee className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold text-teal-600 dark:text-teal-400">{displayStats.pendingFinance}</div>
-                <Link to="/finance/review">
-                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-teal-600 dark:text-teal-400">
-                    Review <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending SAP Sync
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <RefreshCw className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">{displayStats.pendingSAPSync}</div>
-                <Link to="/sap/sync">
-                  <Button variant="link" className="p-0 h-auto text-xs mt-2 text-purple-600 dark:text-purple-400">
-                    Sync now <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Vendors
-            </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
-              <CheckCircle className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <div className="text-4xl font-bold text-green-600 dark:text-green-400">{displayStats.activeVendors}</div>
-                <p className="text-xs text-muted-foreground mt-2">SAP synced vendors</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {isAdmin && (
-          <Card className="card-interactive border-0 shadow-md bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/20 dark:to-red-950/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Stuck — No Approver
-              </CardTitle>
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-500 to-red-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
-                <AlertTriangle className="h-5 w-5 text-white" />
-              </div>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((c) => (
+          <Card key={c.label}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
+              <c.icon className={cn('h-5 w-5', c.color)} />
             </CardHeader>
             <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-9 w-20" />
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-4xl font-bold text-rose-600 dark:text-rose-400">{stuckCount ?? 0}</div>
-                  <Link to="/admin/configuration">
-                    <Button variant="link" className="p-0 h-auto text-xs mt-2 text-rose-600 dark:text-rose-400">
-                      Configure Approval Matrix <ArrowRight className="h-3 w-3 ml-1" />
-                    </Button>
-                  </Link>
-                </>
+                <div className="text-3xl font-semibold">{c.value}</div>
               )}
             </CardContent>
           </Card>
-        )}
-      </div>
+        ))}
+      </section>
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl">Recent Submissions</CardTitle>
-            <CardDescription>Latest vendor registration activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {vendorsLoading ? (
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-48" />
-                      <Skeleton className="h-3 w-32" />
-                    </div>
-                    <Skeleton className="h-6 w-24" />
-                  </div>
-                ))}
-              </div>
-            ) : displayVendors.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Users className="h-8 w-8 opacity-50" />
-                </div>
-                {activeTenantName ? (
-                  <>
-                    <p className="font-medium">No vendors found for {activeTenantName}</p>
-                    <p className="text-sm mt-1">Try switching the tenant in the header above{isSuperAdmin ? ' or view All Tenants' : ''}.</p>
-                    {isSuperAdmin && (
-                      <Button variant="link" size="sm" className="mt-2" onClick={() => setActiveTenantId(null)}>
-                        View All Tenants
-                      </Button>
-                    )}
-                  </>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Vendor Applications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-hidden rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Reference #</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 5 }).map((__, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : vendors.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                      No vendor applications in this date range.
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  <>
-                    <p className="font-medium">No vendors registered yet</p>
-                    <p className="text-sm mt-1">Vendors will appear here once they register</p>
-                  </>
+                  vendors.map((v) => (
+                    <TableRow key={v.id}>
+                      <TableCell className="font-mono text-xs">
+                        <Link to={`/vendors/${v.id}`} className="text-primary hover:underline">
+                          {v.reference_number ?? v.id.slice(0, 8)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{v.company_name ?? '—'}</TableCell>
+                      <TableCell>{v.vendor_email ?? '—'}</TableCell>
+                      <TableCell>{statusBadge(v.status)}</TableCell>
+                      <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
+                    </TableRow>
+                  ))
                 )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {displayVendors.map((vendor) => (
-                  <div
-                    key={vendor.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {vendor.legal_name || 'Unnamed Vendor'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {vendor.registered_city}, {vendor.registered_state}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      {getStatusBadge(vendor.status)}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {new Date(vendor.updated_at).toLocaleDateString('en-IN')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl">Quick Actions</CardTitle>
-            <CardDescription>Common tasks and shortcuts</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {(userRole === 'finance' || userRole === 'admin') && (
-              <Link to="/finance/review">
-                <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl border-amber-200 hover:bg-amber-50 hover:border-amber-300 dark:border-amber-800 dark:hover:bg-amber-950/30">
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                    <IndianRupee className="h-4 w-4 text-white" />
-                  </div>
-                  <span>Review Pending Vendors ({displayStats.pendingFinance})</span>
-                </Button>
-              </Link>
-            )}
-            {(userRole === 'purchase' || userRole === 'admin') && (
-              <Link to="/purchase/approval">
-                <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl border-teal-200 hover:bg-teal-50 hover:border-teal-300 dark:border-teal-800 dark:hover:bg-teal-950/30 mt-2">
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center">
-                    <ShoppingCart className="h-4 w-4 text-white" />
-                  </div>
-                  <span>Approve Vendors ({displayStats.pendingPurchase})</span>
-                </Button>
-              </Link>
-            )}
-            <Link to="/vendors">
-              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl mt-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                  <Users className="h-4 w-4 text-primary" />
-                </div>
-                <span>View All Vendors</span>
-              </Button>
-            </Link>
-            <Link to="/audit-logs">
-              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl mt-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center">
-                  <AlertTriangle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                <span>View Audit Logs</span>
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function DatePickerButton({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  label: string;
+  value: Date;
+  onChange: (d: Date) => void;
+  min?: Date;
+  max?: Date;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="justify-start font-normal">
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          <span className="text-muted-foreground mr-1">{label}:</span>
+          {format(value, 'dd MMM yyyy')}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={value}
+          onSelect={(d) => d && onChange(d)}
+          disabled={(d) => (min ? d < startOfDay(min) : false) || (max ? d > endOfDay(max) : false)}
+          initialFocus
+          className={cn('p-3 pointer-events-auto')}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
