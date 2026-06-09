@@ -925,7 +925,7 @@ export default function AdminInvitations() {
               {allowedTenants.length > 1 ? (
                 <div className="space-y-2">
                   <Label htmlFor="cv-company">Company</Label>
-                  <Select value={selectedTenantId} onValueChange={(v) => setActiveTenantId(v)}>
+                  <Select value={selectedTenantId} onValueChange={(v) => setDialogTenantId(v)}>
                     <SelectTrigger id="cv-company">
                       <SelectValue placeholder="Select a company" />
                     </SelectTrigger>
