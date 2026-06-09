@@ -604,14 +604,9 @@ export default function AdminInvitations() {
 
     let matchesStatus = true;
     if (statusFilter !== 'all') {
-      if (statusFilter.startsWith('stage:')) {
-        const opt = STAGE_FILTER_OPTIONS.find((o) => o.value === statusFilter);
-        const vStatus = invitation.vendor?.status ?? null;
-        matchesStatus = !!opt && !!vStatus && (opt.statuses as readonly string[]).includes(vStatus);
-      } else {
-        matchesStatus = getInvitationStatus(invitation) === statusFilter;
-      }
+      matchesStatus = getInvitationStatus(invitation) === statusFilter;
     }
+
     return matchesSearch && matchesStatus;
   }) || [];
 
