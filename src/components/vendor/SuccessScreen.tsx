@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RegistrationStatusTracker, RegistrationStatus } from './RegistrationStatusTracker';
