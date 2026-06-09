@@ -49,7 +49,10 @@ async function persistClassification(vendorIds: string[], overrides: SapFieldOve
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'sap' | 'dms'>('sap');
+  const [activeTab, setActiveTab] = useState<'sap' | 'dms' | 'rejected'>('sap');
+  const [rejectVendor, setRejectVendor] = useState<VendorRow | null>(null);
+  const [rejectRemarks, setRejectRemarks] = useState('');
+  const [rejectingVendorId, setRejectingVendorId] = useState<string | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
