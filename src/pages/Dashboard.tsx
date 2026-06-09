@@ -158,8 +158,31 @@ export default function Dashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <DatePickerButton label="From" value={dateFrom} onChange={setDateFrom} max={dateTo} />
-          <DatePickerButton label="To" value={dateTo} onChange={setDateTo} min={dateFrom} />
+          <DatePickerButton
+            label="From"
+            value={dateFrom}
+            onChange={(d) => {
+              setDateFrom(startOfDay(d));
+              if (d > dateTo) setDateTo(endOfDay(d));
+            }}
+          />
+          <DatePickerButton
+            label="To"
+            value={dateTo}
+            onChange={(d) => {
+              setDateTo(endOfDay(d));
+              if (d < dateFrom) setDateFrom(startOfDay(d));
+            }}
+          />
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDateFrom(startOfDay(subDays(new Date(), 30)));
+              setDateTo(endOfDay(new Date()));
+            }}
+          >
+            Clear
+          </Button>
           <Button onClick={handleExport} disabled={vendors.length === 0}>
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
@@ -246,14 +269,10 @@ function DatePickerButton({
   label,
   value,
   onChange,
-  min,
-  max,
 }: {
   label: string;
   value: Date;
   onChange: (d: Date) => void;
-  min?: Date;
-  max?: Date;
 }) {
   return (
     <Popover>
@@ -269,7 +288,6 @@ function DatePickerButton({
           mode="single"
           selected={value}
           onSelect={(d) => d && onChange(d)}
-          disabled={(d) => (min ? d < startOfDay(min) : false) || (max ? d > endOfDay(max) : false)}
           initialFocus
           className={cn('p-3 pointer-events-auto')}
         />
