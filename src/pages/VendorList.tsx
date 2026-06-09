@@ -205,7 +205,7 @@ export default function VendorList() {
 
   const handleExport = () => {
     const csvData = filteredVendors.map((v) => ({
-      ID: v.id,
+      Reference: (v as any).reference_number || v.id,
       Name: v.legal_name,
       GSTIN: v.gstin,
       PAN: v.pan,
