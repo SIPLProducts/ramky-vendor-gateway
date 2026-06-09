@@ -58,14 +58,12 @@ import {
   Phone,
   UserPlus,
   ExternalLink,
+  Search,
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import {
-  VendorStageCell,
-  VendorReferenceCell,
-  STAGE_FILTER_OPTIONS,
-} from '@/components/admin/VendorStageCell';
+import { VendorReferenceCell } from '@/components/admin/VendorStageCell';
+
 
 const emailSchema = z.string().email('Please enter a valid email address');
 
@@ -87,6 +85,9 @@ export default function AdminInvitations() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [trackRef, setTrackRef] = useState('');
+  const [isTracking, setIsTracking] = useState(false);
+
   const [isCheckingReadiness, setIsCheckingReadiness] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -606,14 +607,9 @@ export default function AdminInvitations() {
 
     let matchesStatus = true;
     if (statusFilter !== 'all') {
-      if (statusFilter.startsWith('stage:')) {
-        const opt = STAGE_FILTER_OPTIONS.find((o) => o.value === statusFilter);
-        const vStatus = invitation.vendor?.status ?? null;
-        matchesStatus = !!opt && !!vStatus && (opt.statuses as readonly string[]).includes(vStatus);
-      } else {
-        matchesStatus = getInvitationStatus(invitation) === statusFilter;
-      }
+      matchesStatus = getInvitationStatus(invitation) === statusFilter;
     }
+
     return matchesSearch && matchesStatus;
   }) || [];
 
@@ -636,6 +632,35 @@ export default function AdminInvitations() {
     setPageSize(size);
     setCurrentPage(1);
   };
+
+  const handleTrackByReference = async () => {
+    const ref = trackRef.trim();
+    if (!ref) {
+      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
+      return;
+    }
+    setIsTracking(true);
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('reference_number', ref)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.id) {
+        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
+        return;
+      }
+      navigate(`/vendor-status/${data.id}`);
+    } catch (e: any) {
+      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
+    } finally {
+      setIsTracking(false);
+    }
+  };
+
+
+
 
   const getStatusBadge = (invitation: any) => {
     const status = getInvitationStatus(invitation);
@@ -911,7 +936,22 @@ export default function AdminInvitations() {
                 All vendor invitations and their current status
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
+                className="flex items-center gap-2"
+              >
+                <Input
+                  placeholder="Enter Reference Number"
+                  value={trackRef}
+                  onChange={(e) => setTrackRef(e.target.value)}
+                  className="w-56"
+                />
+                <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
+                  {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Search
+                </Button>
+              </form>
               <div className="relative w-64">
                 <Input
                   placeholder="Search by email, name or reference #..."
@@ -929,12 +969,10 @@ export default function AdminInvitations() {
                   <SelectItem value="pending">Invitation: Pending</SelectItem>
                   <SelectItem value="used">Invitation: Used</SelectItem>
                   <SelectItem value="expired">Invitation: Expired</SelectItem>
-                  {STAGE_FILTER_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
+
           </div>
         </CardHeader>
         <CardContent>
@@ -956,8 +994,8 @@ export default function AdminInvitations() {
                     <TableRow>
                       <TableHead>Vendor Name</TableHead>
                       <TableHead>Reference #</TableHead>
-                      <TableHead>Approval Stage</TableHead>
                       <TableHead>Email</TableHead>
+
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Expires</TableHead>
@@ -990,9 +1028,6 @@ export default function AdminInvitations() {
                         </TableCell>
                         <TableCell>
                           <VendorReferenceCell vendor={(invitation as any).vendor} />
-                        </TableCell>
-                        <TableCell>
-                          <VendorStageCell vendor={(invitation as any).vendor} />
                         </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
                         <TableCell>

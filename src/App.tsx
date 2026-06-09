@@ -25,6 +25,8 @@ import SapApiConfigEdit from "./pages/SapApiConfigEdit";
 import KycApiSettings from "./pages/KycApiSettings";
 import KycApiConfigEdit from "./pages/KycApiConfigEdit";
 import VendorList from "./pages/VendorList";
+import VendorStatus from "./pages/VendorStatus";
+
 import AuditLogs from "./pages/AuditLogs";
 import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
@@ -82,6 +84,8 @@ const App = () => (
                 <Route path="/admin/kyc-api-settings" element={<KycApiSettings />} />
                 <Route path="/admin/kyc-api-settings/:id" element={<KycApiConfigEdit />} />
                 <Route path="/vendors" element={<VendorList />} />
+                <Route path="/vendor-status/:id" element={<VendorStatus />} />
+
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
