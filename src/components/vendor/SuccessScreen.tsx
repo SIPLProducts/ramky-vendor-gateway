@@ -7,6 +7,7 @@ import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 interface SuccessScreenProps {
   status: RegistrationStatus;
   vendorId?: string;
+  referenceNumber?: string | null;
   financeComments?: string | null;
   purchaseComments?: string | null;
   onEdit?: () => void;
@@ -15,6 +16,7 @@ interface SuccessScreenProps {
 export function SuccessScreen({
   status,
   vendorId,
+  referenceNumber,
   financeComments,
   purchaseComments,
   onEdit,
@@ -144,10 +146,10 @@ export function SuccessScreen({
         <h1 className="text-2xl font-semibold text-foreground mb-2">{config.title}</h1>
         <p className="text-muted-foreground">{config.message}</p>
         
-        {vendorId && (
+        {(referenceNumber || vendorId) && (
           <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
             <span className="text-sm text-muted-foreground">Reference Number:</span>
-            <span className="text-sm font-mono font-medium text-foreground">{vendorId.slice(0, 8).toUpperCase()}</span>
+            <span className="text-sm font-mono font-medium text-foreground">{referenceNumber || (vendorId ? vendorId.slice(0, 8).toUpperCase() : '')}</span>
           </div>
         )}
       </div>
