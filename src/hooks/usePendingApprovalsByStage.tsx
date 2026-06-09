@@ -7,6 +7,7 @@ export type ApprovalStage = 'BUYER' | 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' |
 export interface StageApprovalItem {
   progressId: string | null;
   vendorId: string;
+  referenceNumber?: string | null;
   vendorName: string;
   submittedAt: string | null;
   isMsme: boolean;
