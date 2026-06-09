@@ -1,65 +1,35 @@
-# Add Approval Stage Tracking to Vendor Invitations
+# Replace Approval Stage column with Vendor Status lookup
 
-## Problem
-The Vendor Invitations page (where "Create Vendor" lives) only shows invitation-level info (Pending / Used / Expired). Once the vendor exists, users can't tell which approval stage it's at (Buyer → SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office → SAP Sync → SAP Synced / Rejected).
+## Changes
 
-## Solution
-Enrich each invitation row with its linked vendor's reference number, current status, and a visual progress indicator showing the approval pipeline.
+### 1. `src/pages/AdminInvitations.tsx`
+- Remove the **Approval Stage** column (header + `VendorStageCell` cell). Keep the **Reference #** column.
+- Remove the `STAGE_FILTER_OPTIONS` entries from the status filter (revert to invitation-lifecycle filters only).
+- Add a **Track Vendor Status** search box beside the grid header (next to "Create Vendor" / "New Invitation", or above the table on the right):
+  - Input placeholder: `Enter Reference Number`
+  - **Search** button (icon + label)
+  - On submit/click: trim input, look up the vendor by `reference_number` via `supabase.from('vendors').select('id').eq('reference_number', ref).maybeSingle()`. If found, `navigate('/vendor-status/' + id)`. If not found or RLS blocks it, show a toast: "No vendor found with this reference number".
+  - Press Enter inside the input triggers Search.
 
-## Changes (frontend only)
+### 2. New page `src/pages/VendorStatus.tsx`
+Read-only status view for a single vendor.
+- Route: `/vendor-status/:id` registered in `src/App.tsx` inside the existing protected `AppLayout` section.
+- Header row: **Back to Vendor Invitations** button (`navigate('/admin/invitations')`) on the left, page title "Vendor Status" on the right.
+- Fetch the vendor via `supabase.from('vendors').select('id, reference_number, company_name, vendor_email, vendor_type, status, created_at, last_rejection_comments').eq('id', id).maybeSingle()`. RLS already restricts visibility — if no row, show "Vendor not found or you do not have access".
+- Content:
+  - Summary card: Reference #, Company Name, Email, Vendor Type, Submitted On, current status badge (reuse the `getStatusBadge` helper pattern from `VendorList.tsx`, or inline a small map).
+  - `RegistrationStatusTracker` (already used in `SuccessScreen`) wired with `useVendorApprovalChain(id)` to show the live stage pipeline.
+  - `ApprovalTimeline` component (already exists at `src/components/vendor/ApprovalTimeline.tsx`) to show per-level history and comments.
+- No edit actions — display only.
 
-### 1. Extend invitations query in `src/pages/AdminInvitations.tsx`
-Join the linked vendor so each row carries:
-- `vendor.reference_number`
-- `vendor.status`
-- `vendor.id` (for deep-link)
-
-Use the existing `vendor_id` FK on `vendor_invitations` → `vendors`:
-```ts
-.select('*, vendor:vendors(id, reference_number, status)')
-```
-
-### 2. New table columns
-Add two columns between "Vendor Name" and "Created":
-- **Reference #** — `vendor.reference_number` as a link to `/vendors/:id`. Shows "—" if vendor not created yet.
-- **Approval Stage** — a `StageBadge` + compact stepper.
-
-### 3. `StageBadge` + `StageProgress` component (new file `src/components/admin/VendorStageCell.tsx`)
-Maps `vendor.status` → label and pipeline position:
-
-```text
-Buyer → SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office → SAP Sync → Done
-```
-
-Status → stage map:
-- `draft`, `submitted`, `validation_pending`, `buyer_review` → Buyer (step 1)
-- `scm_manager_review` → SCM Manager (step 2)
-- `scm_head_review` → SCM Head (step 3)
-- `finance_1_review` → Finance 1 (step 4)
-- `finance_2_review` → Finance 2 (step 5)
-- `ceo_office_review` → CEO Office (step 6)
-- `pending_sap_sync` → SAP Sync (step 7)
-- `sap_synced` → Done (green check, all steps filled)
-- `sap_team_rejected` → red "Rejected by SAP Team" badge
-- `returned_to_vendor` → amber "Returned to Vendor" badge
-- `returned_to_buyer` → amber "Returned to Buyer" badge
-- no vendor row yet → grey "Not Started" badge
-
-Render:
-- A colored `Badge` with the current stage label
-- A horizontal dot/segment stepper (7 dots) — completed = primary, current = primary ring + pulse, future = muted. Tooltip on each dot shows its stage name.
-
-### 4. Existing "Status" (Pending/Used/Expired) badge
-Keep it — it represents the invitation lifecycle, which is different from approval stage. Move it under the email or into a smaller secondary chip so the new Approval Stage column gets visual priority.
-
-### 5. Status filter
-Extend the filter dropdown with an "Approval Stage" group (Buyer / SCM Manager / SCM Head / Finance 1 / Finance 2 / CEO Office / Pending SAP Sync / SAP Synced / Rejected / Returned) in addition to the existing invitation filters.
+### 3. `src/App.tsx`
+- Import `VendorStatus` and add `<Route path="/vendor-status/:id" element={<VendorStatus />} />` inside the same protected layout block where `/vendors` lives.
 
 ## Out of scope
-- No DB changes — `vendors.status` and `vendor_invitations.vendor_id` already exist.
-- No RLS changes — current `user_can_see_vendor` policy already scopes visibility per role.
-- No new edge functions.
+- The `VendorStageCell.tsx` file stays on disk (no longer imported). No DB / RLS / edge-function changes.
+- No change to `Dashboard.tsx` or other pages.
 
 ## Files touched
-- `src/pages/AdminInvitations.tsx` — extend query, add columns, wire filter
-- `src/components/admin/VendorStageCell.tsx` — new component (badge + stepper + tooltip)
+- `src/pages/AdminInvitations.tsx` — remove column + filter entries, add search box
+- `src/pages/VendorStatus.tsx` — new page
+- `src/App.tsx` — register route
