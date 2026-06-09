@@ -59,7 +59,7 @@ export default function VendorStatus() {
       setLoading(true);
       const { data, error } = await supabase
         .from('vendors')
-        .select('id, reference_number, company_name, legal_name, vendor_email, vendor_type, status, created_at, last_rejection_comments')
+        .select('id, reference_number, legal_name, trade_name, primary_email, vendor_type, status, created_at, last_rejection_comments')
         .eq('id', id)
         .maybeSingle();
       if (error) {
@@ -67,8 +67,9 @@ export default function VendorStatus() {
       } else if (!data) {
         setError('Vendor not found or you do not have access.');
       } else {
-        setVendor(data as VendorRow);
+        setVendor(data as unknown as VendorRow);
       }
+
       setLoading(false);
     })();
   }, [id]);
