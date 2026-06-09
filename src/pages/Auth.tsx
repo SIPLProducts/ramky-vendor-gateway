@@ -12,6 +12,8 @@ import { Mail, Lock, User, Loader2, AlertCircle, ArrowRight } from 'lucide-react
 import { z } from 'zod';
 import authHeroImage from '@/assets/auth-hero.jpg';
 import ramkyLogo from '@/assets/ramky-logo.png';
+import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
+
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -24,6 +26,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
   
   // Login form
   const [loginEmail, setLoginEmail] = useState('');
@@ -249,6 +252,16 @@ export default function Auth() {
                         </>
                       )}
                     </Button>
+
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => setForgotOpen(true)}
+                        className="text-sm text-primary hover:underline focus:outline-none"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                   </form>
                 </TabsContent>
 
@@ -346,6 +359,8 @@ export default function Auth() {
           </p>
         </div>
       </div>
+
+      <ForgotPasswordDialog open={forgotOpen} onOpenChange={setForgotOpen} />
     </div>
   );
 }
