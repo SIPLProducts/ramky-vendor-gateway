@@ -383,7 +383,7 @@ export default function VendorList() {
                   <TableBody>
                     {paginatedVendors.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           {activeTenantName ? (
                             <div className="space-y-2">
                               <p className="font-medium">No vendors found for {activeTenantName}</p>
