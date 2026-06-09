@@ -1,27 +1,34 @@
-## Goal
-Replace the current Reference Number (first 8 chars of vendor UUID) with a daily-sequenced format: `YYYYMMDD###` (e.g. `20260609001`, `20260609002`, … resetting to `001` each new day).
+## Delete all vendor data
 
-## Changes
+### Lovable Cloud (this project's DB) — I will do
 
-### 1. Database (migration)
-- Add column `reference_number text` (unique, nullable) on `public.vendors`.
-- Add a counter table `public.vendor_reference_counters (date date primary key, last_seq int not null default 0)` with proper GRANTs (service_role only — used by trigger).
-- Create a `BEFORE INSERT` trigger on `vendors` that, when `reference_number` is null:
-  - Takes today's date (UTC or `Asia/Kolkata` — defaulting to project timezone, will use `(now() AT TIME ZONE 'Asia/Kolkata')::date` since this is an India-facing portal).
-  - Atomically `INSERT … ON CONFLICT (date) DO UPDATE SET last_seq = last_seq + 1 RETURNING last_seq` to get the next sequence safely under concurrency.
-  - Sets `NEW.reference_number = to_char(d,'YYYYMMDD') || lpad(seq::text,3,'0')`.
-- Backfill existing vendor rows: order by `created_at`, group by date, assign sequential numbers.
+1. **Wipe vendor-related tables** (in FK-safe order):
+   - `vendor_documents`
+   - `vendor_validations`
+   - `vendor_approval_progress`
+   - `vendor_feedback`
+   - `ocr_extractions`
+   - `validation_api_logs` (vendor-scoped rows)
+   - `audit_logs` (vendor-scoped rows)
+   - `vendor_invitations`
+   - `vendors`
+   - `vendor_reference_counters` (so daily sequence restarts at 001)
 
-### 2. Frontend
-- `src/components/vendor/SuccessScreen.tsx` — display `vendor.reference_number` instead of `vendorId.slice(0,8).toUpperCase()`. Fallback to the old value if the field is missing.
-- Pass `referenceNumber` prop through from the parent (`VendorRegistration.tsx` / wherever `SuccessScreen` is rendered) by reading it from the vendor row after submission.
-- `src/pages/SAPSync.tsx` (line 417) — prefer `vendor.reference_number` for the displayed reference (kept `sap_reference_no` fallback unchanged).
+2. **Empty the `vendor-documents` storage bucket** — delete every object in the bucket (bucket itself kept).
 
-### 3. Out of scope
-- No changes to SAP payload template (`vendor.reference_no` token mapping in `sapPayloadBuilder.ts` / `sync-vendor-to-sap` is unrelated to this UI Reference Number and remains as-is).
-- No change to `sap_reference_no` column.
+3. **Keep**:
+   - All auth users and `profiles` (including vendor accounts)
+   - Admin/config tables (tenants, roles, SAP/KYC configs, form configs, branding, SMTP, etc.)
 
-## Technical Notes
-- Trigger uses an upsert on the counter table so concurrent inserts can't collide — Postgres serializes the `ON CONFLICT DO UPDATE` row lock.
-- Format zero-pads to 3 digits as specified; if a single day ever exceeds 999 vendors the format naturally widens (`lpad` with min 3) — acceptable since the spec shows 3-digit examples.
-- Timezone: `Asia/Kolkata` so the day rolls over at midnight IST, matching vendor working hours.
+### Self-hosted `vms.siplproducts.com` — you run
+
+I can't reach your self-hosted instance. After the cloud wipe runs, I'll give you:
+- A single SQL script to run on the self-hosted Postgres (same statements as above).
+- A short `supabase storage` CLI / `psql` snippet (or a small Node script) to empty the `vendor-documents` bucket on that instance.
+
+You execute it on the server; data is then in sync with the cloud copy.
+
+### Notes
+
+- This is destructive and irreversible — once approved I run it immediately.
+- Reference numbers will restart at `YYYYMMDD001` for the next vendor created.
