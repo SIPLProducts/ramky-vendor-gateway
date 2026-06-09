@@ -62,7 +62,7 @@ import {
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { VendorReferenceCell } from '@/components/admin/VendorStageCell';
+
 
 
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -144,7 +144,7 @@ export default function AdminInvitations() {
       if (seesAllInvitations) {
         let q = supabase
           .from('vendor_invitations')
-          .select('*, vendor:vendors(id, reference_number, status)')
+          .select('*, vendor:vendors(id, reference_number, status), tenants(id, name)')
           .order('created_at', { ascending: false });
         if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
         const { data, error } = await q;
@@ -183,7 +183,7 @@ export default function AdminInvitations() {
 
       let q = supabase
         .from('vendor_invitations')
-        .select('*, vendor:vendors(id, reference_number, status)')
+        .select('*, vendor:vendors(id, reference_number, status), tenants(id, name)')
         .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
       if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
@@ -1038,7 +1038,7 @@ export default function AdminInvitations() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendor Name</TableHead>
-                      <TableHead>Reference #</TableHead>
+                      <TableHead>Buyer Company</TableHead>
                       <TableHead>Email</TableHead>
 
                       <TableHead>Phone Number</TableHead>
@@ -1071,8 +1071,8 @@ export default function AdminInvitations() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <VendorReferenceCell vendor={(invitation as any).vendor} />
+                        <TableCell className="text-muted-foreground">
+                          {(invitation as any).tenants?.name ?? '—'}
                         </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
                         <TableCell>

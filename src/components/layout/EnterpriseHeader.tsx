@@ -58,7 +58,7 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
               <SelectValue placeholder="Select tenant" />
             </SelectTrigger>
             <SelectContent>
-              {isSuperAdmin && <SelectItem value="__all__">All Tenants</SelectItem>}
+              <SelectItem value="__all__">All Tenants</SelectItem>
               {myTenants.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.name}
