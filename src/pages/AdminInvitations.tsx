@@ -914,21 +914,24 @@ export default function AdminInvitations() {
             <div className="flex items-center gap-2">
               <div className="relative w-64">
                 <Input
-                  placeholder="Search by email..."
+                  placeholder="Search by email, name or reference #..."
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
                 />
               </div>
               <Select value={statusFilter} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-56">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="used">Used</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="pending">Invitation: Pending</SelectItem>
+                  <SelectItem value="used">Invitation: Used</SelectItem>
+                  <SelectItem value="expired">Invitation: Expired</SelectItem>
+                  {STAGE_FILTER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
