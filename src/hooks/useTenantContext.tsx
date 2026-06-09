@@ -15,16 +15,24 @@ interface TenantContextValue {
   activeTenantId: string | null; // null = "all"
   setActiveTenantId: (id: string | null) => void;
   isSuperAdmin: boolean;
-  /** SCM Head, Finance 1/2, Finance Approval, CEO Office, SAP Team — see all tenants. */
+  /** SAP Team — sees all tenants (needed for sync). */
   isCrossTenantReviewer: boolean;
   /** True when the user has the SCM Manager custom role. */
   isScmManager: boolean;
+  /** True when the user is a stage approver (SCM Head / Finance 1 / Finance 2 / CEO Office / Finance Approval). */
+  isStageApprover: boolean;
+  /** True when the user is a Buyer (built-in 'purchase' role or 'Buyer' custom role). */
+  isBuyerRole: boolean;
   /**
    * Vendor ids visible to an SCM Manager via buyer_scm_mappings.
-   * `null` = not applicable (not an SCM-Manager-only user).
-   * `[]`   = SCM Manager with no mapped buyers (sees nothing).
+   * `null` = not applicable. `[]` = SCM Manager with no mapped buyers.
    */
   scmManagerVendorIds: string[] | null;
+  /**
+   * Vendor ids visible to a stage approver or buyer based on routed/invited vendors.
+   * `null` = not applicable.
+   */
+  scopedVendorIds: string[] | null;
   isLoading: boolean;
 }
 
@@ -32,8 +40,12 @@ const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 
 const STORAGE_KEY = 'lovable.activeTenantId';
 
-const CROSS_TENANT_ROLE_NAMES = new Set(
-  ['scm head', 'finance 1', 'finance 2', 'finance approval', 'ceo office', 'sap team'],
+// Only SAP Team retains blanket cross-tenant read access (needed for sync). All other stage
+// approvers (SCM Head, Finance 1/2, Finance Approval, CEO Office) are now scoped to vendors
+// routed to them via buyer_approval_flows.
+const CROSS_TENANT_ROLE_NAMES = new Set(['sap team']);
+const STAGE_APPROVER_ROLE_NAMES = new Set(
+  ['scm head', 'finance 1', 'finance 2', 'finance approval', 'ceo office'],
 );
 
 export function TenantProvider({ children }: { children: ReactNode }) {
@@ -67,6 +79,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     () => customRoleNames.some((n) => n === 'scm manager'),
     [customRoleNames],
   );
+  const isStageApprover = useMemo(
+    () => customRoleNames.some((n) => STAGE_APPROVER_ROLE_NAMES.has(n)),
+    [customRoleNames],
+  );
+  const isBuyerRole = useMemo(
+    () => userRole === 'purchase' || customRoleNames.some((n) => n === 'buyer'),
+    [userRole, customRoleNames],
+  );
 
   // SCM Manager vendor scoping (vendors invited by a mapped buyer).
   const { data: scmManagerVendorIds = null } = useQuery({
@@ -92,6 +112,61 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     staleTime: 60 * 1000,
   });
 
+  // Stage-approver & buyer vendor scoping.
+  // - Buyer: vendors they invited (created_by = me).
+  // - Stage approver: vendors routed to them via buyer_approval_flows.
+  const needsScopedIds =
+    !!user?.id && !isSuperAdmin && !isCrossTenantReviewer && (isStageApprover || isBuyerRole);
+
+  const { data: scopedVendorIds = null } = useQuery({
+    queryKey: ['scoped-vendor-ids', user?.id, isStageApprover, isBuyerRole],
+    queryFn: async (): Promise<string[]> => {
+      if (!user?.id) return [];
+      const ids = new Set<string>();
+
+      if (isBuyerRole) {
+        const { data, error } = await supabase
+          .from('vendor_invitations')
+          .select('vendor_id')
+          .eq('created_by', user.id)
+          .not('vendor_id', 'is', null);
+        if (error) throw error;
+        (data ?? []).forEach((r: any) => r.vendor_id && ids.add(r.vendor_id));
+      }
+
+      if (isStageApprover) {
+        const { data: flows, error: fErr } = await supabase
+          .from('buyer_approval_flows')
+          .select('buyer_user_id')
+          .or(
+            [
+              `scm_head_user_id.eq.${user.id}`,
+              `finance_1_user_id.eq.${user.id}`,
+              `finance_2_user_id.eq.${user.id}`,
+              `ceo_office_user_id.eq.${user.id}`,
+            ].join(','),
+          );
+        if (fErr) throw fErr;
+        const buyerIds = Array.from(
+          new Set((flows ?? []).map((f: any) => f.buyer_user_id).filter(Boolean)),
+        );
+        if (buyerIds.length > 0) {
+          const { data: invites, error: iErr } = await supabase
+            .from('vendor_invitations')
+            .select('vendor_id')
+            .in('created_by', buyerIds)
+            .not('vendor_id', 'is', null);
+          if (iErr) throw iErr;
+          (invites ?? []).forEach((r: any) => r.vendor_id && ids.add(r.vendor_id));
+        }
+      }
+
+      return Array.from(ids);
+    },
+    enabled: needsScopedIds,
+    staleTime: 60 * 1000,
+  });
+
   const [activeTenantId, setActiveTenantIdState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -100,7 +175,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const seesAllTenants = isSuperAdmin || isCrossTenantReviewer;
 
-  // Load tenants the user belongs to (super admins & cross-tenant reviewers see ALL active tenants).
+  // Load tenants the user belongs to (super admins & SAP Team see ALL active tenants).
   const { data: myTenants = [], isLoading } = useQuery({
     queryKey: ['my-tenants', user?.id, seesAllTenants],
     queryFn: async (): Promise<TenantOption[]> => {
@@ -136,7 +211,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (isLoading || !user?.id) return;
 
     if (seesAllTenants) {
-      // Default to "All" (null). Honor a stored id only if it's still valid.
       if (activeTenantId && !myTenantIds.includes(activeTenantId)) {
         setActiveTenantIdState(null);
         if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY);
@@ -164,14 +238,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TenantContextValue>(
     () => ({
       myTenants, myTenantIds, activeTenantId, setActiveTenantId,
-      isSuperAdmin, isCrossTenantReviewer, isScmManager,
+      isSuperAdmin, isCrossTenantReviewer, isScmManager, isStageApprover, isBuyerRole,
       scmManagerVendorIds: isScmManager && !isCrossTenantReviewer && !isSuperAdmin
         ? (scmManagerVendorIds ?? [])
         : null,
+      scopedVendorIds: needsScopedIds ? (scopedVendorIds ?? []) : null,
       isLoading,
     }),
     [myTenants, myTenantIds, activeTenantId, setActiveTenantId, isSuperAdmin,
-     isCrossTenantReviewer, isScmManager, scmManagerVendorIds, isLoading],
+     isCrossTenantReviewer, isScmManager, isStageApprover, isBuyerRole,
+     scmManagerVendorIds, scopedVendorIds, needsScopedIds, isLoading],
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
@@ -183,7 +259,8 @@ export function useTenantContext() {
     return {
       myTenants: [], myTenantIds: [], activeTenantId: null, setActiveTenantId: () => {},
       isSuperAdmin: false, isCrossTenantReviewer: false, isScmManager: false,
-      scmManagerVendorIds: null, isLoading: false,
+      isStageApprover: false, isBuyerRole: false,
+      scmManagerVendorIds: null, scopedVendorIds: null, isLoading: false,
     } as TenantContextValue;
   }
   return ctx;
@@ -191,11 +268,12 @@ export function useTenantContext() {
 
 /**
  * Returns the query filter to apply for the current user.
- * - `tenantIds: [id]` when a single tenant is selected.
- * - `tenantIds: null` for super admins / cross-tenant reviewers viewing "All".
- * - `tenantIds: string[]` for normal users limited to their assigned tenants.
- * - `vendorIds: string[]` for SCM Managers — scope to vendors invited by their mapped buyers
- *   (takes precedence over tenant filtering). Empty array = no visible vendors.
+ * Precedence:
+ *  1. Super admin / SAP Team → no restriction.
+ *  2. Stage approver or Buyer (non-admin) → `vendorIds` from routed/invited list.
+ *  3. SCM Manager → `vendorIds` from buyer-mapped invites.
+ *  4. Single active tenant → that tenant.
+ *  5. Default → all assigned tenants.
  */
 export function useTenantFilter(): {
   tenantIds: string[] | null;
@@ -204,14 +282,27 @@ export function useTenantFilter(): {
 } {
   const {
     myTenantIds, activeTenantId, isSuperAdmin, isCrossTenantReviewer,
-    isScmManager, scmManagerVendorIds,
+    isScmManager, isStageApprover, isBuyerRole,
+    scmManagerVendorIds, scopedVendorIds,
   } = useTenantContext();
 
-  // SCM Manager (without higher cross-tenant role): scope by buyer-mapped vendor ids.
-  if (isScmManager && !isCrossTenantReviewer && !isSuperAdmin) {
+  // 1. Admin / SAP Team — everything.
+  if (isSuperAdmin || isCrossTenantReviewer) {
+    if (activeTenantId) return { tenantIds: [activeTenantId], activeTenantId, vendorIds: null };
+    return { tenantIds: null, activeTenantId: null, vendorIds: null };
+  }
+
+  // 2. Stage approvers + buyers — scope by routed/invited vendor ids.
+  if (isStageApprover || isBuyerRole) {
+    return { tenantIds: null, activeTenantId: null, vendorIds: scopedVendorIds ?? [] };
+  }
+
+  // 3. SCM Manager scoping.
+  if (isScmManager) {
     return { tenantIds: null, activeTenantId: null, vendorIds: scmManagerVendorIds ?? [] };
   }
+
+  // 4/5. Tenant scoping.
   if (activeTenantId) return { tenantIds: [activeTenantId], activeTenantId, vendorIds: null };
-  if (isSuperAdmin || isCrossTenantReviewer) return { tenantIds: null, activeTenantId: null, vendorIds: null };
   return { tenantIds: myTenantIds, activeTenantId: null, vendorIds: null };
 }
