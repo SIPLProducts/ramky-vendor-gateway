@@ -276,6 +276,7 @@ export default function Dashboard() {
                 <TableRow>
                   <TableHead>Reference #</TableHead>
                   <TableHead>Company</TableHead>
+                  <TableHead>Invited By</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created At</TableHead>
@@ -285,7 +286,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-4 w-full" />
                         </TableCell>
@@ -294,7 +295,7 @@ export default function Dashboard() {
                   ))
                 ) : vendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                       No vendor applications in this date range.
                     </TableCell>
                   </TableRow>
@@ -307,11 +308,24 @@ export default function Dashboard() {
                         </Link>
                       </TableCell>
                       <TableCell>{v.legal_name ?? '—'}</TableCell>
+                      <TableCell>
+                        {v.invited_by ? (
+                          <div className="text-sm">
+                            <div className="font-medium">{v.invited_by.name ?? v.invited_by.email ?? '—'}</div>
+                            {v.invited_by.name && v.invited_by.email && (
+                              <div className="text-xs text-muted-foreground">{v.invited_by.email}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>{v.primary_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
                     </TableRow>
                   ))
+
                 )}
               </TableBody>
             </Table>
