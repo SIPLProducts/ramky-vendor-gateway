@@ -105,23 +105,15 @@ export default function AdminInvitations() {
   // - Everyone else: tenants assigned to them via user_tenants
   const allowedTenants = isSuperAdmin ? (allTenants ?? []) : myTenants;
 
-  // Derive the dialog's selected company from the global tenant context so it
-  // stays in two-way sync with the header tenant selector.
+  // Dialog-local tenant selection. Defaults to the header's active tenant when
+  // one is set, otherwise the first allowed tenant. Does NOT mutate the
+  // global tenant context — header keeps "All Tenants" if the user chose it.
+  const [dialogTenantId, setDialogTenantId] = useState<string>('');
   const selectedTenantId =
+    dialogTenantId ||
     (activeTenantId && allowedTenants.some((t) => t.id === activeTenantId) ? activeTenantId : '') ||
     allowedTenants[0]?.id ||
     '';
-
-  // For non-super-admins keep the header in sync with the resolved tenant
-  // (super admins are allowed to keep "All Tenants" until they explicitly pick one).
-  if (
-    !isSuperAdmin &&
-    selectedTenantId &&
-    activeTenantId !== selectedTenantId &&
-    typeof queueMicrotask !== 'undefined'
-  ) {
-    queueMicrotask(() => setActiveTenantId(selectedTenantId));
-  }
 
   const effectiveTenantId = selectedTenantId || null;
   const seesAllInvitations = isSuperAdmin || isCrossTenantReviewer;
