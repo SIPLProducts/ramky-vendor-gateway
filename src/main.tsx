@@ -49,7 +49,9 @@ function notifyNewVersion() {
 function mount() {
   createRoot(document.getElementById("root")!).render(
     <HelmetProvider>
-      <App />
+      <ThemeColorProvider>
+        <App />
+      </ThemeColorProvider>
     </HelmetProvider>
   );
 }
