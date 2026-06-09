@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import * as XLSX from 'xlsx';
 import {
-  CalendarIcon,
   CheckCircle,
   Clock,
   Download,
@@ -16,8 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -79,33 +78,47 @@ function statusBadge(status: string) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
+const toInputValue = (d: Date | null) => (d ? format(d, 'yyyy-MM-dd') : '');
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { tenantIds, vendorIds } = useTenantFilter();
   const { isLoading: tenantLoading } = useTenantContext();
 
-  const [dateFrom, setDateFrom] = useState<Date>(() => startOfDay(subDays(new Date(), 30)));
-  const [dateTo, setDateTo] = useState<Date>(() => endOfDay(new Date()));
+  const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
+  const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
 
-  const fromIso = startOfDay(dateFrom).toISOString();
-  const toIso = endOfDay(dateTo).toISOString();
+  const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
+  const toIso = dateTo ? endOfDay(dateTo).toISOString() : null;
+
+  const handleFromChange = (val: string) => {
+    if (!val) { setDateFrom(null); return; }
+    const d = startOfDay(new Date(val));
+    setDateFrom(d);
+    if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+  };
+  const handleToChange = (val: string) => {
+    if (!val) { setDateTo(null); return; }
+    const d = endOfDay(new Date(val));
+    setDateTo(d);
+    if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+  };
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ['dashboard-vendors', user?.id, tenantIds, vendorIds, fromIso, toIso],
     enabled: !!user?.id && !tenantLoading,
     queryFn: async (): Promise<VendorRow[]> => {
-      // Vendor-id scope is empty → user sees nothing.
       if (vendorIds !== null && vendorIds.length === 0) return [];
 
       let q = supabase
         .from('vendors')
         .select('id, reference_number, legal_name, primary_email, status, created_at, tenant_id')
-        .gte('created_at', fromIso)
-        .lte('created_at', toIso)
         .order('created_at', { ascending: false });
 
+      if (fromIso) q = q.gte('created_at', fromIso);
+      if (toIso) q = q.lte('created_at', toIso);
       if (vendorIds && vendorIds.length > 0) q = q.in('id', vendorIds);
-      else if (tenantIds && tenantIds.length > 0) q = q.in('tenant_id', tenantIds);
+      if (tenantIds && tenantIds.length > 0) q = q.in('tenant_id', tenantIds);
 
       const { data, error } = await q;
       if (error) throw error;
@@ -114,9 +127,7 @@ export default function Dashboard() {
   });
 
   const counts = useMemo(() => {
-    let pending = 0;
-    let approved = 0;
-    let rejected = 0;
+    let pending = 0, approved = 0, rejected = 0;
     for (const v of vendors) {
       if (v.status === 'sap_synced') approved++;
       else if (v.status === 'sap_team_rejected') rejected++;
@@ -136,7 +147,9 @@ export default function Dashboard() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
-    const fname = `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}.xlsx`;
+    const fname = dateFrom && dateTo
+      ? `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}.xlsx`
+      : 'vendors_all.xlsx';
     XLSX.writeFile(wb, fname);
   };
 
@@ -157,29 +170,30 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <DatePickerButton
-            label="From"
-            value={dateFrom}
-            onChange={(d) => {
-              setDateFrom(startOfDay(d));
-              if (d > dateTo) setDateTo(endOfDay(d));
-            }}
-          />
-          <DatePickerButton
-            label="To"
-            value={dateTo}
-            onChange={(d) => {
-              setDateTo(endOfDay(d));
-              if (d < dateFrom) setDateFrom(startOfDay(d));
-            }}
-          />
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="from" className="text-xs text-muted-foreground">From</Label>
+            <Input
+              id="from"
+              type="date"
+              value={toInputValue(dateFrom)}
+              onChange={(e) => handleFromChange(e.target.value)}
+              className="h-9 w-[160px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="to" className="text-xs text-muted-foreground">To</Label>
+            <Input
+              id="to"
+              type="date"
+              value={toInputValue(dateTo)}
+              onChange={(e) => handleToChange(e.target.value)}
+              className="h-9 w-[160px]"
+            />
+          </div>
           <Button
             variant="outline"
-            onClick={() => {
-              setDateFrom(startOfDay(subDays(new Date(), 30)));
-              setDateTo(endOfDay(new Date()));
-            }}
+            onClick={() => { setDateFrom(null); setDateTo(null); }}
           >
             Clear
           </Button>
@@ -262,36 +276,5 @@ export default function Dashboard() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function DatePickerButton({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: Date;
-  onChange: (d: Date) => void;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="justify-start font-normal">
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          <span className="text-muted-foreground mr-1">{label}:</span>
-          {format(value, 'dd MMM yyyy')}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={value}
-          onSelect={(d) => d && onChange(d)}
-          initialFocus
-          className={cn('p-3 pointer-events-auto')}
-        />
-      </PopoverContent>
-    </Popover>
   );
 }
