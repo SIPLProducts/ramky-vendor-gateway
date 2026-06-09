@@ -633,6 +633,32 @@ export default function AdminInvitations() {
     setCurrentPage(1);
   };
 
+  const handleTrackByReference = async () => {
+    const ref = trackRef.trim();
+    if (!ref) {
+      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
+      return;
+    }
+    setIsTracking(true);
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('reference_number', ref)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.id) {
+        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
+        return;
+      }
+      navigate(`/vendor-status/${data.id}`);
+    } catch (e: any) {
+      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
+    } finally {
+      setIsTracking(false);
+    }
+
+
   const getStatusBadge = (invitation: any) => {
     const status = getInvitationStatus(invitation);
 
