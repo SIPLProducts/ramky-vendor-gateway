@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RegistrationStatusTracker, RegistrationStatus } from './RegistrationStatusTracker';
@@ -11,6 +11,8 @@ interface SuccessScreenProps {
   financeComments?: string | null;
   purchaseComments?: string | null;
   onEdit?: () => void;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 export function SuccessScreen({
@@ -20,6 +22,8 @@ export function SuccessScreen({
   financeComments,
   purchaseComments,
   onEdit,
+  onBack,
+  backLabel = 'Back to Applications',
 }: SuccessScreenProps) {
   const { rows: approvalChain } = useVendorApprovalChain(vendorId);
   const canResubmit = status === 'validation_failed' || status === 'finance_rejected' || status === 'purchase_rejected';
@@ -138,6 +142,14 @@ export function SuccessScreen({
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
+      {onBack && (
+        <div className="mb-4">
+          <Button variant="outline" size="sm" onClick={onBack} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Button>
+        </div>
+      )}
       {/* Status Header */}
       <div className="text-center mb-8">
         <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${config.bgClass} mb-4`}>

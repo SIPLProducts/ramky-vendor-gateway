@@ -1,32 +1,24 @@
-# Fixes: Dashboard tenant + date filters
+## Problem
 
-## 1. "All Tenants" gets reset to first company
+When a Buyer / Admin uses **Create Vendor (on behalf)** from the Invitations screen, they're navigated into the registration form. After submitting, they land on the `SuccessScreen` ("Application Submitted Successfully" — the screenshot shared). There is no button to return to the Invitations / Applications list, so the only way back is the browser back button or clicking the header logo.
 
-**Cause:** In `src/hooks/useTenantContext.tsx`, the auto-select effect treats `activeTenantId === null` as "no selection" and forces it back to `myTenantIds[0]` for non-admin users. So when a Buyer picks "All Tenants" (null), it immediately snaps to the first tenant.
+## Fix
 
-**Fix (`src/hooks/useTenantContext.tsx`):**
-- Track an explicit "user chose All" intent. Simplest: only auto-pick the first tenant on initial mount when `localStorage` has no stored value. Once the user explicitly sets null via the header dropdown, persist a sentinel (`'__all__'`) in localStorage and stop auto-correcting to the first tenant.
-- Update `setActiveTenantId(null)` to write `'__all__'` to localStorage; on load, treat `'__all__'` as null and skip the "pick first" branch.
+Add a **"Back to Applications"** action button on the `SuccessScreen`, visible only when the submitter is an internal user (i.e. NOT the vendor coming in via an invite token). It will navigate to `/admin/invitations`.
 
-**Fix (`src/hooks/useTenantContext.tsx` → `useTenantFilter`):** for Buyers, when `activeTenantId === null` return `tenantIds: myTenantIds` so the dashboard query spans every assigned tenant (instead of only `scopedVendorIds`, which is invite-scoped). When a specific tenant is picked, intersect: `tenantIds: [activeTenantId]` AND keep `vendorIds: scopedVendorIds` so buyer still only sees their own invited vendors within that tenant.
+### Files
 
-## 2. Date pickers should be real date inputs, not popover buttons
+1. **`src/components/vendor/SuccessScreen.tsx`**
+   - Add an optional `onBack?: () => void` and `backLabel?: string` prop.
+   - When `onBack` is provided, render a secondary button (next to / above the "What Happens Next?" card) labeled "Back to Applications" that calls `onBack()`.
+   - No other visual changes.
 
-**Fix (`src/pages/Dashboard.tsx`):** Replace the two `<DatePickerButton>` (Popover + Calendar) instances with native `<Input type="date">` controls labeled "From" and "To". Remove the `DatePickerButton` helper, `Calendar`/`Popover` imports, and the `CalendarIcon` usage in the picker.
-- Value bound as `format(dateFrom, 'yyyy-MM-dd')`; onChange parses with `new Date(e.target.value)` → `startOfDay` / `endOfDay`.
-- Keep the self-correcting behavior (From > To bumps To, etc.).
-
-## 3. "Clear" not working
-
-**Cause:** Clear currently resets to "last 30 days → today", which often equals the already-selected range, so visually nothing changes and the filter still excludes older/newer rows.
-
-**Fix (`src/pages/Dashboard.tsx`):** Make Clear truly clear the filter:
-- Change `dateFrom` / `dateTo` state to `Date | null`.
-- When both are null, drop the `.gte` / `.lte` clauses in the query so all vendors load.
-- Clear button sets both to `null` and the date inputs render empty.
-- Export filename falls back to `vendors_all.xlsx` when either bound is null.
+2. **`src/pages/VendorRegistration.tsx`** (around line 1256 where `<SuccessScreen … />` is rendered)
+   - Pass `onBack={() => navigate('/admin/invitations')}` **only when** `!isTokenMode` (so external vendors using the invite link don't see it — they have no portal access).
+   - Reuse the existing `navigate` from `react-router-dom`.
 
 ## Out of scope
-- No DB / RLS / edge-function changes.
-- No changes to Invitations page or other approver screens.
-- Header "All Tenants" item stays visible as already implemented.
+
+- No changes to the submission flow itself, approval routing, or any backend logic.
+- No change to the vendor-token success view (the public success page stays as-is).
+- No change to the Invitations table or filters.

@@ -1260,6 +1260,7 @@ export default function VendorRegistration() {
           financeComments={existingVendor?.finance_comments}
           purchaseComments={existingVendor?.purchase_comments}
           onEdit={isTokenMode ? undefined : handleStartEdit}
+          onBack={isTokenMode ? undefined : () => navigate('/admin/invitations')}
         />
         <FeedbackPopup open={showFeedback} onOpenChange={setShowFeedback} vendorId={vendorId || undefined} />
       </div>
