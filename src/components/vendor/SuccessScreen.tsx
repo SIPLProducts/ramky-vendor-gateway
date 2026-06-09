@@ -11,6 +11,8 @@ interface SuccessScreenProps {
   financeComments?: string | null;
   purchaseComments?: string | null;
   onEdit?: () => void;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 export function SuccessScreen({
@@ -20,6 +22,8 @@ export function SuccessScreen({
   financeComments,
   purchaseComments,
   onEdit,
+  onBack,
+  backLabel = 'Back to Applications',
 }: SuccessScreenProps) {
   const { rows: approvalChain } = useVendorApprovalChain(vendorId);
   const canResubmit = status === 'validation_failed' || status === 'finance_rejected' || status === 'purchase_rejected';
