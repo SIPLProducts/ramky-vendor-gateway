@@ -209,7 +209,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                 <TableRow key={it.progressId ?? it.vendorId}>
                   <TableCell className="font-medium">
                     <div>{it.vendorName}</div>
-                    <div className="text-xs text-muted-foreground font-mono mt-0.5">ID: {it.vendorId}</div>
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">Ref No: {it.referenceNumber || it.vendorId.slice(0, 8).toUpperCase()}</div>
 
                     {blocked && (
                       <div className="text-xs text-amber-600 mt-1">
