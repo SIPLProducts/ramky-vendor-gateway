@@ -170,7 +170,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [activeTenantId, setActiveTenantIdState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored && stored !== 'null' ? stored : null;
+    if (!stored || stored === 'null' || stored === '__all__') return null;
+    return stored;
+  });
+  const [explicitAll, setExplicitAll] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(STORAGE_KEY) === '__all__';
   });
 
   const seesAllTenants = isSuperAdmin || isCrossTenantReviewer;
@@ -222,16 +227,20 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setActiveTenantIdState(null);
       return;
     }
-    if (!activeTenantId || !myTenantIds.includes(activeTenantId)) {
+    if (!activeTenantId && !explicitAll) {
       setActiveTenantIdState(myTenantIds[0]);
+    } else if (activeTenantId && !myTenantIds.includes(activeTenantId)) {
+      setActiveTenantIdState(myTenantIds[0]);
+      setExplicitAll(false);
     }
-  }, [isLoading, user?.id, seesAllTenants, myTenantIds, activeTenantId]);
+  }, [isLoading, user?.id, seesAllTenants, myTenantIds, activeTenantId, explicitAll]);
 
   const setActiveTenantId = useCallback((id: string | null) => {
     setActiveTenantIdState(id);
+    setExplicitAll(id === null);
     if (typeof window !== 'undefined') {
       if (id) localStorage.setItem(STORAGE_KEY, id);
-      else localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, '__all__');
     }
   }, []);
 
@@ -292,9 +301,15 @@ export function useTenantFilter(): {
     return { tenantIds: null, activeTenantId: null, vendorIds: null };
   }
 
-  // 2. Stage approvers + buyers — scope by routed/invited vendor ids.
-  if (isStageApprover || isBuyerRole) {
+  // 2. Stage approvers — scope by routed vendor ids.
+  if (isStageApprover && !isBuyerRole) {
     return { tenantIds: null, activeTenantId: null, vendorIds: scopedVendorIds ?? [] };
+  }
+
+  // 2b. Buyers — scope by invited vendor ids AND by tenant selection.
+  if (isBuyerRole) {
+    const tenants = activeTenantId ? [activeTenantId] : (myTenantIds.length ? myTenantIds : null);
+    return { tenantIds: tenants, activeTenantId, vendorIds: scopedVendorIds ?? [] };
   }
 
   // 3. SCM Manager scoping.
