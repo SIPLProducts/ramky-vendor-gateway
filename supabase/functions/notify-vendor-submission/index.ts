@@ -289,7 +289,8 @@ serve(async (req) => {
     const action = resubmission ? "resubmitted" : "submitted";
     const subject = `Vendor Submitted Registration Form – ${vendorName}`;
 
-    const vendorRef = vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+    const vendorRef = (vendor as any).reference_number
+      || vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
 
     const vendorIdentity = {
       vendorName,
