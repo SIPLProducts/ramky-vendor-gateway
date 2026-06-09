@@ -227,16 +227,20 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setActiveTenantIdState(null);
       return;
     }
-    if (!activeTenantId || !myTenantIds.includes(activeTenantId)) {
+    if (!activeTenantId && !explicitAll) {
       setActiveTenantIdState(myTenantIds[0]);
+    } else if (activeTenantId && !myTenantIds.includes(activeTenantId)) {
+      setActiveTenantIdState(myTenantIds[0]);
+      setExplicitAll(false);
     }
-  }, [isLoading, user?.id, seesAllTenants, myTenantIds, activeTenantId]);
+  }, [isLoading, user?.id, seesAllTenants, myTenantIds, activeTenantId, explicitAll]);
 
   const setActiveTenantId = useCallback((id: string | null) => {
     setActiveTenantIdState(id);
+    setExplicitAll(id === null);
     if (typeof window !== 'undefined') {
       if (id) localStorage.setItem(STORAGE_KEY, id);
-      else localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, '__all__');
     }
   }, []);
 
