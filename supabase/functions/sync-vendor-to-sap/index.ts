@@ -575,7 +575,7 @@ serve(async (req) => {
     const sapVendorCode = successRow?.BP_LIFNR || null;
 
     if (successRow && sapVendorCode) {
-      const refNo = String(vendor.id || "").slice(0, 8).toUpperCase();
+      const refNo = String(vendor.reference_number || vendor.id || "").toUpperCase();
       await supabase.from("vendors").update({
         sap_vendor_code: sapVendorCode,
         sap_reference_no: refNo,
