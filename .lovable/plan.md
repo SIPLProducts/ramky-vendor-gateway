@@ -1,63 +1,70 @@
 ## Goal
 
-Stop cross-buyer / cross-approver vendor and invitation visibility. A Buyer must see only their own vendors and invitations; SCM Manager / SCM Head / Finance 1 / Finance 2 / CEO Office must see only the vendors routed to them via the Approval Matrix. Admin and SAP Team keep full access.
+Replace the current `/dashboard` page with a simple, role-aware dashboard:
 
-## Root causes found
+- 4 summary cards: Total / Pending / Approved / Rejected applications
+- Date Range filter (applied to vendor `created_at`)
+- Data table of vendors matching the filter
+- Export to Excel button (exports the currently filtered rows)
 
-1. **`vendors` RLS** still has broad-tenant policies that bypass our scoping:
-   - `Approvers view tenant vendors` — any user with `app_role = 'approver'` sees every vendor in tenants they belong to (this is why Sriusha / Ajay-style buyers see other buyers' vendors — Sriusha's base role is `approver`, Ajay has `vendor` + custom `Buyer` but other accounts with `approver` leak data).
-   - `Purchase can view tenant vendors`, `Finance can view tenant vendors`, `Customer admins view tenant vendors` — same pattern.
+Role-based visibility is already enforced by `useTenantFilter` + the RLS we tightened previously, so the dashboard just consumes those hooks — no new policies needed.
 
-2. **`vendor_invitations` RLS** has:
-   - `Tenant members can view tenant invitations` and `Finance and purchase view tenant invitations` — every buyer in a tenant sees every other buyer's invitations.
+## Metric definitions
 
-3. **`AdminInvitations.tsx`** query filters only by `tenant_id`, never by `created_by`, so the frontend doesn't compensate.
+Counts are taken from the `vendors` rows the current user can see (RLS + `useTenantFilter`), filtered by the chosen date range on `created_at`:
 
-## Backend changes (migration)
+- **Total Applications** — all visible vendors.
+- **Pending Applications** — `status` in any pre-SAP-Sync stage: `draft`, `submitted`, `buyer_review`, `scm_manager_review`, `scm_head_review`, `finance_1_review`, `finance_2_review`, `ceo_office_review`, `pending_sap_sync`, `validation_pending`, `returned_to_vendor`.
+- **Approved Applications** — `status = 'sap_synced'`.
+- **Rejected Applications** — `status = 'sap_team_rejected'` (the SAP Sync Rejected tab).
 
-Drop the broad-tenant SELECT/UPDATE policies on `vendors` for the `approver`, `purchase`, `finance`, `customer_admin` roles and replace them with scoped policies that reuse the existing helpers:
+## Visibility (already in place — confirm only)
 
-- `Buyers view their invited vendors` — `id IN (SELECT buyer_visible_vendor_ids(auth.uid()))`
-- `Stage approvers view routed vendors` — already present as `Approvers view routed vendors` via `approver_visible_vendor_ids`; keep.
-- `SCM Manager views mapped buyer vendors` — keep.
-- `Customer admins manage tenant vendors` — narrow to write-only (`FOR INSERT/UPDATE/DELETE`); remove their broad SELECT.
-- Keep: `Vendors can view own data`, `SAP team views all vendors`, `Sharvi admins can view all vendors`, `Admins can manage all vendors`, `Inviting users view their vendors`.
-- Update workflow-write policies (`Finance can update tenant vendors in review`, `Purchase can update tenant vendors in purchase review`) to additionally require the vendor be in the user's scoped list (buyer/approver/SCM helpers), so a buyer can't edit a peer's vendor.
+- Admin / Sharvi admin / Customer admin / SAP Team → all vendors (within tenant filter).
+- Buyer → only vendors from invitations they created (`buyer_visible_vendor_ids`).
+- SCM Manager → only vendors of mapped buyers (`buyer_scm_mappings`).
+- SCM Head / Finance 1 / Finance 2 / CEO Office → only vendors routed to them via `buyer_approval_flows` (`approver_visible_vendor_ids`).
 
-Tighten `vendor_invitations` RLS the same way:
-
-- Drop `Tenant members can view tenant invitations`, `Tenant members can update tenant invitations`, `Finance and purchase view tenant invitations`.
-- Add:
-  - `Buyers view own invitations` — `created_by = auth.uid()`.
-  - `Stage approvers view routed invitations` — `created_by IN (SELECT buyer_user_id FROM buyer_approval_flows WHERE scm_manager_user_id = auth.uid() OR scm_head_user_id = auth.uid() OR finance_1_user_id = auth.uid() OR finance_2_user_id = auth.uid() OR ceo_office_user_id = auth.uid())`.
-  - `SCM Managers view mapped buyer invitations` — `created_by IN (SELECT buyer_user_id FROM buyer_scm_mappings WHERE scm_manager_user_id = auth.uid())`.
-  - `SAP Team view all invitations` — `is_sap_team(auth.uid())`.
-- Keep admin/super-admin policies and the "mark own invitation used" / "create" policies.
-
-No table or column changes. Helper functions already exist; we just rewire policies. `user_can_see_vendor()` will be updated to drop the broad `v.tenant_id IN user_tenant_ids` branch, so dependent tables (`vendor_documents`, `vendor_validations`, `vendor_approval_progress`, `audit_logs`) automatically inherit the tighter scope.
+No changes needed in RLS, helpers, or `useTenantContext`.
 
 ## Frontend changes
 
-`src/pages/AdminInvitations.tsx` — change the invitations query for non-admin, non-SAP-Team users so it explicitly matches the new RLS:
+**`src/pages/Dashboard.tsx`** — rewrite to the simple layout:
 
-- Buyer: `.eq('created_by', user.id)`.
-- Stage approver / SCM Manager: fetch the buyer ids they're configured for (one extra query via `buyer_approval_flows` + `buyer_scm_mappings`) and `.in('created_by', buyerIds)`.
-- Admin / Sharvi admin / SAP Team: unchanged (all tenant rows).
+1. Use `useAuth`, `useTenantContext`, and `useTenantFilter` to scope queries (same pattern as `VendorList`).
+2. Local state: `dateFrom`, `dateTo` (default last 30 days). Use the shadcn Calendar in a Popover for each, with the `pointer-events-auto` fix.
+3. Single React Query: `['dashboard-vendors', tenantFilter, dateFrom, dateTo]` →
+   `from('vendors').select('id, reference_number, company_name, vendor_email, status, created_at, tenant_id')` with:
+   - tenant filter from `useTenantFilter` (`tenantIds` or `vendorIds` as appropriate);
+   - `.gte('created_at', dateFrom).lte('created_at', dateTo)`;
+   - `.order('created_at', { ascending: false })`.
+4. Compute the 4 counts in `useMemo` from the returned rows.
+5. Render:
+   - Header row with title + Date Range pickers + **Export to Excel** button.
+   - 4 metric `Card`s (reuse existing icons: `FileText`, `Clock`, `CheckCircle`, `XCircle`).
+   - `Table` with columns: Reference #, Company, Email, Status (badge), Created At. Row click → `/vendors/:id`.
+   - Empty state and `Skeleton` loading state.
+6. **Export to Excel** handler:
+   - Uses `xlsx` (already common in this kind of app; add dependency if missing) to build a single sheet from current rows.
+   - Filename: `vendors_<from>_to_<to>.xlsx`.
+   - No server call — exports exactly what the user can see.
 
-Add a `useTenantContext` consumption to know whether the user is `isStageApprover`, `isScmManager`, or `isBuyerRole`; reuse the same scoping the vendors hook already uses.
-
-No changes needed in `VendorList`, `Dashboard`, or `SAPSync` — they already read through `useTenantFilter` whose `scopedVendorIds` path is correct; they were just being overridden by the broad RLS policies.
-
-## Verification
-
-1. Log in as Ajay Babu (Buyer, no invitations created): All Vendors and Vendor Invitations show empty.
-2. Log in as Sriusha (Buyer with invitations): sees only her three invitations and the vendors she invited, not Divya bharathi's.
-3. Log in as a Finance 1 user mapped to Sriusha's flow: sees Sriusha's vendors only when they reach Finance 1.
-4. Log in as SAP Team / Admin: sees everything.
-5. Run `supabase--linter` after migration to confirm no new policy warnings.
+**Routing / nav** — no change; this replaces the existing `/dashboard` page.
 
 ## Out of scope
 
-- No changes to how approvals are routed or how the approval matrix is configured.
-- No UI rework, only the invitations query.
+- No change to RLS, helpers, or other pages.
 - No new tables, columns, or edge functions.
+- Existing complex dashboard widgets (stuck approvals, buyer companies panel, realtime banners, etc.) are intentionally removed per "simple dashboard". If you want to keep any of those, tell me which.
+
+## Verification
+
+1. Log in as Buyer (Sriusha) → counts and table reflect only her vendors; Ajay Babu sees zero.
+2. Log in as Finance 1 mapped to Sriusha → sees only vendors routed to Finance 1 for her flow.
+3. Log in as Admin / SAP Team → sees all vendors (respecting active tenant).
+4. Change date range → cards and table both update.
+5. Export to Excel → file contains exactly the visible rows.
+
+## Question before I build
+
+Want me to **replace** the current Dashboard entirely, or add this as a **new page** (e.g. `/dashboard/summary`) and leave the existing one in place?
