@@ -36,7 +36,7 @@ type VendorRow = {
   id: string;
   reference_number: string | null;
   company_name: string | null;
-  vendor_email: string | null;
+  primary_email: string | null;
   status: string;
   created_at: string;
   tenant_id: string | null;
@@ -99,7 +99,7 @@ export default function Dashboard() {
 
       let q = supabase
         .from('vendors')
-        .select('id, reference_number, company_name, vendor_email, status, created_at, tenant_id')
+        .select('id, reference_number, company_name, primary_email, status, created_at, tenant_id')
         .gte('created_at', fromIso)
         .lte('created_at', toIso)
         .order('created_at', { ascending: false });
@@ -129,7 +129,7 @@ export default function Dashboard() {
     const rows = vendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
       'Company Name': v.company_name ?? '',
-      Email: v.vendor_email ?? '',
+      Email: v.primary_email ?? '',
       Status: STATUS_LABELS[v.status]?.label ?? v.status,
       'Created At': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
     }));
@@ -227,7 +227,7 @@ export default function Dashboard() {
                         </Link>
                       </TableCell>
                       <TableCell>{v.company_name ?? '—'}</TableCell>
-                      <TableCell>{v.vendor_email ?? '—'}</TableCell>
+                      <TableCell>{v.primary_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
                     </TableRow>
