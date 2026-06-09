@@ -61,6 +61,11 @@ import {
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import {
+  VendorStageCell,
+  VendorReferenceCell,
+  STAGE_FILTER_OPTIONS,
+} from '@/components/admin/VendorStageCell';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 
@@ -138,7 +143,7 @@ export default function AdminInvitations() {
       if (seesAllInvitations) {
         let q = supabase
           .from('vendor_invitations')
-          .select('*')
+          .select('*, vendor:vendors(id, reference_number, status)')
           .order('created_at', { ascending: false });
         if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
         const { data, error } = await q;
@@ -177,7 +182,7 @@ export default function AdminInvitations() {
 
       let q = supabase
         .from('vendor_invitations')
-        .select('*')
+        .select('*, vendor:vendors(id, reference_number, status)')
         .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
       if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
@@ -593,10 +598,22 @@ export default function AdminInvitations() {
   };
 
   // Filter invitations
-  const filteredInvitations = invitations?.filter((invitation) => {
-    const matchesSearch = invitation.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const status = getInvitationStatus(invitation);
-    const matchesStatus = statusFilter === 'all' || status === statusFilter;
+  const filteredInvitations = invitations?.filter((invitation: any) => {
+    const matchesSearch =
+      invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (invitation.vendor?.reference_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (invitation.vendor_name ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesStatus = true;
+    if (statusFilter !== 'all') {
+      if (statusFilter.startsWith('stage:')) {
+        const opt = STAGE_FILTER_OPTIONS.find((o) => o.value === statusFilter);
+        const vStatus = invitation.vendor?.status ?? null;
+        matchesStatus = !!opt && !!vStatus && (opt.statuses as readonly string[]).includes(vStatus);
+      } else {
+        matchesStatus = getInvitationStatus(invitation) === statusFilter;
+      }
+    }
     return matchesSearch && matchesStatus;
   }) || [];
 
@@ -897,21 +914,24 @@ export default function AdminInvitations() {
             <div className="flex items-center gap-2">
               <div className="relative w-64">
                 <Input
-                  placeholder="Search by email..."
+                  placeholder="Search by email, name or reference #..."
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
                 />
               </div>
               <Select value={statusFilter} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-56">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="used">Used</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="pending">Invitation: Pending</SelectItem>
+                  <SelectItem value="used">Invitation: Used</SelectItem>
+                  <SelectItem value="expired">Invitation: Expired</SelectItem>
+                  {STAGE_FILTER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -935,6 +955,8 @@ export default function AdminInvitations() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendor Name</TableHead>
+                      <TableHead>Reference #</TableHead>
+                      <TableHead>Approval Stage</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Created</TableHead>
@@ -965,6 +987,12 @@ export default function AdminInvitations() {
                               </Badge>
                             </div>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <VendorReferenceCell vendor={(invitation as any).vendor} />
+                        </TableCell>
+                        <TableCell>
+                          <VendorStageCell vendor={(invitation as any).vendor} />
                         </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
                         <TableCell>
