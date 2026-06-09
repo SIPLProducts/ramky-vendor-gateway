@@ -205,7 +205,7 @@ export default function VendorList() {
 
   const handleExport = () => {
     const csvData = filteredVendors.map((v) => ({
-      ID: v.id,
+      Reference: (v as any).reference_number || v.id,
       Name: v.legal_name,
       GSTIN: v.gstin,
       PAN: v.pan,
@@ -401,7 +401,7 @@ export default function VendorList() {
                               </div>
                               <div>
                                 <p className="font-medium">{vendor.legal_name || 'Unnamed Vendor'}</p>
-                                <p className="text-xs text-muted-foreground">{vendor.id.slice(0, 8)}...</p>
+                                <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
                               </div>
                             </div>
                           </TableCell>

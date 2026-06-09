@@ -157,7 +157,7 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     const t = ctx.vendor?.trade_name || "";
     value = String(t).split(" ")[0] || "";
   } else if (head === "vendor.reference_no") {
-    value = String(ctx.vendor?.id || "").slice(0, 8).toUpperCase();
+    value = String(ctx.vendor?.reference_number || ctx.vendor?.id || "").toUpperCase();
   } else if (head === "vendor.registered_address_line3_or_2") {
     value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
   } else if (head === "vendor.primary_email_or_fallback") {
@@ -356,7 +356,7 @@ serve(async (req) => {
 
       row.UPLOAD = [];
       row.idtype = "SOLMN1";
-      row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
+      row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
       row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
       console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
@@ -458,7 +458,7 @@ serve(async (req) => {
         delete (row as any).classify;
         row.UPLOAD = [];
         row.idtype = "SOLMN1";
-        row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
+        row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
         row.idtype2 = "ZMSMEN";
         row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
 
@@ -575,7 +575,7 @@ serve(async (req) => {
     const sapVendorCode = successRow?.BP_LIFNR || null;
 
     if (successRow && sapVendorCode) {
-      const refNo = String(vendor.id || "").slice(0, 8).toUpperCase();
+      const refNo = String(vendor.reference_number || vendor.id || "").toUpperCase();
       await supabase.from("vendors").update({
         sap_vendor_code: sapVendorCode,
         sap_reference_no: refNo,
