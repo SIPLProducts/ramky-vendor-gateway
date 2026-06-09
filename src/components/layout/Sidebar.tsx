@@ -190,7 +190,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
 
       {/* Navigation */}
       <nav className={cn(
-        "flex-1 space-y-1 overflow-y-auto py-2",
+        "sidebar-scroll flex-1 space-y-1 overflow-y-auto py-2",
         collapsed ? "px-2" : "px-3"
       )}>
         {filteredItems.map((item) => {
