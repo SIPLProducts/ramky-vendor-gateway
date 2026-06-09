@@ -16,6 +16,7 @@ interface SuccessScreenProps {
 export function SuccessScreen({
   status,
   vendorId,
+  referenceNumber,
   financeComments,
   purchaseComments,
   onEdit,
