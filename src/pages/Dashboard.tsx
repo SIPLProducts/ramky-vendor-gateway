@@ -39,7 +39,9 @@ type VendorRow = {
   status: string;
   created_at: string;
   tenant_id: string | null;
+  invited_by?: { name: string | null; email: string | null } | null;
 };
+
 
 const PENDING_STATUSES = new Set([
   'draft',
