@@ -17,8 +17,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 213 27% 17%;
 
-    /* Primary - SAP Blue (enterprise standard) */
-    --primary: 210 100% 40%;
+    /* Primary - Brand Orange #e87717 */
+    --primary: 24 82% 50%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Neutral grey */
@@ -29,15 +29,15 @@
     --muted: 210 20% 96%;
     --muted-foreground: 215 14% 45%;
 
-    /* Accent - Teal for highlights */
-    --accent: 187 85% 43%;
+    /* Accent - Brand Green #00a13a */
+    --accent: 137 100% 32%;
     --accent-foreground: 0 0% 100%;
 
     /* Status colors - Clear and accessible */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     
-    --success: 142 71% 45%;
+    --success: 137 100% 32%;
     --success-foreground: 0 0% 100%;
     
     --warning: 38 92% 50%;
@@ -49,19 +49,22 @@
     /* Borders and inputs - Subtle definition */
     --border: 214 20% 88%;
     --input: 214 20% 88%;
-    --ring: 210 100% 40%;
+    --ring: 24 82% 50%;
 
     --radius: 0.375rem;
 
     /* Sidebar - Professional dark */
     --sidebar-background: 213 27% 17%;
     --sidebar-foreground: 210 20% 96%;
-    --sidebar-primary: 210 100% 50%;
+    --sidebar-primary: 24 82% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 213 27% 22%;
     --sidebar-accent-foreground: 210 20% 96%;
     --sidebar-border: 213 27% 25%;
-    --sidebar-ring: 210 100% 50%;
+    --sidebar-ring: 24 82% 50%;
+
+    /* Brand gradient */
+    --gradient-brand: linear-gradient(135deg, hsl(24 82% 50%), hsl(137 100% 32%));
 
     /* Enterprise tokens */
     --header-height: 3rem;
