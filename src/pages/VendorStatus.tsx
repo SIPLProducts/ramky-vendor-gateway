@@ -13,14 +13,15 @@ import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 interface VendorRow {
   id: string;
   reference_number: string | null;
-  company_name: string | null;
   legal_name: string | null;
-  vendor_email: string | null;
+  trade_name: string | null;
+  primary_email: string | null;
   vendor_type: string | null;
   status: string;
   created_at: string;
   last_rejection_comments: string | null;
 }
+
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'secondary' },
