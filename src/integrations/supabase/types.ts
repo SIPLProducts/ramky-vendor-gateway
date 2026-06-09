@@ -1772,6 +1772,24 @@ export type Database = {
           },
         ]
       }
+      vendor_reference_counters: {
+        Row: {
+          date: string
+          last_seq: number
+          updated_at: string
+        }
+        Insert: {
+          date: string
+          last_seq?: number
+          updated_at?: string
+        }
+        Update: {
+          date?: string
+          last_seq?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vendor_validations: {
         Row: {
           created_at: string
@@ -1961,6 +1979,7 @@ export type Database = {
           purchase_reviewed_by: string | null
           quality_issues: string | null
           raw_materials_used: string | null
+          reference_number: string | null
           registered_address: string | null
           registered_address_line2: string | null
           registered_address_line3: string | null
@@ -2154,6 +2173,7 @@ export type Database = {
           purchase_reviewed_by?: string | null
           quality_issues?: string | null
           raw_materials_used?: string | null
+          reference_number?: string | null
           registered_address?: string | null
           registered_address_line2?: string | null
           registered_address_line3?: string | null
@@ -2347,6 +2367,7 @@ export type Database = {
           purchase_reviewed_by?: string | null
           quality_issues?: string | null
           raw_materials_used?: string | null
+          reference_number?: string | null
           registered_address?: string | null
           registered_address_line2?: string | null
           registered_address_line3?: string | null
