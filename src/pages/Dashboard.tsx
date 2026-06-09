@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 type VendorRow = {
   id: string;
   reference_number: string | null;
-  company_name: string | null;
+  legal_name: string | null;
   primary_email: string | null;
   status: string;
   created_at: string;
@@ -99,7 +99,7 @@ export default function Dashboard() {
 
       let q = supabase
         .from('vendors')
-        .select('id, reference_number, company_name, primary_email, status, created_at, tenant_id')
+        .select('id, reference_number, legal_name, primary_email, status, created_at, tenant_id')
         .gte('created_at', fromIso)
         .lte('created_at', toIso)
         .order('created_at', { ascending: false });
@@ -128,7 +128,7 @@ export default function Dashboard() {
   const handleExport = () => {
     const rows = vendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
-      'Company Name': v.company_name ?? '',
+      'Company Name': v.legal_name ?? '',
       Email: v.primary_email ?? '',
       Status: STATUS_LABELS[v.status]?.label ?? v.status,
       'Created At': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
@@ -226,7 +226,7 @@ export default function Dashboard() {
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
-                      <TableCell>{v.company_name ?? '—'}</TableCell>
+                      <TableCell>{v.legal_name ?? '—'}</TableCell>
                       <TableCell>{v.primary_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
