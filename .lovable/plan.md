@@ -1,43 +1,32 @@
-## Changes
+# Fixes: Dashboard tenant + date filters
 
-### 1. `src/pages/AdminInvitations.tsx` — Invitation History table
-- Remove the **Reference #** column (header + the `<VendorReferenceCell>` cell + drop the now-unused import).
-- Add a **Buyer Company** column placed between Vendor Name and Email.
-  - Extend both invitations queries' `select` from `'*, vendor:vendors(id, reference_number, status)'` to `'*, vendor:vendors(id, reference_number, status), tenants(id, name)'` (the `tenant_id` FK already exists on `vendor_invitations`).
-  - Render `(invitation as any).tenants?.name ?? '—'` in the new cell.
+## 1. "All Tenants" gets reset to first company
 
-### 2. `src/components/layout/EnterpriseHeader.tsx` — Buyer "All" option
-- Currently the `All Tenants` entry is shown only for super-admin (`isSuperAdmin && <SelectItem value="__all__">`).
-- Show it whenever the switcher renders (i.e. drop the `isSuperAdmin` gate). This lets a Buyer with one or more assigned tenants pick "All Tenants" so the Dashboard / All Vendors show data across every tenant they have access to.
-- No change to who sees the switcher (Buyer / Admin / Sharvi Admin still see it; SCM / Finance / CEO remain hidden).
+**Cause:** In `src/hooks/useTenantContext.tsx`, the auto-select effect treats `activeTenantId === null` as "no selection" and forces it back to `myTenantIds[0]` for non-admin users. So when a Buyer picks "All Tenants" (null), it immediately snaps to the first tenant.
 
-### 3. `src/pages/Dashboard.tsx` — date range picker
-The `DatePickerButton` currently passes `max={dateTo}` on From and `min={dateFrom}` on To, so the Calendar's `disabled` callback greys out everything outside the current range. That makes it impossible to widen the range without bouncing between the two pickers, which is the "unable to select" symptom.
+**Fix (`src/hooks/useTenantContext.tsx`):**
+- Track an explicit "user chose All" intent. Simplest: only auto-pick the first tenant on initial mount when `localStorage` has no stored value. Once the user explicitly sets null via the header dropdown, persist a sentinel (`'__all__'`) in localStorage and stop auto-correcting to the first tenant.
+- Update `setActiveTenantId(null)` to write `'__all__'` to localStorage; on load, treat `'__all__'` as null and skip the "pick first" branch.
 
-Fix:
-- Remove the `min` / `max` props from both `<DatePickerButton>` calls.
-- Wrap the setters so the range self-corrects:
-  ```ts
-  const handleFromChange = (d: Date) => {
-    setDateFrom(startOfDay(d));
-    if (d > dateTo) setDateTo(endOfDay(d));
-  };
-  const handleToChange = (d: Date) => {
-    setDateTo(endOfDay(d));
-    if (d < dateFrom) setDateFrom(startOfDay(d));
-  };
-  ```
-- In `DatePickerButton`, drop the `disabled` predicate entirely so every day in the calendar is selectable.
-- Also add a small **Clear filters** button next to the pickers that resets `dateFrom`/`dateTo` to the default (last 30 days → today). This addresses the "clear based on filtering" ask — users currently have no way to reset after they have narrowed/widened the range.
+**Fix (`src/hooks/useTenantContext.tsx` → `useTenantFilter`):** for Buyers, when `activeTenantId === null` return `tenantIds: myTenantIds` so the dashboard query spans every assigned tenant (instead of only `scopedVendorIds`, which is invite-scoped). When a specific tenant is picked, intersect: `tenantIds: [activeTenantId]` AND keep `vendorIds: scopedVendorIds` so buyer still only sees their own invited vendors within that tenant.
 
-The query already keys on `fromIso`/`toIso`, so React Query refetches automatically on every change.
+## 2. Date pickers should be real date inputs, not popover buttons
+
+**Fix (`src/pages/Dashboard.tsx`):** Replace the two `<DatePickerButton>` (Popover + Calendar) instances with native `<Input type="date">` controls labeled "From" and "To". Remove the `DatePickerButton` helper, `Calendar`/`Popover` imports, and the `CalendarIcon` usage in the picker.
+- Value bound as `format(dateFrom, 'yyyy-MM-dd')`; onChange parses with `new Date(e.target.value)` → `startOfDay` / `endOfDay`.
+- Keep the self-correcting behavior (From > To bumps To, etc.).
+
+## 3. "Clear" not working
+
+**Cause:** Clear currently resets to "last 30 days → today", which often equals the already-selected range, so visually nothing changes and the filter still excludes older/newer rows.
+
+**Fix (`src/pages/Dashboard.tsx`):** Make Clear truly clear the filter:
+- Change `dateFrom` / `dateTo` state to `Date | null`.
+- When both are null, drop the `.gte` / `.lte` clauses in the query so all vendors load.
+- Clear button sets both to `null` and the date inputs render empty.
+- Export filename falls back to `vendors_all.xlsx` when either bound is null.
 
 ## Out of scope
-- No DB / RLS / migration changes.
-- No edits to the approval-stage pages, edge functions, or `VendorStatus.tsx`.
-- The Invite / Create-Vendor dialogs keep their existing tenant scoping.
-
-## Files touched
-- `src/pages/AdminInvitations.tsx`
-- `src/components/layout/EnterpriseHeader.tsx`
-- `src/pages/Dashboard.tsx`
+- No DB / RLS / edge-function changes.
+- No changes to Invitations page or other approver screens.
+- Header "All Tenants" item stays visible as already implemented.

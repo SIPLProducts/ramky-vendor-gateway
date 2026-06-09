@@ -170,7 +170,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [activeTenantId, setActiveTenantIdState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored && stored !== 'null' ? stored : null;
+    if (!stored || stored === 'null' || stored === '__all__') return null;
+    return stored;
+  });
+  const [explicitAll, setExplicitAll] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(STORAGE_KEY) === '__all__';
   });
 
   const seesAllTenants = isSuperAdmin || isCrossTenantReviewer;
