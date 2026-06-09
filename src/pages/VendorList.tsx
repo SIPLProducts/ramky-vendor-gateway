@@ -371,12 +371,14 @@ export default function VendorList() {
                     <TableRow>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Buyer Company</TableHead>
+                      <TableHead>Invited By</TableHead>
                       <TableHead>GSTIN</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>SAP Code</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
+
                   </TableHeader>
                   <TableBody>
                     {paginatedVendors.length === 0 ? (
