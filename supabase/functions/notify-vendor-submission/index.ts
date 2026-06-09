@@ -97,7 +97,7 @@ serve(async (req) => {
 
     const { data: vendor, error: vErr } = await supabase
       .from("vendors")
-      .select("id, legal_name, trade_name, primary_contact_name, primary_email, primary_phone, submitted_at, invitation_id")
+      .select("id, legal_name, trade_name, primary_contact_name, primary_email, primary_phone, submitted_at, invitation_id, reference_number")
       .eq("id", body.vendorId)
       .maybeSingle();
     if (vErr) throw vErr;
@@ -289,7 +289,8 @@ serve(async (req) => {
     const action = resubmission ? "resubmitted" : "submitted";
     const subject = `Vendor Submitted Registration Form – ${vendorName}`;
 
-    const vendorRef = vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+    const vendorRef = (vendor as any).reference_number
+      || vendor.id.replace(/-/g, "").slice(0, 8).toUpperCase();
 
     const vendorIdentity = {
       vendorName,
