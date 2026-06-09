@@ -90,6 +90,34 @@ export default function SAPSync() {
 
   const filteredSap = (sapVendors || []).filter(filterFn);
   const filteredDms = (dmsVendors || []).filter(filterFn);
+  const filteredRejected = (rejectedVendors || []).filter(filterFn);
+
+  const refreshAllLists = () => { refetch(); refetchDms(); refetchRejected(); };
+
+  const handleConfirmReject = async () => {
+    if (!rejectVendor) return;
+    const remarks = rejectRemarks.trim();
+    if (!remarks) {
+      toast.error('Reject Remarks are required');
+      return;
+    }
+    setRejectingVendorId(rejectVendor.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
+        body: { vendorId: rejectVendor.id, remarks },
+      });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Vendor rejected', { description: rejectVendor.legal_name || rejectVendor.id });
+      setRejectVendor(null);
+      setRejectRemarks('');
+      refreshAllLists();
+    } catch (e: any) {
+      toast.error('Reject failed', { description: e?.message || 'Could not reject vendor' });
+    } finally {
+      setRejectingVendorId(null);
+    }
+  };
 
   const selectedSapVendors = useMemo(
     () => filteredSap.filter(v => selectedSapIds.has(v.id)),
