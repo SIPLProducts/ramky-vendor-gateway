@@ -458,7 +458,7 @@ serve(async (req) => {
         delete (row as any).classify;
         row.UPLOAD = [];
         row.idtype = "SOLMN1";
-        row.idnum = String(vendor.id || "").slice(0, 8).toUpperCase();
+        row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
         row.idtype2 = "ZMSMEN";
         row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
 
