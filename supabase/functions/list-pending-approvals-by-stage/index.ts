@@ -224,6 +224,7 @@ Deno.serve(async (req) => {
       return {
         progressId: p.id,
         vendorId: p.vendor_id,
+        referenceNumber: v?.reference_number ?? null,
         vendorName: v?.legal_name ?? v?.trade_name ?? p.vendor_id.slice(0, 8),
         submittedAt: v?.submitted_at ?? null,
         isMsme: isIntl ? false : !!v?.is_msme_registered,
