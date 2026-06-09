@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
         const inv = invByVendor.get(v.id);
         return {
           progressId: null, vendorId: v.id,
+          referenceNumber: v?.reference_number ?? null,
           vendorName: v?.legal_name ?? v?.trade_name ?? v.id.slice(0, 8),
           submittedAt: v?.submitted_at ?? null,
           isMsme: isIntl ? false : !!v?.is_msme_registered,
