@@ -657,6 +657,9 @@ export default function AdminInvitations() {
     } finally {
       setIsTracking(false);
     }
+  };
+
+
 
 
   const getStatusBadge = (invitation: any) => {
