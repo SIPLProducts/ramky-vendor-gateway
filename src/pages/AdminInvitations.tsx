@@ -87,8 +87,12 @@ export default function AdminInvitations() {
   const queryClient = useQueryClient();
   const { data: allTenants } = useTenants();
   const { user, userRole } = useAuth();
-  const { myTenants, activeTenantId, setActiveTenantId } = useTenantContext();
-  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
+  const {
+    myTenants, activeTenantId, setActiveTenantId,
+    isSuperAdmin: isSuperAdminCtx, isCrossTenantReviewer,
+    isStageApprover, isScmManager, isBuyerRole,
+  } = useTenantContext();
+  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin' || isSuperAdminCtx;
 
   // Tenants the user is allowed to invite for:
   // - Super admins: all active tenants
@@ -114,19 +118,69 @@ export default function AdminInvitations() {
   }
 
   const effectiveTenantId = selectedTenantId || null;
+  const seesAllInvitations = isSuperAdmin || isCrossTenantReviewer;
 
-  // Fetch invitations (RLS scopes by tenant for non-super-admins)
+  // Fetch invitations with role-scoped visibility.
+  // - Admin / SAP Team: all (optionally filtered by active tenant).
+  // - Buyer: only invitations they created.
+  // - Stage approver / SCM Manager: invitations created by buyers configured under them.
   const { data: invitations, isLoading } = useQuery({
-    queryKey: ['vendor-invitations', isSuperAdmin ? 'all' : (activeTenantId || 'mine')],
+    queryKey: [
+      'vendor-invitations',
+      seesAllInvitations ? 'all' : 'scoped',
+      user?.id,
+      activeTenantId,
+      isStageApprover, isScmManager, isBuyerRole,
+    ],
     queryFn: async () => {
+      if (!user?.id) return [];
+
+      if (seesAllInvitations) {
+        let q = supabase
+          .from('vendor_invitations')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
+        const { data, error } = await q;
+        if (error) throw error;
+        return data ?? [];
+      }
+
+      const creatorIds = new Set<string>();
+      if (isBuyerRole) creatorIds.add(user.id);
+
+      if (isStageApprover) {
+        const { data: flows } = await supabase
+          .from('buyer_approval_flows')
+          .select('buyer_user_id')
+          .or(
+            [
+              `scm_head_user_id.eq.${user.id}`,
+              `finance_1_user_id.eq.${user.id}`,
+              `finance_2_user_id.eq.${user.id}`,
+              `ceo_office_user_id.eq.${user.id}`,
+              `scm_manager_user_id.eq.${user.id}`,
+            ].join(','),
+          );
+        (flows ?? []).forEach((f: any) => f.buyer_user_id && creatorIds.add(f.buyer_user_id));
+      }
+
+      if (isScmManager) {
+        const { data: maps } = await supabase
+          .from('buyer_scm_mappings')
+          .select('buyer_user_id')
+          .eq('scm_manager_user_id', user.id);
+        (maps ?? []).forEach((m: any) => m.buyer_user_id && creatorIds.add(m.buyer_user_id));
+      }
+
+      if (creatorIds.size === 0) return [];
+
       let q = supabase
         .from('vendor_invitations')
         .select('*')
+        .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
-
-      if (!isSuperAdmin && activeTenantId) {
-        q = q.eq('tenant_id', activeTenantId);
-      }
+      if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
 
       const { data, error } = await q;
       if (error) throw error;
