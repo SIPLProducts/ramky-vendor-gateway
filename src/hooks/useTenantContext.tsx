@@ -88,22 +88,32 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [userRole, customRoleNames],
   );
 
-  // SCM Manager vendor scoping (vendors invited by a mapped buyer).
+  // SCM Manager vendor scoping (vendors invited by a mapped buyer OR routed via buyer_approval_flows).
   const { data: scmManagerVendorIds = null } = useQuery({
     queryKey: ['scm-manager-vendor-ids', user?.id],
     queryFn: async (): Promise<string[]> => {
       if (!user?.id) return [];
+      const buyerIds = new Set<string>();
+
       const { data: mappings, error: mErr } = await supabase
         .from('buyer_scm_mappings')
         .select('buyer_user_id')
         .eq('scm_manager_user_id', user.id);
       if (mErr) throw mErr;
-      const buyerIds = (mappings ?? []).map((m: any) => m.buyer_user_id).filter(Boolean);
-      if (buyerIds.length === 0) return [];
+      (mappings ?? []).forEach((m: any) => m.buyer_user_id && buyerIds.add(m.buyer_user_id));
+
+      const { data: flows, error: fErr } = await supabase
+        .from('buyer_approval_flows')
+        .select('buyer_user_id')
+        .eq('scm_manager_user_id', user.id);
+      if (fErr) throw fErr;
+      (flows ?? []).forEach((f: any) => f.buyer_user_id && buyerIds.add(f.buyer_user_id));
+
+      if (buyerIds.size === 0) return [];
       const { data: invites, error: iErr } = await supabase
         .from('vendor_invitations')
         .select('vendor_id')
-        .in('created_by', buyerIds)
+        .in('created_by', Array.from(buyerIds))
         .not('vendor_id', 'is', null);
       if (iErr) throw iErr;
       return Array.from(new Set((invites ?? []).map((r: any) => r.vendor_id))).filter(Boolean);
@@ -111,6 +121,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     enabled: !!user?.id && isScmManager && !isCrossTenantReviewer && !isSuperAdmin,
     staleTime: 60 * 1000,
   });
+
 
   // Stage-approver & buyer vendor scoping.
   // - Buyer: vendors they invited (created_by = me).

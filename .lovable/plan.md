@@ -1,17 +1,25 @@
-## Plan
+# Fix: SCM Manager sees vendors in approval queue but not in All Vendors / Dashboard
 
-1. **Fix header tenant selector**
-   - Keep `All Tenants` as a real selectable option for buyers with multiple assigned companies.
-   - Ensure choosing it sets the global tenant context to `null` and persists `__all__` instead of reverting to the first company.
+## Root cause
 
-2. **Fix Vendor Invitations page override**
-   - Remove the page-level logic that forces buyers back to the first company when `activeTenantId` is `null`.
-   - Use `activeTenantId` only for table filtering; when it is `null`, show invitations across all assigned companies.
+Raja Mani (SCM Manager) is wired to Ajay Babu's vendors through `buyer_approval_flows.scm_manager_user_id`, NOT through `buyer_scm_mappings` (that table has no row for him). 
 
-3. **Keep creation forms company-specific**
-   - Invitation creation / Create Vendor dialogs will still require a specific company.
-   - If the header is on `All Tenants`, the dialog can default to the first available company inside the dialog without changing the global header selection.
+- The **SCM Manager Approval** page works because it uses the `list-pending-approvals-by-stage` edge function (service role, ignores RLS, walks `vendor_approval_progress`).
+- The **All Vendors** and **Dashboard** pages use `useTenantFilter()` → `scmManagerVendorIds` in `useTenantContext.tsx`, which only looks at `buyer_scm_mappings`. Result: empty list → no vendors shown.
 
-4. **Verify behavior**
-   - Confirm the header displays `All Tenants` after selection.
-   - Confirm the invitation table is no longer filtered to only the first company when `All Tenants` is selected.
+## Change
+
+Update the `scm-manager-vendor-ids` query in `src/hooks/useTenantContext.tsx` to compute the buyer set from BOTH sources, then resolve invited vendors as before:
+
+1. Buyers from `buyer_scm_mappings` where `scm_manager_user_id = me` (existing).
+2. Buyers from `buyer_approval_flows` where `scm_manager_user_id = me` (new).
+3. Union → fetch `vendor_invitations.vendor_id` for `created_by IN (buyers)`.
+
+No other files need changes — `VendorList`, `Dashboard`, and `useTenantFilter` already consume `scmManagerVendorIds`.
+
+## Verification
+
+- As Raja Mani, open All Vendors → Ajay Babu's submitted vendors appear.
+- Dashboard counters reflect the same set.
+- SCM Manager Approval queue is unaffected (still served by the edge function).
+- Other SCM Managers (e.g. Soumendu, Shailesh) keep their existing `buyer_scm_mappings`-based scoping.
