@@ -68,6 +68,7 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
             </SelectContent>
           </Select>
         )}
+        <ThemeColorPicker variant="desktop" />
         {showHelp && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
