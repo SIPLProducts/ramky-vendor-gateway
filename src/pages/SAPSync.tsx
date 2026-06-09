@@ -396,6 +396,19 @@ export default function SAPSync() {
                             <><Server className="h-4 w-4 mr-2" />Prepare &amp; Sync</>
                           )}
                         </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => { setRejectVendor(vendor); setRejectRemarks(''); }}
+                          disabled={rejectingVendorId === vendor.id || multiMode}
+                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Reject vendor'}
+                        >
+                          {rejectingVendorId === vendor.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                          ) : (
+                            <><XCircle className="h-4 w-4 mr-2" />Reject</>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
