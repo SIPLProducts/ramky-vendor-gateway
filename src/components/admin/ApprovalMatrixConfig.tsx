@@ -179,7 +179,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Buyer's resolved tenant (first tenant assignment)
+  // Buyer's resolved tenant (first tenant assignment) — used only for saving tenant_id on the flow
   const buyerTenantIds = useMemo(() => Array.from(userTenants.get(buyerId) ?? []), [buyerId, userTenants]);
   const buyerPrimaryTenantId = buyerTenantIds[0] ?? null;
 
@@ -189,15 +189,9 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
     return buyersAll.filter((u) => userTenants.get(u.id)?.has(filterTenantId));
   }, [buyersAll, filterTenantId, userTenants]);
 
-  // Approvers filtered by the BUYER's tenant (so approval chain stays scoped to the buyer's company)
-  const usersByRole = useMemo(() => {
-    if (!buyerPrimaryTenantId) return usersByRoleAll;
-    const out: Record<string, UserOpt[]> = {};
-    Object.entries(usersByRoleAll).forEach(([k, list]) => {
-      out[k] = list.filter((u) => userTenants.get(u.id)?.has(buyerPrimaryTenantId));
-    });
-    return out;
-  }, [usersByRoleAll, buyerPrimaryTenantId, userTenants]);
+  // Approver roles are GLOBAL — show every user with the role regardless of tenant.
+  const usersByRole = usersByRoleAll;
+
 
   const profileById = useMemo(() => {
     const m = new Map<string, UserOpt>();
