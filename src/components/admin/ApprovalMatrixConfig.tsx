@@ -179,7 +179,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Buyer's resolved tenant (first tenant assignment)
+  // Buyer's resolved tenant (first tenant assignment) — used only for saving tenant_id on the flow
   const buyerTenantIds = useMemo(() => Array.from(userTenants.get(buyerId) ?? []), [buyerId, userTenants]);
   const buyerPrimaryTenantId = buyerTenantIds[0] ?? null;
 
@@ -189,15 +189,9 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
     return buyersAll.filter((u) => userTenants.get(u.id)?.has(filterTenantId));
   }, [buyersAll, filterTenantId, userTenants]);
 
-  // Approvers filtered by the BUYER's tenant (so approval chain stays scoped to the buyer's company)
-  const usersByRole = useMemo(() => {
-    if (!buyerPrimaryTenantId) return usersByRoleAll;
-    const out: Record<string, UserOpt[]> = {};
-    Object.entries(usersByRoleAll).forEach(([k, list]) => {
-      out[k] = list.filter((u) => userTenants.get(u.id)?.has(buyerPrimaryTenantId));
-    });
-    return out;
-  }, [usersByRoleAll, buyerPrimaryTenantId, userTenants]);
+  // Approver roles are GLOBAL — show every user with the role regardless of tenant.
+  const usersByRole = usersByRoleAll;
+
 
   const profileById = useMemo(() => {
     const m = new Map<string, UserOpt>();
@@ -330,7 +324,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
           <div className="text-xs text-muted-foreground flex items-start gap-1.5 mt-1">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Approval Matrix is Buyer-based. The Tenant filter at the top only narrows which buyers and saved flows you see — the flow is automatically tied to the buyer's assigned company.
+              Approval Matrix is Buyer-based. Approvers (SCM Manager, SCM Head, Finance 1/2, CEO Office) are global — the chain you save applies to every tenant the buyer has access to. The Tenant filter at the top only narrows which buyers and saved flows you see.
             </span>
           </div>
         </CardHeader>
@@ -401,7 +395,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                         >
                           <SelectTrigger><SelectValue placeholder={`Select ${def.label}`} /></SelectTrigger>
                           <SelectContent>
-                            {opts.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with this role in the buyer's tenant.</div>}
+                            {opts.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with this role.</div>}
                             {opts.map((u) => (
                               <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                             ))}
