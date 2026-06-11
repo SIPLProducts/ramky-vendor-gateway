@@ -52,15 +52,29 @@ function logConversion(stage: string, info: Record<string, any>) {
 async function canvasToJpegFile(
   canvas: HTMLCanvasElement,
   baseFileName: string,
+  quality: number = JPEG_QUALITY,
 ): Promise<File> {
   const blob: Blob = await new Promise((resolve, reject) =>
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))),
       "image/jpeg",
-      JPEG_QUALITY,
+      quality,
     ),
   );
   return new File([blob], `${baseFileName}.jpg`, { type: "image/jpeg" });
+}
+
+/** Encode a PDF-rendered canvas to JPEG, falling back to a lower-res/quality
+ *  pass if the result is over the upstream provider's multipart cap. */
+async function pdfCanvasToJpegFile(
+  canvas: HTMLCanvasElement,
+  baseFileName: string,
+): Promise<{ file: File; canvas: HTMLCanvasElement }> {
+  let out = await canvasToJpegFile(canvas, baseFileName, PDF_JPEG_QUALITY);
+  if (out.size <= SUREPASS_MAX_BYTES) return { file: out, canvas };
+  const downscaled = fitCanvas(canvas, MAX_PAGE_EDGE);
+  out = await canvasToJpegFile(downscaled, baseFileName, JPEG_QUALITY);
+  return { file: out, canvas: downscaled };
 }
 
 /** Downscale a source canvas in-place so its longest edge <= maxEdge. */
