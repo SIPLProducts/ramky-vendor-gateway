@@ -1,32 +1,28 @@
-# Fix: Extract the original scan from PDFs instead of re-rendering
+# Fix: Lossless extraction is silently failing on your cheque PDF — one-line bug found and verified
 
-## Diagnosis (validated with your file)
+## What I found (tested against your actual file)
 
-`Avyakth - Cancelled Cheque.pdf` is a scanner-produced PDF (HP Scan). It contains exactly one embedded JPEG image — the original scan at 1654×2338 px, 200 dpi.
+The lossless extraction we added last time **never triggers** for `Avyakth - Cancelled Cheque.pdf`. I ran the exact extraction logic against your file and it found **0 candidates**, so the app silently falls back to the quality-losing canvas re-render — which is why you still see the wrong IFSC.
 
-The current conversion re-draws that image onto a canvas at 3400 px and re-encodes it as a new JPEG. Two quality losses happen:
-1. Upscaling beyond the original 2338 px adds no detail, only interpolation blur.
-2. A second JPEG compression pass adds artifacts on top of the original scan's compression.
+**Root cause:** Your scanner (HP Scan) writes the PDF with old-style Mac/classic line endings — a lone carriage return (`\r`) after the `stream` keyword. Our code only handles `\r\n` and `\n` (the two forms the PDF spec describes). Because of that single unhandled byte, the JPEG start-marker check fails and the original scan is never extracted.
 
-Side-by-side crops of the IFSC line confirm the converted version is visibly softer than the embedded original. Uploading the JPG directly to Surepass works because Surepass receives the untouched original pixels.
+I verified the fix directly: after also skipping a lone `\r`, the extraction returns the complete original scan (179,750 bytes, valid JPEG start and end markers) — byte-for-byte identical to the image inside the PDF.
 
-## Fix
+## The fix
 
-**`src/lib/pdfToImage.ts`** — for scanned PDFs, extract the embedded JPEG losslessly instead of rasterizing:
+**`src/lib/pdfToImage.ts`** — in `extractEmbeddedJpeg`, after the `stream` keyword, also skip a lone `\r`:
 
-1. Add `extractEmbeddedJpeg(pdfBytes)`: scan the raw PDF bytes for image objects with `/Filter /DCTDecode` (the standard way scanners embed JPEGs) and pull out the exact JPEG stream — byte-for-byte identical to the original scan.
-2. In the PDF branch: if the PDF is **single-page** and contains **exactly one large DCTDecode image** (covering most of the page), return that JPEG directly as the file sent to Surepass. This makes a scanned-PDF upload equivalent to uploading the original JPG.
-3. Otherwise (text-based PDFs, multi-page PDFs, PNG/Flate scans), keep the existing high-resolution rasterization path unchanged as the fallback.
-4. Keep the 8 MB Surepass cap check; if the extracted image exceeds it, fall back to rasterization.
-5. Log which path was taken (`pdf→embedded-jpeg (lossless)` vs `pdf→rasterized`) with dimensions and size, so we can confirm in the console.
+```text
+before:  handle "\r\n" and "\n"
+after:   handle "\r\n", "\n", and "\r"
+```
+
+Plus one robustness improvement: if the byte right after `stream` still isn't a JPEG start marker, scan forward up to 4 bytes for `FF D8 FF` — so any other unusual scanner output also gets the lossless path instead of silently degrading.
 
 ## How we validate
 
-1. Upload this same cheque PDF in the bank KYC step.
-2. Console should log the lossless path with size ≈ 180 KB (matching the embedded scan), not a ~950 KB re-encoded image.
-3. Surepass response should return `ifsc_code: KARB0000916` and populate the IFSC field — identical to the direct-JPG result.
-4. Smoke-test a multi-page / text-based PDF to confirm the fallback rasterization path still works.
+1. Upload the same cheque PDF in the bank KYC step (in the **preview**, where the latest code runs).
+2. Console must log `pdf→embedded-jpeg (lossless)` with size ≈ 180 KB — confirming the fast path fired this time.
+3. Surepass should return `ifsc_code: KARB0000916`, same as uploading the JPG directly.
 
-## Out of scope
-
-No changes to the edge function, OCR UI, or how the IFSC is read from the response — only the image quality reaching Surepass.
+Note: if you are testing on your self-hosted server (vms.siplproducts.com), it runs older code — you'll need to redeploy after this fix to see it there.

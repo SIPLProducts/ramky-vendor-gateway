@@ -94,10 +94,21 @@ function extractEmbeddedJpeg(bytes: Uint8Array): Uint8Array | null {
       searchFrom = dctIdx + 10;
       continue;
     }
-    // PDF spec: `stream` is followed by either CRLF or a single LF.
+    // PDF spec says CRLF or LF, but some scanners (e.g. HP Scan) emit a
+    // lone CR. Handle all three, then if we still aren't at a JPEG SOI,
+    // scan forward a few bytes to find it.
     let bodyStart = streamKw + "stream".length;
     if (bytes[bodyStart] === 0x0d && bytes[bodyStart + 1] === 0x0a) bodyStart += 2;
     else if (bytes[bodyStart] === 0x0a) bodyStart += 1;
+    else if (bytes[bodyStart] === 0x0d) bodyStart += 1;
+    if (!(bytes[bodyStart] === 0xff && bytes[bodyStart + 1] === 0xd8 && bytes[bodyStart + 2] === 0xff)) {
+      for (let k = 1; k <= 4; k++) {
+        if (bytes[bodyStart + k] === 0xff && bytes[bodyStart + k + 1] === 0xd8 && bytes[bodyStart + k + 2] === 0xff) {
+          bodyStart += k;
+          break;
+        }
+      }
+    }
 
     // Prefer the dictionary's /Length (handles JPEGs that contain `endstream`-like byte sequences).
     let bodyEnd = -1;
