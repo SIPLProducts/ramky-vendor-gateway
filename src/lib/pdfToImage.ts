@@ -30,6 +30,14 @@ const MAX_PAGE_EDGE = 2200;
 const MAX_MASTER_HEIGHT = 4400;
 const JPEG_QUALITY = 0.9;
 
+// PDFs get higher fidelity since we're rasterizing from vector source. The
+// extra resolution is essential for OCR to read small details like the IFSC
+// code on the MICR line of a cheque.
+const MAX_PDF_PAGE_EDGE = 3400;
+const MAX_PDF_RENDER_SCALE = 4;
+const PDF_JPEG_QUALITY = 0.95;
+const SUREPASS_MAX_BYTES = 8 * 1024 * 1024;
+
 function baseName(name: string) {
   const i = name.lastIndexOf(".");
   return i > 0 ? name.slice(0, i) : name;
