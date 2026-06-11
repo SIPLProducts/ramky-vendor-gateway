@@ -395,7 +395,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                         >
                           <SelectTrigger><SelectValue placeholder={`Select ${def.label}`} /></SelectTrigger>
                           <SelectContent>
-                            {opts.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with this role in the buyer's tenant.</div>}
+                            {opts.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with this role.</div>}
                             {opts.map((u) => (
                               <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                             ))}
