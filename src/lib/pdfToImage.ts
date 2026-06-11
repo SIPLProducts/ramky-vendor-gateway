@@ -30,6 +30,14 @@ const MAX_PAGE_EDGE = 2200;
 const MAX_MASTER_HEIGHT = 4400;
 const JPEG_QUALITY = 0.9;
 
+// PDFs get higher fidelity since we're rasterizing from vector source. The
+// extra resolution is essential for OCR to read small details like the IFSC
+// code on the MICR line of a cheque.
+const MAX_PDF_PAGE_EDGE = 3400;
+const MAX_PDF_RENDER_SCALE = 4;
+const PDF_JPEG_QUALITY = 0.95;
+const SUREPASS_MAX_BYTES = 8 * 1024 * 1024;
+
 function baseName(name: string) {
   const i = name.lastIndexOf(".");
   return i > 0 ? name.slice(0, i) : name;
@@ -44,15 +52,29 @@ function logConversion(stage: string, info: Record<string, any>) {
 async function canvasToJpegFile(
   canvas: HTMLCanvasElement,
   baseFileName: string,
+  quality: number = JPEG_QUALITY,
 ): Promise<File> {
   const blob: Blob = await new Promise((resolve, reject) =>
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))),
       "image/jpeg",
-      JPEG_QUALITY,
+      quality,
     ),
   );
   return new File([blob], `${baseFileName}.jpg`, { type: "image/jpeg" });
+}
+
+/** Encode a PDF-rendered canvas to JPEG, falling back to a lower-res/quality
+ *  pass if the result is over the upstream provider's multipart cap. */
+async function pdfCanvasToJpegFile(
+  canvas: HTMLCanvasElement,
+  baseFileName: string,
+): Promise<{ file: File; canvas: HTMLCanvasElement }> {
+  let out = await canvasToJpegFile(canvas, baseFileName, PDF_JPEG_QUALITY);
+  if (out.size <= SUREPASS_MAX_BYTES) return { file: out, canvas };
+  const downscaled = fitCanvas(canvas, MAX_PAGE_EDGE);
+  out = await canvasToJpegFile(downscaled, baseFileName, JPEG_QUALITY);
+  return { file: out, canvas: downscaled };
 }
 
 /** Downscale a source canvas in-place so its longest edge <= maxEdge. */
@@ -196,17 +218,22 @@ export async function normalizeUploadToImage(
   }
 
 
+  // Single-page PDFs get the high-fidelity ceiling (essential for OCR of
+  // small details like the IFSC line on a cheque). Multi-page PDFs stay at
+  // the conservative ceiling so the stitched master stays within limits.
+  const isSinglePage = pdf.numPages === 1;
+  const perPageEdge = isSinglePage ? MAX_PDF_PAGE_EDGE : MAX_PAGE_EDGE;
+  const maxScale = isSinglePage ? MAX_PDF_RENDER_SCALE : 2.5;
+
   // Render each page at a controlled, OCR-safe size.
   const pageCanvases: HTMLCanvasElement[] = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     try {
       const page = await pdf.getPage(p);
 
-      // Pick a scale so the longer edge lands ~MAX_PAGE_EDGE px. This gives
-      // OCR enough resolution without producing giant images.
       const baseViewport = page.getViewport({ scale: 1 });
       const longest = Math.max(baseViewport.width, baseViewport.height) || 1;
-      const targetScale = Math.min(2.5, Math.max(1, MAX_PAGE_EDGE / longest));
+      const targetScale = Math.min(maxScale, Math.max(1, perPageEdge / longest));
       const viewport = page.getViewport({ scale: targetScale });
 
       const canvas = document.createElement("canvas");
@@ -217,26 +244,28 @@ export async function normalizeUploadToImage(
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: ctx, viewport }).promise;
 
-      pageCanvases.push(fitCanvas(canvas, MAX_PAGE_EDGE));
+      pageCanvases.push(fitCanvas(canvas, perPageEdge));
     } catch (pageErr) {
       console.warn(`[pdfToImage] skipping page ${p} due to render error`, pageErr);
     }
   }
 
   if (pageCanvases.length === 0) {
-    // Fall back to the original PDF — the OCR provider may still handle it.
     console.warn("[pdfToImage] no pages rendered, sending original PDF");
     return file;
   }
 
 
   try {
-    // Single-page PDF → emit that page directly.
+    // Single-page PDF → emit that page directly at high fidelity.
     if (pageCanvases.length === 1) {
-      const out = await canvasToJpegFile(pageCanvases[0], baseName(file.name));
+      const { file: out, canvas: finalCanvas } = await pdfCanvasToJpegFile(
+        pageCanvases[0],
+        baseName(file.name),
+      );
       logConversion("pdf(1pg)→jpeg", {
         input: { name: file.name, size: file.size, pages: pdf.numPages },
-        output: { name: out.name, type: out.type, size: out.size, w: pageCanvases[0].width, h: pageCanvases[0].height },
+        output: { name: out.name, type: out.type, size: out.size, w: finalCanvas.width, h: finalCanvas.height, quality: PDF_JPEG_QUALITY },
       });
       return out;
     }
@@ -260,10 +289,10 @@ export async function normalizeUploadToImage(
     }
 
     const capped = master.height > MAX_MASTER_HEIGHT ? fitCanvas(master, MAX_MASTER_HEIGHT) : master;
-    const out = await canvasToJpegFile(capped, baseName(file.name));
+    const { file: out, canvas: finalCanvas } = await pdfCanvasToJpegFile(capped, baseName(file.name));
     logConversion(`pdf(${pageCanvases.length}pg)→jpeg`, {
       input: { name: file.name, size: file.size, pages: pdf.numPages },
-      output: { name: out.name, type: out.type, size: out.size, w: capped.width, h: capped.height },
+      output: { name: out.name, type: out.type, size: out.size, w: finalCanvas.width, h: finalCanvas.height },
     });
     return out;
   } catch (encodeErr) {
