@@ -2485,6 +2485,7 @@ export type Database = {
         Args: { _screen_key: string; _user_id: string }
         Returns: boolean
       }
+      is_admin_like: { Args: { _user_id: string }; Returns: boolean }
       is_cross_tenant_reviewer: { Args: { _user_id: string }; Returns: boolean }
       is_sap_team: { Args: { _user_id: string }; Returns: boolean }
       list_smtp_configs: {
