@@ -297,7 +297,7 @@ export async function normalizeUploadToImage(
   try {
     const embedded = extractEmbeddedJpeg(new Uint8Array(buf));
     if (embedded && embedded.byteLength <= SUREPASS_MAX_BYTES) {
-      const out = new File([embedded], `${baseName(file.name)}.jpg`, { type: "image/jpeg" });
+      const out = new File([embedded.slice().buffer], `${baseName(file.name)}.jpg`, { type: "image/jpeg" });
       logConversion("pdf→embedded-jpeg (lossless)", {
         input: { name: file.name, size: file.size },
         output: { name: out.name, type: out.type, size: out.size },
