@@ -324,7 +324,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
           <div className="text-xs text-muted-foreground flex items-start gap-1.5 mt-1">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Approval Matrix is Buyer-based. The Tenant filter at the top only narrows which buyers and saved flows you see — the flow is automatically tied to the buyer's assigned company.
+              Approval Matrix is Buyer-based. Approvers (SCM Manager, SCM Head, Finance 1/2, CEO Office) are global — the chain you save applies to every tenant the buyer has access to. The Tenant filter at the top only narrows which buyers and saved flows you see.
             </span>
           </div>
         </CardHeader>
