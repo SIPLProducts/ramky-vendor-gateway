@@ -49,6 +49,95 @@ function logConversion(stage: string, info: Record<string, any>) {
   } catch {}
 }
 
+/**
+ * Scan raw PDF bytes for a single embedded JPEG (DCTDecode stream) and return
+ * its exact bytes. Used to short-circuit scanner-produced PDFs (HP Scan,
+ * Canon, etc.) that are just a JPEG wrapped in PDF chrome — rasterizing
+ * those via pdf.js softens small text and breaks OCR.
+ *
+ * Returns null if the PDF is not a simple single-image scan (text-based PDFs,
+ * PDFs with multiple large images, PDFs using Flate-encoded image streams,
+ * etc.) so the caller can fall back to normal rendering.
+ */
+function extractEmbeddedJpeg(bytes: Uint8Array): Uint8Array | null {
+  // ASCII view of the PDF header/dictionaries. Stream bodies may contain
+  // binary, but PDF object dictionaries (`<< ... >>`) are ASCII, so we can
+  // safely scan for the markers we need this way.
+  let ascii = "";
+  // Chunked decode avoids "too many arguments" on big files.
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    ascii += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, Math.min(bytes.length, i + CHUNK)) as unknown as number[],
+    );
+  }
+
+  const found: Array<{ start: number; end: number; length: number }> = [];
+  let searchFrom = 0;
+  while (true) {
+    const dctIdx = ascii.indexOf("/DCTDecode", searchFrom);
+    if (dctIdx === -1) break;
+
+    // Walk backwards to the enclosing `<<` so we can read the dict for /Length.
+    const dictStart = ascii.lastIndexOf("<<", dctIdx);
+    const dictEnd = ascii.indexOf(">>", dctIdx);
+    if (dictStart === -1 || dictEnd === -1) {
+      searchFrom = dctIdx + 10;
+      continue;
+    }
+    const dict = ascii.slice(dictStart, dictEnd);
+
+    // Find the `stream` keyword after the dict — its body is the JPEG.
+    const streamKw = ascii.indexOf("stream", dictEnd);
+    if (streamKw === -1) {
+      searchFrom = dctIdx + 10;
+      continue;
+    }
+    // PDF spec: `stream` is followed by either CRLF or a single LF.
+    let bodyStart = streamKw + "stream".length;
+    if (bytes[bodyStart] === 0x0d && bytes[bodyStart + 1] === 0x0a) bodyStart += 2;
+    else if (bytes[bodyStart] === 0x0a) bodyStart += 1;
+
+    // Prefer the dictionary's /Length (handles JPEGs that contain `endstream`-like byte sequences).
+    let bodyEnd = -1;
+    const lenMatch = /\/Length\s+(\d+)/.exec(dict);
+    if (lenMatch) {
+      const declared = parseInt(lenMatch[1], 10);
+      if (Number.isFinite(declared) && declared > 0 && bodyStart + declared <= bytes.length) {
+        bodyEnd = bodyStart + declared;
+      }
+    }
+    if (bodyEnd === -1) {
+      const endIdx = ascii.indexOf("endstream", bodyStart);
+      if (endIdx === -1) {
+        searchFrom = dctIdx + 10;
+        continue;
+      }
+      // Strip the preceding newline that PDF writers add before `endstream`.
+      bodyEnd = endIdx;
+      if (bytes[bodyEnd - 1] === 0x0a) bodyEnd--;
+      if (bytes[bodyEnd - 1] === 0x0d) bodyEnd--;
+    }
+
+    // Validate JPEG SOI marker. If it's not a real JPEG (e.g. /Filter chain
+    // wraps DCTDecode with something else), bail on this candidate.
+    if (bytes[bodyStart] === 0xff && bytes[bodyStart + 1] === 0xd8 && bytes[bodyStart + 2] === 0xff) {
+      found.push({ start: bodyStart, end: bodyEnd, length: bodyEnd - bodyStart });
+    }
+    searchFrom = bodyEnd > 0 ? bodyEnd : dctIdx + 10;
+  }
+
+  if (found.length === 0) return null;
+  // Only safe for the "single embedded scan" case. Multiple JPEGs means we
+  // don't know which one to send — fall back to rendering the page.
+  if (found.length > 1) return null;
+
+  const { start, end } = found[0];
+  return bytes.subarray(start, end);
+}
+
+
 async function canvasToJpegFile(
   canvas: HTMLCanvasElement,
   baseFileName: string,
@@ -199,6 +288,26 @@ export async function normalizeUploadToImage(
 
   const buf = await file.arrayBuffer();
 
+  // FAST PATH: many "PDFs" from scanners (HP Scan etc.) are just a single
+  // embedded JPEG wrapped in PDF chrome. Re-rendering them via pdf.js +
+  // canvas + JPEG re-encode visibly softens small text (e.g. the IFSC line
+  // on a cheque) and breaks OCR. If we can detect that, hand the original
+  // JPEG bytes straight to the OCR provider — byte-for-byte identical to
+  // uploading the JPG directly.
+  try {
+    const embedded = extractEmbeddedJpeg(new Uint8Array(buf));
+    if (embedded && embedded.byteLength <= SUREPASS_MAX_BYTES) {
+      const out = new File([embedded.slice().buffer], `${baseName(file.name)}.jpg`, { type: "image/jpeg" });
+      logConversion("pdf→embedded-jpeg (lossless)", {
+        input: { name: file.name, size: file.size },
+        output: { name: out.name, type: out.type, size: out.size },
+      });
+      return out;
+    }
+  } catch (extractErr) {
+    console.warn("[pdfToImage] embedded JPEG extraction failed, falling back to render", extractErr);
+  }
+
   // Run pdf.js inline (no worker). Self-hosted deployments often serve .mjs
   // with the wrong content-type or block workers via CSP, and we don't want
   // a silent worker failure to leak a raw PDF into the OCR provider.
@@ -216,6 +325,7 @@ export async function normalizeUploadToImage(
     console.warn("[pdfToImage] getDocument failed, sending original PDF", err);
     return file;
   }
+
 
 
   // Single-page PDFs get the high-fidelity ceiling (essential for OCR of
