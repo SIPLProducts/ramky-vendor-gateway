@@ -199,6 +199,26 @@ export async function normalizeUploadToImage(
 
   const buf = await file.arrayBuffer();
 
+  // FAST PATH: many "PDFs" from scanners (HP Scan etc.) are just a single
+  // embedded JPEG wrapped in PDF chrome. Re-rendering them via pdf.js +
+  // canvas + JPEG re-encode visibly softens small text (e.g. the IFSC line
+  // on a cheque) and breaks OCR. If we can detect that, hand the original
+  // JPEG bytes straight to the OCR provider — byte-for-byte identical to
+  // uploading the JPG directly.
+  try {
+    const embedded = extractEmbeddedJpeg(new Uint8Array(buf));
+    if (embedded && embedded.byteLength <= SUREPASS_MAX_BYTES) {
+      const out = new File([embedded], `${baseName(file.name)}.jpg`, { type: "image/jpeg" });
+      logConversion("pdf→embedded-jpeg (lossless)", {
+        input: { name: file.name, size: file.size },
+        output: { name: out.name, type: out.type, size: out.size },
+      });
+      return out;
+    }
+  } catch (extractErr) {
+    console.warn("[pdfToImage] embedded JPEG extraction failed, falling back to render", extractErr);
+  }
+
   // Run pdf.js inline (no worker). Self-hosted deployments often serve .mjs
   // with the wrong content-type or block workers via CSP, and we don't want
   // a silent worker failure to leak a raw PDF into the OCR provider.
@@ -216,6 +236,7 @@ export async function normalizeUploadToImage(
     console.warn("[pdfToImage] getDocument failed, sending original PDF", err);
     return file;
   }
+
 
 
   // Single-page PDFs get the high-fidelity ceiling (essential for OCR of
