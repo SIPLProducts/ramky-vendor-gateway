@@ -83,13 +83,32 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
     setLoading(true);
     try {
       const allRoleNames = ['Buyer', ...Array.from(new Set(STAGE_DEFS.flatMap((s) => s.roleNames)))];
-      const [{ data: roles }, { data: profiles }, { data: utAll }] = await Promise.all([
+
+      // Helper to page through PostgREST's 1000-row default cap
+      const fetchAll = async <T,>(builder: () => any): Promise<T[]> => {
+        const pageSize = 1000;
+        let from = 0;
+        const out: T[] = [];
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { data, error } = await builder().range(from, from + pageSize - 1);
+          if (error) throw error;
+          const rows = (data ?? []) as T[];
+          out.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
+        return out;
+      };
+
+      const [{ data: roles }, profilesAll, utAll] = await Promise.all([
         supabase.from('custom_roles').select('id, name').in('name', allRoleNames),
-        supabase.from('profiles').select('id, full_name, email'),
-        supabase.from('user_tenants').select('user_id, tenant_id'),
+        fetchAll<any>(() => supabase.from('profiles').select('id, full_name, email')),
+        fetchAll<any>(() => supabase.from('user_tenants').select('user_id, tenant_id')),
       ]);
       const roleMap = new Map((roles ?? []).map((r: any) => [r.id, r.name as string]));
-      const profileMap = new Map<string, UserOpt>((profiles ?? []).map((p: any) => [p.id, p as UserOpt]));
+      const profileMap = new Map<string, UserOpt>((profilesAll ?? []).map((p: any) => [p.id, p as UserOpt]));
+
 
       const utMap = new Map<string, Set<string>>();
       (utAll ?? []).forEach((r: any) => {
