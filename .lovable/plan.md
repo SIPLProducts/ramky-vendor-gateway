@@ -1,28 +1,47 @@
-# Fix: Lossless extraction is silently failing on your cheque PDF — one-line bug found and verified
+## Issue 1 — Admin role permissions
 
-## What I found (tested against your actual file)
+**Diagnosis.** Comparing `role_screen_permissions` for `admin` vs `sharvi_admin` (tenant_id is NULL = global default):
 
-The lossless extraction we added last time **never triggers** for `Avyakth - Cancelled Cheque.pdf`. I ran the exact extraction logic against your file and it found **0 candidates**, so the app silently falls back to the quality-losing canvas re-render — which is why you still see the wrong IFSC.
+- Admin currently has `sap_api_settings = true` — it should be `false` per your rule.
+- Admin already has `kyc_api_settings = false`, so that one is correct.
+- For every other screen that Sharvi Admin can access, Admin will be granted the same access. Where Sharvi Admin cannot access a screen, Admin's setting will be left as-is so it does not lose existing access (e.g. approval screens, audit logs, GST compliance).
 
-**Root cause:** Your scanner (HP Scan) writes the PDF with old-style Mac/classic line endings — a lone carriage return (`\r`) after the `stream` keyword. Our code only handles `\r\n` and `\n` (the two forms the PDF spec describes). Because of that single unhandled byte, the JPEG start-marker check fails and the original scan is never extracted.
+**Fix.** A migration that, for `tenant_id IS NULL`:
+1. Upserts `admin` rows so every screen Sharvi Admin can access becomes accessible to Admin.
+2. Explicitly sets `admin` → `kyc_api_settings = false` and `admin` → `sap_api_settings = false`.
 
-I verified the fix directly: after also skipping a lone `\r`, the extraction returns the complete original scan (179,750 bytes, valid JPEG start and end markers) — byte-for-byte identical to the image inside the PDF.
+No code changes required — `useScreenPermissions` already reads from `role_screen_permissions`.
 
-## The fix
+If you instead want Admin to mirror Sharvi Admin **exactly** (i.e. also lose access to approval/audit/GST screens that Sharvi Admin currently doesn't have), tell me and I'll adjust the migration to do a strict mirror.
 
-**`src/lib/pdfToImage.ts`** — in `extractEmbeddedJpeg`, after the `stream` keyword, also skip a lone `\r`:
+## Issue 2 — CEO Office & Finance 2 missing from Approval Matrix dropdowns
 
-```text
-before:  handle "\r\n" and "\n"
-after:   handle "\r\n", "\n", and "\r"
+**Diagnosis.** In `src/components/admin/ApprovalMatrixConfig.tsx` (line 89):
+
+```ts
+supabase.from('user_tenants').select('user_id, tenant_id')
 ```
 
-Plus one robustness improvement: if the byte right after `stream` still isn't a JPEG start marker, scan forward up to 4 bytes for `FF D8 FF` — so any other unusual scanner output also gets the lossless path instead of silently degrading.
+`user_tenants` currently has **1,770 rows**, but Supabase / PostgREST caps a single `select` at **1,000 rows by default**. So roughly 770 tenant assignments are silently dropped on the client. The dropdown then filters approvers by "user has the buyer's primary tenant" — and any user whose mappings were truncated (which includes the newer CEO Office and Finance 2 users) is excluded from every stage's dropdown, producing "No users with this role in the buyer's tenant."
 
-## How we validate
+I verified in the database that:
+- The `Finance 2` custom role is assigned to `jayavardhan.reddy@ramky.com` (159 tenants).
+- The `CEO Office` custom role is assigned to `sudarsan.srinivasan@ramky.com` (159 tenants).
+- Each buyer's primary tenant IS in both users' tenant sets — so once the client actually loads the full mapping, they will appear.
 
-1. Upload the same cheque PDF in the bank KYC step (in the **preview**, where the latest code runs).
-2. Console must log `pdf→embedded-jpeg (lossless)` with size ≈ 180 KB — confirming the fast path fired this time.
-3. Surepass should return `ifsc_code: KARB0000916`, same as uploading the JPG directly.
+**Fix.** Paginate the `user_tenants` fetch in `ApprovalMatrixConfig.tsx` so all rows are loaded regardless of the PostgREST page limit:
 
-Note: if you are testing on your self-hosted server (vms.siplproducts.com), it runs older code — you'll need to redeploy after this fix to see it there.
+- Replace the single `select` with a loop that pages by 1,000 (`.range(from, to)`) until fewer than 1,000 rows are returned.
+- Same pattern for `profiles` (currently 1 unbounded select — also at risk as users grow).
+
+No schema change needed.
+
+## Files to change
+
+- `src/components/admin/ApprovalMatrixConfig.tsx` — paginate `user_tenants` and `profiles` selects in `loadAll`.
+- New migration — adjust `role_screen_permissions` rows for the `admin` role as described.
+
+## Validation
+
+- Open Admin Configuration → Approval Matrix, pick any buyer; the Finance 2 and CEO Office dropdowns will list the assigned users.
+- Sign in as an Admin user: KYC API Settings and SAP API Settings stay hidden; every other screen Sharvi Admin can see is accessible.
