@@ -350,6 +350,8 @@ app.post("/sap/bp/create", authGuard, async (req, res) => {
       method: "POST",
       headers: { Authorization: basicAuthHeader(SAP_BP_USERNAME, SAP_BP_PASSWORD) },
       body: req.body,
+      reqId: req.reqId,
+      username: SAP_BP_USERNAME,
     });
     console.log(
       `[bp/create] SAP responded ${result.status} in ${result.durationMs}ms`
@@ -414,6 +416,8 @@ app.post("/sap/dms/upload", authGuard, async (req, res) => {
       method: "POST",
       headers: { Authorization: basicAuthHeader(SAP_BP_USERNAME, SAP_BP_PASSWORD) },
       body: req.body,
+      reqId: req.reqId,
+      username: SAP_BP_USERNAME,
     });
     console.log(`[dms/upload] SAP responded ${result.status} in ${result.durationMs}ms`);
     return res.status(200).json({
@@ -472,7 +476,7 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
     if (useBasicAuth && SAP_BP_USERNAME && SAP_BP_PASSWORD) {
       finalHeaders.Authorization = basicAuthHeader(SAP_BP_USERNAME, SAP_BP_PASSWORD);
     }
-    const result = await forwardToSap({ url, method, headers: finalHeaders, body });
+    const result = await forwardToSap({ url, method, headers: finalHeaders, body, reqId: req.reqId, username: useBasicAuth ? SAP_BP_USERNAME : null });
     return res.status(200).json({
       ok: result.ok,
       sapStatus: result.status,
