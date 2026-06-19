@@ -116,8 +116,16 @@ async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'SAP Team']);
-  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  if (!auth.ok) {
+    trace(reqId, SVC, "auth.failed", {});
+    return authErrorResponse(auth, corsHeaders);
+  }
+  trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
     const reqBody = await req.json();
