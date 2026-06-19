@@ -141,7 +141,11 @@ Deno.serve(async (req) => {
 
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25000);
+      // Honor per-config timeout_ms (min 90s). SAP can take ~35s; the old
+      // hardcoded 25s caused "The signal has been aborted". Keep this
+      // >= SAP_REQUEST_TIMEOUT_MS in middleware/.env.
+      const abortMs = Math.max(Number(config.timeout_ms) || 0, 90000);
+      const timer = setTimeout(() => controller.abort(), abortMs);
 
       if (connectionMode === "proxy") {
         const middlewareBase = normalizeMiddlewareBase(config.middleware_url || "");
