@@ -22,9 +22,14 @@ function normalizeMiddlewareBase(raw: string): string {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   try {
     const { configId } = await req.json();
     if (!configId) throw new Error("configId is required");
+    trace(reqId, SVC, "body.parsed", { configId });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
