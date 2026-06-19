@@ -92,9 +92,77 @@ app.use(
 
 // ---------- Helpers ----------
 
+const { randomUUID } = require("crypto");
+
+// Structured one-line JSON logger — every event carries the same reqId so the
+// full edge -> middleware -> SAP chain can be grepped by request id.
+function trace(reqId, stage, fields = {}) {
+  try {
+    console.log(JSON.stringify({
+      svc: "vms-middleware",
+      reqId,
+      stage,
+      ts: new Date().toISOString(),
+      ...fields,
+    }));
+  } catch {
+    console.log(`[middleware] reqId=${reqId} stage=${stage} (unserializable fields)`);
+  }
+}
+
+const SENSITIVE_HEADER_KEYS = /^(authorization|x-middleware-key|cookie|proxy-authorization)$/i;
+const SENSITIVE_BODY_KEYS = /(secret|password|token|api[-_ ]?key|authorization)/i;
+
+function headerKeysOf(h) {
+  if (!h) return [];
+  return Object.keys(h);
+}
+function presentHeaderKeys(h) {
+  if (!h) return {};
+  const out = {};
+  for (const k of Object.keys(h)) {
+    out[k] = SENSITIVE_HEADER_KEYS.test(k) ? "***" : "present";
+  }
+  return out;
+}
+function safeBodyKeys(b) {
+  if (!b || typeof b !== "object") return [];
+  return Object.keys(b).map((k) => (SENSITIVE_BODY_KEYS.test(k) ? `${k}(***)` : k));
+}
+
+// Per-request middleware: assign / propagate reqId and start time.
+app.use((req, res, next) => {
+  const incoming = req.header("x-request-id");
+  req.reqId = (incoming && String(incoming).trim()) || randomUUID();
+  req.reqStartedAt = Date.now();
+  res.setHeader("x-request-id", req.reqId);
+  if (req.path !== "/" && req.path !== "/health") {
+    trace(req.reqId, "req.received", {
+      method: req.method,
+      path: req.path,
+      clientIp: req.ip,
+      headerKeys: headerKeysOf(req.headers),
+      headerPresence: presentHeaderKeys(req.headers),
+      contentLength: Number(req.header("content-length") || 0),
+      middlewareKeyPresent: Boolean(req.header("x-middleware-key")),
+    });
+  }
+  res.on("finish", () => {
+    if (req.path !== "/" && req.path !== "/health") {
+      trace(req.reqId, "response.sent", {
+        status: res.statusCode,
+        elapsedTotalMs: Date.now() - req.reqStartedAt,
+      });
+    }
+  });
+  next();
+});
+
 function authGuard(req, res, next) {
   const provided = req.header("x-middleware-key") || "";
-  if (!SHARED_SECRET || provided !== SHARED_SECRET) {
+  const ok = Boolean(SHARED_SECRET) && provided === SHARED_SECRET;
+  trace(req.reqId, "auth.result", { ok });
+  if (!ok) {
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   }
   next();
@@ -123,34 +191,66 @@ function formatMb(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-async function forwardToSap({ url, method, headers, body }) {
+async function forwardToSap({ url, method, headers, body, reqId, username }) {
+  const rid = reqId || "no-req-id";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   const startedAt = Date.now();
   const upstreamMethod = method || "POST";
-  console.log(`[forwardToSap] -> ${upstreamMethod} ${url}`);
+  const payloadStr = body == null ? null : (typeof body === "string" ? body : JSON.stringify(body));
+  trace(rid, "upstream.prepared", {
+    sapUrl: url,
+    method: upstreamMethod,
+    headerKeys: headerKeysOf(headers),
+    headerPresence: presentHeaderKeys(headers),
+    authMode: headers && (headers.Authorization || headers.authorization) ? "basic" : "none",
+    username: username || null,
+    payloadKeys: body && typeof body === "object" ? safeBodyKeys(body) : null,
+    payloadBytes: payloadStr ? payloadStr.length : 0,
+  });
+  trace(rid, "upstream.fetch.start", { startedAt: new Date(startedAt).toISOString() });
   try {
     const init = {
       method: upstreamMethod,
       headers: { ...(headers || {}) },
       signal: controller.signal,
     };
-    // Only attach a body / content-type for methods that have one.
     if (body != null && upstreamMethod !== "GET" && upstreamMethod !== "HEAD") {
-      init.body = typeof body === "string" ? body : JSON.stringify(body);
+      init.body = payloadStr;
       if (!init.headers["Content-Type"] && !init.headers["content-type"]) {
         init.headers["Content-Type"] = "application/json";
       }
     }
     const res = await fetch(url, init);
     const text = await res.text();
+    const elapsedMs = Date.now() - startedAt;
     let json = null;
     try { json = JSON.parse(text); } catch { /* non-JSON */ }
-    console.log(`[forwardToSap] <- ${res.status} in ${Date.now() - startedAt}ms (${url})`);
-    return { ok: res.ok, status: res.status, durationMs: Date.now() - startedAt, body: json ?? text };
+    const sapHeaderKeys = [];
+    res.headers.forEach((_v, k) => sapHeaderKeys.push(k));
+    trace(rid, "upstream.fetch.end", {
+      elapsedMs,
+      sapStatus: res.status,
+      sapStatusText: res.statusText,
+      sapHeaderKeys,
+      responseBytes: text.length,
+      bodyPreview: text.slice(0, 500),
+    });
+    return { ok: res.ok, status: res.status, durationMs: elapsedMs, body: json ?? text };
   } catch (err) {
-    console.error(`[forwardToSap] FAILED after ${Date.now() - startedAt}ms ${upstreamMethod} ${url}:`, err);
+    const elapsedMs = Date.now() - startedAt;
+    const info = describeFetchError(err);
+    trace(rid, "upstream.fetch.error", {
+      elapsedMs,
+      errorName: err?.name || null,
+      errorMessage: err?.message || String(err),
+      errorCode: err?.code || null,
+      causeCode: err?.cause?.code || null,
+      causeMessage: err?.cause?.message || null,
+      mapped: info,
+      stack: err?.stack || null,
+    });
     throw err;
   } finally {
     clearTimeout(timer);
