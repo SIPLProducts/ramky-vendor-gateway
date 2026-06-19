@@ -1,58 +1,82 @@
-## Fix: edge function aborts before SAP responds
+## Problem
 
-### Root cause
-`supabase/functions/fetch-tenants-from-sap/index.ts` aborts its `fetch` to the middleware after 25s. SAP takes ~35s, so the abort fires first and the user sees `"Could not reach SAP: The signal has been aborted"`.
+`{"msg":"WorkerRequestCancelled: request has been cancelled by supervisor"}` is **not** the same error as before. It is emitted by the **self-hosted Supabase `edge-runtime` supervisor** (the process that hosts Deno workers), not by our `AbortController`. The supervisor killed the worker mid-request.
 
-### Code change (1 file)
-**`supabase/functions/fetch-tenants-from-sap/index.ts`** (around line 133)
+The supervisor cancels a worker for one of these reasons (in order of likelihood for this case):
 
-Replace:
-```ts
-const controller = new AbortController();
-const timer = setTimeout(() => controller.abort(), 25000);
+1. **`worker_request_wall_clock_limit_ms` exceeded** — default in self-hosted edge-runtime is **60 seconds** (sometimes 150s depending on image). Our function now waits up to 90s for SAP, so the supervisor kills it before our own timeout fires.
+2. `worker_request_cpu_time_soft_limit_ms` / `hard_limit_ms` exceeded (CPU, not wall clock) — unlikely here, the function is mostly idle awaiting fetch.
+3. Memory limit exceeded — unlikely for this payload.
+4. Kong/nginx closed the client connection and the supervisor cancelled the orphaned worker — possible but secondary; nginx is already at 600s on `/supabase/`.
+
+So the new bottleneck has moved one layer **up**: from our in-code abort (was 25s, now 90s) to the **edge-runtime supervisor wall-clock limit** on your VM.
+
+## Fix Strategy
+
+Two independent changes are needed. Do **both**.
+
+### A. Raise the edge-runtime supervisor wall-clock limit on the VM (required)
+
+The supervisor is started by the `supabase/edge-runtime` container or the `edge-runtime` binary launched from `scripts/lib/40-functions.sh`. It accepts these flags / env vars:
+
+- `--worker-request-wall-clock-limit-ms` (or env `EDGE_RUNTIME_WORKER_REQUEST_WALL_CLOCK_LIMIT_MS`)
+- `--worker-request-cpu-time-soft-limit-ms`
+- `--worker-request-cpu-time-hard-limit-ms`
+
+Raise wall-clock to **120000 ms** (must be > our in-code 90s + headroom).
+
+Action items (you run on the VM, I cannot reach it):
+
+1. Inspect how edge-runtime is launched:
+   - `systemctl cat supabase-edge-runtime` (or whatever the unit is called), or
+   - `docker inspect <edge-runtime container>` to see the command/env.
+2. Add to the launch command / unit `Environment=`:
+   ```
+   EDGE_RUNTIME_WORKER_REQUEST_WALL_CLOCK_LIMIT_MS=120000
+   EDGE_RUNTIME_WORKER_REQUEST_CPU_TIME_SOFT_LIMIT_MS=120000
+   EDGE_RUNTIME_WORKER_REQUEST_CPU_TIME_HARD_LIMIT_MS=120000
+   ```
+   or pass the equivalent `--worker-request-wall-clock-limit-ms 120000` flags.
+3. Restart: `systemctl restart supabase-edge-runtime` (or `docker restart <name>`).
+4. Verify with `systemctl show supabase-edge-runtime | grep -i wall` or `docker exec ... env | grep WALL`.
+
+I will update `scripts/lib/40-functions.sh` so future redeploys also set these env vars, so the limit doesn't get reset on next `deploy-vms-server.sh` run.
+
+### B. Make the edge function resilient (code change I will make in build mode)
+
+Even with the limit raised, we should:
+
+1. Keep `abortMs = Math.max(config.timeout_ms, 90000)` but cap it at **110000** so our abort still fires *before* the new 120s supervisor limit. That guarantees a clean JSON error instead of the cryptic `WorkerRequestCancelled`.
+2. Wrap the outer `Deno.serve` handler so that if the worker is cancelled, we at least log the elapsed time and the SAP URL we were calling — easier to diagnose next time.
+3. Add `console.log` lines with elapsed ms around the `fetch()` so `supabase functions logs fetch-tenants-from-sap` shows exactly which leg is slow (middleware → SAP, or SAP itself).
+
+### C. Confirmation steps
+
+After (A) + (B):
+
 ```
+# 1. Hit middleware directly — should return JSON in ~35s
+curl -X POST http://206.1.23.95:9009/sap/proxy \
+  -H 'content-type: application/json' \
+  -H "x-middleware-key: $KEY" \
+  -d '{"url":"<SAP_URL>","method":"POST","headers":{...},"body":{"UMAIL":"shaileshvitthal.gundu@ramky.com"},"useBasicAuth":true}'
 
-With:
-```ts
-const controller = new AbortController();
-// Honor per-config timeout_ms (min 90s). SAP can take ~35s; 25s caused
-// "The signal has been aborted". Keep >= middleware SAP_REQUEST_TIMEOUT_MS.
-const abortMs = Math.max(Number(config.timeout_ms) || 0, 90000);
-const timer = setTimeout(() => controller.abort(), abortMs);
-```
-
-This makes the timeout 90s by default and lets you raise it further from the SAP API Settings UI (Timeout field) without another code change.
-
-### Server-side changes you must apply manually
-These live on your self-hosted VM, not in this repo:
-
-1. **`middleware/.env`** on the server — raise SAP request timeout above SAP's 35s:
-   ```
-   SAP_REQUEST_TIMEOUT_MS=90000
-   ```
-   Then:
-   ```
-   systemctl restart vms-middleware
-   ```
-
-2. **SAP API Settings → Tenants From SAP → Timeout (ms)**: set to `90000` for consistency across functions.
-
-3. Nginx is already fine (`proxy_read_timeout 120s` on `/sap`, `600s` on `/supabase/`). No change needed.
-
-### Verification after deploy
-```bash
-# Should now return the tenants JSON in ~35s instead of aborting at 25s
-time curl -s -X POST \
-  http://206.1.23.95:9009/supabase/functions/v1/fetch-tenants-from-sap \
-  -H "Authorization: Bearer <USER_JWT>" \
-  -H "Content-Type: application/json" \
+# 2. Hit the edge function — should now return tenants JSON, not WorkerRequestCancelled
+curl -X POST http://206.1.23.95:9009/supabase/functions/v1/fetch-tenants-from-sap \
+  -H 'authorization: Bearer <user_jwt>' \
+  -H 'content-type: application/json' \
   -d '{"email":"shaileshvitthal.gundu@ramky.com"}'
 ```
-Middleware logs (`journalctl -u vms-middleware -f`) should show:
-```
-[forwardToSap] <- 200 in ~35000ms (http://10.200.1.2:8000/vendor/bp/create?sap-client=300)
-```
 
-### Not doing (and why)
-- **No queue/background-worker refactor.** Hosted Supabase edge functions cap at 25s wall-clock, but **self-hosted edge-runtime has no such 25s cap** — your function is running under your own nginx + Kong + edge-runtime where `proxy_read_timeout` is already 600s. The 25s limit here is purely the `setTimeout` inside the function itself. Raising it is the correct fix; a queue would add complexity for no benefit on your self-hosted setup.
-- **No middleware code changes.** The middleware already forwards correctly and has 60s connect / 60s headers timeouts; only the `.env` value for `SAP_REQUEST_TIMEOUT_MS` needs raising.
+If #1 succeeds and #2 still fails, the supervisor env vars didn't take effect — re-check step A.2.
+
+## Files I will edit in build mode
+
+- `supabase/functions/fetch-tenants-from-sap/index.ts` — cap abort at 110s, add timing logs.
+- `scripts/lib/40-functions.sh` — export the three `EDGE_RUNTIME_*_LIMIT_MS` env vars when launching/relaunching edge-runtime so the fix survives redeploys.
+
+## What I will NOT do
+
+- No queue/background-worker refactor (overkill; raising the limit is the documented fix for self-hosted).
+- No changes to middleware code or nginx (already correctly sized).
+- I cannot SSH to your VM, so step A.1–A.4 must be done by you.

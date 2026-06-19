@@ -139,13 +139,18 @@ Deno.serve(async (req) => {
     let networkError: string | null = null;
     const requestBody = { UMAIL: email };
 
+    const startedAt = Date.now();
     try {
       const controller = new AbortController();
-      // Honor per-config timeout_ms (min 90s). SAP can take ~35s; the old
-      // hardcoded 25s caused "The signal has been aborted". Keep this
-      // >= SAP_REQUEST_TIMEOUT_MS in middleware/.env.
-      const abortMs = Math.max(Number(config.timeout_ms) || 0, 90000);
+      // Cap our in-code abort BELOW the self-hosted edge-runtime supervisor's
+      // wall-clock limit (we set that to 120s on the VM). 110s guarantees we
+      // return a clean JSON error instead of "WorkerRequestCancelled".
+      // Honors per-config timeout_ms, clamped to [90s, 110s].
+      const rawTimeout = Number(config.timeout_ms) || 90000;
+      const abortMs = Math.min(Math.max(rawTimeout, 90000), 110000);
+      console.log(`[fetch-tenants-from-sap] mode=${connectionMode} abortMs=${abortMs} sapUrl=${sapUrl}`);
       const timer = setTimeout(() => controller.abort(), abortMs);
+
 
       if (connectionMode === "proxy") {
         const middlewareBase = normalizeMiddlewareBase(config.middleware_url || "");
@@ -226,8 +231,15 @@ Deno.serve(async (req) => {
         }
       }
     } catch (e: any) {
-      networkError = `Could not reach SAP: ${e?.message || e}`;
+      const elapsed = Date.now() - startedAt;
+      const aborted = e?.name === "AbortError" || /aborted/i.test(String(e?.message || ""));
+      console.error(`[fetch-tenants-from-sap] fetch failed after ${elapsed}ms aborted=${aborted}: ${e?.message || e}`);
+      networkError = aborted
+        ? `SAP did not respond within ${Math.round(elapsed / 1000)}s (timeout). Increase the timeout in SAP API Settings → Tenants From SAP, and ensure the edge-runtime wall-clock limit on the server is higher.`
+        : `Could not reach SAP: ${e?.message || e}`;
     }
+    console.log(`[fetch-tenants-from-sap] total elapsed=${Date.now() - startedAt}ms networkError=${networkError ? "yes" : "no"}`);
+
 
     if (networkError || !sapJson) {
       return json({
