@@ -1,92 +1,58 @@
-# Sharvi Vendor Portal — User Manual (DOCX)
+## Fix: edge function aborts before SAP responds
 
-A single comprehensive, editable Word document covering every role in the Sharvi Vendor Management System, with screenshots captured from the live preview.
+### Root cause
+`supabase/functions/fetch-tenants-from-sap/index.ts` aborts its `fetch` to the middleware after 25s. SAP takes ~35s, so the abort fires first and the user sees `"Could not reach SAP: The signal has been aborted"`.
 
-## Deliverable
+### Code change (1 file)
+**`supabase/functions/fetch-tenants-from-sap/index.ts`** (around line 133)
 
-- **File:** `/mnt/documents/Sharvi_VMS_User_Manual_v1.docx`
-- **Format:** DOCX (editable), US Letter, Sharvi branding (greys + blue accent), Arial/Calibri typography matching the SAP Fiori-inspired UI
-- **Length:** ~35–45 pages with cover, TOC, screenshots, callouts, and troubleshooting
-
-## Document structure
-
-1. **Cover page** — Sharvi logo, title, version, date, support email
-2. **Table of Contents** (auto-generated, hyperlinked)
-3. **About this manual** — audience, conventions, support contact
-4. **System overview**
-   - What VMS does, architecture at a glance (Frontend → Lovable Cloud → SAP via middleware)
-   - Roles & responsibilities matrix (Vendor, Buyer, SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office, Tenant Admin, Sharvi Admin)
-   - Login, password reset, MFA notes
-5. **Vendor guide**
-   - Receiving the invitation email
-   - Accepting the invite & creating account
-   - 7-step registration flow (Company → Contacts → Banking → Tax/KYC → Documents → Declarations → Review/Submit)
-   - Inline verifications (PAN, GST, MSME, Bank/Penny-drop, IFSC) and what blocks progression
-   - Document upload requirements & OCR auto-fill
-   - Tracking status, responding to "Returned to Vendor"
-6. **Approver guide** (one section per stage)
-   - Buyer Approval (assign company, return to vendor, re-approve)
-   - SCM Manager / SCM Head
-   - Finance 1 / Finance 2
-   - CEO Office
-   - Common actions: view documents, comments, approve/reject, audit trail
-7. **Tenant Admin guide**
-   - User management (create user, assign role, change role, deactivate)
-   - Custom roles & permissions matrix
-   - Buyer ↔ SCM mapping
-   - Approval Matrix configuration (per tenant / All Tenants, role-filtered dropdowns)
-   - Workflow configuration
-   - Field configuration / Form builder
-   - Validation API settings (KYC providers, penny-drop)
-   - SAP API settings (direct vs middleware, test connection, payload templates, master data)
-   - Email / SMTP configuration, no-reply sender, Resend tracking
-   - Branding (logo, colors, theme)
-8. **Sharvi Admin Console**
-   - Tenant management, invitations, audit logs
-   - Scheduled GST compliance checks
-   - SAP sync (single & bulk), retry, error inspection
-9. **Notifications & emails** — invitation, submission, status, password reset
-10. **Troubleshooting**
-    - "Email not sent" (DNS/SMTP egress, e.g. `queryA UNKNOWN smtp.gmail.com`)
-    - SAP sync failures (middleware reachability, payload mapping)
-    - Verification API failures
-    - Permission errors / missing role
-11. **Glossary** — VMS, SCM, BP, DMS, KYC, MSME, IFSC, Penny-drop, PostgREST, etc.
-12. **Appendix** — keyboard shortcuts, support contact, version history
-
-## How it will be built
-
-```text
-1. Capture screenshots from live preview (browser tools)
-   - Sign in as test user, navigate each major screen at 1366×768
-   - Save JPGs to /tmp/manual-shots/
-   - Screens: Login, Vendor Register (each step), Vendor Status, Buyer Approval,
-     each approval stage, User Mgmt, Approval Matrix, Workflow, Field Config,
-     SAP Settings, Email Config, Branding, Sharvi Admin Console, Audit Logs
-2. Generate DOCX with docx-js (per built-in skill)
-   - Sharvi palette: bg #F7F9FC, primary blue accent, charcoal text
-   - Heading1/2/3 styles, TOC with outlineLevel, page numbers in footer,
-     Sharvi name in header, smart quotes, proper bullet numbering
-   - Embed each screenshot as ImageRun with caption + alt text
-   - Callout boxes (single-cell tables w/ light-blue shading) for Tips / Warnings
-3. QA pass: convert to PDF via LibreOffice, render each page to JPG,
-   inspect for clipped text, broken images, overlapping elements; fix and re-render
-4. Write final file to /mnt/documents/ and surface via <presentation-artifact>
+Replace:
+```ts
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), 25000);
 ```
 
-## Technical details
+With:
+```ts
+const controller = new AbortController();
+// Honor per-config timeout_ms (min 90s). SAP can take ~35s; 25s caused
+// "The signal has been aborted". Keep >= middleware SAP_REQUEST_TIMEOUT_MS.
+const abortMs = Math.max(Number(config.timeout_ms) || 0, 90000);
+const timer = setTimeout(() => controller.abort(), abortMs);
+```
 
-- **Tooling:** `docx` npm package (already covered by docx skill), LibreOffice for PDF QA, `pdftoppm` for page images
-- **Page setup:** US Letter 12240×15840 DXA, 1" margins, Arial 12pt body, Heading1 32pt bold, Heading2 28pt bold
-- **Screenshots:** captured via `browser--view_preview` + `browser--screenshot`, ~1366px wide, embedded at 6.0" wide to fit content area
-- **Branding tokens pulled from project memory:** grey background, white rounded cards, blue primary, support@sharviinfotech.com
-- **No code/config changes to the app** — manual only
+This makes the timeout 90s by default and lets you raise it further from the SAP API Settings UI (Timeout field) without another code change.
 
-## Out of scope (confirm if you want any added)
+### Server-side changes you must apply manually
+These live on your self-hosted VM, not in this repo:
 
-- Per-page printed glossy design / marketing brochure styling
-- Translation to other languages
-- Video walkthroughs
-- A second in-app `/user-manual` route (we picked DOCX only)
+1. **`middleware/.env`** on the server — raise SAP request timeout above SAP's 35s:
+   ```
+   SAP_REQUEST_TIMEOUT_MS=90000
+   ```
+   Then:
+   ```
+   systemctl restart vms-middleware
+   ```
 
-Confirm and I'll switch to build mode, capture screenshots, generate the DOCX, QA it, and hand you the file.
+2. **SAP API Settings → Tenants From SAP → Timeout (ms)**: set to `90000` for consistency across functions.
+
+3. Nginx is already fine (`proxy_read_timeout 120s` on `/sap`, `600s` on `/supabase/`). No change needed.
+
+### Verification after deploy
+```bash
+# Should now return the tenants JSON in ~35s instead of aborting at 25s
+time curl -s -X POST \
+  http://206.1.23.95:9009/supabase/functions/v1/fetch-tenants-from-sap \
+  -H "Authorization: Bearer <USER_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"shaileshvitthal.gundu@ramky.com"}'
+```
+Middleware logs (`journalctl -u vms-middleware -f`) should show:
+```
+[forwardToSap] <- 200 in ~35000ms (http://10.200.1.2:8000/vendor/bp/create?sap-client=300)
+```
+
+### Not doing (and why)
+- **No queue/background-worker refactor.** Hosted Supabase edge functions cap at 25s wall-clock, but **self-hosted edge-runtime has no such 25s cap** — your function is running under your own nginx + Kong + edge-runtime where `proxy_read_timeout` is already 600s. The 25s limit here is purely the `setTimeout` inside the function itself. Raising it is the correct fix; a queue would add complexity for no benefit on your self-hosted setup.
+- **No middleware code changes.** The middleware already forwards correctly and has 60s connect / 60s headers timeouts; only the `.env` value for `SAP_REQUEST_TIMEOUT_MS` needs raising.
