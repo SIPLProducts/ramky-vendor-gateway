@@ -308,9 +308,15 @@ serve(async (req) => {
               const controller = new AbortController();
               const timer = setTimeout(() => controller.abort(), 180000);
               try {
-                const r = await fetch(url, { method: "POST", headers, body: bodyStr, signal: controller.signal });
+                const r = await traceFetch(reqId, SVC, url, {
+                  method: "POST",
+                  headers,
+                  body: bodyStr,
+                  signal: controller.signal,
+                }, { label: `dms-batch-${i + 1}` });
                 clearTimeout(timer);
                 const t = await r.text();
+                trace(reqId, SVC, "dms-batch.body", { batch: i + 1, url, status: r.status, bytes: t.length, preview: safePreview(t) });
                 console.log(`DMS batch ${i + 1}/${batches.length} url=${url} status=${r.status} body=${t.slice(0, 200)}`);
                 if (r.status === 404 && !workingDmsUrl) {
                   triedDetails.push(`${url}->404`);
@@ -322,6 +328,7 @@ serve(async (req) => {
                 break;
               } catch (e: any) {
                 clearTimeout(timer);
+                trace(reqId, SVC, "dms-batch.error", { batch: i + 1, url, ...summarizeError(e) });
                 triedDetails.push(`${url}->${e?.message || "network error"}`);
               }
             }
