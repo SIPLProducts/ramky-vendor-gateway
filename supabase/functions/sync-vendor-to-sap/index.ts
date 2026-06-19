@@ -566,6 +566,7 @@ serve(async (req) => {
       }
     } catch (e: any) {
       const raw = e?.message || "Network error reaching SAP";
+      trace(reqId, SVC, "upstream.error", { useMiddleware, targetUrl, ...summarizeError(e) });
       if (useMiddleware) {
         networkError = `Could not reach the middleware at ${targetUrl}. Underlying error: ${raw}`;
       } else {
