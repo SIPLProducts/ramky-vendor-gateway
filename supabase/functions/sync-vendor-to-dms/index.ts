@@ -61,13 +61,27 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+function parseHostRewrites(): { from: string; to: string }[] {
+  return (Deno.env.get("SAP_MIDDLEWARE_HOST_REWRITES") || "")
+    .split(",").map((s) => s.trim()).filter(Boolean)
+    .map((pair) => { const [f, t] = pair.split("="); return { from: (f || "").trim(), to: (t || "").trim() }; })
+    .filter((p) => p.from && p.to);
+}
 function rewriteContainerHost(u: string): string {
   if (!u) return u;
   try {
     const url = new URL(u);
+    const hit = parseHostRewrites().find((r) => r.from === url.hostname);
+    if (hit) {
+      const from = url.hostname;
+      url.hostname = hit.to;
+      console.log(JSON.stringify({ svc: "sync-vendor-to-dms", stage: "middleware.url.rewritten", from, to: hit.to, finalUrl: url.toString().replace(/\/+$/, ""), source: "host-rewrite-list" }));
+      return url.toString().replace(/\/+$/, "");
+    }
     if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+      const from = url.hostname;
       url.hostname = "172.17.0.1";
-      console.log(JSON.stringify({ svc: "sync-vendor-to-dms", stage: "middleware.url.rewritten", to: "172.17.0.1", finalUrl: url.toString().replace(/\/+$/, "") }));
+      console.log(JSON.stringify({ svc: "sync-vendor-to-dms", stage: "middleware.url.rewritten", from, to: "172.17.0.1", finalUrl: url.toString().replace(/\/+$/, ""), source: "loopback" }));
       return url.toString().replace(/\/+$/, "");
     }
   } catch { /* ignore */ }
