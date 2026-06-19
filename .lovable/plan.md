@@ -1,33 +1,35 @@
-# Implement Edge Function middleware-URL + timeout fix (so it lands in GitHub)
+# Fix: Edge Function can't reach middleware at public IP from inside Docker
 
-## Why this is needed
-Lovable auto-syncs every code change to your connected GitHub repo. Our recent turns were all in **plan mode** — no files were written, so there is literally nothing for GitHub to receive. To get "latest changes" into Git, we need to actually implement the fix we discussed.
+## What the log shows
+- `middleware_url_normalized: "http://206.1.23.95:9009"` — the DB still has the public IP
+- Fetch hits `in-code-timeout` after 25s
+- You already confirmed: from inside the functions container, `http://172.17.0.1:9009` works in ~17ms, but `http://206.1.23.95:9009` times out (NAT hairpin blocked)
 
-## What will change
+The rewrite I added only catches `127.0.0.1` / `localhost`. The DB value is the public IP, so the rewrite never fires and the function tries the unreachable address.
 
-### 1. `supabase/functions/_shared/trace.ts`
-Add and export a shared helper:
+## Fix (two layers, both needed)
 
-- `normalizeMiddlewareBase(rawUrl, logger)` — strips known path suffixes (`/sap/proxy`, `/sap/bp/create`, `/sap/dms/upload`, `/health`), then if the host is `127.0.0.1` or `localhost`, rewrites it to `172.17.0.1` (the Docker host gateway used by the Supabase functions container). Logs both the original and rewritten URLs under stage `middleware.url.rewritten`.
-- Honors a `SAP_MIDDLEWARE_URL_OVERRIDE` environment secret — when set, it always wins over the DB-stored value.
+### 1. Set `SAP_MIDDLEWARE_URL_OVERRIDE` secret = `http://172.17.0.1:9009`
+The shared normalizer already honors this env var above the DB value. Once set, every SAP edge function (`fetch-tenants-from-sap`, `sap-api-test-connection`, `sap-master-fetch`, `sync-vendor-to-sap`, `sync-vendor-to-dms`, `sync-vendors-to-sap-bulk`) will route through the Docker gateway regardless of what's in `sap_api_configs.middleware_url`. This is the immediate unblocker — no code change, no redeploy.
 
-### 2. Each SAP-calling Edge Function
-Files: `fetch-tenants-from-sap`, `sap-api-test-connection`, `sap-master-fetch`, `sync-vendor-to-sap`, `sync-vendor-to-dms`, `sync-vendors-to-sap-bulk`.
+I'll prompt for this via the add_secret tool after you approve.
 
-- Replace inline URL normalization with the shared `normalizeMiddlewareBase()` call.
-- Fix the in-code abort timeout: change the clamp so `config.timeout_ms` (currently 30000) is the real ceiling — `clamp(config.timeout_ms ?? 30000, 5000, 25000)` — instead of forcing 90000s, which exceeds the Edge runtime wall-clock limit and causes the supervisor to kill the function before any JSON error can be returned.
-- Confirm `await fetch(...)` and `await res.text()` are already awaited and every exit path returns through the shared `json(...)` helper (spot-checked already; no changes needed beyond a final verification pass).
+### 2. Extend `rewriteContainerHost()` to also rewrite the known public IP
+Belt-and-suspenders so a future operator who clears the override or edits the DB doesn't re-break it. In all 6 functions' `rewriteContainerHost`:
 
-### 3. Optional `SAP_MIDDLEWARE_URL_OVERRIDE` secret
-Not added automatically. If you want a kill-switch to override the per-tenant DB value from one place, I'll prompt to add it via the secrets tool after the code lands.
+- Add an extra env-driven list `SAP_MIDDLEWARE_HOST_REWRITES` (comma-separated `from=to` pairs, e.g. `206.1.23.95=172.17.0.1`).
+- If the URL's hostname matches a `from`, rewrite to `to` and log `middleware.url.rewritten` with the mapping source (`env-override` | `loopback` | `host-rewrite-list`).
+- Keep the existing `127.0.0.1` / `localhost` → `172.17.0.1` behavior unchanged.
 
-## What will NOT change
-- No business logic, no SAP payload shapes, no auth, no DB schema, no request/response contracts.
-- No frontend changes.
-- Logging stages and field names stay the same; one new stage `middleware.url.rewritten` is added.
+### 3. No other changes
+- No timeout changes (already clamped to 25s, which is correct for the Edge wall-clock).
+- No business logic, payload, auth, schema, or frontend changes.
+- No queue/background-worker refactor — middleware responds in ~17ms once the host is reachable, so the existing synchronous path is fine.
 
 ## After implementation
-- Files are written → Lovable auto-commits and pushes to your connected GitHub repo within seconds.
-- I'll deploy the affected Edge Functions so you can retry from the app and confirm the new log sequence: `middleware.url.rewritten` → `proxy.fetch.start` → `proxy.fetch.end` → `sap.parsed` → `response.sent`.
+1. I add `SAP_MIDDLEWARE_URL_OVERRIDE=http://172.17.0.1:9009` (with your confirmation).
+2. I write the `rewriteContainerHost` extension to all 6 edge functions; Lovable auto-commits and pushes to GitHub.
+3. Edge Functions redeploy automatically.
+4. Retry "Fetch tenants" from the app and confirm the new log line: `middleware.url.override` (or `middleware.url.rewritten` with `source: "host-rewrite-list"`) → `proxy.fetch.start` → `proxy.fetch.end` (status 200) → `sap.parsed` → `response.sent`.
 
 Approve to switch to build mode and apply.

@@ -9,15 +9,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
+function parseHostRewrites(): { from: string; to: string }[] {
+  return (Deno.env.get("SAP_MIDDLEWARE_HOST_REWRITES") || "")
+    .split(",").map((s) => s.trim()).filter(Boolean)
+    .map((pair) => { const [f, t] = pair.split("="); return { from: (f || "").trim(), to: (t || "").trim() }; })
+    .filter((p) => p.from && p.to);
+}
 function rewriteContainerHost(u: string, reqId?: string): string {
   if (!u) return u;
   try {
     const url = new URL(u);
+    const hit = parseHostRewrites().find((r) => r.from === url.hostname);
+    if (hit) {
+      const from = url.hostname;
+      url.hostname = hit.to;
+      const finalUrl = url.toString().replace(/\/+$/, "");
+      if (reqId) trace(reqId, SVC, "middleware.url.rewritten", { from, to: hit.to, finalUrl, source: "host-rewrite-list" });
+      return finalUrl;
+    }
     if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
       const from = url.hostname;
       url.hostname = "172.17.0.1";
       const finalUrl = url.toString().replace(/\/+$/, "");
-      if (reqId) trace(reqId, SVC, "middleware.url.rewritten", { from, to: "172.17.0.1", finalUrl });
+      if (reqId) trace(reqId, SVC, "middleware.url.rewritten", { from, to: "172.17.0.1", finalUrl, source: "loopback" });
       return finalUrl;
     }
   } catch { /* ignore */ }
