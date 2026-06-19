@@ -367,22 +367,27 @@ serve(async (req) => {
 
     const anyData = Object.values(summary).some((s) => s.upserted > 0);
     if (!anyData && errors.length > 0) {
+      trace(reqId, SVC, "response.sent", { success: false, elapsedTotalMs: Date.now() - tStart, errorCount: errors.length });
       return ok({
         success: false,
         message: errors.join(" | "),
         hint: "Check that 'SAP Fields F4' and 'Classification F4s' configs in SAP API Settings have correct middleware URL, Proxy Secret, and HTTP method.",
+        reqId,
       });
     }
 
+    trace(reqId, SVC, "response.sent", { success: true, elapsedTotalMs: Date.now() - tStart, summaryKeys: Object.keys(summary) });
     return ok({
       success: true,
       summary,
       fetched_at: now,
       sap_response: sapResponse,
       warnings: errors.length > 0 ? errors : undefined,
+      reqId,
     });
   } catch (e: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(e), elapsedTotalMs: Date.now() - tStart });
     console.error("sap-master-fetch error:", e?.message || e);
-    return ok({ success: false, message: e?.message || "Unexpected error" }, 200);
+    return ok({ success: false, message: e?.message || "Unexpected error", reqId }, 200);
   }
 });
