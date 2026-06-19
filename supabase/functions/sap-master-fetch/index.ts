@@ -205,12 +205,13 @@ async function fetchSapForConfig(
       }
       return { sapJson: inner, error: null };
     } else {
-      const res = await fetch(sapUrl, {
+      const res = await traceFetch(reqId, SVC, sapUrl, {
         method: httpMethod,
         headers: sapHeaders,
         signal: controller.signal,
-      });
+      }, { label: `direct[${config.name}]` });
       const text = await res.text();
+      trace(reqId, SVC, "direct.body", { configName: config.name, bytes: text.length, preview: safePreview(text) });
       if (!res.ok) {
         return { sapJson: null, error: `${config.name}: SAP HTTP ${res.status}: ${text.slice(0, 200)}` };
       }
@@ -218,6 +219,7 @@ async function fetchSapForConfig(
       catch { return { sapJson: null, error: `${config.name}: invalid JSON from SAP: ${text.slice(0, 200)}` }; }
     }
   } catch (e: any) {
+    trace(reqId, SVC, "fetchSapForConfig.error", { configName: config.name, ...summarizeError(e) });
     return { sapJson: null, error: `${config.name}: could not reach SAP: ${e?.message || e}` };
   } finally {
     clearTimeout(timer);
