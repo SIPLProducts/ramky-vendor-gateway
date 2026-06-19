@@ -229,14 +229,23 @@ async function fetchSapForConfig(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   const auth = await requireAuthenticatedUser(req);
-  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  if (!auth.ok) {
+    trace(reqId, SVC, "auth.failed", {});
+    return authErrorResponse(auth, corsHeaders);
+  }
+  trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
     const body = await req.json().catch(() => ({}));
     const requestedTypes: string[] | undefined = Array.isArray(body?.master_types)
       ? body.master_types
       : (body?.master_type ? [body.master_type] : undefined);
+    trace(reqId, SVC, "body.parsed", { requestedTypes: requestedTypes || null });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
