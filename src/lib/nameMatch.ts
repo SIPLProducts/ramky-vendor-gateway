@@ -89,16 +89,7 @@ function initialAwareScore(a: string, b: string): number {
  */
 export function fuzzyNameMatch(a?: string | null, b?: string | null): boolean {
   if (!a || !b) return false;
-  const na = normalize(a);
-  const nb = normalize(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  const ta = tokens(a);
-  const tb = tokens(b);
-  if (!ta.length || !tb.length) return false;
-  const setB = new Set(tb);
-  return ta.some((t) => setB.has(t));
+  return nameMatchPercentage(a, b) >= NAME_MATCH_MIN_PASS;
 }
 
 export function panMatch(a?: string | null, b?: string | null): boolean {
