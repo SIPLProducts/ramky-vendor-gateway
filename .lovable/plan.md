@@ -1,51 +1,74 @@
-## Problem
+# Fix: On-behalf vendors not seeding SCM Manager queue
 
-`nameMatchPercentage("B K Nataraja", "BASAVACHARI KOLAR NATARAJA")` returns **33%**, below the 40% PAN↔GST gate in `DocumentVerificationStep.tsx`, so the user sees *"PAN Holder Name does not match GST Legal Name."* even though the names clearly correspond — `B` → Basavachari, `K` → Kolar, `Nataraja` matches.
+## What the screenshots prove
 
-Root cause: the tokenizer in `src/lib/nameMatch.ts` drops any token of length ≤ 1, so initials (`B`, `K`) are thrown away and never get a chance to match the leading letters of the full names.
+1. `seed_vendor_approval_progress('e5d1cfa9…')` → returned `6, scm_manager_review`. Vendor `20260619002` will now appear in Soumendukumar's SCM Manager queue. Refresh the page to confirm.
+2. The 6 levels are correctly seeded: BUYER approved (on-behalf auto), then SCM_MANAGER / SCM_HEAD / FINANCE_1 / FINANCE_2 / CEO_OFFICE all pending.
 
-## Fix — make `nameMatch.ts` initial-aware (single, central change)
+So the seeding logic itself works perfectly. The on-behalf flag was read correctly (BUYER level was auto-approved). The problem was only that **the seeder was never called for this vendor when it was created**.
 
-Update `src/lib/nameMatch.ts` only. No threshold change, no behavior change for already-matching names, no business-logic edits in any KYC tab.
+## Root cause
 
-### 1. New helper: `tokensWithInitials(s)`
+`SELECT … FROM pg_trigger WHERE tgname = 'trg_vendors_seed_approval'` returned **0 rows** on your self-hosted DB.
 
-Same normalization as today, but **keep** single-letter tokens as `{ kind: "initial", value: "b" }` and multi-letter non-noise tokens as `{ kind: "word", value: "basavachari" }`.
+The trigger function `public.trg_vendors_seed_approval()` exists (it's in your DB functions list), but the trigger **binding** that fires it on `vendors` INSERT/UPDATE was never installed on the self-hosted server. On Lovable Cloud it was created by a migration; on your self-host that migration either didn't run, or was dropped.
 
-### 2. New helper: `initialMatchBoost(a, b)`
+That's why:
+- Every new vendor on the self-host comes in with `status = scm_manager_review` (set by the create-vendor edge function), but **no rows** are inserted into `vendor_approval_progress`.
+- All review queues (SCM Manager, SCM Head, Finance 1/2, CEO Office) filter on `vendor_approval_progress`, so the vendor is invisible everywhere except the "All Vendors" list, which reads `vendors.status` directly.
+- The orphan query returned 0 rows now only because vendor `20260619002` is the only one you've tested in this state — every future on-behalf or normal vendor will reproduce the bug until the trigger is installed.
 
-Computes a directional best-match where one side may use initials:
+## Fix plan
 
-- Pair every `initial` on the short side with the first letter of an unused `word` on the long side.
-- A pairing counts as 1 matched "logical token".
-- A direct word↔word match also counts as 1.
-- Return `matchedLogicalTokens / max(logicalTokenCount(a), logicalTokenCount(b))`.
+### Step 1 — Install the missing trigger (one-time, self-host only)
 
-Examples:
-- `"B K Nataraja"` (3 logical tokens: B, K, Nataraja) vs `"BASAVACHARI KOLAR NATARAJA"` (3 logical tokens) → all 3 pair up → **100%**.
-- `"J Smith"` vs `"John Smith"` → 2/2 → **100%**.
-- `"R Kumar"` vs `"Rakesh Sharma"` → only `R↔Rakesh` pairs (Kumar ≠ Sharma) → 1/2 → **50%**.
-- `"Acme Pvt Ltd"` vs `"Acme"` — no initials, falls through to existing logic → unchanged.
+Run on the self-hosted Postgres (psql / SQL editor):
 
-### 3. Wire into `nameMatchPercentage` and `fuzzyNameMatch`
+```sql
+DROP TRIGGER IF EXISTS trg_vendors_seed_approval ON public.vendors;
 
-In `nameMatchPercentage`, compute the existing Jaccard score AND the initial-aware score, then return `max(existing, initialBoosted)`. In `fuzzyNameMatch`, return `true` if `nameMatchPercentage ≥ NAME_MATCH_MIN_PASS` (current 20%).
+CREATE TRIGGER trg_vendors_seed_approval
+AFTER INSERT OR UPDATE OF status ON public.vendors
+FOR EACH ROW
+EXECUTE FUNCTION public.trg_vendors_seed_approval();
+```
 
-This guarantees we never *lower* an already-good score and we never break any current match — we only rescue cases that today incorrectly score low because of initials.
+Verify:
 
-### 4. No other changes
+```sql
+SELECT tgname, tgrelid::regclass, pg_get_triggerdef(oid)
+FROM pg_trigger
+WHERE tgname = 'trg_vendors_seed_approval';
+```
 
-- `NAME_MATCH_MIN_PASS` stays 20.
-- The PAN↔GST gate at `DocumentVerificationStep.tsx:689` stays at 40 — the fix above will push your case to ~100%, well over 40%.
-- No edits to GST tab, MSME tab, Bank tab, edge functions, or DB.
-- No new dependencies.
+Expect **1 row** showing the trigger bound to `public.vendors`.
 
-### 5. Verification
+### Step 2 — Backfill any other orphans
 
-Add a tiny inline sanity check via `console` during dev is not needed — instead I'll verify by running these expected scores in my head against the new algorithm before shipping, and you can re-upload the same PAN + GST to confirm the banner turns green. Expected after fix: PAN tab shows green "PAN verified against GST registry." with no name-mismatch error.
+Already run; returned 0. Re-run after a few new vendors are created to make sure the trigger is now firing:
 
-## Files touched
+```sql
+SELECT v.id, v.reference_number, v.legal_name, v.status
+FROM public.vendors v
+LEFT JOIN public.vendor_approval_progress p ON p.vendor_id = v.id
+WHERE v.status IN ('buyer_review','scm_manager_review','scm_head_review',
+                   'finance_1_review','finance_2_review','ceo_office_review')
+  AND p.id IS NULL;
+```
 
-- `src/lib/nameMatch.ts` — single file, ~40 lines added.
+If any rows appear, seed them: `SELECT public.seed_vendor_approval_progress('<id>');`
 
-That's it. Approve to switch to build mode and apply.
+### Step 3 — End-to-end test
+
+1. Buyer logs in → "Create Vendor on behalf" → submit a fresh vendor.
+2. Run the orphan query → must return 0 rows.
+3. Inspect the new vendor's `vendor_approval_progress`: BUYER should be `approved` (auto, on-behalf), SCM_MANAGER `pending`.
+4. Log in as the SCM Manager mapped to that buyer in `buyer_approval_flows` → the vendor must appear in the queue.
+
+## Why on-behalf "looked broken"
+
+It wasn't the on-behalf branch — that branch only runs **inside** `seed_vendor_approval_progress` (the `IF v_on_behalf THEN auto-approve BUYER`). Since the seeder was never invoked, neither the BUYER auto-approve nor the SCM_MANAGER pending row was ever created, which made it look like on-behalf routing was failing. Once Step 1 installs the trigger, on-behalf will route to SCM Manager correctly for every new vendor.
+
+## No app code changes
+
+This is purely a DB trigger installation on the self-hosted server. The `src/` codebase already calls the seeder via the trigger; nothing in the React/edge-function code needs to change.
