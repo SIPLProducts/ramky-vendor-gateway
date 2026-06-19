@@ -112,17 +112,20 @@ export function nameMatchPercentage(a?: string | null, b?: string | null): numbe
   if (na === nb) return 100;
   const ta = tokens(a);
   const tb = tokens(b);
-  if (!ta.length || !tb.length) {
-    return na.includes(nb) || nb.includes(na) ? 100 : 0;
+  let score = 0;
+  if (ta.length && tb.length) {
+    const setB = new Set(tb);
+    let common = 0;
+    for (const t of ta) if (setB.has(t)) common += 1;
+    score = Math.round((common / Math.max(ta.length, tb.length)) * 100);
+  } else if (na.includes(nb) || nb.includes(na)) {
+    score = 100;
   }
-  const setB = new Set(tb);
-  let common = 0;
-  for (const t of ta) if (setB.has(t)) common += 1;
-  const denom = Math.max(ta.length, tb.length);
-  let score = Math.round((common / denom) * 100);
   // Substring boost — full containment is a strong signal.
   if (na.includes(nb) || nb.includes(na)) score = Math.max(score, 60);
-  return score;
+  // Initial-aware boost — rescues "B K Nataraja" vs "Basavachari Kolar Nataraja".
+  const initialScore = Math.round(initialAwareScore(a, b) * 100);
+  return Math.max(score, initialScore);
 }
 
 /**
