@@ -231,8 +231,15 @@ Deno.serve(async (req) => {
         }
       }
     } catch (e: any) {
-      networkError = `Could not reach SAP: ${e?.message || e}`;
+      const elapsed = Date.now() - startedAt;
+      const aborted = e?.name === "AbortError" || /aborted/i.test(String(e?.message || ""));
+      console.error(`[fetch-tenants-from-sap] fetch failed after ${elapsed}ms aborted=${aborted}: ${e?.message || e}`);
+      networkError = aborted
+        ? `SAP did not respond within ${Math.round(elapsed / 1000)}s (timeout). Increase the timeout in SAP API Settings → Tenants From SAP, and ensure the edge-runtime wall-clock limit on the server is higher.`
+        : `Could not reach SAP: ${e?.message || e}`;
     }
+    console.log(`[fetch-tenants-from-sap] total elapsed=${Date.now() - startedAt}ms networkError=${networkError ? "yes" : "no"}`);
+
 
     if (networkError || !sapJson) {
       return json({
