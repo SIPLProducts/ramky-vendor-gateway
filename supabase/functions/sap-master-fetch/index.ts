@@ -144,7 +144,7 @@ async function fetchSapForConfig(
       for (const p of proxyPaths) {
         proxyUrl = `${middlewareBase}${p}`;
         triedUrls.push(proxyUrl);
-        const r = await fetch(proxyUrl, {
+        const r = await traceFetch(reqId, SVC, proxyUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -157,7 +157,7 @@ async function fetchSapForConfig(
             useBasicAuth: true,
           }),
           signal: controller.signal,
-        });
+        }, { label: `proxy[${config.name}]` });
         const body = await r.text();
         // Only fall back on a clear "route not found" signal: 404 or HTML page
         const looksLikeMissingRoute =
