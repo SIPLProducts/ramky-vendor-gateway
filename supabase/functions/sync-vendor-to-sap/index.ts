@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
+import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_shared/trace.ts";
+
+const SVC = "sync-vendor-to-sap";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
 // Indian state -> SAP T005S numeric region code for country IN.
@@ -232,12 +235,21 @@ function fail(message: string, extra: Record<string, any> = {}) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'SAP Team']);
-  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  if (!auth.ok) {
+    trace(reqId, SVC, "auth.failed", {});
+    return authErrorResponse(auth, corsHeaders);
+  }
+  trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
     const { vendorId, overrides, sapPayload: clientPayload } = await req.json();
     if (!vendorId) throw new Error("vendorId is required");
+    trace(reqId, SVC, "body.parsed", { vendorId, hasOverrides: Boolean(overrides), hasClientPayload: Array.isArray(clientPayload) });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -511,12 +523,20 @@ serve(async (req) => {
         }
       }
 
-      const res = await fetch(targetUrl, {
-        method: "POST", headers, body: JSON.stringify(payload), signal: controller.signal,
+      trace(reqId, SVC, "upstream.prepared", {
+        targetUrl,
+        useMiddleware,
+        timeoutMs,
+        payloadBytes: JSON.stringify(payload).length,
+        topLevelKeys: Array.isArray(payload) && payload[0] ? Object.keys(payload[0]).length : 0,
       });
+      const res = await traceFetch(reqId, SVC, targetUrl, {
+        method: "POST", headers, body: JSON.stringify(payload), signal: controller.signal,
+      }, { label: useMiddleware ? "middleware" : "sap-direct" });
       clearTimeout(timer);
       httpStatus = res.status;
       const text = await res.text();
+      trace(reqId, SVC, "upstream.body", { httpStatus, bytes: text.length, preview: safePreview(text) });
       console.log("SAP raw response status:", httpStatus, "body:", text.slice(0, 500));
 
       try {
@@ -546,6 +566,7 @@ serve(async (req) => {
       }
     } catch (e: any) {
       const raw = e?.message || "Network error reaching SAP";
+      trace(reqId, SVC, "upstream.error", { useMiddleware, targetUrl, ...summarizeError(e) });
       if (useMiddleware) {
         networkError = `Could not reach the middleware at ${targetUrl}. Underlying error: ${raw}`;
       } else {
@@ -684,7 +705,8 @@ serve(async (req) => {
       sapResponse: sapResponse || [],
     });
   } catch (error: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(error), elapsedTotalMs: Date.now() - tStart });
     console.error("sync-vendor-to-sap error:", error);
-    return ok({ success: false, message: error.message || "Unexpected error", sapResponse: [] });
+    return ok({ success: false, message: error.message || "Unexpected error", sapResponse: [], reqId });
   }
 });

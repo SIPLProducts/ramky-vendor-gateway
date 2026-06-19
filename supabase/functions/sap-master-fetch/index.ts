@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
+import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_shared/trace.ts";
+
+const SVC = "sap-master-fetch";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
 // Map SAP master JSON keys -> our master_type + (codeField, descField)
@@ -91,6 +94,7 @@ function legacyFindConfig(configs: any[]): any | null {
 async function fetchSapForConfig(
   supabase: any,
   config: any,
+  reqId: string,
 ): Promise<{ sapJson: any | null; error: string | null }> {
   const base = (config.base_url || "").replace(/\/$/, "");
   const path = config.endpoint_path || "";
@@ -140,7 +144,7 @@ async function fetchSapForConfig(
       for (const p of proxyPaths) {
         proxyUrl = `${middlewareBase}${p}`;
         triedUrls.push(proxyUrl);
-        const r = await fetch(proxyUrl, {
+        const r = await traceFetch(reqId, SVC, proxyUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -153,7 +157,7 @@ async function fetchSapForConfig(
             useBasicAuth: true,
           }),
           signal: controller.signal,
-        });
+        }, { label: `proxy[${config.name}]` });
         const body = await r.text();
         // Only fall back on a clear "route not found" signal: 404 or HTML page
         const looksLikeMissingRoute =
@@ -201,12 +205,13 @@ async function fetchSapForConfig(
       }
       return { sapJson: inner, error: null };
     } else {
-      const res = await fetch(sapUrl, {
+      const res = await traceFetch(reqId, SVC, sapUrl, {
         method: httpMethod,
         headers: sapHeaders,
         signal: controller.signal,
-      });
+      }, { label: `direct[${config.name}]` });
       const text = await res.text();
+      trace(reqId, SVC, "direct.body", { configName: config.name, bytes: text.length, preview: safePreview(text) });
       if (!res.ok) {
         return { sapJson: null, error: `${config.name}: SAP HTTP ${res.status}: ${text.slice(0, 200)}` };
       }
@@ -214,6 +219,7 @@ async function fetchSapForConfig(
       catch { return { sapJson: null, error: `${config.name}: invalid JSON from SAP: ${text.slice(0, 200)}` }; }
     }
   } catch (e: any) {
+    trace(reqId, SVC, "fetchSapForConfig.error", { configName: config.name, ...summarizeError(e) });
     return { sapJson: null, error: `${config.name}: could not reach SAP: ${e?.message || e}` };
   } finally {
     clearTimeout(timer);
@@ -223,14 +229,23 @@ async function fetchSapForConfig(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   const auth = await requireAuthenticatedUser(req);
-  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  if (!auth.ok) {
+    trace(reqId, SVC, "auth.failed", {});
+    return authErrorResponse(auth, corsHeaders);
+  }
+  trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
     const body = await req.json().catch(() => ({}));
     const requestedTypes: string[] | undefined = Array.isArray(body?.master_types)
       ? body.master_types
       : (body?.master_type ? [body.master_type] : undefined);
+    trace(reqId, SVC, "body.parsed", { requestedTypes: requestedTypes || null });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -291,7 +306,9 @@ serve(async (req) => {
     const now = new Date().toISOString();
 
     for (const run of runs) {
-      const { sapJson, error } = await fetchSapForConfig(supabase, run.config);
+      trace(reqId, SVC, "run.start", { label: run.label, configId: run.config.id });
+      const { sapJson, error } = await fetchSapForConfig(supabase, run.config, reqId);
+      trace(reqId, SVC, "run.end", { label: run.label, ok: !error, error });
       if (error || !sapJson) {
         errors.push(error || `${run.label}: empty response.`);
         continue;
@@ -350,22 +367,27 @@ serve(async (req) => {
 
     const anyData = Object.values(summary).some((s) => s.upserted > 0);
     if (!anyData && errors.length > 0) {
+      trace(reqId, SVC, "response.sent", { success: false, elapsedTotalMs: Date.now() - tStart, errorCount: errors.length });
       return ok({
         success: false,
         message: errors.join(" | "),
         hint: "Check that 'SAP Fields F4' and 'Classification F4s' configs in SAP API Settings have correct middleware URL, Proxy Secret, and HTTP method.",
+        reqId,
       });
     }
 
+    trace(reqId, SVC, "response.sent", { success: true, elapsedTotalMs: Date.now() - tStart, summaryKeys: Object.keys(summary) });
     return ok({
       success: true,
       summary,
       fetched_at: now,
       sap_response: sapResponse,
       warnings: errors.length > 0 ? errors : undefined,
+      reqId,
     });
   } catch (e: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(e), elapsedTotalMs: Date.now() - tStart });
     console.error("sap-master-fetch error:", e?.message || e);
-    return ok({ success: false, message: e?.message || "Unexpected error" }, 200);
+    return ok({ success: false, message: e?.message || "Unexpected error", reqId }, 200);
   }
 });

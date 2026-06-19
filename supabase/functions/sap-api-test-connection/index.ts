@@ -1,9 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { makeReqId, trace, traceFetch, summarizeError } from "../_shared/trace.ts";
+
+const SVC = "sap-api-test-connection";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
 function normalizeMiddlewareBase(raw: string): string {
@@ -19,9 +22,14 @@ function normalizeMiddlewareBase(raw: string): string {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   try {
     const { configId } = await req.json();
     if (!configId) throw new Error("configId is required");
+    trace(reqId, SVC, "body.parsed", { configId });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -72,6 +80,14 @@ serve(async (req) => {
       }
     }
 
+    trace(reqId, SVC, "config.loaded", {
+      configId,
+      connectionMode: config.connection_mode,
+      isProxy,
+      targetUrl,
+      hasCreds: Boolean(creds),
+    });
+
     const start = Date.now();
     let status = 0;
     let message = "";
@@ -79,7 +95,11 @@ serve(async (req) => {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), Math.min(config.timeout_ms || 30000, 15000));
-      const res = await fetch(targetUrl, { method: "GET", headers, signal: controller.signal });
+      const res = await traceFetch(reqId, SVC, targetUrl, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      }, { label: "probe" });
       clearTimeout(timer);
       status = res.status;
       ok = res.status < 500;
@@ -87,6 +107,7 @@ serve(async (req) => {
         ? (isProxy ? `Middleware reachable (HTTP ${status})` : `Connection reachable (HTTP ${status})`)
         : `${isProxy ? "Middleware" : "SAP"} returned HTTP ${status}`;
     } catch (e: any) {
+      trace(reqId, SVC, "probe.error", summarizeError(e));
       message = isProxy
         ? `Could not reach middleware at ${targetUrl}. Make sure 'node server.js' is running and the URL is publicly reachable. ${e?.message || ""}`
         : (e?.message || "Connection failed");
@@ -103,12 +124,12 @@ serve(async (req) => {
         try {
           const authCtrl = new AbortController();
           const authTimer = setTimeout(() => authCtrl.abort(), 10000);
-          const authRes = await fetch(`${mwBase}/sap/bp/create`, {
+          const authRes = await traceFetch(reqId, SVC, `${mwBase}/sap/bp/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-middleware-key": secret },
             body: JSON.stringify([]),
             signal: authCtrl.signal,
-          });
+          }, { label: "auth-check" });
           clearTimeout(authTimer);
           if (authRes.status === 401) {
             ok = false;
@@ -117,20 +138,28 @@ serve(async (req) => {
             message = `Middleware reachable and proxy secret accepted (HTTP ${authRes.status}).`;
           }
         } catch (e: any) {
+          trace(reqId, SVC, "auth-check.error", summarizeError(e));
           // Don't fail the test on transient auth-check errors
           message = `${message} (auth check skipped: ${e?.message || "network error"})`;
         }
       }
     }
 
+    trace(reqId, SVC, "response.sent", {
+      ok,
+      status,
+      latency_ms,
+      elapsedTotalMs: Date.now() - tStart,
+    });
     return new Response(
-      JSON.stringify({ ok, status, latency_ms, message, target: targetUrl }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      JSON.stringify({ ok, status, latency_ms, message, target: targetUrl, reqId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "x-request-id": reqId }, status: 200 },
     );
   } catch (error: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(error), elapsedTotalMs: Date.now() - tStart });
     return new Response(
-      JSON.stringify({ ok: false, message: error.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      JSON.stringify({ ok: false, message: error.message, reqId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "x-request-id": reqId }, status: 200 },
     );
   }
 });

@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
+import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_shared/trace.ts";
+
+const SVC = "sync-vendor-to-dms";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
 function ok(body: any) {
@@ -113,8 +116,16 @@ async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'SAP Team']);
-  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  if (!auth.ok) {
+    trace(reqId, SVC, "auth.failed", {});
+    return authErrorResponse(auth, corsHeaders);
+  }
+  trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
     const reqBody = await req.json();
@@ -297,9 +308,15 @@ serve(async (req) => {
               const controller = new AbortController();
               const timer = setTimeout(() => controller.abort(), 180000);
               try {
-                const r = await fetch(url, { method: "POST", headers, body: bodyStr, signal: controller.signal });
+                const r = await traceFetch(reqId, SVC, url, {
+                  method: "POST",
+                  headers,
+                  body: bodyStr,
+                  signal: controller.signal,
+                }, { label: `dms-batch-${i + 1}` });
                 clearTimeout(timer);
                 const t = await r.text();
+                trace(reqId, SVC, "dms-batch.body", { batch: i + 1, url, status: r.status, bytes: t.length, preview: safePreview(t) });
                 console.log(`DMS batch ${i + 1}/${batches.length} url=${url} status=${r.status} body=${t.slice(0, 200)}`);
                 if (r.status === 404 && !workingDmsUrl) {
                   triedDetails.push(`${url}->404`);
@@ -311,6 +328,7 @@ serve(async (req) => {
                 break;
               } catch (e: any) {
                 clearTimeout(timer);
+                trace(reqId, SVC, "dms-batch.error", { batch: i + 1, url, ...summarizeError(e) });
                 triedDetails.push(`${url}->${e?.message || "network error"}`);
               }
             }
@@ -399,13 +417,21 @@ serve(async (req) => {
 
 
     const successCount = results.filter(r => r.success).length;
+    trace(reqId, SVC, "response.sent", {
+      success: successCount > 0,
+      successCount,
+      targetCount,
+      elapsedTotalMs: Date.now() - tStart,
+    });
     return ok({
       success: successCount > 0,
       message: `${successCount}/${targetCount} vendor(s) uploaded to DMS`,
       results,
+      reqId,
     });
   } catch (error: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(error), elapsedTotalMs: Date.now() - tStart });
     console.error("sync-vendor-to-dms error:", error);
-    return ok({ success: false, message: error.message || "Unexpected error", results: [] });
+    return ok({ success: false, message: error.message || "Unexpected error", results: [], reqId });
   }
 });
