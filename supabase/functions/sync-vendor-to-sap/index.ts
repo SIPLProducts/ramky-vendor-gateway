@@ -705,7 +705,8 @@ serve(async (req) => {
       sapResponse: sapResponse || [],
     });
   } catch (error: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(error), elapsedTotalMs: Date.now() - tStart });
     console.error("sync-vendor-to-sap error:", error);
-    return ok({ success: false, message: error.message || "Unexpected error", sapResponse: [] });
+    return ok({ success: false, message: error.message || "Unexpected error", sapResponse: [], reqId });
   }
 });
