@@ -23,6 +23,65 @@ function tokens(s: string): string[] {
     .filter((t) => t.length > 1 && !NOISE_TOKENS.has(t));
 }
 
+type LogicalToken = { kind: 'initial' | 'word'; value: string };
+
+/**
+ * Like `tokens()` but keeps single-letter tokens as `initial` entries so that
+ * "B K Nataraja" can be paired against "Basavachari Kolar Nataraja".
+ * Noise tokens (pvt, ltd, ms, ...) are still stripped.
+ */
+function tokensWithInitials(s: string): LogicalToken[] {
+  return normalize(s)
+    .split(' ')
+    .filter((t) => t && !NOISE_TOKENS.has(t))
+    .map((t) => (t.length === 1 ? { kind: 'initial' as const, value: t } : { kind: 'word' as const, value: t }));
+}
+
+/**
+ * Score (0..1) treating single-letter tokens on either side as initials that
+ * pair with the first letter of an unused word on the other side. Word-word
+ * pairs match on equality. Denominator is the larger logical-token count so
+ * "J Smith" vs "John Smith" scores 1.0 and "R Kumar" vs "Rakesh Sharma" 0.5.
+ */
+function initialAwareScore(a: string, b: string): number {
+  const ta = tokensWithInitials(a);
+  const tb = tokensWithInitials(b);
+  if (!ta.length || !tb.length) return 0;
+
+  const usedA = new Array(ta.length).fill(false);
+  const usedB = new Array(tb.length).fill(false);
+  let matched = 0;
+
+  // First pass: word-word equality (strongest signal).
+  for (let i = 0; i < ta.length; i++) {
+    if (ta[i].kind !== 'word') continue;
+    for (let j = 0; j < tb.length; j++) {
+      if (usedB[j] || tb[j].kind !== 'word') continue;
+      if (ta[i].value === tb[j].value) {
+        usedA[i] = true; usedB[j] = true; matched += 1; break;
+      }
+    }
+  }
+
+  // Second pass: initial-word pairing on the leading letter.
+  for (let i = 0; i < ta.length; i++) {
+    if (usedA[i]) continue;
+    const ai = ta[i];
+    for (let j = 0; j < tb.length; j++) {
+      if (usedB[j]) continue;
+      const bj = tb[j];
+      const isPair =
+        (ai.kind === 'initial' && bj.kind === 'word' && bj.value[0] === ai.value) ||
+        (ai.kind === 'word' && bj.kind === 'initial' && ai.value[0] === bj.value);
+      if (isPair) {
+        usedA[i] = true; usedB[j] = true; matched += 1; break;
+      }
+    }
+  }
+
+  return matched / Math.max(ta.length, tb.length);
+}
+
 /**
  * True if the two names share at least one significant token, OR one is
  * a substring of the other after normalisation. Intentionally lenient —
