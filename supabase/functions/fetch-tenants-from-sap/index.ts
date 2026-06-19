@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
 function json(body: any, status = 200) {
@@ -10,6 +10,28 @@ function json(body: any, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Structured one-line JSON logger. Every event carries the same reqId so the
+// full chain (edge -> middleware -> SAP) can be grepped by request id.
+function trace(reqId: string, stage: string, fields: Record<string, unknown> = {}) {
+  try {
+    console.log(JSON.stringify({
+      svc: "fetch-tenants-from-sap",
+      reqId,
+      stage,
+      ts: new Date().toISOString(),
+      ...fields,
+    }));
+  } catch {
+    console.log(`[fetch-tenants-from-sap] reqId=${reqId} stage=${stage} (unserializable fields)`);
+  }
+}
+
+function headerKeys(h: Headers | Record<string, string> | undefined): string[] {
+  if (!h) return [];
+  if (h instanceof Headers) return Array.from(h.keys());
+  return Object.keys(h);
 }
 
 function normalizeMiddlewareBase(raw: string): string {
@@ -25,7 +47,6 @@ function normalizeMiddlewareBase(raw: string): string {
 function extractTenants(sapJson: any): { code: string; name: string; raw: any }[] {
   if (!sapJson) return [];
 
-  // Candidate arrays
   const candidates: any[] = [];
   if (Array.isArray(sapJson)) candidates.push(sapJson);
   for (const k of [
@@ -47,7 +68,6 @@ function extractTenants(sapJson: any): { code: string; name: string; raw: any }[
   const seen = new Set<string>();
   for (const item of arr) {
     if (item == null) continue;
-    // primitive string entry → use as both
     if (typeof item === "string") {
       const c = item.trim();
       if (c && !seen.has(c)) { seen.add(c); out.push({ code: c, name: c, raw: item }); }
@@ -74,9 +94,20 @@ function extractTenants(sapJson: any): { code: string; name: string; raw: any }[
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = req.headers.get("x-request-id") || crypto.randomUUID();
+  const tStart = Date.now();
+
+  trace(reqId, "req.received", {
+    method: req.method,
+    url: req.url,
+    userAgent: req.headers.get("user-agent") || null,
+    incomingHeaderKeys: headerKeys(req.headers),
+  });
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      trace(reqId, "auth.missing", {});
       return json({ error: "Unauthorized" }, 401);
     }
 
@@ -88,10 +119,15 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
+    if (userErr || !userData?.user) {
+      trace(reqId, "auth.failed", { error: userErr?.message || "no user" });
+      return json({ error: "Unauthorized" }, 401);
+    }
+    trace(reqId, "auth.ok", { userId: userData.user.id, email: userData.user.email });
 
     const body = await req.json().catch(() => ({}));
     const email: string = String(body?.email || "").trim();
+    trace(reqId, "body.parsed", { email });
     if (!email || !/.+@.+\..+/.test(email)) {
       return json({ success: false, message: "Valid email is required." }, 400);
     }
@@ -106,18 +142,34 @@ Deno.serve(async (req) => {
 
     if (cfgErr) throw cfgErr;
     if (!config) {
+      trace(reqId, "config.missing", {});
       return json({ success: false, message: "SAP API config 'Tenants From SAP' not found or inactive." });
     }
 
     const base = (config.base_url || "").replace(/\/$/, "");
     const path = config.endpoint_path || "";
     const sapUrl = `${base}${path}`;
+    const httpMethod = (config.http_method || "POST").toUpperCase();
+    const connectionMode = (config.connection_mode || "direct").toLowerCase();
+    const normalizedMiddlewareBase = normalizeMiddlewareBase(config.middleware_url || "");
+
+    trace(reqId, "config.loaded", {
+      configId: config.id,
+      name: config.name,
+      connection_mode: connectionMode,
+      base_url: base,
+      endpoint_path: path,
+      sapUrl,
+      httpMethod,
+      timeout_ms: config.timeout_ms ?? null,
+      middleware_url_normalized: normalizedMiddlewareBase,
+      proxySecretPresent: Boolean((config.proxy_secret || "").trim()),
+      authType: config.auth_type || null,
+    });
+
     if (!sapUrl) {
       return json({ success: false, message: "Tenants From SAP: base_url + endpoint_path missing." });
     }
-
-    const httpMethod = (config.http_method || "POST").toUpperCase();
-    const connectionMode = (config.connection_mode || "direct").toLowerCase();
 
     const { data: creds } = await admin
       .from("sap_api_credentials")
@@ -139,55 +191,67 @@ Deno.serve(async (req) => {
     let networkError: string | null = null;
     const requestBody = { UMAIL: email };
 
-    const startedAt = Date.now();
+    const rawTimeout = Number(config.timeout_ms) || 90000;
+    const abortMs = Math.min(Math.max(rawTimeout, 90000), 110000);
+
+    const controller = new AbortController();
+    let timerFired = false;
+    const timer = setTimeout(() => { timerFired = true; controller.abort("in-code-timeout"); }, abortMs);
+
+    const fetchStarted = Date.now();
     try {
-      const controller = new AbortController();
-      // Cap our in-code abort BELOW the self-hosted edge-runtime supervisor's
-      // wall-clock limit (we set that to 120s on the VM). 110s guarantees we
-      // return a clean JSON error instead of "WorkerRequestCancelled".
-      // Honors per-config timeout_ms, clamped to [90s, 110s].
-      const rawTimeout = Number(config.timeout_ms) || 90000;
-      const abortMs = Math.min(Math.max(rawTimeout, 90000), 110000);
-      console.log(`[fetch-tenants-from-sap] mode=${connectionMode} abortMs=${abortMs} sapUrl=${sapUrl}`);
-      const timer = setTimeout(() => controller.abort(), abortMs);
-
-
       if (connectionMode === "proxy") {
-        const middlewareBase = normalizeMiddlewareBase(config.middleware_url || "");
-        const middlewareKey = (config.proxy_secret || "").trim();
-        if (!middlewareBase) {
+        if (!normalizedMiddlewareBase) {
           clearTimeout(timer);
+          trace(reqId, "proxy.config.missing", { reason: "middleware_url empty" });
           return json({
             success: false,
             message: "SAP middleware URL is not configured for 'Tenants From SAP'.",
             hint: "Open SAP API Settings → Tenants From SAP and set the Node.js Middleware URL and Proxy Secret.",
           });
         }
+        const middlewareKey = (config.proxy_secret || "").trim();
         if (!middlewareKey) {
           clearTimeout(timer);
-          return json({
-            success: false,
-            message: "Proxy Secret is not set for 'Tenants From SAP'.",
-          });
+          trace(reqId, "proxy.config.missing", { reason: "proxy_secret empty" });
+          return json({ success: false, message: "Proxy Secret is not set for 'Tenants From SAP'." });
         }
-        const proxyUrl = `${middlewareBase}/sap/proxy`;
+        const proxyUrl = `${normalizedMiddlewareBase}/sap/proxy`;
+        const outgoingHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+          "x-middleware-key": middlewareKey,
+          "x-request-id": reqId,
+        };
+        const proxyPayload = {
+          url: sapUrl,
+          method: httpMethod,
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: requestBody,
+          useBasicAuth: true,
+        };
+        trace(reqId, "proxy.prepared", {
+          proxyUrl,
+          abortMs,
+          outgoingHeaderKeys: headerKeys(outgoingHeaders),
+          payloadKeys: Object.keys(proxyPayload),
+        });
+        trace(reqId, "proxy.fetch.start", { startedAt: new Date(fetchStarted).toISOString() });
         const res = await fetch(proxyUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-middleware-key": middlewareKey,
-          },
-          body: JSON.stringify({
-            url: sapUrl,
-            method: httpMethod,
-            headers: { Accept: "application/json", "Content-Type": "application/json" },
-            body: requestBody,
-            useBasicAuth: true,
-          }),
+          headers: outgoingHeaders,
+          body: JSON.stringify(proxyPayload),
           signal: controller.signal,
         });
-        clearTimeout(timer);
+        const elapsed = Date.now() - fetchStarted;
         const text = await res.text();
+        trace(reqId, "proxy.fetch.end", {
+          elapsedMs: elapsed,
+          status: res.status,
+          statusText: res.statusText,
+          responseHeaderKeys: headerKeys(res.headers),
+          contentLength: text.length,
+          bodyPreview: text.slice(0, 500),
+        });
         if (!res.ok) {
           networkError = `Middleware HTTP ${res.status}: ${text.slice(0, 300)}`;
         } else {
@@ -215,14 +279,28 @@ Deno.serve(async (req) => {
           }
         }
       } else {
+        trace(reqId, "direct.prepared", {
+          sapUrl,
+          httpMethod,
+          headerKeys: headerKeys(directHeaders),
+        });
+        trace(reqId, "direct.fetch.start", { startedAt: new Date(fetchStarted).toISOString() });
         const res = await fetch(sapUrl, {
           method: httpMethod,
           headers: directHeaders,
           body: httpMethod === "GET" ? undefined : JSON.stringify(requestBody),
           signal: controller.signal,
         });
-        clearTimeout(timer);
+        const elapsed = Date.now() - fetchStarted;
         const text = await res.text();
+        trace(reqId, "direct.fetch.end", {
+          elapsedMs: elapsed,
+          status: res.status,
+          statusText: res.statusText,
+          responseHeaderKeys: headerKeys(res.headers),
+          contentLength: text.length,
+          bodyPreview: text.slice(0, 500),
+        });
         if (!res.ok) {
           networkError = `SAP HTTP ${res.status}: ${text.slice(0, 200)}`;
         } else {
@@ -230,18 +308,33 @@ Deno.serve(async (req) => {
           catch { networkError = `Invalid JSON from SAP: ${text.slice(0, 200)}`; }
         }
       }
+      clearTimeout(timer);
     } catch (e: any) {
-      const elapsed = Date.now() - startedAt;
+      clearTimeout(timer);
+      const elapsed = Date.now() - fetchStarted;
       const aborted = e?.name === "AbortError" || /aborted/i.test(String(e?.message || ""));
-      console.error(`[fetch-tenants-from-sap] fetch failed after ${elapsed}ms aborted=${aborted}: ${e?.message || e}`);
+      trace(reqId, "proxy.fetch.error", {
+        elapsedMs: elapsed,
+        errorName: e?.name || null,
+        errorMessage: e?.message || String(e),
+        errorCode: e?.cause?.code || e?.code || null,
+        causeMessage: e?.cause?.message || null,
+        aborted,
+        timerFired,
+        abortReason: String(controller.signal.reason ?? ""),
+        stack: e?.stack || null,
+      });
       networkError = aborted
         ? `SAP did not respond within ${Math.round(elapsed / 1000)}s (timeout). Increase the timeout in SAP API Settings → Tenants From SAP, and ensure the edge-runtime wall-clock limit on the server is higher.`
         : `Could not reach SAP: ${e?.message || e}`;
     }
-    console.log(`[fetch-tenants-from-sap] total elapsed=${Date.now() - startedAt}ms networkError=${networkError ? "yes" : "no"}`);
-
 
     if (networkError || !sapJson) {
+      trace(reqId, "response.sent", {
+        success: false,
+        elapsedTotalMs: Date.now() - tStart,
+        networkError,
+      });
       return json({
         success: false,
         message: networkError || "Empty response from SAP.",
@@ -249,6 +342,15 @@ Deno.serve(async (req) => {
     }
 
     const tenants = extractTenants(sapJson);
+    trace(reqId, "sap.parsed", {
+      tenantCount: tenants.length,
+      rawKeys: sapJson && typeof sapJson === "object" && !Array.isArray(sapJson) ? Object.keys(sapJson) : [],
+    });
+    trace(reqId, "response.sent", {
+      success: true,
+      elapsedTotalMs: Date.now() - tStart,
+      tenantCount: tenants.length,
+    });
 
     return json({
       success: true,
@@ -256,7 +358,12 @@ Deno.serve(async (req) => {
       raw_sap_response: sapJson,
     });
   } catch (e: any) {
-    console.error("fetch-tenants-from-sap error:", e?.message || e);
+    trace(reqId, "unhandled.error", {
+      errorName: e?.name || null,
+      errorMessage: e?.message || String(e),
+      stack: e?.stack || null,
+      elapsedTotalMs: Date.now() - tStart,
+    });
     return json({ success: false, message: e?.message || "Unexpected error" }, 500);
   }
 });
