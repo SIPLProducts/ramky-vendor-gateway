@@ -94,6 +94,7 @@ function legacyFindConfig(configs: any[]): any | null {
 async function fetchSapForConfig(
   supabase: any,
   config: any,
+  reqId: string,
 ): Promise<{ sapJson: any | null; error: string | null }> {
   const base = (config.base_url || "").replace(/\/$/, "");
   const path = config.endpoint_path || "";
