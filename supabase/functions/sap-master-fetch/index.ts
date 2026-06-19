@@ -306,7 +306,9 @@ serve(async (req) => {
     const now = new Date().toISOString();
 
     for (const run of runs) {
-      const { sapJson, error } = await fetchSapForConfig(supabase, run.config);
+      trace(reqId, SVC, "run.start", { label: run.label, configId: run.config.id });
+      const { sapJson, error } = await fetchSapForConfig(supabase, run.config, reqId);
+      trace(reqId, SVC, "run.end", { label: run.label, ok: !error, error });
       if (error || !sapJson) {
         errors.push(error || `${run.label}: empty response.`);
         continue;
