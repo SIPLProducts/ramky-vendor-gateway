@@ -58,8 +58,22 @@ function ok(body: any, status = 200) {
   });
 }
 
+function rewriteContainerHost(u: string): string {
+  if (!u) return u;
+  try {
+    const url = new URL(u);
+    if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+      url.hostname = "172.17.0.1";
+      console.log(JSON.stringify({ svc: "sap-master-fetch", stage: "middleware.url.rewritten", from: "127.0.0.1/localhost", to: "172.17.0.1", finalUrl: url.toString().replace(/\/+$/, "") }));
+      return url.toString().replace(/\/+$/, "");
+    }
+  } catch { /* ignore */ }
+  return u;
+}
+
 function normalizeMiddlewareBase(raw: string): string {
-  let v = String(raw || "").replace(/\s+/g, "").trim();
+  const override = (Deno.env.get("SAP_MIDDLEWARE_URL_OVERRIDE") || "").trim();
+  let v = String(override || raw || "").replace(/\s+/g, "").trim();
   // Repair common scheme typos: "http;//host", "https;//host", "http:/host"
   v = v.replace(/^(https?);\/\//i, "$1://");
   v = v.replace(/^(https?):\/(?!\/)/i, "$1://");
@@ -74,7 +88,7 @@ function normalizeMiddlewareBase(raw: string): string {
        .replace(/\/sap\/proxy$/i, "")
        .replace(/\/health$/i, "")
        .replace(/\/+$/, "");
-  return v;
+  return rewriteContainerHost(v);
 }
 
 function pickConfig(configs: any[], name: string): any | null {

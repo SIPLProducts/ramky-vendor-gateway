@@ -34,13 +34,31 @@ function headerKeys(h: Headers | Record<string, string> | undefined): string[] {
   return Object.keys(h);
 }
 
-function normalizeMiddlewareBase(raw: string): string {
-  let v = String(raw || "").replace(/\s+/g, "").trim().replace(/\/+$/, "");
+function rewriteContainerHost(u: string, reqId?: string): string {
+  if (!u) return u;
+  try {
+    const url = new URL(u);
+    if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+      const original = url.hostname;
+      url.hostname = "172.17.0.1";
+      const rewritten = url.toString().replace(/\/+$/, "");
+      if (reqId) trace(reqId, "middleware.url.rewritten", { from: original, to: "172.17.0.1", finalUrl: rewritten });
+      return rewritten;
+    }
+  } catch { /* ignore */ }
+  return u;
+}
+
+function normalizeMiddlewareBase(raw: string, reqId?: string): string {
+  const override = (Deno.env.get("SAP_MIDDLEWARE_URL_OVERRIDE") || "").trim();
+  const source = override || String(raw || "");
+  if (override && reqId) trace(reqId, "middleware.url.override", { usingEnvOverride: true });
+  let v = source.replace(/\s+/g, "").trim().replace(/\/+$/, "");
   v = v.replace(/\/sap\/bp\/create$/i, "")
        .replace(/\/sap\/proxy$/i, "")
        .replace(/\/health$/i, "")
        .replace(/\/+$/, "");
-  return v;
+  return rewriteContainerHost(v, reqId);
 }
 
 // Best-effort extraction of a list of tenants from whatever SAP returns.
@@ -151,7 +169,7 @@ Deno.serve(async (req) => {
     const sapUrl = `${base}${path}`;
     const httpMethod = (config.http_method || "POST").toUpperCase();
     const connectionMode = (config.connection_mode || "direct").toLowerCase();
-    const normalizedMiddlewareBase = normalizeMiddlewareBase(config.middleware_url || "");
+    const normalizedMiddlewareBase = normalizeMiddlewareBase(config.middleware_url || "", reqId);
 
     trace(reqId, "config.loaded", {
       configId: config.id,
@@ -191,8 +209,9 @@ Deno.serve(async (req) => {
     let networkError: string | null = null;
     const requestBody = { UMAIL: email };
 
-    const rawTimeout = Number(config.timeout_ms) || 90000;
-    const abortMs = Math.min(Math.max(rawTimeout, 90000), 110000);
+    // Honor configured timeout; clamp under Edge runtime wall-clock so failures surface as JSON error.
+    const rawTimeout = Number(config.timeout_ms) || 30000;
+    const abortMs = Math.min(Math.max(rawTimeout, 5000), 25000);
 
     const controller = new AbortController();
     let timerFired = false;
