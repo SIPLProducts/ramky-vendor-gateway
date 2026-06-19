@@ -417,13 +417,21 @@ serve(async (req) => {
 
 
     const successCount = results.filter(r => r.success).length;
+    trace(reqId, SVC, "response.sent", {
+      success: successCount > 0,
+      successCount,
+      targetCount,
+      elapsedTotalMs: Date.now() - tStart,
+    });
     return ok({
       success: successCount > 0,
       message: `${successCount}/${targetCount} vendor(s) uploaded to DMS`,
       results,
+      reqId,
     });
   } catch (error: any) {
+    trace(reqId, SVC, "unhandled.error", { ...summarizeError(error), elapsedTotalMs: Date.now() - tStart });
     console.error("sync-vendor-to-dms error:", error);
-    return ok({ success: false, message: error.message || "Unexpected error", results: [] });
+    return ok({ success: false, message: error.message || "Unexpected error", results: [], reqId });
   }
 });
