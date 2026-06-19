@@ -23,6 +23,65 @@ function tokens(s: string): string[] {
     .filter((t) => t.length > 1 && !NOISE_TOKENS.has(t));
 }
 
+type LogicalToken = { kind: 'initial' | 'word'; value: string };
+
+/**
+ * Like `tokens()` but keeps single-letter tokens as `initial` entries so that
+ * "B K Nataraja" can be paired against "Basavachari Kolar Nataraja".
+ * Noise tokens (pvt, ltd, ms, ...) are still stripped.
+ */
+function tokensWithInitials(s: string): LogicalToken[] {
+  return normalize(s)
+    .split(' ')
+    .filter((t) => t && !NOISE_TOKENS.has(t))
+    .map((t) => (t.length === 1 ? { kind: 'initial' as const, value: t } : { kind: 'word' as const, value: t }));
+}
+
+/**
+ * Score (0..1) treating single-letter tokens on either side as initials that
+ * pair with the first letter of an unused word on the other side. Word-word
+ * pairs match on equality. Denominator is the larger logical-token count so
+ * "J Smith" vs "John Smith" scores 1.0 and "R Kumar" vs "Rakesh Sharma" 0.5.
+ */
+function initialAwareScore(a: string, b: string): number {
+  const ta = tokensWithInitials(a);
+  const tb = tokensWithInitials(b);
+  if (!ta.length || !tb.length) return 0;
+
+  const usedA = new Array(ta.length).fill(false);
+  const usedB = new Array(tb.length).fill(false);
+  let matched = 0;
+
+  // First pass: word-word equality (strongest signal).
+  for (let i = 0; i < ta.length; i++) {
+    if (ta[i].kind !== 'word') continue;
+    for (let j = 0; j < tb.length; j++) {
+      if (usedB[j] || tb[j].kind !== 'word') continue;
+      if (ta[i].value === tb[j].value) {
+        usedA[i] = true; usedB[j] = true; matched += 1; break;
+      }
+    }
+  }
+
+  // Second pass: initial-word pairing on the leading letter.
+  for (let i = 0; i < ta.length; i++) {
+    if (usedA[i]) continue;
+    const ai = ta[i];
+    for (let j = 0; j < tb.length; j++) {
+      if (usedB[j]) continue;
+      const bj = tb[j];
+      const isPair =
+        (ai.kind === 'initial' && bj.kind === 'word' && bj.value[0] === ai.value) ||
+        (ai.kind === 'word' && bj.kind === 'initial' && ai.value[0] === bj.value);
+      if (isPair) {
+        usedA[i] = true; usedB[j] = true; matched += 1; break;
+      }
+    }
+  }
+
+  return matched / Math.max(ta.length, tb.length);
+}
+
 /**
  * True if the two names share at least one significant token, OR one is
  * a substring of the other after normalisation. Intentionally lenient —
@@ -30,16 +89,7 @@ function tokens(s: string): string[] {
  */
 export function fuzzyNameMatch(a?: string | null, b?: string | null): boolean {
   if (!a || !b) return false;
-  const na = normalize(a);
-  const nb = normalize(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  const ta = tokens(a);
-  const tb = tokens(b);
-  if (!ta.length || !tb.length) return false;
-  const setB = new Set(tb);
-  return ta.some((t) => setB.has(t));
+  return nameMatchPercentage(a, b) >= NAME_MATCH_MIN_PASS;
 }
 
 export function panMatch(a?: string | null, b?: string | null): boolean {
@@ -62,17 +112,20 @@ export function nameMatchPercentage(a?: string | null, b?: string | null): numbe
   if (na === nb) return 100;
   const ta = tokens(a);
   const tb = tokens(b);
-  if (!ta.length || !tb.length) {
-    return na.includes(nb) || nb.includes(na) ? 100 : 0;
+  let score = 0;
+  if (ta.length && tb.length) {
+    const setB = new Set(tb);
+    let common = 0;
+    for (const t of ta) if (setB.has(t)) common += 1;
+    score = Math.round((common / Math.max(ta.length, tb.length)) * 100);
+  } else if (na.includes(nb) || nb.includes(na)) {
+    score = 100;
   }
-  const setB = new Set(tb);
-  let common = 0;
-  for (const t of ta) if (setB.has(t)) common += 1;
-  const denom = Math.max(ta.length, tb.length);
-  let score = Math.round((common / denom) * 100);
   // Substring boost — full containment is a strong signal.
   if (na.includes(nb) || nb.includes(na)) score = Math.max(score, 60);
-  return score;
+  // Initial-aware boost — rescues "B K Nataraja" vs "Basavachari Kolar Nataraja".
+  const initialScore = Math.round(initialAwareScore(a, b) * 100);
+  return Math.max(score, initialScore);
 }
 
 /**
