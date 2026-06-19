@@ -9,14 +9,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
-function normalizeMiddlewareBase(raw: string): string {
-  if (!raw) return "";
-  let v = String(raw).replace(/\s+/g, "").trim().replace(/\/+$/, "");
+function rewriteContainerHost(u: string, reqId?: string): string {
+  if (!u) return u;
+  try {
+    const url = new URL(u);
+    if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+      const from = url.hostname;
+      url.hostname = "172.17.0.1";
+      const finalUrl = url.toString().replace(/\/+$/, "");
+      if (reqId) trace(reqId, SVC, "middleware.url.rewritten", { from, to: "172.17.0.1", finalUrl });
+      return finalUrl;
+    }
+  } catch { /* ignore */ }
+  return u;
+}
+
+function normalizeMiddlewareBase(raw: string, reqId?: string): string {
+  const override = (Deno.env.get("SAP_MIDDLEWARE_URL_OVERRIDE") || "").trim();
+  const source = override || raw;
+  if (!source) return "";
+  if (override && reqId) trace(reqId, SVC, "middleware.url.override", { usingEnvOverride: true });
+  let v = String(source).replace(/\s+/g, "").trim().replace(/\/+$/, "");
   v = v.replace(/\/sap\/bp\/create$/i, "")
        .replace(/\/sap\/proxy$/i, "")
        .replace(/\/health$/i, "")
        .replace(/\/+$/, "");
-  return v;
+  return rewriteContainerHost(v, reqId);
 }
 
 serve(async (req) => {
@@ -51,7 +69,7 @@ serve(async (req) => {
 
     const isProxy = config.connection_mode === "proxy";
     const rawMw = (config.middleware_url || "").toString();
-    const mwBase = normalizeMiddlewareBase(rawMw);
+    const mwBase = normalizeMiddlewareBase(rawMw, reqId);
 
     let targetUrl = "";
     if (isProxy) {

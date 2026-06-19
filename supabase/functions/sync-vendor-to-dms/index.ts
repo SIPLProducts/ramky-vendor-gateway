@@ -61,15 +61,30 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+function rewriteContainerHost(u: string): string {
+  if (!u) return u;
+  try {
+    const url = new URL(u);
+    if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+      url.hostname = "172.17.0.1";
+      console.log(JSON.stringify({ svc: "sync-vendor-to-dms", stage: "middleware.url.rewritten", to: "172.17.0.1", finalUrl: url.toString().replace(/\/+$/, "") }));
+      return url.toString().replace(/\/+$/, "");
+    }
+  } catch { /* ignore */ }
+  return u;
+}
+
 function normalizeMiddlewareBase(raw: string): string {
-  if (!raw) return "";
-  let v = String(raw).replace(/\s+/g, "").trim();
+  const override = (Deno.env.get("SAP_MIDDLEWARE_URL_OVERRIDE") || "").trim();
+  const source = override || raw;
+  if (!source) return "";
+  let v = String(source).replace(/\s+/g, "").trim();
   v = v.replace(/\/+$/, "");
   v = v.replace(/\/sap\/bp\/create$/i, "");
   v = v.replace(/\/sap\/dms\/upload$/i, "");
   v = v.replace(/\/sap\/proxy$/i, "");
   v = v.replace(/\/health$/i, "");
-  return v.replace(/\/+$/, "");
+  return rewriteContainerHost(v.replace(/\/+$/, ""));
 }
 
 function estimateUploadBytes(upload: any): number {

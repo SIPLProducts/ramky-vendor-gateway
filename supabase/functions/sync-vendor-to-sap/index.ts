@@ -294,15 +294,29 @@ serve(async (req) => {
     const envMiddlewareUrl = Deno.env.get("SAP_MIDDLEWARE_URL");
     const envMiddlewareKey = Deno.env.get("SAP_MIDDLEWARE_KEY");
 
+    function rewriteContainerHost(u: string): string {
+      if (!u) return u;
+      try {
+        const url = new URL(u);
+        if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+          url.hostname = "172.17.0.1";
+          console.log(JSON.stringify({ svc: "sync-vendor-to-sap", stage: "middleware.url.rewritten", to: "172.17.0.1", finalUrl: url.toString().replace(/\/+$/, "") }));
+          return url.toString().replace(/\/+$/, "");
+        }
+      } catch { /* ignore */ }
+      return u;
+    }
     function normalizeMiddlewareBase(raw: string): string {
-      if (!raw) return "";
-      let v = String(raw).replace(/\s+/g, "").trim();
+      const override = (Deno.env.get("SAP_MIDDLEWARE_URL_OVERRIDE") || "").trim();
+      const source = override || raw;
+      if (!source) return "";
+      let v = String(source).replace(/\s+/g, "").trim();
       v = v.replace(/\/+$/, "");
       v = v.replace(/\/sap\/bp\/create$/i, "");
       v = v.replace(/\/sap\/proxy$/i, "");
       v = v.replace(/\/health$/i, "");
       v = v.replace(/\/+$/, "");
-      return v;
+      return rewriteContainerHost(v);
     }
 
     const rawMiddlewareUrl = config?.middleware_url || envMiddlewareUrl || "";
