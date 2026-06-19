@@ -235,12 +235,21 @@ function fail(message: string, extra: Record<string, any> = {}) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const reqId = makeReqId(req);
+  const tStart = Date.now();
+  trace(reqId, SVC, "req.received", { method: req.method, url: req.url });
+
   const auth = await requireAuthenticatedUser(req, ['admin', 'sharvi_admin', 'customer_admin', 'finance', 'SAP Team']);
-  if (!auth.ok) return authErrorResponse(auth, corsHeaders);
+  if (!auth.ok) {
+    trace(reqId, SVC, "auth.failed", {});
+    return authErrorResponse(auth, corsHeaders);
+  }
+  trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
     const { vendorId, overrides, sapPayload: clientPayload } = await req.json();
     if (!vendorId) throw new Error("vendorId is required");
+    trace(reqId, SVC, "body.parsed", { vendorId, hasOverrides: Boolean(overrides), hasClientPayload: Array.isArray(clientPayload) });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
