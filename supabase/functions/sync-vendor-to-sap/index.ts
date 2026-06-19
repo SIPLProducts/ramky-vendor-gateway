@@ -523,12 +523,20 @@ serve(async (req) => {
         }
       }
 
-      const res = await fetch(targetUrl, {
-        method: "POST", headers, body: JSON.stringify(payload), signal: controller.signal,
+      trace(reqId, SVC, "upstream.prepared", {
+        targetUrl,
+        useMiddleware,
+        timeoutMs,
+        payloadBytes: JSON.stringify(payload).length,
+        topLevelKeys: Array.isArray(payload) && payload[0] ? Object.keys(payload[0]).length : 0,
       });
+      const res = await traceFetch(reqId, SVC, targetUrl, {
+        method: "POST", headers, body: JSON.stringify(payload), signal: controller.signal,
+      }, { label: useMiddleware ? "middleware" : "sap-direct" });
       clearTimeout(timer);
       httpStatus = res.status;
       const text = await res.text();
+      trace(reqId, SVC, "upstream.body", { httpStatus, bytes: text.length, preview: safePreview(text) });
       console.log("SAP raw response status:", httpStatus, "body:", text.slice(0, 500));
 
       try {
