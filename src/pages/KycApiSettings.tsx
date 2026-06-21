@@ -42,7 +42,7 @@ const TEMPLATES: Array<{
     } },
   { provider_name: "PAN_OCR", display_name: "PAN OCR", category: "OCR",
     base_url: "https://kyc-api.surepass.app", endpoint_path: "/api/v1/ocr/pan",
-    request_mode: "multipart", file_field_name: "file", request_body_template: {},
+    request_mode: "multipart", file_field_name: "file", request_body_template: { strict_check_name: "true" },
     response_data_mapping: {
       pan_number: "data.ocr_fields.0.pan_number.value",
       full_name: "data.ocr_fields.0.full_name.value",
