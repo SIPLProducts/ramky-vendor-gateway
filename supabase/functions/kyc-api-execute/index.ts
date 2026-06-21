@@ -142,6 +142,24 @@ serve(async (req) => {
       const uploadName = pickFilename(fileName, fileMimeType);
       console.log(`[kyc-api-execute] multipart upload field=${provider.file_field_name || "file"} name=${uploadName} mime=${fileMimeType}`);
       fd.append(provider.file_field_name || "file", blob, uploadName);
+      // Append any extra request_body_template fields as form fields (e.g. PAN OCR
+      // `strict_check_name`). Placeholders like `{{id_number}}` are substituted
+      // from `input` using the same logic as JSON mode. Empty/null values are
+      // skipped; objects/arrays are JSON-stringified.
+      const extraTpl = provider.request_body_template;
+      const extraFieldNames: string[] = [];
+      if (extraTpl && typeof extraTpl === "object" && !Array.isArray(extraTpl)) {
+        const filledExtras = substitute(extraTpl, input ?? {}) as Record<string, any>;
+        for (const [k, v] of Object.entries(filledExtras)) {
+          if (v === undefined || v === null || v === "") continue;
+          const strVal = (typeof v === "object") ? JSON.stringify(v) : String(v);
+          fd.append(k, strVal);
+          extraFieldNames.push(k);
+        }
+      }
+      if (extraFieldNames.length > 0) {
+        console.log(`[kyc-api-execute] multipart extraFields=${extraFieldNames.join(",")}`);
+      }
       body = fd;
       // CRITICAL: never force Content-Type for multipart — fetch must set the
       // multipart/form-data boundary itself, otherwise Surepass returns HTTP 400.
