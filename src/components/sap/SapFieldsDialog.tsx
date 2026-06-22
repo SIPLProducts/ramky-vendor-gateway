@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
