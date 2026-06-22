@@ -18,6 +18,7 @@ import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
+import { mapStateToSapLocationCode, getLocationLabel } from '@/lib/stateToSapLocation';
 import {
   OrganizationDetails,
   StatutoryDetails,
