@@ -466,15 +466,27 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           <Controller
             name="vendorLocation"
             control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Vendor Location"
-                masterType="vendor_location"
-                value={field.value || []}
-                onChange={field.onChange}
-                selectPlaceholder="Select locations"
-              />
-            )}
+            render={({ field }) => {
+              const code = (field.value || [])[0] || '';
+              const display = code
+                ? getLocationLabel(code, sapVendorLoc)
+                : '';
+              return (
+                <div className="grid gap-1.5">
+                  <Label>Vendor Location</Label>
+                  <Input
+                    value={display}
+                    readOnly
+                    disabled
+                    placeholder={watchedState ? '—' : 'Select State first'}
+                    className="bg-muted/40 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Auto-filled from State.
+                  </p>
+                </div>
+              );
+            }}
           />
           <Controller
             name="identificationSource"
