@@ -2236,7 +2236,7 @@ export function DocumentVerificationStep({
 
                 {isMsmeRegistered === true && (
                   <div className="space-y-4">
-                    <TabsContent value="manual" className="space-y-3">
+                    
                       <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground">
                           Udyam Number *
