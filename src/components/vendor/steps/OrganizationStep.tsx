@@ -166,6 +166,24 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedState]);
 
+  // Auto-populate State from GST certificate (jurisdiction state or principal place).
+  // Only fills when the vendor has not yet picked a state — never overrides a manual choice.
+  const gstStateHint = statutoryData?.gstJurisdictionState || statutoryData?.gstPrincipalPlaceOfBusiness || '';
+  useEffect(() => {
+    if (watchedState) return;
+    if (!gstStateHint) return;
+    const hint = gstStateHint.toLowerCase();
+    const match = INDIAN_STATES.find(
+      (s) => s.toLowerCase() === hint || hint.includes(s.toLowerCase())
+    );
+    if (match) {
+      setValue('state', match, { shouldValidate: true, shouldDirty: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gstStateHint]);
+
+
+
 
   // Live-push current form values up to parent so autosave persists Step-1 fields
   // (including the four classification multi-selects) without waiting for "Next".
