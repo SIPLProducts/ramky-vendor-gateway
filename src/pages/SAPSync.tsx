@@ -275,7 +275,7 @@ export default function SAPSync() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Ready for SAP Sync</p>
+                <p className="text-sm text-muted-foreground">Pending for SAP Sync</p>
                 <p className="text-3xl font-bold text-blue-600">{filteredSap.length}</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center">

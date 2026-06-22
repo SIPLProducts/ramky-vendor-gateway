@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,6 +65,7 @@ function getFileIcon(mimeType: string | null) {
 }
 
 export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
+  const { toast } = useToast();
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -95,12 +97,24 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
     try {
       const { data, error } = await supabase.storage
         .from('vendor-documents')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
-
+        .createSignedUrl(filePath, 3600);
       if (error) throw error;
-      return data.signedUrl;
+      return data?.signedUrl ?? null;
     } catch (error) {
       console.error('Error getting signed URL:', error);
+      return null;
+    }
+  };
+
+  const downloadBlob = async (filePath: string): Promise<Blob | null> => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('vendor-documents')
+        .download(filePath);
+      if (error) throw error;
+      return data ?? null;
+    } catch (error) {
+      console.error('Error downloading file:', error);
       return null;
     }
   };
@@ -110,14 +124,49 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
     if (url) {
       setPreviewUrl(url);
       setPreviewDoc(doc);
+      return;
     }
+    const blob = await downloadBlob(doc.file_path);
+    if (blob) {
+      setPreviewUrl(URL.createObjectURL(blob));
+      setPreviewDoc(doc);
+      return;
+    }
+    toast({
+      title: 'Preview unavailable',
+      description: 'Document file is missing in storage.',
+      variant: 'destructive',
+    });
+  };
+
+  const triggerBrowserDownload = (href: string, fileName: string) => {
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = fileName;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleDownload = async (doc: VendorDocument) => {
     const url = await getSignedUrl(doc.file_path);
     if (url) {
-      window.open(url, '_blank');
+      triggerBrowserDownload(url, doc.file_name);
+      return;
     }
+    const blob = await downloadBlob(doc.file_path);
+    if (blob) {
+      const objectUrl = URL.createObjectURL(blob);
+      triggerBrowserDownload(objectUrl, doc.file_name);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+      return;
+    }
+    toast({
+      title: 'Download failed',
+      description: 'Document file is missing in storage.',
+      variant: 'destructive',
+    });
   };
 
   if (isLoading) {
@@ -198,15 +247,13 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {doc.mime_type?.startsWith('image/') || doc.mime_type === 'application/pdf' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handlePreview(doc)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePreview(doc)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
