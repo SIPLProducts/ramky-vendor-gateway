@@ -230,13 +230,17 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={(v) => setClassify('CATV', v)}
                 placeholder="Select vendor categories"
               />
-              <SapF4MultiSelectField
-                label="Vendor Location"
-                masterType="vendor_location"
-                value={form.classify.LOCV || []}
-                onChange={(v) => setClassify('LOCV', v)}
-                placeholder="Select locations"
-              />
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Vendor Location</Label>
+                <Input
+                  value={getLocationLabel((form.classify.LOCV || [])[0], vendorLocRows)}
+                  readOnly
+                  disabled
+                  placeholder="Auto-filled from State"
+                  className="bg-muted/40 cursor-not-allowed"
+                />
+                <p className="text-[11px] text-muted-foreground">Auto-filled from registration State (read-only).</p>
+              </div>
               <SapF4MultiSelectField
                 label="Vendor Identification Source"
                 masterType="identification_source"
