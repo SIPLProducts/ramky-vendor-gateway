@@ -150,24 +150,21 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     }
   }, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
 
-  // Auto-populate Vendor Location (Classification) from the selected State.
-  // Vendor Location is read-only and always derives from State.
+  // Auto-populate Vendor Location (Classification) directly from the selected State.
+  // Vendor Location mirrors the State value and is read-only.
   const watchedState = watch('state');
   const watchedVendorLocation = watch('vendorLocation');
   useEffect(() => {
+    const current = (watchedVendorLocation || [])[0] || '';
     if (!watchedState) {
-      if ((watchedVendorLocation || []).length > 0) {
-        setValue('vendorLocation', [], { shouldDirty: true });
-      }
+      if (current) setValue('vendorLocation', [], { shouldDirty: true });
       return;
     }
-    const mapped = mapStateToSapLocationCode(watchedState, sapVendorLoc);
-    const current = (watchedVendorLocation || [])[0];
-    if (mapped && mapped !== current) {
-      setValue('vendorLocation', [mapped], { shouldDirty: true });
+    if (watchedState !== current) {
+      setValue('vendorLocation', [watchedState], { shouldDirty: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedState, sapVendorLoc]);
+  }, [watchedState]);
 
 
   // Live-push current form values up to parent so autosave persists Step-1 fields
