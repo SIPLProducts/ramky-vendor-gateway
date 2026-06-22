@@ -168,6 +168,37 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
     }
   };
 
+  // On mount (or when the incoming `data` identity changes), if any address
+  // Line 1 arrives pre-populated with > 40 chars and the downstream lines are
+  // empty, cascade the overflow into Lines 2-4 so validation passes and the
+  // user sees the same layout that live typing produces.
+  useEffect(() => {
+    const cascade = (
+      key: 'registered' | 'manufacturing' | 'branch',
+    ) => {
+      const baseField = key === 'registered'
+        ? 'registeredAddress'
+        : key === 'manufacturing'
+          ? 'manufacturingAddress'
+          : 'branchAddress';
+      const l2Field = `${baseField}Line2` as keyof AddressDetails;
+      const l3Field = `${baseField}Line3` as keyof AddressDetails;
+      const l4Field = `${baseField}Line4` as keyof AddressDetails;
+      const raw = (data as any)?.[baseField] as string | undefined;
+      if (!raw || raw.length <= 40) return;
+      if ((data as any)?.[l2Field] || (data as any)?.[l3Field] || (data as any)?.[l4Field]) return;
+      const [l1, l2, l3, l4] = splitAddressIntoLines(raw);
+      setValue(baseField as any, l1, { shouldValidate: true, shouldDirty: true });
+      setValue(l2Field as any, l2 as any, { shouldValidate: true, shouldDirty: true });
+      setValue(l3Field as any, l3 as any, { shouldValidate: true, shouldDirty: true });
+      setValue(l4Field as any, l4 as any, { shouldValidate: true, shouldDirty: true });
+    };
+    cascade('registered');
+    cascade('manufacturing');
+    cascade('branch');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   useEffect(() => {
     if (sameAsRegistered) {
       setValue('manufacturingAddress', registeredAddress);
@@ -180,6 +211,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
       setValue('manufacturingEmail', registeredEmail);
     }
   }, [sameAsRegistered, registeredAddress, registeredAddressLine2, registeredAddressLine3, registeredAddressLine4, registeredCity, registeredState, registeredPincode, registeredEmail, setValue]);
+
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">

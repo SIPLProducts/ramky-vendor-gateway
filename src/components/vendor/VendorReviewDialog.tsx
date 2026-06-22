@@ -527,8 +527,11 @@ export function VendorReviewDialog({
                         <Field label="City" value={vendor.registered_city} />
                         <Field label="State" value={vendor.registered_state} />
                         <Field label="PIN Code" value={vendor.registered_pincode} />
-                        <Field label="Phone" value={(vendor as any).registered_phone || vendor.primary_phone} />
-                        <Field label="Email" value={(vendor as any).registered_email || vendor.primary_email} />
+                        <Field label="Contact 1" value={(vendor as any).registered_contact_1 || vendor.primary_phone} />
+                        <Field label="Contact 2" value={(vendor as any).registered_contact_2} />
+                        <Field label="Email 1" value={(vendor as any).registered_email || vendor.primary_email} />
+                        <Field label="Email 2" value={(vendor as any).registered_email_2} />
+
                       </div>
                     </div>
 

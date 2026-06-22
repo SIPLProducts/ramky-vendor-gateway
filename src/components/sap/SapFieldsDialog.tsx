@@ -165,8 +165,11 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
               <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
               <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
-              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone || (vendor as any)?.primary_phone} />
-              <ReadOnlyField label="Email" value={(vendor as any)?.registered_email || (vendor as any)?.primary_email} />
+              <ReadOnlyField label="Contact 1" value={(vendor as any)?.registered_contact_1 || (vendor as any)?.primary_phone} />
+              <ReadOnlyField label="Contact 2" value={(vendor as any)?.registered_contact_2} />
+              <ReadOnlyField label="Email 1" value={(vendor as any)?.registered_email || (vendor as any)?.primary_email} />
+              <ReadOnlyField label="Email 2" value={(vendor as any)?.registered_email_2} />
+
             </Section>
 
             <Separator />

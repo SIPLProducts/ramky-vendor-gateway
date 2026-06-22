@@ -144,8 +144,11 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
               <DataRow label="City" value={data.address?.registeredCity} />
               <DataRow label="State" value={data.address?.registeredState} />
               <DataRow label="PIN Code" value={data.address?.registeredPincode} />
-              <DataRow label="Phone" value={data.address?.registeredPhone || data.contact?.ceoPhone} />
-              <DataRow label="Email" value={data.address?.registeredEmail || data.contact?.ceoEmail} />
+              <DataRow label="Contact 1" value={data.address?.registeredContact1 || data.contact?.ceoPhone} />
+              <DataRow label="Contact 2" value={data.address?.registeredContact2} />
+              <DataRow label="Email 1" value={data.address?.registeredEmail || data.contact?.ceoEmail} />
+              <DataRow label="Email 2" value={data.address?.registeredEmail2} />
+
             </div>
           </div>
           <div className="rounded-lg border border-border/60 p-4 bg-muted/20">
