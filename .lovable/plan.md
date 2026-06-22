@@ -1,43 +1,47 @@
-## Goal
-Auto-populate **Vendor Location** (Classification card in Organization Profile) from the selected **State**, render it read-only, and also display it read-only in the SAP Sync popup.
+## 1. Vendor Location auto-fills from State (input field)
 
-## Why a mapper is needed
-- `state` uses friendly names from `INDIAN_STATES` (e.g. `Odisha`, `Uttarakhand`, `Chhattisgarh`, `Puducherry`, `Jammu and Kashmir`).
-- SAP `vendor_location` master codes are uppercase with SAP-style spellings (e.g. `ORISSA`, `UTTARAKAND`, `CHHAATTISGARH`, `PONDICHERRY`, `JAMMU UND KASHMIR`, `DADRA UND NAGAR HAV.`, `MEGALAYA`, `ANDAMAN UND NICO.IN.`).
-- Need a small mapping helper so the auto-populated code actually matches an existing SAP code.
+`src/components/vendor/steps/OrganizationStep.tsx`
 
-## Changes (frontend only)
+- Replace the disabled/grey display with a normal-looking `<Input readOnly>` that mirrors the selected State value (e.g. `Telangana`) — not the SAP mapped code.
+- Update the auto-populate `useEffect` (lines 157–170) to set `vendorLocation` to `[watchedState]` directly when state changes, and clear it when state is cleared. Remove the `mapStateToSapLocationCode` / `getLocationLabel` usage for the visible field.
+- Helper text: "Auto-filled from State". No "Select State first" greyed-out state — show the State as-is.
+- `SapFieldsDialog.tsx` already shows Vendor Location as read-only; it will continue to render whatever value is stored (now the State name), no further change needed.
 
-### 1. New `src/lib/stateToSapLocation.ts`
-Pure helper exporting:
-- `STATE_TO_SAP_LOCATION_OVERRIDES`: explicit map for the spelling mismatches above.
-- `mapStateToSapLocationCode(state, sapRows)`: returns the matching SAP code by, in order:
-  1. exact override match,
-  2. case-insensitive match against `sapRows[].code`,
-  3. uppercase of the state name as fallback.
-- `getLocationLabel(code, sapRows)`: returns `"CODE — Description"` or just the code.
+## 2. Address Line 1 overflow into Lines 2–4 (Registered / Corporate Office only)
 
-### 2. `src/components/vendor/steps/OrganizationStep.tsx`
-- Watch `state` with react-hook-form. On change (and once on mount when `data.state` is present), call `mapStateToSapLocationCode(state, sapVendorLoc)` and `setValue('vendorLocation', [mappedCode], { shouldDirty: true })`. If `state` is cleared, set `vendorLocation` to `[]`.
-- Replace the `Controller` rendering the `ClassificationField` for Vendor Location with a read-only display:
-  - Same `Label` ("Vendor Location") with helper text "Auto-filled from State".
-  - A disabled/readonly `Input` showing `getLocationLabel(value[0], sapVendorLoc)` or "Select State first".
-  - Keep the Controller so the value is part of the form payload (just render disabled UI inside it).
-- No change to the other three classification fields.
+`src/components/vendor/steps/AddressStep.tsx`
 
-### 3. `src/components/sap/SapFieldsDialog.tsx`
-- Replace the `SapF4MultiSelectField` for Vendor Location (lines 231–237) with a read-only display:
-  - Label "Vendor Location" with `text-xs text-muted-foreground` (matching surrounding fields).
-  - Readonly `Input` showing `getLocationLabel(form.classify.LOCV[0], sapVendorLoc)` (load `sapVendorLoc` via `useEnsureSapMaster('vendor_location')`).
-  - Keep `form.classify.LOCV` untouched so the value continues to flow into the SAP payload via the existing `LOCV` handling (`SAPSync.tsx` `persistClassification` + `sapPayloadBuilder.ts` already read `vendor_locations`).
-- No change to the other classification fields in the popup.
+- Replace the plain `register('registeredAddress')` on Address Line 1 with a controlled `onChange` that:
+  - Accepts the full pasted/typed string (no `maxLength={40}` cap on Line 1 typing — we still slice to 40).
+  - Splits the input into chunks of 40 characters, preferring to break on the last space within the 40-char window so words aren't cut mid-word; falls back to a hard 40-char cut if no space.
+  - Writes chunk 1 to `registeredAddress`, chunk 2 to `registeredAddressLine2`, chunk 3 to `registeredAddressLine3`, chunk 4 to `registeredAddressLine4`. Any text beyond 160 chars is dropped (Line 4 capped at 40).
+  - Uses `setValue(..., { shouldValidate: true, shouldDirty: true })` so the existing 40-char zod rules and downstream `sameAsRegistered` mirror logic keep working.
+- Lines 2–4 inputs remain editable; if the user types in them directly we leave their value alone (only Line 1 typing triggers the auto-flow). Manufacturing/Branch address blocks are not changed.
 
-### 4. No backend / schema / edge function changes
-- `vendor_locations` is already persisted from `formData.organization.vendorLocation` (`useVendorRegistration.tsx` line 314).
-- SAP payload already uses `vendor_locations` (`sapPayloadBuilder.ts` line 212–213).
+## 3. MSME — show Upload Udyam Certificate beside Udyam Number, mandatory
 
-## Verification
-1. On Organization Profile, change **State** → Classification card shows Vendor Location auto-filled (read-only) with the mapped SAP code/description.
-2. Try states with known spelling differences (Odisha, Uttarakhand, Chhattisgarh, Puducherry, Jammu and Kashmir) and confirm they resolve to the SAP codes (`ORISSA`, `UTTARAKAND`, `CHHAATTISGARH`, `PONDICHERRY`, `JAMMU UND KASHMIR`).
-3. Open SAP Sync popup for a vendor → Classification section shows Vendor Location read-only with the same value; other classification fields remain editable.
-4. Existing vendors with already-saved `vendor_locations` continue to display correctly (no overwrite unless the user changes State).
+`src/components/vendor/kyc/MsmeKycTab.tsx`
+
+- Remove the Manual / Upload `Tabs` split. When "Are you MSME / Udyam Registered?" = Yes, render a single two-column grid:
+  - Left: existing `ManualEntryAndVerify` for Udyam Number (unchanged behaviour: Verify via API).
+  - Right: new "Upload Udyam Certificate *" file input using the same `FileUpload` component used by GST/PAN/Bank tabs, wired to `props.msmeCertificateFile` / `props.onMsmeCertificateFileChange`. Accept PDF/JPG/PNG, same size limit as the other KYC docs.
+- Keep the existing OCR cross-check (Enterprise Name match) — trigger it automatically after a file is uploaded, reusing the current `runMsmeOcr` + `handleOcrVerify` flow that the Upload tab uses today.
+- Mandatory enforcement:
+  - Show red "*" on the upload label.
+  - In `ComplianceStep.tsx`, block "Next" when `isMsmeRegistered === true` AND `msmeCertificateFile` is null/empty (mirror the same gating used for GST certificate). Surface an inline error: "Udyam Certificate is required."
+- Storage: no change needed — `useVendorRegistration.tsx` already uploads `msmeCertificateFile` with `type: 'msme_certificate'` to the same `vendor-documents` bucket / `vendor_documents` table used by GST, PAN, and Bank docs.
+
+## 4. Verification
+
+- Type a 120-char string into Address Line 1 → expect Lines 1–3 to fill at word boundaries, each ≤40 chars.
+- Pick a State in Organization step → Vendor Location input shows that state, read-only; SAP Sync popup shows the same value.
+- Select MSME = Yes → both fields visible; trying to proceed without a file blocks with the new error; uploading runs OCR; on submit the file lands in `vendor_documents` with `document_type = 'msme_certificate'`.
+
+## Files touched
+
+- `src/components/vendor/steps/OrganizationStep.tsx` — Vendor Location input + simplified effect
+- `src/components/vendor/steps/AddressStep.tsx` — Address Line 1 overflow handler
+- `src/components/vendor/kyc/MsmeKycTab.tsx` — single-view layout with mandatory upload
+- `src/components/vendor/steps/ComplianceStep.tsx` — gate "Next" on MSME cert when MSME = Yes
+
+No DB, edge function, or storage bucket changes.

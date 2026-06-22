@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, Download, Pencil, Upload, XCircle } from 'lucide-react';
-import { FileUpload } from '@/components/vendor/FileUpload';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { ManualEntryAndVerify } from './ManualEntryAndVerify';
 import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { ApiResponseDetails } from './ApiResponseDetails';
@@ -54,7 +49,7 @@ interface MsmeKycTabProps {
 export function MsmeKycTab(props: MsmeKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const { state, verify } = useProviderVerify();
-  const [mode, setMode] = useState<'manual' | 'upload'>('manual');
+  
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
   const [enterpriseName, setEnterpriseName] = useState<string>('');
   const [enterpriseCheck, setEnterpriseCheck] =
@@ -219,13 +214,8 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       </div>
 
       {props.isMsmeRegistered && (
-        <Tabs value={mode} onValueChange={(v) => setMode(v as 'manual' | 'upload')} className="space-y-4">
-          <TabsList className="grid grid-cols-2 max-w-sm">
-            <TabsTrigger value="manual"><Pencil className="h-3.5 w-3.5 mr-2" />Enter manually</TabsTrigger>
-            <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-2" />Upload certificate</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="manual" className="space-y-3">
+        <div className="grid md:grid-cols-2 gap-5 items-start">
+          <div className="space-y-3">
             <ManualEntryAndVerify
               id="msmeNumber"
               label="MSME / Udyam Number *"
@@ -240,12 +230,12 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
             {manualApiResult && (
               <ApiResponseDetails result={manualApiResult} title="MSME verification response" />
             )}
-          </TabsContent>
+          </div>
 
-          <TabsContent value="upload" className="space-y-3">
+          <div className="space-y-3">
             <OcrUploadAndVerify
               documentType="msme"
-              fileLabel="MSME / Udyam Certificate *"
+              fileLabel="Upload Udyam Certificate *"
               currentFile={props.msmeCertificateFile}
               onFileChange={props.onMsmeCertificateFileChange}
               runOcr={runMsmeOcr}
@@ -254,8 +244,13 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
               onVerified={() => {}}
               vendorId={props.vendorId}
             />
-          </TabsContent>
-        </Tabs>
+            {!props.msmeCertificateFile && (
+              <p className="text-xs text-destructive">
+                Udyam Certificate is required.
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
 

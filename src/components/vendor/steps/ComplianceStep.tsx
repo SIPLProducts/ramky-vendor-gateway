@@ -157,7 +157,10 @@ export function ComplianceStep({
   const isStepValid =
     (statuses.gst === 'passed' || statuses.gst === 'na' || (!isGstRegistered && !!gstSelfDeclarationFile)) &&
     statuses.pan === 'passed' &&
-    (statuses.msme === 'passed' || statuses.msme === 'na' || (!isMsmeRegistered && !!msmeSelfDeclarationFile)) &&
+    (
+      (!isMsmeRegistered && !!msmeSelfDeclarationFile) ||
+      (isMsmeRegistered && statuses.msme === 'passed' && !!msmeCertificateFile)
+    ) &&
     statuses.bank === 'passed';
 
   useEffect(() => {

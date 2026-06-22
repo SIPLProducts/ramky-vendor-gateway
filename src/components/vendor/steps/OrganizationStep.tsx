@@ -18,7 +18,7 @@ import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
-import { mapStateToSapLocationCode, getLocationLabel } from '@/lib/stateToSapLocation';
+
 import {
   OrganizationDetails,
   StatutoryDetails,
@@ -150,24 +150,21 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     }
   }, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
 
-  // Auto-populate Vendor Location (Classification) from the selected State.
-  // Vendor Location is read-only and always derives from State.
+  // Auto-populate Vendor Location (Classification) directly from the selected State.
+  // Vendor Location mirrors the State value and is read-only.
   const watchedState = watch('state');
   const watchedVendorLocation = watch('vendorLocation');
   useEffect(() => {
+    const current = (watchedVendorLocation || [])[0] || '';
     if (!watchedState) {
-      if ((watchedVendorLocation || []).length > 0) {
-        setValue('vendorLocation', [], { shouldDirty: true });
-      }
+      if (current) setValue('vendorLocation', [], { shouldDirty: true });
       return;
     }
-    const mapped = mapStateToSapLocationCode(watchedState, sapVendorLoc);
-    const current = (watchedVendorLocation || [])[0];
-    if (mapped && mapped !== current) {
-      setValue('vendorLocation', [mapped], { shouldDirty: true });
+    if (watchedState !== current) {
+      setValue('vendorLocation', [watchedState], { shouldDirty: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedState, sapVendorLoc]);
+  }, [watchedState]);
 
 
   // Live-push current form values up to parent so autosave persists Step-1 fields
@@ -467,19 +464,15 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
             name="vendorLocation"
             control={control}
             render={({ field }) => {
-              const code = (field.value || [])[0] || '';
-              const display = code
-                ? getLocationLabel(code, sapVendorLoc)
-                : '';
+              const value = (field.value || [])[0] || '';
               return (
                 <div className="grid gap-1.5">
-                  <Label>Vendor Location</Label>
+                  <Label htmlFor="vendorLocation">Vendor Location</Label>
                   <Input
-                    value={display}
+                    id="vendorLocation"
+                    value={value}
                     readOnly
-                    disabled
-                    placeholder={watchedState ? '—' : 'Select State first'}
-                    className="bg-muted/40 cursor-not-allowed"
+                    placeholder={watchedState ? '' : 'Auto-filled from State'}
                   />
                   <p className="text-xs text-muted-foreground">
                     Auto-filled from State.
