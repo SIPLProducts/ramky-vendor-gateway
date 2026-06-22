@@ -232,7 +232,15 @@ export function VendorReviewDialog({
           .from('vendor_documents')
           .select('*')
           .eq('vendor_id', vendorId)
-          .in('document_type', ['gst_certificate', 'gst_self_declaration']),
+          .in('document_type', [
+            'gst_certificate', 'gst_self_declaration',
+            'pan_card',
+            'msme_certificate', 'msme_self_declaration',
+            'cancelled_cheque', 'cancelled_cheque_2',
+            'registration_copy', 'swift_iban_details',
+            'iec_certificate', 'financial_docs', 'dealership_certificate',
+          ]),
+
       ]);
       if (cancelled) return;
       if (vErr) {
