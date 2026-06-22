@@ -825,3 +825,12 @@ export function VendorReviewDialog({
     </Dialog>
   );
 }
+
+function Field({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="font-medium break-words">{value || "-"}</p>
+    </div>
+  );
+}
