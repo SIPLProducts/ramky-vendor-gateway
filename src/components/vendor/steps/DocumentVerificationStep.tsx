@@ -2423,7 +2423,7 @@ export function DocumentVerificationStep({
 
                     <div className="pt-2">
                       <FileUpload
-                        label="Upload Udyam Certificate (optional)"
+                        label="Upload Udyam Certificate *"
                         documentType="msme_certificate"
                         vendorId={vendorId}
                         currentFile={msmeDoc.file ?? null}
@@ -2431,6 +2431,11 @@ export function DocumentVerificationStep({
                           setMsmeDoc((prev) => ({ ...prev, file: file ?? undefined }))
                         }
                       />
+                      {msmeDoc.status === "verified" && !msmeDoc.file && (
+                        <p className="mt-1 text-xs text-destructive">
+                          Udyam certificate upload is required to proceed.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
