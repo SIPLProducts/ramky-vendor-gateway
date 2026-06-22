@@ -133,13 +133,42 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
 
       <div className="form-section">
         <SectionHeader icon={MapPin} title="Address Information" step={3} onEdit={onEditStep} />
-        <div className="space-y-1">
-          <DataRow label="Registered Address" value={data.address?.registeredAddress} />
-          <DataRow label="City" value={data.address?.registeredCity} />
-          <DataRow label="State" value={data.address?.registeredState} />
-          <DataRow label="PIN Code" value={data.address?.registeredPincode} />
+        <div className="space-y-5">
+          <div className="rounded-lg border border-border/60 p-4 bg-muted/20">
+            <h4 className="text-sm font-semibold text-foreground mb-2">Registered / Corporate Office Address</h4>
+            <div className="space-y-1">
+              <DataRow label="Address Line 1" value={data.address?.registeredAddress} />
+              <DataRow label="Address Line 2" value={data.address?.registeredAddressLine2} />
+              <DataRow label="Address Line 3" value={data.address?.registeredAddressLine3} />
+              <DataRow label="Address Line 4" value={data.address?.registeredAddressLine4} />
+              <DataRow label="City" value={data.address?.registeredCity} />
+              <DataRow label="State" value={data.address?.registeredState} />
+              <DataRow label="PIN Code" value={data.address?.registeredPincode} />
+              <DataRow label="Phone" value={data.address?.registeredPhone || data.contact?.ceoPhone} />
+              <DataRow label="Email" value={data.address?.registeredEmail || data.contact?.ceoEmail} />
+            </div>
+          </div>
+          <div className="rounded-lg border border-border/60 p-4 bg-muted/20">
+            <h4 className="text-sm font-semibold text-foreground mb-2">Communication Address</h4>
+            {data.address?.sameAsRegistered ? (
+              <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
+            ) : (
+              <div className="space-y-1">
+                <DataRow label="Address Line 1" value={data.address?.manufacturingAddress} />
+                <DataRow label="Address Line 2" value={data.address?.manufacturingAddressLine2} />
+                <DataRow label="Address Line 3" value={data.address?.manufacturingAddressLine3} />
+                <DataRow label="Address Line 4" value={data.address?.manufacturingAddressLine4} />
+                <DataRow label="City" value={data.address?.manufacturingCity} />
+                <DataRow label="State" value={data.address?.manufacturingState} />
+                <DataRow label="PIN Code" value={data.address?.manufacturingPincode} />
+                <DataRow label="Phone" value={data.address?.manufacturingPhone} />
+                <DataRow label="Email" value={data.address?.manufacturingEmail} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
 
       <div className="form-section">
         <SectionHeader icon={Users} title="Contact Information" step={4} onEdit={onEditStep} />
