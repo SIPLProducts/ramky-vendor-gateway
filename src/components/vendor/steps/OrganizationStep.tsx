@@ -22,7 +22,6 @@ import { ClassificationField } from '@/components/vendor/ClassificationField';
 import {
   OrganizationDetails,
   StatutoryDetails,
-  GstDetails,
   INDUSTRY_TYPES,
   ORGANIZATION_TYPES,
   OWNERSHIP_TYPES,
