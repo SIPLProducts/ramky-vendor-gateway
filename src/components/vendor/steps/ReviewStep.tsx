@@ -220,7 +220,9 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
             <>
               <DataRow label="MSME Category" value={data.statutory?.msmeCategory} />
               <DataRow label="MSME Number" value={data.statutory?.msmeNumber} />
+              <DataRow label="Udyam Certificate" value={data.statutory?.msmeCertificateFile ? 'Uploaded ✓' : 'Pending upload'} />
             </>
+
           ) : (
             <>
               <DataRow label="MSME Self-Declaration" value={data.statutory?.msmeSelfDeclarationFile ? 'Uploaded ✓' : 'Pending upload'} />
