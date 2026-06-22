@@ -464,19 +464,15 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
             name="vendorLocation"
             control={control}
             render={({ field }) => {
-              const code = (field.value || [])[0] || '';
-              const display = code
-                ? getLocationLabel(code, sapVendorLoc)
-                : '';
+              const value = (field.value || [])[0] || '';
               return (
                 <div className="grid gap-1.5">
-                  <Label>Vendor Location</Label>
+                  <Label htmlFor="vendorLocation">Vendor Location</Label>
                   <Input
-                    value={display}
+                    id="vendorLocation"
+                    value={value}
                     readOnly
-                    disabled
-                    placeholder={watchedState ? '—' : 'Select State first'}
-                    className="bg-muted/40 cursor-not-allowed"
+                    placeholder={watchedState ? '' : 'Auto-filled from State'}
                   />
                   <p className="text-xs text-muted-foreground">
                     Auto-filled from State.
