@@ -515,19 +515,39 @@ export function VendorReviewDialog({
                       <MapPin className="h-4 w-4" />
                       Address Details
                     </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="space-y-1">
-                        <p className="text-muted-foreground">Registered Address</p>
-                        <p className="font-medium">{vendor.registered_address || '-'}</p>
-                        <p className="text-muted-foreground text-xs">{vendor.registered_city}, {vendor.registered_state} - {vendor.registered_pincode}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-muted-foreground">Communication Address</p>
-                        <p className="font-medium">{vendor.communication_address || vendor.registered_address || '-'}</p>
-                        <p className="text-muted-foreground text-xs">{vendor.communication_city || vendor.registered_city}, {vendor.communication_state || vendor.registered_state}</p>
+
+                    {/* Registered / Corporate Office Address */}
+                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
+                      <p className="text-sm font-semibold text-foreground">Registered / Corporate Office Address</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        <Field label="Address Line 1" value={vendor.registered_address} />
+                        <Field label="Address Line 2" value={(vendor as any).registered_address_line2} />
+                        <Field label="Address Line 3" value={(vendor as any).registered_address_line3} />
+                        <Field label="Address Line 4" value={(vendor as any).registered_address_line4} />
+                        <Field label="City" value={vendor.registered_city} />
+                        <Field label="State" value={vendor.registered_state} />
+                        <Field label="PIN Code" value={vendor.registered_pincode} />
+                        <Field label="Phone" value={(vendor as any).registered_phone || vendor.primary_phone} />
+                        <Field label="Email" value={(vendor as any).registered_email || vendor.primary_email} />
                       </div>
                     </div>
+
+                    {/* Communication Address */}
+                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
+                      <p className="text-sm font-semibold text-foreground">Communication Address</p>
+                      {!vendor.communication_address || vendor.communication_address === vendor.registered_address ? (
+                        <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                          <Field label="Address" value={vendor.communication_address} />
+                          <Field label="City" value={vendor.communication_city} />
+                          <Field label="State" value={vendor.communication_state} />
+                          <Field label="PIN Code" value={(vendor as any).communication_pincode} />
+                        </div>
+                      )}
+                    </div>
                   </div>
+
 
                   <Separator />
 
