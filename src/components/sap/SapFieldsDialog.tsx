@@ -20,6 +20,9 @@ export type SapFieldOverrides = {
   msme: string; idtype: string; idnum: string;
   bukrs: string; akont: string; zuawa: string; cdi: string; fdgrv: string;
   vkorg: string; waers: string; kalsk: string; webre: string; lebre: string; ven_class: string;
+  reg_addr1: string; reg_addr2: string; reg_addr3: string; reg_addr4: string;
+  reg_city: string; reg_state: string; reg_pincode: string;
+  reg_contact1: string; reg_contact2: string; reg_email1: string; reg_email2: string;
   classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[] };
 };
 
@@ -156,20 +159,19 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Registered / Corporate Office Address (read-only) */}
+            {/* Registered / Corporate Office Address (editable) */}
             <Section icon={<MapPin className="h-4 w-4" />} title="Registered / Corporate Office Address">
-              <ReadOnlyField label="Address Line 1" value={(vendor as any)?.registered_address} />
-              <ReadOnlyField label="Address Line 2" value={(vendor as any)?.registered_address_line2} />
-              <ReadOnlyField label="Address Line 3" value={(vendor as any)?.registered_address_line3} />
-              <ReadOnlyField label="Address Line 4" value={(vendor as any)?.registered_address_line4} />
-              <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
-              <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
-              <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
-              <ReadOnlyField label="Contact 1" value={(vendor as any)?.registered_contact_1 || (vendor as any)?.primary_phone} />
-              <ReadOnlyField label="Contact 2" value={(vendor as any)?.registered_contact_2} />
-              <ReadOnlyField label="Email 1" value={(vendor as any)?.registered_email || (vendor as any)?.primary_email} />
-              <ReadOnlyField label="Email 2" value={(vendor as any)?.registered_email_2} />
-
+              <TextField label="Address Line 1" value={form.reg_addr1} onChange={v => set('reg_addr1', v)} />
+              <TextField label="Address Line 2" value={form.reg_addr2} onChange={v => set('reg_addr2', v)} />
+              <TextField label="Address Line 3" value={form.reg_addr3} onChange={v => set('reg_addr3', v)} />
+              <TextField label="Address Line 4" value={form.reg_addr4} onChange={v => set('reg_addr4', v)} />
+              <TextField label="City" value={form.reg_city} onChange={v => set('reg_city', v)} />
+              <TextField label="State" value={form.reg_state} onChange={v => set('reg_state', v)} />
+              <TextField label="Pincode" value={form.reg_pincode} onChange={v => set('reg_pincode', v)} />
+              <TextField label="Contact 1" value={form.reg_contact1} onChange={v => set('reg_contact1', v)} />
+              <TextField label="Contact 2" value={form.reg_contact2} onChange={v => set('reg_contact2', v)} />
+              <TextField label="Email 1" value={form.reg_email1} onChange={v => set('reg_email1', v)} />
+              <TextField label="Email 2" value={form.reg_email2} onChange={v => set('reg_email2', v)} />
             </Section>
 
             <Separator />
@@ -193,7 +195,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" required invalid={missingFields.includes('waers')} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
-                options={[['', 'None'], ['MIC', 'MIC']]} />
+                options={[['MIC', 'MIC — Micro'], ['SML', 'SML — Small'], ['MED', 'MED — Medium'], ['ZNA', 'ZNA — Not Applicable']]} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
@@ -284,14 +286,21 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): SapFieldOverrides {
   const msme = isMsme(vendor);
   const d = tenantDefaults || {};
+  const v: any = vendor || {};
+  const cat = String(v.msme_category || '').toLowerCase().trim();
+  const msmeCode = !msme
+    ? 'ZNA'
+    : cat === 'small' ? 'SML'
+    : cat === 'medium' ? 'MED'
+    : 'MIC';
   return {
     partn_cat: d.partn_cat ?? '2',
     partn_grp: d.partn_grp ?? '',
     title: d.title ?? '0003',
     taxtype: d.taxtype ?? 'IN3',
-    msme: msme ? 'MIC' : '',
+    msme: msmeCode,
     idtype: msme ? 'ZMSMEN' : '',
-    idnum: (vendor as any)?.msme_number || '',
+    idnum: v.msme_number || '',
     bukrs: d.bukrs ?? '',
     akont: d.akont ?? '',
     zuawa: d.zuawa ?? '014',
@@ -303,11 +312,22 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
+    reg_addr1: v.registered_address ?? '',
+    reg_addr2: v.registered_address_line2 ?? '',
+    reg_addr3: v.registered_address_line3 ?? '',
+    reg_addr4: v.registered_address_line4 ?? '',
+    reg_city: v.registered_city ?? '',
+    reg_state: v.registered_state ?? '',
+    reg_pincode: v.registered_pincode ?? '',
+    reg_contact1: v.registered_contact_1 ?? v.primary_phone ?? '',
+    reg_contact2: v.registered_contact_2 ?? '',
+    reg_email1: v.registered_email ?? v.primary_email ?? '',
+    reg_email2: v.registered_email_2 ?? '',
     classify: {
-      MGV: Array.isArray((vendor as any)?.material_group_vendors) ? (vendor as any).material_group_vendors : [],
-      CATV: Array.isArray((vendor as any)?.vendor_categories) ? (vendor as any).vendor_categories : [],
-      LOCV: Array.isArray((vendor as any)?.vendor_locations) ? (vendor as any).vendor_locations : [],
-      IDS: Array.isArray((vendor as any)?.identification_sources) ? (vendor as any).identification_sources : [],
+      MGV: Array.isArray(v.material_group_vendors) ? v.material_group_vendors : [],
+      CATV: Array.isArray(v.vendor_categories) ? v.vendor_categories : [],
+      LOCV: Array.isArray(v.vendor_locations) ? v.vendor_locations : [],
+      IDS: Array.isArray(v.identification_sources) ? v.identification_sources : [],
     },
   };
 }
