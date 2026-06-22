@@ -159,20 +159,19 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* Registered / Corporate Office Address (read-only) */}
+            {/* Registered / Corporate Office Address (editable) */}
             <Section icon={<MapPin className="h-4 w-4" />} title="Registered / Corporate Office Address">
-              <ReadOnlyField label="Address Line 1" value={(vendor as any)?.registered_address} />
-              <ReadOnlyField label="Address Line 2" value={(vendor as any)?.registered_address_line2} />
-              <ReadOnlyField label="Address Line 3" value={(vendor as any)?.registered_address_line3} />
-              <ReadOnlyField label="Address Line 4" value={(vendor as any)?.registered_address_line4} />
-              <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
-              <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
-              <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
-              <ReadOnlyField label="Contact 1" value={(vendor as any)?.registered_contact_1 || (vendor as any)?.primary_phone} />
-              <ReadOnlyField label="Contact 2" value={(vendor as any)?.registered_contact_2} />
-              <ReadOnlyField label="Email 1" value={(vendor as any)?.registered_email || (vendor as any)?.primary_email} />
-              <ReadOnlyField label="Email 2" value={(vendor as any)?.registered_email_2} />
-
+              <TextField label="Address Line 1" value={form.reg_addr1} onChange={v => set('reg_addr1', v)} />
+              <TextField label="Address Line 2" value={form.reg_addr2} onChange={v => set('reg_addr2', v)} />
+              <TextField label="Address Line 3" value={form.reg_addr3} onChange={v => set('reg_addr3', v)} />
+              <TextField label="Address Line 4" value={form.reg_addr4} onChange={v => set('reg_addr4', v)} />
+              <TextField label="City" value={form.reg_city} onChange={v => set('reg_city', v)} />
+              <TextField label="State" value={form.reg_state} onChange={v => set('reg_state', v)} />
+              <TextField label="Pincode" value={form.reg_pincode} onChange={v => set('reg_pincode', v)} />
+              <TextField label="Contact 1" value={form.reg_contact1} onChange={v => set('reg_contact1', v)} />
+              <TextField label="Contact 2" value={form.reg_contact2} onChange={v => set('reg_contact2', v)} />
+              <TextField label="Email 1" value={form.reg_email1} onChange={v => set('reg_email1', v)} />
+              <TextField label="Email 2" value={form.reg_email2} onChange={v => set('reg_email2', v)} />
             </Section>
 
             <Separator />
