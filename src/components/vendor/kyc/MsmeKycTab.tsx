@@ -49,7 +49,7 @@ interface MsmeKycTabProps {
 export function MsmeKycTab(props: MsmeKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const { state, verify } = useProviderVerify();
-  const [mode, setMode] = useState<'manual' | 'upload'>('manual');
+  
   const [manualApiResult, setManualApiResult] = useState<KycApiResult | undefined>();
   const [enterpriseName, setEnterpriseName] = useState<string>('');
   const [enterpriseCheck, setEnterpriseCheck] =
