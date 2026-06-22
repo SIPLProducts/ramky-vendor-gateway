@@ -133,6 +133,41 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
   const registeredPincode = watch('registeredPincode');
   const registeredEmail = watch('registeredEmail');
 
+  // Split a long Address Line 1 into Lines 1-4 (max 40 chars each), preferring
+  // word boundaries within each 40-char window so words aren't cut mid-word.
+  const splitAddressIntoLines = (raw: string): [string, string, string, string] => {
+    const text = (raw || '').replace(/\s+/g, ' ').trimStart();
+    const chunks: string[] = [];
+    let rest = text;
+    while (rest.length > 0 && chunks.length < 4) {
+      if (rest.length <= 40) {
+        chunks.push(rest);
+        rest = '';
+        break;
+      }
+      let cut = 40;
+      const window = rest.slice(0, 40);
+      const lastSpace = window.lastIndexOf(' ');
+      if (lastSpace > 0 && lastSpace >= 20) cut = lastSpace;
+      chunks.push(rest.slice(0, cut).trimEnd());
+      rest = rest.slice(cut).trimStart();
+    }
+    return [chunks[0] || '', chunks[1] || '', chunks[2] || '', chunks[3] || ''];
+  };
+
+  const handleAddressLine1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const [l1, l2, l3, l4] = splitAddressIntoLines(raw);
+    setValue('registeredAddress', l1, { shouldValidate: true, shouldDirty: true });
+    // Only overwrite downstream lines once overflow actually occurs, so a user
+    // typing their own Line 2-4 values doesn't get wiped by short Line 1 edits.
+    if (raw.length > 40 || l2) {
+      setValue('registeredAddressLine2', l2, { shouldValidate: true, shouldDirty: true });
+      setValue('registeredAddressLine3', l3, { shouldValidate: true, shouldDirty: true });
+      setValue('registeredAddressLine4', l4, { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
   useEffect(() => {
     if (sameAsRegistered) {
       setValue('manufacturingAddress', registeredAddress);
