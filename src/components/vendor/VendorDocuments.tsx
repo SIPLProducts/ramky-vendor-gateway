@@ -247,15 +247,13 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {doc.mime_type?.startsWith('image/') || doc.mime_type === 'application/pdf' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handlePreview(doc)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePreview(doc)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
