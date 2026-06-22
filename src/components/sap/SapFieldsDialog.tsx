@@ -51,6 +51,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const refreshMaster = useRefreshSapMaster();
+  const { data: vendorLocRows } = useSapMasterData('vendor_location');
 
   useEffect(() => {
     if (!open) return;
