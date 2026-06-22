@@ -1210,7 +1210,7 @@ export function DocumentVerificationStep({
   const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
 
   // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
-  const [msmeMode, setMsmeMode] = useState<"manual" | "upload">("manual");
+  
   const [msmeManualNumber, setMsmeManualNumber] = useState<string>("");
   const [msmeManualBusy, setMsmeManualBusy] = useState(false);
   const [msmeManualError, setMsmeManualError] = useState<string | null>(null);
