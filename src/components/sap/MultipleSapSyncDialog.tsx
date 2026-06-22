@@ -53,6 +53,9 @@ function buildCommonDefaults(tenantDefaults: any | null): SapFieldOverrides {
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
+    reg_addr1: '', reg_addr2: '', reg_addr3: '', reg_addr4: '',
+    reg_city: '', reg_state: '', reg_pincode: '',
+    reg_contact1: '', reg_contact2: '', reg_email1: '', reg_email2: '',
     classify: { MGV: [], CATV: [], LOCV: [], IDS: [] },
   };
 }
