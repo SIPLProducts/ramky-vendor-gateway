@@ -195,11 +195,15 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             <Label htmlFor="registeredAddress">Address Line 1 *</Label>
             <Input
               id="registeredAddress"
-              {...register('registeredAddress')}
-              placeholder="Building name, street address (max 40 chars)"
-              maxLength={40}
+              value={registeredAddress || ''}
+              onChange={handleAddressLine1Change}
+              placeholder="Building name, street address (overflow auto-flows into Lines 2-4)"
+              maxLength={160}
               className={errors.registeredAddress ? 'border-destructive' : ''}
             />
+            <p className="text-xs text-muted-foreground">
+              Text beyond 40 characters automatically flows into Address Line 2, 3 and 4.
+            </p>
             {errors.registeredAddress && (
               <p className="text-xs text-destructive">{errors.registeredAddress.message}</p>
             )}
