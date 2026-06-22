@@ -1620,7 +1620,7 @@ export function DocumentVerificationStep({
   const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
   const stage3Done =
     (isMsmeRegistered === false && !!msmeDeclarationFile) ||
-    (isMsmeRegistered === true && msmeDoc.status === "verified");
+    (isMsmeRegistered === true && msmeDoc.status === "verified" && !!msmeDoc.file);
   const stage4Done =
     bankDoc.status === "verified" &&
     (!bank2Enabled || bankDoc2.status === "verified");
