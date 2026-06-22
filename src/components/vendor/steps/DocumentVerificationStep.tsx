@@ -1734,18 +1734,16 @@ export function DocumentVerificationStep({
       };
     }
     // Lift uploaded files so the parent can persist them in the draft.
-    // IMPORTANT: only include a file when the section actually applies to the
-    // current selection AND the doc is verified, so that flipping a Yes/No
-    // toggle or re-uploading a different document never leaves a stale file
-    // reference in the saved payload.
+    // Persist as soon as a file is picked for the active section — do NOT
+    // gate on verification, otherwise unverified uploads silently vanish
+    // from Review / Approval and never reach vendor_documents storage.
     out.gstCertificateFile =
-      isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
-    out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
+      isGstRegistered === true ? (gstDoc.file ?? null) : null;
+    out.panCardFile = panDoc.file ?? null;
     out.msmeCertificateFile =
-      isMsmeRegistered === true && msmeDoc.status === "verified" ? (msmeDoc.file ?? null) : null;
-    out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null;
-    out.cancelledChequeFile2 =
-      bank2Enabled && bankDoc2.status === "verified" ? (bankDoc2.file ?? null) : null;
+      isMsmeRegistered === true ? (msmeDoc.file ?? null) : null;
+    out.cancelledChequeFile = bankDoc.file ?? null;
+    out.cancelledChequeFile2 = bank2Enabled ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
