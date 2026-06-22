@@ -286,14 +286,21 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): SapFieldOverrides {
   const msme = isMsme(vendor);
   const d = tenantDefaults || {};
+  const v: any = vendor || {};
+  const cat = String(v.msme_category || '').toLowerCase().trim();
+  const msmeCode = !msme
+    ? 'ZNA'
+    : cat === 'small' ? 'SML'
+    : cat === 'medium' ? 'MED'
+    : 'MIC';
   return {
     partn_cat: d.partn_cat ?? '2',
     partn_grp: d.partn_grp ?? '',
     title: d.title ?? '0003',
     taxtype: d.taxtype ?? 'IN3',
-    msme: msme ? 'MIC' : '',
+    msme: msmeCode,
     idtype: msme ? 'ZMSMEN' : '',
-    idnum: (vendor as any)?.msme_number || '',
+    idnum: v.msme_number || '',
     bukrs: d.bukrs ?? '',
     akont: d.akont ?? '',
     zuawa: d.zuawa ?? '014',
@@ -305,11 +312,22 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
     ven_class: d.ven_class ?? '',
+    reg_addr1: v.registered_address ?? '',
+    reg_addr2: v.registered_address_line2 ?? '',
+    reg_addr3: v.registered_address_line3 ?? '',
+    reg_addr4: v.registered_address_line4 ?? '',
+    reg_city: v.registered_city ?? '',
+    reg_state: v.registered_state ?? '',
+    reg_pincode: v.registered_pincode ?? '',
+    reg_contact1: v.registered_contact_1 ?? v.primary_phone ?? '',
+    reg_contact2: v.registered_contact_2 ?? '',
+    reg_email1: v.registered_email ?? v.primary_email ?? '',
+    reg_email2: v.registered_email_2 ?? '',
     classify: {
-      MGV: Array.isArray((vendor as any)?.material_group_vendors) ? (vendor as any).material_group_vendors : [],
-      CATV: Array.isArray((vendor as any)?.vendor_categories) ? (vendor as any).vendor_categories : [],
-      LOCV: Array.isArray((vendor as any)?.vendor_locations) ? (vendor as any).vendor_locations : [],
-      IDS: Array.isArray((vendor as any)?.identification_sources) ? (vendor as any).identification_sources : [],
+      MGV: Array.isArray(v.material_group_vendors) ? v.material_group_vendors : [],
+      CATV: Array.isArray(v.vendor_categories) ? v.vendor_categories : [],
+      LOCV: Array.isArray(v.vendor_locations) ? v.vendor_locations : [],
+      IDS: Array.isArray(v.identification_sources) ? v.identification_sources : [],
     },
   };
 }
