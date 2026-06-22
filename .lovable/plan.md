@@ -1,53 +1,29 @@
 ## Goal
+Make `strict_check_name` (and any other multipart extra fields) visible in the edge function logs with their actual values, so you can confirm in the Node/edge console log that the field is being forwarded to Surepass.
 
-Send `strict_check_name: "true"` as an additional form field in the multipart request to the Surepass PAN OCR endpoint (`https://kyc-api.surepass.app/api/v1/ocr/pan`), without affecting any other provider.
-
-## Why a code change is needed
-
-Today the PAN OCR provider is configured with `request_mode: "multipart"` and `request_body_template: {}`. The edge function `supabase/functions/kyc-api-execute/index.ts` (multipart branch, lines 135–150) only appends the file to `FormData` and ignores `request_body_template` entirely. So even if we set `request_body_template = { strict_check_name: "true" }` in the DB, it would never be sent on the wire.
-
-We need to (a) make the multipart branch forward `request_body_template` fields, and (b) update the default template / existing row for PAN_OCR.
-
-## Changes
-
-### 1. `supabase/functions/kyc-api-execute/index.ts` (multipart branch)
-
-After `fd.append(provider.file_field_name || "file", blob, uploadName);`, iterate `provider.request_body_template` (when it's a plain object) and append each key/value as a form field, applying the same `substitute(...)` placeholder logic already used for JSON mode so `{{...}}` templates keep working. Values are coerced to string; nested objects/arrays are JSON-stringified. Empty/null values are skipped. This is generic and only activates when a provider actually has fields in its template — current GST_OCR / BANK_OCR templates are `{}` so they remain byte-identical on the wire.
-
-Add a log line listing the extra field names (no values) for diagnostics.
-
-### 2. `src/pages/KycApiSettings.tsx` (seed defaults)
-
-Change line 45 for `PAN_OCR` from
-`request_body_template: {}`
-to
-`request_body_template: { strict_check_name: "true" }`
-so any fresh "Install defaults" run picks it up. No other provider entry changes.
-
-### 3. DB migration to update the existing PAN_OCR row
-
-New migration `supabase/migrations/<ts>_pan_ocr_strict_check_name.sql`:
-
-```sql
-UPDATE public.kyc_api_providers
-SET request_body_template = COALESCE(request_body_template, '{}'::jsonb)
-                            || '{"strict_check_name":"true"}'::jsonb,
-    updated_at = now()
-WHERE provider_name = 'PAN_OCR';
+## Current behavior
+The edge function already appends `strict_check_name=true` to the multipart form body and logs the **field names**:
 ```
+[kyc-api-execute] multipart extraFields=strict_check_name
+```
+But the **values** are not logged, which is why it looks like "nothing is going" when inspecting the console.
 
-Uses jsonb merge so any other fields an admin may have added are preserved; only the `strict_check_name` key is set/overwritten.
+## Change
+In `supabase/functions/kyc-api-execute/index.ts` (multipart branch, around line 152-162), enhance logging to also print the key=value pairs being sent, plus log the full provider template once:
 
-## Non-impact verification
+1. Before the loop, log: `[kyc-api-execute] multipart request_body_template=<JSON>` so we can see the configured template.
+2. Inside the loop, collect `key=value` pairs into an array.
+3. After the loop, log: `[kyc-api-execute] multipart extraFieldsResolved=strict_check_name=true,...` instead of only field names.
 
-- Multipart branch change is a no-op for providers whose `request_body_template` is empty (GST_OCR, BANK_OCR today).
-- JSON-mode providers (PAN, GST, MSME, BANK, PAN comprehensive) are untouched.
-- Response mapping for PAN OCR is unchanged — `strict_check_name` only affects the request payload; Surepass keeps the same response shape (`data.ocr_fields[0]…`).
-- The existing PAN OCR → name-match flow in `PanKycTab` / `DocumentVerificationStep` continues to read `full_name` and `pan_number` from the same paths.
-- KYC API Settings edit screen already exposes `request_body_template` in the "Request Payload" tab, so admins can see/override the new field if needed.
+No behavioral change — purely additional logging. JSON-mode providers and non-multipart flows are untouched.
 
-## Test plan (after switching to build mode)
+## Verification
+1. Redeploy `kyc-api-execute`.
+2. Re-upload a PAN card from the UI.
+3. Open edge function logs and confirm you see:
+   - `multipart request_body_template={"strict_check_name":"true"}`
+   - `multipart extraFieldsResolved=strict_check_name=true`
+4. This confirms the field is being forwarded to `https://kyc-api.surepass.app/api/v1/ocr/pan` in the multipart body.
 
-1. Re-upload a PAN card in the vendor Document Verification step; confirm `kyc-api-execute` logs show `extraFields=strict_check_name` and the OCR result returns `full_name` / `pan_number` as before.
-2. Re-upload a GST card and a cheque; confirm logs do NOT show `extraFields` (templates still empty) and OCR still works.
-3. In KYC API Settings → PAN OCR → Request Payload tab, confirm the saved JSON shows `{"strict_check_name":"true"}`.
+## Note on browser DevTools
+The field will still **not** appear in the browser Network tab — the browser only sends `{ providerName, input, fileBase64 }` to our edge function. `strict_check_name` is injected server-side from `api_providers.request_body_template` and forwarded to Surepass. The new logs are how you verify it in the middleware/edge console.
