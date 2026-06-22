@@ -2235,18 +2235,7 @@ export function DocumentVerificationStep({
                 )}
 
                 {isMsmeRegistered === true && (
-                  <Tabs value={msmeMode} onValueChange={(v) => setMsmeMode(v as "manual" | "upload")} className="space-y-4">
-                    <TabsList className="grid grid-cols-2 max-w-sm">
-                      <TabsTrigger value="manual">
-                        <Pencil className="h-3.5 w-3.5 mr-2" />
-                        Manual Entry
-                      </TabsTrigger>
-                      <TabsTrigger value="upload">
-                        <Upload className="h-3.5 w-3.5 mr-2" />
-                        Upload
-                      </TabsTrigger>
-                    </TabsList>
-
+                  <div className="space-y-4">
                     <TabsContent value="manual" className="space-y-3">
                       <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground">
@@ -2431,99 +2420,19 @@ export function DocumentVerificationStep({
                           </div>
                         )}
                       </div>
-                    </TabsContent>
 
-                    <TabsContent value="upload" className="space-y-3">
-                      <DocSplitRow
-                        uploadLabel="Udyam Certificate"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        doc={msmeDoc}
-                        onUpload={handleMsmeUpload}
-                        onReset={() => setMsmeDoc(idleDoc)}
-                        busyLabel={
-                          msmeDoc.status === "uploading" ? "Uploading…" :
-                          msmeDoc.status === "preparing" ? "Preparing document for OCR…" :
-                          msmeDoc.status === "ocr" ? "Reading Udyam…" :
-                          msmeDoc.status === "verifying" ? "Verifying…" : ""
-                        }
-                        verifiedFields={
-                          (() => { const m = msmeDoc.apiData?.normalized || {}; return (
-                          <div className="space-y-3">
-                            <ReviewBanner />
-                            <div className="grid md:grid-cols-2 gap-3">
-                              <EditableOcrField
-                                label="Udyam Number"
-                                value={msmeDoc.ocrData?.udyam_number}
-                                originalValue={msmeDoc.originalOcrData?.udyam_number}
-                                onChange={(v) => setOcrField(setMsmeDoc, "udyam_number", v.toUpperCase())}
-                                mono
-                                verifiedValue={m.udyam_number}
-                                verifiedLabel="Udyam Number is verified"
-                              />
-                              <div className="md:col-span-2">
-                                <EditableOcrField
-                                  label="Enterprise Name"
-                                  value={msmeDoc.ocrData?.enterprise_name}
-                                  originalValue={msmeDoc.originalOcrData?.enterprise_name}
-                                  onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
-                                  verifiedValue={m.enterprise_name}
-                                  verifiedLabel="Enterprise Name matches registry"
-                                />
-                                {msmeDoc.apiData?.enterpriseNameMessage && (
-                                  <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
-                                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                                    <span>{msmeDoc.apiData.enterpriseNameMessage}</span>
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <EditableOcrField
-                                label="Enterprise Type"
-                                value={msmeDoc.ocrData?.enterprise_type}
-                                originalValue={msmeDoc.originalOcrData?.enterprise_type}
-                                onChange={(v) => setOcrField(setMsmeDoc, "enterprise_type", v)}
-                                placeholder="Micro / Small / Medium"
-                                verifiedValue={m.enterprise_type}
-                                verifiedLabel="Verified from registry"
-                              />
-                              <EditableOcrField
-                                label="Current Year"
-                                value={msmeDoc.ocrData?.classification_year}
-                                originalValue={msmeDoc.originalOcrData?.classification_year}
-                                onChange={(v) => setOcrField(setMsmeDoc, "classification_year", v)}
-                                placeholder="e.g. 2026-27"
-                                verifiedValue={m.classification_year}
-                                verifiedLabel="Verified from registry"
-                              />
-                              <EditableOcrField
-                                label="Major Activity"
-                                value={msmeDoc.ocrData?.major_activity}
-                                originalValue={msmeDoc.originalOcrData?.major_activity}
-                                onChange={(v) => setOcrField(setMsmeDoc, "major_activity", v)}
-                                placeholder="e.g. Manufacturing, Services, Trading"
-                                verifiedValue={m.major_activity}
-                                verifiedLabel="Verified from registry"
-                              />
-                            </div>
-                            {!msmeDoc.ocrData?.major_activity && (
-                              <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                                {msmeDoc.file ? (
-                                  <>
-                                    <Sparkles className="h-3 w-3 text-primary" />
-                                    Reading Major Activity from certificate…
-                                  </>
-                                ) : (
-                                  <>Couldn't read Major Activity from the certificate — please enter manually.</>
-                                )}
-                              </p>
-                            )}
-                          </div>
-                          ); })()
+                    <div className="pt-2">
+                      <FileUpload
+                        label="Upload Udyam Certificate (optional)"
+                        documentType="msme_certificate"
+                        vendorId={vendorId}
+                        currentFile={msmeDoc.file ?? null}
+                        onFileSelect={(file) =>
+                          setMsmeDoc((prev) => ({ ...prev, file: file ?? undefined }))
                         }
                       />
-                    </TabsContent>
-                  </Tabs>
+                    </div>
+                  </div>
                 )}
 
 
