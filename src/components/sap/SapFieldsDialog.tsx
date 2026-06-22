@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, MapPin, Phone, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
@@ -141,6 +141,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <ReadOnlyField label="GST ID (GSTIN)" value={(vendor as any)?.gstin} />
               <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
               <ReadOnlyField label="Udyam Number (MSME)" value={(vendor as any)?.msme_number} />
+              <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
             </Section>
 
             <Separator />
@@ -164,15 +165,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <ReadOnlyField label="City" value={(vendor as any)?.registered_city} />
               <ReadOnlyField label="State" value={(vendor as any)?.registered_state} />
               <ReadOnlyField label="Pincode" value={(vendor as any)?.registered_pincode} />
-              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone} />
-            </Section>
-
-            <Separator />
-
-            {/* Contact Details (read-only) */}
-            <Section icon={<Phone className="h-4 w-4" />} title="Contact Details">
-              <ReadOnlyField label="Contact Number" value={(vendor as any)?.primary_phone || (vendor as any)?.registered_phone} />
-              <ReadOnlyField label="Email ID" value={(vendor as any)?.primary_email || (vendor as any)?.registered_email} />
+              <ReadOnlyField label="Phone" value={(vendor as any)?.registered_phone || (vendor as any)?.primary_phone} />
+              <ReadOnlyField label="Email" value={(vendor as any)?.registered_email || (vendor as any)?.primary_email} />
             </Section>
 
             <Separator />
@@ -182,35 +176,29 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
                 options={[['1', 'Person'], ['2', 'Organization'], ['3', 'Group']]} />
               <SapF4SelectField label="Vendor Account Group" masterType="vendor_account_group" value={form.partn_grp} onChange={v => set('partn_grp', v)} liveItems={liveF4?.VENDOR_ACC_GRP} placeholder="Select Vendor Account Group" required invalid={missingFields.includes('partn_grp')} />
-              <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
-                options={[['', 'None'], ['MIC', 'MIC']]} />
             </Section>
 
             <Separator />
 
-            {/* Company Code Data */}
+            {/* Company Code Data (now also includes former Purchase Data fields + MSME indicator) */}
             <Section icon={<Briefcase className="h-4 w-4" />} title="Company Code Data">
               <SapF4SelectField label="Company Code" masterType="company_code" value={form.bukrs} onChange={v => set('bukrs', v)} liveItems={liveF4?.COMPANY_CODE} placeholder="Select Company Code" required invalid={missingFields.includes('bukrs')} />
               <SapF4SelectField label="Rec-Account" masterType="recon_account" value={form.akont} onChange={v => set('akont', v)} liveItems={liveF4?.RECON_ACCOUNT} placeholder="Select Rec-Account" required invalid={missingFields.includes('akont')} filter={{ key: 'BUKRS', value: form.bukrs, emptyHint: 'Select Company Code first' }} />
               <TextField label="Sort Key" value={form.zuawa} onChange={v => set('zuawa', v)} />
               <SapF4SelectField label="Planning Group" masterType="planning_group" value={form.fdgrv} onChange={v => set('fdgrv', v)} liveItems={liveF4?.PLANNING_GROUP} placeholder="Select Planning Group" required invalid={missingFields.includes('fdgrv')} />
-              <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
-                onChange={v => set('cdi', v ? 'X' : '')} />
-            </Section>
-
-            <Separator />
-
-            {/* Purchase Data */}
-            <Section icon={<ShoppingCart className="h-4 w-4" />} title="Purchase Data">
               <SapF4SelectField label="Purchase Org" masterType="purchase_org" value={form.vkorg} onChange={v => set('vkorg', v)} liveItems={liveF4?.PURCHASE_ORG} placeholder="Select Purchase Org" required invalid={missingFields.includes('vkorg')} />
               <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" required invalid={missingFields.includes('waers')} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
-              <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
+              <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
+                options={[['', 'None'], ['MIC', 'MIC']]} />
+              <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
+                onChange={v => set('cdi', v ? 'X' : '')} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
                 onChange={v => set('webre', v ? 'X' : '')} />
               <CheckboxField label="Service-Based Invoice Verification" checked={form.lebre === 'X'}
                 onChange={v => set('lebre', v ? 'X' : '')} />
             </Section>
+
 
             <Separator />
 
