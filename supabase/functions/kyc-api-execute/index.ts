@@ -147,18 +147,21 @@ serve(async (req) => {
       // from `input` using the same logic as JSON mode. Empty/null values are
       // skipped; objects/arrays are JSON-stringified.
       const extraTpl = provider.request_body_template;
-      const extraFieldNames: string[] = [];
+      const extraPairs: string[] = [];
+      console.log(`[kyc-api-execute] multipart request_body_template=${JSON.stringify(extraTpl ?? null)}`);
       if (extraTpl && typeof extraTpl === "object" && !Array.isArray(extraTpl)) {
         const filledExtras = substitute(extraTpl, input ?? {}) as Record<string, any>;
         for (const [k, v] of Object.entries(filledExtras)) {
           if (v === undefined || v === null || v === "") continue;
           const strVal = (typeof v === "object") ? JSON.stringify(v) : String(v);
           fd.append(k, strVal);
-          extraFieldNames.push(k);
+          extraPairs.push(`${k}=${strVal}`);
         }
       }
-      if (extraFieldNames.length > 0) {
-        console.log(`[kyc-api-execute] multipart extraFields=${extraFieldNames.join(",")}`);
+      if (extraPairs.length > 0) {
+        console.log(`[kyc-api-execute] multipart extraFieldsResolved=${extraPairs.join(",")}`);
+      } else {
+        console.log(`[kyc-api-execute] multipart extraFieldsResolved=<none>`);
       }
       body = fd;
       // CRITICAL: never force Content-Type for multipart — fetch must set the
