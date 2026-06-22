@@ -195,7 +195,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <SapF4SelectField label="Currency" masterType="currency" value={form.waers} onChange={v => set('waers', v)} liveItems={liveF4?.CURRENCY} placeholder="Select Currency" required invalid={missingFields.includes('waers')} />
               <TextField label="Group for Calc Schema (Supplier)" value={form.kalsk} onChange={v => set('kalsk', v)} />
               <SelectField label="MSME (Minority Indicator)" value={form.msme} onChange={v => set('msme', v)}
-                options={[['', 'None'], ['MIC', 'MIC']]} />
+                options={[['MIC', 'MIC — Micro'], ['SML', 'SML — Small'], ['MED', 'MED — Medium'], ['ZNA', 'ZNA — Not Applicable']]} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'}
                 onChange={v => set('cdi', v ? 'X' : '')} />
               <CheckboxField label="GR-Based Invoice Verification" checked={form.webre === 'X'}
