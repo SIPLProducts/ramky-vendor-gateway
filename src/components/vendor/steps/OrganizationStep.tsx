@@ -18,6 +18,7 @@ import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
+import { mapStateToSapLocationCode, getLocationLabel } from '@/lib/stateToSapLocation';
 import {
   OrganizationDetails,
   StatutoryDetails,
@@ -148,6 +149,25 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
       setValue('buyerCompanyId', next, { shouldDirty: false, shouldValidate: false });
     }
   }, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
+
+  // Auto-populate Vendor Location (Classification) from the selected State.
+  // Vendor Location is read-only and always derives from State.
+  const watchedState = watch('state');
+  const watchedVendorLocation = watch('vendorLocation');
+  useEffect(() => {
+    if (!watchedState) {
+      if ((watchedVendorLocation || []).length > 0) {
+        setValue('vendorLocation', [], { shouldDirty: true });
+      }
+      return;
+    }
+    const mapped = mapStateToSapLocationCode(watchedState, sapVendorLoc);
+    const current = (watchedVendorLocation || [])[0];
+    if (mapped && mapped !== current) {
+      setValue('vendorLocation', [mapped], { shouldDirty: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedState, sapVendorLoc]);
 
 
   // Live-push current form values up to parent so autosave persists Step-1 fields
@@ -446,15 +466,27 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           <Controller
             name="vendorLocation"
             control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Vendor Location"
-                masterType="vendor_location"
-                value={field.value || []}
-                onChange={field.onChange}
-                selectPlaceholder="Select locations"
-              />
-            )}
+            render={({ field }) => {
+              const code = (field.value || [])[0] || '';
+              const display = code
+                ? getLocationLabel(code, sapVendorLoc)
+                : '';
+              return (
+                <div className="grid gap-1.5">
+                  <Label>Vendor Location</Label>
+                  <Input
+                    value={display}
+                    readOnly
+                    disabled
+                    placeholder={watchedState ? '—' : 'Select State first'}
+                    className="bg-muted/40 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Auto-filled from State.
+                  </p>
+                </div>
+              );
+            }}
           />
           <Controller
             name="identificationSource"

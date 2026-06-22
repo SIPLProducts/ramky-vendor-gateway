@@ -13,6 +13,7 @@ import { Server, Loader2, Building2, Briefcase, ShoppingCart, Landmark, Tags, Ma
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
+import { getLocationLabel } from '@/lib/stateToSapLocation';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
@@ -50,6 +51,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const refreshMaster = useRefreshSapMaster();
+  const { data: vendorLocRows } = useSapMasterData('vendor_location');
 
   useEffect(() => {
     if (!open) return;
@@ -228,13 +230,17 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={(v) => setClassify('CATV', v)}
                 placeholder="Select vendor categories"
               />
-              <SapF4MultiSelectField
-                label="Vendor Location"
-                masterType="vendor_location"
-                value={form.classify.LOCV || []}
-                onChange={(v) => setClassify('LOCV', v)}
-                placeholder="Select locations"
-              />
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Vendor Location</Label>
+                <Input
+                  value={getLocationLabel((form.classify.LOCV || [])[0], vendorLocRows)}
+                  readOnly
+                  disabled
+                  placeholder="Auto-filled from State"
+                  className="bg-muted/40 cursor-not-allowed"
+                />
+                <p className="text-[11px] text-muted-foreground">Auto-filled from registration State (read-only).</p>
+              </div>
               <SapF4MultiSelectField
                 label="Vendor Identification Source"
                 masterType="identification_source"
