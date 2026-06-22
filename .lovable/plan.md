@@ -1,29 +1,43 @@
 ## Goal
-Make `strict_check_name` (and any other multipart extra fields) visible in the edge function logs with their actual values, so you can confirm in the Node/edge console log that the field is being forwarded to Surepass.
+Auto-populate **Vendor Location** (Classification card in Organization Profile) from the selected **State**, render it read-only, and also display it read-only in the SAP Sync popup.
 
-## Current behavior
-The edge function already appends `strict_check_name=true` to the multipart form body and logs the **field names**:
-```
-[kyc-api-execute] multipart extraFields=strict_check_name
-```
-But the **values** are not logged, which is why it looks like "nothing is going" when inspecting the console.
+## Why a mapper is needed
+- `state` uses friendly names from `INDIAN_STATES` (e.g. `Odisha`, `Uttarakhand`, `Chhattisgarh`, `Puducherry`, `Jammu and Kashmir`).
+- SAP `vendor_location` master codes are uppercase with SAP-style spellings (e.g. `ORISSA`, `UTTARAKAND`, `CHHAATTISGARH`, `PONDICHERRY`, `JAMMU UND KASHMIR`, `DADRA UND NAGAR HAV.`, `MEGALAYA`, `ANDAMAN UND NICO.IN.`).
+- Need a small mapping helper so the auto-populated code actually matches an existing SAP code.
 
-## Change
-In `supabase/functions/kyc-api-execute/index.ts` (multipart branch, around line 152-162), enhance logging to also print the key=value pairs being sent, plus log the full provider template once:
+## Changes (frontend only)
 
-1. Before the loop, log: `[kyc-api-execute] multipart request_body_template=<JSON>` so we can see the configured template.
-2. Inside the loop, collect `key=value` pairs into an array.
-3. After the loop, log: `[kyc-api-execute] multipart extraFieldsResolved=strict_check_name=true,...` instead of only field names.
+### 1. New `src/lib/stateToSapLocation.ts`
+Pure helper exporting:
+- `STATE_TO_SAP_LOCATION_OVERRIDES`: explicit map for the spelling mismatches above.
+- `mapStateToSapLocationCode(state, sapRows)`: returns the matching SAP code by, in order:
+  1. exact override match,
+  2. case-insensitive match against `sapRows[].code`,
+  3. uppercase of the state name as fallback.
+- `getLocationLabel(code, sapRows)`: returns `"CODE — Description"` or just the code.
 
-No behavioral change — purely additional logging. JSON-mode providers and non-multipart flows are untouched.
+### 2. `src/components/vendor/steps/OrganizationStep.tsx`
+- Watch `state` with react-hook-form. On change (and once on mount when `data.state` is present), call `mapStateToSapLocationCode(state, sapVendorLoc)` and `setValue('vendorLocation', [mappedCode], { shouldDirty: true })`. If `state` is cleared, set `vendorLocation` to `[]`.
+- Replace the `Controller` rendering the `ClassificationField` for Vendor Location with a read-only display:
+  - Same `Label` ("Vendor Location") with helper text "Auto-filled from State".
+  - A disabled/readonly `Input` showing `getLocationLabel(value[0], sapVendorLoc)` or "Select State first".
+  - Keep the Controller so the value is part of the form payload (just render disabled UI inside it).
+- No change to the other three classification fields.
+
+### 3. `src/components/sap/SapFieldsDialog.tsx`
+- Replace the `SapF4MultiSelectField` for Vendor Location (lines 231–237) with a read-only display:
+  - Label "Vendor Location" with `text-xs text-muted-foreground` (matching surrounding fields).
+  - Readonly `Input` showing `getLocationLabel(form.classify.LOCV[0], sapVendorLoc)` (load `sapVendorLoc` via `useEnsureSapMaster('vendor_location')`).
+  - Keep `form.classify.LOCV` untouched so the value continues to flow into the SAP payload via the existing `LOCV` handling (`SAPSync.tsx` `persistClassification` + `sapPayloadBuilder.ts` already read `vendor_locations`).
+- No change to the other classification fields in the popup.
+
+### 4. No backend / schema / edge function changes
+- `vendor_locations` is already persisted from `formData.organization.vendorLocation` (`useVendorRegistration.tsx` line 314).
+- SAP payload already uses `vendor_locations` (`sapPayloadBuilder.ts` line 212–213).
 
 ## Verification
-1. Redeploy `kyc-api-execute`.
-2. Re-upload a PAN card from the UI.
-3. Open edge function logs and confirm you see:
-   - `multipart request_body_template={"strict_check_name":"true"}`
-   - `multipart extraFieldsResolved=strict_check_name=true`
-4. This confirms the field is being forwarded to `https://kyc-api.surepass.app/api/v1/ocr/pan` in the multipart body.
-
-## Note on browser DevTools
-The field will still **not** appear in the browser Network tab — the browser only sends `{ providerName, input, fileBase64 }` to our edge function. `strict_check_name` is injected server-side from `api_providers.request_body_template` and forwarded to Surepass. The new logs are how you verify it in the middleware/edge console.
+1. On Organization Profile, change **State** → Classification card shows Vendor Location auto-filled (read-only) with the mapped SAP code/description.
+2. Try states with known spelling differences (Odisha, Uttarakhand, Chhattisgarh, Puducherry, Jammu and Kashmir) and confirm they resolve to the SAP codes (`ORISSA`, `UTTARAKAND`, `CHHAATTISGARH`, `PONDICHERRY`, `JAMMU UND KASHMIR`).
+3. Open SAP Sync popup for a vendor → Classification section shows Vendor Location read-only with the same value; other classification fields remain editable.
+4. Existing vendors with already-saved `vendor_locations` continue to display correctly (no overwrite unless the user changes State).
