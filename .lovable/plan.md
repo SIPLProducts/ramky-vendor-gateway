@@ -1,62 +1,59 @@
-## 1. Fix document View/Download for SAP Team role
+## 1. Legal Name fallback — make blank values actually fall through
 
-**Root cause.** The storage RLS policy `"Vendor and approvers can view documents"` on `storage.objects` (migration `20260506070349`) only allows: the vendor themselves, `admin`, `sharvi_admin`, `customer_admin`, `finance`, `purchase`, `approver` app_roles. SAP Team is a **custom role** (checked via `public.is_sap_team()` / `public.has_custom_role()`), not an app_role — so `createSignedUrl` and `.download()` both get denied and the UI shows "Storage object not found". Same reason other cross-tenant reviewer custom roles (SCM Head, Finance 1/2, CEO Office) may hit it.
+Today `getSapName1` uses plain `||`, so a `trade_name` of `" "`, `""`, `"-"`, `"—"`, or `"N/A"` is treated as a real value and the Legal Name fallback never fires. That's why some rows still render blank or as "Unnamed Vendor".
 
-**Fix.** Add one new migration that drops and recreates the SELECT policy on `storage.objects` for the `vendor-documents` bucket, extending the allow-list to include SAP Team and the other reviewer custom roles via the existing security-definer helpers:
+**`src/lib/sapPayloadBuilder.ts` — `getSapName1`**
+- Add a tiny `clean(x)` helper: returns `""` for null/undefined, whitespace-only strings, and placeholder tokens `-`, `—`, `N/A`, `NA`.
+- GST = Yes branch: `clean(trade_name) || clean(legal_name) || clean(account_holder_name)`.
+- GST = No  branch: `clean(account_holder_name) || clean(legal_name) || clean(trade_name)`.
 
-```sql
-DROP POLICY IF EXISTS "Vendor and approvers can view documents" ON storage.objects;
+**`src/hooks/useRealtimeUpdates.tsx` — `pickVendorName`**
+- Same blank-aware fallback so realtime updates don't overwrite a good name with whitespace.
 
-CREATE POLICY "Vendor and approvers can view documents"
-  ON storage.objects FOR SELECT
-  USING (
-    bucket_id = 'vendor-documents'
-    AND (
-      EXISTS (
-        SELECT 1 FROM public.vendors v
-        WHERE v.id::text = (storage.foldername(name))[1]
-          AND (v.user_id = auth.uid()
-               OR lower(v.primary_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
-      )
-      OR public.has_role(auth.uid(), 'admin'::app_role)
-      OR public.has_role(auth.uid(), 'sharvi_admin'::app_role)
-      OR public.has_role(auth.uid(), 'customer_admin'::app_role)
-      OR public.has_role(auth.uid(), 'finance'::app_role)
-      OR public.has_role(auth.uid(), 'purchase'::app_role)
-      OR public.has_role(auth.uid(), 'approver'::app_role)
-      OR public.is_sap_team(auth.uid())
-      OR public.is_cross_tenant_reviewer(auth.uid())
-    )
-  );
-```
+**`src/pages/AuditLogs.tsx`**
+- Replace inline `gstin ? trade_name : legal_name` with the same blank-aware fallback (small local helper).
 
-No client code changes needed — once the policy allows SAP Team, the existing View/Download buttons in **All Vendors** (`VendorList` → `VendorReviewDialog` → `VendorDocuments`) and **SAP Sync** (`SAPSync` → same dialog) will work.
+All other screens (All Vendors, SAP Sync, Finance Review, Purchase Approval, Vendor Status, Review Dialog, Submission Preview) already go through `getSapName1`, so fixing the helper propagates everywhere.
 
-## 2. NAME1 fallback rule update
+---
 
-Current rule in `src/lib/sapPayloadBuilder.ts` `getSapName1()`:
-- GST present → `trade_name || legal_name` ✓ (already correct)
-- GST absent → `legal_name || account_holder_name || trade_name` ✗
+## 2. Always display `VENDOR` (e.g. `1017540`), never `BP_LIFNR` (e.g. `1061357`)
 
-New rule per user:
-- GST present → `trade_name || legal_name` (unchanged)
-- GST absent → `account_holder_name || legal_name || trade_name`
+No schema change. Strictly prefer `VENDOR` end-to-end so it's stored in `vendors.sap_vendor_code` and shown in every table, dialog, toast, SweetAlert, email, and audit log.
 
-**Change.** Single edit in `src/lib/sapPayloadBuilder.ts` line 40 — swap the order so `account_holder_name` comes before `legal_name`. Update the doc-comment above the function to match.
+**Backend (edge functions) — write VENDOR only**
+- `supabase/functions/sync-vendor-to-sap/index.ts`
+  - Replace every `successRow.VENDOR || successRow.BP_LIFNR` and `r.VENDOR || r.BP_LIFNR` with just `successRow.VENDOR` (fallback to BP_LIFNR only when VENDOR is truly empty).
+  - Normalize ACC_RES rows so `BP_LIFNR` is set to the VENDOR value before returning to the client (so any downstream consumer that still reads `BP_LIFNR` gets the VENDOR number). Keep the original `BP_LIFNR` available under a new key `BP_LIFNR_ORIG` so DMS upload still has the BP id when it actually needs it.
+  - Persist `sap_vendor_code = VENDOR`; the email subject/body uses VENDOR.
+- `supabase/functions/sync-vendors-to-sap-bulk/index.ts`
+  - Same change in the per-row loop: `sapVendorCode = match.VENDOR ?? match.BP_LIFNR`, write VENDOR into `sap_vendor_code`, audit log details show VENDOR, and the normalized `ACC_RES` returned to the client carries `VENDOR` (and stamps `BP_LIFNR` with the VENDOR value for legacy UI consumers, preserving the original as `BP_LIFNR_ORIG`).
+- `supabase/functions/sync-vendor-to-dms/index.ts` + `supabase/functions/prepare-dms-payload/index.ts`
+  - DMS still needs the BP_LIFNR identifier in its outbound payload. Read `vendors.sap_vendor_code` (now = VENDOR) and use it as-is — SAP DMS accepts the VENDOR number in the `BP_LIFNR` field per the new API behavior. No display change here; this only affects what we send to SAP.
 
-Because every table/dialog already routes through `getSapName1()` (per prior work), this one-line change propagates everywhere automatically.
+**Frontend — use VENDOR in every visible spot**
+- `src/pages/SAPSync.tsx`
+  - Sync-result panel / success toast / SweetAlert row: change `{r.VENDOR || r.BP_LIFNR}` → `{r.VENDOR ?? r.BP_LIFNR}` (VENDOR strictly first) and update the label to "SAP Vendor Code".
+  - DMS tab and Synced tab columns already read `v.sap_vendor_code` (now VENDOR) — no change.
+- `src/pages/VendorList.tsx`
+  - Table cell, details panel, CSV export already read `vendor.sap_vendor_code` (now VENDOR) — no change.
+- `src/components/vendor/VendorReviewDialog.tsx`, `VendorSubmissionPreviewDialog.tsx`
+  - Any "SAP Vendor Code" / `BP_LIFNR` field reads `vendor.sap_vendor_code` — already VENDOR after the backend change.
+- `src/hooks/useVendors.tsx` success toast (`SAP Vendor Code: …`)
+  - Already reads `sapVendorCode` from the edge response, which now equals VENDOR.
 
-**Also align two inline duplicates** that don't call `getSapName1()`:
-- `src/hooks/useRealtimeUpdates.tsx` — `pickVendorName()` helper: apply the same `account_holder_name`-first ordering for the no-GST branch.
-- `src/pages/AuditLogs.tsx` — the inline `gstin ? trade_name : legal_name` expression: change the no-GST branch to prefer `account_holder_name` then `legal_name`.
+**Legacy data**
+Rows already synced before this change have BP_LIFNR stored in `sap_vendor_code` — there's no way to recover the matching VENDOR id, so those rows will keep showing the old number until they are re-synced. Every new sync from now on will store and display VENDOR.
 
-## Out of scope
-- No changes to upload paths, the bucket itself, or other storage policies (INSERT/UPDATE/DELETE).
-- No schema changes, no edge-function changes.
-- No UI/layout changes beyond what the display rule produces.
+---
 
 ## Verification
-- Sign in as a SAP Team user → All Vendors → open a vendor → click View and Download on each document → file opens / downloads (no "Storage object not found" toast).
-- Same on SAP Sync screen.
-- A vendor with GST + no trade name shows Legal Name in every table.
-- A vendor without GST shows Account Holder Name in every table; falls back to Legal Name only if account holder name is empty.
+
+- GST = Yes vendor with `trade_name = " "` / `"-"` → All Vendors, SAP Sync, Finance Review, Purchase Approval, Audit Logs, Review Dialog all show the Legal Name.
+- GST = No vendor with empty Account Holder Name → same screens show Legal Name.
+- Sync a new vendor where SAP returns `{ VENDOR: "1017540", BP_LIFNR: "1061357" }`:
+  - All Vendors and SAP Sync show `1017540` in the SAP Vendor Code column.
+  - Sync-success SweetAlert / toast shows `SAP Vendor Code: 1017540`.
+  - Buyer notification email shows `1017540`.
+  - Audit log details show `sap_vendor_code: 1017540`.
+  - DMS upload still succeeds (payload carries `1017540` as the identifier, which the new SAP API accepts).
