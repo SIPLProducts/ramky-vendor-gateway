@@ -10,8 +10,15 @@ interface VendorUpdate {
   status: string;
   legal_name: string | null;
   trade_name: string | null;
+  gstin?: string | null;
   updated_at: string;
 }
+
+const pickVendorName = (rec: { gstin?: string | null; trade_name?: string | null; legal_name?: string | null }, fallback: string) => {
+  const has = (x: unknown) => x != null && String(x).trim().length > 0;
+  if (has(rec.gstin)) return rec.trade_name || rec.legal_name || fallback;
+  return rec.legal_name || rec.trade_name || fallback;
+};
 
 interface RealtimeHookOptions {
   onVendorUpdate?: (vendor: VendorUpdate) => void;
@@ -50,6 +57,7 @@ export function useRealtimeUpdates(options: RealtimeHookOptions = {}) {
         status: newRecord.status,
         legal_name: newRecord.legal_name,
         trade_name: newRecord.trade_name,
+        gstin: newRecord.gstin,
         updated_at: newRecord.updated_at,
       };
 
@@ -58,7 +66,7 @@ export function useRealtimeUpdates(options: RealtimeHookOptions = {}) {
 
       // Check if status changed
       if (oldRecord && oldRecord.status !== newRecord.status && showNotifications) {
-        const vendorName = newRecord.trade_name || newRecord.legal_name || 'Vendor';
+        const vendorName = pickVendorName(newRecord, 'Vendor');
         const statusLabel = statusLabels[newRecord.status] || newRecord.status;
         
         // Show in-app toast
@@ -78,7 +86,7 @@ export function useRealtimeUpdates(options: RealtimeHookOptions = {}) {
     }
 
     if (eventType === 'INSERT' && newRecord && showNotifications) {
-      const vendorName = newRecord.trade_name || newRecord.legal_name || 'New Vendor';
+      const vendorName = pickVendorName(newRecord, 'New Vendor');
       toast.success(`New vendor registered: ${vendorName}`, {
         duration: 5000,
       });

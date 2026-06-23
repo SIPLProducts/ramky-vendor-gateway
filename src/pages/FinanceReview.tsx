@@ -321,7 +321,7 @@ export default function FinanceReview() {
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Vendor Details - {selectedVendor?.legal_name}</DialogTitle>
+            <DialogTitle className="text-xl">Vendor Details - {selectedVendor ? (getSapName1(selectedVendor) || selectedVendor.legal_name) : ''}</DialogTitle>
             <DialogDescription>
               Review complete vendor information, Purchase/SCM approval trail, documents, and validations
             </DialogDescription>

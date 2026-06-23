@@ -21,6 +21,7 @@ import { GstFilingStatusTable, normalizeFilingStatus, type FilingStatusRow } fro
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationResult } from '@/types/vendor';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import {
   Building2,
   MapPin,
@@ -414,7 +415,7 @@ export function VendorReviewDialog({
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
-            {vendor?.legal_name || 'Vendor Details'}
+            {(vendor && getSapName1(vendor)) || vendor?.legal_name || 'Vendor Details'}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>

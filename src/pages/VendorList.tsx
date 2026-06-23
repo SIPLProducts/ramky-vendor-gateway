@@ -526,7 +526,7 @@ export default function VendorList() {
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <Building2 className="h-5 w-5 text-primary" />
-              {selectedVendor?.legal_name}
+              {selectedVendor ? (getSapName1(selectedVendor) || selectedVendor.legal_name) : ''}
               <span className="ml-2">{selectedVendor && getStatusBadge(selectedVendor.status as VendorStatus)}</span>
             </DialogTitle>
           </DialogHeader>
@@ -794,7 +794,7 @@ export default function VendorList() {
           {returnTarget && (
             <div className="space-y-3 text-sm">
               <div>
-                <div className="font-medium">{returnTarget.legal_name || returnTarget.id}</div>
+                <div className="font-medium">{getSapName1(returnTarget) || returnTarget.legal_name || returnTarget.id}</div>
                 <div className="text-xs text-muted-foreground">
                   Last rejected at: {(returnTarget as any).last_rejection_stage ?? '—'}
                 </div>
