@@ -257,7 +257,7 @@ serve(async (req) => {
       if (explicitPayload && explicitPayload.BP_LIFNR === vendor.sap_vendor_code) {
         // Use the payload sent from the browser as-is (already contains base64 + paths).
         for (const item of explicitPayload.FILE_UPLOAD) {
-          if (item?.FILE && item?.FILE_PATH) uploads.push({ FILE: item.FILE, FILE_PATH: item.FILE_PATH });
+          if (item?.FILE && item?.FILE_PATH) uploads.push({ FILE: item.FILE, FILE_PATH: toDmsPath(item.FILE_PATH) });
         }
       } else {
         const { data: docs } = await supabase
