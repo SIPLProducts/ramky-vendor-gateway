@@ -165,10 +165,24 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
   } else if (head === "vendor.primary_email_or_fallback") {
     const v = ctx.vendor || {};
-    value = v.primary_email || v.registered_email || v.registered_email_2 || v.branch_email || v.manufacturing_email || "";
+    value = v.registered_email || v.primary_email || v.registered_email_2 || v.branch_email || v.manufacturing_email || "";
   } else if (head === "vendor.primary_phone_or_fallback") {
     const v = ctx.vendor || {};
-    value = v.primary_phone || v.registered_contact_1 || v.registered_phone || v.registered_contact_2 || "";
+    value = v.registered_contact_1 || v.primary_phone || v.registered_phone || v.registered_contact_2 || "";
+  } else if (head === "vendor.secondary_email_value") {
+    const v = ctx.vendor || {};
+    value = v.registered_email_2 || v.secondary_email || "";
+  } else if (head === "vendor.secondary_phone_value") {
+    const v = ctx.vendor || {};
+    value = v.registered_contact_2 || v.secondary_phone || "";
+  } else if (head === "vendor.name1_value") {
+    const v: any = ctx.vendor || {};
+    const has = (x: any) => x != null && String(x).trim().length > 0;
+    if (has(v.gstin)) value = String(v.trade_name || v.legal_name || "").trim();
+    else value = String(v.legal_name || v.account_holder_name || v.trade_name || "").trim();
+  } else if (head === "vendor.ven_class_value") {
+    const v: any = ctx.vendor || {};
+    value = v.gstin && String(v.gstin).trim() ? "" : "0";
   } else if (head === "vendor.account_holder_or_legal") {
     const v = ctx.vendor || {};
     value = v.account_holder_name || v.legal_name || "";
