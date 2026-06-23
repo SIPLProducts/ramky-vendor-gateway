@@ -312,7 +312,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     kalsk: d.kalsk ?? 'L1',
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
-    ven_class: d.ven_class ?? '',
+    ven_class: (d.ven_class !== undefined && d.ven_class !== null && d.ven_class !== '') ? d.ven_class : getSapVenClass(v),
     reg_addr1: v.registered_address ?? '',
     reg_addr2: v.registered_address_line2 ?? '',
     reg_addr3: v.registered_address_line3 ?? '',
