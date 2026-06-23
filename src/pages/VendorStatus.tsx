@@ -10,11 +10,14 @@ import { RegistrationStatusTracker, RegistrationStatus } from '@/components/vend
 import { ApprovalTimeline } from '@/components/vendor/ApprovalTimeline';
 import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
+
 interface VendorRow {
   id: string;
   reference_number: string | null;
   legal_name: string | null;
   trade_name: string | null;
+  gstin: string | null;
   primary_email: string | null;
   vendor_type: string | null;
   status: string;
@@ -59,7 +62,7 @@ export default function VendorStatus() {
       setLoading(true);
       const { data, error } = await supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, primary_email, vendor_type, status, created_at, last_rejection_comments')
+        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments')
         .eq('id', id)
         .maybeSingle();
       if (error) {
@@ -105,7 +108,7 @@ export default function VendorStatus() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Field label="Reference #" value={vendor.reference_number ?? '—'} mono />
-                <Field label="Company Name" value={vendor.legal_name ?? vendor.trade_name ?? '—'} />
+                <Field label="Company Name" value={getSapName1(vendor) || vendor.legal_name || vendor.trade_name || '—'} />
                 <Field label="Email" value={vendor.primary_email ?? '—'} />
 
                 <Field label="Vendor Type" value={vendor.vendor_type ?? '—'} />

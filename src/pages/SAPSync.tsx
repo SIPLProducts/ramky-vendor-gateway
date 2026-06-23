@@ -109,7 +109,7 @@ export default function SAPSync() {
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
-      toast.success('Vendor rejected', { description: rejectVendor.legal_name || rejectVendor.id });
+      toast.success('Vendor rejected', { description: getSapName1(rejectVendor) || rejectVendor.legal_name || rejectVendor.id });
       setRejectVendor(null);
       setRejectRemarks('');
       refreshAllLists();
@@ -171,7 +171,7 @@ export default function SAPSync() {
     const vendor = pendingSyncVendor;
     if (!vendor) return;
     console.log('[SAPSync] handleConfirmSync starting for vendor', vendor.id, overrides);
-    toast.info('Syncing vendor to SAP…', { description: vendor.legal_name || vendor.id });
+    toast.info('Syncing vendor to SAP…', { description: getSapName1(vendor) || vendor.legal_name || vendor.id });
     setSyncingVendorId(vendor.id);
     try {
       await persistClassification([vendor.id], overrides);
@@ -596,7 +596,7 @@ export default function SAPSync() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-semibold">{rejectVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="font-semibold">{(rejectVendor && getSapName1(rejectVendor)) || rejectVendor?.legal_name || 'Unnamed Vendor'}</p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 Ref No: {(rejectVendor as any)?.reference_number || rejectVendor?.id.slice(0, 8).toUpperCase()}
               </p>

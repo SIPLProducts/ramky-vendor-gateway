@@ -326,7 +326,7 @@ export default function PurchaseApproval() {
                         variant="outline"
                         className="rounded-xl border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
                         onClick={() => {
-                          setSelectedFinanceComment({ vendorName: vendor.legal_name || 'Vendor', comment: vendor.finance_comments });
+                          setSelectedFinanceComment({ vendorName: getSapName1(vendor) || vendor.legal_name || 'Vendor', comment: vendor.finance_comments });
                           setShowFinanceCommentDialog(true);
                         }}
                       >
@@ -404,7 +404,7 @@ export default function PurchaseApproval() {
 
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-xl">Vendor Details - {selectedVendor?.legal_name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-xl">Vendor Details - {selectedVendor ? (getSapName1(selectedVendor) || selectedVendor.legal_name) : ''}</DialogTitle></DialogHeader>
           {selectedVendor && (
             <Tabs defaultValue="details" className="w-full">
               <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted p-1">
