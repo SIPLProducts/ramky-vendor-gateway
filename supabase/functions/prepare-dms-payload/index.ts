@@ -9,6 +9,15 @@ const corsHeaders = {
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
+const DMS_PATH_PREFIX = "C:/Users/ADMIN/OneDrive/Desktop/";
+function toDmsPath(storagePath: string): string {
+  const p = storagePath || "";
+  if (p.startsWith(DMS_PATH_PREFIX)) return p;
+  const parts = p.split("/");
+  const rest = parts.length > 1 ? parts.slice(1).join("/") : parts.join("/");
+  return DMS_PATH_PREFIX + rest;
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
@@ -69,7 +78,7 @@ serve(async (req) => {
           .from("vendor-documents").download(d.file_path);
         if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
         const base64 = await blobToBase64(blob);
-        FILE_UPLOAD.push({ FILE: base64, FILE_PATH: d.file_path });
+        FILE_UPLOAD.push({ FILE: base64, FILE_PATH: toDmsPath(d.file_path) });
       } catch (e: any) {
         skipped.push(`${d.file_name} (${e?.message || "error"})`);
       }
