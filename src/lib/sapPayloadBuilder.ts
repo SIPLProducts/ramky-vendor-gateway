@@ -25,6 +25,26 @@ export function resolveRegion(state: string | null | undefined): string {
   return stateToRegion[key] || "";
 }
 
+/**
+ * Resolve the SAP NAME1 value for a vendor row.
+ * - If GSTIN present → Trade Name (fallback Legal Name).
+ * - If GSTIN absent → Legal Name (which holds the PAN account holder name)
+ *   with Account Holder Name as a final fallback.
+ */
+export function getSapName1(vendor: any): string {
+  const v = vendor || {};
+  const has = (x: any) => x != null && String(x).trim().length > 0;
+  if (has(v.gstin)) {
+    return String(v.trade_name || v.legal_name || "").trim();
+  }
+  return String(v.legal_name || v.account_holder_name || v.trade_name || "").trim();
+}
+
+export function getSapVenClass(vendor: any): string {
+  const v = vendor || {};
+  return v.gstin && String(v.gstin).trim() ? "" : "0";
+}
+
 const DOC_NAME_MAP: Record<string, string> = {
   pan_card: "pan", gst_certificate: "gst", gst_self_declaration: "gst_self_declaration",
   msme_certificate: "msme", cancelled_cheque: "bank_cheque1", cancelled_cheque_2: "bank_cheque2",
