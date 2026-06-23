@@ -18,6 +18,7 @@ import { Building2, Loader2, FileCheck, Award } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData, SapMasterRow } from '@/hooks/useSapMasterData';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
+import { toast } from 'sonner';
 
 import {
   OrganizationDetails,
@@ -269,8 +270,19 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     onNext({ organization, statutory });
   };
 
+  const onInvalid = (errs: any) => {
+    const firstKey = Object.keys(errs || {})[0];
+    const firstMsg = firstKey ? (errs[firstKey]?.message as string) : 'Please complete the required fields.';
+    toast.error(firstMsg || 'Please complete the required fields.');
+    // Scroll to first invalid field
+    if (firstKey) {
+      const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
+      (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   return (
-    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form id="step-form-2" onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">
           <Building2 className="h-5 w-5 text-primary" />
