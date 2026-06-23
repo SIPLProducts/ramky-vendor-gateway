@@ -1161,6 +1161,9 @@ export default function VendorRegistration() {
     }
   };
 
+  // Step 1 is rendered persistently (see JSX below) so its internal KYC
+  // state (MSME tab manual entry, picked files, OCR previews, etc.) is
+  // preserved when the user navigates to another step and returns.
   const renderStep = () => {
     // International flow
     if (isInternational) {
@@ -1170,7 +1173,7 @@ export default function VendorRegistration() {
       }
       switch (currentStep) {
         case 1:
-          return <IntlDocumentsStep vendorId={vendorId} data={intl.documents} onChange={(d) => setIntlSlice('documents', d)} />;
+          return null; // rendered persistently outside renderStep
         case 2:
           return <IntlCompanyDetailsStep tenantId={tenantId} data={intl.company} onSubmit={handleIntlCompanyComplete} onLiveUpdate={(d) => setIntlSlice('company', d)} />;
         case 3:
@@ -1183,7 +1186,7 @@ export default function VendorRegistration() {
     // Built-in domestic steps 1..5
     switch (currentStep) {
       case 1:
-        return <DocumentVerificationStep vendorId={vendorId} initialData={verifiedData} initialTab={pendingDocTab} onComplete={handleDocVerificationComplete} onStageChange={handleDocStageChange} />;
+        return null; // rendered persistently outside renderStep
       case 2:
         return <OrganizationStep tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} onNext={handleOrganizationComplete} onLiveUpdate={(d) => setFormData((prev) => ({ ...prev, organization: d.organization, statutory: d.statutory }))} />;
       case 3:
@@ -1213,6 +1216,7 @@ export default function VendorRegistration() {
     }
     return null;
   };
+
 
   if (isLoadingVendor || isValidatingToken || isBootstrappingOnBehalf) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
 
