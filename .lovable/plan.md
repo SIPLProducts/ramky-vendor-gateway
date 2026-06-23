@@ -1,72 +1,55 @@
-## What the error actually means
+## Goal
 
-The URL in the request is the **unauthenticated** storage endpoint:
+Everywhere a vendor is listed in a table, show the SAP **NAME1** value instead of `legal_name`:
 
-```
-/storage/v1/object/vendor-documents/<vendor_id>/cancelled_cheque/<file>.pdf
-```
+- GSTIN present → **Trade Name** (fallback Legal Name)
+- GSTIN absent → **Legal Name / PAN Account Holder Name** (fallback Trade Name)
 
-- No `/sign/...?token=` segment → it is **not** the signed URL the app produces via `createSignedUrl`.
-- `vendor-documents` is a **private** bucket, so a direct GET to `/object/<bucket>/<path>` will always return `404 not_found` on a self-hosted Supabase, even if the file exists.
+The shared helper `getSapName1(vendor)` in `src/lib/sapPayloadBuilder.ts` already encodes this rule and is used in SAP Sync. We'll reuse it everywhere.
 
-So one of two things is happening on the self-hosted server:
+## Changes
 
-1. **The object genuinely is not in storage on the self-hosted instance.** The `vendor_documents` row was migrated (or created against this DB) but the underlying file in the `vendor-documents` bucket was never copied over. The app calls `createSignedUrl`, storage replies "object does not exist", code falls back to `download()` which also fails, and the UI shows "File is missing in storage."
-2. **The storage service is misconfigured** (wrong S3/file backend, bucket name mismatch, or `vendor-documents` bucket not created on the self-hosted Supabase). Same symptom for every file.
+### Frontend tables — swap displayed name to `getSapName1(vendor) || vendor.legal_name`
 
-The app code itself (upload path, `file_path` convention `{vendorId}/{documentType}/{timestamp}_{name}`, `createSignedUrl` + `download` fallback) is correct and unchanged — this is an environment/data issue on the self-hosted box.
+Update only the vendor-name cell/label in each table/list (no other columns, no business logic):
 
-## Verification steps on the self-hosted server
+1. `src/pages/VendorList.tsx` — list card name (line ~411).
+2. `src/pages/Dashboard.tsx` — recent vendors table (line ~310). Also include `trade_name, gstin` in the `.select(...)` (line ~117).
+3. `src/pages/FinanceReview.tsx` — list row name (line ~260).
+4. `src/pages/PurchaseApproval.tsx` — list row name (line ~312).
+5. `src/pages/GstCompliance.tsx` — table cell (line ~524). Already selects what's needed.
+6. `src/pages/DocumentVerification.tsx` — sidebar vendor list item (line ~705) only.
+7. `src/components/sap/MultipleSapSyncDialog.tsx` — list item (line ~139).
+8. `src/components/approvals/StageApprovalView.tsx` — uses `item.vendorName` from the edge function; no change here (handled below).
 
-Run these on the self-hosted Supabase to localize the cause:
+Search filters and dialog titles are out of scope to keep this strictly a table-display change.
 
-1. Confirm the bucket exists:
-   ```sql
-   select id, name, public from storage.buckets where name = 'vendor-documents';
-   ```
-2. Confirm the object row exists in storage metadata:
-   ```sql
-   select name, bucket_id, created_at
-   from storage.objects
-   where bucket_id = 'vendor-documents'
-     and name = 'f30c1a63-e593-43b2-b8b1-878db58ae0c9/cancelled_cheque/1781761907875_LN_Cheque.pdf';
-   ```
-3. Confirm the physical file exists in the storage backend (S3 bucket or `/var/lib/storage` mount, depending on how Supabase Storage is configured).
-4. Test a signed URL from the server:
-   ```bash
-   curl -X POST \
-     -H "Authorization: Bearer <service_role_key>" \
-     -H "Content-Type: application/json" \
-     -d '{"expiresIn":3600}' \
-     http://206.1.23.95:9009/supabase/storage/v1/object/sign/vendor-documents/<path>
-   ```
-   - 200 + token → storage works, the original failing URL was just the wrong (unsigned) one.
-   - 404 → the object truly isn't there; this is a data-migration gap.
+### Approval list edge function — compute NAME1 server-side
 
-## Likely outcomes and remediation
+`supabase/functions/list-pending-approvals-by-stage/index.ts`:
 
-- **Object missing (most likely)** — re-sync the `vendor-documents` bucket from the source environment to the self-hosted backend (S3 sync or rsync of the storage volume). No code change needed; once files land at the expected `file_path`, the SAP Sync viewer will work.
-- **Bucket missing / misnamed** — create a `vendor-documents` private bucket on the self-hosted Supabase and re-run the storage data sync.
-- **Storage service misconfigured** — fix the storage container's S3/file backend env vars so `storage.objects` rows actually resolve to bytes.
+- Add `gstin` to the two `vendors` `.select(...)` calls.
+- Replace both `vendorName: v?.legal_name ?? v?.trade_name ?? …` expressions with the NAME1 rule:
+  ```ts
+  vendorName: (v?.gstin ? (v?.trade_name || v?.legal_name) : (v?.legal_name || v?.trade_name)) || p.vendor_id.slice(0, 8)
+  ```
+- Redeploy the function.
 
-## Small UI hardening (only code change proposed)
+This fixes the SCM Manager Approval table (the screenshot) plus every other stage table that consumes `StageApprovalView`.
 
-To make the SAP Sync screen more useful when this happens again, I'd make one tiny change in `src/components/vendor/VendorDocuments.tsx`:
+### Out of scope
 
-- When both `createSignedUrl` and `download` fail, include the failing `file_path` in the toast description (currently it just says "Document file is missing in storage."). This lets the admin/operator copy the exact key to investigate on the storage server without opening DevTools.
+- `legal_name` usages in dialog titles, audit logs, exports, search filters, SAP payload internals, KYC pages, and the registration form — all preserved as-is.
+- No DB or schema changes; no new columns.
+- No changes to `getSapName1` itself.
 
-Example new toast:
+## Files touched
 
-```
-Preview unavailable
-Storage object not found: f30c1a63-.../cancelled_cheque/1781761907875_LN_Cheque.pdf
-```
-
-No other code changes. Upload pipeline, RLS, and `createSignedUrl` usage are already correct.
-
-## Out of scope
-
-- Migrating the actual files between environments (must be done on the self-hosted infra).
-- Changing the bucket to public — that would expose vendor PII and is not appropriate.
-
-Approve this and I'll apply the toast/error-detail change; the storage migration must be done on the self-hosted box per the verification steps above.
+- `src/pages/VendorList.tsx`
+- `src/pages/Dashboard.tsx`
+- `src/pages/FinanceReview.tsx`
+- `src/pages/PurchaseApproval.tsx`
+- `src/pages/GstCompliance.tsx`
+- `src/pages/DocumentVerification.tsx`
+- `src/components/sap/MultipleSapSyncDialog.tsx`
+- `supabase/functions/list-pending-approvals-by-stage/index.ts` (+ redeploy)
