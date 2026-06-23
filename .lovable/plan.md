@@ -1,48 +1,26 @@
-## Goal
+## Problem
 
-Make the NAME1 display rule (GST → Trade Name, No GST → PAN/Legal Name) consistent **everywhere a vendor identity is shown to a user** — not just the main listing tables that were updated last round.
+In Step 1 (Documents → KYC), after entering MSME details (and similarly other unverified entries — Udyam number typed but not yet "Verified", or a certificate file picked but OCR not finished), if the user navigates to Organization (or any other step) and comes back via the previous button or top step indicator, the MSME tab is reset.
 
-The helper `getSapName1(vendor)` in `src/lib/sapPayloadBuilder.ts` already encodes the rule and is the single source of truth. This plan reuses it.
+Root cause: Step 1's `DocumentVerificationStep` is conditionally rendered (`switch (currentStep) { case 1: ... }`) in `src/pages/VendorRegistration.tsx`. Leaving step 1 unmounts the component and destroys all its local React state. The parent's `verifiedData` only contains `msme` block when `msmeDoc.status === "verified"` (`buildOutput` in `DocumentVerificationStep.tsx` line 1736), and the manual Udyam number input (`msmeManualNumber`), in‑progress OCR data, and the picked file are not fully rehydrated from `initialData` on remount (`msmeDoc` init at line 411 only rebuilds from `initialData.msme`, ignoring `msmeCertificateFile`, partial OCR, manual entry, error messages, etc.).
 
-## What's already done (no change needed)
+## Fix
 
-These vendor listing tables already render `getSapName1(vendor) || vendor.legal_name`:
+Keep `DocumentVerificationStep` mounted across step navigation so its in-progress KYC state (MSME and the other three tabs) is preserved when the user moves to Organization/Address/etc. and returns.
 
-- `VendorList.tsx`, `Dashboard.tsx`, `FinanceReview.tsx`, `PurchaseApproval.tsx`, `GstCompliance.tsx`, `DocumentVerification.tsx`, `SAPSync.tsx`, `MultipleSapSyncDialog.tsx`
-- Approvals tables (BuyerApproval / CeoApproval / Finance1Approval / Finance2Approval / ScmHeadApproval / ScmManagerApproval) — driven by `StageApprovalView` + edge function `list-pending-approvals-by-stage`, both already updated.
+### Changes (single file: `src/pages/VendorRegistration.tsx`)
 
-## What this plan changes
+1. In `renderStep()` (domestic branch, around lines 1184–1195), stop rendering Step 1 inside the `switch`. Instead, always render `DocumentVerificationStep` once in the page (outside `renderStep`), wrapped in a `<div hidden={currentStep !== 1} aria-hidden={currentStep !== 1}>` (or `style={{ display: currentStep === 1 ? 'block' : 'none' }}`) so it stays mounted but is only visible on step 1.
+2. The `switch` keeps cases 2..5 unchanged and returns `null` for `case 1` (it is rendered separately above).
+3. Apply the same treatment to the international branch's Step 1 (`IntlDocumentsStep`) for consistency, since it has the same unmount-on-navigation risk.
+4. No change to props, `verifiedData`, `handleDocStageChange`, `handleDocVerificationComplete`, or the autosave/draft pipeline — they continue to work because the component is still mounted and `onStageChange` keeps firing only when its local state actually changes.
 
-Extend the NAME1 rule to all remaining places where a vendor's name is shown as a result of clicking a row in those tables, plus the few stragglers, so the displayed name is always consistent with the table cell:
+### Out of scope
 
-### 1. Dialog titles / headers opened from a vendor row
-Replace `selectedVendor.legal_name` / `vendor.legal_name` in titles and toasts with `getSapName1(...) || legal_name || 'Vendor'`.
+- No changes to `DocumentVerificationStep`'s internal state model, `buildOutput`, or KYC tab rehydration logic.
+- No backend, schema, or edge-function changes.
+- Other steps (Organization, Address, etc.) are not kept mounted — they already round-trip cleanly through `formData`/`onLiveUpdate`. Only Step 1 is affected by this bug.
 
-- `src/pages/FinanceReview.tsx` — dialog title (line 324)
-- `src/pages/PurchaseApproval.tsx` — dialog title (line 407), finance-comment dialog vendor label (line 329), return-target row label
-- `src/pages/VendorList.tsx` — sheet header (line 529), summary "Legal Name" field stays (it's an explicit label), return-target label (line 797) → use NAME1
-- `src/pages/SAPSync.tsx` — reject confirmation dialog name (line 599), success/info toasts that include `vendor.legal_name` (lines 112, 174, 191 — `BPNAME` payload stays untouched per existing SAP rules)
-- `src/components/vendor/VendorReviewDialog.tsx` — dialog title (line 417). Keep the labeled "Legal Name" and "Trade Name" rows in the body as-is.
+### Verification
 
-### 2. Vendor's own status page
-- `src/pages/VendorStatus.tsx` — add `gstin` to the `.select()`, change the "Company Name" field (line 108) to `getSapName1(vendor) || vendor.legal_name || vendor.trade_name || '—'`.
-
-### 3. Audit logs row label
-- `src/pages/AuditLogs.tsx` (line 169-170) — when rendering `Vendor: <name>` from `log.details`, prefer `details.trade_name` when `details.gstin` is present, else `details.legal_name`.
-
-### 4. Realtime toast notifications
-- `src/hooks/useRealtimeUpdates.tsx` — `vendorName` derivations (lines 61, 81) already use `trade_name || legal_name`. Tighten to the NAME1 rule using the row's `gstin` so they match the tables.
-
-## Out of scope (unchanged)
-
-- Explicit labeled fields like "Legal Name" / "Trade Name" inside detail panels.
-- Registration form inputs, KYC tabs, OCR/API verification screens.
-- SAP payload builders, `getSapName1` itself, `BPNAME` error-payload field.
-- Exports (CSV "Company Name"/"Name" columns), search filters (they still match against `legal_name` and `trade_name` for usability).
-- DB schema; no new columns.
-
-## Technical notes
-
-- Each touched file gets a `getSapName1` import from `@/lib/sapPayloadBuilder` if not already present.
-- For `VendorStatus.tsx` and `AuditLogs.tsx`, ensure the selected fields include `gstin` / `trade_name` so the rule can be evaluated client-side.
-- No edge function redeploys are required (the approvals function was already updated last round).
+After the change: enter a Udyam number / pick an MSME certificate without clicking Verify → go to Organization → click Previous (or the Documents step in the top indicator) → the MSME tab should retain the entered number, the selected file, OCR preview, status pill, and the "Yes/No MSME registered" selection exactly as left.
