@@ -1542,6 +1542,61 @@ export function DocumentVerificationStep({
     return () => clearTimeout(t);
   }, [bank2Enabled, bankDoc2.ocrData?.ifsc_code, bankDoc2.ocrData?.branch_name]);
 
+  // Validate Primary vs Secondary Account Holder Name. When the secondary
+  // cheque is verified, compare its holder name against the primary holder
+  // name. On mismatch, surface a SweetAlert and reset all secondary fields.
+  const secondaryMismatchHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!bank2Enabled) return;
+    if (bankDoc2.status !== "verified") return;
+    if (bankDoc.status !== "verified") return;
+    const primaryName = String(
+      bankDoc.ocrData?.account_holder_name ||
+        (bankDoc.apiData as any)?.accountHolderName ||
+        "",
+    ).trim();
+    const secondaryName = String(
+      bankDoc2.ocrData?.account_holder_name ||
+        (bankDoc2.apiData as any)?.accountHolderName ||
+        "",
+    ).trim();
+    if (!primaryName || !secondaryName) return;
+
+    // De-dupe so we don't loop on the same verified pair.
+    const key = `${primaryName}::${secondaryName}`;
+    if (secondaryMismatchHandledRef.current === key) return;
+
+    const score = nameMatchPercentage(primaryName, secondaryName);
+    if (score >= 90) {
+      secondaryMismatchHandledRef.current = key;
+      return;
+    }
+
+    secondaryMismatchHandledRef.current = key;
+    // Reset everything secondary so the vendor must re-upload.
+    setBankDoc2(idleDoc);
+    lastBankFile2Ref.current = null;
+    setBankBranchAutoFilled2(false);
+    setBankBranchAddress2("");
+    setBankAccountType2("current");
+    bankAddressTouchedRef2.current = false;
+
+    Swal.fire({
+      icon: "error",
+      title: "Account holder mismatch",
+      text: "Primary and Secondary Account Holder Names do not match.",
+      confirmButtonColor: "#2563eb",
+    });
+  }, [
+    bank2Enabled,
+    bankDoc.status,
+    bankDoc2.status,
+    bankDoc.ocrData?.account_holder_name,
+    bankDoc2.ocrData?.account_holder_name,
+  ]);
+
+
+
   // Re-run PAN ↔ GSTIN cross-check live whenever the user corrects either OCR field.
   useEffect(() => {
     if (panDoc.status !== "verified" || isGstRegistered !== true) {
