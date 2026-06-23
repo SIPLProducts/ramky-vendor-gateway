@@ -1519,9 +1519,29 @@ export default function VendorRegistration() {
 
             {/* Form Content */}
             <div className="p-6" key={`step-${formData.vendorType}-${resetNonce}`}>
-
-              {renderStep()}
+              {/* Step 1 stays mounted across navigation so in-progress KYC
+                  inputs (MSME manual entry, picked files, OCR previews, etc.)
+                  survive when the user moves to another step and returns. */}
+              <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
+                {isInternational ? (
+                  <IntlDocumentsStep
+                    vendorId={vendorId}
+                    data={(formData.international ?? EMPTY_INTERNATIONAL_DATA).documents}
+                    onChange={(d) => setIntlSlice('documents', d)}
+                  />
+                ) : (
+                  <DocumentVerificationStep
+                    vendorId={vendorId}
+                    initialData={verifiedData}
+                    initialTab={pendingDocTab}
+                    onComplete={handleDocVerificationComplete}
+                    onStageChange={handleDocStageChange}
+                  />
+                )}
+              </div>
+              {currentStep !== 1 && renderStep()}
             </div>
+
 
             {/* Action Bar - Inside Card */}
             <div className="px-6 py-4 border-t bg-muted/30 rounded-b-[10px]">
