@@ -614,14 +614,17 @@ serve(async (req) => {
     } else {
       // Legacy/flat shape fallback — synthesize an ACC_RES-shaped row so the UI still renders.
       const flat = sapResponse || [];
-      const s = flat.find((it: any) => it?.MSGTYP === "S" && it?.BP_LIFNR);
+      const s = flat.find((it: any) => it?.MSGTYP === "S" && (it?.VENDOR || it?.BP_LIFNR));
       const e = flat.find((it: any) => it?.MSGTYP === "E");
-      if (s) accRes = [{ MSGTYP: "S", BP_LIFNR: s.BP_LIFNR, LONGMSG: s.MSG || "Business Partner created", BPNAME: s.BPNAME }];
-      else if (e) accRes = [{ MSGTYP: "E", BP_LIFNR: e.BP_LIFNR || "", LONGMSG: e.MSG || "SAP returned an error", BPNAME: e.BPNAME }];
+      if (s) accRes = [{ MSGTYP: "S", VENDOR: s.VENDOR || s.BP_LIFNR, BP_LIFNR: s.VENDOR || s.BP_LIFNR, LONGMSG: s.MSG || "Business Partner created", BPNAME: s.BPNAME }];
+      else if (e) accRes = [{ MSGTYP: "E", VENDOR: e.VENDOR || e.BP_LIFNR || "", BP_LIFNR: e.VENDOR || e.BP_LIFNR || "", LONGMSG: e.MSG || "SAP returned an error", BPNAME: e.BPNAME }];
     }
 
-    const successRow = accRes.find((r: any) => r?.MSGTYP === "S" && r?.BP_LIFNR);
-    const sapVendorCode = successRow?.BP_LIFNR || null;
+    // Normalize so every row exposes a VENDOR field (prefer VENDOR, fall back to BP_LIFNR).
+    accRes = accRes.map((r: any) => ({ ...r, VENDOR: r?.VENDOR || r?.BP_LIFNR || "" }));
+
+    const successRow = accRes.find((r: any) => r?.MSGTYP === "S" && (r?.VENDOR || r?.BP_LIFNR));
+    const sapVendorCode = successRow?.VENDOR || successRow?.BP_LIFNR || null;
 
     if (successRow && sapVendorCode) {
       const refNo = String(vendor.reference_number || vendor.id || "").toUpperCase();

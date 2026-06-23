@@ -696,7 +696,7 @@ export default function SAPSync() {
                         {r.MSGTYP === 'S' ? 'Success' : 'Error'}
                       </Badge>
                     </div>
-                    {r.BP_LIFNR && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{r.BP_LIFNR}</span></p>}
+                    {(r.VENDOR || r.BP_LIFNR) && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR || r.BP_LIFNR}</span></p>}
                     {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
                   </div>
                 ))}
@@ -734,7 +734,7 @@ export default function SAPSync() {
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     {r.idnum && <p>Ref No (idnum): <span className="font-mono">{r.idnum}</span></p>}
-                    {r.BP_LIFNR && <p>SAP Vendor Code: <span className="font-mono font-semibold">{r.BP_LIFNR}</span></p>}
+                    {(r.VENDOR || r.BP_LIFNR) && <p>SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR || r.BP_LIFNR}</span></p>}
                   </div>
                 </div>
               ))}
@@ -769,12 +769,12 @@ export default function SAPSync() {
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    SAP Code: <span className="font-mono">{r.BP_LIFNR || r.sap?.BP_LIFNR || '-'}</span> • Uploaded: {r.uploadedCount}
+                    SAP Code: <span className="font-mono">{r.VENDOR || r.BP_LIFNR || r.sap?.VENDOR || r.sap?.BP_LIFNR || '-'}</span> • Uploaded: {r.uploadedCount}
                   </p>
                   {r.sap && (
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs bg-background rounded-md p-2 border">
-                      {r.sap.BP_LIFNR && (
-                        <div><span className="text-muted-foreground">BP_LIFNR:</span> <span className="font-mono font-medium">{r.sap.BP_LIFNR}</span></div>
+                      {(r.sap.VENDOR || r.sap.BP_LIFNR) && (
+                        <div><span className="text-muted-foreground">Vendor Code:</span> <span className="font-mono font-medium">{r.sap.VENDOR || r.sap.BP_LIFNR}</span></div>
                       )}
                       {r.sap.MSGTYP && (
                         <div><span className="text-muted-foreground">Type:</span> <span className="font-mono">{r.sap.MSGTYP}</span></div>

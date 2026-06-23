@@ -223,23 +223,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           continue;
         }
 
-        // Replacement → remove old storage object first.
-        // The metadata row is updated atomically via upsert below.
-        if (existing) {
+        // Upload-first, then update metadata, then remove the previous storage
+        // object. This guarantees vendor_documents rows always point to a file
+        // that actually exists in storage (prevents "File missing in storage"
+        // errors when the new upload would have failed after deleting the old).
+        const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
+        if (!result) continue;
+
+        await saveDocumentMetadata(vendorIdForUpload, result);
+        uploadedFilesRef.current.add(doc.file);
+
+        if (existing && existing.file_path && existing.file_path !== result.filePath) {
           try {
             await supabase.storage.from('vendor-documents').remove([existing.file_path]);
           } catch (e) {
             console.warn('Failed to remove old storage object:', e);
           }
         }
-
-        const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
-        if (result) {
-          await saveDocumentMetadata(vendorIdForUpload, result);
-          uploadedFilesRef.current.add(doc.file);
-        }
       }
     };
+
 
     uploadInFlight.current = run();
     try {

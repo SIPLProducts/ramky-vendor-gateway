@@ -230,8 +230,12 @@ serve(async (req) => {
       // Fallback: positional
       if (!match && accRes[i]) match = accRes[i];
 
-      const success = match?.MSGTYP === "S" && !!match?.BP_LIFNR;
-      const sapVendorCode = match?.BP_LIFNR || null;
+      const success = match?.MSGTYP === "S" && !!(match?.VENDOR || match?.BP_LIFNR);
+      const sapVendorCode = match?.VENDOR || match?.BP_LIFNR || null;
+      if (match) {
+        // Expose VENDOR on the row so the client can prefer it.
+        match.VENDOR = match.VENDOR || match.BP_LIFNR || "";
+      }
       const message = match?.LONGMSG || match?.MSG || (success ? "Vendor created" : "No response from SAP for this vendor");
 
       results.push({ vendorId: vid, refNo, sapVendorCode, success, message, raw: match || null });
@@ -254,10 +258,11 @@ serve(async (req) => {
     }
 
     const successCount = results.filter(r => r.success).length;
+    const normalizedAccRes = (accRes || []).map((r: any) => ({ ...r, VENDOR: r?.VENDOR || r?.BP_LIFNR || "" }));
     return ok({
       success: successCount > 0,
       message: `${successCount}/${vendorIds.length} vendor(s) created in SAP`,
-      ACC_RES: accRes,
+      ACC_RES: normalizedAccRes,
       results,
     });
   } catch (error: any) {
