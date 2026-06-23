@@ -703,7 +703,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                         onClick={() => setSelectedVendor(vendor)}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium">{vendor.legal_name || 'Unknown Vendor'}</p>
+                          <p className="font-medium">{getSapName1(vendor) || vendor.legal_name || 'Unknown Vendor'}</p>
                           <div className="flex items-center gap-1">
                             {vendor.doc_count > 0 && (
                               <Badge variant="outline" className="text-xs">
