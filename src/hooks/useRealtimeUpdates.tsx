@@ -11,13 +11,14 @@ interface VendorUpdate {
   legal_name: string | null;
   trade_name: string | null;
   gstin?: string | null;
+  account_holder_name?: string | null;
   updated_at: string;
 }
 
-const pickVendorName = (rec: { gstin?: string | null; trade_name?: string | null; legal_name?: string | null }, fallback: string) => {
+const pickVendorName = (rec: { gstin?: string | null; trade_name?: string | null; legal_name?: string | null; account_holder_name?: string | null }, fallback: string) => {
   const has = (x: unknown) => x != null && String(x).trim().length > 0;
   if (has(rec.gstin)) return rec.trade_name || rec.legal_name || fallback;
-  return rec.legal_name || rec.trade_name || fallback;
+  return rec.account_holder_name || rec.legal_name || rec.trade_name || fallback;
 };
 
 interface RealtimeHookOptions {
