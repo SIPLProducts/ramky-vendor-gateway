@@ -27,16 +27,29 @@ export function resolveRegion(state: string | null | undefined): string {
 
 /**
  * Resolve the SAP NAME1 value for a vendor row.
- * - If GSTIN present → Trade Name (fallback Legal Name).
+ * - If GSTIN present → Trade Name (fallback Legal Name, then Account Holder Name).
  * - If GSTIN absent → Account Holder Name (fallback Legal Name, then Trade Name).
+ * Whitespace-only and placeholder tokens ("-", "—", "N/A", "NA") are treated as empty
+ * so the fallback actually fires.
  */
+const PLACEHOLDER_TOKENS = new Set(["-", "—", "n/a", "na", "none", "null", "undefined"]);
+function cleanName(x: any): string {
+  if (x == null) return "";
+  const s = String(x).trim();
+  if (!s) return "";
+  if (PLACEHOLDER_TOKENS.has(s.toLowerCase())) return "";
+  return s;
+}
 export function getSapName1(vendor: any): string {
   const v = vendor || {};
-  const has = (x: any) => x != null && String(x).trim().length > 0;
-  if (has(v.gstin)) {
-    return String(v.trade_name || v.legal_name || "").trim();
+  const gstin = cleanName(v.gstin);
+  const trade = cleanName(v.trade_name);
+  const legal = cleanName(v.legal_name);
+  const ahn = cleanName(v.account_holder_name);
+  if (gstin) {
+    return trade || legal || ahn || "";
   }
-  return String(v.account_holder_name || v.legal_name || v.trade_name || "").trim();
+  return ahn || legal || trade || "";
 }
 
 export function getSapVenClass(vendor: any): string {

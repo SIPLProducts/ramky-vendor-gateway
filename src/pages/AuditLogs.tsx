@@ -167,7 +167,13 @@ export default function AuditLogs() {
                           {typeof log.details === 'object' && 'comments' in (log.details as Record<string, unknown>)
                             ? String((log.details as Record<string, unknown>).comments)
                             : typeof log.details === 'object' && ('legal_name' in (log.details as Record<string, unknown>) || 'trade_name' in (log.details as Record<string, unknown>))
-                            ? `Vendor: ${(() => { const d = log.details as Record<string, unknown>; const gstin = d.gstin as string | undefined; const trade = d.trade_name as string | undefined; const legal = d.legal_name as string | undefined; const ahn = d.account_holder_name as string | undefined; return String((gstin && (trade || legal)) || (ahn || legal || trade) || ''); })()}`
+                            ? `Vendor: ${(() => {
+                                const d = log.details as Record<string, unknown>;
+                                const PH = new Set(["-", "—", "n/a", "na", "none", "null", "undefined"]);
+                                const cn = (x: unknown) => { if (x == null) return ""; const s = String(x).trim(); if (!s) return ""; return PH.has(s.toLowerCase()) ? "" : s; };
+                                const gstin = cn(d.gstin); const trade = cn(d.trade_name); const legal = cn(d.legal_name); const ahn = cn(d.account_holder_name);
+                                return (gstin ? (trade || legal || ahn) : (ahn || legal || trade)) || '';
+                              })()}`
                             : JSON.stringify(log.details).slice(0, 100) + (JSON.stringify(log.details).length > 100 ? '...' : '')}
                         </p>
                       )}
