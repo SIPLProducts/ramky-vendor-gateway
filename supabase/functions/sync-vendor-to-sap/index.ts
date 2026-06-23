@@ -635,15 +635,19 @@ serve(async (req) => {
       const flat = sapResponse || [];
       const s = flat.find((it: any) => it?.MSGTYP === "S" && (it?.VENDOR || it?.BP_LIFNR));
       const e = flat.find((it: any) => it?.MSGTYP === "E");
-      if (s) accRes = [{ MSGTYP: "S", VENDOR: s.VENDOR || s.BP_LIFNR, BP_LIFNR: s.VENDOR || s.BP_LIFNR, LONGMSG: s.MSG || "Business Partner created", BPNAME: s.BPNAME }];
-      else if (e) accRes = [{ MSGTYP: "E", VENDOR: e.VENDOR || e.BP_LIFNR || "", BP_LIFNR: e.VENDOR || e.BP_LIFNR || "", LONGMSG: e.MSG || "SAP returned an error", BPNAME: e.BPNAME }];
+      if (s) accRes = [{ MSGTYP: "S", VENDOR: s.VENDOR || s.BP_LIFNR, BP_LIFNR: s.VENDOR || s.BP_LIFNR, BP_LIFNR_ORIG: s.BP_LIFNR || "", LONGMSG: s.MSG || "Business Partner created", BPNAME: s.BPNAME }];
+      else if (e) accRes = [{ MSGTYP: "E", VENDOR: e.VENDOR || e.BP_LIFNR || "", BP_LIFNR: e.VENDOR || e.BP_LIFNR || "", BP_LIFNR_ORIG: e.BP_LIFNR || "", LONGMSG: e.MSG || "SAP returned an error", BPNAME: e.BPNAME }];
     }
 
-    // Normalize so every row exposes a VENDOR field (prefer VENDOR, fall back to BP_LIFNR).
-    accRes = accRes.map((r: any) => ({ ...r, VENDOR: r?.VENDOR || r?.BP_LIFNR || "" }));
+    // Normalize so every row exposes a VENDOR field strictly preferred,
+    // and overwrite BP_LIFNR with VENDOR for downstream UI consumers (keep original under BP_LIFNR_ORIG).
+    accRes = accRes.map((r: any) => {
+      const vendorVal = r?.VENDOR || r?.BP_LIFNR || "";
+      return { ...r, VENDOR: vendorVal, BP_LIFNR_ORIG: r?.BP_LIFNR_ORIG ?? r?.BP_LIFNR ?? "", BP_LIFNR: vendorVal };
+    });
 
-    const successRow = accRes.find((r: any) => r?.MSGTYP === "S" && (r?.VENDOR || r?.BP_LIFNR));
-    const sapVendorCode = successRow?.VENDOR || successRow?.BP_LIFNR || null;
+    const successRow = accRes.find((r: any) => r?.MSGTYP === "S" && r?.VENDOR);
+    const sapVendorCode = successRow?.VENDOR || null;
 
     if (successRow && sapVendorCode) {
       const refNo = String(vendor.reference_number || vendor.id || "").toUpperCase();
