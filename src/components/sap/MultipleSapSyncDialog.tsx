@@ -136,7 +136,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
           <div className="flex flex-wrap gap-2 mt-2">
             {vendors.map(v => (
               <Badge key={v.id} variant="secondary" className="rounded-full">
-                {v.legal_name || v.trade_name || v.id.slice(0, 8)}
+                {getSapName1(v) || v.legal_name || v.trade_name || v.id.slice(0, 8)}
               </Badge>
             ))}
           </div>
