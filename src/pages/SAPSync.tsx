@@ -368,7 +368,7 @@ export default function SAPSync() {
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                            <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
                             <Badge className="bg-green-100 text-green-700 border-green-200">{getApprovalLabel(vendor)}</Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
