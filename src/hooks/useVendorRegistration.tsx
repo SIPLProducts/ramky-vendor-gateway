@@ -241,9 +241,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           }
         }
       }
-
-      }
     };
+
 
     uploadInFlight.current = run();
     try {
