@@ -230,11 +230,13 @@ serve(async (req) => {
       // Fallback: positional
       if (!match && accRes[i]) match = accRes[i];
 
-      const success = match?.MSGTYP === "S" && !!(match?.VENDOR || match?.BP_LIFNR);
       const sapVendorCode = match?.VENDOR || match?.BP_LIFNR || null;
+      const success = match?.MSGTYP === "S" && !!sapVendorCode;
       if (match) {
-        // Expose VENDOR on the row so the client can prefer it.
-        match.VENDOR = match.VENDOR || match.BP_LIFNR || "";
+        // Strictly prefer VENDOR and also stamp BP_LIFNR with the VENDOR value for downstream UI consumers.
+        match.BP_LIFNR_ORIG = match.BP_LIFNR_ORIG ?? match.BP_LIFNR ?? "";
+        match.VENDOR = sapVendorCode || "";
+        match.BP_LIFNR = sapVendorCode || "";
       }
       const message = match?.LONGMSG || match?.MSG || (success ? "Vendor created" : "No response from SAP for this vendor");
 
@@ -258,7 +260,10 @@ serve(async (req) => {
     }
 
     const successCount = results.filter(r => r.success).length;
-    const normalizedAccRes = (accRes || []).map((r: any) => ({ ...r, VENDOR: r?.VENDOR || r?.BP_LIFNR || "" }));
+    const normalizedAccRes = (accRes || []).map((r: any) => {
+      const vendorVal = r?.VENDOR || r?.BP_LIFNR || "";
+      return { ...r, VENDOR: vendorVal, BP_LIFNR_ORIG: r?.BP_LIFNR_ORIG ?? r?.BP_LIFNR ?? "", BP_LIFNR: vendorVal };
+    });
     return ok({
       success: successCount > 0,
       message: `${successCount}/${vendorIds.length} vendor(s) created in SAP`,
