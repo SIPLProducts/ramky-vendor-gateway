@@ -309,7 +309,7 @@ export default function Dashboard() {
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
-                      <TableCell>{v.legal_name ?? '—'}</TableCell>
+                      <TableCell>{getSapName1(v) || v.legal_name || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">
