@@ -90,6 +90,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
       ktokk: "",
       langu: "EN",
       lifnr: "",
+      name1: "{{vendor.name1_value|trunc:40}}",
       name2: "{{vendor.relative_name|trunc:40}}",
       name3: "",
       nodel: "",
