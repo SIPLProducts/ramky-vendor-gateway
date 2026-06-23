@@ -1,55 +1,48 @@
 ## Goal
 
-Everywhere a vendor is listed in a table, show the SAP **NAME1** value instead of `legal_name`:
+Make the NAME1 display rule (GST → Trade Name, No GST → PAN/Legal Name) consistent **everywhere a vendor identity is shown to a user** — not just the main listing tables that were updated last round.
 
-- GSTIN present → **Trade Name** (fallback Legal Name)
-- GSTIN absent → **Legal Name / PAN Account Holder Name** (fallback Trade Name)
+The helper `getSapName1(vendor)` in `src/lib/sapPayloadBuilder.ts` already encodes the rule and is the single source of truth. This plan reuses it.
 
-The shared helper `getSapName1(vendor)` in `src/lib/sapPayloadBuilder.ts` already encodes this rule and is used in SAP Sync. We'll reuse it everywhere.
+## What's already done (no change needed)
 
-## Changes
+These vendor listing tables already render `getSapName1(vendor) || vendor.legal_name`:
 
-### Frontend tables — swap displayed name to `getSapName1(vendor) || vendor.legal_name`
+- `VendorList.tsx`, `Dashboard.tsx`, `FinanceReview.tsx`, `PurchaseApproval.tsx`, `GstCompliance.tsx`, `DocumentVerification.tsx`, `SAPSync.tsx`, `MultipleSapSyncDialog.tsx`
+- Approvals tables (BuyerApproval / CeoApproval / Finance1Approval / Finance2Approval / ScmHeadApproval / ScmManagerApproval) — driven by `StageApprovalView` + edge function `list-pending-approvals-by-stage`, both already updated.
 
-Update only the vendor-name cell/label in each table/list (no other columns, no business logic):
+## What this plan changes
 
-1. `src/pages/VendorList.tsx` — list card name (line ~411).
-2. `src/pages/Dashboard.tsx` — recent vendors table (line ~310). Also include `trade_name, gstin` in the `.select(...)` (line ~117).
-3. `src/pages/FinanceReview.tsx` — list row name (line ~260).
-4. `src/pages/PurchaseApproval.tsx` — list row name (line ~312).
-5. `src/pages/GstCompliance.tsx` — table cell (line ~524). Already selects what's needed.
-6. `src/pages/DocumentVerification.tsx` — sidebar vendor list item (line ~705) only.
-7. `src/components/sap/MultipleSapSyncDialog.tsx` — list item (line ~139).
-8. `src/components/approvals/StageApprovalView.tsx` — uses `item.vendorName` from the edge function; no change here (handled below).
+Extend the NAME1 rule to all remaining places where a vendor's name is shown as a result of clicking a row in those tables, plus the few stragglers, so the displayed name is always consistent with the table cell:
 
-Search filters and dialog titles are out of scope to keep this strictly a table-display change.
+### 1. Dialog titles / headers opened from a vendor row
+Replace `selectedVendor.legal_name` / `vendor.legal_name` in titles and toasts with `getSapName1(...) || legal_name || 'Vendor'`.
 
-### Approval list edge function — compute NAME1 server-side
+- `src/pages/FinanceReview.tsx` — dialog title (line 324)
+- `src/pages/PurchaseApproval.tsx` — dialog title (line 407), finance-comment dialog vendor label (line 329), return-target row label
+- `src/pages/VendorList.tsx` — sheet header (line 529), summary "Legal Name" field stays (it's an explicit label), return-target label (line 797) → use NAME1
+- `src/pages/SAPSync.tsx` — reject confirmation dialog name (line 599), success/info toasts that include `vendor.legal_name` (lines 112, 174, 191 — `BPNAME` payload stays untouched per existing SAP rules)
+- `src/components/vendor/VendorReviewDialog.tsx` — dialog title (line 417). Keep the labeled "Legal Name" and "Trade Name" rows in the body as-is.
 
-`supabase/functions/list-pending-approvals-by-stage/index.ts`:
+### 2. Vendor's own status page
+- `src/pages/VendorStatus.tsx` — add `gstin` to the `.select()`, change the "Company Name" field (line 108) to `getSapName1(vendor) || vendor.legal_name || vendor.trade_name || '—'`.
 
-- Add `gstin` to the two `vendors` `.select(...)` calls.
-- Replace both `vendorName: v?.legal_name ?? v?.trade_name ?? …` expressions with the NAME1 rule:
-  ```ts
-  vendorName: (v?.gstin ? (v?.trade_name || v?.legal_name) : (v?.legal_name || v?.trade_name)) || p.vendor_id.slice(0, 8)
-  ```
-- Redeploy the function.
+### 3. Audit logs row label
+- `src/pages/AuditLogs.tsx` (line 169-170) — when rendering `Vendor: <name>` from `log.details`, prefer `details.trade_name` when `details.gstin` is present, else `details.legal_name`.
 
-This fixes the SCM Manager Approval table (the screenshot) plus every other stage table that consumes `StageApprovalView`.
+### 4. Realtime toast notifications
+- `src/hooks/useRealtimeUpdates.tsx` — `vendorName` derivations (lines 61, 81) already use `trade_name || legal_name`. Tighten to the NAME1 rule using the row's `gstin` so they match the tables.
 
-### Out of scope
+## Out of scope (unchanged)
 
-- `legal_name` usages in dialog titles, audit logs, exports, search filters, SAP payload internals, KYC pages, and the registration form — all preserved as-is.
-- No DB or schema changes; no new columns.
-- No changes to `getSapName1` itself.
+- Explicit labeled fields like "Legal Name" / "Trade Name" inside detail panels.
+- Registration form inputs, KYC tabs, OCR/API verification screens.
+- SAP payload builders, `getSapName1` itself, `BPNAME` error-payload field.
+- Exports (CSV "Company Name"/"Name" columns), search filters (they still match against `legal_name` and `trade_name` for usability).
+- DB schema; no new columns.
 
-## Files touched
+## Technical notes
 
-- `src/pages/VendorList.tsx`
-- `src/pages/Dashboard.tsx`
-- `src/pages/FinanceReview.tsx`
-- `src/pages/PurchaseApproval.tsx`
-- `src/pages/GstCompliance.tsx`
-- `src/pages/DocumentVerification.tsx`
-- `src/components/sap/MultipleSapSyncDialog.tsx`
-- `supabase/functions/list-pending-approvals-by-stage/index.ts` (+ redeploy)
+- Each touched file gets a `getSapName1` import from `@/lib/sapPayloadBuilder` if not already present.
+- For `VendorStatus.tsx` and `AuditLogs.tsx`, ensure the selected fields include `gstin` / `trade_name` so the rule can be evaluated client-side.
+- No edge function redeploys are required (the approvals function was already updated last round).
