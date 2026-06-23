@@ -38,7 +38,7 @@ export function StickyActionBar({
   const ContinueButton = (
     <Button
       type="submit"
-      form={currentStep === 1 ? "step-form-1" : "step-form"}
+      form={currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
       disabled={!canProceed}
       className={cn(
         "min-w-[120px]",

@@ -129,6 +129,7 @@ serve(async (req) => {
         idnum: refNo,
         idtype2: "ZMSMEN",
         idnum2: vendor?.msme_number ? String(vendor.msme_number).slice(0, 20) : "",
+        IDCATG: vendor?.msme_major_activity ? String(vendor.msme_major_activity) : "",
       };
     });
 
