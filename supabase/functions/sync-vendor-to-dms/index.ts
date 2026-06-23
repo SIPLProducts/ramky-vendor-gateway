@@ -275,7 +275,7 @@ serve(async (req) => {
               .from("vendor-documents").download(d.file_path);
             if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
             const base64 = await blobToBase64(blob);
-            uploads.push({ FILE: base64, FILE_PATH: d.file_path });
+            uploads.push({ FILE: base64, FILE_PATH: toDmsPath(d.file_path) });
           } catch (e: any) {
             skipped.push(`${d.file_name} (${e?.message || "error"})`);
           }
