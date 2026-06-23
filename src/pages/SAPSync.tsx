@@ -477,7 +477,7 @@ export default function SAPSync() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{v.legal_name || 'Unnamed'}</div>
+                              <div className="font-medium">{getSapName1(v) || v.legal_name || 'Unnamed'}</div>
                               <div className="text-xs text-muted-foreground">{getBuyerCompanyName(v.tenant_id)}</div>
                             </TableCell>
                             <TableCell><span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{refNo}</span></TableCell>
