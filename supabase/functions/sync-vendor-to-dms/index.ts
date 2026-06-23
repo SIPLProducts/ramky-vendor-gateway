@@ -10,6 +10,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
+const DMS_PATH_PREFIX = "C:/Users/ADMIN/OneDrive/Desktop/";
+function toDmsPath(storagePath: string): string {
+  const p = storagePath || "";
+  if (p.startsWith(DMS_PATH_PREFIX)) return p;
+  const parts = p.split("/");
+  const rest = parts.length > 1 ? parts.slice(1).join("/") : parts.join("/");
+  return DMS_PATH_PREFIX + rest;
+}
+
 function ok(body: any) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
