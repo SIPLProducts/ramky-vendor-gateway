@@ -14,6 +14,7 @@ import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
 import { getLocationLabel } from '@/lib/stateToSapLocation';
+import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
