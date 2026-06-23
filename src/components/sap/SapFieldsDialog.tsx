@@ -141,11 +141,15 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           <div className="space-y-6 py-2">
             {/* Vendor Information (read-only) */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Information">
+              <ReadOnlyField label="SAP Name (NAME1)" value={getSapName1(vendor)} />
               <ReadOnlyField label="Trade Name" value={(vendor as any)?.trade_name} />
               <ReadOnlyField label="GST ID (GSTIN)" value={(vendor as any)?.gstin} />
               <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
               <ReadOnlyField label="Udyam Number (MSME)" value={(vendor as any)?.msme_number} />
-              <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
+              <div className="space-y-1">
+                <TextField label="Vendor Class (VEN_CLASS)" value={form.ven_class} onChange={v => set('ven_class', v)} />
+                <p className="text-[10px] text-muted-foreground">Auto: empty when GST is present, "0" otherwise. Override here if needed.</p>
+              </div>
             </Section>
 
             <Separator />
