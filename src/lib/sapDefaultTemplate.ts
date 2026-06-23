@@ -30,7 +30,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
   langu: "EN",
   lebre: "{{override.lebre|default:X}}",
   lprio: "",
-  name1: "{{vendor.legal_name|trunc:40}}",
+  name1: "{{vendor.name1_value|trunc:40}}",
   name2: "{{vendor.relative_name|trunc:40}}",
   name3: "",
   pernr: "",
