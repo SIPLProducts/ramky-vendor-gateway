@@ -35,6 +35,8 @@ type VendorRow = {
   id: string;
   reference_number: string | null;
   legal_name: string | null;
+  trade_name: string | null;
+  gstin: string | null;
   primary_email: string | null;
   status: string;
   created_at: string;
