@@ -105,7 +105,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
       zuawa: "{{override.zuawa|default:014}}",
       idtype: "",
       region: "{{region(vendor.registered_state)}}",
-      sterm1: "{{vendor.legal_name|trunc:20}}",
+      sterm1: "{{vendor.name1_value|trunc:20}}",
       sterm2: "",
       street: "{{vendor.registered_address|trunc:60}}",
       bp_type: "",
