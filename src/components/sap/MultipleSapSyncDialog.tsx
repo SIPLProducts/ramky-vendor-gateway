@@ -13,6 +13,7 @@ import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertC
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { SapF4SelectField, type SapFieldOverrides } from './SapFieldsDialog';
 
 interface Props {
