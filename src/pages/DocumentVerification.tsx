@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/hooks/useTenantContext';
 import { useToast } from '@/hooks/use-toast';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { 
   Card, 
   CardContent, 
@@ -74,6 +75,7 @@ interface VendorDocument {
 interface Vendor {
   id: string;
   legal_name: string | null;
+  trade_name: string | null;
   gstin: string | null;
   pan: string | null;
   status: string;
@@ -702,7 +704,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                         onClick={() => setSelectedVendor(vendor)}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium">{vendor.legal_name || 'Unknown Vendor'}</p>
+                          <p className="font-medium">{getSapName1(vendor) || vendor.legal_name || 'Unknown Vendor'}</p>
                           <div className="flex items-center gap-1">
                             {vendor.doc_count > 0 && (
                               <Badge variant="outline" className="text-xs">

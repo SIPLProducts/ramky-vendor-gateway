@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -309,7 +310,7 @@ export default function PurchaseApproval() {
                     <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/5 flex items-center justify-center"><Building2 className="h-7 w-7 text-teal-600" /></div>
                     <div>
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                        <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
                         <Badge className={scmBadge.className}>{scmBadge.label}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>

@@ -30,11 +30,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 
 type VendorRow = {
   id: string;
   reference_number: string | null;
   legal_name: string | null;
+  trade_name: string | null;
+  gstin: string | null;
   primary_email: string | null;
   status: string;
   created_at: string;
@@ -114,7 +117,7 @@ export default function Dashboard() {
 
       let q = supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, primary_email, status, created_at, tenant_id')
+        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, status, created_at, tenant_id')
         .order('created_at', { ascending: false });
 
       if (fromIso) q = q.gte('created_at', fromIso);
@@ -307,7 +310,7 @@ export default function Dashboard() {
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
-                      <TableCell>{v.legal_name ?? '—'}</TableCell>
+                      <TableCell>{getSapName1(v) || v.legal_name || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">

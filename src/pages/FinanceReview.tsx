@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import {
   GstFilingStatusTable,
   normalizeFilingStatus,
@@ -257,7 +258,7 @@ export default function FinanceReview() {
                     <div>
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="font-bold text-lg text-foreground">
-                          {vendor.legal_name || 'Unnamed Vendor'}
+                          {getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}
                         </h3>
                         {getStatusBadge(vendor.status)}
                       </div>

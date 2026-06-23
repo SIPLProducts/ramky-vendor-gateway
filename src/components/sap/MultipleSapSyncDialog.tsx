@@ -13,6 +13,7 @@ import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertC
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
+import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { SapF4SelectField, type SapFieldOverrides } from './SapFieldsDialog';
 
 interface Props {
@@ -136,7 +137,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
           <div className="flex flex-wrap gap-2 mt-2">
             {vendors.map(v => (
               <Badge key={v.id} variant="secondary" className="rounded-full">
-                {v.legal_name || v.trade_name || v.id.slice(0, 8)}
+                {getSapName1(v) || v.legal_name || v.trade_name || v.id.slice(0, 8)}
               </Badge>
             ))}
           </div>
