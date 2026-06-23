@@ -25,6 +25,26 @@ export function resolveRegion(state: string | null | undefined): string {
   return stateToRegion[key] || "";
 }
 
+/**
+ * Resolve the SAP NAME1 value for a vendor row.
+ * - If GSTIN present → Trade Name (fallback Legal Name).
+ * - If GSTIN absent → Legal Name (which holds the PAN account holder name)
+ *   with Account Holder Name as a final fallback.
+ */
+export function getSapName1(vendor: any): string {
+  const v = vendor || {};
+  const has = (x: any) => x != null && String(x).trim().length > 0;
+  if (has(v.gstin)) {
+    return String(v.trade_name || v.legal_name || "").trim();
+  }
+  return String(v.legal_name || v.account_holder_name || v.trade_name || "").trim();
+}
+
+export function getSapVenClass(vendor: any): string {
+  const v = vendor || {};
+  return v.gstin && String(v.gstin).trim() ? "" : "0";
+}
+
 const DOC_NAME_MAP: Record<string, string> = {
   pan_card: "pan", gst_certificate: "gst", gst_self_declaration: "gst_self_declaration",
   msme_certificate: "msme", cancelled_cheque: "bank_cheque1", cancelled_cheque_2: "bank_cheque2",
@@ -98,10 +118,21 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     value = String(ctx.vendor?.id || "").slice(0, 8).toUpperCase();
   } else if (head === "vendor.primary_email_or_fallback") {
     const v: any = ctx.vendor || {};
-    value = v.primary_email || v.registered_email || v.registered_email_2 || v.branch_email || v.manufacturing_email || "";
+    value = v.registered_email || v.primary_email || v.registered_email_2 || v.branch_email || v.manufacturing_email || "";
   } else if (head === "vendor.primary_phone_or_fallback") {
     const v: any = ctx.vendor || {};
-    value = v.primary_phone || v.registered_contact_1 || v.registered_phone || v.registered_contact_2 || "";
+    value = v.registered_contact_1 || v.primary_phone || v.registered_phone || v.registered_contact_2 || "";
+  } else if (head === "vendor.secondary_email_value") {
+    const v: any = ctx.vendor || {};
+    value = v.registered_email_2 || v.secondary_email || "";
+  } else if (head === "vendor.secondary_phone_value") {
+    const v: any = ctx.vendor || {};
+    value = v.registered_contact_2 || v.secondary_phone || "";
+  } else if (head === "vendor.name1_value") {
+    value = getSapName1(ctx.vendor || {});
+  } else if (head === "vendor.ven_class_value") {
+    const v: any = ctx.vendor || {};
+    value = (v.gstin && String(v.gstin).trim()) ? "" : "0";
   } else if (head === "vendor.account_holder_or_legal") {
     const v: any = ctx.vendor || {};
     value = v.account_holder_name || v.legal_name || "";
@@ -122,6 +153,10 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     } else if (name === "msme_idnum") {
       if (value === undefined || value === null || value === "") {
         value = ctx.isMsme ? String(ctx.vendor?.msme_number || "").slice(0, 20) : "";
+      }
+    } else if (name === "default_ven_class") {
+      if (value === undefined || value === null || value === "") {
+        value = getSapVenClass(ctx.vendor || {});
       }
     } else {
       value = applyFilter(value, f);

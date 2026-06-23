@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
+import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -367,7 +368,7 @@ export default function SAPSync() {
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                            <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
                             <Badge className="bg-green-100 text-green-700 border-green-200">{getApprovalLabel(vendor)}</Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
@@ -476,7 +477,7 @@ export default function SAPSync() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{v.legal_name || 'Unnamed'}</div>
+                              <div className="font-medium">{getSapName1(v) || v.legal_name || 'Unnamed'}</div>
                               <div className="text-xs text-muted-foreground">{getBuyerCompanyName(v.tenant_id)}</div>
                             </TableCell>
                             <TableCell><span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{refNo}</span></TableCell>
@@ -549,7 +550,7 @@ export default function SAPSync() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1 flex-wrap">
-                              <h3 className="font-bold text-lg">{vendor.legal_name || 'Unnamed Vendor'}</h3>
+                              <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
                               <Badge className="bg-red-100 text-red-700 border-red-200">SAP Team Rejected</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>

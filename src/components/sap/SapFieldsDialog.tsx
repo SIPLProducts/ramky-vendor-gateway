@@ -14,6 +14,7 @@ import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
 import { getLocationLabel } from '@/lib/stateToSapLocation';
+import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
@@ -140,11 +141,15 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           <div className="space-y-6 py-2">
             {/* Vendor Information (read-only) */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Information">
+              <ReadOnlyField label="SAP Name (NAME1)" value={getSapName1(vendor)} />
               <ReadOnlyField label="Trade Name" value={(vendor as any)?.trade_name} />
               <ReadOnlyField label="GST ID (GSTIN)" value={(vendor as any)?.gstin} />
               <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
               <ReadOnlyField label="Udyam Number (MSME)" value={(vendor as any)?.msme_number} />
-              <TextField label="Vendor Class" value={form.ven_class} onChange={v => set('ven_class', v)} />
+              <div className="space-y-1">
+                <TextField label="Vendor Class (VEN_CLASS)" value={form.ven_class} onChange={v => set('ven_class', v)} />
+                <p className="text-[10px] text-muted-foreground">Auto: empty when GST is present, "0" otherwise. Override here if needed.</p>
+              </div>
             </Section>
 
             <Separator />
@@ -311,7 +316,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     kalsk: d.kalsk ?? 'L1',
     webre: d.webre ?? 'X',
     lebre: d.lebre ?? 'X',
-    ven_class: d.ven_class ?? '',
+    ven_class: (d.ven_class !== undefined && d.ven_class !== null && d.ven_class !== '') ? d.ven_class : getSapVenClass(v),
     reg_addr1: v.registered_address ?? '',
     reg_addr2: v.registered_address_line2 ?? '',
     reg_addr3: v.registered_address_line3 ?? '',

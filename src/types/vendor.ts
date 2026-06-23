@@ -400,6 +400,7 @@ export const INDUSTRY_TYPES = [
 ] as const;
 
 export const ORGANIZATION_TYPES = [
+  'Individual',
   'SSI (Small Scale Industry)',
   'MSI (Medium Scale Industry)',
   'Private Limited',

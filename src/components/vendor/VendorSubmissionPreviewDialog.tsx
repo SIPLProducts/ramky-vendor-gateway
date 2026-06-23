@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 import {
   Building2,
   MapPin,
@@ -136,11 +137,13 @@ export function VendorSubmissionPreviewDialog({
               <div className="form-section">
                 <SectionHeader icon={Building2} title="Organization Details" />
                 <div className="space-y-1">
+                  <DataRow label="SAP Name (NAME1)" value={getSapName1(vendor)} />
                   <DataRow label="Legal Name" value={vendor.legal_name} />
                   <DataRow label="Trade Name" value={vendor.trade_name} />
                   <DataRow label="Industry Type" value={vendor.industry_type} />
                   <DataRow label="Organization Type" value={vendor.organization_type} />
                   <DataRow label="Ownership Type" value={vendor.ownership_type} />
+                  <DataRow label="Vendor Class (VEN_CLASS)" value={getSapVenClass(vendor)} />
                   <DataRow
                     label="Product Categories"
                     value={
