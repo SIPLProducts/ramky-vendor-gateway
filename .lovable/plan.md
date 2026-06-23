@@ -1,97 +1,72 @@
-## Goal
-Three SAP Sync corrections: NAME1 derivation rule, address/contact mapping (with new "Individual" org type), and VEN_CLASS rule.
+## What the error actually means
 
----
+The URL in the request is the **unauthenticated** storage endpoint:
 
-### 1. NAME1 source rule
+```
+/storage/v1/object/vendor-documents/<vendor_id>/cancelled_cheque/<file>.pdf
+```
 
-Currently `name1` resolves to `{{vendor.legal_name|trunc:40}}` in both the built-in template (`src/lib/sapDefaultTemplate.ts`) and the DB template, and the same value is shown across the app.
+- No `/sign/...?token=` segment → it is **not** the signed URL the app produces via `createSignedUrl`.
+- `vendor-documents` is a **private** bucket, so a direct GET to `/object/<bucket>/<path>` will always return `404 not_found` on a self-hosted Supabase, even if the file exists.
 
-Change to:
-- If `vendor.gstin` is non-empty → use **Trade Name** (`vendor.trade_name`).
-- Otherwise → use **PAN Account Holder Name** (`vendor.pan_holder_name` / fallback `account_holder_name`).
+So one of two things is happening on the self-hosted server:
 
-Implementation:
-- Add a new resolver token `vendor.name1_value` in both:
-  - `src/lib/sapPayloadBuilder.ts` (`resolveExpr`)
-  - `supabase/functions/sync-vendor-to-sap/index.ts` (`resolveExpr`)
-  
-  Logic: `gstin ? (trade_name || legal_name) : (pan_holder_name || account_holder_name || legal_name)`.
-- Update `src/lib/sapDefaultTemplate.ts` so `name1`, `vendors[0].name1`, `sterm1` use `{{vendor.name1_value|trunc:40}}` (and trunc:20 for sterm1).
-- In the UI: wherever the SAP "Name / NAME1" value is shown (SAP Sync view, vendor preview, review dialog), compute and display the same derived value. Add a tiny helper `getSapName1(vendor)` in `src/lib/sapPayloadBuilder.ts` and reuse in:
-  - `src/pages/SAPSync.tsx` (vendor name column in result tables)
-  - `src/components/sap/SapFieldsDialog.tsx` (preview of NAME1)
-  - `src/components/vendor/VendorSubmissionPreviewDialog.tsx` (where legal_name is shown as SAP name)
+1. **The object genuinely is not in storage on the self-hosted instance.** The `vendor_documents` row was migrated (or created against this DB) but the underlying file in the `vendor-documents` bucket was never copied over. The app calls `createSignedUrl`, storage replies "object does not exist", code falls back to `download()` which also fails, and the UI shows "File is missing in storage."
+2. **The storage service is misconfigured** (wrong S3/file backend, bucket name mismatch, or `vendor-documents` bucket not created on the self-hosted Supabase). Same symptom for every file.
 
-No DB column changes.
+The app code itself (upload path, `file_path` convention `{vendorId}/{documentType}/{timestamp}_{name}`, `createSignedUrl` + `download` fallback) is correct and unchanged — this is an environment/data issue on the self-hosted box.
 
----
+## Verification steps on the self-hosted server
 
-### 2. Organization Type + contact/email mapping
+Run these on the self-hosted Supabase to localize the cause:
 
-**2a. Add "Individual" option** to `ORGANIZATION_TYPES` in `src/types/vendor.ts`. It will automatically surface in:
-- `OrganizationStep.tsx`
-- `EnterpriseOrganizationStep.tsx`
-- any read-only displays that just print `organization_type`.
+1. Confirm the bucket exists:
+   ```sql
+   select id, name, public from storage.buckets where name = 'vendor-documents';
+   ```
+2. Confirm the object row exists in storage metadata:
+   ```sql
+   select name, bucket_id, created_at
+   from storage.objects
+   where bucket_id = 'vendor-documents'
+     and name = 'f30c1a63-e593-43b2-b8b1-878db58ae0c9/cancelled_cheque/1781761907875_LN_Cheque.pdf';
+   ```
+3. Confirm the physical file exists in the storage backend (S3 bucket or `/var/lib/storage` mount, depending on how Supabase Storage is configured).
+4. Test a signed URL from the server:
+   ```bash
+   curl -X POST \
+     -H "Authorization: Bearer <service_role_key>" \
+     -H "Content-Type: application/json" \
+     -d '{"expiresIn":3600}' \
+     http://206.1.23.95:9009/supabase/storage/v1/object/sign/vendor-documents/<path>
+   ```
+   - 200 + token → storage works, the original failing URL was just the wrong (unsigned) one.
+   - 404 → the object truly isn't there; this is a data-migration gap.
 
-**2b. Fix SAP contact/email mapping**
+## Likely outcomes and remediation
 
-Today the template uses:
-- `mob_number = {{vendor.primary_phone_or_fallback}}` (resolver prefers `primary_phone` first)
-- `smtp_addr = {{vendor.primary_email_or_fallback}}` (resolver prefers `primary_email` first)
-- `tel_number = {{vendor.registered_phone}}` (legacy column, usually empty)
+- **Object missing (most likely)** — re-sync the `vendor-documents` bucket from the source environment to the self-hosted backend (S3 sync or rsync of the storage volume). No code change needed; once files land at the expected `file_path`, the SAP Sync viewer will work.
+- **Bucket missing / misnamed** — create a `vendor-documents` private bucket on the self-hosted Supabase and re-run the storage data sync.
+- **Storage service misconfigured** — fix the storage container's S3/file backend env vars so `storage.objects` rows actually resolve to bytes.
 
-Required mapping:
-| Form field | SAP key |
-|---|---|
-| Contact 1 (`registered_contact_1`) | `MOB_NUMBER` |
-| Contact 2 (`registered_contact_2`) | stored as Secondary Contact (also sent as `tel_number` so SAP keeps it) |
-| Email 1 (`registered_email`) | `SMTP_ADDR` |
-| Email 2 (`registered_email_2`) | stored as Secondary Email (`smtp_addr2` in payload, empty if blank) |
+## Small UI hardening (only code change proposed)
 
-Changes:
-- In both resolvers update:
-  - `vendor.primary_phone_or_fallback` → `registered_contact_1 || primary_phone` (Contact 1 wins)
-  - `vendor.primary_email_or_fallback` → `registered_email || primary_email` (Email 1 wins)
-  - Add new token `vendor.secondary_phone_value` → `registered_contact_2 || secondary_phone`
-  - Add new token `vendor.secondary_email_value` → `registered_email_2 || secondary_email`
-- In `src/lib/sapDefaultTemplate.ts`:
-  - `tel_number` → `{{vendor.secondary_phone_value|trunc:30}}` (top-level + `vendors[0]`)
-  - Add `smtp_addr2: "{{vendor.secondary_email_value|trunc:241}}"` (top-level + `vendors[0]`)
-- Keep the existing `mob_number` / `smtp_addr` template strings — only the resolver priority changes.
+To make the SAP Sync screen more useful when this happens again, I'd make one tiny change in `src/components/vendor/VendorDocuments.tsx`:
 
----
+- When both `createSignedUrl` and `download` fail, include the failing `file_path` in the toast description (currently it just says "Document file is missing in storage."). This lets the admin/operator copy the exact key to investigate on the storage server without opening DevTools.
 
-### 3. VEN_CLASS rule
+Example new toast:
 
-Today `ven_class` uses `{{override.ven_class}}` and the override defaults from `sap_default_fields`. There is no GST-aware rule.
+```
+Preview unavailable
+Storage object not found: f30c1a63-.../cancelled_cheque/1781761907875_LN_Cheque.pdf
+```
 
-New rule:
-- `gstin` present → `VEN_CLASS = ""`
-- `gstin` absent → `VEN_CLASS = "0"`
+No other code changes. Upload pipeline, RLS, and `createSignedUrl` usage are already correct.
 
-Implementation:
-- Add resolver token `vendor.ven_class_value` in both resolvers: `gstin ? "" : "0"`.
-- Update `src/lib/sapDefaultTemplate.ts` so `ven_class` (top-level + `vendors[0]`) becomes `{{override.ven_class|default_ven_class}}` — implement a `default_ven_class` filter that, when the override value is empty, returns the GST-aware default. (Keeps manual overrides from SapFieldsDialog still working.)
-- Display the same computed value in the UI:
-  - `SapFieldsDialog.tsx` — initialise `ven_class` default with the GST-aware value when no tenant default exists, and show a small helper note "Auto: empty when GST present, 0 otherwise."
-  - `SAPSync.tsx` — show the computed `ven_class` in the per-vendor result/preview row.
+## Out of scope
 
----
+- Migrating the actual files between environments (must be done on the self-hosted infra).
+- Changing the bucket to public — that would expose vendor PII and is not appropriate.
 
-### Files to edit
-
-- `src/types/vendor.ts` — add "Individual".
-- `src/lib/sapDefaultTemplate.ts` — `name1`, `sterm1`, `tel_number`, add `smtp_addr2`, `ven_class` template strings.
-- `src/lib/sapPayloadBuilder.ts` — new resolver tokens + `default_ven_class` filter + exported `getSapName1` helper.
-- `supabase/functions/sync-vendor-to-sap/index.ts` — mirror resolver tokens + filter.
-- `supabase/functions/sync-vendors-to-sap-bulk/index.ts` — same resolver/filter changes if it has its own copy.
-- `src/components/sap/SapFieldsDialog.tsx` — Name1 preview, GST-aware ven_class default.
-- `src/pages/SAPSync.tsx` — use `getSapName1` for vendor name column; show `ven_class`.
-- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — show NAME1 derived value.
-
-Then redeploy `sync-vendor-to-sap` and `sync-vendors-to-sap-bulk`.
-
-### Out of scope
-- No DB schema migration. `registered_contact_1/2` and `registered_email/2` columns already exist.
-- No retroactive data backfill for vendors already synced to SAP.
+Approve this and I'll apply the toast/error-detail change; the storage migration must be done on the self-hosted box per the verification steps above.

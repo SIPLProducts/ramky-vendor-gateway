@@ -134,7 +134,7 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
     }
     toast({
       title: 'Preview unavailable',
-      description: 'Document file is missing in storage.',
+      description: `Storage object not found: ${doc.file_path}`,
       variant: 'destructive',
     });
   };
