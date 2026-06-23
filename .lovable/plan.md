@@ -1,44 +1,97 @@
-## 1) Validate Primary vs Secondary Account Holder Name (cancelled cheques)
+## Goal
+Three SAP Sync corrections: NAME1 derivation rule, address/contact mapping (with new "Individual" org type), and VEN_CLASS rule.
 
-**Where:** `src/components/vendor/steps/DocumentVerificationStep.tsx` — secondary cheque upload flow (`handleBankUpload2`) and the manual-bank popup submit (`handleBankPopupSubmit` when `target === "secondary"`).
+---
 
-**Logic:**
-- After the secondary cheque is OCR-verified (or manual flow returns a `nameAtBank`), read the primary holder name from `bankDoc.ocrData?.account_holder_name` (or `bankDoc.apiData?.accountHolderName`).
-- Normalize both names (uppercase, collapse whitespace, strip punctuation, drop common salutations like MR/MRS/M/S).
-- If primary is set and the two names do not match (exact normalized match, fall back to >=90% similarity via the existing `nameMatchScore`/cross-match helper already imported in the file), then:
-  - Show SweetAlert2: `Swal.fire({ icon: 'error', title: 'Account holder mismatch', text: 'Primary and Secondary Account Holder Names do not match.' })`.
-  - Reset secondary state: `setBankDoc2(idleDoc)`, `lastBankFile2Ref.current = null`, `setBankBranchAutoFilled2(false)`, `setBankBranchAddress2('')`, and clear any other `*_2` secondary fields (account number / IFSC / bank name / branch already live in `bankDoc2.ocrData` which is cleared by resetting `bankDoc2`).
-  - Also clear the file input element if a ref is available so the same file can be reselected.
-- Run the same check inside `handleBankPopupSubmit` (target=secondary) before the `setDoc({ status: 'verified', ... })` call; if mismatch, abort with the same Swal + reset.
-- `sweetalert2` (v11) is already in `package.json` — `import Swal from 'sweetalert2'`.
+### 1. NAME1 source rule
 
-## 2) Show `VENDOR` instead of `BP_LIFNR` after SAP sync
+Currently `name1` resolves to `{{vendor.legal_name|trunc:40}}` in both the built-in template (`src/lib/sapDefaultTemplate.ts`) and the DB template, and the same value is shown across the app.
 
-**Edge function side** (`supabase/functions/sync-vendor-to-sap/index.ts`, `supabase/functions/sync-vendors-to-sap-bulk/index.ts`, `supabase/functions/prepare-dms-payload/index.ts` if it forwards the value):
-- When parsing the SAP response, if the row contains a `VENDOR` field, copy it onto `BP_LIFNR` (or add a new `VENDOR` property to each `ACC_RES` row) so the client receives both. Prefer `VENDOR` when present, fall back to `BP_LIFNR`.
-- Set `sapVendorCode` from `match?.VENDOR ?? match?.BP_LIFNR`.
+Change to:
+- If `vendor.gstin` is non-empty → use **Trade Name** (`vendor.trade_name`).
+- Otherwise → use **PAN Account Holder Name** (`vendor.pan_holder_name` / fallback `account_holder_name`).
 
-**Client side:**
-- `src/pages/SAPSync.tsx` — replace `r.BP_LIFNR` reads at lines 699, 737, 772, 776–777 with `r.VENDOR ?? r.BP_LIFNR` and rename the visible label from "BP_LIFNR" to "Vendor Code" (line 777). Same fallback for `r.sap?.VENDOR ?? r.sap?.BP_LIFNR`.
-- `src/hooks/useVendors.tsx` — in `useDMSSync` (lines 690–701), check `payload.VENDOR || payload.BP_LIFNR`; in audit-log `details.sap_vendor_code` already uses `sapResult.sapVendorCode` which now comes from VENDOR.
-- The `vendors.sap_vendor_code` DB column already stores whatever `sapVendorCode` resolves to — no schema change needed; it will simply start holding the `VENDOR` value.
+Implementation:
+- Add a new resolver token `vendor.name1_value` in both:
+  - `src/lib/sapPayloadBuilder.ts` (`resolveExpr`)
+  - `supabase/functions/sync-vendor-to-sap/index.ts` (`resolveExpr`)
+  
+  Logic: `gstin ? (trade_name || legal_name) : (pan_holder_name || account_holder_name || legal_name)`.
+- Update `src/lib/sapDefaultTemplate.ts` so `name1`, `vendors[0].name1`, `sterm1` use `{{vendor.name1_value|trunc:40}}` (and trunc:20 for sterm1).
+- In the UI: wherever the SAP "Name / NAME1" value is shown (SAP Sync view, vendor preview, review dialog), compute and display the same derived value. Add a tiny helper `getSapName1(vendor)` in `src/lib/sapPayloadBuilder.ts` and reuse in:
+  - `src/pages/SAPSync.tsx` (vendor name column in result tables)
+  - `src/components/sap/SapFieldsDialog.tsx` (preview of NAME1)
+  - `src/components/vendor/VendorSubmissionPreviewDialog.tsx` (where legal_name is shown as SAP name)
 
-**Tables affected (display only):** SAP Sync result dialogs (single, bulk, DMS), `VendorList.tsx` "SAP Code" column — already reads `sap_vendor_code`, so it picks up VENDOR automatically once the edge function updates the source.
+No DB column changes.
 
-## 3) Documents "missing in storage" in SAP Sync → View
+---
 
-**Diagnosis steps (read-only):**
-- Query `vendor_documents` for the affected vendor(s) and list rows whose `file_path` does not have a matching object in the `vendor-documents` bucket.
-- Likely causes already known to the code path:
-  - `uploadAllDocuments` deletes the old storage object before upserting the new one (line 230). If the subsequent `uploadDocument` throws after the delete, the row is left pointing to a now-missing file. Wrap the delete inside a try and only delete after the new upload succeeds (delete-after-success swap), OR delete only after `saveDocumentMetadata` succeeds. Safer pattern: upload new under a fresh path, update metadata, then delete the old object.
-  - Some vendors were seeded without a corresponding storage upload (sample/migration data). For those, the only fix is to re-upload.
-- Add a one-off admin script/edge function `audit-vendor-documents` that lists orphan rows (DB row exists but `storage.from('vendor-documents').download(file_path)` 404s) so support can identify which vendors must re-upload.
+### 2. Organization Type + contact/email mapping
 
-**Code fix in `src/hooks/useVendorRegistration.tsx` (`uploadAllDocuments`):**
-- Reorder: (1) upload new file to a fresh path, (2) `upsert` metadata row to the new path, (3) only then remove the previous storage object. This guarantees the DB row always points to an existing file.
+**2a. Add "Individual" option** to `ORGANIZATION_TYPES` in `src/types/vendor.ts`. It will automatically surface in:
+- `OrganizationStep.tsx`
+- `EnterpriseOrganizationStep.tsx`
+- any read-only displays that just print `organization_type`.
 
-**UI:** Per earlier confirmed preference, keep the View/Download buttons and the existing toast in `VendorDocuments.tsx` (no change). The toast will simply stop firing once new uploads use the swap order and orphans are re-uploaded.
+**2b. Fix SAP contact/email mapping**
 
-## Out of scope
-- No schema changes; no RLS changes; no rename of the `sap_vendor_code` column.
-- Re-uploading historical orphan files is a data task for the affected vendors (or admin re-upload) — not a code change.
+Today the template uses:
+- `mob_number = {{vendor.primary_phone_or_fallback}}` (resolver prefers `primary_phone` first)
+- `smtp_addr = {{vendor.primary_email_or_fallback}}` (resolver prefers `primary_email` first)
+- `tel_number = {{vendor.registered_phone}}` (legacy column, usually empty)
+
+Required mapping:
+| Form field | SAP key |
+|---|---|
+| Contact 1 (`registered_contact_1`) | `MOB_NUMBER` |
+| Contact 2 (`registered_contact_2`) | stored as Secondary Contact (also sent as `tel_number` so SAP keeps it) |
+| Email 1 (`registered_email`) | `SMTP_ADDR` |
+| Email 2 (`registered_email_2`) | stored as Secondary Email (`smtp_addr2` in payload, empty if blank) |
+
+Changes:
+- In both resolvers update:
+  - `vendor.primary_phone_or_fallback` → `registered_contact_1 || primary_phone` (Contact 1 wins)
+  - `vendor.primary_email_or_fallback` → `registered_email || primary_email` (Email 1 wins)
+  - Add new token `vendor.secondary_phone_value` → `registered_contact_2 || secondary_phone`
+  - Add new token `vendor.secondary_email_value` → `registered_email_2 || secondary_email`
+- In `src/lib/sapDefaultTemplate.ts`:
+  - `tel_number` → `{{vendor.secondary_phone_value|trunc:30}}` (top-level + `vendors[0]`)
+  - Add `smtp_addr2: "{{vendor.secondary_email_value|trunc:241}}"` (top-level + `vendors[0]`)
+- Keep the existing `mob_number` / `smtp_addr` template strings — only the resolver priority changes.
+
+---
+
+### 3. VEN_CLASS rule
+
+Today `ven_class` uses `{{override.ven_class}}` and the override defaults from `sap_default_fields`. There is no GST-aware rule.
+
+New rule:
+- `gstin` present → `VEN_CLASS = ""`
+- `gstin` absent → `VEN_CLASS = "0"`
+
+Implementation:
+- Add resolver token `vendor.ven_class_value` in both resolvers: `gstin ? "" : "0"`.
+- Update `src/lib/sapDefaultTemplate.ts` so `ven_class` (top-level + `vendors[0]`) becomes `{{override.ven_class|default_ven_class}}` — implement a `default_ven_class` filter that, when the override value is empty, returns the GST-aware default. (Keeps manual overrides from SapFieldsDialog still working.)
+- Display the same computed value in the UI:
+  - `SapFieldsDialog.tsx` — initialise `ven_class` default with the GST-aware value when no tenant default exists, and show a small helper note "Auto: empty when GST present, 0 otherwise."
+  - `SAPSync.tsx` — show the computed `ven_class` in the per-vendor result/preview row.
+
+---
+
+### Files to edit
+
+- `src/types/vendor.ts` — add "Individual".
+- `src/lib/sapDefaultTemplate.ts` — `name1`, `sterm1`, `tel_number`, add `smtp_addr2`, `ven_class` template strings.
+- `src/lib/sapPayloadBuilder.ts` — new resolver tokens + `default_ven_class` filter + exported `getSapName1` helper.
+- `supabase/functions/sync-vendor-to-sap/index.ts` — mirror resolver tokens + filter.
+- `supabase/functions/sync-vendors-to-sap-bulk/index.ts` — same resolver/filter changes if it has its own copy.
+- `src/components/sap/SapFieldsDialog.tsx` — Name1 preview, GST-aware ven_class default.
+- `src/pages/SAPSync.tsx` — use `getSapName1` for vendor name column; show `ven_class`.
+- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — show NAME1 derived value.
+
+Then redeploy `sync-vendor-to-sap` and `sync-vendors-to-sap-bulk`.
+
+### Out of scope
+- No DB schema migration. `registered_contact_1/2` and `registered_email/2` columns already exist.
+- No retroactive data backfill for vendors already synced to SAP.
