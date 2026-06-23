@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 import {
   Building2,
   MapPin,
