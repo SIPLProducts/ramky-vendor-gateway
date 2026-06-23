@@ -74,6 +74,7 @@ interface VendorDocument {
 interface Vendor {
   id: string;
   legal_name: string | null;
+  trade_name: string | null;
   gstin: string | null;
   pan: string | null;
   status: string;
