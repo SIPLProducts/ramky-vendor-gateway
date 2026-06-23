@@ -418,6 +418,7 @@ serve(async (req) => {
       row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
       row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
+      row.IDCATG = vendor.msme_major_activity ? String(vendor.msme_major_activity) : "";
       console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
     } else {
       // Legacy path: resolve template server-side.
@@ -520,6 +521,7 @@ serve(async (req) => {
         row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
         row.idtype2 = "ZMSMEN";
         row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
+        row.IDCATG = vendor.msme_major_activity ? String(vendor.msme_major_activity) : "";
 
         // For international vendors, replace hardcoded "IN" country codes in
         // the resolved payload with the vendor's actual SAP country code.
