@@ -1845,7 +1845,7 @@ export function DocumentVerificationStep({
 
   return (
     <form
-      id="step-form"
+      id="step-form-1"
       onSubmit={(e) => { e.preventDefault(); if (allDone) handleContinue(); }}
       className="space-y-5"
     >

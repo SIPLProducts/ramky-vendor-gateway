@@ -1,44 +1,40 @@
+## Issue
 
-## Goal
-DMS payload `FILE_PATH` must be sent as a Windows-style path the SAP DMS server can resolve, not the Supabase storage key.
+When the vendor is on Step 2 (Organization Profile) and clicks **Continue**, nothing happens — the form never advances to Step 3.
 
-Currently sent:
-```
-f01f4f32-342b-4ce9-8a41-0b23c8301591/pan_card/1782207119684_Pan_Card_Archer__1_.pdf
-```
+## Root cause
 
-Required (UUID folder stripped, hardcoded prefix added):
-```
-C:/Users/ADMIN/OneDrive/Desktop/pan_card/1782207119684_Pan_Card_Archer__1_.pdf
-```
+Step 1 (`DocumentVerificationStep`) is kept mounted at all times (rendered with `display:none` when not on step 1, see `VendorRegistration.tsx` line 1525). Its `<form>` uses `id="step-form"`.
 
-## Changes
+Step 2 (`OrganizationStep`) also renders a `<form id="step-form">`.
 
-Add a small helper in both edge functions:
+So while the vendor is on Step 2, **two forms with the same id `step-form` exist in the DOM**. The Continue button uses `<Button form="step-form">`, which the browser resolves via `document.getElementById("step-form")` — that always returns the **first** match, i.e. Step 1's hidden form.
 
-```ts
-const DMS_PATH_PREFIX = "C:/Users/ADMIN/OneDrive/Desktop/";
-function toDmsPath(storagePath: string) {
-  // storage path looks like "<vendor-uuid>/<doc_type>/<filename>"
-  // drop the leading UUID segment, prepend the hardcoded desktop prefix
-  const parts = (storagePath || "").split("/");
-  const rest = parts.length > 1 ? parts.slice(1).join("/") : parts.join("/");
-  return DMS_PATH_PREFIX + rest;
-}
-```
+Step 1's form `onSubmit` is `(e) => { e.preventDefault(); if (allDone) handleContinue(); }`. Because Step 1's `allDone` gate isn't fully satisfied (or even if it were, it advances 1→2, not 2→3), clicking Continue on Step 2 silently does nothing.
 
-### 1. `supabase/functions/prepare-dms-payload/index.ts`
-- Line 72: `FILE_UPLOAD.push({ FILE: base64, FILE_PATH: toDmsPath(d.file_path) });`
+This same collision affects every other step that uses `id="step-form"` (Address, Contact, Financial, Compliance, international steps, DynamicStep) whenever Step 1 is also mounted — Step 2 just hits it first because that's where users notice it.
 
-### 2. `supabase/functions/sync-vendor-to-dms/index.ts`
-- Line 251 (explicit payload branch): normalize via `toDmsPath(item.FILE_PATH)` so paths coming from the browser are also rewritten — safe because the helper is a no-op if the prefix is already present (add an early-return check: if it starts with `DMS_PATH_PREFIX`, return as-is).
-- Line 269 (server-side fetch branch): `uploads.push({ FILE: base64, FILE_PATH: toDmsPath(d.file_path) });`
+## Fix
 
-No changes to Supabase storage itself — internal downloads still use the original `d.file_path`. Only the value sent to the DMS server is rewritten.
+Give Step 1's always-mounted form a unique id, and point the Continue button at the right id based on the current step.
 
-### 3. Deploy
-Redeploy `prepare-dms-payload` and `sync-vendor-to-dms`.
+### Files to change
 
-## Verification
-- Trigger a DMS sync; in DevTools → Network → `sync-vendor-to-dms` payload, every `FILE_PATH` must start with `C:/Users/ADMIN/OneDrive/Desktop/` and contain no UUID.
-- DMS server response is success (file resolves on its filesystem).
+1. **`src/components/vendor/steps/DocumentVerificationStep.tsx`** (line 1848)
+   - Change `id="step-form"` → `id="step-form-1"`.
+   - This is the only step that stays mounted while other steps are visible, so it's the only one that must differ.
+
+2. **`src/pages/VendorRegistration.tsx`** (Continue button around line 1631)
+   - Change `form="step-form"` → `form={currentStep === 1 ? "step-form-1" : "step-form"}`.
+   - Leave the Submit Application button untouched (last step uses its own path).
+
+3. **`src/components/vendor/StickyActionBar.tsx`** — if it also renders a submit button with `form="step-form"`, apply the same conditional (`step-form-1` when `currentStep === 1`). Will confirm and patch during implementation.
+
+No other step files need to change — they're only mounted one at a time, so reusing `id="step-form"` for steps 2–N remains safe.
+
+### Verification
+
+- On Step 1, Continue still advances to Step 2 (uses `step-form-1`).
+- On Step 2, fill required fields (Legal Name, Industry, Org Type, Ownership, State) and click Continue → advances to Step 3.
+- Steps 3, 4, 5 Continue buttons still work.
+- No regression on the international flow (its Continue uses `handleIntlDocsContinue`, not the form attribute).

@@ -1628,7 +1628,7 @@ export default function VendorRegistration() {
                     ) : (
                       <Button
                         type="submit"
-                        form="step-form"
+                        form={currentStep === 1 ? "step-form-1" : "step-form"}
                         disabled={!canProceed}
                         className={cn(
                           "min-w-[120px]",
