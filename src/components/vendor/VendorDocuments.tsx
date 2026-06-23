@@ -164,7 +164,7 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
     }
     toast({
       title: 'Download failed',
-      description: 'Document file is missing in storage.',
+      description: `Storage object not found: ${doc.file_path}`,
       variant: 'destructive',
     });
   };
