@@ -28,8 +28,7 @@ export function resolveRegion(state: string | null | undefined): string {
 /**
  * Resolve the SAP NAME1 value for a vendor row.
  * - If GSTIN present → Trade Name (fallback Legal Name).
- * - If GSTIN absent → Legal Name (which holds the PAN account holder name)
- *   with Account Holder Name as a final fallback.
+ * - If GSTIN absent → Account Holder Name (fallback Legal Name, then Trade Name).
  */
 export function getSapName1(vendor: any): string {
   const v = vendor || {};
@@ -37,7 +36,7 @@ export function getSapName1(vendor: any): string {
   if (has(v.gstin)) {
     return String(v.trade_name || v.legal_name || "").trim();
   }
-  return String(v.legal_name || v.account_holder_name || v.trade_name || "").trim();
+  return String(v.account_holder_name || v.legal_name || v.trade_name || "").trim();
 }
 
 export function getSapVenClass(vendor: any): string {
