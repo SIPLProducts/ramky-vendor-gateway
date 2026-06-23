@@ -154,6 +154,10 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
       if (value === undefined || value === null || value === "") {
         value = ctx.isMsme ? String(ctx.vendor?.msme_number || "").slice(0, 20) : "";
       }
+    } else if (name === "default_ven_class") {
+      if (value === undefined || value === null || value === "") {
+        value = getSapVenClass(ctx.vendor || {});
+      }
     } else {
       value = applyFilter(value, f);
     }
