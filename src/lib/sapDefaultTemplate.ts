@@ -57,7 +57,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
   idnum2: "{{override.idnum2|msme_idnum}}",
   idtype: "SOLMN1",
   region: "{{region(vendor.registered_state)}}",
-  sterm1: "{{vendor.legal_name|trunc:20}}",
+  sterm1: "{{vendor.name1_value|trunc:20}}",
   sterm2: "{{vendor.trade_name_first_word|trunc:20}}",
   street: "{{vendor.registered_address|trunc:60}}",
   zinco1: "",
