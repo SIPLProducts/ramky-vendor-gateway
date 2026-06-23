@@ -258,10 +258,11 @@ serve(async (req) => {
     }
 
     const successCount = results.filter(r => r.success).length;
+    const normalizedAccRes = (accRes || []).map((r: any) => ({ ...r, VENDOR: r?.VENDOR || r?.BP_LIFNR || "" }));
     return ok({
       success: successCount > 0,
       message: `${successCount}/${vendorIds.length} vendor(s) created in SAP`,
-      ACC_RES: accRes,
+      ACC_RES: normalizedAccRes,
       results,
     });
   } catch (error: any) {
