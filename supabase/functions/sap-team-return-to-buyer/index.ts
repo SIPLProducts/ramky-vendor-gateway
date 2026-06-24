@@ -24,7 +24,7 @@ const row = (k: string, v: string) =>
 function getName1(v: any): string {
   const hasGst = !!(v?.gstin && String(v.gstin).trim());
   if (hasGst && v?.trade_name) return v.trade_name;
-  return v?.pan_account_holder_name || v?.trade_name || v?.legal_name || 'Vendor';
+  return v?.account_holder_name || v?.trade_name || v?.legal_name || 'Vendor';
 }
 
 Deno.serve(async (req) => {
