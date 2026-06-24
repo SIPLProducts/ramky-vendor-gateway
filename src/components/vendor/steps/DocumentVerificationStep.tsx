@@ -1099,8 +1099,47 @@ export function DocumentVerificationStep({
         setMsmeDeclarationFile(null);
         setMsmeDeclarationReason("");
       }
+      // Bank depends on MSME — clear dependent bank state too.
+      resetBankCascade();
       return next;
     });
+  }, []);
+
+  // ---------- Cascading reset helpers ----------
+  // When a parent document (GST → PAN → MSME → Bank) is uploaded, replaced, or
+  // reset, every dependent document and its captured data must be cleared so
+  // stale verification results never leak into the new submission payload.
+  const resetBankCascade = useCallback(() => {
+    setBankDoc(idleDoc);
+    setBankDoc2(idleDoc);
+    lastBankFileRef.current = null;
+    lastBankFile2Ref.current = null;
+    setBankPopup((p) => ({ ...p, open: false }));
+  }, []);
+
+  const resetMsmeCascade = useCallback(() => {
+    setMsmeDoc(idleDoc);
+    setMsmeManualNumber("");
+    setMsmeManualError(null);
+    setMsmeDeclarationFile(null);
+    setMsmeDeclarationReason("");
+    setIsMsmeRegistered(null);
+    resetBankCascade();
+  }, [resetBankCascade]);
+
+  const resetPanCascade = useCallback(() => {
+    setPanDoc(idleDoc);
+    setPanCrossCheckError(null);
+    resetMsmeCascade();
+  }, [resetMsmeCascade]);
+
+  const resetGstAux = useCallback(() => {
+    setGstDeclarationFile(null);
+    setGstDeclarationReason("");
+    setEditablePrincipalPlace("");
+    setGstFilingRows([]);
+    setGstFilingChecked(false);
+    setGstLatestFiled(null);
   }, []);
 
   const effectiveLegalName = useMemo(() => {
