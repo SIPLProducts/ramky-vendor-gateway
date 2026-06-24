@@ -1,26 +1,27 @@
-Plan:
+# SAP Sync Popup Fixes
 
-1. Fix Step 2 Continue navigation reliably
-   - Update the vendor registration navigation so the Continue button submits the currently visible step form instead of relying on a shared `step-form` id.
-   - Give each mounted step a unique form id, at minimum:
-     - Step 1: `step-form-1`
-     - Step 2: `step-form-2`
-     - Step 3+: matching current step ids or a computed active form id.
-   - Update the Continue button and sticky action bar to use the active step form id.
-   - This prevents any hidden/previous form from capturing the click and blocking movement to the next tab.
+Three small UI/data adjustments to the SAP Sync flow.
 
-2. Make Organization step validation visible
-   - If Step 2 validation fails, show the missing required field messages clearly and keep the button behavior consistent.
-   - Ensure Buyer Company is correctly registered in the form state when it is assigned from the invitation/tenant.
+## 1. Make Vendor Class & MSME read-only in SAP Sync popup
+File: `src/components/sap/SapFieldsDialog.tsx`
 
-3. Add SAP payload key `IDCATG`
-   - Map SAP key `IDCATG` from database field `msme_major_activity`.
-   - Add it in the client SAP payload builder so SAP Sync preview/send includes it.
-   - Add it in the single-vendor edge function normalization path so the deployed backend also sends it.
-   - Add it in the bulk SAP sync path so multi-sync sends the same key.
-   - Keep the value blank when MSME major activity is unavailable.
+- Vendor Class (VEN_CLASS) field (line 150): replace the editable `TextField` with a `ReadOnlyField` showing `form.ven_class` (still auto-derived: empty when GST present, "0" otherwise; or tenant default).
+- MSME (Minority Indicator) field (line 202-203): replace the editable `SelectField` with a `ReadOnlyField` showing the human label (e.g. "SMA — Small") resolved from `form.msme`. Value is still auto-derived from vendor's MSME category and sent in the payload.
 
-4. Verify
-   - Check domestic registration flow: Step 1 complete → Step 2 required fields → Continue goes to Address tab.
-   - Check generated SAP payload includes `IDCATG: <vendor.msme_major_activity>` for MSME vendors.
-   - Ensure no BP_LIFNR/VENDOR behavior is changed by this fix.
+## 2. Rename MSME "Small" code from SML → SMA
+File: `src/components/sap/SapFieldsDialog.tsx`
+
+- Line 203 options list: change `['SML', 'SML — Small']` → `['SMA', 'SMA — Small']`.
+- Line 298 `buildDefaults`: change `cat === 'small' ? 'SML'` → `cat === 'small' ? 'SMA'`.
+
+(No other occurrences of `'SML'` exist in src or supabase — verified.)
+
+## 3. Remove Download button in Review dialog → Documents tab
+Files:
+- `src/components/vendor/VendorDocuments.tsx` — add optional prop `hideDownload?: boolean`; when true, do not render the Download `<Button>` (lines 257–263). Eye/preview button stays.
+- `src/components/vendor/VendorReviewDialog.tsx` (line 684) — pass `hideDownload` to `<VendorDocuments vendorId={vendor.id} hideDownload />`.
+
+Other usages (`VendorList`, `FinanceReview`, `PurchaseApproval`) keep the Download button (prop defaults to false).
+
+## Out of scope
+No payload/edge-function changes; the SAP payload already sends `form.msme` and `form.ven_class` regardless of whether the UI is editable.
