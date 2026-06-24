@@ -20,7 +20,7 @@ import {
   useVendors, useSAPSync, useMultipleSAPSync, useDMSSync, useBuyerCompanies, VendorRow,
 } from '@/hooks/useVendors';
 import {
-  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban,
+  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban, Undo2,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -54,6 +54,9 @@ export default function SAPSync() {
   const [rejectVendor, setRejectVendor] = useState<VendorRow | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState('');
   const [rejectingVendorId, setRejectingVendorId] = useState<string | null>(null);
+  const [returnVendor, setReturnVendor] = useState<VendorRow | null>(null);
+  const [returnRemarks, setReturnRemarks] = useState('');
+  const [returningVendorId, setReturningVendorId] = useState<string | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
@@ -117,6 +120,31 @@ export default function SAPSync() {
       toast.error('Reject failed', { description: e?.message || 'Could not reject vendor' });
     } finally {
       setRejectingVendorId(null);
+    }
+  };
+
+  const handleConfirmReturnToBuyer = async () => {
+    if (!returnVendor) return;
+    const remarks = returnRemarks.trim();
+    if (!remarks) {
+      toast.error('Remarks are required');
+      return;
+    }
+    setReturningVendorId(returnVendor.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-team-return-to-buyer', {
+        body: { vendorId: returnVendor.id, remarks },
+      });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Sent back to Buyer', { description: getSapName1(returnVendor) || returnVendor.legal_name || returnVendor.id });
+      setReturnVendor(null);
+      setReturnRemarks('');
+      refreshAllLists();
+    } catch (e: any) {
+      toast.error('Return to Buyer failed', { description: e?.message || 'Could not return vendor' });
+    } finally {
+      setReturningVendorId(null);
     }
   };
 
@@ -474,6 +502,19 @@ export default function SAPSync() {
                             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
                           ) : (
                             <><XCircle className="h-4 w-4 mr-2" />Duplicate Reject</>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                          onClick={() => { setReturnVendor(vendor); setReturnRemarks(''); }}
+                          disabled={returningVendorId === vendor.id || multiMode}
+                          title={multiMode ? 'Uncheck other vendors to return individually' : 'Send back to the inviting Buyer for correction'}
+                        >
+                          {returningVendorId === vendor.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending back...</>
+                          ) : (
+                            <><Undo2 className="h-4 w-4 mr-2" />Reject &amp; Send to Buyer</>
                           )}
                         </Button>
                       </div>
