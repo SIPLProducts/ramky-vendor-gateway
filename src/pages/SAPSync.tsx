@@ -167,6 +167,34 @@ export default function SAPSync() {
     setShowSapFieldsDialog(true);
   };
 
+  const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string } => {
+    if (!resp) return { matched: false, message: '' };
+    const rows = Array.isArray(resp.ACC_RES) ? resp.ACC_RES : [];
+    const texts: string[] = [
+      resp.message || '',
+      ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
+    ];
+    const re = /pan\s*number\s*duplicat|duplicate\s*pan/i;
+    for (const t of texts) {
+      if (t && re.test(t)) return { matched: true, message: String(t).trim() };
+    }
+    return { matched: false, message: '' };
+  };
+
+  const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
+        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP' },
+      });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Moved to Duplicate Rejected Data');
+      refreshAllLists();
+    } catch (e) {
+      console.warn('[SAPSync] auto duplicate-reject failed', e);
+    }
+  };
+
   const handleConfirmSync = async (overrides: SapFieldOverrides) => {
     const vendor = pendingSyncVendor;
     if (!vendor) return;
@@ -182,7 +210,12 @@ export default function SAPSync() {
       setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
       setSelectedSapIds(new Set());
-      toast.success('SAP sync complete');
+      const dup = isPanDuplicateResponse(result.sapResponse);
+      if (dup.matched) {
+        await autoRejectAsDuplicate(vendor.id, dup.message);
+      } else {
+        toast.success('SAP sync complete');
+      }
     } catch (error: any) {
       console.error('[SAPSync] sapSync failed', error);
       const msg = error?.message || 'SAP sync failed';
@@ -190,14 +223,19 @@ export default function SAPSync() {
       const fallback = error?.ACC_RES ?? [
         { MSGTYP: 'E', LONGMSG: msg, BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
       ];
-      setSapSyncResult({
+      const failResp = {
         success: false,
         message: msg,
         ACC_RES: fallback,
-      });
+      };
+      setSapSyncResult(failResp);
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
+      const dup = isPanDuplicateResponse(failResp);
+      if (dup.matched) {
+        await autoRejectAsDuplicate(vendor.id, dup.message);
+      }
     } finally {
       setSyncingVendorId(null);
     }
@@ -212,12 +250,40 @@ export default function SAPSync() {
       setShowMultipleSync(false);
       setShowBulkResult(true);
       setSelectedSapIds(new Set());
+      // Auto-move PAN-duplicate failures
+      const results: any[] = Array.isArray(result?.results) ? result.results : [];
+      const dupIds: { id: string; msg: string }[] = [];
+      for (const r of results) {
+        const vid = r?.vendorId || r?.vendor_id;
+        const dup = isPanDuplicateResponse(r?.sapResponse || r);
+        if (vid && dup.matched) dupIds.push({ id: vid, msg: dup.message });
+      }
+      if (dupIds.length === 0) {
+        const dup = isPanDuplicateResponse(result);
+        if (dup.matched) {
+          for (const vid of vendorIds) dupIds.push({ id: vid, msg: dup.message });
+        }
+      }
+      for (const d of dupIds) {
+        try {
+          await supabase.functions.invoke('sap-team-reject-vendor', {
+            body: { vendorId: d.id, remarks: d.msg || 'PAN Number Duplicated — vendor already exists in SAP' },
+          });
+        } catch (e) {
+          console.warn('[SAPSync] bulk auto duplicate-reject failed', d.id, e);
+        }
+      }
+      if (dupIds.length > 0) {
+        toast.success(`Moved ${dupIds.length} vendor(s) to Duplicate Rejected Data`);
+        refreshAllLists();
+      }
     } catch (error: any) {
       setBulkResult({ success: false, message: error?.message || 'Bulk sync failed', ACC_RES: [], results: [] });
       setShowMultipleSync(false);
       setShowBulkResult(true);
     }
   };
+
 
   const handleDmsSync = async (vendorIds: string[]) => {
     try {
@@ -306,7 +372,7 @@ export default function SAPSync() {
         <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="sap" className="gap-2"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
           <TabsTrigger value="dms" className="gap-2"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
-          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Rejected{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Duplicate Rejected Data{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
         </TabsList>
 
         {/* SAP Sync tab */}
@@ -402,12 +468,12 @@ export default function SAPSync() {
                           className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                           onClick={() => { setRejectVendor(vendor); setRejectRemarks(''); }}
                           disabled={rejectingVendorId === vendor.id || multiMode}
-                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Reject vendor'}
+                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Mark as duplicate (already in SAP)'}
                         >
                           {rejectingVendorId === vendor.id ? (
-                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
                           ) : (
-                            <><XCircle className="h-4 w-4 mr-2" />Reject</>
+                            <><XCircle className="h-4 w-4 mr-2" />Duplicate Reject</>
                           )}
                         </Button>
                       </div>
@@ -532,8 +598,8 @@ export default function SAPSync() {
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <Ban className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold">No rejected vendors</h3>
-                <p className="text-muted-foreground mt-2">Vendors rejected by the SAP Team will appear here.</p>
+                <h3 className="text-xl font-semibold">No duplicate-rejected vendors</h3>
+                <p className="text-muted-foreground mt-2">Vendors marked as duplicate (already in SAP) will appear here.</p>
               </CardContent></Card>
             ) : (
               filteredRejected.map((vendor) => {
@@ -551,7 +617,7 @@ export default function SAPSync() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1 flex-wrap">
                               <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
-                              <Badge className="bg-red-100 text-red-700 border-red-200">SAP Team Rejected</Badge>
+                              <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate Rejected</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -561,7 +627,7 @@ export default function SAPSync() {
                             </div>
                             {remarks && (
                               <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
-                                <p className="text-xs font-semibold text-red-700 mb-1">Reject Remarks</p>
+                                <p className="text-xs font-semibold text-red-700 mb-1">Duplicate Reject Remarks</p>
                                 <p className="text-sm text-red-900 whitespace-pre-wrap">{remarks}</p>
                               </div>
                             )}
@@ -588,10 +654,10 @@ export default function SAPSync() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Reject Vendor
+              Duplicate Reject Vendor
             </DialogTitle>
             <DialogDescription>
-              The vendor will be marked as <span className="font-semibold">SAP Team Rejected</span> and moved to the Rejected tab.
+              The vendor will be marked as a <span className="font-semibold">duplicate (already available in SAP)</span> and moved to the Duplicate Rejected Data tab.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -603,7 +669,7 @@ export default function SAPSync() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="reject-remarks">
-                Reject Remarks <span className="text-red-600">*</span>
+                Duplicate Reject Remarks <span className="text-red-600">*</span>
               </Label>
               <Textarea
                 id="reject-remarks"
@@ -613,7 +679,7 @@ export default function SAPSync() {
                 rows={4}
                 className="rounded-xl"
               />
-              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Rejected tab.</p>
+              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Duplicate Rejected Data tab.</p>
             </div>
           </div>
           <DialogFooter>
@@ -626,9 +692,9 @@ export default function SAPSync() {
               disabled={!rejectRemarks.trim() || !!rejectingVendorId}
             >
               {rejectingVendorId ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
               ) : (
-                <><XCircle className="h-4 w-4 mr-2" />Confirm Reject</>
+                <><XCircle className="h-4 w-4 mr-2" />Confirm Duplicate Reject</>
               )}
             </Button>
           </DialogFooter>
