@@ -137,7 +137,16 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
   };
 
   return (
-    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(handleFormSubmit, (errs) => {
+      const firstKey = Object.keys(errs || {})[0];
+      const firstMsg = firstKey ? ((errs as any)[firstKey]?.message as string) : 'Please complete the required fields.';
+      toast.error(firstMsg || 'Please complete the required fields.');
+      if (firstKey) {
+        const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
+        (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    })} className="space-y-6">
+
       {/* Financial Details */}
       <div className="form-section">
         <h3 className="form-section-title">
