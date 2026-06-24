@@ -1264,8 +1264,13 @@ export function DocumentVerificationStep({
       setPanCrossCheckError(null);
       return null;
     });
+  };
 
-  const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+  const handleMsmeUpload = (file: File) => {
+    // MSME upload/replace — cascade-clear Bank.
+    resetBankCascade();
+    return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+  };
 
   // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
   
