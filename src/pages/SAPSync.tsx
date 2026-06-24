@@ -598,8 +598,8 @@ export default function SAPSync() {
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <Ban className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold">No rejected vendors</h3>
-                <p className="text-muted-foreground mt-2">Vendors rejected by the SAP Team will appear here.</p>
+                <h3 className="text-xl font-semibold">No duplicate-rejected vendors</h3>
+                <p className="text-muted-foreground mt-2">Vendors marked as duplicate (already in SAP) will appear here.</p>
               </CardContent></Card>
             ) : (
               filteredRejected.map((vendor) => {
