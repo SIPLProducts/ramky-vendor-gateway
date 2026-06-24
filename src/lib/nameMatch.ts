@@ -171,7 +171,10 @@ export interface CrossNameMatchResult {
 export function evaluateCrossNameMatch(
   candidate: string | null | undefined,
   references: CrossNameReference[],
+  options?: { minPass?: number; requireWordOverlap?: boolean },
 ): CrossNameMatchResult {
+  const minPass = options?.minPass ?? NAME_MATCH_MIN_PASS;
+  const requireWordOverlap = options?.requireWordOverlap ?? false;
   const usable = (references || []).filter((r) => r && r.value && String(r.value).trim());
   if (!candidate || !candidate.trim() || usable.length === 0) {
     return { passed: false, skipped: true, bestScore: 0, matches: [], best: null };
@@ -183,14 +186,39 @@ export function evaluateCrossNameMatch(
   });
 
   const best = scored.reduce((acc, cur) => (cur.score > acc.score ? cur : acc), scored[0]);
-  const matches = scored.filter((s) => s.score >= NAME_MATCH_MIN_PASS);
+  let matches = scored.filter((s) => s.score >= minPass);
+  let passed = best.score >= minPass;
+  if (passed && requireWordOverlap) {
+    // Require at least one usable reference to share a real word with the
+    // candidate. Pure initial-letter pairings (e.g. "KRISH" vs "K MURUGAN")
+    // do not count.
+    const anyWordOverlap = usable.some((r) => hasWordOverlap(candidate, r.value));
+    if (!anyWordOverlap) {
+      passed = false;
+      matches = [];
+    }
+  }
   return {
-    passed: best.score >= NAME_MATCH_MIN_PASS,
+    passed,
     skipped: false,
     bestScore: best.score,
     matches,
     best,
   };
+}
+
+/**
+ * True if `a` and `b` share at least one significant word token (length > 1,
+ * not a noise token). Single-letter / initial pairings do NOT count. Used by
+ * high-trust cross-checks (e.g. bank account holder) to reject coincidental
+ * initial-letter matches like "KRISH" vs "K MURUGAN".
+ */
+export function hasWordOverlap(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const ta = tokens(a);
+  if (!ta.length) return false;
+  const tb = new Set(tokens(b));
+  return ta.some((t) => tb.has(t));
 }
 
 /** Format a list of passing matches for a success banner. */
