@@ -627,19 +627,6 @@ export function VendorReviewDialog({
                     </div>
                   </div>
 
-                  <Separator />
-
-                  {/* Approval Timeline */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <Calendar className="h-4 w-4" />
-                      Approval Timeline
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="space-y-1"><p className="text-muted-foreground">Finance Reviewed At</p><p className="font-medium">{vendor.finance_reviewed_at ? new Date(vendor.finance_reviewed_at).toLocaleString('en-IN') : '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Purchase Reviewed At</p><p className="font-medium">{vendor.purchase_reviewed_at ? new Date(vendor.purchase_reviewed_at).toLocaleString('en-IN') : '-'}</p></div>
-                    </div>
-                  </div>
 
                   {(vendor.finance_comments || vendor.purchase_comments) && (
                     <>
