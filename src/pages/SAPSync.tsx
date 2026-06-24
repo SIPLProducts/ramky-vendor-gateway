@@ -468,12 +468,12 @@ export default function SAPSync() {
                           className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                           onClick={() => { setRejectVendor(vendor); setRejectRemarks(''); }}
                           disabled={rejectingVendorId === vendor.id || multiMode}
-                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Reject vendor'}
+                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Mark as duplicate (already in SAP)'}
                         >
                           {rejectingVendorId === vendor.id ? (
-                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
                           ) : (
-                            <><XCircle className="h-4 w-4 mr-2" />Reject</>
+                            <><XCircle className="h-4 w-4 mr-2" />Duplicate Reject</>
                           )}
                         </Button>
                       </div>
