@@ -669,7 +669,7 @@ export default function SAPSync() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="reject-remarks">
-                Reject Remarks <span className="text-red-600">*</span>
+                Duplicate Reject Remarks <span className="text-red-600">*</span>
               </Label>
               <Textarea
                 id="reject-remarks"
