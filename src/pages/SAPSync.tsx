@@ -679,7 +679,7 @@ export default function SAPSync() {
                 rows={4}
                 className="rounded-xl"
               />
-              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Rejected tab.</p>
+              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Duplicate Rejected Data tab.</p>
             </div>
           </div>
           <DialogFooter>
