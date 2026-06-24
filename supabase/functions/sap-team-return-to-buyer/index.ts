@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     const { data: vendor, error: vErr } = await admin
       .from('vendors')
-      .select('id, status, legal_name, trade_name, gstin, account_holder_name, vendor_reference_number, vendor_code, tenant_id')
+      .select('id, status, legal_name, trade_name, gstin, account_holder_name, reference_number, sap_vendor_code, tenant_id')
       .eq('id', vendorId).single();
     if (vErr || !vendor) throw new Error(vErr?.message || 'Vendor not found');
 
@@ -90,8 +90,8 @@ Deno.serve(async (req) => {
         } else {
           buyerEmailUsed = buyerEmail;
           const vendorName = getName1(vendor);
-          const vendorRef = (vendor as any).vendor_reference_number
-            ?? (vendor as any).vendor_code
+          const vendorRef = (vendor as any).reference_number
+            ?? (vendor as any).sap_vendor_code
             ?? String(vendor.id).slice(0, 8);
           const rejecterName = (rejecterProfile as any)?.full_name ?? 'SAP Team';
           const rejecterEmail = (rejecterProfile as any)?.email ?? '';
