@@ -1,10 +1,10 @@
 // Lets the SAP Team (or admin) reject a vendor at the SAP Sync stage and send
 // it back to the inviting Buyer for correction. Sets vendors.status =
-// 'returned_to_buyer', stores remarks, and notifies the buyer via email.
-//
-// Once the buyer re-approves (via buyer-reapprove-rejected), the entire
-// approval matrix is re-seeded so the vendor restarts the workflow
-// (SCM Manager -> SCM Head -> Finance 1 -> Finance 2 -> ...).
+// 'returned_to_buyer', stores remarks, and notifies the buyer via SMTP using
+// the same configuration as approval-stage rejections in
+// process-approval-action. If the buyer email fails and the caller did not
+// pass forceReject:true, the rejection is aborted so the SAP team can
+// confirm/retry.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { requireAuthenticatedUser, authErrorResponse } from '../_shared/auth.ts';
 
@@ -13,14 +13,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const esc = (s: unknown) =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+const row = (k: string, v: string) =>
+  `<tr><td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f9fafb;font-weight:600;width:38%">${esc(k)}</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(v)}</td></tr>`;
+
+function getName1(v: any): string {
+  const hasGst = !!(v?.gst_number && String(v.gst_number).trim());
+  if (hasGst && v?.trade_name) return v.trade_name;
+  return v?.pan_account_holder_name || v?.trade_name || v?.legal_name || 'Vendor';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   const auth = await requireAuthenticatedUser(req, [
-    'admin',
-    'sharvi_admin',
-    'SAP Team',
-    'sap team',
+    'admin', 'sharvi_admin', 'SAP Team', 'sap team',
   ]);
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
@@ -28,6 +39,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const vendorId: string | undefined = body.vendorId || body.vendor_id;
     const remarks: string = (body.remarks || body.comments || '').toString().trim();
+    const forceReject: boolean = !!body.forceReject;
 
     if (!vendorId) {
       return new Response(JSON.stringify({ error: 'vendorId is required' }), {
@@ -47,9 +59,90 @@ Deno.serve(async (req) => {
 
     const { data: vendor, error: vErr } = await admin
       .from('vendors')
-      .select('id, status, legal_name, trade_name, primary_email, registered_email, tenant_id')
+      .select('id, status, legal_name, trade_name, gst_number, pan_account_holder_name, vendor_reference_number, vendor_code, tenant_id')
       .eq('id', vendorId).single();
     if (vErr || !vendor) throw new Error(vErr?.message || 'Vendor not found');
+
+    // Identify the inviting buyer.
+    const { data: invite } = await admin
+      .from('vendor_invitations')
+      .select('created_by, email')
+      .eq('vendor_id', vendorId)
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle();
+
+    const invitingBuyerId: string | null = (invite as any)?.created_by ?? null;
+
+    // Build email -- same template as process-approval-action reject.
+    let emailSent = false;
+    let emailError: string | null = null;
+    let buyerEmailUsed: string | null = null;
+
+    if (invitingBuyerId) {
+      try {
+        const [{ data: buyerProfile }, { data: rejecterProfile }] = await Promise.all([
+          admin.from('profiles').select('email, full_name').eq('id', invitingBuyerId).maybeSingle(),
+          admin.from('profiles').select('email, full_name').eq('id', auth.userId).maybeSingle(),
+        ]);
+        const buyerEmail = (buyerProfile as any)?.email ?? (invite as any)?.email ?? null;
+        if (!buyerEmail) {
+          emailError = 'Buyer email not found in profile.';
+        } else {
+          buyerEmailUsed = buyerEmail;
+          const vendorName = getName1(vendor);
+          const vendorRef = (vendor as any).vendor_reference_number
+            ?? (vendor as any).vendor_code
+            ?? String(vendor.id).slice(0, 8);
+          const rejecterName = (rejecterProfile as any)?.full_name ?? 'SAP Team';
+          const rejecterEmail = (rejecterProfile as any)?.email ?? '';
+          const stageLabel = 'SAP Team';
+          const rejectedAtIst = new Date().toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+          }) + ' IST';
+          const html = `
+            <div style="font-family:Arial,sans-serif;color:#111;max-width:640px;margin:auto">
+              <h2 style="color:#b91c1c;margin:0 0 12px">Vendor Application Rejected</h2>
+              <p>Dear ${esc((buyerProfile as any)?.full_name ?? 'Buyer')},</p>
+              <p>The vendor application below has been <b>rejected</b> at the <b>${esc(stageLabel)}</b> stage and routed back to you for correction.</p>
+              <table style="border-collapse:collapse;width:100%;margin:12px 0;font-size:14px">
+                ${row('Vendor Name', vendorName)}
+                ${row('Vendor Reference Number', vendorRef)}
+                ${row('Rejected By', `${rejecterName}${rejecterEmail ? ` <${rejecterEmail}>` : ''}`)}
+                ${row('Rejection Stage', stageLabel)}
+                ${row('Rejection Remarks', remarks)}
+                ${row('Rejection Date & Time', rejectedAtIst)}
+              </table>
+              <p>Please log in to the Vendor Portal to review the remarks, update the vendor information, and resubmit. Once resubmitted, the application will restart the approval workflow (SCM Manager → SCM Head → Finance 1 → Finance 2 → ...).</p>
+              <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Sharvi Vendor Portal.</p>
+            </div>`;
+          const { data: emailResp, error: emailInvokeErr } = await admin.functions.invoke('send-smtp-email', {
+            body: { to: buyerEmail, subject: 'Vendor Application Rejected', html },
+          });
+          if (emailInvokeErr) {
+            emailError = emailInvokeErr.message ?? 'SMTP invoke failed';
+          } else if (emailResp && (emailResp as any).success === false) {
+            emailError = (emailResp as any).error ?? 'SMTP send failed';
+          } else {
+            emailSent = true;
+          }
+        }
+      } catch (e: any) {
+        emailError = e?.message ?? String(e);
+      }
+    } else {
+      emailError = 'No inviting buyer recorded for vendor.';
+    }
+
+    // Abort unless email sent or caller forced.
+    if (!emailSent && !forceReject) {
+      return new Response(JSON.stringify({
+        ok: false,
+        email_sent: false,
+        requires_confirmation: true,
+        error: emailError ?? 'Unable to send rejection email.',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const nowIso = new Date().toISOString();
 
@@ -77,47 +170,22 @@ Deno.serve(async (req) => {
       details: { remarks, stage: 'SAP_TEAM' },
     });
 
-    // Identify the inviting buyer and email them.
-    const { data: invite } = await admin
-      .from('vendor_invitations')
-      .select('created_by, email')
-      .eq('vendor_id', vendorId)
-      .order('created_at', { ascending: false })
-      .limit(1).maybeSingle();
+    try {
+      await admin.from('audit_logs').insert({
+        action: emailSent ? 'buyer_notified_rejection_email' : 'buyer_rejection_email_failed',
+        user_id: auth.userId,
+        vendor_id: vendorId,
+        details: { buyer_email: buyerEmailUsed, stage: 'SAP_TEAM', email_error: emailError },
+      });
+    } catch (_) { /* ignore */ }
 
-    let buyerEmail: string | null = invite?.email ?? null;
-    let buyerName = 'Buyer';
-    if (invite?.created_by) {
-      const { data: prof } = await admin
-        .from('profiles')
-        .select('email, full_name')
-        .eq('id', invite.created_by)
-        .maybeSingle();
-      if (prof?.email) buyerEmail = prof.email;
-      if (prof?.full_name) buyerName = prof.full_name;
-    }
-
-    if (buyerEmail) {
-      try {
-        await admin.functions.invoke('send-status-notification', {
-          body: {
-            vendorId,
-            newStatus: 'returned_to_buyer',
-            previousStatus: vendor.status,
-            vendorEmail: buyerEmail,
-            vendorName: buyerName,
-            comments: `SAP Team returned this vendor for correction.\n\nRemarks: ${remarks}`,
-            simulationMode: false,
-          },
-        });
-      } catch (e) {
-        console.warn('[sap-team-return-to-buyer] notification failed', e);
-      }
-    }
-
-    return new Response(JSON.stringify({ ok: true, success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({
+      ok: true,
+      success: true,
+      vendor_status: 'returned_to_buyer',
+      email_sent: emailSent,
+      email_error: emailSent ? null : emailError,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err?.message || 'Unexpected error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

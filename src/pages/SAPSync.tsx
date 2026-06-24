@@ -131,13 +131,40 @@ export default function SAPSync() {
       return;
     }
     setReturningVendorId(returnVendor.id);
+    const vendorLabel = getSapName1(returnVendor) || returnVendor.legal_name || returnVendor.id;
     try {
-      const { data, error } = await supabase.functions.invoke('sap-team-return-to-buyer', {
-        body: { vendorId: returnVendor.id, remarks },
-      });
+      const invokeReturn = (forceReject: boolean) =>
+        supabase.functions.invoke('sap-team-return-to-buyer', {
+          body: { vendorId: returnVendor.id, remarks, forceReject },
+        });
+
+      let { data, error } = await invokeReturn(false);
       if (error) throw error;
-      if (data && (data as any).error) throw new Error((data as any).error);
-      toast.success('Sent back to Buyer', { description: getSapName1(returnVendor) || returnVendor.legal_name || returnVendor.id });
+
+      // Email failed — ask the SAP user to confirm before proceeding.
+      if (data && (data as any).ok === false && (data as any).requires_confirmation) {
+        const msg = (data as any).error || 'Unable to send rejection email to the buyer.';
+        const proceed = window.confirm(
+          `${msg}\n\nProceed with the rejection anyway? The buyer will NOT receive an email notification.`,
+        );
+        if (!proceed) {
+          return;
+        }
+        ({ data, error } = await invokeReturn(true));
+        if (error) throw error;
+      }
+
+      if (data && (data as any).error && (data as any).ok !== true) {
+        throw new Error((data as any).error);
+      }
+
+      const emailSent = !!(data as any)?.email_sent;
+      if (emailSent) {
+        toast.success('Sent back to Buyer — buyer notified by email', { description: vendorLabel });
+      } else {
+        const err = (data as any)?.email_error || 'email not delivered';
+        toast.warning('Sent back to Buyer (email failed)', { description: `${vendorLabel} — ${err}` });
+      }
       setReturnVendor(null);
       setReturnRemarks('');
       refreshAllLists();
@@ -147,6 +174,7 @@ export default function SAPSync() {
       setReturningVendorId(null);
     }
   };
+
 
   const selectedSapVendors = useMemo(
     () => filteredSap.filter(v => selectedSapIds.has(v.id)),
