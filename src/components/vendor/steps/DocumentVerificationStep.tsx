@@ -2019,7 +2019,7 @@ export function DocumentVerificationStep({
                       accept=".pdf,.jpg,.jpeg,.png"
                       doc={gstDoc}
                       onUpload={handleGstUpload}
-                      onReset={() => setGstDoc(idleDoc)}
+                      onReset={() => { setGstDoc(idleDoc); resetGstAux(); resetPanCascade(); }}
                       busyLabel={
                         gstDoc.status === "uploading" ? "Uploading…" :
                         gstDoc.status === "preparing" ? "Preparing document for OCR…" :
