@@ -926,7 +926,7 @@ export function DocumentVerificationStep({
         { field: "GST Trade Name", value: gstTradeName },
         { field: "PAN Holder Name", value: panHolderName },
         { field: "MSME Enterprise Name", value: msmeEnterpriseName },
-      ]);
+      ], { minPass: 50, requireWordOverlap: true });
       if (!evalRes.skipped) {
         if (!evalRes.passed) {
           return {
