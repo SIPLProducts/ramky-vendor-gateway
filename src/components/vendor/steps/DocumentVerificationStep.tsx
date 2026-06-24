@@ -1243,8 +1243,10 @@ export function DocumentVerificationStep({
     });
   };
 
-  const handlePanUpload = (file: File) =>
-    runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
+  const handlePanUpload = (file: File) => {
+    // PAN replace/upload — cascade-clear MSME and Bank.
+    resetMsmeCascade();
+    return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
         // Prefer the canonical PAN returned by the GST validation API; fall
         // back to slicing the GSTIN (chars 3-12) only if the API didn't
