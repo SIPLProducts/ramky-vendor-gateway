@@ -1087,6 +1087,20 @@ export function DocumentVerificationStep({
         setManualLegalName("");
         setManualAddress({ address: "", city: "", state: "", pincode: "" });
       }
+      // GST is the top of the chain — cascade-clear PAN, MSME, and Bank.
+      setPanDoc(idleDoc);
+      setPanCrossCheckError(null);
+      setMsmeDoc(idleDoc);
+      setMsmeManualNumber("");
+      setMsmeManualError(null);
+      setMsmeDeclarationFile(null);
+      setMsmeDeclarationReason("");
+      setIsMsmeRegistered(null);
+      setBankDoc(idleDoc);
+      setBankDoc2(idleDoc);
+      lastBankFileRef.current = null;
+      lastBankFile2Ref.current = null;
+      setBankPopup((p) => ({ ...p, open: false }));
       return next;
     });
   }, []);
