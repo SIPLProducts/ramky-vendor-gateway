@@ -70,7 +70,16 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
   // CEO/MD fields are optional — no auto-fill needed.
 
   return (
-    <form id="step-form" onSubmit={handleSubmit(onNext)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(onNext, (errs) => {
+      const firstKey = Object.keys(errs || {})[0];
+      const firstMsg = firstKey ? ((errs as any)[firstKey]?.message as string) : 'Please complete the required contact fields.';
+      toast.error(firstMsg || 'Please complete the required contact fields.');
+      if (firstKey) {
+        const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
+        (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    })} className="space-y-6">
+
       <div className="form-section">
         <h3 className="form-section-title">
           <User className="h-5 w-5 text-primary" />
