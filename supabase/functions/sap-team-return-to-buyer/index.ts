@@ -90,8 +90,8 @@ Deno.serve(async (req) => {
         } else {
           buyerEmailUsed = buyerEmail;
           const vendorName = getName1(vendor);
-          const vendorRef = (vendor as any).vendor_reference_number
-            ?? (vendor as any).vendor_code
+          const vendorRef = (vendor as any).reference_number
+            ?? (vendor as any).sap_vendor_code
             ?? String(vendor.id).slice(0, 8);
           const rejecterName = (rejecterProfile as any)?.full_name ?? 'SAP Team';
           const rejecterEmail = (rejecterProfile as any)?.email ?? '';
