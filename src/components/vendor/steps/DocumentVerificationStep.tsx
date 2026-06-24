@@ -2190,7 +2190,7 @@ export function DocumentVerificationStep({
                 accept=".pdf,.jpg,.jpeg,.png"
                 doc={panDoc}
                 onUpload={handlePanUpload}
-                onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
+                onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); resetMsmeCascade(); }}
                 busyLabel={
                   panDoc.status === "uploading" ? "Uploading…" :
                   panDoc.status === "preparing" ? "Preparing document for OCR…" :
