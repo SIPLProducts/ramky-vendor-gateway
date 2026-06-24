@@ -692,9 +692,9 @@ export default function SAPSync() {
               disabled={!rejectRemarks.trim() || !!rejectingVendorId}
             >
               {rejectingVendorId ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
               ) : (
-                <><XCircle className="h-4 w-4 mr-2" />Confirm Reject</>
+                <><XCircle className="h-4 w-4 mr-2" />Confirm Duplicate Reject</>
               )}
             </Button>
           </DialogFooter>
