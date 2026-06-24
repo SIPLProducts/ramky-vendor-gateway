@@ -1,45 +1,39 @@
-## Goal
-Add a second rejection action on the SAP Sync screen — **Reject & Send to Buyer** — that bounces the vendor application back to the inviting Buyer (not to "Duplicate Rejected Data"), notifies the Buyer by email, and lets the Buyer edit and resubmit. On resubmission, the vendor re-enters the standard multi-level approval workflow from the start.
+# Fix: Buyer not receiving email on SAP Team "Reject & Send to Buyer"
 
-## UI changes — `src/pages/SAPSync.tsx`
+## Root cause
 
-1. Beside the existing **Duplicate Reject** button on each SAP-tab vendor card, render a new **Reject & Send to Buyer** button (outline / amber styling to distinguish from Duplicate Reject).
-2. Add new state:
-   - `returnVendor: VendorRow | null`
-   - `returnRemarks: string`
-   - `returningVendorId: string | null`
-3. Add a new dialog "Reject & Send to Buyer" with:
-   - Vendor name (read-only)
-   - Mandatory **Remarks** textarea (validated non-empty; show inline error + toast on submit if empty)
-   - Cancel / Confirm buttons
-4. `handleConfirmReturnToBuyer` invokes the new edge function `sap-team-return-to-buyer` with `{ vendorId, remarks }`. On success: toast "Sent back to Buyer", close dialog, `refreshAllLists()`.
+`sap-team-return-to-buyer` invokes `send-status-notification`, which is a **simulation-only** function (logs to `audit_logs`, never sends mail). It also has no template for `returned_to_buyer`.
 
-No changes to the Duplicate Reject flow, the Duplicate Rejected Data tab, or the PAN-duplicate auto-reject logic.
+Approval-stage rejections (SCM Manager / Head / Finance) in `process-approval-action` work because they invoke `send-smtp-email` with a rich HTML, treat failure as fatal, and require the caller to retry with `forceReject` to override.
 
-## Backend — new edge function `supabase/functions/sap-team-return-to-buyer/index.ts`
+The SAP-team return path must follow the same configuration.
 
-- Auth: require `admin`, `sharvi_admin`, or `SAP Team` (mirrors `sap-team-reject-vendor`).
-- Input validation: `vendorId` (uuid string) and `remarks` (non-empty string) — 400 on missing.
-- Service-role client.
-- Load vendor + latest `vendor_invitations` row to identify the inviting Buyer (`created_by`, plus buyer email via `profiles`).
-- Update `vendors`:
-  - `status = 'buyer_review'` (vendor re-enters the Buyer stage; on the buyer's next save/resubmit the existing `trg_vendors_seed_approval` trigger re-seeds `vendor_approval_progress` for the full SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO chain, restarting the workflow).
-  - `last_rejection_comments = remarks`
-  - `last_rejection_stage = 'SAP_TEAM'`
-  - `last_rejected_by = auth.userId`, `last_rejected_at = now()`
-- Clear stale `vendor_approval_progress` rows and call the `seed_vendor_approval_progress` RPC so the buyer sees a fresh pending Buyer row.
-- Insert `audit_logs` row: `action = 'sap_team_return_to_buyer'`, details `{ remarks }`.
-- Send email to the Buyer via the existing `send-status-notification` edge function (best-effort try/catch): subject context "Vendor returned by SAP team — please review and resubmit", recipient = buyer's email, comments = remarks.
-- Return `{ success: true }`.
+## Changes
 
-### Buyer-side resubmit (no new UI work needed)
-The existing Buyer queue already lists vendors in `buyer_review`. When the Buyer opens, edits, and resubmits, the vendor advances through the standard approval chain (SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office if MSME → SAP Sync), restarting the full workflow as requested.
+### 1. `supabase/functions/sap-team-return-to-buyer/index.ts`
+Replace the `send-status-notification` invocation with the same `send-smtp-email` flow used by `process-approval-action` reject:
+
+- Load buyer profile (email, full_name) via `vendor_invitations.created_by` → `profiles`.
+- Load rejecter profile and vendor row (legal_name/trade_name, vendor_reference_number, vendor_code) for the email body.
+- Build the same HTML template (header "Vendor Application Rejected", stage = "SAP Team", remarks, IST timestamp). NAME1 logic: prefer trade_name when GST exists, else PAN account holder name, else legal_name.
+- Call `admin.functions.invoke('send-smtp-email', { body: { to, subject, html } })`.
+- Accept a new `forceReject: boolean` body field. If email fails AND `!forceReject`: return `{ ok: false, email_sent: false, requires_confirmation: true, error }` and do **not** update vendor status / clear approval progress.
+- If email succeeds OR `forceReject`: perform the existing status update, delete pending `vendor_approval_progress`, and write two `audit_logs` rows (`sap_team_return_to_buyer` and `buyer_notified_rejection_email` / `buyer_rejection_email_failed`).
+- Response shape: `{ ok: true, email_sent, email_error }`.
+
+### 2. `src/pages/SAPSync.tsx` — `handleConfirmReturnToBuyer`
+Mirror the existing approval-reject UX:
+
+- First call without `forceReject`. If response is `{ ok: false, requires_confirmation: true }`, show a confirm dialog ("Email to buyer failed: <error>. Proceed with rejection anyway?"). On confirm, re-invoke with `forceReject: true`.
+- On success, toast includes "Buyer notified" when `email_sent`, otherwise "Vendor returned (email failed)".
 
 ## Out of scope
-- No schema migration (reuses existing `last_rejection_*` columns and the `buyer_review` status).
-- No changes to the Buyer dashboard UI — it already supports `buyer_review` + resubmission.
-- No changes to the Duplicate Reject flow.
 
-## Files touched
-- `src/pages/SAPSync.tsx` — new button, dialog, handler, state.
-- `supabase/functions/sap-team-return-to-buyer/index.ts` — new edge function (deployed via `supabase--deploy_edge_functions`).
+- No changes to `send-status-notification` (still used by other flows in simulation).
+- No schema changes.
+- No UI changes beyond the SAP Sync return-to-buyer dialog handler.
+
+## Verification
+
+- Trigger "Reject & Send to Buyer" with a valid buyer profile email and an SMTP config present → buyer inbox receives the same rejection email format as SCM/Finance rejects.
+- Disable SMTP config → first call returns the confirm prompt; clicking Force completes the rejection and logs `buyer_rejection_email_failed`.
