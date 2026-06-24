@@ -463,40 +463,6 @@ export default function VendorList() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {vendor.status === 'returned_to_buyer' && (
-                                <>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={async () => {
-                                      const { data: inv } = await supabase
-                                        .from('vendor_invitations')
-                                        .select('id')
-                                        .eq('vendor_id', vendor.id)
-                                        .order('created_at', { ascending: false })
-                                        .limit(1)
-                                        .maybeSingle();
-                                      if (inv?.id) {
-                                        window.open(`/vendor/register?onBehalfOf=${inv.id}`, '_blank');
-                                      } else {
-                                        toast({ title: 'No invitation found for this vendor', variant: 'destructive' });
-                                      }
-                                    }}
-                                  >
-                                    Edit & Resubmit
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setReturnTarget(vendor);
-                                      setReturnRemarks('');
-                                    }}
-                                  >
-                                    Return to Vendor
-                                  </Button>
-                                </>
-                              )}
                             </div>
                           </TableCell>
 
