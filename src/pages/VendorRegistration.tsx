@@ -800,14 +800,27 @@ export default function VendorRegistration() {
     // only happens after the vendor enabled it in Step 1).
     const wantsSecondary = prev.bank.secondary?.enabled === true || !!data.bank2;
 
+    // GST cascade — when the verified GSTIN changes (replaced or reset),
+    // clear the Organization tab's Legal Name, Trade Name and State so they
+    // are re-populated from the freshly verified GST document and never carry
+    // stale values from a previously uploaded GSTIN.
+    const prevGstin = (prev.statutory.gstin || '').toUpperCase();
+    const newGstin = (data.gst?.gstin || '').toUpperCase();
+    const gstChanged = !!prevGstin && prevGstin !== newGstin;
+
+    const orgLegalBase = gstChanged ? '' : prev.organization.legalName;
+    const orgTradeBase = gstChanged ? '' : prev.organization.tradeName;
+    const orgStateBase = gstChanged ? '' : prev.organization.state;
+
     return {
       ...prev,
       organization: {
         ...prev.organization,
-        legalName: fill(prev.organization.legalName, ocrLegalName),
-        tradeName: fill(prev.organization.tradeName, ocrTradeName),
-        state: fill(prev.organization.state, stateFromDoc),
+        legalName: fill(orgLegalBase, ocrLegalName),
+        tradeName: fill(orgTradeBase, ocrTradeName),
+        state: fill(orgStateBase, stateFromDoc),
       },
+
       address: {
         ...prev.address,
         registeredAddress: fill(prev.address.registeredAddress, addrLineFromDoc),
