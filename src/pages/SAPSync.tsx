@@ -742,6 +742,60 @@ export default function SAPSync() {
         </DialogContent>
       </Dialog>
 
+      {/* Return-to-Buyer dialog */}
+      <Dialog open={!!returnVendor} onOpenChange={(o) => { if (!o) { setReturnVendor(null); setReturnRemarks(''); } }}>
+        <DialogContent className="rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-amber-600" />
+              Reject &amp; Send to Buyer
+            </DialogTitle>
+            <DialogDescription>
+              The vendor will be returned to the inviting Buyer for correction. They will be notified by email and can resubmit, restarting the full approval workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <p className="font-semibold">{(returnVendor && getSapName1(returnVendor)) || returnVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="text-xs text-muted-foreground font-mono mt-1">
+                Ref No: {(returnVendor as any)?.reference_number || returnVendor?.id.slice(0, 8).toUpperCase()}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="return-remarks">
+                Remarks <span className="text-red-600">*</span>
+              </Label>
+              <Textarea
+                id="return-remarks"
+                value={returnRemarks}
+                onChange={(e) => setReturnRemarks(e.target.value)}
+                placeholder="e.g. PAN mismatch — please re-verify and resubmit"
+                rows={4}
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">Required. Shared with the Buyer in the notification email.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setReturnVendor(null); setReturnRemarks(''); }}>
+              Cancel
+            </Button>
+            <Button
+              className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleConfirmReturnToBuyer}
+              disabled={!returnRemarks.trim() || !!returningVendorId}
+            >
+              {returningVendorId ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending back...</>
+              ) : (
+                <><Undo2 className="h-4 w-4 mr-2" />Send to Buyer</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <VendorReviewDialog
         vendorId={selectedVendor?.id ?? null}
         open={showDetails}
