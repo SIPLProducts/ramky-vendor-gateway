@@ -654,10 +654,10 @@ export default function SAPSync() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Reject Vendor
+              Duplicate Reject Vendor
             </DialogTitle>
             <DialogDescription>
-              The vendor will be marked as <span className="font-semibold">SAP Team Rejected</span> and moved to the Rejected tab.
+              The vendor will be marked as a <span className="font-semibold">duplicate (already available in SAP)</span> and moved to the Duplicate Rejected Data tab.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
