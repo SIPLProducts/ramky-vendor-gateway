@@ -627,7 +627,7 @@ export default function SAPSync() {
                             </div>
                             {remarks && (
                               <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
-                                <p className="text-xs font-semibold text-red-700 mb-1">Reject Remarks</p>
+                                <p className="text-xs font-semibold text-red-700 mb-1">Duplicate Reject Remarks</p>
                                 <p className="text-sm text-red-900 whitespace-pre-wrap">{remarks}</p>
                               </div>
                             )}
