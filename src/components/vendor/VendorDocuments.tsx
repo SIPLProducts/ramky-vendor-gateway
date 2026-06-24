@@ -34,6 +34,7 @@ interface VendorDocument {
 
 interface VendorDocumentsProps {
   vendorId: string;
+  hideDownload?: boolean;
 }
 
 const documentTypeLabels: Record<string, string> = {
@@ -64,7 +65,7 @@ function getFileIcon(mimeType: string | null) {
   return <FileText className="h-5 w-5" />;
 }
 
-export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
+export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocumentsProps) {
   const { toast } = useToast();
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -254,13 +255,15 @@ export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownload(doc)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  {!hideDownload && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownload(doc)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
