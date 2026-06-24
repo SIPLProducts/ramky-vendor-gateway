@@ -30,6 +30,7 @@ import {
   ENLISTMENT_OPTIONS,
   CERTIFICATION_OPTIONS,
   INDIAN_STATES,
+  GST_STATE_CODE_MAP,
 } from '@/types/vendor';
 
 const sapOptions = (rows: SapMasterRow[] | undefined) =>
@@ -167,21 +168,43 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedState]);
 
-  // Auto-populate State from GST certificate (jurisdiction state or principal place).
-  // Only fills when the vendor has not yet picked a state — never overrides a manual choice.
-  const gstStateHint = statutoryData?.gstJurisdictionState || statutoryData?.gstPrincipalPlaceOfBusiness || '';
-  useEffect(() => {
-    if (watchedState) return;
-    if (!gstStateHint) return;
-    const hint = gstStateHint.toLowerCase();
-    const match = INDIAN_STATES.find(
-      (s) => s.toLowerCase() === hint || hint.includes(s.toLowerCase())
-    );
-    if (match) {
-      setValue('state', match, { shouldValidate: true, shouldDirty: true });
+  // Auto-populate State deterministically from the GSTIN's state code (first 2
+  // digits). Falls back to an exact match on the jurisdiction-state text when
+  // no GSTIN is available. We never infer from the principal-place address —
+  // free-form addresses caused incorrect "Telangana" matches for AP vendors.
+  const gstinForState = (statutoryData?.gstin || '').toUpperCase().replace(/\s+/g, '');
+  const jurisdictionStateRaw = statutoryData?.gstJurisdictionState || '';
+  const resolvedGstState = (() => {
+    if (gstinForState.length >= 2) {
+      const mapped = GST_STATE_CODE_MAP[gstinForState.slice(0, 2)];
+      if (mapped) return mapped;
     }
+    if (jurisdictionStateRaw) {
+      const cleaned = jurisdictionStateRaw
+        .replace(/^state\s*[-:]?\s*/i, '')
+        .replace(/\s*state\s*tax\s*$/i, '')
+        .trim()
+        .toLowerCase();
+      const match = INDIAN_STATES.find((s) => s.toLowerCase() === cleaned);
+      if (match) return match;
+    }
+    return '';
+  })();
+
+  // Track the last value we auto-set so we can refresh it when GST changes,
+  // without ever overriding a manual selection by the user.
+  const lastAutoStateRef = useRef<string>('');
+  useEffect(() => {
+    if (!resolvedGstState) return;
+    const current = watchedState || '';
+    // Only auto-fill when empty or when the field still holds our previous
+    // auto-set value (i.e. user has not manually picked a different state).
+    if (current && current !== lastAutoStateRef.current) return;
+    if (current === resolvedGstState) return;
+    setValue('state', resolvedGstState, { shouldValidate: true, shouldDirty: true });
+    lastAutoStateRef.current = resolvedGstState;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gstStateHint]);
+  }, [resolvedGstState]);
 
 
 
