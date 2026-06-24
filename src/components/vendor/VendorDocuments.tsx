@@ -34,6 +34,7 @@ interface VendorDocument {
 
 interface VendorDocumentsProps {
   vendorId: string;
+  hideDownload?: boolean;
 }
 
 const documentTypeLabels: Record<string, string> = {
