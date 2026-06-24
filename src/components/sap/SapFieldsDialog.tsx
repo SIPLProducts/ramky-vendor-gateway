@@ -147,8 +147,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <ReadOnlyField label="PAN Number" value={(vendor as any)?.pan} />
               <ReadOnlyField label="Udyam Number (MSME)" value={(vendor as any)?.msme_number} />
               <div className="space-y-1">
-                <TextField label="Vendor Class (VEN_CLASS)" value={form.ven_class} onChange={v => set('ven_class', v)} />
-                <p className="text-[10px] text-muted-foreground">Auto: empty when GST is present, "0" otherwise. Override here if needed.</p>
+                <ReadOnlyField label="Vendor Class (VEN_CLASS)" value={form.ven_class} />
+                <p className="text-[10px] text-muted-foreground">Auto: empty when GST is present, "0" otherwise.</p>
               </div>
             </Section>
 
