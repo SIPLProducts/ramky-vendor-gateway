@@ -30,6 +30,7 @@ import {
   ENLISTMENT_OPTIONS,
   CERTIFICATION_OPTIONS,
   INDIAN_STATES,
+  GST_STATE_CODE_MAP,
 } from '@/types/vendor';
 
 const sapOptions = (rows: SapMasterRow[] | undefined) =>
