@@ -372,7 +372,7 @@ export default function SAPSync() {
         <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="sap" className="gap-2"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
           <TabsTrigger value="dms" className="gap-2"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
-          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Rejected{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Duplicate Rejected Data{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
         </TabsList>
 
         {/* SAP Sync tab */}
