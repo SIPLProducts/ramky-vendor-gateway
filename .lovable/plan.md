@@ -1,11 +1,12 @@
+## Goal
+Make `/` (and refresh on any unauthenticated route) land directly on the Sign-in page instead of the Landing marketing page.
+
 ## Change
+In `src/App.tsx`:
+- Replace `<Route path="/" element={<Landing />} />` with `<Route path="/" element={<Navigate to="/auth" replace />} />`.
+- Remove the now-unused `Landing` import.
 
-Remove the **Approval Timeline** card from the SAP Review / View popup (`VendorReviewDialog.tsx`). This is the only place this card appears in view-button popups.
-
-The login/auth page (`/auth`) stays exactly as shown in the screenshot — no changes.
-
-## File
-
-- `src/components/vendor/VendorReviewDialog.tsx` — delete the Approval Timeline block starting around line 632 (the card containing "Finance Reviewed At" / "Purchase Reviewed At").
-
-No other screens or logic change.
+## Notes
+- Authenticated users land on `/dashboard` after login (existing `ProtectedRoute` behavior unchanged).
+- On refresh, the root URL `/` will redirect to `/auth`, so unauthenticated sessions always see the login form.
+- No other routes or auth/session logic are touched.
