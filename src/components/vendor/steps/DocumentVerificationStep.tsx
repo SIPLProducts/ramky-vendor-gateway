@@ -1087,6 +1087,20 @@ export function DocumentVerificationStep({
         setManualLegalName("");
         setManualAddress({ address: "", city: "", state: "", pincode: "" });
       }
+      // GST is the top of the chain — cascade-clear PAN, MSME, and Bank.
+      setPanDoc(idleDoc);
+      setPanCrossCheckError(null);
+      setMsmeDoc(idleDoc);
+      setMsmeManualNumber("");
+      setMsmeManualError(null);
+      setMsmeDeclarationFile(null);
+      setMsmeDeclarationReason("");
+      setIsMsmeRegistered(null);
+      setBankDoc(idleDoc);
+      setBankDoc2(idleDoc);
+      lastBankFileRef.current = null;
+      lastBankFile2Ref.current = null;
+      setBankPopup((p) => ({ ...p, open: false }));
       return next;
     });
   }, []);
@@ -1099,8 +1113,47 @@ export function DocumentVerificationStep({
         setMsmeDeclarationFile(null);
         setMsmeDeclarationReason("");
       }
+      // Bank depends on MSME — clear dependent bank state too.
+      resetBankCascade();
       return next;
     });
+  }, []);
+
+  // ---------- Cascading reset helpers ----------
+  // When a parent document (GST → PAN → MSME → Bank) is uploaded, replaced, or
+  // reset, every dependent document and its captured data must be cleared so
+  // stale verification results never leak into the new submission payload.
+  const resetBankCascade = useCallback(() => {
+    setBankDoc(idleDoc);
+    setBankDoc2(idleDoc);
+    lastBankFileRef.current = null;
+    lastBankFile2Ref.current = null;
+    setBankPopup((p) => ({ ...p, open: false }));
+  }, []);
+
+  const resetMsmeCascade = useCallback(() => {
+    setMsmeDoc(idleDoc);
+    setMsmeManualNumber("");
+    setMsmeManualError(null);
+    setMsmeDeclarationFile(null);
+    setMsmeDeclarationReason("");
+    setIsMsmeRegistered(null);
+    resetBankCascade();
+  }, [resetBankCascade]);
+
+  const resetPanCascade = useCallback(() => {
+    setPanDoc(idleDoc);
+    setPanCrossCheckError(null);
+    resetMsmeCascade();
+  }, [resetMsmeCascade]);
+
+  const resetGstAux = useCallback(() => {
+    setGstDeclarationFile(null);
+    setGstDeclarationReason("");
+    setEditablePrincipalPlace("");
+    setGstFilingRows([]);
+    setGstFilingChecked(false);
+    setGstLatestFiled(null);
   }, []);
 
   const effectiveLegalName = useMemo(() => {
@@ -1157,6 +1210,8 @@ export function DocumentVerificationStep({
   };
 
   const handleGstUpload = (file: File) => {
+    // Parent of PAN/MSME/Bank — cascade-clear dependents before re-verifying.
+    resetPanCascade();
     // Reset filing-status state for the new upload
     setGstFilingRows([]);
     setGstFilingChecked(false);
@@ -1188,8 +1243,10 @@ export function DocumentVerificationStep({
     });
   };
 
-  const handlePanUpload = (file: File) =>
-    runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
+  const handlePanUpload = (file: File) => {
+    // PAN replace/upload — cascade-clear MSME and Bank.
+    resetMsmeCascade();
+    return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
         // Prefer the canonical PAN returned by the GST validation API; fall
         // back to slicing the GSTIN (chars 3-12) only if the API didn't
@@ -1207,8 +1264,13 @@ export function DocumentVerificationStep({
       setPanCrossCheckError(null);
       return null;
     });
+  };
 
-  const handleMsmeUpload = (file: File) => runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+  const handleMsmeUpload = (file: File) => {
+    // MSME upload/replace — cascade-clear Bank.
+    resetBankCascade();
+    return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+  };
 
   // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
   
@@ -1231,6 +1293,8 @@ export function DocumentVerificationStep({
     }
     setMsmeManualError(null);
     setMsmeManualBusy(true);
+    // MSME re-validation — cascade-clear Bank so stale penny-drop data clears.
+    resetBankCascade();
     setMsmeDoc({ status: "verifying", fileName: undefined, fileSize: undefined });
     try {
       const r = await callProvider({
@@ -1955,7 +2019,7 @@ export function DocumentVerificationStep({
                       accept=".pdf,.jpg,.jpeg,.png"
                       doc={gstDoc}
                       onUpload={handleGstUpload}
-                      onReset={() => setGstDoc(idleDoc)}
+                      onReset={() => { setGstDoc(idleDoc); resetGstAux(); resetPanCascade(); }}
                       busyLabel={
                         gstDoc.status === "uploading" ? "Uploading…" :
                         gstDoc.status === "preparing" ? "Preparing document for OCR…" :
@@ -2126,7 +2190,7 @@ export function DocumentVerificationStep({
                 accept=".pdf,.jpg,.jpeg,.png"
                 doc={panDoc}
                 onUpload={handlePanUpload}
-                onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); }}
+                onReset={() => { setPanDoc(idleDoc); setPanCrossCheckError(null); resetMsmeCascade(); }}
                 busyLabel={
                   panDoc.status === "uploading" ? "Uploading…" :
                   panDoc.status === "preparing" ? "Preparing document for OCR…" :
@@ -2468,7 +2532,7 @@ export function DocumentVerificationStep({
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => { setMsmeDoc(idleDoc); setMsmeManualNumber(""); setMsmeManualError(null); }}
+                              onClick={() => { setMsmeDoc(idleDoc); setMsmeManualNumber(""); setMsmeManualError(null); resetBankCascade(); }}
                             >
                               <RotateCcw className="h-3.5 w-3.5 mr-1" />
                               Re-validate
@@ -2521,7 +2585,7 @@ export function DocumentVerificationStep({
                 accept=".pdf,.jpg,.jpeg,.png"
                 doc={bankDoc}
                 onUpload={handleBankUpload}
-                onReset={() => setBankDoc(idleDoc)}
+                onReset={() => { setBankDoc(idleDoc); lastBankFileRef.current = null; }}
                 busyLabel={
                   bankDoc.status === "uploading" ? "Uploading…" :
                   bankDoc.status === "preparing" ? "Preparing document for OCR…" :
@@ -2661,7 +2725,7 @@ export function DocumentVerificationStep({
                       accept=".pdf,.jpg,.jpeg,.png"
                       doc={bankDoc2}
                       onUpload={handleBankUpload2}
-                      onReset={() => setBankDoc2(idleDoc)}
+                      onReset={() => { setBankDoc2(idleDoc); lastBankFile2Ref.current = null; }}
                       busyLabel={
                         bankDoc2.status === "uploading" ? "Uploading…" :
                         bankDoc2.status === "preparing" ? "Preparing document for OCR…" :
