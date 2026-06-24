@@ -681,7 +681,7 @@ export function VendorReviewDialog({
             </TabsContent>
 
             <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
-              <VendorDocuments vendorId={vendor.id} />
+              <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
             <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
