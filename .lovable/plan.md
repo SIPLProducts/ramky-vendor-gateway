@@ -1,27 +1,28 @@
-# SAP Sync Popup Fixes
+## SAP Sync — Duplicate-rejection updates
 
-Three small UI/data adjustments to the SAP Sync flow.
+Scope: SAP Sync screen only. Edit `src/pages/SAPSync.tsx`.
 
-## 1. Make Vendor Class & MSME read-only in SAP Sync popup
-File: `src/components/sap/SapFieldsDialog.tsx`
+### 1. Rename "Reject" → "Duplicate Reject"
+- SAP Sync vendor card action button label changes from `Reject` / `Rejecting...` to `Duplicate Reject` / `Marking duplicate...`.
+- Reject confirmation dialog: title → "Duplicate Reject Vendor"; description → "The vendor will be marked as a duplicate (already available in SAP) and moved to the Duplicate Rejected Data tab."; confirm button → "Confirm Duplicate Reject".
+- Default remarks placeholder stays ("e.g. Vendor already exists in SAP").
 
-- Vendor Class (VEN_CLASS) field (line 150): replace the editable `TextField` with a `ReadOnlyField` showing `form.ven_class` (still auto-derived: empty when GST present, "0" otherwise; or tenant default).
-- MSME (Minority Indicator) field (line 202-203): replace the editable `SelectField` with a `ReadOnlyField` showing the human label (e.g. "SMA — Small") resolved from `form.msme`. Value is still auto-derived from vendor's MSME category and sent in the payload.
+No behavior change — the existing `sap-team-reject-vendor` edge function already moves the vendor to the rejected list, which is exactly the requested flow.
 
-## 2. Rename MSME "Small" code from SML → SMA
-File: `src/components/sap/SapFieldsDialog.tsx`
+### 2. Rename tab "Rejected" → "Duplicate Rejected Data"
+- TabsTrigger label updated.
+- Empty-state heading: "No duplicate-rejected vendors".
+- Rejected card badge: `SAP Team Rejected` → `Duplicate Rejected`.
+- Rejected card remarks header: `Reject Remarks` → `Duplicate Reject Remarks`.
 
-- Line 203 options list: change `['SML', 'SML — Small']` → `['SMA', 'SMA — Small']`.
-- Line 298 `buildDefaults`: change `cat === 'small' ? 'SML'` → `cat === 'small' ? 'SMA'`.
+### 3. Auto-move on PAN duplicate SAP failure
+In `handleConfirmSync`, after the SAP sync result is set, inspect the response. If the sync failed (`success === false` OR any `ACC_RES` row has `MSGTYP === 'E'`) AND any message text matches `/pan\s*number\s*duplicat|duplicate\s*pan/i`:
 
-(No other occurrences of `'SML'` exist in src or supabase — verified.)
+1. Call `supabase.functions.invoke('sap-team-reject-vendor', { body: { vendorId, remarks: <matched message or "PAN Number Duplicated — vendor already exists in SAP"> } })` silently.
+2. On success, show a toast "Moved to Duplicate Rejected Data" and call `refreshAllLists()` so the rejected tab updates while the SAP result dialog stays visible for the user to review.
+3. Swallow any error from this auto-move (log only) — the result dialog already explains the failure.
 
-## 3. Remove Download button in Review dialog → Documents tab
-Files:
-- `src/components/vendor/VendorDocuments.tsx` — add optional prop `hideDownload?: boolean`; when true, do not render the Download `<Button>` (lines 257–263). Eye/preview button stays.
-- `src/components/vendor/VendorReviewDialog.tsx` (line 684) — pass `hideDownload` to `<VendorDocuments vendorId={vendor.id} hideDownload />`.
+Bulk sync results (`handleMultipleSync`) get the same detection: iterate `bulkResult.results` (or `ACC_RES`), and for each vendor whose response includes a PAN-duplicate message, fire the same edge call. Refresh lists once at the end.
 
-Other usages (`VendorList`, `FinanceReview`, `PurchaseApproval`) keep the Download button (prop defaults to false).
-
-## Out of scope
-No payload/edge-function changes; the SAP payload already sends `form.msme` and `form.ven_class` regardless of whether the UI is editable.
+### Out of scope
+No edge-function, schema, or payload-builder changes — `sap-team-reject-vendor` already handles the state transition and `last_rejection_comments` field used by the rejected card.

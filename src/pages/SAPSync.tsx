@@ -167,6 +167,34 @@ export default function SAPSync() {
     setShowSapFieldsDialog(true);
   };
 
+  const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string } => {
+    if (!resp) return { matched: false, message: '' };
+    const rows = Array.isArray(resp.ACC_RES) ? resp.ACC_RES : [];
+    const texts: string[] = [
+      resp.message || '',
+      ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
+    ];
+    const re = /pan\s*number\s*duplicat|duplicate\s*pan/i;
+    for (const t of texts) {
+      if (t && re.test(t)) return { matched: true, message: String(t).trim() };
+    }
+    return { matched: false, message: '' };
+  };
+
+  const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
+        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP' },
+      });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Moved to Duplicate Rejected Data');
+      refreshAllLists();
+    } catch (e) {
+      console.warn('[SAPSync] auto duplicate-reject failed', e);
+    }
+  };
+
   const handleConfirmSync = async (overrides: SapFieldOverrides) => {
     const vendor = pendingSyncVendor;
     if (!vendor) return;
@@ -182,7 +210,12 @@ export default function SAPSync() {
       setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
       setSelectedSapIds(new Set());
-      toast.success('SAP sync complete');
+      const dup = isPanDuplicateResponse(result.sapResponse);
+      if (dup.matched) {
+        await autoRejectAsDuplicate(vendor.id, dup.message);
+      } else {
+        toast.success('SAP sync complete');
+      }
     } catch (error: any) {
       console.error('[SAPSync] sapSync failed', error);
       const msg = error?.message || 'SAP sync failed';
@@ -190,14 +223,19 @@ export default function SAPSync() {
       const fallback = error?.ACC_RES ?? [
         { MSGTYP: 'E', LONGMSG: msg, BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
       ];
-      setSapSyncResult({
+      const failResp = {
         success: false,
         message: msg,
         ACC_RES: fallback,
-      });
+      };
+      setSapSyncResult(failResp);
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
       setShowSapResultDialog(true);
+      const dup = isPanDuplicateResponse(failResp);
+      if (dup.matched) {
+        await autoRejectAsDuplicate(vendor.id, dup.message);
+      }
     } finally {
       setSyncingVendorId(null);
     }
@@ -212,12 +250,40 @@ export default function SAPSync() {
       setShowMultipleSync(false);
       setShowBulkResult(true);
       setSelectedSapIds(new Set());
+      // Auto-move PAN-duplicate failures
+      const results: any[] = Array.isArray(result?.results) ? result.results : [];
+      const dupIds: { id: string; msg: string }[] = [];
+      for (const r of results) {
+        const vid = r?.vendorId || r?.vendor_id;
+        const dup = isPanDuplicateResponse(r?.sapResponse || r);
+        if (vid && dup.matched) dupIds.push({ id: vid, msg: dup.message });
+      }
+      if (dupIds.length === 0) {
+        const dup = isPanDuplicateResponse(result);
+        if (dup.matched) {
+          for (const vid of vendorIds) dupIds.push({ id: vid, msg: dup.message });
+        }
+      }
+      for (const d of dupIds) {
+        try {
+          await supabase.functions.invoke('sap-team-reject-vendor', {
+            body: { vendorId: d.id, remarks: d.msg || 'PAN Number Duplicated — vendor already exists in SAP' },
+          });
+        } catch (e) {
+          console.warn('[SAPSync] bulk auto duplicate-reject failed', d.id, e);
+        }
+      }
+      if (dupIds.length > 0) {
+        toast.success(`Moved ${dupIds.length} vendor(s) to Duplicate Rejected Data`);
+        refreshAllLists();
+      }
     } catch (error: any) {
       setBulkResult({ success: false, message: error?.message || 'Bulk sync failed', ACC_RES: [], results: [] });
       setShowMultipleSync(false);
       setShowBulkResult(true);
     }
   };
+
 
   const handleDmsSync = async (vendorIds: string[]) => {
     try {
