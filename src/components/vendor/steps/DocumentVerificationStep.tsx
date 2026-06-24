@@ -1293,6 +1293,8 @@ export function DocumentVerificationStep({
     }
     setMsmeManualError(null);
     setMsmeManualBusy(true);
+    // MSME re-validation — cascade-clear Bank so stale penny-drop data clears.
+    resetBankCascade();
     setMsmeDoc({ status: "verifying", fileName: undefined, fileSize: undefined });
     try {
       const r = await callProvider({
