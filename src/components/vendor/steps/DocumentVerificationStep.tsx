@@ -2725,7 +2725,7 @@ export function DocumentVerificationStep({
                       accept=".pdf,.jpg,.jpeg,.png"
                       doc={bankDoc2}
                       onUpload={handleBankUpload2}
-                      onReset={() => setBankDoc2(idleDoc)}
+                      onReset={() => { setBankDoc2(idleDoc); lastBankFile2Ref.current = null; }}
                       busyLabel={
                         bankDoc2.status === "uploading" ? "Uploading…" :
                         bankDoc2.status === "preparing" ? "Preparing document for OCR…" :
