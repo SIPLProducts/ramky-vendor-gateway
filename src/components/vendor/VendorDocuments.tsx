@@ -65,7 +65,7 @@ function getFileIcon(mimeType: string | null) {
   return <FileText className="h-5 w-5" />;
 }
 
-export function VendorDocuments({ vendorId }: VendorDocumentsProps) {
+export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocumentsProps) {
   const { toast } = useToast();
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
