@@ -294,7 +294,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
   const cat = String(v.msme_category || '').toLowerCase().trim();
   const msmeCode = !msme
     ? 'ZNA'
-    : cat === 'small' ? 'SML'
+    : cat === 'small' ? 'SMA'
     : cat === 'medium' ? 'MED'
     : 'MIC';
   return {
