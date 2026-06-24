@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     const { data: vendor, error: vErr } = await admin
       .from('vendors')
-      .select('id, status, legal_name, trade_name, gstin, pan_account_holder_name, vendor_reference_number, vendor_code, tenant_id')
+      .select('id, status, legal_name, trade_name, gstin, account_holder_name, vendor_reference_number, vendor_code, tenant_id')
       .eq('id', vendorId).single();
     if (vErr || !vendor) throw new Error(vErr?.message || 'Vendor not found');
 
