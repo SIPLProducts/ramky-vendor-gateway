@@ -10,7 +10,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
-import Landing from "./pages/Landing";
+
 import VendorRegistration from "./pages/VendorRegistration";
 import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
 
@@ -61,7 +61,7 @@ const App = () => (
           <TenantProvider>
           <Routes>
             {/* Public Routes - Auth is the main entry */}
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/vendor/login" element={<VendorLogin />} />
