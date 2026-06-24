@@ -1,28 +1,45 @@
-## SAP Sync — Duplicate-rejection updates
+## Goal
+Add a second rejection action on the SAP Sync screen — **Reject & Send to Buyer** — that bounces the vendor application back to the inviting Buyer (not to "Duplicate Rejected Data"), notifies the Buyer by email, and lets the Buyer edit and resubmit. On resubmission, the vendor re-enters the standard multi-level approval workflow from the start.
 
-Scope: SAP Sync screen only. Edit `src/pages/SAPSync.tsx`.
+## UI changes — `src/pages/SAPSync.tsx`
 
-### 1. Rename "Reject" → "Duplicate Reject"
-- SAP Sync vendor card action button label changes from `Reject` / `Rejecting...` to `Duplicate Reject` / `Marking duplicate...`.
-- Reject confirmation dialog: title → "Duplicate Reject Vendor"; description → "The vendor will be marked as a duplicate (already available in SAP) and moved to the Duplicate Rejected Data tab."; confirm button → "Confirm Duplicate Reject".
-- Default remarks placeholder stays ("e.g. Vendor already exists in SAP").
+1. Beside the existing **Duplicate Reject** button on each SAP-tab vendor card, render a new **Reject & Send to Buyer** button (outline / amber styling to distinguish from Duplicate Reject).
+2. Add new state:
+   - `returnVendor: VendorRow | null`
+   - `returnRemarks: string`
+   - `returningVendorId: string | null`
+3. Add a new dialog "Reject & Send to Buyer" with:
+   - Vendor name (read-only)
+   - Mandatory **Remarks** textarea (validated non-empty; show inline error + toast on submit if empty)
+   - Cancel / Confirm buttons
+4. `handleConfirmReturnToBuyer` invokes the new edge function `sap-team-return-to-buyer` with `{ vendorId, remarks }`. On success: toast "Sent back to Buyer", close dialog, `refreshAllLists()`.
 
-No behavior change — the existing `sap-team-reject-vendor` edge function already moves the vendor to the rejected list, which is exactly the requested flow.
+No changes to the Duplicate Reject flow, the Duplicate Rejected Data tab, or the PAN-duplicate auto-reject logic.
 
-### 2. Rename tab "Rejected" → "Duplicate Rejected Data"
-- TabsTrigger label updated.
-- Empty-state heading: "No duplicate-rejected vendors".
-- Rejected card badge: `SAP Team Rejected` → `Duplicate Rejected`.
-- Rejected card remarks header: `Reject Remarks` → `Duplicate Reject Remarks`.
+## Backend — new edge function `supabase/functions/sap-team-return-to-buyer/index.ts`
 
-### 3. Auto-move on PAN duplicate SAP failure
-In `handleConfirmSync`, after the SAP sync result is set, inspect the response. If the sync failed (`success === false` OR any `ACC_RES` row has `MSGTYP === 'E'`) AND any message text matches `/pan\s*number\s*duplicat|duplicate\s*pan/i`:
+- Auth: require `admin`, `sharvi_admin`, or `SAP Team` (mirrors `sap-team-reject-vendor`).
+- Input validation: `vendorId` (uuid string) and `remarks` (non-empty string) — 400 on missing.
+- Service-role client.
+- Load vendor + latest `vendor_invitations` row to identify the inviting Buyer (`created_by`, plus buyer email via `profiles`).
+- Update `vendors`:
+  - `status = 'buyer_review'` (vendor re-enters the Buyer stage; on the buyer's next save/resubmit the existing `trg_vendors_seed_approval` trigger re-seeds `vendor_approval_progress` for the full SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO chain, restarting the workflow).
+  - `last_rejection_comments = remarks`
+  - `last_rejection_stage = 'SAP_TEAM'`
+  - `last_rejected_by = auth.userId`, `last_rejected_at = now()`
+- Clear stale `vendor_approval_progress` rows and call the `seed_vendor_approval_progress` RPC so the buyer sees a fresh pending Buyer row.
+- Insert `audit_logs` row: `action = 'sap_team_return_to_buyer'`, details `{ remarks }`.
+- Send email to the Buyer via the existing `send-status-notification` edge function (best-effort try/catch): subject context "Vendor returned by SAP team — please review and resubmit", recipient = buyer's email, comments = remarks.
+- Return `{ success: true }`.
 
-1. Call `supabase.functions.invoke('sap-team-reject-vendor', { body: { vendorId, remarks: <matched message or "PAN Number Duplicated — vendor already exists in SAP"> } })` silently.
-2. On success, show a toast "Moved to Duplicate Rejected Data" and call `refreshAllLists()` so the rejected tab updates while the SAP result dialog stays visible for the user to review.
-3. Swallow any error from this auto-move (log only) — the result dialog already explains the failure.
+### Buyer-side resubmit (no new UI work needed)
+The existing Buyer queue already lists vendors in `buyer_review`. When the Buyer opens, edits, and resubmits, the vendor advances through the standard approval chain (SCM Manager → SCM Head → Finance 1 → Finance 2 → CEO Office if MSME → SAP Sync), restarting the full workflow as requested.
 
-Bulk sync results (`handleMultipleSync`) get the same detection: iterate `bulkResult.results` (or `ACC_RES`), and for each vendor whose response includes a PAN-duplicate message, fire the same edge call. Refresh lists once at the end.
+## Out of scope
+- No schema migration (reuses existing `last_rejection_*` columns and the `buyer_review` status).
+- No changes to the Buyer dashboard UI — it already supports `buyer_review` + resubmission.
+- No changes to the Duplicate Reject flow.
 
-### Out of scope
-No edge-function, schema, or payload-builder changes — `sap-team-reject-vendor` already handles the state transition and `last_rejection_comments` field used by the rejected card.
+## Files touched
+- `src/pages/SAPSync.tsx` — new button, dialog, handler, state.
+- `supabase/functions/sap-team-return-to-buyer/index.ts` — new edge function (deployed via `supabase--deploy_edge_functions`).
