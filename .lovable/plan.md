@@ -1,9 +1,9 @@
-## Root cause
-`sap-team-return-to-buyer` selects `gst_number` from `public.vendors`, but that column is named `gstin`. Postgres returns `column vendors.gst_number does not exist`, the function throws, the response is HTTP 500, and the UI shows "Return to Buyer failed — Edge Function returned a non-2xx status code".
+## Fix `sap-team-return-to-buyer` 500 error
 
-## Fix
-Edit `supabase/functions/sap-team-return-to-buyer/index.ts`:
-- Change the `vendors` select list from `gst_number` to `gstin`.
-- Update `getName1()` to read `v?.gstin` instead of `v?.gst_number` when deciding whether to use the trade name.
+**Root cause:** The edge function references a non-existent column `vendors.pan_account_holder_name`. The actual column name is `account_holder_name`.
 
-No other files change. Auth, email pipeline, and downstream update logic stay as-is.
+**Change:** Edit `supabase/functions/sap-team-return-to-buyer/index.ts`:
+- Line 27: replace `v?.pan_account_holder_name` with `v?.account_holder_name` in the NAME1 helper.
+- Line 62: change the select list from `pan_account_holder_name` to `account_holder_name`.
+
+No DB migration needed — column already exists. After redeploy, "Reject & Send to Buyer" will resolve the vendor name correctly (Trade Name when GSTIN present, otherwise Account Holder Name) and the 500 will be gone.
