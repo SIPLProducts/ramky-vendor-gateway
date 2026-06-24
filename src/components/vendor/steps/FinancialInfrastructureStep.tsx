@@ -18,6 +18,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { FinancialDetails, InfrastructureDetails, QHSEDetails, PRODUCT_TYPES, PRODUCTION_FACILITIES, WATER_SUPPLY_TYPES, INSPECTION_TYPES } from '@/types/vendor';
 import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
+
 
 const currentYear = new Date().getFullYear();
 
