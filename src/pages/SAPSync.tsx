@@ -20,7 +20,7 @@ import {
   useVendors, useSAPSync, useMultipleSAPSync, useDMSSync, useBuyerCompanies, VendorRow,
 } from '@/hooks/useVendors';
 import {
-  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban,
+  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban, Undo2,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -54,6 +54,9 @@ export default function SAPSync() {
   const [rejectVendor, setRejectVendor] = useState<VendorRow | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState('');
   const [rejectingVendorId, setRejectingVendorId] = useState<string | null>(null);
+  const [returnVendor, setReturnVendor] = useState<VendorRow | null>(null);
+  const [returnRemarks, setReturnRemarks] = useState('');
+  const [returningVendorId, setReturningVendorId] = useState<string | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
@@ -117,6 +120,31 @@ export default function SAPSync() {
       toast.error('Reject failed', { description: e?.message || 'Could not reject vendor' });
     } finally {
       setRejectingVendorId(null);
+    }
+  };
+
+  const handleConfirmReturnToBuyer = async () => {
+    if (!returnVendor) return;
+    const remarks = returnRemarks.trim();
+    if (!remarks) {
+      toast.error('Remarks are required');
+      return;
+    }
+    setReturningVendorId(returnVendor.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-team-return-to-buyer', {
+        body: { vendorId: returnVendor.id, remarks },
+      });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Sent back to Buyer', { description: getSapName1(returnVendor) || returnVendor.legal_name || returnVendor.id });
+      setReturnVendor(null);
+      setReturnRemarks('');
+      refreshAllLists();
+    } catch (e: any) {
+      toast.error('Return to Buyer failed', { description: e?.message || 'Could not return vendor' });
+    } finally {
+      setReturningVendorId(null);
     }
   };
 
@@ -476,6 +504,19 @@ export default function SAPSync() {
                             <><XCircle className="h-4 w-4 mr-2" />Duplicate Reject</>
                           )}
                         </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                          onClick={() => { setReturnVendor(vendor); setReturnRemarks(''); }}
+                          disabled={returningVendorId === vendor.id || multiMode}
+                          title={multiMode ? 'Uncheck other vendors to return individually' : 'Send back to the inviting Buyer for correction'}
+                        >
+                          {returningVendorId === vendor.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending back...</>
+                          ) : (
+                            <><Undo2 className="h-4 w-4 mr-2" />Reject &amp; Send to Buyer</>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -700,6 +741,60 @@ export default function SAPSync() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Return-to-Buyer dialog */}
+      <Dialog open={!!returnVendor} onOpenChange={(o) => { if (!o) { setReturnVendor(null); setReturnRemarks(''); } }}>
+        <DialogContent className="rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-amber-600" />
+              Reject &amp; Send to Buyer
+            </DialogTitle>
+            <DialogDescription>
+              The vendor will be returned to the inviting Buyer for correction. They will be notified by email and can resubmit, restarting the full approval workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <p className="font-semibold">{(returnVendor && getSapName1(returnVendor)) || returnVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="text-xs text-muted-foreground font-mono mt-1">
+                Ref No: {(returnVendor as any)?.reference_number || returnVendor?.id.slice(0, 8).toUpperCase()}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="return-remarks">
+                Remarks <span className="text-red-600">*</span>
+              </Label>
+              <Textarea
+                id="return-remarks"
+                value={returnRemarks}
+                onChange={(e) => setReturnRemarks(e.target.value)}
+                placeholder="e.g. PAN mismatch — please re-verify and resubmit"
+                rows={4}
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">Required. Shared with the Buyer in the notification email.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setReturnVendor(null); setReturnRemarks(''); }}>
+              Cancel
+            </Button>
+            <Button
+              className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleConfirmReturnToBuyer}
+              disabled={!returnRemarks.trim() || !!returningVendorId}
+            >
+              {returningVendorId ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending back...</>
+              ) : (
+                <><Undo2 className="h-4 w-4 mr-2" />Send to Buyer</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <VendorReviewDialog
         vendorId={selectedVendor?.id ?? null}
