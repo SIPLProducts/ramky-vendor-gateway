@@ -1,7 +1,9 @@
-## Issue
-On the **All Vendors** screen (`src/pages/VendorList.tsx`), rows with status `returned_to_buyer` render two action buttons — **Edit & Resubmit** and **Return to Vendor**. These actions belong to the Buyer Approval workflow (and are already available on the Buyer Approval screen), not to the read-only All Vendors listing.
+## Root cause
+`sap-team-return-to-buyer` selects `gst_number` from `public.vendors`, but that column is named `gstin`. Postgres returns `column vendors.gst_number does not exist`, the function throws, the response is HTTP 500, and the UI shows "Return to Buyer failed — Edge Function returned a non-2xx status code".
 
 ## Fix
-In `src/pages/VendorList.tsx`, remove the `returned_to_buyer` conditional block (lines ~466–499) from the Actions cell. The Actions column will keep only the View (eye) button for every row, regardless of status.
+Edit `supabase/functions/sap-team-return-to-buyer/index.ts`:
+- Change the `vendors` select list from `gst_number` to `gstin`.
+- Update `getName1()` to read `v?.gstin` instead of `v?.gst_number` when deciding whether to use the trade name.
 
-No other files change. The Buyer Approval screen retains its own Edit & Resubmit / Return to Vendor controls.
+No other files change. Auth, email pipeline, and downstream update logic stay as-is.

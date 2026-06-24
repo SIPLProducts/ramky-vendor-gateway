@@ -22,7 +22,7 @@ const row = (k: string, v: string) =>
   `<tr><td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f9fafb;font-weight:600;width:38%">${esc(k)}</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(v)}</td></tr>`;
 
 function getName1(v: any): string {
-  const hasGst = !!(v?.gst_number && String(v.gst_number).trim());
+  const hasGst = !!(v?.gstin && String(v.gstin).trim());
   if (hasGst && v?.trade_name) return v.trade_name;
   return v?.pan_account_holder_name || v?.trade_name || v?.legal_name || 'Vendor';
 }
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     const { data: vendor, error: vErr } = await admin
       .from('vendors')
-      .select('id, status, legal_name, trade_name, gst_number, pan_account_holder_name, vendor_reference_number, vendor_code, tenant_id')
+      .select('id, status, legal_name, trade_name, gstin, pan_account_holder_name, vendor_reference_number, vendor_code, tenant_id')
       .eq('id', vendorId).single();
     if (vErr || !vendor) throw new Error(vErr?.message || 'Vendor not found');
 
