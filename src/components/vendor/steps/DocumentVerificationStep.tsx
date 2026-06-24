@@ -2532,7 +2532,7 @@ export function DocumentVerificationStep({
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => { setMsmeDoc(idleDoc); setMsmeManualNumber(""); setMsmeManualError(null); }}
+                              onClick={() => { setMsmeDoc(idleDoc); setMsmeManualNumber(""); setMsmeManualError(null); resetBankCascade(); }}
                             >
                               <RotateCcw className="h-3.5 w-3.5 mr-1" />
                               Re-validate
