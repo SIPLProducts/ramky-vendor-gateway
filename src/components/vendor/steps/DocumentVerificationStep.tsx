@@ -1210,6 +1210,8 @@ export function DocumentVerificationStep({
   };
 
   const handleGstUpload = (file: File) => {
+    // Parent of PAN/MSME/Bank — cascade-clear dependents before re-verifying.
+    resetPanCascade();
     // Reset filing-status state for the new upload
     setGstFilingRows([]);
     setGstFilingChecked(false);
