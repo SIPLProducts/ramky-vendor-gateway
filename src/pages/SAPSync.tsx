@@ -247,7 +247,7 @@ export default function SAPSync() {
   const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
-        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP' },
+        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
