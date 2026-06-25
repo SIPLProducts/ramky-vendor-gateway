@@ -112,7 +112,14 @@ export default function SAPSync() {
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
-      toast.success('Vendor rejected', { description: getSapName1(rejectVendor) || rejectVendor.legal_name || rejectVendor.id });
+      const label = getSapName1(rejectVendor) || rejectVendor.legal_name || rejectVendor.id;
+      const emailSent = !!(data as any)?.email_sent;
+      if (emailSent) {
+        toast.success('Vendor rejected — buyer notified by email', { description: label });
+      } else {
+        const err = (data as any)?.email_error;
+        toast.warning('Vendor rejected (buyer email failed)', { description: `${label}${err ? ` — ${err}` : ''}` });
+      }
       setRejectVendor(null);
       setRejectRemarks('');
       refreshAllLists();
@@ -240,7 +247,7 @@ export default function SAPSync() {
   const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
-        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP' },
+        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
@@ -323,7 +330,7 @@ export default function SAPSync() {
       for (const d of dupIds) {
         try {
           await supabase.functions.invoke('sap-team-reject-vendor', {
-            body: { vendorId: d.id, remarks: d.msg || 'PAN Number Duplicated — vendor already exists in SAP' },
+            body: { vendorId: d.id, remarks: d.msg || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
           });
         } catch (e) {
           console.warn('[SAPSync] bulk auto duplicate-reject failed', d.id, e);
