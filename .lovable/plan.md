@@ -1,36 +1,45 @@
-## Goal
-Make the new `sap_team_closed` status (introduced for "Duplicate & Close") render with a proper label and color everywhere status is shown — not just on the SAP Sync screen.
+# Make all Tenant / Buyer Company dropdowns searchable
 
-Today, screens like Dashboard, All Vendors list, Vendor Status, and the stage cell only know about `sap_team_rejected`. Any vendor moved to `sap_team_closed` falls through to a raw `sap_team_closed` string with the default badge.
+User Management already uses the searchable `TenantCombobox` (with a "Search tenant…" input). The same searchable picker should be applied to every other tenant / buyer-company dropdown across the app, so users don't have to scroll through long lists.
 
-## Files to update (label-only, no business logic)
+## Dropdowns to convert
 
-1. **`src/pages/VendorList.tsx`** (`getStatusBadge` map)
-   - Add: `sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' }`
+Replace the current shadcn `Select` (or similar) with `TenantCombobox` (which already provides search, "All Tenants" option, keyboard nav, and a consistent look):
 
-2. **`src/pages/Dashboard.tsx`**
-   - Add `sap_team_closed` entry to `STATUS_LABELS` with label `Duplicate & Closed`, destructive variant.
-   - Include `sap_team_closed` in the `rejected` counter alongside `sap_team_rejected` (so the Rejected KPI tile reflects closed-duplicates too).
+1. **Top header tenant switcher** — `src/components/layout/EnterpriseHeader.tsx`
+   - Current: `Select` over `myTenants` with `__all__` option.
+   - New: `TenantCombobox` with `allowAll`, bound to `activeTenantId` / `setActiveTenantId`. Keep the compact header sizing (`triggerClassName="h-8 text-xs w-[200px]"`).
 
-3. **`src/pages/VendorStatus.tsx`**
-   - Add `sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' }` to the status label map.
+2. **SAP Sync — Buyer Company filter** — `src/pages/SAPSync.tsx` (~line 391)
 
-4. **`src/components/admin/VendorStageCell.tsx`**
-   - Add a `case 'sap_team_closed'` in `statusToStep` returning `{ step: -1, label: 'Duplicate & Closed', tone: 'destructive' }`.
-   - Update the `stage:rejected` filter option to also include `sap_team_closed`, and rename it to `Stage: Duplicate & Closed` (covers both legacy `sap_team_rejected` and new `sap_team_closed`).
+3. **Vendor List — Buyer Company filter** — `src/pages/VendorList.tsx` (~line 347)
 
-5. **`src/components/vendor/EmailNotificationDemo.tsx`** (demo dropdown)
-   - Add a `sap_team_closed` option labelled `Duplicate & Closed` (red tone) so the demo list stays in sync.
+4. **Finance Review — Buyer Company filter** — `src/pages/FinanceReview.tsx` (~line 211)
 
-6. **`src/components/vendor/RegistrationStatusTracker.tsx` / `src/types/vendor.ts` / `src/components/vendor/SuccessScreen.tsx`**
-   - Only touch if the vendor-facing tracker should also recognise the closed state. Plan: add `'sap_team_closed'` to the `VendorStatus` union in `src/types/vendor.ts` and treat it like `sap_team_rejected` in `RegistrationStatusTracker` (terminal/destructive node). SuccessScreen needs no change (it only checks `sap_synced`).
+5. **Purchase Approval — Buyer Company filter** — `src/pages/PurchaseApproval.tsx` (~line 272)
+
+6. **Sharvi Admin Console — tenant picker** — `src/pages/SharviAdminConsole.tsx` (~line 42)
+
+7. **Admin Invitations — tenant pickers (2)** — `src/pages/AdminInvitations.tsx` (lines 839, 934)
+   - The second one is inside a per-row picker; reuse `TenantCombobox` there too (single-select). For the "All Tenants" filter variant pass `allowAll`; for the per-invite assignment pass it without `allowAll`.
+
+## Component reuse
+
+Use the existing `src/components/admin/TenantCombobox.tsx` as-is. It already supports:
+- `allowAll` + custom `allLabel` (e.g. "All Buyer Companies" for the buyer-company filters),
+- search input,
+- value as tenant id or `null`,
+- optional `userCounts`.
+
+For the buyer-company filters, pass `allLabel="All Buyer Companies"` and map current `'all'` ↔ `null` at the call site so existing filter logic keeps working without changing queries/hooks.
 
 ## Out of scope
-- No DB / enum / edge-function changes (already shipped in the previous task).
-- No change to the SAP Sync screen — it already labels this correctly.
-- No change to "Reject & Send to Buyer" flow or any other status.
+
+- No changes to data models, hooks, queries, or filter logic.
+- No changes to non-tenant dropdowns (status, role, etc.).
+- No styling/theme changes beyond making each trigger match its surrounding layout (header stays compact; page filters stay at default height).
 
 ## Verification
-- Dashboard "Rejected" tile and status badges show "Duplicate & Closed" for the affected vendors.
-- All Vendors list and Vendor Status page render the same label in destructive style.
-- Stage filter "Duplicate & Closed" returns both `sap_team_closed` and legacy `sap_team_rejected` rows.
+
+- Open each screen above, confirm the dropdown shows a "Search tenant…" / "Search…" input, filters as you type, and selecting an option applies the same filter behavior as today.
+- Header switcher still toggles tenant scope across the app, including the `__all__` → null path.
