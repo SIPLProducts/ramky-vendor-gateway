@@ -30,21 +30,13 @@ export default function SharviAdminConsole() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Active Tenant:</span>
-            <Select 
-              value={selectedTenantId || ''} 
-              onValueChange={(v) => setSelectedTenantId(v || null)}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select tenant..." />
-              </SelectTrigger>
-              <SelectContent>
-                {tenants?.map((tenant) => (
-                  <SelectItem key={tenant.id} value={tenant.id}>
-                    {tenant.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <TenantCombobox
+              tenants={tenants ?? []}
+              value={selectedTenantId}
+              onChange={(id) => setSelectedTenantId(id)}
+              placeholder="Select tenant..."
+              className="w-[220px]"
+            />
           </div>
         </div>
       </div>
