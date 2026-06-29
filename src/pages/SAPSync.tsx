@@ -124,7 +124,7 @@ export default function SAPSync() {
       setRejectRemarks('');
       refreshAllLists();
     } catch (e: any) {
-      toast.error('Reject failed', { description: e?.message || 'Could not reject vendor' });
+      toast.error('Close failed', { description: e?.message || 'Could not close vendor' });
     } finally {
       setRejectingVendorId(null);
     }
