@@ -152,22 +152,45 @@ export default function Reports() {
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label className="text-xs">Mode</Label>
-              <RadioGroup
-                value={mode}
-                onValueChange={(v) => setMode(v as any)}
-                className="flex gap-6 mt-2"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="single" id="m-single" />
-                  <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="all" id="m-all" />
-                  <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
-                </div>
-              </RadioGroup>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Report Type</Label>
+                <RadioGroup
+                  value={reportType}
+                  onValueChange={(v) => setReportType(v as ReportType)}
+                  className="flex flex-wrap gap-4 mt-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="vendor" id="rt-vendor" />
+                    <Label htmlFor="rt-vendor" className="cursor-pointer">Vendor Report</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="approval" id="rt-approval" />
+                    <Label htmlFor="rt-approval" className="cursor-pointer">Approval Flow Report</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="both" id="rt-both" />
+                    <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div>
+                <Label className="text-xs">Scope</Label>
+                <RadioGroup
+                  value={mode}
+                  onValueChange={(v) => setMode(v as any)}
+                  className="flex flex-wrap gap-4 mt-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="single" id="m-single" />
+                    <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="all" id="m-all" />
+                    <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
+                  </div>
+                </RadioGroup>
+              </div>
             </div>
 
             {mode === 'single' ? (
@@ -181,56 +204,48 @@ export default function Reports() {
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs">From Date</Label>
-                  <Popover modal>
-                    <PopoverTrigger asChild>
+                  <Label className="text-xs">Date Range</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Popover modal>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn('w-full justify-start text-left font-normal', !fromDate && 'text-muted-foreground')}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {fromDate && toDate
+                            ? `${format(fromDate, 'PP')} – ${format(toDate, 'PP')}`
+                            : fromDate
+                              ? `${format(fromDate, 'PP')} – …`
+                              : 'Pick date range'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
+                        <Calendar
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={setDateRange}
+                          numberOfMonths={2}
+                          initialFocus
+                          className={cn('p-3 pointer-events-auto')}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {dateRange && (
                       <Button
                         type="button"
-                        variant="outline"
-                        className={cn('w-full justify-start text-left font-normal mt-1', !fromDate && 'text-muted-foreground')}
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDateRange(undefined)}
+                        title="Clear date range"
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {fromDate ? format(fromDate, 'PPP') : 'Pick a date'}
+                        <X className="h-4 w-4" />
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
-                      <Calendar
-                        mode="single"
-                        selected={fromDate}
-                        onSelect={(d) => setFromDate(d ?? undefined)}
-                        disabled={(date) => (toDate ? date > toDate : false)}
-                        initialFocus
-                        className={cn('p-3 pointer-events-auto')}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <Label className="text-xs">To Date</Label>
-                  <Popover modal>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className={cn('w-full justify-start text-left font-normal mt-1', !toDate && 'text-muted-foreground')}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {toDate ? format(toDate, 'PPP') : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
-                      <Calendar
-                        mode="single"
-                        selected={toDate}
-                        onSelect={(d) => setToDate(d ?? undefined)}
-                        disabled={(date) => (fromDate ? date < fromDate : false)}
-                        initialFocus
-                        className={cn('p-3 pointer-events-auto')}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">Vendor Status</Label>
@@ -254,14 +269,15 @@ export default function Reports() {
               <Button variant="outline" onClick={reset} disabled={loading}>
                 <RefreshCw className="h-4 w-4 mr-2" /> Reset
               </Button>
-              <Button variant="outline" onClick={() => exportVendorExcel(rows, 'vendor')} disabled={rows.length === 0}>
+              <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
               </Button>
-              <Button variant="outline" onClick={() => exportVendorPdf(rows, 'vendor')} disabled={rows.length === 0}>
+              <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
                 <FileText className="h-4 w-4 mr-2" /> PDF
               </Button>
             </div>
           </CardContent>
+
         </Card>
       )}
 
