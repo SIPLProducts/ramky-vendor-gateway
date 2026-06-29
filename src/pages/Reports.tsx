@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import {
   CalendarIcon, FileSpreadsheet, FileText, Search, RefreshCw,
   Building2, Landmark, MapPin, Mail, ShieldCheck, FolderOpen,
   Tag, Globe2, ClipboardCheck, Eye, Download, ArrowLeft,
-  CheckCircle2, Circle, XCircle, Clock, MinusCircle,
+  CheckCircle2, Circle, XCircle, Clock, MinusCircle, X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,9 @@ import {
 } from '@/lib/reports/loadVendorReport';
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
+
+type ReportType = 'vendor' | 'approval' | 'both';
+
 
 const STATUS_OPTIONS = [
   'draft', 'submitted', 'buyer_review',
@@ -67,13 +71,16 @@ function fmtValue(v: any): string {
 export default function Reports() {
   const { toast } = useToast();
   const [mode, setMode] = useState<'single' | 'all'>('all');
-  const [fromDate, setFromDate] = useState<Date | undefined>();
-  const [toDate, setToDate] = useState<Date | undefined>();
+  const [reportType, setReportType] = useState<ReportType>('both');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [statuses, setStatuses] = useState<string[]>([]);
   const [refNum, setRefNum] = useState('');
   const [rows, setRows] = useState<VendorReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+
+  const fromDate = dateRange?.from;
+  const toDate = dateRange?.to;
 
   const run = async (overrideRef?: string) => {
     const refValue = overrideRef ?? (mode === 'single' ? refNum.trim() : '');
@@ -101,7 +108,7 @@ export default function Reports() {
   };
 
   const reset = () => {
-    setFromDate(undefined); setToDate(undefined);
+    setDateRange(undefined);
     setStatuses([]); setRefNum(''); setRows([]); setHasRun(false);
   };
 
@@ -119,6 +126,9 @@ export default function Reports() {
   };
 
   const single = mode === 'single' ? rows[0] : null;
+  const showVendor = reportType === 'vendor' || reportType === 'both';
+  const showApproval = reportType === 'approval' || reportType === 'both';
+
 
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
@@ -142,22 +152,45 @@ export default function Reports() {
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label className="text-xs">Mode</Label>
-              <RadioGroup
-                value={mode}
-                onValueChange={(v) => setMode(v as any)}
-                className="flex gap-6 mt-2"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="single" id="m-single" />
-                  <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="all" id="m-all" />
-                  <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
-                </div>
-              </RadioGroup>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Report Type</Label>
+                <RadioGroup
+                  value={reportType}
+                  onValueChange={(v) => setReportType(v as ReportType)}
+                  className="flex flex-wrap gap-4 mt-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="vendor" id="rt-vendor" />
+                    <Label htmlFor="rt-vendor" className="cursor-pointer">Vendor Report</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="approval" id="rt-approval" />
+                    <Label htmlFor="rt-approval" className="cursor-pointer">Approval Flow Report</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="both" id="rt-both" />
+                    <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div>
+                <Label className="text-xs">Scope</Label>
+                <RadioGroup
+                  value={mode}
+                  onValueChange={(v) => setMode(v as any)}
+                  className="flex flex-wrap gap-4 mt-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="single" id="m-single" />
+                    <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="all" id="m-all" />
+                    <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
+                  </div>
+                </RadioGroup>
+              </div>
             </div>
 
             {mode === 'single' ? (
@@ -171,56 +204,48 @@ export default function Reports() {
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs">From Date</Label>
-                  <Popover modal>
-                    <PopoverTrigger asChild>
+                  <Label className="text-xs">Date Range</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Popover modal>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn('w-full justify-start text-left font-normal', !fromDate && 'text-muted-foreground')}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {fromDate && toDate
+                            ? `${format(fromDate, 'PP')} – ${format(toDate, 'PP')}`
+                            : fromDate
+                              ? `${format(fromDate, 'PP')} – …`
+                              : 'Pick date range'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
+                        <Calendar
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={setDateRange}
+                          numberOfMonths={2}
+                          initialFocus
+                          className={cn('p-3 pointer-events-auto')}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {dateRange && (
                       <Button
                         type="button"
-                        variant="outline"
-                        className={cn('w-full justify-start text-left font-normal mt-1', !fromDate && 'text-muted-foreground')}
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDateRange(undefined)}
+                        title="Clear date range"
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {fromDate ? format(fromDate, 'PPP') : 'Pick a date'}
+                        <X className="h-4 w-4" />
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
-                      <Calendar
-                        mode="single"
-                        selected={fromDate}
-                        onSelect={(d) => setFromDate(d ?? undefined)}
-                        disabled={(date) => (toDate ? date > toDate : false)}
-                        initialFocus
-                        className={cn('p-3 pointer-events-auto')}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <Label className="text-xs">To Date</Label>
-                  <Popover modal>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className={cn('w-full justify-start text-left font-normal mt-1', !toDate && 'text-muted-foreground')}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {toDate ? format(toDate, 'PPP') : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
-                      <Calendar
-                        mode="single"
-                        selected={toDate}
-                        onSelect={(d) => setToDate(d ?? undefined)}
-                        disabled={(date) => (fromDate ? date < fromDate : false)}
-                        initialFocus
-                        className={cn('p-3 pointer-events-auto')}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">Vendor Status</Label>
@@ -244,14 +269,15 @@ export default function Reports() {
               <Button variant="outline" onClick={reset} disabled={loading}>
                 <RefreshCw className="h-4 w-4 mr-2" /> Reset
               </Button>
-              <Button variant="outline" onClick={() => exportVendorExcel(rows, 'vendor')} disabled={rows.length === 0}>
+              <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
               </Button>
-              <Button variant="outline" onClick={() => exportVendorPdf(rows, 'vendor')} disabled={rows.length === 0}>
+              <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
                 <FileText className="h-4 w-4 mr-2" /> PDF
               </Button>
             </div>
           </CardContent>
+
         </Card>
       )}
 
@@ -263,15 +289,16 @@ export default function Reports() {
 
       {!loading && single && (
         <>
-          <SingleVendorView row={single} />
-          <ApprovalFlowTimeline row={single} />
+          {showVendor && <SingleVendorView row={single} />}
+          {showApproval && <ApprovalFlowTimeline row={single} />}
         </>
       )}
 
       {!loading && mode === 'all' && rows.length > 0 && (
         <>
-          <AllVendorsTable rows={rows} onView={viewVendor} />
-          <AllVendorsApprovalMatrix rows={rows} />
+          {showVendor && <AllVendorsTable rows={rows} onView={viewVendor} />}
+          {showApproval && <AllVendorsApprovalMatrix rows={rows} />}
+
         </>
       )}
     </div>
