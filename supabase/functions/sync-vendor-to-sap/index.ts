@@ -712,8 +712,8 @@ serve(async (req) => {
                   <tr><td style="background:#f7f9fc;"><b>Reference No.</b></td><td>${refNo}</td></tr>
                   <tr><td style="background:#f7f9fc;"><b>Synced At</b></td><td>${syncedAt}</td></tr>
                 </table>
-                <p style="margin-top:16px;">You can review this vendor in the Sharvi Vendor Portal.</p>
-                <p>Regards,<br/>Sharvi Vendor Portal</p>
+                <p style="margin-top:16px;">You can review this vendor in the Ramky Vendor Portal.</p>
+                <p>Regards,<br/>Ramky Vendor Portal</p>
               </div>`;
             const { error: mailErr } = await supabase.functions.invoke("send-smtp-email", {
               body: { to: buyerEmail, subject, html },
