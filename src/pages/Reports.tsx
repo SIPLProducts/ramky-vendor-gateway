@@ -21,7 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
   loadVendorReports, STAGE_ORDER, STAGE_LABEL,
-  type VendorReportRow, type StageKey,
+  type VendorReportRow,
+
 } from '@/lib/reports/loadVendorReport';
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
