@@ -248,8 +248,9 @@ export default function Reports() {
                       placeholder="All statuses"
                     />
                   </div>
-
+                </div>
               </div>
+
             )}
 
             <div className="flex flex-wrap gap-2 pt-2">
