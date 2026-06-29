@@ -21,6 +21,8 @@ export type RegistrationStatus =
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
   | 'sap_synced'
+  | 'sap_team_rejected'
+  | 'sap_team_closed'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
 
@@ -88,6 +90,8 @@ function getActiveStepIndex(status: RegistrationStatus): number {
     case 'rejected':
     case 'purchase_rejected':
     case 'finance_rejected':
+    case 'sap_team_rejected':
+    case 'sap_team_closed':
       return -2;
     default:
       return 0;

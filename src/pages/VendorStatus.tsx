@@ -46,6 +46,8 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   sap_synced: { label: 'SAP Synced', variant: 'default' },
   returned_to_buyer: { label: 'Returned to Buyer', variant: 'destructive' },
   returned_to_vendor: { label: 'Returned to Vendor', variant: 'destructive' },
+  sap_team_rejected: { label: 'Duplicate & Closed', variant: 'destructive' },
+  sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' },
 };
 
 export default function VendorStatus() {

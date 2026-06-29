@@ -80,6 +80,8 @@ type VendorStatus =
   | 'sap_synced'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
+  | 'sap_team_rejected'
+  | 'sap_team_closed'
   // legacy values still in DB
   | 'finance_review'
   | 'finance_approved'
@@ -197,6 +199,8 @@ export default function VendorList() {
       sap_synced: { label: 'SAP Synced', variant: 'default' },
       returned_to_buyer: { label: 'Returned to Buyer', variant: 'destructive' },
       returned_to_vendor: { label: 'Returned to Vendor', variant: 'destructive' },
+      sap_team_rejected: { label: 'Duplicate & Closed', variant: 'destructive' },
+      sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' },
 
       // legacy
       finance_review: { label: 'Finance Review', variant: 'outline' },
