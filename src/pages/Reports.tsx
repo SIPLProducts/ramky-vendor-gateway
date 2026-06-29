@@ -107,9 +107,11 @@ export default function Reports() {
   };
 
   const reset = () => {
-    setDateRange(undefined);
+    setDateFrom(startOfDay(subDays(new Date(), 30)));
+    setDateTo(endOfDay(new Date()));
     setStatuses([]); setRefNum(''); setRows([]); setHasRun(false);
   };
+
 
   const viewVendor = async (ref: string) => {
     setMode('single');
