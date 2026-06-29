@@ -65,7 +65,7 @@ serve(async (req) => {
     const { error: updateErr } = await supabase
       .from("vendors")
       .update({
-        status: "sap_team_rejected",
+        status: "sap_team_closed",
         last_rejected_by: auth.userId,
         last_rejected_at: nowIso,
         last_rejection_comments: remarks,
@@ -83,7 +83,7 @@ serve(async (req) => {
     await supabase.from("audit_logs").insert({
       vendor_id: vendorId,
       user_id: auth.userId,
-      action: "sap_team_duplicate_reject",
+      action: "sap_team_duplicate_close",
       details: { remarks, stage: "SAP_TEAM", auto_triggered: autoTriggered },
     });
 
