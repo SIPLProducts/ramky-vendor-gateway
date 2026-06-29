@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import {
   CalendarIcon, FileSpreadsheet, FileText, Search, RefreshCw,
   Building2, Landmark, MapPin, Mail, ShieldCheck, FolderOpen,
   Tag, Globe2, ClipboardCheck, Eye, Download, ArrowLeft,
-  CheckCircle2, Circle, XCircle, Clock, MinusCircle,
+  CheckCircle2, Circle, XCircle, Clock, MinusCircle, X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,9 @@ import {
 } from '@/lib/reports/loadVendorReport';
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
+
+type ReportType = 'vendor' | 'approval' | 'both';
+
 
 const STATUS_OPTIONS = [
   'draft', 'submitted', 'buyer_review',
