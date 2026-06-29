@@ -45,6 +45,7 @@ export interface VendorReportRow {
     file_name: string;
     uploaded_at: string | null;
     file_path: string | null;
+    signed_url?: string | null;
   }>;
   validations?: Array<{
     validation_type: string;
@@ -52,6 +53,7 @@ export interface VendorReportRow {
     verified_at: string | null;
     details: any;
   }>;
+
 }
 
 export interface ReportFilters {
