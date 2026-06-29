@@ -1,45 +1,76 @@
-# Reference # search should also find email-invited vendors
 
-## Problem
+## Reports Screen
 
-On **Buyer → Vendor Invitations**, the "Enter Reference Number → Search" box only resolves to a Vendor Status page for **on-behalf** vendors. When a buyer invited a vendor by email, and the vendor later registered and submitted, entering that vendor's Reference # returns "Not found" — even though the buyer is the invitation creator and is allowed to see that vendor's progress.
+A new screen to give buyers/admins a complete audit trail of vendor registration and approval, with export.
 
-Result: buyers can't track email-invited vendors through the same Reference # search, only on-behalf ones.
+### Route & navigation
 
-## Root cause
+- New route: `/reports` → `src/pages/Reports.tsx` (inside `AppLayout`, under `ProtectedRoute`).
+- Add a "Reports" link in the Sidebar (visible only when the user has the `reports` screen permission — see Role Permissions section).
 
-In `src/pages/AdminInvitations.tsx → handleTrackByReference`, the non-admin branch joins `vendor_invitations → vendors!inner` filtered by `created_by IN creatorIds` AND `vendors.reference_number = ref`. For email-invited vendors, `vendor_invitations.vendor_id` is often not back-linked after the vendor self-registers, so the inner join drops the row and the lookup fails. The vendor itself IS readable to the buyer via the existing RLS policy `user_can_see_vendor` (covers buyer-created invitations, on-behalf, approver and SCM-manager mappings).
+### Filters (top of page)
 
-## Fix (single file, search-only)
+- **Date Range**: From / To (shadcn DatePicker with `pointer-events-auto`). Filters on `vendors.created_at`.
+- **Vendor Status**: multi-select of `vendor_status` enum values (Draft, Submitted, Buyer Review, SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office, Approved, Rejected, Returned to Vendor, Pending SAP Sync, Synced).
+- **Report Type** (tabs): `Vendor Report` | `Approval Flow Report`.
+- **Mode** (radio/segmented): `Single Vendor` (Reference Number input, uses existing `vendors.reference_number` lookup with RLS) | `All Vendors` (uses filters).
+- Buttons: `Run Report`, `Export Excel`, `Export PDF`, `Reset`.
 
-In `src/pages/AdminInvitations.tsx`, simplify `handleTrackByReference`:
+### Data sources (all RLS-scoped, no new tables)
 
-1. For **all roles** (admin and non-admin), query `public.vendors` directly:
-   ```ts
-   const { data } = await supabase
-     .from('vendors')
-     .select('id')
-     .eq('reference_number', ref)
-     .maybeSingle();
-   ```
-2. RLS (`user_can_see_vendor`) automatically enforces who can see what — admin/SAP team see all; buyers see their own invitations + on-behalf; SCM/approvers see their mapped vendors. No app-side scoping needed.
-3. If a row comes back → `navigate('/vendor-status/' + id)` (existing behavior — that page already renders the full Vendor Details + Application Progress + Approval Progress timeline shown in the screenshot, including Submitted → Document Verification → Buyer Approval → SCM Manager → SCM Head → Finance 1 → Finance 2 → SAP Sync).
-4. If no row → keep the existing "Not found / no access" toast.
+- `vendors` — core details + final status.
+- `vendor_invitations` — invitation sent date, invited email, on-behalf flag, buyer (`created_by`).
+- `vendor_approval_progress` — every stage row (BUYER, SCM_MANAGER, SCM_HEAD, FINANCE_1, FINANCE_2, CEO_OFFICE) with `status`, `acted_at`, `started_at`, `completed_at`, `comments`, `acted_by`.
+- `profiles` — resolve approver names/emails from `acted_by`.
+- `audit_logs` — SAP Team actions (sync/return/reject) keyed by vendor, used to render the SAP Team row in the approval timeline.
 
-Delete the now-unused `creatorIds` / `buyer_approval_flows` / `buyer_scm_mappings` lookup block inside this function (it was only used to scope the invitations join; RLS replaces it).
+A small helper `src/lib/reports/loadVendorReport.ts` fetches a vendor + its progress + profiles + SAP audit events and shapes them into a normalized record:
 
-## Vendor-side visibility
+```
+VendorReportRow {
+  reference_number, vendor_name, vendor_type, status,
+  invited_at, invited_email, submitted_at, on_behalf,
+  buyer: StageInfo,
+  scm_manager: StageInfo,
+  scm_head: StageInfo,
+  finance_1: StageInfo,
+  finance_2: StageInfo,
+  ceo_office: StageInfo,
+  sap_team: StageInfo,            // derived from audit_logs
+  current_stage, final_status,
+}
+StageInfo { approver_name, status, acted_at, remarks }
+```
 
-The vendor already lands on `/vendor-status/:id` after submitting (existing route, same page). No change needed for the vendor experience — they see the same full timeline.
+### Vendor Report view
 
-## Verification
+- Table columns (All Vendors mode): Ref #, Vendor Name, Type, Status, Invited At, Submitted At, Current Stage, Final Status.
+- Single Vendor mode: same row rendered as a details card.
 
-- As a buyer who invited a vendor by **email**, after the vendor submits: enter Reference # → lands on `/vendor-status/:id` showing Vendor Details + Application Progress + Approval Progress.
-- As a buyer who created an **on-behalf** vendor: existing flow still works.
-- Reference # for a vendor the buyer is NOT entitled to see still shows "Not found" (RLS blocks).
-- Admin / SAP team can search any Reference # (already true, unchanged).
-- Inline "Search by email, name or reference #" table filter, the invitations table rendering, on-behalf Resume button, and the `/vendor-status` page itself remain untouched.
+### Approval Flow Report view
 
-## Out of scope
+- All Vendors mode: one row per vendor with 7 stage columns (Buyer, SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office, SAP Team). Each cell shows status badge + approver + date; tooltip shows remarks.
+- Single Vendor mode: vertical timeline (reuses `ApprovalTimeline` styling) plus a SAP Team row.
 
-No DB migrations, no edge function changes, no UI redesign of `/vendor-status`, no change to the invitations table, on-behalf flow, or RLS policies.
+### Export
+
+- **Excel** via `xlsx` (already in deps if present; otherwise add `xlsx`). Two sheets: `Vendors` and `Approval Flow` (one row per vendor × stage).
+- **PDF** via `jspdf` + `jspdf-autotable` (add if missing). Landscape, one table per report type. Single Vendor PDF renders a labelled detail block + stage table.
+- File names: `vendor-report-YYYYMMDD-HHmm.xlsx`, `approval-flow-report-...pdf`.
+
+### Role Permissions integration
+
+- Add screen key `reports` to the existing `role_screen_permissions` / `custom_role_screen_permissions` matrices (data insert via the insert tool — no schema change needed; the screen key is just a string).
+- Sidebar entry and route guard both use `useScreenPermissions().can('reports')`.
+- Admin / Sharvi Admin get it by default; other roles toggle via the existing Role Permissions UI.
+
+### Out of scope
+
+- No DB schema changes, no new RLS policies (existing `user_can_see_vendor` already scopes visibility for buyers/approvers/admins/SAP team).
+- No edits to the Vendor Invitations screen, vendor status page, approval pages, or SAP sync.
+- No scheduled/emailed reports.
+
+### Files
+
+- New: `src/pages/Reports.tsx`, `src/components/reports/ReportFilters.tsx`, `src/components/reports/VendorReportTable.tsx`, `src/components/reports/ApprovalFlowTable.tsx`, `src/lib/reports/loadVendorReport.ts`, `src/lib/reports/exportExcel.ts`, `src/lib/reports/exportPdf.ts`.
+- Edited: `src/App.tsx` (route), `src/components/layout/Sidebar.tsx` (nav entry), Role Permissions seed (insert `reports` screen key rows).

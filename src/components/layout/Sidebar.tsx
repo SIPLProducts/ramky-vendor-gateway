@@ -27,6 +27,7 @@ import {
   Layers,
   Crown,
   UserCheck,
+  BarChart3,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -84,6 +85,7 @@ const navItems: NavItem[] = [
   { label: 'GST Compliance', href: '/compliance/gst', icon: CheckCircle, screenKey: 'gst_compliance' },
   { label: 'Scheduled Checks', href: '/compliance/scheduled', icon: ClipboardCheck, screenKey: 'scheduled_checks' },
   { label: 'Audit Logs', href: '/audit-logs', icon: History, screenKey: 'audit_logs' },
+  { label: 'Reports', href: '/reports', icon: BarChart3, screenKey: 'reports' },
   { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
   { label: 'Email Configuration', href: '/admin/email-config', icon: Mail, screenKey: 'email_configuration' },
   { label: 'Help & Support', href: '/support', icon: HelpCircle, screenKey: 'support' },
