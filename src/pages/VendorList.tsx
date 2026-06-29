@@ -59,6 +59,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 
 type VendorStatus =
   | 'draft'
