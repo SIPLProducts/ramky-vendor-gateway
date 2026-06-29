@@ -69,15 +69,16 @@ export default function Reports() {
   const { toast } = useToast();
   const [mode, setMode] = useState<'single' | 'all'>('all');
   const [reportType, setReportType] = useState<ReportType>('both');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
+  const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
   const [statuses, setStatuses] = useState<string[]>([]);
   const [refNum, setRefNum] = useState('');
   const [rows, setRows] = useState<VendorReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
 
-  const fromDate = dateRange?.from;
-  const toDate = dateRange?.to;
+  const toInputValue = (d: Date | null) => (d ? format(d, 'yyyy-MM-dd') : '');
+
 
   const run = async (overrideRef?: string) => {
     const refValue = overrideRef ?? (mode === 'single' ? refNum.trim() : '');
