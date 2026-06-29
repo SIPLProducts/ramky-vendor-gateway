@@ -1,44 +1,36 @@
 ## Goal
-On SAP Sync, treat both `"PAN Number Duplicate"` AND `"PAN & GST combination is Duplicated"` errors as duplicates. Rename the existing duplicate-reject UI to "Duplicate & Close", introduce a new vendor status `sap_team_closed`, and notify the buyer by email. Existing "Reject & Send to Buyer" flow stays as is.
+Make the new `sap_team_closed` status (introduced for "Duplicate & Close") render with a proper label and color everywhere status is shown — not just on the SAP Sync screen.
 
-## Changes
+Today, screens like Dashboard, All Vendors list, Vendor Status, and the stage cell only know about `sap_team_rejected`. Any vendor moved to `sap_team_closed` falls through to a raw `sap_team_closed` string with the default badge.
 
-### 1. DB migration — new enum value
-Add `sap_team_closed` to `vendor_status` enum:
+## Files to update (label-only, no business logic)
 
-```sql
-ALTER TYPE public.vendor_status ADD VALUE IF NOT EXISTS 'sap_team_closed';
-```
+1. **`src/pages/VendorList.tsx`** (`getStatusBadge` map)
+   - Add: `sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' }`
 
-(Existing `sap_team_rejected` is retained for backward compatibility / historical rows.)
+2. **`src/pages/Dashboard.tsx`**
+   - Add `sap_team_closed` entry to `STATUS_LABELS` with label `Duplicate & Closed`, destructive variant.
+   - Include `sap_team_closed` in the `rejected` counter alongside `sap_team_rejected` (so the Rejected KPI tile reflects closed-duplicates too).
 
-### 2. `supabase/functions/sap-team-reject-vendor/index.ts`
-- Change the status it writes from `sap_team_rejected` → `sap_team_closed`.
-- Update `last_rejection_stage` to stay `SAP_TEAM`.
-- Email headline / wording updated to "Vendor Closed — Duplicate in SAP" with body:
-  > Vendor `<Ref No>` has been closed because a duplicate vendor already exists in SAP. No further action is required.
-- Keep `autoTriggered` branch wording ("automatically closed due to PAN/GST duplicate in SAP").
-- Email failure still does NOT abort the close (duplicate close is final); response keeps `email_sent` / `email_error`.
-- Audit-log action strings updated: `sap_team_duplicate_close`, `buyer_notified_duplicate_close_email`, `buyer_duplicate_close_email_failed`.
+3. **`src/pages/VendorStatus.tsx`**
+   - Add `sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' }` to the status label map.
 
-### 3. `src/pages/SAPSync.tsx`
-- **Tab rename:** "Duplicate Rejected Data" → "Duplicate & Closed".
-- **Tab data source:** fetch BOTH `sap_team_closed` AND `sap_team_rejected` so existing historical rows still appear. Card badge label becomes "Duplicate & Closed".
-- **Button rename:** "Duplicate Reject" → "Duplicate & Close". Icon stays.
-- **Dialog rename:** Title "Duplicate & Close Vendor"; description "moved to the Duplicate & Closed tab"; remarks label "Duplicate & Close Remarks *" (already mandatory — kept).
-- **Auto-detect regex** in `isPanDuplicateResponse` widened to also match `"PAN & GST combination is Duplicated"`:
-  ```
-  /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i
-  ```
-  Applied to `LONGMSG`/`MSG` checks for both single sync (`handleConfirmSync`) and bulk sync (`handleMultipleSync`) paths. No other behavioural change to those handlers.
-- Toast strings updated from "Duplicate Rejected Data" → "Duplicate & Closed".
-- "Reject & Send to Buyer" button/dialog/handler — **unchanged**.
+4. **`src/components/admin/VendorStageCell.tsx`**
+   - Add a `case 'sap_team_closed'` in `statusToStep` returning `{ step: -1, label: 'Duplicate & Closed', tone: 'destructive' }`.
+   - Update the `stage:rejected` filter option to also include `sap_team_closed`, and rename it to `Stage: Duplicate & Closed` (covers both legacy `sap_team_rejected` and new `sap_team_closed`).
 
-### 4. `src/hooks/useVendors.tsx` (if needed)
-Confirm `useVendors([...])` accepts multi-status array (already does — used elsewhere). The Rejected tab query becomes `useVendors(['sap_team_closed', 'sap_team_rejected'])`.
+5. **`src/components/vendor/EmailNotificationDemo.tsx`** (demo dropdown)
+   - Add a `sap_team_closed` option labelled `Duplicate & Closed` (red tone) so the demo list stays in sync.
+
+6. **`src/components/vendor/RegistrationStatusTracker.tsx` / `src/types/vendor.ts` / `src/components/vendor/SuccessScreen.tsx`**
+   - Only touch if the vendor-facing tracker should also recognise the closed state. Plan: add `'sap_team_closed'` to the `VendorStatus` union in `src/types/vendor.ts` and treat it like `sap_team_rejected` in `RegistrationStatusTracker` (terminal/destructive node). SuccessScreen needs no change (it only checks `sap_synced`).
 
 ## Out of scope
-- No change to "Reject & Send to Buyer" flow, its status (`returned_to_buyer`), or its email template.
-- No new email template files — HTML stays inlined in the edge function, matching existing pattern.
-- No change to approval-stage rejection flows.
-- No frontend changes outside `SAPSync.tsx` (and the hook call within it).
+- No DB / enum / edge-function changes (already shipped in the previous task).
+- No change to the SAP Sync screen — it already labels this correctly.
+- No change to "Reject & Send to Buyer" flow or any other status.
+
+## Verification
+- Dashboard "Rejected" tile and status badges show "Duplicate & Closed" for the affected vendors.
+- All Vendors list and Vendor Status page render the same label in destructive style.
+- Stage filter "Duplicate & Closed" returns both `sap_team_closed` and legacy `sap_team_rejected` rows.
