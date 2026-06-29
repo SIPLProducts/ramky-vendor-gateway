@@ -2580,6 +2580,7 @@ export type Database = {
         | "returned_to_vendor"
         | "buyer_review"
         | "sap_team_rejected"
+        | "sap_team_closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2747,6 +2748,7 @@ export const Constants = {
         "returned_to_vendor",
         "buyer_review",
         "sap_team_rejected",
+        "sap_team_closed",
       ],
     },
   },

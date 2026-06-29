@@ -1,0 +1,1 @@
+ALTER TYPE public.vendor_status ADD VALUE IF NOT EXISTS 'sap_team_closed';
