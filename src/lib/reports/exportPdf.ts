@@ -16,7 +16,7 @@ function statusLabel(s: string): string {
   return s;
 }
 
-export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 'approval') {
+export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 'approval' | 'both') {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   doc.setFontSize(14);
   doc.text(reportType === 'approval' ? 'Approval Flow Report' : 'Vendor Report', 40, 40);
