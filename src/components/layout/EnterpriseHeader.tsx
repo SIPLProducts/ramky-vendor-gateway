@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Phone, Mail, Building2 } from 'lucide-react';
+import { HelpCircle, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
@@ -49,23 +49,15 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
 
       <div className="flex items-center gap-2">
         {showSwitcher && (
-          <Select
-            value={activeTenantId ?? '__all__'}
-            onValueChange={(v) => setActiveTenantId(v === '__all__' ? null : v)}
-          >
-            <SelectTrigger className="h-8 w-[180px] gap-2 text-xs">
-              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <SelectValue placeholder="Select tenant" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All Tenants</SelectItem>
-              {myTenants.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TenantCombobox
+            tenants={myTenants}
+            value={activeTenantId}
+            onChange={(id) => setActiveTenantId(id)}
+            allowAll
+            allLabel="All Tenants"
+            className="w-[200px]"
+            triggerClassName="h-8 text-xs"
+          />
         )}
         {showHelp && (
           <DropdownMenu>

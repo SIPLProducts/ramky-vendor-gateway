@@ -61,6 +61,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -202,20 +203,16 @@ export default function FinanceReview() {
               className="pl-11 h-11 rounded-xl"
             />
           </div>
-          <Select value={buyerCompanyFilter} onValueChange={setBuyerCompanyFilter}>
-            <SelectTrigger className="w-56 h-11 rounded-xl">
-              <Building2 className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by buyer" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Buyer Companies</SelectItem>
-              {buyerCompanies?.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name} ({company.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TenantCombobox
+            tenants={buyerCompanies ?? []}
+            value={buyerCompanyFilter === 'all' ? null : buyerCompanyFilter}
+            onChange={(id) => setBuyerCompanyFilter(id ?? 'all')}
+            allowAll
+            allLabel="All Buyer Companies"
+            placeholder="Filter by buyer"
+            className="w-56"
+            triggerClassName="h-11 rounded-xl"
+          />
         </div>
       </div>
 
