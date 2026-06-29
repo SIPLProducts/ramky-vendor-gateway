@@ -77,7 +77,7 @@ export default function SAPSync() {
 
   const { data: sapVendors, isLoading, refetch } = useVendors(['pending_sap_sync', 'purchase_approved']);
   const { data: dmsVendors, isLoading: dmsLoading, refetch: refetchDms } = useVendors(['dms_sync_pending', 'dms_synced']);
-  const { data: rejectedVendors, isLoading: rejectedLoading, refetch: refetchRejected } = useVendors(['sap_team_rejected' as any]);
+  const { data: rejectedVendors, isLoading: rejectedLoading, refetch: refetchRejected } = useVendors(['sap_team_closed' as any, 'sap_team_rejected' as any]);
   const { data: buyerCompanies } = useBuyerCompanies();
   const sapSync = useSAPSync();
   const bulkSync = useMultipleSAPSync();
