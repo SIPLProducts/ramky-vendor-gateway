@@ -338,20 +338,15 @@ export default function VendorList() {
 
               </SelectContent>
             </Select>
-            <Select value={buyerCompanyFilter} onValueChange={handleBuyerCompanyFilterChange}>
-              <SelectTrigger className="w-56">
-                <Building2 className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filter by buyer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Buyer Companies</SelectItem>
-                {buyerCompanies?.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name} ({company.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <TenantCombobox
+              tenants={buyerCompanies ?? []}
+              value={buyerCompanyFilter === 'all' ? null : buyerCompanyFilter}
+              onChange={(id) => handleBuyerCompanyFilterChange(id ?? 'all')}
+              allowAll
+              allLabel="All Buyer Companies"
+              placeholder="Filter by buyer"
+              className="w-56"
+            />
           </div>
         </CardHeader>
         <CardContent>
