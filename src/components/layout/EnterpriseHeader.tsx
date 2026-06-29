@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Phone, Mail, Building2 } from 'lucide-react';
+import { HelpCircle, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
