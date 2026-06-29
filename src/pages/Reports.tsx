@@ -289,15 +289,16 @@ export default function Reports() {
 
       {!loading && single && (
         <>
-          <SingleVendorView row={single} />
-          <ApprovalFlowTimeline row={single} />
+          {showVendor && <SingleVendorView row={single} />}
+          {showApproval && <ApprovalFlowTimeline row={single} />}
         </>
       )}
 
       {!loading && mode === 'all' && rows.length > 0 && (
         <>
-          <AllVendorsTable rows={rows} onView={viewVendor} />
-          <AllVendorsApprovalMatrix rows={rows} />
+          {showVendor && <AllVendorsTable rows={rows} onView={viewVendor} />}
+          {showApproval && <AllVendorsApprovalMatrix rows={rows} />}
+
         </>
       )}
     </div>
