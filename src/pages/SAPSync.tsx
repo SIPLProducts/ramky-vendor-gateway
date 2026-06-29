@@ -693,17 +693,17 @@ export default function SAPSync() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1 flex-wrap">
                               <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
-                              <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate Rejected</Badge>
+                              <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate &amp; Closed</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                               <span className="font-mono bg-muted px-2 py-0.5 rounded">Ref No: {refNo}</span>
                               <span>GSTIN: {vendor.gstin || 'N/A'}</span>
-                              {rejectedAt && <span>Rejected: {new Date(rejectedAt).toLocaleString()}</span>}
+                              {rejectedAt && <span>Closed: {new Date(rejectedAt).toLocaleString()}</span>}
                             </div>
                             {remarks && (
                               <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
-                                <p className="text-xs font-semibold text-red-700 mb-1">Duplicate Reject Remarks</p>
+                                <p className="text-xs font-semibold text-red-700 mb-1">Duplicate &amp; Close Remarks</p>
                                 <p className="text-sm text-red-900 whitespace-pre-wrap">{remarks}</p>
                               </div>
                             )}
