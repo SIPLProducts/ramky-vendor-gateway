@@ -80,6 +80,8 @@ type VendorStatus =
   | 'sap_synced'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
+  | 'sap_team_rejected'
+  | 'sap_team_closed'
   // legacy values still in DB
   | 'finance_review'
   | 'finance_approved'
