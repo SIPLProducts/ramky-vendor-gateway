@@ -1,41 +1,51 @@
-## Goal
-Fix the Reports screen date filters and add a three-way report mode selector.
+## Reports screen — complete data, working date picker, inline display
 
-## Changes (Reports.tsx only)
+### 1. Replace date picker with Dashboard-style inputs (`src/pages/Reports.tsx`)
+Drop the `Popover` + `Calendar mode="range"` block (which is the one still misbehaving) and replace it with the same pattern Dashboard uses:
 
-### 1. Replace popover-button date pickers with a working range picker
-Current: two `<Button>` triggers opening a `Calendar mode="single"` inside `Popover` — clicks don't register reliably.
+- Two native `<Input type="date">` controls labeled **From** and **To**, side-by-side.
+- State stored as `Date | null` (`dateFrom`, `dateTo`), defaulting to last 30 days like Dashboard, with `startOfDay` / `endOfDay` normalization.
+- Auto-correct when From > To (mirror Dashboard's `setDateTo` / `setDateFrom` guards).
+- Pass `dateFrom.toISOString()` / `dateTo.toISOString()` to `loadVendorReports`.
+- Remove `Calendar`, `Popover*`, `react-day-picker`, and the `DateRange` import from this file.
 
-New: single shadcn **date-range picker**:
-- One trigger button labeled "From – To" (or "Pick date range")
-- `<Calendar mode="range" selected={range} onSelect={setRange} numberOfMonths={2} className="p-3 pointer-events-auto" />`
-- `Popover` with `modal={true}`, trigger button `type="button"`
-- Range maps to existing `from` / `to` filter state (ISO strings: `range.from` → start of day, `range.to` → end of day)
-- "Clear" button next to the trigger to reset the range
+### 2. Keep Run Report on the same screen
+Already inline — confirm and tighten: keep `viewVendor` (single-vendor drill-down) on the same route via state only (no `navigate()` calls), and keep the "Back to all vendors" button. No router navigation is introduced anywhere in the Run / View flow.
 
-### 2. Replace the current Vendor/Approval tabs with a 3-option mode selector
-Add a `RadioGroup` (segmented control style) at the top of the report config card:
-- **Vendor Report** — shows only the vendor detail sections (Organization, GST, PAN, MSME, Bank, Addresses, Contacts, Classification, Tax & Compliance, International, Documents)
-- **Approval Flow Report** — shows only the approval timeline / matrix
-- **Both** — shows vendor sections first, then approval flow below
+### 3. Excel + PDF download buttons
+Already present in the filter card. Move/duplicate them into a second toolbar that **also shows when a single vendor is open** (currently the filter card hides in single mode, so exports disappear). Add a small toolbar at the top of the single-vendor view with **Excel** and **PDF** buttons that call the existing `exportVendorExcel` / `exportVendorPdf` with the current single row.
 
-State: `reportMode: 'vendor' | 'approval' | 'both'` (default `'both'`).
+### 4. Show ALL captured vendor fields, grouped into cards
 
-Apply to:
-- Single Vendor view: conditionally render vendor cards block and/or approval timeline block based on mode
-- All Vendors view: 
-  - `vendor` → vendor columns table only
-  - `approval` → approval matrix table only
-  - `both` → vendor columns + approval matrix (existing combined view)
-- Export buttons pass the selected mode to `exportVendorExcel` / `exportVendorPdf` (existing functions already accept `'vendor' | 'approval'`; add `'both'` handling that includes all columns/sheets)
+The `vendors` table has ~192 columns. Hard-coding a short whitelist (current behavior) is why fields are missing. New approach in `src/pages/Reports.tsx` (single-vendor view only):
 
-### 3. Export signature update
-- `exportExcel.ts` and `exportPdf.ts`: widen `reportType` param to `'vendor' | 'approval' | 'both'`. For `'both'`, emit both the vendor sheet/page and the approval sheet/page (already done for single-vendor; extend to multi-vendor).
+- Define ordered **section groups** by column-name prefix / keyword. For each group, list known labels first, then auto-append any remaining matching columns from `row.details` with a humanized label (`snake_case → Title Case`).
+- Always skip empty (`null` / `''` / `[]`) values and internal columns (`id`, `tenant_id`, `user_id`, `created_at`, `updated_at`, `*_token`, `metadata`, raw JSON dumps already shown elsewhere).
+- Group definitions:
+  - **Organization Details** — `legal_name`, `trade_name`, `vendor_type`, `business_type`, `cin`, `incorporation_date`, `website`, `industry*`, `establishment*`, plus any other org-level scalars.
+  - **PAN Details** — every column matching `^pan` (number, holder name, verification status, verified_at, raw response flags, etc.).
+  - **GST Details** (renamed heading) — every column matching `gst` (gstin, legal_name_as_per_gst, trade_name_as_per_gst, gst_status, gst_registration_type, place_of_supply, gst_filing_status, gst_verified_at, etc.).
+  - **MSME Details** — every column matching `msme` / `udyam` (registered flag, number, category, enterprise type, date, verified flag, etc.).
+  - **Bank Details** — every column matching `bank|account|ifsc|branch|upi|penny`, including `account_holder_name`, `bank_name`, `account_number`, `account_type`, `ifsc_code`, `branch_name`, `branch_address`, penny-drop verification fields.
+  - **Registered / Corporate Office Address** — `registered_*`, `corporate_*`, `address*`, `city`, `state`, `pincode`, `country` (split into two cards if both registered and corporate prefixes exist).
+  - **Contact Details** — `primary_*`, `contact_*`, `phone*`, `email*`, `alternate_*`, `designation`.
+  - **Classification Details** — `classification*`, `category*`, `subcategory*`, `vendor_category`, `payment_terms`, `currency`, `tax_*` that isn't covered above.
+  - **International Details** (international vendors only) — `tax_residency*`, `swift*`, `iban*`, `country_of_*`, `lut*`, `dtaa*`.
+  - **Other Details** — auto-fallback card for any remaining non-empty `row.details` columns that didn't match a group, so nothing captured is dropped.
+- Each card uses the existing `Card` + 2-column grid layout, with the icon already imported. Heading for GST card explicitly reads **"GST Details"**.
 
-## Out of scope
-Data loader, approval matrix logic, RLS, registration pages, SAP, role permissions.
+### 5. Documents card
+Already lists `row.documents` with signed-URL "Open" buttons — keep. Confirm every uploaded doc renders (no filtering by type) and show `document_type`, `file_name`, uploaded date, and an Open link.
 
-## Files
-- `src/pages/Reports.tsx` (main edit)
-- `src/lib/reports/exportExcel.ts` (type widen + `'both'` branch)
-- `src/lib/reports/exportPdf.ts` (type widen + `'both'` branch)
+### 6. Out of scope
+- No DB / RLS / migration changes.
+- No changes to approval-flow logic or `loadVendorReport.ts` (it already returns full `row.details = v`).
+- No changes to exporters' internal layout beyond passing the single row through.
+
+### Files touched
+- `src/pages/Reports.tsx` (date picker swap, exports toolbar in single view, dynamic field grouping for single vendor).
+
+### Technical notes
+- Humanize helper: `key.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase())`.
+- Group matcher runs once per render over `Object.entries(row.details)` with a `Set` of already-consumed keys to guarantee each field appears in exactly one card; leftovers go to **Other Details**.
+- Date inputs use `value={date ? format(date,'yyyy-MM-dd') : ''}` and `onChange={e => setDate(e.target.value ? startOfDay(new Date(e.target.value)) : null)}`, identical to Dashboard.
