@@ -829,19 +829,13 @@ export default function AdminInvitations() {
               {allowedTenants.length > 1 ? (
                 <div className="space-y-2">
                   <Label htmlFor="company">Company {isSuperAdmin ? '(Tenant)' : ''}</Label>
-                  <Select value={selectedTenantId} onValueChange={(v) => setDialogTenantId(v)}>
-
-                    <SelectTrigger id="company">
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allowedTenants.map((tenant) => (
-                        <SelectItem key={tenant.id} value={tenant.id}>
-                          {tenant.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <TenantCombobox
+                    tenants={allowedTenants}
+                    value={selectedTenantId || null}
+                    onChange={(id) => setDialogTenantId(id ?? '')}
+                    placeholder="Select a company"
+                    className="w-full"
+                  />
                 </div>
               ) : (
                 <div className="space-y-2">
