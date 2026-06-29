@@ -71,13 +71,16 @@ function fmtValue(v: any): string {
 export default function Reports() {
   const { toast } = useToast();
   const [mode, setMode] = useState<'single' | 'all'>('all');
-  const [fromDate, setFromDate] = useState<Date | undefined>();
-  const [toDate, setToDate] = useState<Date | undefined>();
+  const [reportType, setReportType] = useState<ReportType>('both');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [statuses, setStatuses] = useState<string[]>([]);
   const [refNum, setRefNum] = useState('');
   const [rows, setRows] = useState<VendorReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+
+  const fromDate = dateRange?.from;
+  const toDate = dateRange?.to;
 
   const run = async (overrideRef?: string) => {
     const refValue = overrideRef ?? (mode === 'single' ? refNum.trim() : '');
@@ -105,7 +108,7 @@ export default function Reports() {
   };
 
   const reset = () => {
-    setFromDate(undefined); setToDate(undefined);
+    setDateRange(undefined);
     setStatuses([]); setRefNum(''); setRows([]); setHasRun(false);
   };
 
@@ -123,6 +126,9 @@ export default function Reports() {
   };
 
   const single = mode === 'single' ? rows[0] : null;
+  const showVendor = reportType === 'vendor' || reportType === 'both';
+  const showApproval = reportType === 'approval' || reportType === 'both';
+
 
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
