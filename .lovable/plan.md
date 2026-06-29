@@ -1,46 +1,45 @@
-## Scope
+# Reference # search should also find email-invited vendors
 
-Three copy-only edits across email bodies and support-address references. No business logic, no schema, no UI behavior changes.
+## Problem
 
-## Changes
+On **Buyer → Vendor Invitations**, the "Enter Reference Number → Search" box only resolves to a Vendor Status page for **on-behalf** vendors. When a buyer invited a vendor by email, and the vendor later registered and submitted, entering that vendor's Reference # returns "Not found" — even though the buyer is the invitation creator and is allowed to see that vendor's progress.
 
-### 1. Rewrite the duplicate-closed paragraph
-`supabase/functions/sap-team-reject-vendor/index.ts` (line ~159) — replace the closing sentence in the email body with:
+Result: buyers can't track email-invited vendors through the same Reference # search, only on-behalf ones.
 
-> Vendor `<ref>` has been closed because a vendor with the same details already exists in SAP. This vendor has been moved to the **Duplicate & Closed** tab in the SAP Sync screen. No further action is required for this submission.
+## Root cause
 
-(Keeps the `${esc(vendorRef)}` interpolation and the bold tag on **Duplicate & Closed**.)
+In `src/pages/AdminInvitations.tsx → handleTrackByReference`, the non-admin branch joins `vendor_invitations → vendors!inner` filtered by `created_by IN creatorIds` AND `vendors.reference_number = ref`. For email-invited vendors, `vendor_invitations.vendor_id` is often not back-linked after the vendor self-registers, so the inner join drops the row and the lookup fails. The vendor itself IS readable to the buyer via the existing RLS policy `user_can_see_vendor` (covers buyer-created invitations, on-behalf, approver and SCM-manager mappings).
 
-### 2. "Sharvi Vendor Portal" → "Ramky Vendor Portal" in email bodies only
-Update every occurrence inside email HTML/subject strings sent by edge functions:
+## Fix (single file, search-only)
 
-- `supabase/functions/sap-team-reject-vendor/index.ts` (footer line ~160)
-- `supabase/functions/sync-vendor-to-sap/index.ts` (lines ~715, ~716 — "review this vendor in the Sharvi Vendor Portal" and "Regards, Sharvi Vendor Portal")
-- `supabase/functions/process-approval-action/index.ts` (footer line ~192)
-- `supabase/functions/sap-team-return-to-buyer/index.ts` (footer line ~117)
-- `supabase/functions/send-password-reset/index.ts` (subject line ~50, body lines ~55 and ~70)
-- `supabase/functions/send-vendor-invitation/index.ts` — default `companyName` fallback (line ~66)
-- `supabase/functions/notify-vendor-submission/index.ts` — if any "Sharvi Vendor Portal" string exists in its email body (check during edit)
-- `supabase/functions/smtp-config-test/index.ts` (subject line ~134)
+In `src/pages/AdminInvitations.tsx`, simplify `handleTrackByReference`:
 
-**Out of scope** (do NOT change — these are app UI / admin config / deployment scripts, not email content): `src/pages/AdminConfiguration.tsx`, `src/pages/EmailConfiguration.tsx`, `src/pages/ResetPassword.tsx`, `src/components/admin/NoReplyEmailConfig.tsx`, `DEPLOYMENT_WINDOWS.md`, `setup-selfhost.sh`, `iis/web.config`, `middleware/*`. Touching these risks renaming the product across the admin UI and infra docs, which the user didn't ask for.
+1. For **all roles** (admin and non-admin), query `public.vendors` directly:
+   ```ts
+   const { data } = await supabase
+     .from('vendors')
+     .select('id')
+     .eq('reference_number', ref)
+     .maybeSingle();
+   ```
+2. RLS (`user_can_see_vendor`) automatically enforces who can see what — admin/SAP team see all; buyers see their own invitations + on-behalf; SCM/approvers see their mapped vendors. No app-side scoping needed.
+3. If a row comes back → `navigate('/vendor-status/' + id)` (existing behavior — that page already renders the full Vendor Details + Application Progress + Approval Progress timeline shown in the screenshot, including Submitted → Document Verification → Buyer Approval → SCM Manager → SCM Head → Finance 1 → Finance 2 → SAP Sync).
+4. If no row → keep the existing "Not found / no access" toast.
 
-### 3. `support@sharviinfotech.com` → `vendxsupport@ramky.com` everywhere
-Replace in both edge functions and UI:
+Delete the now-unused `creatorIds` / `buyer_approval_flows` / `buyer_scm_mappings` lookup block inside this function (it was only used to scope the invitations join; RLS replaces it).
 
-- `supabase/functions/notify-vendor-submission/index.ts` (line 15 `supportEmail` constant)
-- `supabase/functions/send-vendor-invitation/index.ts` (line 67 default `supportEmail`)
-- `src/pages/Landing.tsx` (lines 111, 166, 278, 279, 295 — `mailto:` + visible text)
-- `src/pages/SupportHelp.tsx` (lines 307, 308)
-- `src/pages/VendorInviteAccept.tsx` (lines 145, 148)
-- `src/pages/VendorLogin.tsx` (lines 127, 130)
-- `src/components/vendor/SubmissionSuccessDialog.tsx` (lines 72, 75)
+## Vendor-side visibility
 
-(Both the `href="mailto:..."` and the visible label get the new address.)
+The vendor already lands on `/vendor-status/:id` after submitting (existing route, same page). No change needed for the vendor experience — they see the same full timeline.
 
 ## Verification
 
-- Re-grep `support@sharviinfotech.com` across the repo → expect zero hits.
-- Re-grep "Sharvi Vendor Portal" inside `supabase/functions/**` → expect zero hits; matches still allowed in admin UI, infra docs, and middleware.
-- Deploy edge functions whose bodies changed: `sap-team-reject-vendor`, `sync-vendor-to-sap`, `process-approval-action`, `sap-team-return-to-buyer`, `send-password-reset`, `send-vendor-invitation`, `notify-vendor-submission`, `smtp-config-test`.
-- Spot-check one duplicate-close email by triggering an SAP-team reject in the SAP Sync screen and confirming the new paragraph + "Ramky Vendor Portal" footer + new support address (where applicable).
+- As a buyer who invited a vendor by **email**, after the vendor submits: enter Reference # → lands on `/vendor-status/:id` showing Vendor Details + Application Progress + Approval Progress.
+- As a buyer who created an **on-behalf** vendor: existing flow still works.
+- Reference # for a vendor the buyer is NOT entitled to see still shows "Not found" (RLS blocks).
+- Admin / SAP team can search any Reference # (already true, unchanged).
+- Inline "Search by email, name or reference #" table filter, the invitations table rendering, on-behalf Resume button, and the `/vendor-status` page itself remain untouched.
+
+## Out of scope
+
+No DB migrations, no edge function changes, no UI redesign of `/vendor-status`, no change to the invitations table, on-behalf flow, or RLS policies.
