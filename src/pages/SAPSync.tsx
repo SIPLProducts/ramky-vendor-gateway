@@ -330,14 +330,14 @@ export default function SAPSync() {
       for (const d of dupIds) {
         try {
           await supabase.functions.invoke('sap-team-reject-vendor', {
-            body: { vendorId: d.id, remarks: d.msg || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
+            body: { vendorId: d.id, remarks: d.msg || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
           });
         } catch (e) {
-          console.warn('[SAPSync] bulk auto duplicate-reject failed', d.id, e);
+          console.warn('[SAPSync] bulk auto duplicate-close failed', d.id, e);
         }
       }
       if (dupIds.length > 0) {
-        toast.success(`Moved ${dupIds.length} vendor(s) to Duplicate Rejected Data`);
+        toast.success(`Moved ${dupIds.length} vendor(s) to Duplicate & Closed`);
         refreshAllLists();
       }
     } catch (error: any) {
