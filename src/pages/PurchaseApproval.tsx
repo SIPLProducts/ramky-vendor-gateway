@@ -46,6 +46,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 
 export default function PurchaseApproval() {
   const [searchTerm, setSearchTerm] = useState('');
