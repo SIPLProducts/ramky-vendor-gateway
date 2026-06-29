@@ -730,10 +730,10 @@ export default function SAPSync() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Duplicate Reject Vendor
+              Duplicate &amp; Close Vendor
             </DialogTitle>
             <DialogDescription>
-              The vendor will be marked as a <span className="font-semibold">duplicate (already available in SAP)</span> and moved to the Duplicate Rejected Data tab.
+              The vendor will be marked as a <span className="font-semibold">duplicate (already available in SAP)</span> and moved to the Duplicate &amp; Closed tab.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -745,7 +745,7 @@ export default function SAPSync() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="reject-remarks">
-                Duplicate Reject Remarks <span className="text-red-600">*</span>
+                Duplicate &amp; Close Remarks <span className="text-red-600">*</span>
               </Label>
               <Textarea
                 id="reject-remarks"
@@ -755,7 +755,7 @@ export default function SAPSync() {
                 rows={4}
                 className="rounded-xl"
               />
-              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Duplicate Rejected Data tab.</p>
+              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Duplicate &amp; Closed tab.</p>
             </div>
           </div>
           <DialogFooter>
@@ -768,9 +768,9 @@ export default function SAPSync() {
               disabled={!rejectRemarks.trim() || !!rejectingVendorId}
             >
               {rejectingVendorId ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Closing...</>
               ) : (
-                <><XCircle className="h-4 w-4 mr-2" />Confirm Duplicate Reject</>
+                <><XCircle className="h-4 w-4 mr-2" />Confirm Duplicate &amp; Close</>
               )}
             </Button>
           </DialogFooter>
