@@ -1,65 +1,57 @@
-## Reports — fix stage status & add full vendor details
+## Reports — split sections, professional layout, fix date picker
 
-### 1. Stage status logic (Reports page + exports)
+### 1. Restructure Reports page (`src/pages/Reports.tsx`)
 
-Today every stage in `STAGE_ORDER` defaults to `not_required` (orange badge), so skipped levels look like an error and pending levels are hidden. Rework `loadVendorReport.ts`:
+Replace the current Tabs (Vendor Report / Approval Flow Report) with two clearly separated sections that render together for the chosen mode. The Tabs control is removed — both reports always render so the user can review vendor data and approval history side-by-side, with anchor links at the top ("Vendor Details", "Approval Flow") for quick scroll.
 
-- For each vendor, derive which stages are actually in its approval matrix from `vendor_approval_progress` rows (every level the router created).
-- For each of the 7 stages produce one of:
-  - `approved` / `rejected` / `returned` — when a progress row was acted on
-  - `pending` — row exists with `status='pending'` (or this is the current stage based on `vendors.status`)
-  - `skipped` — no row for this stage in the matrix → render as plain `—` (neutral, muted), NOT orange `not_required`
-- SAP_TEAM derived as today from `audit_logs` + `vendors.status` (`pending_sap_sync` → pending, `sap_synced` → approved, rejections → rejected, otherwise skipped).
-- Compute `current_stage` from the first `pending` stage; if vendor is `sap_synced`/`dms_synced` show `Completed`.
+**Single Vendor mode** (already mostly built — polish only):
+- Reorder/rename section cards to match the requested grouping exactly:
+  1. Organization Details (legal name, trade name, type, category, sub-category, incorporation date, website, CIN)
+  2. PAN Details (PAN, PAN holder name, PAN verification status from `vendor_validations`)
+  3. GST Details (GSTIN, GST registration type, place of supply, GST verification status)
+  4. MSME Details (is_msme_registered, msme_number, msme_category, MSME verification status)
+  5. Bank Details (bank name, branch, IFSC, account #, account type, beneficiary, penny-drop result)
+  6. Registered / Corporate Office Address
+  7. Communication Address
+  8. Contact Details (primary / finance / technical)
+  9. Classification Details (vendor_category, vendor_sub_category, business_type, any classification fields present on `vendors`)
+  10. Tax & Compliance
+  11. International Details (only when international)
+  12. Uploaded Documents — card with table of `vendor_documents` (type, file name, uploaded date, download link via signed URL from the existing `vendor-documents` bucket)
+- Each card uses a coloured header strip + icon (lucide) for a clean modern look (Building2, FileText, Landmark, MapPin, Users, FolderOpen, ShieldCheck etc.)
+- Empty sections are hidden so domestic vendors don't see empty international card.
 
-Status badge mapping in `Reports.tsx`:
-- `approved` → green/secondary
-- `rejected` / `returned` → red/destructive
-- `pending` → blue/outline ("Pending")
-- `skipped` → no badge, just `—` muted text, approver/date also `—`
+**Approval Flow section** (rendered after vendor details in single-vendor mode, and as the main table in all-vendors mode):
+- Single vendor: a vertical timeline-style card listing all 7 stages (Buyer → SAP Team) with Approver Name, Status badge, Approval Date & Time, Remarks. Approved stages show the green check + the recorded `acted_at`. Pending stage is highlighted as "Current Stage". Skipped stages render as muted `—` row.
+- All vendors: keep the existing wide matrix table but tidy spacing, sticky first two columns, and add a "Current Stage" column before "Final".
 
-Apply the same labels in Excel + PDF exports (replace literal `not_required` with `Skipped` and use `—` for approver/date/remarks when skipped).
+**All Vendors — Vendor Report table:**
+- Keep current summary table but add a "View Details" action per row that switches into single-vendor mode for that reference number (reuses the same detail layout).
 
-### 2. Single-vendor report — full vendor-filled details
+### 2. Fix the date picker in All Vendors mode
 
-Currently the Single Vendor card shows only 8 summary fields. Expand `SingleVendorView` to render every section the vendor filled, grouped into collapsible cards (read-only):
+The Popover currently sits inside a Card that has `overflow-x-auto` further down and the page wrapper restricts width; the Calendar's `selected` handler also receives `Date | undefined` while `setFromDate` works, but on certain viewports the Popover closes before the day click registers because the trigger Button is inside a `<form>`-like flow without `type="button"`.
 
-1. Basic Information — legal name, trade name, vendor type, category, PAN, GSTIN, CIN, MSME, incorporation date, website
-2. Registered & Communication Address — line1/2, city, state, country, pincode (both addresses)
-3. Contact Persons — primary, finance, technical (name / designation / email / phone)
-4. Banking Details — bank name, branch, IFSC, account no, account type, beneficiary
-5. Tax & Compliance — GST regn type, TDS section, lower deduction cert, tax residency, place of supply
-6. International fields (only when `vendor_type='international'`) — IBAN, SWIFT, intermediary bank, correspondent bank, tax jurisdiction
-7. KYC / Documents — list `vendor_documents` (doc_type, file name, uploaded_at, verification status) with download link
-8. Validation results — pulled from `vendor_validations` (PAN, GST, bank penny-drop, MSME, name-match) with status + verified_at
-9. Approval Flow — existing per-stage table (now with corrected pending/skipped logic)
-10. Invitation & Submission — invited_by, invited_at, invitation_email, on_behalf, submitted_at, last_rejection_comments
+Fixes applied to both From/To pickers:
+- Add `type="button"` to the trigger `<Button>` so a stray Enter / click doesn't submit and dismiss.
+- Add `modal={true}` to `<Popover>` so the calendar is portaled above and click-outside is handled correctly.
+- Ensure `<PopoverContent>` has `z-50 bg-popover` (defaults already set) and add `sideOffset={8}`.
+- Wrap `onSelect` to coerce: `onSelect={(d) => setFromDate(d ?? undefined)}` and add `disabled={(date) => toDate ? date > toDate : false}` for From, mirrored for To, so the range stays valid.
+- Verify by opening the preview, picking a From date, then a To date, and confirm both display in the trigger and Run Report uses them.
 
-Each field renders only when it has a value (skip empty rows) so domestic vendors don't show empty international blocks. Use the existing `Field`/`Info` pattern with a grid; add an `<h3>` section header per card.
+### 3. Data loader tweak (`src/lib/reports/loadVendorReport.ts`)
 
-Data load: extend `loadVendorReports` in single-vendor mode (when `referenceNumber` is set OR only one vendor returned) to also fetch:
-- full `vendors` row (`select *` for the single vendor instead of the trimmed column list)
-- `vendor_documents` where `vendor_id = …`
-- `vendor_validations` where `vendor_id = …`
+- For single-vendor mode also surface a `signed_url` per document by calling `supabase.storage.from('vendor-documents').createSignedUrl(file_path, 3600)` in parallel, so the Documents card can render a working "Download" link. No schema change.
+- No change to approval-flow logic.
 
-Return them on `VendorReportRow` as optional `details`, `documents`, `validations` (only populated for single-vendor mode to keep the all-vendors query light).
+### 4. Exports
 
-### 3. Exports — full details for single-vendor
-
-- **Excel** (`exportExcel.ts`): when one row + `details` present, add extra sheets: `Vendor Details` (key/value), `Documents`, `Validations`. Approval Flow sheet uses new status labels.
-- **PDF** (`exportPdf.ts`): for single-vendor add sections for Basic Info, Address, Bank, Tax, Documents, Validations before the Approval Flow table; use `autoTable` per section.
-
-### 4. Approval Progress card on Vendor Status page
-
-`ApprovalTimeline` already only renders progress rows that exist, so skipped stages naturally don't appear — no change needed there. Add a small legend at the top of the timeline ("Skipped stages are not shown — only stages in this vendor's approval matrix are listed.") so users understand why a level is missing.
+No structural change — existing Excel/PDF exporters already emit Vendor Details, Documents, Validations and an Approval Flow sheet. Only label tweaks if any new field is added.
 
 ### Files
 
-Edit:
-- `src/lib/reports/loadVendorReport.ts` — new status derivation, fetch full single-vendor details/documents/validations, add `skipped` status
-- `src/pages/Reports.tsx` — new badge/label rules, expanded `SingleVendorView` with grouped detail cards
-- `src/lib/reports/exportExcel.ts` — extra sheets for single-vendor + new labels
-- `src/lib/reports/exportPdf.ts` — extra sections for single-vendor + new labels
-- `src/components/vendor/ApprovalTimeline.tsx` — legend line about skipped stages
+Edit only:
+- `src/pages/Reports.tsx` — remove Tabs, render Vendor Details cards + Approval Flow timeline together, fix date pickers, add View-Details action on all-vendors table.
+- `src/lib/reports/loadVendorReport.ts` — generate signed URLs for documents in single-vendor mode.
 
-No DB schema, RLS, or approval-matrix logic changes. No edits to vendor registration, approval pages, or SAP sync.
+Out of scope: DB schema, RLS, approval-matrix logic, registration pages, SAP sync.
