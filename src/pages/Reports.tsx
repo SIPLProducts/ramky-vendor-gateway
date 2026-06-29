@@ -205,48 +205,38 @@ export default function Reports() {
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label className="text-xs">Date Range</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Popover modal>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={cn('w-full justify-start text-left font-normal', !fromDate && 'text-muted-foreground')}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {fromDate && toDate
-                            ? `${format(fromDate, 'PP')} – ${format(toDate, 'PP')}`
-                            : fromDate
-                              ? `${format(fromDate, 'PP')} – …`
-                              : 'Pick date range'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start" sideOffset={8}>
-                        <Calendar
-                          mode="range"
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={2}
-                          initialFocus
-                          className={cn('p-3 pointer-events-auto')}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {dateRange && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDateRange(undefined)}
-                        title="Clear date range"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                  <Label className="text-xs">From</Label>
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={toInputValue(dateFrom)}
+                    max={toInputValue(dateTo)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) { setDateFrom(null); return; }
+                      const d = startOfDay(new Date(val));
+                      setDateFrom(d);
+                      if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">To</Label>
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={toInputValue(dateTo)}
+                    min={toInputValue(dateFrom)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) { setDateTo(null); return; }
+                      const d = endOfDay(new Date(val));
+                      setDateTo(d);
+                      if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+                    }}
+                  />
                 </div>
                 <div>
                   <Label className="text-xs">Vendor Status</Label>
@@ -258,7 +248,7 @@ export default function Reports() {
                       placeholder="All statuses"
                     />
                   </div>
-                </div>
+
               </div>
             )}
 
