@@ -2,9 +2,18 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { STAGE_ORDER, STAGE_LABEL, type VendorReportRow } from './loadVendorReport';
 
-function fmt(d: string | null): string {
+function fmt(d: string | null | undefined): string {
   if (!d) return '';
-  try { return new Date(d).toLocaleString(); } catch { return d; }
+  try { return new Date(d).toLocaleString(); } catch { return String(d); }
+}
+
+function statusLabel(s: string): string {
+  if (s === 'skipped') return 'Skipped';
+  if (s === 'pending') return 'Pending';
+  if (s === 'approved') return 'Approved';
+  if (s === 'rejected') return 'Rejected';
+  if (s === 'returned') return 'Returned';
+  return s;
 }
 
 export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 'approval') {
@@ -14,7 +23,93 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
   doc.setFontSize(9);
   doc.text(`Generated: ${new Date().toLocaleString()}  •  ${rows.length} vendor(s)`, 40, 56);
 
-  if (reportType === 'vendor') {
+  const isSingle = rows.length === 1 && !!rows[0].details;
+
+  if (isSingle) {
+    const r = rows[0];
+    const d = r.details ?? {};
+
+    autoTable(doc, {
+      startY: 70,
+      head: [['Field', 'Value']],
+      body: [
+        ['Reference #', r.reference_number],
+        ['Vendor Name', r.vendor_name],
+        ['Vendor Type', r.vendor_type],
+        ['Invited Email', r.invited_email],
+        ['Invited At', fmt(r.invited_at)],
+        ['Submitted At', fmt(r.submitted_at)],
+        ['On Behalf', r.on_behalf ? 'Yes' : 'No'],
+        ['Current Stage', r.current_stage],
+        ['Final Status', r.final_status],
+      ],
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+
+    const detailEntries = Object.entries(d)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)]);
+    if (detailEntries.length) {
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.text('Vendor Details', 40, 40);
+      autoTable(doc, {
+        startY: 56,
+        head: [['Field', 'Value']],
+        body: detailEntries,
+        styles: { fontSize: 7, cellPadding: 3 },
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+    }
+
+    if (r.documents && r.documents.length) {
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.text('Documents', 40, 40);
+      autoTable(doc, {
+        startY: 56,
+        head: [['Type', 'File Name', 'Uploaded At']],
+        body: r.documents.map((dd) => [dd.document_type, dd.file_name, fmt(dd.uploaded_at)]),
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+    }
+
+    if (r.validations && r.validations.length) {
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.text('Validations', 40, 40);
+      autoTable(doc, {
+        startY: 56,
+        head: [['Validation', 'Status', 'Verified At']],
+        body: r.validations.map((vv) => [vv.validation_type, vv.status, fmt(vv.verified_at)]),
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+    }
+
+    doc.addPage();
+    doc.setFontSize(12);
+    doc.text('Approval Flow', 40, 40);
+    autoTable(doc, {
+      startY: 56,
+      head: [['Stage', 'Approver', 'Status', 'Acted At', 'Remarks']],
+      body: STAGE_ORDER.map((s) => {
+        const i = r.stages[s];
+        const skipped = i.status === 'skipped';
+        return [
+          STAGE_LABEL[s],
+          skipped ? '—' : i.approver_name,
+          statusLabel(i.status),
+          skipped ? '—' : fmt(i.acted_at),
+          skipped ? '—' : (i.remarks || '—'),
+        ];
+      }),
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+  } else if (reportType === 'vendor') {
     autoTable(doc, {
       startY: 70,
       head: [['Ref #', 'Vendor', 'Type', 'Invited', 'Submitted', 'Current', 'Status']],
@@ -27,17 +122,22 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
     });
   } else {
     rows.forEach((r, idx) => {
-      const startY = idx === 0 ? 70 : (doc as any).lastAutoTable.finalY + 24;
-      if (startY > 500) doc.addPage();
+      if (idx > 0) doc.addPage();
       doc.setFontSize(10);
-      doc.text(`${r.reference_number}  •  ${r.vendor_name}  •  ${r.final_status}`,
-        40, idx === 0 ? 70 : (doc as any).lastAutoTable.finalY + 18);
+      doc.text(`${r.reference_number}  •  ${r.vendor_name}  •  ${r.final_status}`, 40, 40);
       autoTable(doc, {
-        startY: idx === 0 ? 80 : (doc as any).lastAutoTable.finalY + 24,
+        startY: 56,
         head: [['Stage', 'Approver', 'Status', 'Acted At', 'Remarks']],
         body: STAGE_ORDER.map((s) => {
           const i = r.stages[s];
-          return [STAGE_LABEL[s], i.approver_name, i.status, fmt(i.acted_at), i.remarks];
+          const skipped = i.status === 'skipped';
+          return [
+            STAGE_LABEL[s],
+            skipped ? '—' : i.approver_name,
+            statusLabel(i.status),
+            skipped ? '—' : fmt(i.acted_at),
+            skipped ? '—' : i.remarks,
+          ];
         }),
         styles: { fontSize: 8, cellPadding: 4 },
         headStyles: { fillColor: [37, 99, 235] },
