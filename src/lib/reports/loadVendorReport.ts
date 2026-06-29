@@ -263,4 +263,21 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
 
     return row;
   });
+
+  // Generate signed URLs for documents (single-vendor mode only)
+  if (isSingle) {
+    for (const r of result) {
+      if (!r.documents) continue;
+      await Promise.all(r.documents.map(async (doc) => {
+        if (!doc.file_path) return;
+        const { data } = await supabase.storage
+          .from('vendor-documents')
+          .createSignedUrl(doc.file_path, 3600);
+        doc.signed_url = data?.signedUrl ?? null;
+      }));
+    }
+  }
+
+  return result;
 }
+
