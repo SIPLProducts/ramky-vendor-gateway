@@ -77,7 +77,7 @@ export default function SAPSync() {
 
   const { data: sapVendors, isLoading, refetch } = useVendors(['pending_sap_sync', 'purchase_approved']);
   const { data: dmsVendors, isLoading: dmsLoading, refetch: refetchDms } = useVendors(['dms_sync_pending', 'dms_synced']);
-  const { data: rejectedVendors, isLoading: rejectedLoading, refetch: refetchRejected } = useVendors(['sap_team_rejected' as any]);
+  const { data: rejectedVendors, isLoading: rejectedLoading, refetch: refetchRejected } = useVendors(['sap_team_closed' as any, 'sap_team_rejected' as any]);
   const { data: buyerCompanies } = useBuyerCompanies();
   const sapSync = useSAPSync();
   const bulkSync = useMultipleSAPSync();
@@ -115,16 +115,16 @@ export default function SAPSync() {
       const label = getSapName1(rejectVendor) || rejectVendor.legal_name || rejectVendor.id;
       const emailSent = !!(data as any)?.email_sent;
       if (emailSent) {
-        toast.success('Vendor rejected — buyer notified by email', { description: label });
+        toast.success('Vendor closed — buyer notified by email', { description: label });
       } else {
         const err = (data as any)?.email_error;
-        toast.warning('Vendor rejected (buyer email failed)', { description: `${label}${err ? ` — ${err}` : ''}` });
+        toast.warning('Vendor closed (buyer email failed)', { description: `${label}${err ? ` — ${err}` : ''}` });
       }
       setRejectVendor(null);
       setRejectRemarks('');
       refreshAllLists();
     } catch (e: any) {
-      toast.error('Reject failed', { description: e?.message || 'Could not reject vendor' });
+      toast.error('Close failed', { description: e?.message || 'Could not close vendor' });
     } finally {
       setRejectingVendorId(null);
     }
@@ -237,7 +237,7 @@ export default function SAPSync() {
       resp.message || '',
       ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
     ];
-    const re = /pan\s*number\s*duplicat|duplicate\s*pan/i;
+    const re = /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i;
     for (const t of texts) {
       if (t && re.test(t)) return { matched: true, message: String(t).trim() };
     }
@@ -247,14 +247,14 @@ export default function SAPSync() {
   const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
-        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
+        body: { vendorId, remarks: remarks || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
-      toast.success('Moved to Duplicate Rejected Data');
+      toast.success('Moved to Duplicate & Closed');
       refreshAllLists();
     } catch (e) {
-      console.warn('[SAPSync] auto duplicate-reject failed', e);
+      console.warn('[SAPSync] auto duplicate-close failed', e);
     }
   };
 
@@ -330,14 +330,14 @@ export default function SAPSync() {
       for (const d of dupIds) {
         try {
           await supabase.functions.invoke('sap-team-reject-vendor', {
-            body: { vendorId: d.id, remarks: d.msg || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
+            body: { vendorId: d.id, remarks: d.msg || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
           });
         } catch (e) {
-          console.warn('[SAPSync] bulk auto duplicate-reject failed', d.id, e);
+          console.warn('[SAPSync] bulk auto duplicate-close failed', d.id, e);
         }
       }
       if (dupIds.length > 0) {
-        toast.success(`Moved ${dupIds.length} vendor(s) to Duplicate Rejected Data`);
+        toast.success(`Moved ${dupIds.length} vendor(s) to Duplicate & Closed`);
         refreshAllLists();
       }
     } catch (error: any) {
@@ -435,7 +435,7 @@ export default function SAPSync() {
         <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="sap" className="gap-2"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
           <TabsTrigger value="dms" className="gap-2"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
-          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Duplicate Rejected Data{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Duplicate &amp; Closed{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
         </TabsList>
 
         {/* SAP Sync tab */}
@@ -531,12 +531,12 @@ export default function SAPSync() {
                           className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                           onClick={() => { setRejectVendor(vendor); setRejectRemarks(''); }}
                           disabled={rejectingVendorId === vendor.id || multiMode}
-                          title={multiMode ? 'Uncheck other vendors to reject individually' : 'Mark as duplicate (already in SAP)'}
+                          title={multiMode ? 'Uncheck other vendors to close individually' : 'Mark as duplicate (already in SAP) and close'}
                         >
                           {rejectingVendorId === vendor.id ? (
-                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Closing...</>
                           ) : (
-                            <><XCircle className="h-4 w-4 mr-2" />Duplicate Reject</>
+                            <><XCircle className="h-4 w-4 mr-2" />Duplicate &amp; Close</>
                           )}
                         </Button>
                         <Button
@@ -674,8 +674,8 @@ export default function SAPSync() {
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <Ban className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold">No duplicate-rejected vendors</h3>
-                <p className="text-muted-foreground mt-2">Vendors marked as duplicate (already in SAP) will appear here.</p>
+                <h3 className="text-xl font-semibold">No duplicate &amp; closed vendors</h3>
+                <p className="text-muted-foreground mt-2">Vendors closed as duplicates (already in SAP) will appear here.</p>
               </CardContent></Card>
             ) : (
               filteredRejected.map((vendor) => {
@@ -693,17 +693,17 @@ export default function SAPSync() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1 flex-wrap">
                               <h3 className="font-bold text-lg">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</h3>
-                              <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate Rejected</Badge>
+                              <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate &amp; Closed</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                               <span className="font-mono bg-muted px-2 py-0.5 rounded">Ref No: {refNo}</span>
                               <span>GSTIN: {vendor.gstin || 'N/A'}</span>
-                              {rejectedAt && <span>Rejected: {new Date(rejectedAt).toLocaleString()}</span>}
+                              {rejectedAt && <span>Closed: {new Date(rejectedAt).toLocaleString()}</span>}
                             </div>
                             {remarks && (
                               <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
-                                <p className="text-xs font-semibold text-red-700 mb-1">Duplicate Reject Remarks</p>
+                                <p className="text-xs font-semibold text-red-700 mb-1">Duplicate &amp; Close Remarks</p>
                                 <p className="text-sm text-red-900 whitespace-pre-wrap">{remarks}</p>
                               </div>
                             )}
@@ -730,10 +730,10 @@ export default function SAPSync() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Duplicate Reject Vendor
+              Duplicate &amp; Close Vendor
             </DialogTitle>
             <DialogDescription>
-              The vendor will be marked as a <span className="font-semibold">duplicate (already available in SAP)</span> and moved to the Duplicate Rejected Data tab.
+              The vendor will be marked as a <span className="font-semibold">duplicate (already available in SAP)</span> and moved to the Duplicate &amp; Closed tab.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -745,7 +745,7 @@ export default function SAPSync() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="reject-remarks">
-                Duplicate Reject Remarks <span className="text-red-600">*</span>
+                Duplicate &amp; Close Remarks <span className="text-red-600">*</span>
               </Label>
               <Textarea
                 id="reject-remarks"
@@ -755,7 +755,7 @@ export default function SAPSync() {
                 rows={4}
                 className="rounded-xl"
               />
-              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Duplicate Rejected Data tab.</p>
+              <p className="text-xs text-muted-foreground">Required. Shown to reviewers in the Duplicate &amp; Closed tab.</p>
             </div>
           </div>
           <DialogFooter>
@@ -768,9 +768,9 @@ export default function SAPSync() {
               disabled={!rejectRemarks.trim() || !!rejectingVendorId}
             >
               {rejectingVendorId ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Marking duplicate...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Closing...</>
               ) : (
-                <><XCircle className="h-4 w-4 mr-2" />Confirm Duplicate Reject</>
+                <><XCircle className="h-4 w-4 mr-2" />Confirm Duplicate &amp; Close</>
               )}
             </Button>
           </DialogFooter>
