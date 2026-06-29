@@ -131,7 +131,7 @@ serve(async (req) => {
         from,
         to: [recipient],
         cc: withCc && ccArr.length ? ccArr : undefined,
-        subject: "Sharvi Vendor Portal — SMTP Test Email",
+        subject: "Ramky Vendor Portal — SMTP Test Email",
         text:
           "This is a test email confirming your SMTP configuration is working.",
         html:
