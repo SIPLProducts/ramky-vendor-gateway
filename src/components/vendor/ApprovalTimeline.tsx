@@ -77,7 +77,11 @@ export function ApprovalTimeline({ vendorId }: Props) {
     <Card>
       <CardHeader><CardTitle className="text-sm">Approval Progress</CardTitle></CardHeader>
       <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">
+          Only stages configured in this vendor's approval matrix are shown. Skipped stages are not listed.
+        </p>
         <ol className="space-y-3">
+
           {rows.map((r) => {
             const isActive = r.level_number === activeLevel && r.status === 'pending';
             const Icon = r.status === 'approved' ? CheckCircle2
