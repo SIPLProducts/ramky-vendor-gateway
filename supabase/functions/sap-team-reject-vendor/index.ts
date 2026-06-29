@@ -180,7 +180,7 @@ serve(async (req) => {
       await supabase.from("audit_logs").insert({
         vendor_id: vendorId,
         user_id: auth.userId,
-        action: emailSent ? "buyer_notified_duplicate_rejection_email" : "buyer_duplicate_rejection_email_failed",
+        action: emailSent ? "buyer_notified_duplicate_close_email" : "buyer_duplicate_close_email_failed",
         details: { buyer_email: buyerEmailUsed, stage: "SAP_TEAM", email_error: emailError, auto_triggered: autoTriggered },
       });
     } catch (_) { /* ignore */ }
