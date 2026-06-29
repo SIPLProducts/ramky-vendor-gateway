@@ -237,7 +237,7 @@ export default function SAPSync() {
       resp.message || '',
       ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
     ];
-    const re = /pan\s*number\s*duplicat|duplicate\s*pan/i;
+    const re = /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i;
     for (const t of texts) {
       if (t && re.test(t)) return { matched: true, message: String(t).trim() };
     }
