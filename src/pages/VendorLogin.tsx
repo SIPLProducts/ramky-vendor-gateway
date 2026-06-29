@@ -124,10 +124,10 @@ export default function VendorLogin() {
               <p className="text-xs text-center text-muted-foreground">
                 Having trouble? Contact{' '}
                 <a
-                  href="mailto:support@sharviinfotech.com"
+                  href="mailto:vendxsupport@ramky.com"
                   className="text-primary hover:underline"
                 >
-                  support@sharviinfotech.com
+                  vendxsupport@ramky.com
                 </a>
               </p>
             </div>

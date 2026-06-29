@@ -304,8 +304,8 @@ export default function SupportHelp() {
                 </div>
                 <div>
                   <p className="font-medium">Email Support</p>
-                  <a href="mailto:support@sharviinfotech.com" className="text-sm text-primary hover:underline">
-                    support@sharviinfotech.com
+                  <a href="mailto:vendxsupport@ramky.com" className="text-sm text-primary hover:underline">
+                    vendxsupport@ramky.com
                   </a>
                 </div>
               </div>

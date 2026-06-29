@@ -142,10 +142,10 @@ export default function VendorInviteAccept() {
                 <p className="text-sm text-muted-foreground">
                   Please contact{' '}
                   <a
-                    href="mailto:support@sharviinfotech.com"
+                    href="mailto:vendxsupport@ramky.com"
                     className="text-primary hover:underline"
                   >
-                    support@sharviinfotech.com
+                    vendxsupport@ramky.com
                   </a>{' '}
                   for help.
                 </p>

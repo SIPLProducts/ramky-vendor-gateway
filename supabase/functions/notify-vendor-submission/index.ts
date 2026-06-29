@@ -12,7 +12,7 @@ interface Body {
   resubmission?: boolean;
 }
 
-const supportEmail = "support@sharviinfotech.com";
+const supportEmail = "vendxsupport@ramky.com";
 const companyName = "Ramky Vendor Portal";
 
 function buildHtml(opts: {

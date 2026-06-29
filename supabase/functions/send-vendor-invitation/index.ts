@@ -64,7 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Resolve tenant company name dynamically
     let companyName = "Sharvi Vendor Portal";
-    let supportEmail = "support@sharviinfotech.com";
+    let supportEmail = "vendxsupport@ramky.com";
     try {
       const sbUrl = Deno.env.get("SUPABASE_URL");
       const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
