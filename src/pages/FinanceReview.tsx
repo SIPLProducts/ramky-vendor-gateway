@@ -61,6 +61,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
