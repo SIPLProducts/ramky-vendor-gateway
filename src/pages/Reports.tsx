@@ -413,137 +413,285 @@ function AllVendorsApprovalMatrix({ rows }: { rows: VendorReportRow[] }) {
 type SectionDef = {
   title: string;
   icon: any;
-  fields: Array<[string, string]>;
+  // Known labels (preferred order/wording). Any matching key not listed is auto-appended.
+  knownLabels?: Record<string, string>;
+  match: (key: string) => boolean;
   show?: (d: any) => boolean;
 };
+
+// Internal / noise columns we should never display.
+const HIDDEN_KEYS = new Set<string>([
+  'id', 'user_id', 'tenant_id', 'created_at', 'updated_at', 'submitted_at',
+  'invited_at', 'reference_number', 'legal_name', 'trade_name',
+  'vendor_type', 'status', 'primary_email',
+  'metadata', 'token', 'session_id',
+]);
 
 const SECTIONS: SectionDef[] = [
   {
     title: 'Organization Details',
     icon: Building2,
-    fields: [
-      ['Legal Name', 'legal_name'],
-      ['Trade Name', 'trade_name'],
-      ['Vendor Type', 'vendor_type'],
-      ['CIN', 'cin'],
-      ['Incorporation Date', 'incorporation_date'],
-      ['Website', 'website'],
-      ['Business Type', 'business_type'],
-    ],
+    knownLabels: {
+      legal_name: 'Legal Name',
+      trade_name: 'Trade Name',
+      vendor_type: 'Vendor Type',
+      cin: 'CIN',
+      llpin: 'LLPIN',
+      incorporation_date: 'Incorporation Date',
+      date_of_incorporation: 'Date of Incorporation',
+      website: 'Website',
+      business_type: 'Business Type',
+      constitution_of_business: 'Constitution of Business',
+      industry_sector: 'Industry Sector',
+      establishment_year: 'Establishment Year',
+      number_of_employees: 'Number of Employees',
+      annual_turnover: 'Annual Turnover',
+    },
+    match: (k) =>
+      ['cin', 'llpin', 'incorporation_date', 'date_of_incorporation', 'website',
+       'business_type', 'constitution_of_business', 'establishment_year',
+       'number_of_employees', 'annual_turnover', 'industry_sector',
+       'company_type', 'organization_type'].includes(k),
   },
   {
     title: 'PAN Details',
     icon: FileText,
-    fields: [
-      ['PAN', 'pan'],
-      ['PAN Holder Name', 'pan_holder_name'],
-    ],
+    knownLabels: {
+      pan: 'PAN',
+      pan_number: 'PAN Number',
+      pan_holder_name: 'PAN Holder Name',
+      pan_status: 'PAN Status',
+      pan_verified: 'PAN Verified',
+      pan_verified_at: 'PAN Verified At',
+    },
+    match: (k) => k === 'pan' || k.startsWith('pan_'),
   },
   {
     title: 'GST Details',
     icon: FileText,
-    fields: [
-      ['GSTIN', 'gstin'],
-      ['GST Registration Type', 'gst_registration_type'],
-      ['Place of Supply', 'place_of_supply'],
-    ],
+    knownLabels: {
+      gstin: 'GSTIN',
+      gst_number: 'GST Number',
+      gst_status: 'GST Status',
+      gst_registration_type: 'GST Registration Type',
+      gst_registered: 'GST Registered',
+      legal_name_as_per_gst: 'Legal Name (as per GST)',
+      trade_name_as_per_gst: 'Trade Name (as per GST)',
+      place_of_supply: 'Place of Supply',
+      gst_filing_status: 'GST Filing Status',
+      gst_verified: 'GST Verified',
+      gst_verified_at: 'GST Verified At',
+    },
+    match: (k) => k === 'gstin' || k.includes('gst'),
   },
   {
     title: 'MSME Details',
     icon: ShieldCheck,
-    fields: [
-      ['MSME Registered', 'is_msme_registered'],
-      ['MSME Number', 'msme_number'],
-      ['MSME Category', 'msme_category'],
-      ['MSME Type', 'msme_type'],
-    ],
+    knownLabels: {
+      is_msme_registered: 'MSME Registered',
+      msme_number: 'MSME / Udyam Number',
+      udyam_number: 'Udyam Number',
+      msme_category: 'MSME Category',
+      msme_type: 'Enterprise Type',
+      msme_enterprise_type: 'Enterprise Type',
+      msme_registration_date: 'MSME Registration Date',
+      msme_verified: 'MSME Verified',
+      msme_verified_at: 'MSME Verified At',
+    },
+    match: (k) => k.includes('msme') || k.includes('udyam'),
   },
   {
     title: 'Bank Details',
     icon: Landmark,
-    fields: [
-      ['Bank Name', 'bank_name'],
-      ['Branch', 'bank_branch'],
-      ['IFSC', 'ifsc_code'],
-      ['Account Number', 'account_number'],
-      ['Account Type', 'account_type'],
-      ['Beneficiary Name', 'beneficiary_name'],
-    ],
+    knownLabels: {
+      bank_name: 'Bank Name',
+      bank_branch: 'Branch',
+      branch_name: 'Branch Name',
+      branch_address: 'Branch Address',
+      ifsc_code: 'IFSC Code',
+      account_number: 'Account Number',
+      account_type: 'Account Type',
+      account_holder_name: 'Account Holder Name',
+      beneficiary_name: 'Beneficiary Name',
+      micr_code: 'MICR Code',
+      swift_code: 'SWIFT Code',
+      iban: 'IBAN',
+      upi_id: 'UPI ID',
+      penny_drop_status: 'Penny Drop Status',
+      penny_drop_verified_at: 'Penny Drop Verified At',
+    },
+    match: (k) =>
+      k.startsWith('bank_') || k.startsWith('account_') || k.startsWith('branch_') ||
+      k.startsWith('ifsc') || k.startsWith('micr') || k.startsWith('upi') ||
+      k.startsWith('penny') || k === 'beneficiary_name',
   },
   {
-    title: 'Registered / Corporate Office Address',
+    title: 'Registered Office Address',
     icon: MapPin,
-    fields: [
-      ['Address Line 1', 'registered_address_line1'],
-      ['Address Line 2', 'registered_address_line2'],
-      ['City', 'registered_city'],
-      ['State', 'registered_state'],
-      ['Country', 'registered_country'],
-      ['Pincode', 'registered_pincode'],
-    ],
+    knownLabels: {
+      registered_address_line1: 'Address Line 1',
+      registered_address_line2: 'Address Line 2',
+      registered_city: 'City',
+      registered_state: 'State',
+      registered_country: 'Country',
+      registered_pincode: 'Pincode',
+    },
+    match: (k) => k.startsWith('registered_'),
+  },
+  {
+    title: 'Corporate Office Address',
+    icon: MapPin,
+    knownLabels: {
+      corporate_address_line1: 'Address Line 1',
+      corporate_address_line2: 'Address Line 2',
+      corporate_city: 'City',
+      corporate_state: 'State',
+      corporate_country: 'Country',
+      corporate_pincode: 'Pincode',
+    },
+    match: (k) => k.startsWith('corporate_'),
   },
   {
     title: 'Communication Address',
     icon: MapPin,
-    fields: [
-      ['Address Line 1', 'communication_address_line1'],
-      ['Address Line 2', 'communication_address_line2'],
-      ['City', 'communication_city'],
-      ['State', 'communication_state'],
-      ['Country', 'communication_country'],
-      ['Pincode', 'communication_pincode'],
-    ],
+    knownLabels: {
+      communication_address_line1: 'Address Line 1',
+      communication_address_line2: 'Address Line 2',
+      communication_city: 'City',
+      communication_state: 'State',
+      communication_country: 'Country',
+      communication_pincode: 'Pincode',
+    },
+    match: (k) => k.startsWith('communication_'),
   },
   {
     title: 'Contact Details',
     icon: Mail,
-    fields: [
-      ['Primary Contact Name', 'primary_contact_name'],
-      ['Primary Email', 'primary_email'],
-      ['Primary Phone', 'primary_phone'],
-      ['Finance Contact Name', 'finance_contact_name'],
-      ['Finance Email', 'finance_email'],
-      ['Finance Phone', 'finance_phone'],
-      ['Technical Contact Name', 'technical_contact_name'],
-      ['Technical Email', 'technical_email'],
-      ['Technical Phone', 'technical_phone'],
-    ],
+    knownLabels: {
+      primary_contact_name: 'Primary Contact Name',
+      primary_phone: 'Primary Phone',
+      primary_designation: 'Primary Designation',
+      finance_contact_name: 'Finance Contact Name',
+      finance_email: 'Finance Email',
+      finance_phone: 'Finance Phone',
+      technical_contact_name: 'Technical Contact Name',
+      technical_email: 'Technical Email',
+      technical_phone: 'Technical Phone',
+      alternate_email: 'Alternate Email',
+      alternate_phone: 'Alternate Phone',
+    },
+    match: (k) =>
+      k.startsWith('primary_') || k.startsWith('finance_contact') || k.startsWith('finance_email') ||
+      k.startsWith('finance_phone') || k.startsWith('technical_') ||
+      k.startsWith('alternate_') || k.startsWith('contact_') || k.includes('designation') ||
+      k.endsWith('_phone') || k.endsWith('_email'),
   },
   {
     title: 'Classification Details',
     icon: Tag,
-    fields: [
-      ['Vendor Category', 'vendor_category'],
-      ['Vendor Sub Category', 'vendor_sub_category'],
-      ['Industry Sector', 'industry_sector'],
-      ['Service Type', 'service_type'],
-    ],
+    knownLabels: {
+      vendor_category: 'Vendor Category',
+      vendor_sub_category: 'Vendor Sub Category',
+      service_type: 'Service Type',
+      payment_terms: 'Payment Terms',
+      currency: 'Currency',
+      preferred_currency: 'Preferred Currency',
+      buyer_company: 'Buyer Company',
+    },
+    match: (k) =>
+      k.startsWith('vendor_category') || k.startsWith('vendor_sub') || k.includes('classification') ||
+      k.includes('category') || k.includes('subcategory') ||
+      ['service_type', 'payment_terms', 'currency', 'preferred_currency', 'buyer_company'].includes(k),
   },
   {
     title: 'Tax & Compliance',
     icon: ShieldCheck,
-    fields: [
-      ['TDS Section', 'tds_section'],
-      ['Lower Deduction Certificate', 'lower_deduction_certificate'],
-      ['Tax Residency', 'tax_residency'],
-    ],
+    knownLabels: {
+      tds_section: 'TDS Section',
+      tds_rate: 'TDS Rate',
+      lower_deduction_certificate: 'Lower Deduction Certificate',
+      tax_residency: 'Tax Residency',
+      tan_number: 'TAN Number',
+    },
+    match: (k) =>
+      k.startsWith('tds_') || k.startsWith('tan_') || k.includes('compliance') ||
+      ['lower_deduction_certificate', 'tax_residency'].includes(k),
   },
   {
     title: 'International Details',
     icon: Globe2,
     show: (d) => (d.vendor_type ?? 'domestic') === 'international',
-    fields: [
-      ['IBAN', 'iban'],
-      ['SWIFT Code', 'swift_code'],
-      ['Intermediary Bank', 'intermediary_bank'],
-      ['Correspondent Bank', 'correspondent_bank'],
-      ['Tax Jurisdiction', 'tax_jurisdiction'],
-    ],
+    knownLabels: {
+      intermediary_bank: 'Intermediary Bank',
+      correspondent_bank: 'Correspondent Bank',
+      tax_jurisdiction: 'Tax Jurisdiction',
+      country_of_residence: 'Country of Residence',
+      lut_number: 'LUT Number',
+      dtaa_applicable: 'DTAA Applicable',
+    },
+    match: (k) =>
+      k.startsWith('intermediary_') || k.startsWith('correspondent_') ||
+      k.startsWith('tax_jurisdiction') || k.startsWith('country_of_') ||
+      k.startsWith('lut_') || k.startsWith('dtaa'),
   },
 ];
 
+function humanize(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildSectionData(d: Record<string, any>) {
+  const consumed = new Set<string>(HIDDEN_KEYS);
+  const result = SECTIONS.map((section) => {
+    if (section.show && !section.show(d)) return null;
+    const entries: Array<[string, string]> = [];
+    // Preserve known label order first.
+    if (section.knownLabels) {
+      for (const [key, label] of Object.entries(section.knownLabels)) {
+        if (consumed.has(key)) continue;
+        const v = d[key];
+        if (v === null || v === undefined || v === '') continue;
+        entries.push([label, fmtValue(v)]);
+        consumed.add(key);
+      }
+    }
+    // Auto-include anything else matching this section.
+    for (const [key, value] of Object.entries(d)) {
+      if (consumed.has(key)) continue;
+      if (!section.match(key)) continue;
+      if (value === null || value === undefined || value === '') continue;
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        entries.push([humanize(key), JSON.stringify(value)]);
+      } else {
+        entries.push([humanize(key), fmtValue(value)]);
+      }
+      consumed.add(key);
+    }
+    if (entries.length === 0) return null;
+    return { title: section.title, icon: section.icon, entries };
+  }).filter(Boolean) as Array<{ title: string; icon: any; entries: Array<[string, string]> }>;
+
+  // Fallback: any remaining captured field goes to "Other Details".
+  const other: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(d)) {
+    if (consumed.has(key)) continue;
+    if (value === null || value === undefined || value === '') continue;
+    if (key.endsWith('_id') || key.endsWith('_token')) continue;
+    if (typeof value === 'object') {
+      other.push([humanize(key), JSON.stringify(value)]);
+    } else {
+      other.push([humanize(key), fmtValue(value)]);
+    }
+  }
+  if (other.length > 0) {
+    result.push({ title: 'Other Details', icon: InfoIcon, entries: other });
+  }
+  return result;
+}
+
 function SingleVendorView({ row }: { row: VendorReportRow }) {
   const d = row.details ?? {};
+  const sections = buildSectionData(d);
 
   return (
     <div className="space-y-4">
@@ -569,12 +717,7 @@ function SingleVendorView({ row }: { row: VendorReportRow }) {
 
       {/* Section cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {SECTIONS.filter((s) => !s.show || s.show(d)).map((section) => {
-          const filled = section.fields.filter(([, k]) => {
-            const v = d[k];
-            return v !== null && v !== undefined && v !== '';
-          });
-          if (filled.length === 0) return null;
+        {sections.map((section) => {
           const Icon = section.icon;
           return (
             <Card key={section.title}>
@@ -585,14 +728,15 @@ function SingleVendorView({ row }: { row: VendorReportRow }) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm pt-4">
-                {filled.map(([label, key]) => (
-                  <Info key={key} label={label} value={fmtValue(d[key])} />
+                {section.entries.map(([label, value]) => (
+                  <Info key={label} label={label} value={value} />
                 ))}
               </CardContent>
             </Card>
           );
         })}
       </div>
+
 
       {/* Documents */}
       {row.documents && row.documents.length > 0 && (
