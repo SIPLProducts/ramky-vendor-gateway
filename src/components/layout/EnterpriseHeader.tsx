@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
