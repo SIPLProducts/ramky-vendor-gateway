@@ -170,7 +170,7 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
     valsByVendor.get(v.vendor_id)!.push(v);
   });
 
-  return vendors.map((v: any) => {
+  const result: VendorReportRow[] = vendors.map((v: any) => {
     const inv = invByVendor.get(v.id);
     const progressRows = progByVendor.get(v.id) ?? [];
 
