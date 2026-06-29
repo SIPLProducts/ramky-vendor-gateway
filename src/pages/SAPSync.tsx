@@ -247,14 +247,14 @@ export default function SAPSync() {
   const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
-        body: { vendorId, remarks: remarks || 'PAN Number Duplicated — vendor already exists in SAP', autoTriggered: true },
+        body: { vendorId, remarks: remarks || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
-      toast.success('Moved to Duplicate Rejected Data');
+      toast.success('Moved to Duplicate & Closed');
       refreshAllLists();
     } catch (e) {
-      console.warn('[SAPSync] auto duplicate-reject failed', e);
+      console.warn('[SAPSync] auto duplicate-close failed', e);
     }
   };
 
