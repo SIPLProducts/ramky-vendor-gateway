@@ -15,7 +15,7 @@ function statusLabel(s: string): string {
   return s;
 }
 
-export function exportVendorExcel(rows: VendorReportRow[], reportType: 'vendor' | 'approval') {
+export function exportVendorExcel(rows: VendorReportRow[], reportType: 'vendor' | 'approval' | 'both') {
   const wb = XLSX.utils.book_new();
 
   const vendorSheet = rows.map((r) => ({
