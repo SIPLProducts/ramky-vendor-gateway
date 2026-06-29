@@ -115,10 +115,10 @@ export default function SAPSync() {
       const label = getSapName1(rejectVendor) || rejectVendor.legal_name || rejectVendor.id;
       const emailSent = !!(data as any)?.email_sent;
       if (emailSent) {
-        toast.success('Vendor rejected — buyer notified by email', { description: label });
+        toast.success('Vendor closed — buyer notified by email', { description: label });
       } else {
         const err = (data as any)?.email_error;
-        toast.warning('Vendor rejected (buyer email failed)', { description: `${label}${err ? ` — ${err}` : ''}` });
+        toast.warning('Vendor closed (buyer email failed)', { description: `${label}${err ? ` — ${err}` : ''}` });
       }
       setRejectVendor(null);
       setRejectRemarks('');
