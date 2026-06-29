@@ -136,11 +136,11 @@ serve(async (req) => {
           }) + " IST";
 
           const headline = autoTriggered
-            ? "Vendor automatically rejected by SAP — Duplicate PAN"
-            : "Vendor rejected by SAP Team — Duplicate in SAP";
+            ? "Vendor Closed — Duplicate detected in SAP"
+            : "Vendor Closed — Duplicate in SAP";
           const intro = autoTriggered
-            ? "The vendor application below was <b>automatically rejected</b> during SAP Sync because SAP reported the PAN number is already registered for an existing vendor."
-            : "The vendor application below has been <b>rejected by the SAP Team</b> because the vendor already exists in SAP (duplicate).";
+            ? `The vendor application below was <b>automatically closed</b> during SAP Sync because SAP reported a duplicate (PAN or PAN+GST combination already registered for an existing vendor).`
+            : `The vendor application below has been <b>closed by the SAP Team</b> because a duplicate vendor already exists in SAP.`;
 
           const html = `
             <div style="font-family:Arial,sans-serif;color:#111;max-width:640px;margin:auto">
@@ -150,13 +150,13 @@ serve(async (req) => {
               <table style="border-collapse:collapse;width:100%;margin:12px 0;font-size:14px">
                 ${row("Vendor Name", vendorName)}
                 ${row("Vendor Reference Number", vendorRef)}
-                ${row("Rejected By", `${rejecterName}${rejecterEmail ? ` <${rejecterEmail}>` : ""}`)}
-                ${row("Rejection Stage", "SAP Team")}
+                ${row("Closed By", `${rejecterName}${rejecterEmail ? ` <${rejecterEmail}>` : ""}`)}
+                ${row("Stage", "SAP Team")}
                 ${row("Reason", "Duplicate — vendor already available in SAP")}
                 ${row("Remarks", remarks)}
-                ${row("Rejection Date & Time", rejectedAtIst)}
+                ${row("Closed Date & Time", rejectedAtIst)}
               </table>
-              <p>This vendor has been moved to the <b>Duplicate Rejected Data</b> tab in the SAP Sync screen. No further action is required for this submission.</p>
+              <p>Vendor <b>${esc(vendorRef)}</b> has been closed because a duplicate vendor already exists in SAP. This vendor now appears in the <b>Duplicate &amp; Closed</b> tab of the SAP Sync screen. No further action is required for this submission.</p>
               <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Sharvi Vendor Portal.</p>
             </div>`;
 
