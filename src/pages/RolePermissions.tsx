@@ -30,6 +30,7 @@ export const SCREENS: { key: string; label: string }[] = [
   { key: 'gst_compliance', label: 'GST Compliance' },
   { key: 'scheduled_checks', label: 'Scheduled Checks' },
   { key: 'audit_logs', label: 'Audit Logs' },
+  { key: 'reports', label: 'Reports' },
   { key: 'user_management', label: 'User Management' },
   { key: 'role_permissions', label: 'Role Permissions' },
   { key: 'admin_configuration', label: 'Admin Configuration' },

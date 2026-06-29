@@ -40,6 +40,7 @@ import SharviAdminConsole from "./pages/SharviAdminConsole";
 import FormBuilder from "./pages/FormBuilder";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
+import Reports from "./pages/Reports";
 
 import EmailConfiguration from "./pages/EmailConfiguration";
 import BuyerApproval from "./pages/approvals/BuyerApproval";
@@ -98,6 +99,7 @@ const App = () => (
                 <Route path="/compliance/scheduled" element={<ScheduledChecks />} />
                 <Route path="/sharvi-admin" element={<SharviAdminConsole />} />
                 <Route path="/admin/form-builder" element={<FormBuilder />} />
+                <Route path="/reports" element={<Reports />} />
                 
                 <Route path="/approvals/buyer" element={<BuyerApproval />} />
                 <Route path="/approvals/scm-manager" element={<ScmManagerApproval />} />
