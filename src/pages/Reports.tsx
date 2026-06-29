@@ -34,13 +34,26 @@ const STATUS_OPTIONS = [
 ].map((s) => ({ value: s, label: s.replace(/_/g, ' ') }));
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (s === 'approved' || s === 'sap_synced') return 'secondary';
-  if (s === 'rejected' || s.endsWith('_rejected')) return 'destructive';
+  if (s === 'approved' || s === 'sap_synced' || s === 'dms_synced') return 'secondary';
+  if (s === 'rejected' || s === 'returned' || s.endsWith('_rejected')) return 'destructive';
   if (s === 'pending') return 'outline';
   return 'default';
 }
 
-function fmt(d: string | null): string {
+function statusLabel(s: string): string {
+  if (s === 'pending') return 'Pending';
+  if (s === 'approved') return 'Approved';
+  if (s === 'rejected') return 'Rejected';
+  if (s === 'returned') return 'Returned';
+  return s.replace(/_/g, ' ');
+}
+
+function StageBadge({ status }: { status: string }) {
+  if (status === 'skipped') return <span className="text-muted-foreground text-xs">—</span>;
+  return <Badge variant={statusVariant(status)}>{statusLabel(status)}</Badge>;
+}
+
+function fmt(d: string | null | undefined): string {
   if (!d) return '—';
   try { return new Date(d).toLocaleString(); } catch { return d; }
 }
@@ -204,9 +217,7 @@ export default function Reports() {
         <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No results.</CardContent></Card>
       )}
 
-      {!loading && single && (
-        <SingleVendorView row={single} reportType={reportType} />
-      )}
+      {!loading && single && <SingleVendorView row={single} />}
 
       {!loading && mode === 'all' && rows.length > 0 && reportType === 'vendor' && (
         <Card>
@@ -259,10 +270,14 @@ export default function Reports() {
                     {STAGE_ORDER.map((s) => {
                       const i = r.stages[s];
                       return (
-                        <TableCell key={s} className="text-xs" title={i.remarks}>
-                          <Badge variant={statusVariant(i.status)} className="mb-1">{i.status}</Badge>
-                          <div className="text-[10px] text-muted-foreground">{i.approver_name}</div>
-                          <div className="text-[10px] text-muted-foreground">{i.acted_at ? fmt(i.acted_at) : ''}</div>
+                        <TableCell key={s} className="text-xs align-top" title={i.remarks}>
+                          <StageBadge status={i.status} />
+                          {i.status !== 'skipped' && (
+                            <>
+                              <div className="text-[10px] text-muted-foreground mt-1">{i.approver_name}</div>
+                              <div className="text-[10px] text-muted-foreground">{i.acted_at ? fmt(i.acted_at) : ''}</div>
+                            </>
+                          )}
                         </TableCell>
                       );
                     })}
@@ -278,14 +293,115 @@ export default function Reports() {
   );
 }
 
-function SingleVendorView({ row, reportType }: { row: VendorReportRow; reportType: 'vendor' | 'approval' }) {
+// -------- Single Vendor View --------
+
+const SECTIONS: Array<{ title: string; fields: Array<[string, string]>; international?: boolean }> = [
+  {
+    title: 'Basic Information',
+    fields: [
+      ['Legal Name', 'legal_name'],
+      ['Trade Name', 'trade_name'],
+      ['Vendor Type', 'vendor_type'],
+      ['Category', 'vendor_category'],
+      ['Sub Category', 'vendor_sub_category'],
+      ['PAN', 'pan'],
+      ['GSTIN', 'gstin'],
+      ['CIN', 'cin'],
+      ['MSME Registered', 'is_msme_registered'],
+      ['MSME Number', 'msme_number'],
+      ['Incorporation Date', 'incorporation_date'],
+      ['Website', 'website'],
+    ],
+  },
+  {
+    title: 'Registered Address',
+    fields: [
+      ['Address Line 1', 'registered_address_line1'],
+      ['Address Line 2', 'registered_address_line2'],
+      ['City', 'registered_city'],
+      ['State', 'registered_state'],
+      ['Country', 'registered_country'],
+      ['Pincode', 'registered_pincode'],
+    ],
+  },
+  {
+    title: 'Communication Address',
+    fields: [
+      ['Address Line 1', 'communication_address_line1'],
+      ['Address Line 2', 'communication_address_line2'],
+      ['City', 'communication_city'],
+      ['State', 'communication_state'],
+      ['Country', 'communication_country'],
+      ['Pincode', 'communication_pincode'],
+    ],
+  },
+  {
+    title: 'Contact Persons',
+    fields: [
+      ['Primary Contact Name', 'primary_contact_name'],
+      ['Primary Email', 'primary_email'],
+      ['Primary Phone', 'primary_phone'],
+      ['Finance Contact Name', 'finance_contact_name'],
+      ['Finance Email', 'finance_email'],
+      ['Finance Phone', 'finance_phone'],
+      ['Technical Contact Name', 'technical_contact_name'],
+      ['Technical Email', 'technical_email'],
+      ['Technical Phone', 'technical_phone'],
+    ],
+  },
+  {
+    title: 'Banking Details',
+    fields: [
+      ['Bank Name', 'bank_name'],
+      ['Branch', 'bank_branch'],
+      ['IFSC', 'ifsc_code'],
+      ['Account Number', 'account_number'],
+      ['Account Type', 'account_type'],
+      ['Beneficiary Name', 'beneficiary_name'],
+    ],
+  },
+  {
+    title: 'Tax & Compliance',
+    fields: [
+      ['GST Registration Type', 'gst_registration_type'],
+      ['TDS Section', 'tds_section'],
+      ['Lower Deduction Certificate', 'lower_deduction_certificate'],
+      ['Tax Residency', 'tax_residency'],
+      ['Place of Supply', 'place_of_supply'],
+    ],
+  },
+  {
+    title: 'International Details',
+    international: true,
+    fields: [
+      ['IBAN', 'iban'],
+      ['SWIFT Code', 'swift_code'],
+      ['Intermediary Bank', 'intermediary_bank'],
+      ['Correspondent Bank', 'correspondent_bank'],
+      ['Tax Jurisdiction', 'tax_jurisdiction'],
+    ],
+  },
+];
+
+function fmtValue(v: any): string {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  return String(v);
+}
+
+function SingleVendorView({ row }: { row: VendorReportRow }) {
+  const d = row.details ?? {};
+  const isIntl = (d.vendor_type ?? row.vendor_type) === 'international';
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">{row.vendor_name}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">{row.vendor_name}</CardTitle>
+        </CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Info label="Reference #" value={row.reference_number} />
-          <Info label="Type" value={row.vendor_type} />
+          <Info label="Vendor Type" value={row.vendor_type} />
           <Info label="Invited Email" value={row.invited_email} />
           <Info label="Invited At" value={fmt(row.invited_at)} />
           <Info label="Submitted At" value={fmt(row.submitted_at)} />
@@ -295,33 +411,112 @@ function SingleVendorView({ row, reportType }: { row: VendorReportRow; reportTyp
         </CardContent>
       </Card>
 
-      {reportType === 'approval' && (
+      {SECTIONS.filter((s) => !s.international || isIntl).map((section) => {
+        const filled = section.fields.filter(([, k]) => {
+          const v = d[k];
+          return v !== null && v !== undefined && v !== '';
+        });
+        if (filled.length === 0) return null;
+        return (
+          <Card key={section.title}>
+            <CardHeader><CardTitle className="text-base">{section.title}</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+              {filled.map(([label, key]) => (
+                <Info key={key} label={label} value={fmtValue(d[key])} />
+              ))}
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {row.documents && row.documents.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Approval Flow</CardTitle></CardHeader>
-          <CardContent>
+          <CardHeader><CardTitle className="text-base">Documents ({row.documents.length})</CardTitle></CardHeader>
+          <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Stage</TableHead>
-                <TableHead>Approver</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Acted At</TableHead>
-                <TableHead>Remarks</TableHead>
+                <TableHead>Document Type</TableHead>
+                <TableHead>File Name</TableHead>
+                <TableHead>Uploaded At</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {STAGE_ORDER.map((s) => {
-                  const i = row.stages[s];
-                  return (
-                    <TableRow key={s}>
-                      <TableCell className="font-medium">{STAGE_LABEL[s]}</TableCell>
-                      <TableCell>{i.approver_name}</TableCell>
-                      <TableCell><Badge variant={statusVariant(i.status)}>{i.status}</Badge></TableCell>
-                      <TableCell className="text-xs">{fmt(i.acted_at)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{i.remarks || '—'}</TableCell>
-                    </TableRow>
-                  );
-                })}
+                {row.documents.map((doc, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{doc.document_type}</TableCell>
+                    <TableCell className="text-xs">{doc.file_name}</TableCell>
+                    <TableCell className="text-xs">{fmt(doc.uploaded_at)}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {row.validations && row.validations.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Validation Results</CardTitle></CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Validation</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Verified At</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {row.validations.map((v, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="capitalize">{v.validation_type.replace(/_/g, ' ')}</TableCell>
+                    <TableCell><Badge variant={statusVariant(v.status)}>{v.status}</Badge></TableCell>
+                    <TableCell className="text-xs">{fmt(v.verified_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Approval Flow</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            Stages marked <span className="font-medium">—</span> were not part of this vendor's approval matrix and were skipped.
+          </p>
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>Stage</TableHead>
+              <TableHead>Approver</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Acted At</TableHead>
+              <TableHead>Remarks</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {STAGE_ORDER.map((s) => {
+                const i = row.stages[s];
+                const skipped = i.status === 'skipped';
+                return (
+                  <TableRow key={s} className={skipped ? 'opacity-50' : ''}>
+                    <TableCell className="font-medium">{STAGE_LABEL[s]}</TableCell>
+                    <TableCell>{skipped ? '—' : i.approver_name}</TableCell>
+                    <TableCell><StageBadge status={i.status} /></TableCell>
+                    <TableCell className="text-xs">{skipped ? '—' : fmt(i.acted_at)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{skipped ? '—' : (i.remarks || '—')}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {row.details?.last_rejection_comments && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Latest Comment</CardTitle></CardHeader>
+          <CardContent className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-3">
+            {row.details.last_rejection_comments}
           </CardContent>
         </Card>
       )}
@@ -333,7 +528,7 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="font-medium">{value || '—'}</div>
+      <div className="font-medium break-words">{value || '—'}</div>
     </div>
   );
 }
