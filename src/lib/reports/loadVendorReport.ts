@@ -44,7 +44,7 @@ export interface VendorReportRow {
     document_type: string;
     file_name: string;
     uploaded_at: string | null;
-    verification_status: string | null;
+    file_path: string | null;
   }>;
   validations?: Array<{
     validation_type: string;
@@ -113,13 +113,13 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
     isSingle
       ? supabase
           .from('vendor_documents')
-          .select('document_type, file_name, uploaded_at, verification_status')
+          .select('document_type, file_name, uploaded_at, file_path')
           .in('vendor_id', vendorIds)
       : Promise.resolve({ data: [] as any[] }),
     isSingle
       ? supabase
           .from('vendor_validations')
-          .select('vendor_id, validation_type, status, verified_at, details')
+          .select('vendor_id, validation_type, status, validated_at, details')
           .in('vendor_id', vendorIds)
       : Promise.resolve({ data: [] as any[] }),
   ]);
@@ -249,12 +249,12 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
         document_type: d.document_type,
         file_name: d.file_name,
         uploaded_at: d.uploaded_at,
-        verification_status: d.verification_status,
+        file_path: d.file_path,
       }));
       row.validations = (valsByVendor.get(v.id) ?? []).map((vv: any) => ({
         validation_type: vv.validation_type,
         status: vv.status,
-        verified_at: vv.verified_at,
+        verified_at: vv.validated_at,
         details: vv.details,
       }));
     }
