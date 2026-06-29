@@ -8,7 +8,7 @@ import { BrandingConfig } from '@/components/admin/BrandingConfig';
 import { WorkflowConfig } from '@/components/admin/WorkflowConfig';
 import { FieldConfigManager } from '@/components/admin/FieldConfigManager';
 import { useTenants } from '@/hooks/useTenant';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SharviAdminConsole() {
