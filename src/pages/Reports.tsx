@@ -90,8 +90,9 @@ export default function Reports() {
     setLoading(true);
     try {
       const data = await loadVendorReports({
-        from: !isSingle && fromDate ? fromDate.toISOString() : null,
-        to: !isSingle && toDate ? new Date(toDate.getTime() + 86_399_000).toISOString() : null,
+        from: !isSingle && dateFrom ? startOfDay(dateFrom).toISOString() : null,
+        to: !isSingle && dateTo ? endOfDay(dateTo).toISOString() : null,
+
         statuses: !isSingle ? statuses : undefined,
         referenceNumber: isSingle ? refValue : null,
       });
