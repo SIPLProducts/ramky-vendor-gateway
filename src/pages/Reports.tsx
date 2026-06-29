@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
-import type { DateRange } from 'react-day-picker';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import {
-  CalendarIcon, FileSpreadsheet, FileText, Search, RefreshCw,
+  FileSpreadsheet, FileText, Search, RefreshCw,
   Building2, Landmark, MapPin, Mail, ShieldCheck, FolderOpen,
   Tag, Globe2, ClipboardCheck, Eye, Download, ArrowLeft,
-  CheckCircle2, Circle, XCircle, Clock, MinusCircle, X,
+  CheckCircle2, Circle, XCircle, Clock, MinusCircle, Info as InfoIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,10 +20,10 @@ import { cn } from '@/lib/utils';
 import {
   loadVendorReports, STAGE_ORDER, STAGE_LABEL,
   type VendorReportRow,
-
 } from '@/lib/reports/loadVendorReport';
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
+
 
 type ReportType = 'vendor' | 'approval' | 'both';
 
