@@ -109,7 +109,7 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
       styles: { fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: [37, 99, 235] },
     });
-  } else if (reportType === 'vendor') {
+  } else if (reportType === 'vendor' || reportType === 'both') {
     autoTable(doc, {
       startY: 70,
       head: [['Ref #', 'Vendor', 'Type', 'Invited', 'Submitted', 'Current', 'Status']],
@@ -120,7 +120,32 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
       styles: { fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: [37, 99, 235] },
     });
+    if (reportType === 'both') {
+      rows.forEach((r) => {
+        doc.addPage();
+        doc.setFontSize(10);
+        doc.text(`${r.reference_number}  •  ${r.vendor_name}  •  ${r.final_status}`, 40, 40);
+        autoTable(doc, {
+          startY: 56,
+          head: [['Stage', 'Approver', 'Status', 'Acted At', 'Remarks']],
+          body: STAGE_ORDER.map((s) => {
+            const i = r.stages[s];
+            const skipped = i.status === 'skipped';
+            return [
+              STAGE_LABEL[s],
+              skipped ? '—' : i.approver_name,
+              statusLabel(i.status),
+              skipped ? '—' : fmt(i.acted_at),
+              skipped ? '—' : i.remarks,
+            ];
+          }),
+          styles: { fontSize: 8, cellPadding: 4 },
+          headStyles: { fillColor: [37, 99, 235] },
+        });
+      });
+    }
   } else {
+
     rows.forEach((r, idx) => {
       if (idx > 0) doc.addPage();
       doc.setFontSize(10);
