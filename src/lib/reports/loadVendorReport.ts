@@ -45,6 +45,7 @@ export interface VendorReportRow {
     file_name: string;
     uploaded_at: string | null;
     file_path: string | null;
+    signed_url?: string | null;
   }>;
   validations?: Array<{
     validation_type: string;
@@ -52,6 +53,7 @@ export interface VendorReportRow {
     verified_at: string | null;
     details: any;
   }>;
+
 }
 
 export interface ReportFilters {
@@ -168,7 +170,7 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
     valsByVendor.get(v.vendor_id)!.push(v);
   });
 
-  return vendors.map((v: any) => {
+  const result: VendorReportRow[] = vendors.map((v: any) => {
     const inv = invByVendor.get(v.id);
     const progressRows = progByVendor.get(v.id) ?? [];
 
@@ -261,4 +263,21 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
 
     return row;
   });
+
+  // Generate signed URLs for documents (single-vendor mode only)
+  if (isSingle) {
+    for (const r of result) {
+      if (!r.documents) continue;
+      await Promise.all(r.documents.map(async (doc) => {
+        if (!doc.file_path) return;
+        const { data } = await supabase.storage
+          .from('vendor-documents')
+          .createSignedUrl(doc.file_path, 3600);
+        doc.signed_url = data?.signedUrl ?? null;
+      }));
+    }
+  }
+
+  return result;
 }
+
