@@ -51,7 +51,8 @@ function statusToStep(status: string | null | undefined): {
     case 'sap_synced':
       return { step: 8, label: 'Approved (SAP Synced)', tone: 'success' };
     case 'sap_team_rejected':
-      return { step: -1, label: 'Rejected by SAP Team', tone: 'destructive' };
+    case 'sap_team_closed':
+      return { step: -1, label: 'Duplicate & Closed', tone: 'destructive' };
     case 'returned_to_vendor':
       return { step: -1, label: 'Returned to Vendor', tone: 'warning' };
     case 'returned_to_buyer':
@@ -139,6 +140,6 @@ export const STAGE_FILTER_OPTIONS = [
   { value: 'stage:ceo_office', label: 'Stage: CEO Office', statuses: ['ceo_office_review'] },
   { value: 'stage:pending_sap', label: 'Stage: Pending SAP Sync', statuses: ['pending_sap_sync'] },
   { value: 'stage:sap_synced', label: 'Stage: SAP Synced', statuses: ['sap_synced'] },
-  { value: 'stage:rejected', label: 'Stage: SAP Rejected', statuses: ['sap_team_rejected'] },
+  { value: 'stage:rejected', label: 'Stage: Duplicate & Closed', statuses: ['sap_team_rejected', 'sap_team_closed'] },
   { value: 'stage:returned', label: 'Stage: Returned', statuses: ['returned_to_vendor', 'returned_to_buyer'] },
 ] as const;

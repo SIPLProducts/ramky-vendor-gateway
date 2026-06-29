@@ -75,7 +75,8 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   returned_to_vendor: { label: 'Returned to Vendor', variant: 'outline' },
   returned_to_buyer: { label: 'Returned to Buyer', variant: 'outline' },
   sap_synced: { label: 'Approved (SAP Synced)', variant: 'default' },
-  sap_team_rejected: { label: 'SAP Team Rejected', variant: 'destructive' },
+  sap_team_rejected: { label: 'Duplicate & Closed', variant: 'destructive' },
+  sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' },
 };
 
 function statusBadge(status: string) {
@@ -174,7 +175,7 @@ export default function Dashboard() {
     let pending = 0, approved = 0, rejected = 0;
     for (const v of vendors) {
       if (v.status === 'sap_synced') approved++;
-      else if (v.status === 'sap_team_rejected') rejected++;
+      else if (v.status === 'sap_team_rejected' || v.status === 'sap_team_closed') rejected++;
       else if (PENDING_STATUSES.has(v.status)) pending++;
     }
     return { total: vendors.length, pending, approved, rejected };

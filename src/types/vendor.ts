@@ -24,7 +24,9 @@ export type VendorStatus =
   | 'pending_sap_sync'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
-  | 'sap_synced';
+  | 'sap_synced'
+  | 'sap_team_rejected'
+  | 'sap_team_closed';
 
 
 

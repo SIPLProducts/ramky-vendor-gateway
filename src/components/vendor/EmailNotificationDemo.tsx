@@ -28,6 +28,7 @@ const statusOptions = [
   { value: 'purchase_approved', label: 'Purchase Approved', color: 'bg-green-100 text-green-700' },
   { value: 'purchase_rejected', label: 'Purchase Rejected', color: 'bg-red-100 text-red-700' },
   { value: 'sap_synced', label: 'SAP Synced', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'sap_team_closed', label: 'Duplicate & Closed', color: 'bg-red-100 text-red-700' },
 ];
 
 export function EmailNotificationDemo() {
