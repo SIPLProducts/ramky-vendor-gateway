@@ -714,7 +714,12 @@ serve(async (req) => {
           if (buyerEmail) {
             const legal = vendor.legal_name || vendor.trade_name || "Vendor";
             const trade = vendor.trade_name || "";
-            const syncedAt = new Date().toLocaleString();
+            const syncedAt = new Date().toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              day: '2-digit', month: '2-digit', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', second: '2-digit',
+              hour12: true,
+            }) + ' IST';
             const subject = `Vendor ${legal} successfully created in SAP (${sapVendorCode})`;
             const html = `
               <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:14px;">

@@ -1,29 +1,35 @@
-## Goal
-
-Allow DMS sync to upload files of any size and any count without being skipped by app-side MB limits. SAP BP sync stays unchanged (`UPLOAD: []`).
-
 ## Changes
 
-### 1. `supabase/functions/sync-vendor-to-dms/index.ts`
-- Remove the `MAX_UPLOAD_BYTES` (10 MB) per-file skip — large files like bank cheque will no longer be dropped with "(>10MB)".
-- Remove the `DMS_BATCH_MAX_BYTES` (1 MB) per-file rejection — single files larger than 1 MB will no longer be skipped with "exceeds safe per-request DMS limit".
-- Keep batching logic so multiple files are split across requests, but stop dropping individual files:
-  - If adding the next file would exceed the batch threshold and the current batch already has files, close the batch and start a new one.
-  - If a single file is larger than the batch threshold, send it on its own as a one-file batch (no skip).
-- Keep all existing logging, retry-across-candidate-URLs, SAP response parsing, audit log, and status update behavior.
+### 1. Email "Synced At" → IST time
+`supabase/functions/sync-vendor-to-sap/index.ts` (line ~717)
 
-### 2. `supabase/functions/prepare-dms-payload/index.ts`
-- Remove the 10 MB skip in the preview payload so the browser-side preview matches the actual DMS sync (no "(>10MB)" entries).
+Currently:
+```ts
+const syncedAt = new Date().toLocaleString();
+```
 
-### 3. Not changed
-- `src/lib/sapPayloadBuilder.ts` — SAP BP-create payload continues to send `UPLOAD: []`.
-- `supabase/functions/sync-vendor-to-sap/index.ts` — unchanged.
-- MSME read-only popup, DMS path mapping, middleware URL handling, frontend upload UI — unchanged.
+Change to format in IST (Asia/Kolkata):
+```ts
+const syncedAt = new Date().toLocaleString('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hour12: true,
+}) + ' IST';
+```
+So the success email shows correct India time (e.g. `30/06/2026, 04:22:18 PM IST`) regardless of server timezone.
 
-## Result
+### 2. SAP Sync screen vendor card
+`src/pages/SAPSync.tsx` (lines ~498 and ~502)
 
-Any number of vendor documents of any size stored in `vendor-documents` will be included in DMS sync. The only remaining limits are real ones from middleware/SAP/network, which will now surface as actual errors instead of silent "skipped" entries.
+- Remove the green `CEO Office Approved` / `Finance 2 Approved` badge next to the vendor name (delete the `<Badge>` line and keep `getApprovalLabel` helper untouched in case used elsewhere — actually only used here; safe to remove the badge usage only).
+- Replace `ID: 27b38218...` chip with `Ref: <reference_number>`:
+  ```tsx
+  <span className="font-mono bg-muted px-2 py-0.5 rounded">
+    Ref: {(vendor as any).reference_number || vendor.id.slice(0, 8).toUpperCase()}
+  </span>
+  ```
 
-## Note
-
-This removes the app-side safety cap that was originally added to avoid HTTP 413 at the proxy. If the middleware or SAP server rejects very large payloads, those errors will now be reported per batch in the result message rather than pre-empted. The middleware itself may still need its body-size limit raised separately if downstream 413s appear.
+### Out of scope
+- DMS Sync tab, Duplicate & Closed tab, dialogs, email subject, DB schema — unchanged.
+- SAP sync / DMS sync upload logic — unchanged.
