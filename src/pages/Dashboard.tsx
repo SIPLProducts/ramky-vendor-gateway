@@ -181,15 +181,22 @@ export default function Dashboard() {
   const counts = useMemo(() => {
     let pending = 0, approved = 0, rejected = 0;
     for (const v of vendors) {
-      if (v.status === 'sap_synced') approved++;
-      else if (v.status === 'sap_team_rejected' || v.status === 'sap_team_closed') rejected++;
+      if (APPROVED_STATUSES.has(v.status)) approved++;
+      else if (REJECTED_STATUSES.has(v.status)) rejected++;
       else if (PENDING_STATUSES.has(v.status)) pending++;
     }
     return { total: vendors.length, pending, approved, rejected };
   }, [vendors]);
 
+  const filteredVendors = useMemo(() => {
+    if (statusFilter === 'all') return vendors;
+    if (statusFilter === 'approved') return vendors.filter((v) => APPROVED_STATUSES.has(v.status));
+    if (statusFilter === 'rejected') return vendors.filter((v) => REJECTED_STATUSES.has(v.status));
+    return vendors.filter((v) => PENDING_STATUSES.has(v.status));
+  }, [vendors, statusFilter]);
+
   const handleExport = () => {
-    const rows = vendors.map((v) => ({
+    const rows = filteredVendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
       'Company Name': v.legal_name ?? '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
@@ -201,18 +208,24 @@ export default function Dashboard() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+    const suffix = statusFilter === 'all' ? '' : `_${statusFilter}`;
     const fname = dateFrom && dateTo
-      ? `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}.xlsx`
-      : 'vendors_all.xlsx';
+      ? `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}${suffix}.xlsx`
+      : `vendors_all${suffix}.xlsx`;
     XLSX.writeFile(wb, fname);
   };
 
-  const cards = [
-    { label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
-    { label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
-    { label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
-    { label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
+  const cards: Array<{ key: StatusFilter; label: string; value: number; icon: typeof FileText; color: string }> = [
+    { key: 'all', label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
+    { key: 'pending', label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
+    { key: 'approved', label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
+    { key: 'rejected', label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
   ];
+
+  const toggleFilter = (key: StatusFilter) => {
+    if (key === 'all') { setStatusFilter('all'); return; }
+    setStatusFilter((cur) => (cur === key ? 'all' : key));
+  };
 
   return (
     <div className="space-y-6 p-4 md:p-6">
