@@ -61,39 +61,37 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
-  // Only attach the MSME certificate to keep the request under SAP middleware limits.
+  // Attach every uploaded vendor document. Each file is capped individually at MAX_UPLOAD_BYTES.
   const uploads: any[] = [];
   const skipped: string[] = [];
   const { data: docs, error } = await supabase
     .from("vendor_documents")
     .select("document_type, file_name, file_path, file_size, uploaded_at")
     .eq("vendor_id", vendorId)
-    .eq("document_type", "msme_certificate")
-    .order("uploaded_at", { ascending: false })
-    .limit(1);
+    .order("uploaded_at", { ascending: false });
   if (error) {
-    console.error("Failed to load vendor_documents (msme):", error.message);
+    console.error("Failed to load vendor_documents:", error.message);
     return { uploads, skipped };
   }
-  const d = (docs || [])[0];
-  if (!d) return { uploads, skipped };
-  try {
-    if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-      skipped.push(`${d.file_name} (>10MB)`);
-      return { uploads, skipped };
+  for (const d of docs || []) {
+    try {
+      if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+        skipped.push(`${d.file_name} (>10MB)`);
+        continue;
+      }
+      const { data: blob, error: dlErr } = await supabase.storage
+        .from("vendor-documents").download(d.file_path);
+      if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
+      const base64 = await blobToBase64(blob);
+      uploads.push({
+        FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
+        FILE: base64,
+        FILE_PATH: d.file_path,
+      });
+    } catch (e: any) {
+      console.error(`Upload build failed for ${d.file_name}:`, e?.message);
+      skipped.push(d.file_name);
     }
-    const { data: blob, error: dlErr } = await supabase.storage
-      .from("vendor-documents").download(d.file_path);
-    if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); return { uploads, skipped }; }
-    const base64 = await blobToBase64(blob);
-    uploads.push({
-      FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
-      FILE: base64,
-      FILE_PATH: d.file_path,
-    });
-  } catch (e: any) {
-    console.error(`Upload build failed for ${d.file_name}:`, e?.message);
-    skipped.push(d.file_name);
   }
   return { uploads, skipped };
 }
@@ -424,17 +422,15 @@ serve(async (req) => {
       const msmeOff = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
       const effMsmeNo = msmeOff ? '' : (ovMsmeNo || '');
       const effMsmeAct = msmeOff ? '' : (ovMsmeAct || '');
-      const { uploads: msmeUploads, skipped: msmeSkipped } = effMsmeNo
-        ? await buildUploadArray(supabase, vendor_id)
-        : { uploads: [], skipped: [] };
-      row.UPLOAD = msmeUploads;
+      const { uploads: docUploads, skipped: docSkipped } = await buildUploadArray(supabase, vendor_id);
+      row.UPLOAD = docUploads;
       row.idtype = "SOLMN1";
       row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
       row.idnum2 = effMsmeNo ? String(effMsmeNo).slice(0, 20) : "";
       row.IDCATG = effMsmeAct ? String(effMsmeAct) : "";
-      if (msmeSkipped.length) console.warn("Skipped MSME upload:", msmeSkipped.join(", "));
-      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "msmeUploads:", msmeUploads.length);
+      if (docSkipped.length) console.warn("Skipped uploads:", docSkipped.join(", "));
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "uploads:", docUploads.length);
     } else {
       // Legacy path: resolve template server-side.
       const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
@@ -500,14 +496,12 @@ serve(async (req) => {
         template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
       }
 
-      // Attach MSME certificate only (other docs intentionally excluded — payload-size).
+      // Attach every uploaded vendor document (each file capped individually).
       const ovMsmeNo2 = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_no'))
         ? (overrides.reg_msme_no ?? '') : vendor.msme_number;
       const msmeOff2 = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
       const effMsmeNo2 = msmeOff2 ? '' : (ovMsmeNo2 || '');
-      const { uploads, skipped } = effMsmeNo2
-        ? await buildUploadArray(supabase, vendor_id)
-        : { uploads: [] as any[], skipped: [] as string[] };
+      const { uploads, skipped } = await buildUploadArray(supabase, vendor_id);
 
       const ctx: ResolverCtx = {
         vendor,
