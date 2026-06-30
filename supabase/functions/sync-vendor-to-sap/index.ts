@@ -422,17 +422,15 @@ serve(async (req) => {
       const msmeOff = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
       const effMsmeNo = msmeOff ? '' : (ovMsmeNo || '');
       const effMsmeAct = msmeOff ? '' : (ovMsmeAct || '');
-      const { uploads: msmeUploads, skipped: msmeSkipped } = effMsmeNo
-        ? await buildUploadArray(supabase, vendor_id)
-        : { uploads: [], skipped: [] };
-      row.UPLOAD = msmeUploads;
+      const { uploads: docUploads, skipped: docSkipped } = await buildUploadArray(supabase, vendor_id);
+      row.UPLOAD = docUploads;
       row.idtype = "SOLMN1";
       row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
       row.idnum2 = effMsmeNo ? String(effMsmeNo).slice(0, 20) : "";
       row.IDCATG = effMsmeAct ? String(effMsmeAct) : "";
-      if (msmeSkipped.length) console.warn("Skipped MSME upload:", msmeSkipped.join(", "));
-      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "msmeUploads:", msmeUploads.length);
+      if (docSkipped.length) console.warn("Skipped uploads:", docSkipped.join(", "));
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "uploads:", docUploads.length);
     } else {
       // Legacy path: resolve template server-side.
       const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
