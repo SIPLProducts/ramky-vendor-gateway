@@ -308,7 +308,20 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             onClick={() => {
               const missing = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
               setMissingFields(missing as string[]);
-              if (missing.length === 0) onConfirm(form);
+              if (missing.length === 0) {
+                const cat = String(form.reg_msme_cat || '').toLowerCase().trim();
+                const msmeCode = !form.reg_is_msme
+                  ? 'ZNA'
+                  : cat === 'small' ? 'SMA'
+                  : cat === 'medium' ? 'MED'
+                  : 'MIC';
+                onConfirm({
+                  ...form,
+                  msme: msmeCode,
+                  idtype: form.reg_is_msme ? 'ZMSMEN' : '',
+                  idnum: form.reg_is_msme ? (form.reg_msme_no || '') : '',
+                });
+              }
             }}
             disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
