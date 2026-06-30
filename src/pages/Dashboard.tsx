@@ -272,21 +272,34 @@ export default function Dashboard() {
       </header>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((c) => (
-          <Card key={c.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
-              <c.icon className={cn('h-5 w-5', c.color)} />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-3xl font-semibold">{c.value}</div>
+        {cards.map((c) => {
+          const active = statusFilter === c.key;
+          return (
+            <Card
+              key={c.label}
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleFilter(c.key)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
+              className={cn(
+                'cursor-pointer transition hover:shadow-md',
+                active && 'ring-2 ring-primary border-primary'
               )}
-            </CardContent>
-          </Card>
-        ))}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
+                <c.icon className={cn('h-5 w-5', c.color)} />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="text-3xl font-semibold">{c.value}</div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </section>
 
       <Card>
