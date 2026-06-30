@@ -1,24 +1,34 @@
-## Change
+## Goal
 
-Stop attaching files in the `sync-vendor-to-sap` payload. The SAP master-data sync should send `UPLOAD: []` (or omit it where allowed), and all document upload continues to flow through the existing dedicated `sync-vendor-to-dms` edge function (which posts `{ BP_LIFNR, FILE_UPLOAD }` to the SAP DMS endpoint).
+1. In the SAP Field Confirmation popup (SapFieldsDialog), make all MSME Details fields **read-only display** (MSME Registered, Udyam/MSME Number, MSME Category, Major Activity / IDCATG).
+2. Confirm SAP sync continues to send `UPLOAD: []` (no files), and DMS sync continues to upload all files. No backend behavior changes.
 
-Today `buildUploads` in `src/lib/sapPayloadBuilder.ts` downloads every vendor document, base64-encodes it, and stuffs it into `row.UPLOAD`, and the legacy server path in `sync-vendor-to-sap/index.ts` does the same via `buildUploadArray`. This bloats the BP-create payload and duplicates what `sync-vendor-to-dms` already does.
+## Changes
 
-## Files
+### `src/components/sap/SapFieldsDialog.tsx`
 
-1. **`src/lib/sapPayloadBuilder.ts`**
-   - Remove the `buildUploads` call in `buildSapPayload`. Set `row.UPLOAD = []` unconditionally.
-   - Remove (or keep unused + comment) `buildUploads`, `MAX_UPLOAD_BYTES`, the `blobToBase64` helper, and the `skipped` field plumbing related to uploads. `skipped` returned from `buildSapPayload` becomes `[]`.
+In the "MSME Details" section (lines ~186–217), replace the editable controls with `ReadOnlyField` displays sourced from the vendor record:
 
-2. **`supabase/functions/sync-vendor-to-sap/index.ts`**
-   - Client-supplied payload path: do **not** call `buildUploadArray`. Force `row.UPLOAD = []` before forwarding to SAP (overwrite anything the client sent in `UPLOAD`, since DMS handles files).
-   - Legacy server-built payload path: same — `row.UPLOAD = []`, no `buildUploadArray` call.
-   - Leave `buildUploadArray` in place but unused (or delete it) — preference: delete to avoid drift.
+- "MSME Registered" → `ReadOnlyField` showing "Yes" / "No" (from `vendor.is_msme_registered` or `msme_number` presence).
+- "Udyam / MSME Number" → `ReadOnlyField` from `vendor.msme_number`.
+- "MSME Category" → `ReadOnlyField` from `vendor.msme_category` (display label: Micro/Small/Medium).
+- "Major Activity (IDCATG)" → `ReadOnlyField` from `vendor.msme_major_activity`.
+- Update the helper note text to: "MSME details are taken from the vendor registration record and pushed to SAP as-is."
 
-3. **No change** to `sync-vendor-to-dms/index.ts`, `prepare-dms-payload/index.ts`, the DMS trigger logic in `src/hooks/useVendors.tsx`, or any UI. Files continue to upload via the separate DMS call already wired after a successful BP create.
+Keep `SapFieldOverrides` shape unchanged. The `reg_is_msme`, `reg_msme_no`, `reg_msme_cat`, `reg_msme_act` values continue to be initialized in `buildDefaults` from the vendor record and forwarded via `onConfirm` exactly as today — the only difference is the user cannot edit them in the popup. The Sync-to-SAP submit handler that derives `msme` (MIC/SMA/MED/ZNA), `idtype`, `idnum` from these values stays identical.
+
+### SAP sync upload behavior — no change needed
+
+Already in place from prior work:
+- `src/lib/sapPayloadBuilder.ts` sets `row.UPLOAD = []` unconditionally; `buildUploads` is no longer called.
+- `supabase/functions/sync-vendor-to-sap/index.ts` forces `row.UPLOAD = []` on both client-supplied and legacy server-built code paths.
+
+### DMS sync — no change
+
+`supabase/functions/sync-vendor-to-dms/index.ts` continues to upload all vendor documents to the DMS endpoint as today. Trigger logic in `useVendors.tsx` (DMS call fired after a successful BP create) is untouched.
 
 ## Out of scope
 
-- Schema changes, UI changes, bulk-sync edge function.
-- DMS batching, retry, or path-rewrite logic — unchanged.
-- MSME override fields (`reg_is_msme`, `idnum2`, `IDCATG`, etc.) stay exactly as they are; only the `UPLOAD` array is emptied.
+- No schema changes, no edge-function redeploy needed (no server logic changes).
+- No changes to MultipleSapSyncDialog, payload template, or SAP master data flows.
+- No change to how MSME overrides flow through the payload — only the popup UI becomes read-only.
