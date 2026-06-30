@@ -417,13 +417,24 @@ serve(async (req) => {
       };
       delete (row as any).classify;
 
-      row.UPLOAD = [];
+      const ovMsmeNo = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_no'))
+        ? (overrides.reg_msme_no ?? '') : vendor.msme_number;
+      const ovMsmeAct = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_act'))
+        ? (overrides.reg_msme_act ?? '') : vendor.msme_major_activity;
+      const msmeOff = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
+      const effMsmeNo = msmeOff ? '' : (ovMsmeNo || '');
+      const effMsmeAct = msmeOff ? '' : (ovMsmeAct || '');
+      const { uploads: msmeUploads, skipped: msmeSkipped } = effMsmeNo
+        ? await buildUploadArray(supabase, vendor_id)
+        : { uploads: [], skipped: [] };
+      row.UPLOAD = msmeUploads;
       row.idtype = "SOLMN1";
       row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
-      row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
-      row.IDCATG = vendor.msme_major_activity ? String(vendor.msme_major_activity) : "";
-      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
+      row.idnum2 = effMsmeNo ? String(effMsmeNo).slice(0, 20) : "";
+      row.IDCATG = effMsmeAct ? String(effMsmeAct) : "";
+      if (msmeSkipped.length) console.warn("Skipped MSME upload:", msmeSkipped.join(", "));
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "msmeUploads:", msmeUploads.length);
     } else {
       // Legacy path: resolve template server-side.
       const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
