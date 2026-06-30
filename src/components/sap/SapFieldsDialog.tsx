@@ -182,37 +182,26 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
-            {/* MSME (editable — overrides values used in SAP payload) */}
+            {/* MSME (read-only — sourced from vendor registration record) */}
             <Section icon={<FileCheck className="h-4 w-4" />} title="MSME Details">
-              <CheckboxField
-                label="MSME Registered"
-                checked={!!form.reg_is_msme}
-                onChange={v => setForm(prev => ({
-                  ...prev,
-                  reg_is_msme: v,
-                  reg_msme_no: v ? prev.reg_msme_no : '',
-                  reg_msme_cat: v ? prev.reg_msme_cat : '',
-                  reg_msme_act: v ? prev.reg_msme_act : '',
-                }))}
-              />
-              <TextField
-                label="Udyam / MSME Number"
-                value={form.reg_is_msme ? form.reg_msme_no : ''}
-                onChange={v => set('reg_msme_no', v)}
-              />
-              <SelectField
+              <ReadOnlyField label="MSME Registered" value={form.reg_is_msme ? 'Yes' : 'No'} />
+              <ReadOnlyField label="Udyam / MSME Number" value={form.reg_is_msme ? form.reg_msme_no : ''} />
+              <ReadOnlyField
                 label="MSME Category"
-                value={form.reg_msme_cat}
-                onChange={v => set('reg_msme_cat', v)}
-                options={[['micro', 'Micro'], ['small', 'Small'], ['medium', 'Medium']]}
+                value={
+                  form.reg_msme_cat
+                    ? ({ micro: 'Micro', small: 'Small', medium: 'Medium' } as Record<string, string>)[
+                        String(form.reg_msme_cat).toLowerCase()
+                      ] || form.reg_msme_cat
+                    : ''
+                }
               />
-              <TextField
+              <ReadOnlyField
                 label="Major Activity (IDCATG)"
                 value={form.reg_is_msme ? form.reg_msme_act : ''}
-                onChange={v => set('reg_msme_act', v)}
               />
               <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
-                These values override the saved registration data when pushing to SAP. The MSME certificate (if uploaded) is attached automatically.
+                MSME details are taken from the vendor registration record and pushed to SAP as-is.
               </p>
             </Section>
 
