@@ -61,6 +61,11 @@ const PENDING_STATUSES = new Set([
   'returned_to_buyer',
 ]);
 
+const APPROVED_STATUSES = new Set(['sap_synced', 'dms_synced']);
+const REJECTED_STATUSES = new Set(['sap_team_rejected', 'sap_team_closed']);
+
+type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
   submitted: { label: 'Submitted', variant: 'secondary' },
@@ -75,6 +80,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   returned_to_vendor: { label: 'Returned to Vendor', variant: 'outline' },
   returned_to_buyer: { label: 'Returned to Buyer', variant: 'outline' },
   sap_synced: { label: 'Approved (SAP Synced)', variant: 'default' },
+  dms_synced: { label: 'Approved (DMS Synced)', variant: 'default' },
   sap_team_rejected: { label: 'Duplicate & Closed', variant: 'destructive' },
   sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' },
 };
@@ -91,6 +97,7 @@ export default function Dashboard() {
   const { tenantIds, vendorIds } = useTenantFilter();
   const { isLoading: tenantLoading } = useTenantContext();
 
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
 
@@ -174,15 +181,22 @@ export default function Dashboard() {
   const counts = useMemo(() => {
     let pending = 0, approved = 0, rejected = 0;
     for (const v of vendors) {
-      if (v.status === 'sap_synced') approved++;
-      else if (v.status === 'sap_team_rejected' || v.status === 'sap_team_closed') rejected++;
+      if (APPROVED_STATUSES.has(v.status)) approved++;
+      else if (REJECTED_STATUSES.has(v.status)) rejected++;
       else if (PENDING_STATUSES.has(v.status)) pending++;
     }
     return { total: vendors.length, pending, approved, rejected };
   }, [vendors]);
 
+  const filteredVendors = useMemo(() => {
+    if (statusFilter === 'all') return vendors;
+    if (statusFilter === 'approved') return vendors.filter((v) => APPROVED_STATUSES.has(v.status));
+    if (statusFilter === 'rejected') return vendors.filter((v) => REJECTED_STATUSES.has(v.status));
+    return vendors.filter((v) => PENDING_STATUSES.has(v.status));
+  }, [vendors, statusFilter]);
+
   const handleExport = () => {
-    const rows = vendors.map((v) => ({
+    const rows = filteredVendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
       'Company Name': v.legal_name ?? '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
@@ -194,18 +208,24 @@ export default function Dashboard() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+    const suffix = statusFilter === 'all' ? '' : `_${statusFilter}`;
     const fname = dateFrom && dateTo
-      ? `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}.xlsx`
-      : 'vendors_all.xlsx';
+      ? `vendors_${format(dateFrom, 'yyyyMMdd')}_to_${format(dateTo, 'yyyyMMdd')}${suffix}.xlsx`
+      : `vendors_all${suffix}.xlsx`;
     XLSX.writeFile(wb, fname);
   };
 
-  const cards = [
-    { label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
-    { label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
-    { label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
-    { label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
+  const cards: Array<{ key: StatusFilter; label: string; value: number; icon: typeof FileText; color: string }> = [
+    { key: 'all', label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
+    { key: 'pending', label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
+    { key: 'approved', label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
+    { key: 'rejected', label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
   ];
+
+  const toggleFilter = (key: StatusFilter) => {
+    if (key === 'all') { setStatusFilter('all'); return; }
+    setStatusFilter((cur) => (cur === key ? 'all' : key));
+  };
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -244,7 +264,7 @@ export default function Dashboard() {
           >
             Clear
           </Button>
-          <Button onClick={handleExport} disabled={vendors.length === 0}>
+          <Button onClick={handleExport} disabled={filteredVendors.length === 0}>
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
           </Button>
@@ -252,26 +272,45 @@ export default function Dashboard() {
       </header>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((c) => (
-          <Card key={c.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
-              <c.icon className={cn('h-5 w-5', c.color)} />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-3xl font-semibold">{c.value}</div>
+        {cards.map((c) => {
+          const active = statusFilter === c.key;
+          return (
+            <Card
+              key={c.label}
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleFilter(c.key)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
+              className={cn(
+                'cursor-pointer transition hover:shadow-md',
+                active && 'ring-2 ring-primary border-primary'
               )}
-            </CardContent>
-          </Card>
-        ))}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
+                <c.icon className={cn('h-5 w-5', c.color)} />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="text-3xl font-semibold">{c.value}</div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </section>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base">Vendor Applications</CardTitle>
+          {statusFilter !== 'all' && (
+            <div className="text-xs text-muted-foreground">
+              Showing: <span className="font-medium text-foreground">{cards.find((c) => c.key === statusFilter)?.label}</span>
+              <button type="button" onClick={() => setStatusFilter('all')} className="ml-2 text-primary hover:underline">Clear filter</button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-md border">
@@ -297,14 +336,14 @@ export default function Dashboard() {
                       ))}
                     </TableRow>
                   ))
-                ) : vendors.length === 0 ? (
+                ) : filteredVendors.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      No vendor applications in this date range.
+                      {statusFilter === 'all' ? 'No vendor applications in this date range.' : 'No vendor applications match this filter.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  vendors.map((v) => (
+                  filteredVendors.map((v) => (
                     <TableRow key={v.id}>
                       <TableCell className="font-mono text-xs">
                         <Link to={`/vendors/${v.id}`} className="text-primary hover:underline">
