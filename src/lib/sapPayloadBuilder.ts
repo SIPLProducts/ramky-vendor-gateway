@@ -221,10 +221,27 @@ export async function buildSapPayload(
 
   const isInternational = (vendor as any).vendor_type === 'international';
 
+  // Overlay SAP-Sync popup edits onto a vendor clone so {{vendor.*}} placeholders
+  // pick up Address/Contact/Email values the user just edited in the confirmation dialog.
+  const vendorForPayload: any = { ...(vendor as any) };
+  const ov: any = overrides || {};
+  const hasKey = (k: string) => Object.prototype.hasOwnProperty.call(ov, k);
+  if (hasKey('reg_addr1'))    vendorForPayload.registered_address = ov.reg_addr1 ?? '';
+  if (hasKey('reg_addr2'))    vendorForPayload.registered_address_line2 = ov.reg_addr2 ?? '';
+  if (hasKey('reg_addr3'))    vendorForPayload.registered_address_line3 = ov.reg_addr3 ?? '';
+  if (hasKey('reg_addr4'))    vendorForPayload.registered_address_line4 = ov.reg_addr4 ?? '';
+  if (hasKey('reg_city'))     vendorForPayload.registered_city = ov.reg_city ?? '';
+  if (hasKey('reg_state'))    vendorForPayload.registered_state = ov.reg_state ?? '';
+  if (hasKey('reg_pincode'))  vendorForPayload.registered_pincode = ov.reg_pincode ?? '';
+  if (hasKey('reg_contact1')) { vendorForPayload.registered_contact_1 = ov.reg_contact1 ?? ''; vendorForPayload.primary_phone = ov.reg_contact1 ?? ''; }
+  if (hasKey('reg_contact2')) { vendorForPayload.registered_contact_2 = ov.reg_contact2 ?? ''; vendorForPayload.secondary_phone = ov.reg_contact2 ?? ''; }
+  if (hasKey('reg_email1'))   { vendorForPayload.registered_email = ov.reg_email1 ?? ''; vendorForPayload.primary_email = ov.reg_email1 ?? ''; }
+  if (hasKey('reg_email2'))   { vendorForPayload.registered_email_2 = ov.reg_email2 ?? ''; vendorForPayload.secondary_email = ov.reg_email2 ?? ''; }
+
   if (!isInternational) {
-    if (!vendor.registered_state || !resolveRegion(vendor.registered_state)) {
+    if (!vendorForPayload.registered_state || !resolveRegion(vendorForPayload.registered_state)) {
       throw new Error(
-        `Vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for IN.`,
+        `Vendor's Registered State "${vendorForPayload.registered_state || "(empty)"}" is not mapped to an SAP region code for IN.`,
       );
     }
   }

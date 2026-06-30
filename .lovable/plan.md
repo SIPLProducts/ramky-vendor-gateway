@@ -1,40 +1,39 @@
-## Goal
+## Problem
 
-Send Contact 2 and Email 2 from the Registration Form on the **secondary** SAP fields (`mob_number2` / `smtp_addr2`) and restore the **primary** fields (`mob_number` / `smtp_addr` / `tel_number`) to their original meaning — both at the top level and inside `vendors[]`. Top-level already does this correctly; the `vendors[]` entry currently overwrites the primary fields with the secondary values and is missing `mob_number2` entirely.
+The SAP Field Confirmation popup lets the user edit Address 1-4, City, State, Pincode, Contact 1/2, Email 1/2 — but those edits never reach the SAP payload. The template only references `vendor.registered_address`, `vendor.secondary_phone_value`, `vendor.secondary_email_value`, etc., which are read straight from the saved vendor row. The `reg_*` keys on `SapFieldOverrides` are passed to `buildSapPayload` but ignored.
 
-## Final mapping (after change)
+Net effect: editing Contact 2 / Email 2 / Address in the popup has no impact on the JSON sent to SAP.
 
-Top-level (already correct, no change needed):
-- `smtp_addr`  → Email 1 (`primary_email_or_fallback`)
-- `smtp_addr2` → Email 2 (`secondary_email_value`)
-- `mob_number` → Contact 1 (`primary_phone_or_fallback`)
-- `mob_number2` → Contact 2 (`secondary_phone_value`)  ← add at top level
-- `tel_number` → Contact 2 (kept as-is for backward compat)
+## Fix
 
-`vendors[0]` entry (fix):
-- `smtp_addr`  → Email 1
-- `smtp_addr2` → Email 2
-- `mob_number` → Contact 1
-- `mob_number2` → Contact 2  ← new key
-- `tel_number` → `""`
+In `src/lib/sapPayloadBuilder.ts`, before building the resolver context, apply popup overrides onto a **shallow copy of the vendor object** so the existing `{{vendor.*}}` placeholders pick up the edited values. No template changes needed.
 
-## Files to change
+Mapping (override key → vendor field used by template):
 
-1. **`src/lib/sapDefaultTemplate.ts`** — built-in fallback template
-   - Top-level: add `mob_number2: "{{vendor.secondary_phone_value|trunc:30}}"` next to `mob_number`.
-   - `vendors[0]`:
-     - `smtp_addr`  → `"{{vendor.primary_email_or_fallback|trunc:241}}"`
-     - `smtp_addr2` → `"{{vendor.secondary_email_value|trunc:241}}"`
-     - `mob_number` → `"{{vendor.primary_phone_or_fallback|trunc:30}}"`
-     - Add `mob_number2: "{{vendor.secondary_phone_value|trunc:30}}"`
-     - `tel_number` stays `""`
+| Popup field        | Override key     | Vendor field overwritten              |
+|--------------------|------------------|----------------------------------------|
+| Address Line 1     | `reg_addr1`      | `registered_address`                   |
+| Address Line 2     | `reg_addr2`      | `registered_address_line2`             |
+| Address Line 3     | `reg_addr3`      | `registered_address_line3`             |
+| Address Line 4     | `reg_addr4`      | `registered_address_line4`             |
+| City               | `reg_city`       | `registered_city`                      |
+| State              | `reg_state`      | `registered_state`                     |
+| Pincode            | `reg_pincode`    | `registered_pincode`                   |
+| Contact 1          | `reg_contact1`   | `registered_contact_1`, `primary_phone`|
+| Contact 2          | `reg_contact2`   | `registered_contact_2`, `secondary_phone` |
+| Email 1            | `reg_email1`     | `registered_email`, `primary_email`    |
+| Email 2            | `reg_email2`     | `registered_email_2`, `secondary_email`|
 
-2. **`supabase/functions/sync-vendor-to-sap/index.ts`** — patch the embedded default template the same way (top-level add `mob_number2`; vendors[] restore primary and add `mob_number2`).
+Rules:
+- Only apply a key when the override value is a non-empty string (preserves saved value when the user clears a field? — use "override wins as long as the field was rendered", i.e. when the key is present on the overrides object — popup always sends all keys, so empty string from popup is an intentional clear and should be respected; pick **"present key wins, including empty"**, matching the WYSIWYG behavior the user expects).
+- For State, also recompute the region check against the override value so the existing "state not mapped" guard runs on what's actually being sent.
+- Do not mutate the original vendor object returned by Supabase; clone it (`{ ...vendor }`).
 
-3. **`sap_payload_templates` table** — update the active row's `template` JSONB so live tenants pick up the new mapping immediately (no schema change, just a `jsonb_set` on the existing row, mirroring the file edits above).
+Out of scope:
+- No template edits, no schema changes, no UI changes.
+- Bulk sync (`sync-vendors-to-sap-bulk` edge function) is server-side and uses a different code path; the user's report is about the per-vendor popup, so leave the bulk path untouched unless they ask.
+- We are NOT writing the popup edits back to the `vendors` table — they apply only to this SAP push.
 
-## Out of scope
+## Files
 
-- No new resolver helpers — `secondary_phone_value` / `secondary_email_value` / `primary_*_or_fallback` already exist in `src/lib/sapPayloadBuilder.ts`.
-- No registration-form changes; Contact 2 / Email 2 are already captured as `registered_contact_2` / `registered_email_2`.
-- No edge-function logic changes beyond the embedded default template literal.
+1. `src/lib/sapPayloadBuilder.ts` — inside `buildSapPayload`, after loading `vendor` and before building `ctx`, build `vendorForPayload = { ...vendor }` and copy each present `overrides.reg_*` key into the matching vendor field(s) above. Use `vendorForPayload` in the `ResolverCtx` and in the region pre-check.
