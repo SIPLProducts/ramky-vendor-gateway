@@ -496,14 +496,12 @@ serve(async (req) => {
         template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
       }
 
-      // Attach MSME certificate only (other docs intentionally excluded — payload-size).
+      // Attach every uploaded vendor document (each file capped individually).
       const ovMsmeNo2 = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_no'))
         ? (overrides.reg_msme_no ?? '') : vendor.msme_number;
       const msmeOff2 = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
       const effMsmeNo2 = msmeOff2 ? '' : (ovMsmeNo2 || '');
-      const { uploads, skipped } = effMsmeNo2
-        ? await buildUploadArray(supabase, vendor_id)
-        : { uploads: [] as any[], skipped: [] as string[] };
+      const { uploads, skipped } = await buildUploadArray(supabase, vendor_id);
 
       const ctx: ResolverCtx = {
         vendor,
