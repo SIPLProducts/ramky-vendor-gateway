@@ -536,12 +536,15 @@ serve(async (req) => {
           IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
         };
         delete (row as any).classify;
-        row.UPLOAD = [];
+        row.UPLOAD = uploads;
         row.idtype = "SOLMN1";
         row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
         row.idtype2 = "ZMSMEN";
-        row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
-        row.IDCATG = vendor.msme_major_activity ? String(vendor.msme_major_activity) : "";
+        row.idnum2 = effMsmeNo2 ? String(effMsmeNo2).slice(0, 20) : "";
+        const ovMsmeAct2 = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_act'))
+          ? (overrides.reg_msme_act ?? '') : vendor.msme_major_activity;
+        const effMsmeAct2 = msmeOff2 ? '' : (ovMsmeAct2 || '');
+        row.IDCATG = effMsmeAct2 ? String(effMsmeAct2) : "";
 
         // For international vendors, replace hardcoded "IN" country codes in
         // the resolved payload with the vendor's actual SAP country code.
