@@ -326,7 +326,7 @@ export async function buildSapPayload(
     IDS: classifyArrays.IDS[0] || "",
   };
 
-  const isMsme = !!(vendor as any).msme_number;
+  const isMsme = !!vendorForPayload.msme_number;
 
   // Load template — DB-first, then fall back to the built-in default so
   // self-hosted deployments without a seeded `sap_payload_templates` row
