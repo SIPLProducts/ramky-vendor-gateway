@@ -315,7 +315,7 @@ export async function buildSapPayload(
   const { uploads, skipped } = await buildUploads(vendorId);
 
   const ctx: ResolverCtx = {
-    vendor: vendor as any,
+    vendor: vendorForPayload,
     override: mergedOverrides,
     classify: classifyCtx,
     uploads,
