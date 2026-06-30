@@ -336,14 +336,14 @@ export default function Dashboard() {
                       ))}
                     </TableRow>
                   ))
-                ) : vendors.length === 0 ? (
+                ) : filteredVendors.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      No vendor applications in this date range.
+                      {statusFilter === 'all' ? 'No vendor applications in this date range.' : 'No vendor applications match this filter.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  vendors.map((v) => (
+                  filteredVendors.map((v) => (
                     <TableRow key={v.id}>
                       <TableCell className="font-mono text-xs">
                         <Link to={`/vendors/${v.id}`} className="text-primary hover:underline">
