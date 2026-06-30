@@ -57,6 +57,7 @@ function buildCommonDefaults(tenantDefaults: any | null): SapFieldOverrides {
     reg_addr1: '', reg_addr2: '', reg_addr3: '', reg_addr4: '',
     reg_city: '', reg_state: '', reg_pincode: '',
     reg_contact1: '', reg_contact2: '', reg_email1: '', reg_email2: '',
+    reg_is_msme: false, reg_msme_no: '', reg_msme_cat: '', reg_msme_act: '',
     classify: { MGV: [], CATV: [], LOCV: [], IDS: [] },
   };
 }
