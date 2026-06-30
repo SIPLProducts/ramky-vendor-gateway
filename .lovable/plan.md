@@ -1,39 +1,49 @@
 ## Problem
 
-The SAP Field Confirmation popup lets the user edit Address 1-4, City, State, Pincode, Contact 1/2, Email 1/2 — but those edits never reach the SAP payload. The template only references `vendor.registered_address`, `vendor.secondary_phone_value`, `vendor.secondary_email_value`, etc., which are read straight from the saved vendor row. The `reg_*` keys on `SapFieldOverrides` are passed to `buildSapPayload` but ignored.
+Two separate gaps make MSME data disappear from the SAP payload:
 
-Net effect: editing Contact 2 / Email 2 / Address in the popup has no impact on the JSON sent to SAP.
+1. **MSME certificate file** is uploaded to Documents but never reaches the SAP `UPLOAD` array. Both the client builder (`src/lib/sapPayloadBuilder.ts` line ~342) and the edge function (`supabase/functions/sync-vendor-to-sap/index.ts` lines ~416 and ~519) hard-code `row.UPLOAD = []`. This was done to avoid SAP middleware 413 (payload too large) when attaching every document. MSME alone is a single small file, safe to include.
+
+2. **MSME field values** (`msme` flag, `idnum2`, `IDCATG`) come only from `vendors.is_msme_registered` / `vendors.msme_number` / `vendors.msme_major_activity`. On recent test vendors these columns are `false` / `null`, and the SAP Sync popup has no MSME inputs — so the SAP team has no way to enter/correct them at push time. They render as empty in the payload.
 
 ## Fix
 
-In `src/lib/sapPayloadBuilder.ts`, before building the resolver context, apply popup overrides onto a **shallow copy of the vendor object** so the existing `{{vendor.*}}` placeholders pick up the edited values. No template changes needed.
+### 1. Attach MSME certificate to `UPLOAD` (single-file whitelist)
 
-Mapping (override key → vendor field used by template):
+Both code paths build an `UPLOAD` array containing **only** the latest `msme_certificate` from `vendor_documents`, base64-encoded, capped at the existing `MAX_UPLOAD_BYTES` (10 MB). All other document types remain excluded.
 
-| Popup field        | Override key     | Vendor field overwritten              |
-|--------------------|------------------|----------------------------------------|
-| Address Line 1     | `reg_addr1`      | `registered_address`                   |
-| Address Line 2     | `reg_addr2`      | `registered_address_line2`             |
-| Address Line 3     | `reg_addr3`      | `registered_address_line3`             |
-| Address Line 4     | `reg_addr4`      | `registered_address_line4`             |
-| City               | `reg_city`       | `registered_city`                      |
-| State              | `reg_state`      | `registered_state`                     |
-| Pincode            | `reg_pincode`    | `registered_pincode`                   |
-| Contact 1          | `reg_contact1`   | `registered_contact_1`, `primary_phone`|
-| Contact 2          | `reg_contact2`   | `registered_contact_2`, `secondary_phone` |
-| Email 1            | `reg_email1`     | `registered_email`, `primary_email`    |
-| Email 2            | `reg_email2`     | `registered_email_2`, `secondary_email`|
+Each upload entry follows the existing shape used elsewhere in the edge function:
 
-Rules:
-- Only apply a key when the override value is a non-empty string (preserves saved value when the user clears a field? — use "override wins as long as the field was rendered", i.e. when the key is present on the overrides object — popup always sends all keys, so empty string from popup is an intentional clear and should be respected; pick **"present key wins, including empty"**, matching the WYSIWYG behavior the user expects).
-- For State, also recompute the region check against the override value so the existing "state not mapped" guard runs on what's actually being sent.
-- Do not mutate the original vendor object returned by Supabase; clone it (`{ ...vendor }`).
+```json
+{ "doctype": "msme", "filename": "...", "mimetype": "...", "filedata": "<base64>" }
+```
 
-Out of scope:
-- No template edits, no schema changes, no UI changes.
-- Bulk sync (`sync-vendors-to-sap-bulk` edge function) is server-side and uses a different code path; the user's report is about the per-vendor popup, so leave the bulk path untouched unless they ask.
-- We are NOT writing the popup edits back to the `vendors` table — they apply only to this SAP push.
+- `src/lib/sapPayloadBuilder.ts`: replace the stub `buildUploads` (currently returns `[]`) with a fetch of vendor_documents filtered to `document_type = 'msme_certificate'`, download from the `vendor-documents` storage bucket, base64-encode, push one entry. Remove the `row.UPLOAD = []` override so the template's `{{uploads}}` value is preserved.
+- `supabase/functions/sync-vendor-to-sap/index.ts`: same logic in `buildUploadArray` (already scaffolded — just narrow it to `msme_certificate` and stop forcing `row.UPLOAD = []` at lines ~416 and ~519). Skip silently if no MSME doc exists or file exceeds the cap (push to `skipped[]`).
 
-## Files
+### 2. Add MSME inputs to the SAP Sync confirmation popup
 
-1. `src/lib/sapPayloadBuilder.ts` — inside `buildSapPayload`, after loading `vendor` and before building `ctx`, build `vendorForPayload = { ...vendor }` and copy each present `overrides.reg_*` key into the matching vendor field(s) above. Use `vendorForPayload` in the `ResolverCtx` and in the region pre-check.
+Mirror the Contact 2 / Email 2 / Address pattern just shipped:
+
+| Popup field          | Override key   | Vendor field overwritten     |
+|----------------------|----------------|------------------------------|
+| MSME Registered (Y/N)| `reg_is_msme`  | `is_msme_registered`         |
+| MSME Number          | `reg_msme_no`  | `msme_number`                |
+| MSME Major Activity  | `reg_msme_act` | `msme_major_activity`        |
+
+Changes:
+
+- `src/components/.../SapFieldConfirmation.tsx` (the popup): add a small "MSME" section with these three controls, prefilled from the vendor row, and include the three `reg_*` keys in the `overrides` object passed to `buildSapPayload`.
+- `src/lib/sapPayloadBuilder.ts` `buildSapPayload`: in the existing `vendorForPayload` overlay block, copy `reg_is_msme` → `is_msme_registered`, `reg_msme_no` → `msme_number`, `reg_msme_act` → `msme_major_activity`. After overlay, recompute `isMsme = !!vendorForPayload.msme_number` so `msme_flag` / `idnum2` / `IDCATG` pick up the popup values.
+
+### Scope / non-goals
+
+- No schema changes.
+- No change to the bulk sync edge function (`sync-vendors-to-sap-bulk`) — popup-driven push only, same boundary as the previous Contact 2 / Email 2 fix.
+- Other document types stay excluded from `UPLOAD` to keep the request under SAP middleware limits.
+
+## Files touched
+
+- `src/lib/sapPayloadBuilder.ts` — real MSME upload fetch + MSME override overlay; drop `row.UPLOAD = []`.
+- `supabase/functions/sync-vendor-to-sap/index.ts` — same MSME upload fetch; drop the two `row.UPLOAD = []` overrides.
+- `src/components/.../SapFieldConfirmation.tsx` — MSME section + 3 override keys (exact file path confirmed when editing).
