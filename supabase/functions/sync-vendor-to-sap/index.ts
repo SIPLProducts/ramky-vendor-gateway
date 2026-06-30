@@ -61,35 +61,39 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
+  // Only attach the MSME certificate to keep the request under SAP middleware limits.
   const uploads: any[] = [];
   const skipped: string[] = [];
   const { data: docs, error } = await supabase
     .from("vendor_documents")
-    .select("document_type, file_name, file_path, file_size")
-    .eq("vendor_id", vendorId);
+    .select("document_type, file_name, file_path, file_size, uploaded_at")
+    .eq("vendor_id", vendorId)
+    .eq("document_type", "msme_certificate")
+    .order("uploaded_at", { ascending: false })
+    .limit(1);
   if (error) {
-    console.error("Failed to load vendor_documents:", error.message);
+    console.error("Failed to load vendor_documents (msme):", error.message);
     return { uploads, skipped };
   }
-  for (const d of docs || []) {
-    try {
-      if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-        skipped.push(`${d.file_name} (>10MB)`);
-        continue;
-      }
-      const { data: blob, error: dlErr } = await supabase.storage
-        .from("vendor-documents").download(d.file_path);
-      if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
-      const base64 = await blobToBase64(blob);
-      uploads.push({
-        FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
-        FILE: base64,
-        FILE_PATH: d.file_path,
-      });
-    } catch (e: any) {
-      console.error(`Upload build failed for ${d.file_name}:`, e?.message);
-      skipped.push(d.file_name);
+  const d = (docs || [])[0];
+  if (!d) return { uploads, skipped };
+  try {
+    if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+      skipped.push(`${d.file_name} (>10MB)`);
+      return { uploads, skipped };
     }
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from("vendor-documents").download(d.file_path);
+    if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); return { uploads, skipped }; }
+    const base64 = await blobToBase64(blob);
+    uploads.push({
+      FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
+      FILE: base64,
+      FILE_PATH: d.file_path,
+    });
+  } catch (e: any) {
+    console.error(`Upload build failed for ${d.file_name}:`, e?.message);
+    skipped.push(d.file_name);
   }
   return { uploads, skipped };
 }
