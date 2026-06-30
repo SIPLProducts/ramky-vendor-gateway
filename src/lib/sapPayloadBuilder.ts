@@ -355,7 +355,10 @@ export async function buildSapPayload(
     template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
   }
 
-  const { uploads, skipped } = await buildUploads(vendorId);
+  // Files are uploaded separately via the sync-vendor-to-dms edge function.
+  // The BP-create payload must NOT carry file contents.
+  const uploads: any[] = [];
+  const skipped: string[] = [];
 
   const ctx: ResolverCtx = {
     vendor: vendorForPayload,
@@ -382,7 +385,7 @@ export async function buildSapPayload(
       IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
     };
     delete (row as any).classify;
-    row.UPLOAD = uploads;
+    row.UPLOAD = [];
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
     row.idtype2 = "ZMSMEN";
