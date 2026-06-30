@@ -1,29 +1,33 @@
 ## Goal
 
-In the SAP payload, the `vendors[]` array entry should send **Contact 2** and **Email 2** from the Registration Form for `mob_number` and `smtp_addr`.
+1. The **Approved Applications** card on the Dashboard must count every SAP-synced vendor and exactly match the rows shown in the table.
+2. Clicking any of the four stat cards (Total / Pending / Approved / Rejected) filters the table to that group; clicking the active card clears the filter.
 
-## Storage check (no schema change needed)
+## Changes — `src/pages/Dashboard.tsx`
 
-Contact 2 and Email 2 are already captured on the Registration Form (Address step → `registeredContact2`, `registeredEmail2`) and persisted to `vendors.registered_contact_2` / `vendors.registered_email_2`. The resolver tokens `{{vendor.secondary_phone_value}}` and `{{vendor.secondary_email_value}}` already pull from those columns, so no DB or form changes are required.
+### 1. Approved count matches "SAP synced" rows
 
-## Change
+After SAP sync, a vendor's status flips to `sap_synced` and then to `dms_synced` once documents post to DMS. The current Approved counter only counts `sap_synced`, so any vendor that moved on to `dms_synced` is missed and the table contains rows the card does not. Plus `dms_synced` is not in `STATUS_LABELS` so the table shows the raw enum string.
 
-Inside the `vendors: [{ ... }]` block only (top-level `mob_number` / `smtp_addr` outside the array stay on primary):
+- Add `dms_synced: { label: 'Approved (DMS Synced)', variant: 'default' }` to `STATUS_LABELS`.
+- Define `APPROVED_STATUSES = new Set(['sap_synced', 'dms_synced'])` and `REJECTED_STATUSES = new Set(['sap_team_rejected', 'sap_team_closed'])`.
+- Update the `counts` memo to use those sets — guarantees card values == row counts per group.
 
-| Field        | Current source                                  | New source                                       |
-|--------------|-------------------------------------------------|--------------------------------------------------|
-| `mob_number` | `{{vendor.primary_phone_or_fallback\|trunc:30}}` | `{{vendor.secondary_phone_value\|trunc:30}}`     |
-| `smtp_addr`  | `{{vendor.primary_email_or_fallback\|trunc:241}}`| `{{vendor.secondary_email_value\|trunc:241}}`    |
+### 2. Click-to-filter cards
 
-`smtp_addr2` and `tel_number` inside the same `vendors[]` entry currently point to the secondary fields. To avoid duplication, they will be blanked (`""`) so primary contact data does not silently drop out — Contact 2 / Email 2 become the sole values sent in this array.
-
-## Files / data to update
-
-1. **`src/lib/sapDefaultTemplate.ts`** — update the two fields inside `vendors: [{...}]`; blank `smtp_addr2` and `tel_number` in that same entry.
-2. **`supabase/functions/sync-vendor-to-sap/index.ts`** — apply the same change to the inline `DEFAULT_SAP_PAYLOAD_TEMPLATE` fallback so self-hosted/edge runs match.
-3. **`sap_payload_templates` table** — patch the active row (`is_active = true AND tenant_id IS NULL`) JSON `template -> vendors[0]` with the same four field updates, since the live SAP Sync screen reads from this row (built-in default is only the fallback).
+- Add `const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')`.
+- Derive `filteredVendors` with `useMemo`:
+  - `all` → all vendors
+  - `pending` → `PENDING_STATUSES.has(v.status)`
+  - `approved` → `APPROVED_STATUSES.has(v.status)`
+  - `rejected` → `REJECTED_STATUSES.has(v.status)`
+- Bind each card to a key (`total | pending | approved | rejected`). Wrap each `Card` in a `button` (or add `role="button"`, `onClick`, `tabIndex=0`, keyboard handler) that toggles: clicking the active filter resets to `all`.
+- Active card gets a ring/border (`ring-2 ring-primary` and `cursor-pointer`) for affordance.
+- Table body, empty-state copy, and the Excel export all consume `filteredVendors` instead of `vendors`, so the export respects the active filter too.
+- Show a small "Showing: <label>" hint with a "Clear filter" link above the table when `statusFilter !== 'all'`.
 
 ## Out of scope
 
-- No changes to Registration Form fields, validation, resolver functions, region mapping, classification, banking, or any other SAP field.
-- Top-level (non-`vendors[]`) `smtp_addr` / `mob_number` / `tel_number` keep their current mappings.
+- No backend / RLS / status-enum changes.
+- No new columns or schema work.
+- Date range, tenant scoping, and invited-by lookup stay unchanged — the new filter is applied on top of the already-fetched list.
