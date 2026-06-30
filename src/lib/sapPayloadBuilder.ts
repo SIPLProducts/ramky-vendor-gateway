@@ -271,6 +271,12 @@ export async function buildSapPayload(
   if (hasKey('reg_contact2')) { vendorForPayload.registered_contact_2 = ov.reg_contact2 ?? ''; vendorForPayload.secondary_phone = ov.reg_contact2 ?? ''; }
   if (hasKey('reg_email1'))   { vendorForPayload.registered_email = ov.reg_email1 ?? ''; vendorForPayload.primary_email = ov.reg_email1 ?? ''; }
   if (hasKey('reg_email2'))   { vendorForPayload.registered_email_2 = ov.reg_email2 ?? ''; vendorForPayload.secondary_email = ov.reg_email2 ?? ''; }
+  if (hasKey('reg_is_msme'))  vendorForPayload.is_msme_registered = !!ov.reg_is_msme;
+  if (hasKey('reg_msme_no'))  vendorForPayload.msme_number = ov.reg_msme_no ?? '';
+  if (hasKey('reg_msme_cat')) vendorForPayload.msme_category = ov.reg_msme_cat ?? '';
+  if (hasKey('reg_msme_act')) vendorForPayload.msme_major_activity = ov.reg_msme_act ?? '';
+  // If popup explicitly turned MSME off, clear msme_number so isMsme=false downstream.
+  if (hasKey('reg_is_msme') && !ov.reg_is_msme) vendorForPayload.msme_number = '';
 
   if (!isInternational) {
     if (!vendorForPayload.registered_state || !resolveRegion(vendorForPayload.registered_state)) {
