@@ -199,8 +199,8 @@ function resolveTemplate(node: any, ctx: ResolverCtx): any {
 }
 
 async function buildUploads(vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
-  // Only attach the MSME certificate (single small file) to keep the request
-  // under the SAP middleware payload-size limit. Other docs stay excluded.
+  // Attach every uploaded vendor document. Each file is individually capped at
+  // MAX_UPLOAD_BYTES; oversized files are skipped (reported in `skipped`).
   const uploads: any[] = [];
   const skipped: string[] = [];
   try {
@@ -208,33 +208,36 @@ async function buildUploads(vendorId: string): Promise<{ uploads: any[]; skipped
       .from("vendor_documents")
       .select("document_type, file_name, file_path, file_size, uploaded_at")
       .eq("vendor_id", vendorId)
-      .eq("document_type", "msme_certificate")
-      .order("uploaded_at", { ascending: false })
-      .limit(1);
+      .order("uploaded_at", { ascending: false });
     if (error) {
-      console.warn("buildUploads(msme): vendor_documents query failed:", error.message);
+      console.warn("buildUploads: vendor_documents query failed:", error.message);
       return { uploads, skipped };
     }
-    const d = (docs || [])[0];
-    if (!d) return { uploads, skipped };
-    if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-      skipped.push(`${d.file_name} (>10MB)`);
-      return { uploads, skipped };
+    for (const d of docs || []) {
+      try {
+        if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+          skipped.push(`${d.file_name} (>10MB)`);
+          continue;
+        }
+        const { data: blob, error: dlErr } = await supabase.storage
+          .from("vendor-documents").download(d.file_path);
+        if (dlErr || !blob) {
+          skipped.push(`${d.file_name} (download failed)`);
+          continue;
+        }
+        const base64 = await blobToBase64(blob);
+        uploads.push({
+          FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
+          FILE: base64,
+          FILE_PATH: d.file_path,
+        });
+      } catch (e: any) {
+        console.warn(`buildUploads: failed for ${d.file_name}:`, e?.message);
+        skipped.push(d.file_name);
+      }
     }
-    const { data: blob, error: dlErr } = await supabase.storage
-      .from("vendor-documents").download(d.file_path);
-    if (dlErr || !blob) {
-      skipped.push(`${d.file_name} (download failed)`);
-      return { uploads, skipped };
-    }
-    const base64 = await blobToBase64(blob);
-    uploads.push({
-      FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
-      FILE: base64,
-      FILE_PATH: d.file_path,
-    });
   } catch (e: any) {
-    console.warn("buildUploads(msme) failed:", e?.message);
+    console.warn("buildUploads failed:", e?.message);
   }
   return { uploads, skipped };
 }
