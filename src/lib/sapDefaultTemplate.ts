@@ -184,6 +184,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
   wt_withcd: "",
   j_1iexcicu: "",
   mob_number: "{{vendor.primary_phone_or_fallback|trunc:30}}",
+  mob_number2: "{{vendor.secondary_phone_value|trunc:30}}",
   postl_cod1: "{{vendor.registered_pincode|trunc:10}}",
   str_suppl1: "{{vendor.registered_address_line2|trunc:40}}",
   str_suppl2: "{{vendor.registered_address_line3|trunc:40}}",
