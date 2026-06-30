@@ -97,6 +97,7 @@ export default function Dashboard() {
   const { tenantIds, vendorIds } = useTenantFilter();
   const { isLoading: tenantLoading } = useTenantContext();
 
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
 
