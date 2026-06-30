@@ -303,8 +303,14 @@ export default function Dashboard() {
       </section>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base">Vendor Applications</CardTitle>
+          {statusFilter !== 'all' && (
+            <div className="text-xs text-muted-foreground">
+              Showing: <span className="font-medium text-foreground">{cards.find((c) => c.key === statusFilter)?.label}</span>
+              <button type="button" onClick={() => setStatusFilter('all')} className="ml-2 text-primary hover:underline">Clear filter</button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-md border">
