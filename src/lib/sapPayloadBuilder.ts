@@ -379,12 +379,12 @@ export async function buildSapPayload(
       IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
     };
     delete (row as any).classify;
-    row.UPLOAD = [];
+    row.UPLOAD = uploads;
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
     row.idtype2 = "ZMSMEN";
-    row.idnum2 = (vendor as any).msme_number ? String((vendor as any).msme_number).slice(0, 20) : "";
-    row.IDCATG = (vendor as any).msme_major_activity ? String((vendor as any).msme_major_activity) : "";
+    row.idnum2 = vendorForPayload.msme_number ? String(vendorForPayload.msme_number).slice(0, 20) : "";
+    row.IDCATG = vendorForPayload.msme_major_activity ? String(vendorForPayload.msme_major_activity) : "";
 
     // Always emit new international bank keys (empty for domestic, populated for intl below)
     if (row.swift_code === undefined) row.swift_code = "";
