@@ -559,7 +559,7 @@ serve(async (req) => {
 
       payload = [row];
 
-      if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
+      
     }
 
     console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl,
