@@ -70,10 +70,6 @@ serve(async (req) => {
     const skipped: string[] = [];
     for (const d of docs || []) {
       try {
-        if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-          skipped.push(`${d.file_name} (>10MB)`);
-          continue;
-        }
         const { data: blob, error: dlErr } = await supabase.storage
           .from("vendor-documents").download(d.file_path);
         if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }

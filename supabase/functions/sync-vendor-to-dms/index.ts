@@ -267,10 +267,6 @@ serve(async (req) => {
 
         for (const d of docs || []) {
           try {
-            if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-              skipped.push(`${d.file_name} (>10MB)`);
-              continue;
-            }
             const { data: blob, error: dlErr } = await supabase.storage
               .from("vendor-documents").download(d.file_path);
             if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
@@ -294,17 +290,12 @@ serve(async (req) => {
         success = false;
         message = "No uploadable documents found for this vendor";
       } else {
-        // Split into batches to avoid 413 PayloadTooLarge at the middleware.
-        // Each batch keeps total approximate JSON size under DMS_BATCH_MAX_BYTES.
+        // Split into batches when total size grows large; a single oversized file is sent on its own.
         const batches: any[][] = [];
         let current: any[] = [];
         let currentBytes = 0;
         for (const u of uploads) {
           const sz = estimateUploadBytes(u);
-          if (sz > DMS_BATCH_MAX_BYTES) {
-            skipped.push(`${u.FILE_PATH || "document"} (${formatMb(sz)} exceeds safe per-request DMS limit ${formatMb(DMS_BATCH_MAX_BYTES)})`);
-            continue;
-          }
           if (current.length > 0 && currentBytes + sz > DMS_BATCH_MAX_BYTES) {
             batches.push(current);
             current = [];
@@ -314,11 +305,6 @@ serve(async (req) => {
           currentBytes += sz;
         }
         if (current.length > 0) batches.push(current);
-
-        if (uploads.length > 0 && batches.length === 0) {
-          success = false;
-          message = `No documents fit the safe DMS request size of ${formatMb(DMS_BATCH_MAX_BYTES)}. ${skipped.join("; ")}`;
-        }
 
         let batchErrors = 0;
         let lastErrorMessage = "";
