@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2, FileCheck } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
@@ -24,6 +24,7 @@ export type SapFieldOverrides = {
   reg_addr1: string; reg_addr2: string; reg_addr3: string; reg_addr4: string;
   reg_city: string; reg_state: string; reg_pincode: string;
   reg_contact1: string; reg_contact2: string; reg_email1: string; reg_email2: string;
+  reg_is_msme: boolean; reg_msme_no: string; reg_msme_cat: string; reg_msme_act: string;
   classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[] };
 };
 
@@ -181,6 +182,43 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             <Separator />
 
+            {/* MSME (editable — overrides values used in SAP payload) */}
+            <Section icon={<FileCheck className="h-4 w-4" />} title="MSME Details">
+              <CheckboxField
+                label="MSME Registered"
+                checked={!!form.reg_is_msme}
+                onChange={v => setForm(prev => ({
+                  ...prev,
+                  reg_is_msme: v,
+                  reg_msme_no: v ? prev.reg_msme_no : '',
+                  reg_msme_cat: v ? prev.reg_msme_cat : '',
+                  reg_msme_act: v ? prev.reg_msme_act : '',
+                }))}
+              />
+              <TextField
+                label="Udyam / MSME Number"
+                value={form.reg_is_msme ? form.reg_msme_no : ''}
+                onChange={v => set('reg_msme_no', v)}
+              />
+              <SelectField
+                label="MSME Category"
+                value={form.reg_msme_cat}
+                onChange={v => set('reg_msme_cat', v)}
+                options={[['micro', 'Micro'], ['small', 'Small'], ['medium', 'Medium']]}
+              />
+              <TextField
+                label="Major Activity (IDCATG)"
+                value={form.reg_is_msme ? form.reg_msme_act : ''}
+                onChange={v => set('reg_msme_act', v)}
+              />
+              <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
+                These values override the saved registration data when pushing to SAP. The MSME certificate (if uploaded) is attached automatically.
+              </p>
+            </Section>
+
+            <Separator />
+
+
             {/* Vendor Header (editable SAP) */}
             <Section icon={<Building2 className="h-4 w-4" />} title="Vendor Header">
               <SelectField label="Vendor (Person/Organization/Group)" value={form.partn_cat} onChange={v => set('partn_cat', v)}
@@ -270,7 +308,20 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             onClick={() => {
               const missing = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
               setMissingFields(missing as string[]);
-              if (missing.length === 0) onConfirm(form);
+              if (missing.length === 0) {
+                const cat = String(form.reg_msme_cat || '').toLowerCase().trim();
+                const msmeCode = !form.reg_is_msme
+                  ? 'ZNA'
+                  : cat === 'small' ? 'SMA'
+                  : cat === 'medium' ? 'MED'
+                  : 'MIC';
+                onConfirm({
+                  ...form,
+                  msme: msmeCode,
+                  idtype: form.reg_is_msme ? 'ZMSMEN' : '',
+                  idnum: form.reg_is_msme ? (form.reg_msme_no || '') : '',
+                });
+              }
             }}
             disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
@@ -327,6 +378,10 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     reg_contact2: v.registered_contact_2 ?? '',
     reg_email1: v.registered_email ?? v.primary_email ?? '',
     reg_email2: v.registered_email_2 ?? '',
+    reg_is_msme: !!msme,
+    reg_msme_no: v.msme_number ?? '',
+    reg_msme_cat: v.msme_category ?? '',
+    reg_msme_act: v.msme_major_activity ?? '',
     classify: {
       MGV: Array.isArray(v.material_group_vendors) ? v.material_group_vendors : [],
       CATV: Array.isArray(v.vendor_categories) ? v.vendor_categories : [],

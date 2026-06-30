@@ -199,10 +199,44 @@ function resolveTemplate(node: any, ctx: ResolverCtx): any {
 }
 
 async function buildUploads(vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
-  // SAP document upload is intentionally disabled from this API payload because
-  // base64 documents make the request too large for the middleware/SAP route.
-  // Keep the key in the final payload as UPLOAD: [] so SAP receives the expected shape.
-  return { uploads: [], skipped: [] };
+  // Only attach the MSME certificate (single small file) to keep the request
+  // under the SAP middleware payload-size limit. Other docs stay excluded.
+  const uploads: any[] = [];
+  const skipped: string[] = [];
+  try {
+    const { data: docs, error } = await supabase
+      .from("vendor_documents")
+      .select("document_type, file_name, file_path, file_size, uploaded_at")
+      .eq("vendor_id", vendorId)
+      .eq("document_type", "msme_certificate")
+      .order("uploaded_at", { ascending: false })
+      .limit(1);
+    if (error) {
+      console.warn("buildUploads(msme): vendor_documents query failed:", error.message);
+      return { uploads, skipped };
+    }
+    const d = (docs || [])[0];
+    if (!d) return { uploads, skipped };
+    if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+      skipped.push(`${d.file_name} (>10MB)`);
+      return { uploads, skipped };
+    }
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from("vendor-documents").download(d.file_path);
+    if (dlErr || !blob) {
+      skipped.push(`${d.file_name} (download failed)`);
+      return { uploads, skipped };
+    }
+    const base64 = await blobToBase64(blob);
+    uploads.push({
+      FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
+      FILE: base64,
+      FILE_PATH: d.file_path,
+    });
+  } catch (e: any) {
+    console.warn("buildUploads(msme) failed:", e?.message);
+  }
+  return { uploads, skipped };
 }
 
 export type BuildResult = {
@@ -237,6 +271,12 @@ export async function buildSapPayload(
   if (hasKey('reg_contact2')) { vendorForPayload.registered_contact_2 = ov.reg_contact2 ?? ''; vendorForPayload.secondary_phone = ov.reg_contact2 ?? ''; }
   if (hasKey('reg_email1'))   { vendorForPayload.registered_email = ov.reg_email1 ?? ''; vendorForPayload.primary_email = ov.reg_email1 ?? ''; }
   if (hasKey('reg_email2'))   { vendorForPayload.registered_email_2 = ov.reg_email2 ?? ''; vendorForPayload.secondary_email = ov.reg_email2 ?? ''; }
+  if (hasKey('reg_is_msme'))  vendorForPayload.is_msme_registered = !!ov.reg_is_msme;
+  if (hasKey('reg_msme_no'))  vendorForPayload.msme_number = ov.reg_msme_no ?? '';
+  if (hasKey('reg_msme_cat')) vendorForPayload.msme_category = ov.reg_msme_cat ?? '';
+  if (hasKey('reg_msme_act')) vendorForPayload.msme_major_activity = ov.reg_msme_act ?? '';
+  // If popup explicitly turned MSME off, clear msme_number so isMsme=false downstream.
+  if (hasKey('reg_is_msme') && !ov.reg_is_msme) vendorForPayload.msme_number = '';
 
   if (!isInternational) {
     if (!vendorForPayload.registered_state || !resolveRegion(vendorForPayload.registered_state)) {
@@ -286,7 +326,7 @@ export async function buildSapPayload(
     IDS: classifyArrays.IDS[0] || "",
   };
 
-  const isMsme = !!(vendor as any).msme_number;
+  const isMsme = !!vendorForPayload.msme_number;
 
   // Load template — DB-first, then fall back to the built-in default so
   // self-hosted deployments without a seeded `sap_payload_templates` row
@@ -339,12 +379,12 @@ export async function buildSapPayload(
       IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
     };
     delete (row as any).classify;
-    row.UPLOAD = [];
+    row.UPLOAD = uploads;
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
     row.idtype2 = "ZMSMEN";
-    row.idnum2 = (vendor as any).msme_number ? String((vendor as any).msme_number).slice(0, 20) : "";
-    row.IDCATG = (vendor as any).msme_major_activity ? String((vendor as any).msme_major_activity) : "";
+    row.idnum2 = vendorForPayload.msme_number ? String(vendorForPayload.msme_number).slice(0, 20) : "";
+    row.IDCATG = vendorForPayload.msme_major_activity ? String(vendorForPayload.msme_major_activity) : "";
 
     // Always emit new international bank keys (empty for domestic, populated for intl below)
     if (row.swift_code === undefined) row.swift_code = "";

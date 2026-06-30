@@ -61,35 +61,39 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 async function buildUploadArray(supabase: any, vendorId: string): Promise<{ uploads: any[]; skipped: string[] }> {
+  // Only attach the MSME certificate to keep the request under SAP middleware limits.
   const uploads: any[] = [];
   const skipped: string[] = [];
   const { data: docs, error } = await supabase
     .from("vendor_documents")
-    .select("document_type, file_name, file_path, file_size")
-    .eq("vendor_id", vendorId);
+    .select("document_type, file_name, file_path, file_size, uploaded_at")
+    .eq("vendor_id", vendorId)
+    .eq("document_type", "msme_certificate")
+    .order("uploaded_at", { ascending: false })
+    .limit(1);
   if (error) {
-    console.error("Failed to load vendor_documents:", error.message);
+    console.error("Failed to load vendor_documents (msme):", error.message);
     return { uploads, skipped };
   }
-  for (const d of docs || []) {
-    try {
-      if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
-        skipped.push(`${d.file_name} (>10MB)`);
-        continue;
-      }
-      const { data: blob, error: dlErr } = await supabase.storage
-        .from("vendor-documents").download(d.file_path);
-      if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); continue; }
-      const base64 = await blobToBase64(blob);
-      uploads.push({
-        FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
-        FILE: base64,
-        FILE_PATH: d.file_path,
-      });
-    } catch (e: any) {
-      console.error(`Upload build failed for ${d.file_name}:`, e?.message);
-      skipped.push(d.file_name);
+  const d = (docs || [])[0];
+  if (!d) return { uploads, skipped };
+  try {
+    if (d.file_size && d.file_size > MAX_UPLOAD_BYTES) {
+      skipped.push(`${d.file_name} (>10MB)`);
+      return { uploads, skipped };
     }
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from("vendor-documents").download(d.file_path);
+    if (dlErr || !blob) { skipped.push(`${d.file_name} (download failed)`); return { uploads, skipped }; }
+    const base64 = await blobToBase64(blob);
+    uploads.push({
+      FILE_NAME: DOC_NAME_MAP[d.document_type] || d.document_type,
+      FILE: base64,
+      FILE_PATH: d.file_path,
+    });
+  } catch (e: any) {
+    console.error(`Upload build failed for ${d.file_name}:`, e?.message);
+    skipped.push(d.file_name);
   }
   return { uploads, skipped };
 }
@@ -413,13 +417,24 @@ serve(async (req) => {
       };
       delete (row as any).classify;
 
-      row.UPLOAD = [];
+      const ovMsmeNo = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_no'))
+        ? (overrides.reg_msme_no ?? '') : vendor.msme_number;
+      const ovMsmeAct = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_act'))
+        ? (overrides.reg_msme_act ?? '') : vendor.msme_major_activity;
+      const msmeOff = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
+      const effMsmeNo = msmeOff ? '' : (ovMsmeNo || '');
+      const effMsmeAct = msmeOff ? '' : (ovMsmeAct || '');
+      const { uploads: msmeUploads, skipped: msmeSkipped } = effMsmeNo
+        ? await buildUploadArray(supabase, vendor_id)
+        : { uploads: [], skipped: [] };
+      row.UPLOAD = msmeUploads;
       row.idtype = "SOLMN1";
       row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
-      row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
-      row.IDCATG = vendor.msme_major_activity ? String(vendor.msme_major_activity) : "";
-      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length);
+      row.idnum2 = effMsmeNo ? String(effMsmeNo).slice(0, 20) : "";
+      row.IDCATG = effMsmeAct ? String(effMsmeAct) : "";
+      if (msmeSkipped.length) console.warn("Skipped MSME upload:", msmeSkipped.join(", "));
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "msmeUploads:", msmeUploads.length);
     } else {
       // Legacy path: resolve template server-side.
       const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
@@ -485,9 +500,14 @@ serve(async (req) => {
         template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
       }
 
-      // Document uploads are temporarily disabled to avoid SAP middleware 413 (PayloadTooLarge).
-      const uploads: any[] = [];
-      const skipped: string[] = [];
+      // Attach MSME certificate only (other docs intentionally excluded — payload-size).
+      const ovMsmeNo2 = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_no'))
+        ? (overrides.reg_msme_no ?? '') : vendor.msme_number;
+      const msmeOff2 = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
+      const effMsmeNo2 = msmeOff2 ? '' : (ovMsmeNo2 || '');
+      const { uploads, skipped } = effMsmeNo2
+        ? await buildUploadArray(supabase, vendor_id)
+        : { uploads: [] as any[], skipped: [] as string[] };
 
       const ctx: ResolverCtx = {
         vendor,
@@ -516,12 +536,15 @@ serve(async (req) => {
           IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
         };
         delete (row as any).classify;
-        row.UPLOAD = [];
+        row.UPLOAD = uploads;
         row.idtype = "SOLMN1";
         row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
         row.idtype2 = "ZMSMEN";
-        row.idnum2 = vendor.msme_number ? String(vendor.msme_number).slice(0, 20) : "";
-        row.IDCATG = vendor.msme_major_activity ? String(vendor.msme_major_activity) : "";
+        row.idnum2 = effMsmeNo2 ? String(effMsmeNo2).slice(0, 20) : "";
+        const ovMsmeAct2 = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_act'))
+          ? (overrides.reg_msme_act ?? '') : vendor.msme_major_activity;
+        const effMsmeAct2 = msmeOff2 ? '' : (ovMsmeAct2 || '');
+        row.IDCATG = effMsmeAct2 ? String(effMsmeAct2) : "";
 
         // For international vendors, replace hardcoded "IN" country codes in
         // the resolved payload with the vendor's actual SAP country code.
