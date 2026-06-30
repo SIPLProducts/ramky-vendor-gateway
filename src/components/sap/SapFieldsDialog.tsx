@@ -24,6 +24,7 @@ export type SapFieldOverrides = {
   reg_addr1: string; reg_addr2: string; reg_addr3: string; reg_addr4: string;
   reg_city: string; reg_state: string; reg_pincode: string;
   reg_contact1: string; reg_contact2: string; reg_email1: string; reg_email2: string;
+  reg_is_msme: boolean; reg_msme_no: string; reg_msme_cat: string; reg_msme_act: string;
   classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[] };
 };
 
