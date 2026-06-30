@@ -197,9 +197,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               />
               <TextField
                 label="Udyam / MSME Number"
-                value={form.reg_msme_no}
+                value={form.reg_is_msme ? form.reg_msme_no : ''}
                 onChange={v => set('reg_msme_no', v)}
-                disabled={!form.reg_is_msme}
               />
               <SelectField
                 label="MSME Category"
@@ -209,9 +208,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               />
               <TextField
                 label="Major Activity (IDCATG)"
-                value={form.reg_msme_act}
+                value={form.reg_is_msme ? form.reg_msme_act : ''}
                 onChange={v => set('reg_msme_act', v)}
-                disabled={!form.reg_is_msme}
               />
               <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
                 These values override the saved registration data when pushing to SAP. The MSME certificate (if uploaded) is attached automatically.
