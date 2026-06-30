@@ -328,6 +328,10 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     reg_contact2: v.registered_contact_2 ?? '',
     reg_email1: v.registered_email ?? v.primary_email ?? '',
     reg_email2: v.registered_email_2 ?? '',
+    reg_is_msme: !!msme,
+    reg_msme_no: v.msme_number ?? '',
+    reg_msme_cat: v.msme_category ?? '',
+    reg_msme_act: v.msme_major_activity ?? '',
     classify: {
       MGV: Array.isArray(v.material_group_vendors) ? v.material_group_vendors : [],
       CATV: Array.isArray(v.vendor_categories) ? v.vendor_categories : [],
