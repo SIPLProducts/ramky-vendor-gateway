@@ -422,15 +422,14 @@ serve(async (req) => {
       const msmeOff = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
       const effMsmeNo = msmeOff ? '' : (ovMsmeNo || '');
       const effMsmeAct = msmeOff ? '' : (ovMsmeAct || '');
-      const { uploads: docUploads, skipped: docSkipped } = await buildUploadArray(supabase, vendor_id);
-      row.UPLOAD = docUploads;
+      // Files are uploaded separately via sync-vendor-to-dms; never include them here.
+      row.UPLOAD = [];
       row.idtype = "SOLMN1";
       row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
       row.idtype2 = "ZMSMEN";
       row.idnum2 = effMsmeNo ? String(effMsmeNo).slice(0, 20) : "";
       row.IDCATG = effMsmeAct ? String(effMsmeAct) : "";
-      if (docSkipped.length) console.warn("Skipped uploads:", docSkipped.join(", "));
-      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "uploads:", docUploads.length);
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "uploads: 0 (DMS handled separately)");
     } else {
       // Legacy path: resolve template server-side.
       const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
@@ -496,12 +495,12 @@ serve(async (req) => {
         template = JSON.parse(JSON.stringify(DEFAULT_SAP_PAYLOAD_TEMPLATE));
       }
 
-      // Attach every uploaded vendor document (each file capped individually).
+      // Files are uploaded separately via sync-vendor-to-dms; never include them in the BP-create payload.
       const ovMsmeNo2 = (overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_msme_no'))
         ? (overrides.reg_msme_no ?? '') : vendor.msme_number;
       const msmeOff2 = overrides && Object.prototype.hasOwnProperty.call(overrides, 'reg_is_msme') && !overrides.reg_is_msme;
       const effMsmeNo2 = msmeOff2 ? '' : (ovMsmeNo2 || '');
-      const { uploads, skipped } = await buildUploadArray(supabase, vendor_id);
+      const uploads: any[] = [];
 
       const ctx: ResolverCtx = {
         vendor,
@@ -530,7 +529,7 @@ serve(async (req) => {
           IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
         };
         delete (row as any).classify;
-        row.UPLOAD = uploads;
+        row.UPLOAD = [];
         row.idtype = "SOLMN1";
         row.idnum = String(vendor.reference_number || vendor.id || "").toUpperCase();
         row.idtype2 = "ZMSMEN";
@@ -560,7 +559,7 @@ serve(async (req) => {
 
       payload = [row];
 
-      if (skipped.length) console.warn("Skipped uploads:", skipped.join(", "));
+      
     }
 
     console.log("SAP request via:", useMiddleware ? "middleware" : "direct", targetUrl,
