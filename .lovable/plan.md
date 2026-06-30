@@ -1,33 +1,40 @@
 ## Goal
 
-1. The **Approved Applications** card on the Dashboard must count every SAP-synced vendor and exactly match the rows shown in the table.
-2. Clicking any of the four stat cards (Total / Pending / Approved / Rejected) filters the table to that group; clicking the active card clears the filter.
+Send Contact 2 and Email 2 from the Registration Form on the **secondary** SAP fields (`mob_number2` / `smtp_addr2`) and restore the **primary** fields (`mob_number` / `smtp_addr` / `tel_number`) to their original meaning — both at the top level and inside `vendors[]`. Top-level already does this correctly; the `vendors[]` entry currently overwrites the primary fields with the secondary values and is missing `mob_number2` entirely.
 
-## Changes — `src/pages/Dashboard.tsx`
+## Final mapping (after change)
 
-### 1. Approved count matches "SAP synced" rows
+Top-level (already correct, no change needed):
+- `smtp_addr`  → Email 1 (`primary_email_or_fallback`)
+- `smtp_addr2` → Email 2 (`secondary_email_value`)
+- `mob_number` → Contact 1 (`primary_phone_or_fallback`)
+- `mob_number2` → Contact 2 (`secondary_phone_value`)  ← add at top level
+- `tel_number` → Contact 2 (kept as-is for backward compat)
 
-After SAP sync, a vendor's status flips to `sap_synced` and then to `dms_synced` once documents post to DMS. The current Approved counter only counts `sap_synced`, so any vendor that moved on to `dms_synced` is missed and the table contains rows the card does not. Plus `dms_synced` is not in `STATUS_LABELS` so the table shows the raw enum string.
+`vendors[0]` entry (fix):
+- `smtp_addr`  → Email 1
+- `smtp_addr2` → Email 2
+- `mob_number` → Contact 1
+- `mob_number2` → Contact 2  ← new key
+- `tel_number` → `""`
 
-- Add `dms_synced: { label: 'Approved (DMS Synced)', variant: 'default' }` to `STATUS_LABELS`.
-- Define `APPROVED_STATUSES = new Set(['sap_synced', 'dms_synced'])` and `REJECTED_STATUSES = new Set(['sap_team_rejected', 'sap_team_closed'])`.
-- Update the `counts` memo to use those sets — guarantees card values == row counts per group.
+## Files to change
 
-### 2. Click-to-filter cards
+1. **`src/lib/sapDefaultTemplate.ts`** — built-in fallback template
+   - Top-level: add `mob_number2: "{{vendor.secondary_phone_value|trunc:30}}"` next to `mob_number`.
+   - `vendors[0]`:
+     - `smtp_addr`  → `"{{vendor.primary_email_or_fallback|trunc:241}}"`
+     - `smtp_addr2` → `"{{vendor.secondary_email_value|trunc:241}}"`
+     - `mob_number` → `"{{vendor.primary_phone_or_fallback|trunc:30}}"`
+     - Add `mob_number2: "{{vendor.secondary_phone_value|trunc:30}}"`
+     - `tel_number` stays `""`
 
-- Add `const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')`.
-- Derive `filteredVendors` with `useMemo`:
-  - `all` → all vendors
-  - `pending` → `PENDING_STATUSES.has(v.status)`
-  - `approved` → `APPROVED_STATUSES.has(v.status)`
-  - `rejected` → `REJECTED_STATUSES.has(v.status)`
-- Bind each card to a key (`total | pending | approved | rejected`). Wrap each `Card` in a `button` (or add `role="button"`, `onClick`, `tabIndex=0`, keyboard handler) that toggles: clicking the active filter resets to `all`.
-- Active card gets a ring/border (`ring-2 ring-primary` and `cursor-pointer`) for affordance.
-- Table body, empty-state copy, and the Excel export all consume `filteredVendors` instead of `vendors`, so the export respects the active filter too.
-- Show a small "Showing: <label>" hint with a "Clear filter" link above the table when `statusFilter !== 'all'`.
+2. **`supabase/functions/sync-vendor-to-sap/index.ts`** — patch the embedded default template the same way (top-level add `mob_number2`; vendors[] restore primary and add `mob_number2`).
+
+3. **`sap_payload_templates` table** — update the active row's `template` JSONB so live tenants pick up the new mapping immediately (no schema change, just a `jsonb_set` on the existing row, mirroring the file edits above).
 
 ## Out of scope
 
-- No backend / RLS / status-enum changes.
-- No new columns or schema work.
-- Date range, tenant scoping, and invited-by lookup stay unchanged — the new filter is applied on top of the already-fetched list.
+- No new resolver helpers — `secondary_phone_value` / `secondary_email_value` / `primary_*_or_fallback` already exist in `src/lib/sapPayloadBuilder.ts`.
+- No registration-form changes; Contact 2 / Email 2 are already captured as `registered_contact_2` / `registered_email_2`.
+- No edge-function logic changes beyond the embedded default template literal.
