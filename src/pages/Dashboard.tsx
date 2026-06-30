@@ -264,7 +264,7 @@ export default function Dashboard() {
           >
             Clear
           </Button>
-          <Button onClick={handleExport} disabled={vendors.length === 0}>
+          <Button onClick={handleExport} disabled={filteredVendors.length === 0}>
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
           </Button>
