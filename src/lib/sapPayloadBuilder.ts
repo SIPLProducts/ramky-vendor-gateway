@@ -206,10 +206,10 @@ async function buildUploads(vendorId: string): Promise<{ uploads: any[]; skipped
   try {
     const { data: docs, error } = await supabase
       .from("vendor_documents")
-      .select("document_type, file_name, file_path, file_size, created_at")
+      .select("document_type, file_name, file_path, file_size, uploaded_at")
       .eq("vendor_id", vendorId)
       .eq("document_type", "msme_certificate")
-      .order("created_at", { ascending: false })
+      .order("uploaded_at", { ascending: false })
       .limit(1);
     if (error) {
       console.warn("buildUploads(msme): vendor_documents query failed:", error.message);
