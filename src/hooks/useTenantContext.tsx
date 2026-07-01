@@ -76,7 +76,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [customRoleNames],
   );
   const isScmManager = useMemo(
-    () => customRoleNames.some((n) => n === 'scm manager'),
+    () => customRoleNames.some((n) => n === 'scm co'),
     [customRoleNames],
   );
   const isStageApprover = useMemo(

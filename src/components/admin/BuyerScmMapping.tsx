@@ -24,7 +24,7 @@ interface MappingRow {
 }
 
 
-const SCM_ROLE = 'SCM Manager';
+const SCM_ROLE = 'SCM CO';
 const BUYER_ROLE = 'Buyer';
 
 export function BuyerScmMapping({ tenantId }: Props) {
