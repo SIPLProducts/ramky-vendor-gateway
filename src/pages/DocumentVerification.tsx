@@ -42,7 +42,7 @@ import {
   AlertTriangle,
   Building2,
   Download,
-  IndianRupee,
+  
   Loader2,
   Eye,
   Mail,
