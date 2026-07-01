@@ -23,7 +23,7 @@ interface UseVendorRegistrationOptions {
 }
 
 // Statuses that allow editing
-const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected', 'returned_to_vendor', 'returned_to_buyer'];
+const EDITABLE_STATUSES: VendorStatus[] = ['draft', 'validation_failed', 'finance_rejected', 'returned_to_vendor'];
 
 // Document types that can be uploaded
 type DocumentType = 'gst_certificate' | 'gst_self_declaration' | 'pan_card' | 'msme_certificate' | 'msme_self_declaration' | 'cancelled_cheque' | 'cancelled_cheque_2' | 'financial_docs' | 'dealership_certificate' | 'registration_copy' | 'swift_iban_details';
