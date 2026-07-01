@@ -341,69 +341,6 @@ export default function DocumentVerification() {
     },
   });
 
-  // Run Penny Drop validation
-  const runPennyDropMutation = useMutation({
-    mutationFn: async (vendor: Vendor) => {
-      setRunningValidation('penny_drop');
-      setPennyDropResult(null);
-      setPennyDropStage(0);
-      setShowPennyDropDialog(true);
-
-      const stageInterval = setInterval(() => {
-        setPennyDropStage(prev => Math.min(prev + 1, 5));
-      }, 400);
-
-      const { data, error } = await supabase.functions.invoke('validate-penny-drop', {
-        body: {
-          accountNumber: vendor.account_number || '1234567890123456',
-          ifscCode: vendor.ifsc_code || 'HDFC0001234',
-          accountHolderName: vendor.legal_name || 'Unknown',
-          vendorName: vendor.legal_name || 'Unknown',
-        },
-      });
-
-      clearInterval(stageInterval);
-      
-      if (error) throw error;
-
-      setPennyDropResult(data);
-      setPennyDropStage(data.stages?.length || 5);
-
-      await supabase
-        .from('vendor_validations')
-        .delete()
-        .eq('vendor_id', vendor.id)
-        .eq('validation_type', 'bank');
-
-      await supabase.from('vendor_validations').insert({
-        vendor_id: vendor.id,
-        validation_type: 'bank',
-        status: data.verified ? 'passed' : 'failed',
-        message: `Penny Drop: ${data.message}`,
-        details: data,
-      });
-
-      return data;
-    },
-    onSuccess: (data) => {
-      toast({
-        title: data.verified ? 'Penny Drop Verified' : 'Penny Drop Warning',
-        description: data.message,
-        variant: data.verified ? 'default' : 'destructive',
-      });
-      refetchValidations();
-    },
-    onError: (error) => {
-      toast({
-        title: 'Penny Drop Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-    onSettled: () => {
-      setRunningValidation(null);
-    },
-  });
 
   // Run all validations for single vendor
   const runAllValidationsMutation = useMutation({
