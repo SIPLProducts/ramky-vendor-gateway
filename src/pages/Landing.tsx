@@ -1,7 +1,9 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 import {
   ShieldCheck,
   Workflow,
@@ -113,6 +115,14 @@ const organizationJsonLd = {
 };
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const { user, loading, isVendor, userRole } = useAuth();
+
+  useEffect(() => {
+    if (loading || !user || !userRole) return;
+    if (isVendor) navigate('/vendor/login', { replace: true });
+  }, [user, loading, userRole, isVendor, navigate]);
+
   return (
     <div className="min-h-screen bg-[#F7F9FC] text-foreground">
       <Helmet>
