@@ -109,34 +109,6 @@ interface Deviation {
   message: string;
 }
 
-interface PennyDropResult {
-  success: boolean;
-  verified: boolean;
-  message: string;
-  data?: {
-    transactionId: string;
-    accountNumber: string;
-    ifscCode: string;
-    bankName: string;
-    branchName: string;
-    accountHolderName: string;
-    nameMatchScore: number;
-    nameMatchStatus: 'exact' | 'partial' | 'mismatch';
-    accountStatus: string;
-    accountType: string;
-    transferAmount: number;
-    transferStatus: string;
-    transferTimestamp: string;
-    utrNumber: string;
-    responseTime: number;
-  };
-  stages?: {
-    stage: string;
-    status: 'completed' | 'in_progress' | 'pending' | 'failed';
-    message: string;
-    timestamp: string;
-  }[];
-}
 
 const validationTypeLabels: Record<string, string> = {
   gst: 'GST Verification',
