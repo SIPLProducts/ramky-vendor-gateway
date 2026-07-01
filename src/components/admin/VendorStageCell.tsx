@@ -12,7 +12,7 @@ export type VendorLite = {
 
 const PIPELINE = [
   { key: 'BUYER', label: 'Buyer' },
-  { key: 'SCM_MANAGER', label: 'SCM Manager' },
+  { key: 'SCM_MANAGER', label: 'SCM CO' },
   { key: 'SCM_HEAD', label: 'SCM Head' },
   { key: 'FINANCE_1', label: 'Finance 1' },
   { key: 'FINANCE_2', label: 'Finance 2' },
@@ -37,7 +37,7 @@ function statusToStep(status: string | null | undefined): {
     case 'buyer_review':
       return { step: 1, label: 'Buyer Review', tone: 'progress' };
     case 'scm_manager_review':
-      return { step: 2, label: 'SCM Manager Review', tone: 'progress' };
+      return { step: 2, label: 'SCM CO', tone: 'progress' };
     case 'scm_head_review':
       return { step: 3, label: 'SCM Head Review', tone: 'progress' };
     case 'finance_1_review':
@@ -133,7 +133,7 @@ export function VendorReferenceCell({ vendor }: { vendor: VendorLite }) {
 // Filter helpers used by the page
 export const STAGE_FILTER_OPTIONS = [
   { value: 'stage:buyer', label: 'Stage: Buyer', statuses: ['draft', 'submitted', 'validation_pending', 'buyer_review'] },
-  { value: 'stage:scm_manager', label: 'Stage: SCM Manager', statuses: ['scm_manager_review'] },
+  { value: 'stage:scm_manager', label: 'Stage: SCM CO', statuses: ['scm_manager_review'] },
   { value: 'stage:scm_head', label: 'Stage: SCM Head', statuses: ['scm_head_review'] },
   { value: 'stage:finance_1', label: 'Stage: Finance 1', statuses: ['finance_1_review'] },
   { value: 'stage:finance_2', label: 'Stage: Finance 2', statuses: ['finance_2_review'] },

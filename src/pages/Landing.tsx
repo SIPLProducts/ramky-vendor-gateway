@@ -33,7 +33,7 @@ const features = [
   {
     icon: Workflow,
     title: "Multi-level approval workflow",
-    body: "Configurable SCM Manager, SCM Head, Finance and CEO stages with delegation, comments, and a full audit trail for every decision.",
+    body: "Configurable SCM CO, SCM Head, Finance and CEO stages with delegation, comments, and a full audit trail for every decision.",
   },
   {
     icon: RefreshCw,
