@@ -106,4 +106,4 @@ WHERE buyer_user_id = '<buyer-uuid>';
 
 The first pending row’s `stage` should be `BUYER` — that’s why the request
 appears on the Buyer’s screen. After the Buyer approves, the next row
-(`SCM_MANAGER`) becomes pending and the SCM Manager screen lights up.
+(`SCM_MANAGER`) becomes pending and the SCM CO screen lights up.
