@@ -77,6 +77,32 @@ export function PanKycTab(props: PanKycTabProps) {
   };
 
 
+  const runPanComprehensive = (pan: string) => {
+    // Fire-and-forget. Must never throw or block PAN verification.
+    (async () => {
+      try {
+        const cr = await callProvider({
+          providerName: 'PAN',
+          input: { id_number: pan, pan },
+        });
+        if (cr?.ok && cr.data) {
+          const rawStatus = pickStr((cr.data as any).status) || null;
+          const rawLinked = (cr.data as any).aadhaar_linked;
+          const aadhaarLinked =
+            rawLinked === true || String(rawLinked).toLowerCase() === 'true'
+              ? true
+              : rawLinked === false || String(rawLinked).toLowerCase() === 'false'
+                ? false
+                : null;
+          updateResult({ panStatus: rawStatus, aadhaarLinked });
+          props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
+        }
+      } catch {
+        /* silent — comprehensive call is best-effort */
+      }
+    })();
+  };
+
   const runPanOcr = async (file: File) => {
     if (!props.gstVerified) {
       return {
@@ -87,6 +113,7 @@ export function PanKycTab(props: PanKycTabProps) {
     props.onStatusChange?.('validating');
     const r = await callProvider({ providerName: 'PAN_OCR', file });
     toastKycResult('PAN OCR', r);
+
     if (!r.found && !r.message_code) {
       props.onStatusChange?.('failed');
       return {
