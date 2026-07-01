@@ -250,7 +250,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
             <Switch id="include-scm" checked={includeScm} onCheckedChange={setIncludeScm} />
             <div className="space-y-0.5">
               <label htmlFor="include-scm" className="text-sm font-medium cursor-pointer">
-                Include SCM Manager / SCM Head in approval flow
+                Include SCM CO / SCM Head in approval flow
               </label>
               <p className="text-xs text-muted-foreground">
                 When off, vendors invited by this buyer skip SCM stages and go directly to Finance 1.
