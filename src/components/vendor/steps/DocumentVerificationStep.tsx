@@ -276,10 +276,14 @@ function extractPanComprehensiveFields(result: any): { status: string | null; aa
     data.aadhaarLinked ??
     data.aadhaar_linked_with_pan ??
     data.is_aadhaar_linked ??
+    data.aadhaar_seeding_status ??
+    data.aadhaar_seeding_status_desc ??
     rawData.aadhaar_linked ??
     rawData.aadhaarLinked ??
     rawData.aadhaar_linked_with_pan ??
     rawData.is_aadhaar_linked ??
+    rawData.aadhaar_seeding_status ??
+    rawData.aadhaar_seeding_status_desc ??
     null;
   return {
     status: statusRaw == null || statusRaw === "" ? null : String(statusRaw),
