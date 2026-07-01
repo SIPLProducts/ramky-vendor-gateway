@@ -1330,52 +1330,29 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <main
-          className="flex-1 relative bg-slate-950"
-          style={{ backgroundImage: `url(${ramkyHeroBg.url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-        >
-          {/* Overlay for readability */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-950/60 to-slate-950/40 lg:from-slate-950/70 lg:via-slate-950/40 lg:to-slate-950/20" />
-
-          <div className="relative z-10 min-h-full grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-8 p-4 sm:p-8 lg:p-12 items-center">
-            {/* Left: brand messaging (desktop) */}
-            <div className="hidden lg:flex flex-col justify-center text-white space-y-5 max-w-xl">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/70">Ramky Group</p>
-              <h2 className="text-4xl xl:text-5xl font-semibold leading-tight">
-                Welcome to the <span className="text-orange-400">Vendor Portal</span>
-              </h2>
-              <p className="text-lg text-white/80 italic">Towards sustainable growth</p>
-              <div className="pt-4 border-t border-white/20">
-                <p className="text-sm text-white/70 leading-relaxed">
-                  Ramky Infrastructure Ltd. &middot; Ramky Estates &middot; Smilax Laboratories Ltd. &middot; Ramky Foundation
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+          <div className="w-full max-w-2xl bg-card rounded-[10px] shadow-lg border p-6 sm:p-8 space-y-6">
+            {isTokenMode && invitationEmail && (
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
                 </p>
               </div>
+            )}
+            <div className="space-y-1">
+              <h1 className="text-xl font-semibold text-foreground">Select Vendor Type</h1>
+              <p className="text-sm text-muted-foreground">Choose the vendor category to begin your registration. You can change this later.</p>
             </div>
-
-            {/* Right: selection card */}
-            <div className="w-full max-w-xl lg:justify-self-end bg-card/95 backdrop-blur-md rounded-[10px] shadow-2xl border border-white/20 p-6 sm:p-8 space-y-6">
-              {isTokenMode && invitationEmail && (
-                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
-                  </p>
-                </div>
-              )}
-              <div className="space-y-1">
-                <h1 className="text-xl font-semibold text-foreground">Select Vendor Type</h1>
-                <p className="text-sm text-muted-foreground">Choose the vendor category to begin your registration. You can change this later.</p>
-              </div>
-              <VendorTypeSelector
-                value={pendingChoiceType}
-                onChange={setPendingChoiceType}
-                disabled={isSubmitting}
-              />
-              <div className="flex justify-end pt-2">
-                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
-                  Continue
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
+            <VendorTypeSelector
+              value={pendingChoiceType}
+              onChange={setPendingChoiceType}
+              disabled={isSubmitting}
+            />
+            <div className="flex justify-end pt-2">
+              <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
+                Continue
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
             </div>
           </div>
         </main>
