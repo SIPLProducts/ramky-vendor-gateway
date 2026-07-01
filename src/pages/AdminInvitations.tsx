@@ -635,7 +635,7 @@ export default function AdminInvitations() {
     setIsTracking(true);
     try {
       // RLS (user_can_see_vendor) enforces visibility for buyers, on-behalf,
-      // SCM managers, stage approvers, admin, and SAP team. Query directly.
+      // SCM CO, stage approvers, admin, and SAP team. Query directly.
       const { data, error } = await supabase
         .from('vendors')
         .select('id')
