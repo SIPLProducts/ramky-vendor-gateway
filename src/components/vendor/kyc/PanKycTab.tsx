@@ -174,31 +174,7 @@ export function PanKycTab(props: PanKycTabProps) {
 
     if (panOk && nameOk) {
       props.onStatusChange?.('passed');
-      // Fire-and-forget PAN Comprehensive call to fetch `status` + `aadhaar_linked`.
-      // Optional: if the provider isn't configured or the call fails, we silently
-      // skip — this must not block PAN verification.
-      (async () => {
-        try {
-          const cr = await callProvider({
-            providerName: 'PAN',
-            input: { id_number: extractedPan, pan: extractedPan },
-          });
-          if (cr?.ok && cr.data) {
-            const rawStatus = pickStr((cr.data as any).status) || null;
-            const rawLinked = (cr.data as any).aadhaar_linked;
-            const aadhaarLinked =
-              rawLinked === true || String(rawLinked).toLowerCase() === 'true'
-                ? true
-                : rawLinked === false || String(rawLinked).toLowerCase() === 'false'
-                  ? false
-                  : null;
-            updateResult({ panStatus: rawStatus, aadhaarLinked });
-            props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
-          }
-        } catch {
-          /* silent — comprehensive call is best-effort */
-        }
-      })();
+
       return {
         ok: true,
         message: `PAN Number verified with GST PAN Number. ${nameMessage}`,
