@@ -138,7 +138,11 @@ export function PanKycTab(props: PanKycTabProps) {
 
     if (extractedPan && extractedPan.length === 10) {
       props.onPanChange(extractedPan);
+      // Trigger PAN Comprehensive Validation immediately after OCR captures a valid PAN.
+      // Independent of PAN-vs-GST match and independent of GST=Yes/No.
+      runPanComprehensive(extractedPan);
     }
+
 
     const panOk = panMatch(extractedPan, props.gstPanNumber);
 
