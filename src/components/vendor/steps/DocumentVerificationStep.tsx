@@ -2656,7 +2656,7 @@ export function DocumentVerificationStep({
             <StageShell
               icon={<Landmark className="h-4 w-4" />}
               title="Bank Account"
-              subtitle="Upload cancelled cheque — penny-drop verifies the account"
+              subtitle="Upload cancelled cheque"
               status={tabStatus.bank}
               verifiedAt={bankDoc.verifiedAt}
             >
