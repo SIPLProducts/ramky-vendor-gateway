@@ -8,7 +8,7 @@ export type ApprovalStage =
 
 /**
  * Display label for a level within a stage.
- * SCM Manager uses SCM CO1, SCM CO2, … per business rebrand.
+ * SCM CO stage uses SCM CO1, SCM CO2, … per business rebrand.
  * All other stages keep the generic L{n} label.
  */
 export function formatStageLevel(stage: ApprovalStage | string, n: number): string {
