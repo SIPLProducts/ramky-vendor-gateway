@@ -28,7 +28,7 @@ import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRi
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
-import ramkyHeroBg from '@/assets/ramky-hero-bg.png.asset.json';
+
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { AutoSaveIndicator, type AutoSaveState } from '@/components/vendor/AutoSaveIndicator';
