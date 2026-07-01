@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
+import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 import { supabase } from '@/integrations/supabase/client';
