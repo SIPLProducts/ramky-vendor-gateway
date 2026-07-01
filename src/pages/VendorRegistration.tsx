@@ -1353,7 +1353,7 @@ export default function VendorRegistration() {
             </div>
 
             {/* Right: selection card */}
-            <div className="w-full max-w-xl lg:justify-self-end bg-card/75 backdrop-blur-md rounded-[10px] shadow-2xl border border-white/20 p-6 sm:p-8 space-y-6">
+            <div className="w-full max-w-xl lg:justify-self-end bg-card/95 backdrop-blur-md rounded-[10px] shadow-2xl border border-white/20 p-6 sm:p-8 space-y-6">
               {isTokenMode && invitationEmail && (
                 <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">
