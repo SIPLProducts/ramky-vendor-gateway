@@ -550,6 +550,14 @@ export default function SAPSync() {
                             <><Undo2 className="h-4 w-4 mr-2" />Reject &amp; Send to Buyer</>
                           )}
                         </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setCommentsVendor(vendor)}
+                          title="View approval comment history"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />Comments
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
