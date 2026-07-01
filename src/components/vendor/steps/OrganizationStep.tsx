@@ -112,9 +112,9 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     setValue,
     formState: { errors },
   } = useForm<FormValues>({
-
     resolver: zodResolver(schema),
     defaultValues: {
+
       ...data,
       state: data?.state || '',
       accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
