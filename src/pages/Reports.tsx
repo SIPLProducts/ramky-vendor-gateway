@@ -461,6 +461,8 @@ const SECTIONS: SectionDef[] = [
       pan_number: 'PAN Number',
       pan_holder_name: 'PAN Holder Name',
       pan_status: 'PAN Status',
+      pan_aadhaar_linked: 'Is Aadhaar Linked',
+      pan_comprehensive_verified_at: 'PAN Comprehensive Verified At',
       pan_verified: 'PAN Verified',
       pan_verified_at: 'PAN Verified At',
     },
