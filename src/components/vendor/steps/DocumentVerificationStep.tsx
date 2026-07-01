@@ -29,6 +29,7 @@ import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled, type 
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
+import { formatPanStatus, formatAadhaarLinked } from "@/lib/panComprehensive";
 
 /**
  * Maps the registration step's document type → the provider_name configured
@@ -157,6 +158,9 @@ export interface VerifiedDocumentData {
   };
   bank?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
   bank2?: { accountNumber: string; ifsc: string; bankName: string; branchName?: string; accountHolderName?: string; apiName?: string; accountType?: string; bankAddress?: string };
+  panStatus?: string | null;
+  panAadhaarLinked?: boolean | null;
+  panComprehensiveVerifiedAt?: string | null;
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
   panCardFile?: File | null;
@@ -250,6 +254,37 @@ function friendlyModelName(model?: string): string | undefined {
   return tail
     .replace(/-/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function normalizeBooleanLike(value: unknown): boolean | null {
+  if (value === true || value === false) return value;
+  const s = String(value ?? "").trim().toLowerCase();
+  if (["true", "yes", "y", "linked", "aadhaar linked", "aadhaar linked with pan", "1"].includes(s)) return true;
+  if (["false", "no", "n", "not linked", "aadhaar not linked", "aadhaar not linked with pan", "0"].includes(s)) return false;
+  return null;
+}
+
+function extractPanComprehensiveFields(result: any): { status: string | null; aadhaarLinked: boolean | null } {
+  const rawData =
+    result?.raw && typeof result.raw === "object" && result.raw.data && typeof result.raw.data === "object"
+      ? result.raw.data
+      : {};
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  const statusRaw = data.status ?? data.pan_status ?? rawData.status ?? rawData.pan_status ?? null;
+  const linkedRaw =
+    data.aadhaar_linked ??
+    data.aadhaarLinked ??
+    data.aadhaar_linked_with_pan ??
+    data.is_aadhaar_linked ??
+    rawData.aadhaar_linked ??
+    rawData.aadhaarLinked ??
+    rawData.aadhaar_linked_with_pan ??
+    rawData.is_aadhaar_linked ??
+    null;
+  return {
+    status: statusRaw == null || statusRaw === "" ? null : String(statusRaw),
+    aadhaarLinked: normalizeBooleanLike(linkedRaw),
+  };
 }
 
 export function DocumentVerificationStep({
@@ -393,12 +428,28 @@ export function DocumentVerificationStep({
   // Stage 2: PAN
   const [panDoc, setPanDoc] = useState<DocState>(() => {
     if (!initialData?.pan) return idleDoc;
-    const data = { pan_number: initialData.pan.number, holder_name: initialData.pan.holderName };
+    const data = {
+      pan_number: initialData.pan.number,
+      holder_name: initialData.pan.holderName,
+      status: initialData.panStatus ?? undefined,
+      aadhaar_linked: initialData.panAadhaarLinked ?? undefined,
+    };
     return {
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { name: initialData.pan.apiName },
+      apiData: {
+        name: initialData.pan.apiName,
+        panStatus: initialData.panStatus ?? null,
+        aadhaarLinked: initialData.panAadhaarLinked ?? null,
+        panComprehensiveVerifiedAt: initialData.panComprehensiveVerifiedAt ?? null,
+        normalized: {
+          pan_number: initialData.pan.number,
+          holder_name: initialData.pan.holderName,
+          status: initialData.panStatus ?? null,
+          aadhaar_linked: initialData.panAadhaarLinked ?? null,
+        },
+      },
       nameMatchScore: initialData.pan.nameMatchScore,
     };
   });
@@ -664,18 +715,45 @@ export function DocumentVerificationStep({
       };
     }
     if (kind === "pan") {
-      // PAN flow: OCR has already run.
-      // - If GST = Yes: GST registry is the source of truth for PAN + name,
-      //   so we skip the PAN Comprehensive Validation API and rely solely on
-      //   OCR + GST cross-check (PAN derived from GSTIN[2..12], holder name
-      //   fuzzy-matches GST legal name >= 40%).
-      // - If GST = No (Self-Declaration): call the PAN provider and require
-      //   `data.status === "valid"`.
+      // PAN flow: OCR has already run. Always call PAN Comprehensive Validation
+      // after a valid PAN is read, then keep the existing GST cross-check gate.
       const ocrPan = String(ocr.pan_number || "").toUpperCase().trim();
       const ocrName = String(ocr.full_name || ocr.holder_name || ocr.name || "").trim();
       if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(ocrPan)) {
         return { ok: false as const, message: "Could not read a valid 10-character PAN. Please upload a clearer scan." };
       }
+
+      const r = await callProvider({
+        providerName: "PAN",
+        input: { id_number: ocrPan, pan: ocrPan, pan_number: ocrPan },
+      });
+      toastKycResult("PAN", r);
+      if (!r.found) {
+        return {
+          ok: false as const,
+          message: "PAN Comprehensive Validation provider is not configured. Add it in KYC & Validation API Settings.",
+        };
+      }
+      const comprehensive = extractPanComprehensiveFields(r);
+      const rawData: Record<string, any> =
+        (r.raw && typeof r.raw === "object" && (r.raw as any).data && typeof (r.raw as any).data === "object")
+          ? (r.raw as any).data
+          : {};
+      const apiStatus = String(comprehensive.status ?? "").toLowerCase().trim();
+      if (!r.ok || apiStatus !== "valid") {
+        return {
+          ok: false as const,
+          message: r.message || "PAN validation failed. Please upload a clearer PAN card and try again.",
+        };
+      }
+      const apiName = String(
+        (r.data as any)?.full_name ||
+        (r.data as any)?.name ||
+        (r.data as any)?.holder_name ||
+        rawData.full_name ||
+        rawData.name ||
+        ""
+      ).trim();
 
       if (isGstRegistered === true) {
         const gstin = String(gstDoc.ocrData?.gstin || "").toUpperCase().trim();
@@ -698,6 +776,8 @@ export function DocumentVerificationStep({
           pan_number: ocrPan,
           holder_name: holderName,
           full_name: holderName,
+          status: comprehensive.status,
+          aadhaar_linked: comprehensive.aadhaarLinked,
         };
         return {
           ok: true as const,
@@ -706,6 +786,9 @@ export function DocumentVerificationStep({
             pan: ocrPan,
             source: "GST cross-check",
             status: "valid",
+            panStatus: comprehensive.status,
+            aadhaarLinked: comprehensive.aadhaarLinked,
+            panComprehensiveVerifiedAt: new Date().toISOString(),
             panMatchMessage: "PAN verified against GST registry.",
           },
           normalized,
@@ -713,43 +796,13 @@ export function DocumentVerificationStep({
         };
       }
 
-      const r = await callProvider({
-        providerName: "PAN",
-        input: { id_number: ocrPan, pan: ocrPan, pan_number: ocrPan },
-      });
-      toastKycResult("PAN", r);
-      if (!r.found) {
-        return {
-          ok: false as const,
-          message: "PAN Comprehensive Validation provider is not configured. Add it in KYC & Validation API Settings.",
-        };
-      }
-      const rawData: Record<string, any> =
-        (r.raw && typeof r.raw === "object" && (r.raw as any).data && typeof (r.raw as any).data === "object")
-          ? (r.raw as any).data
-          : {};
-      const apiStatus = String(
-        (r.data as any)?.status ?? (r.data as any)?.pan_status ?? rawData.status ?? rawData.pan_status ?? ""
-      ).toLowerCase().trim();
-      if (!r.ok || apiStatus !== "valid") {
-        return {
-          ok: false as const,
-          message: r.message || "PAN validation failed. Please upload a clearer PAN card and try again.",
-        };
-      }
-      const apiName = String(
-        (r.data as any)?.full_name ||
-        (r.data as any)?.name ||
-        (r.data as any)?.holder_name ||
-        rawData.full_name ||
-        rawData.name ||
-        ""
-      ).trim();
       const holderName = ocrName || apiName;
       const normalized: Record<string, any> = {
         pan_number: ocrPan,
         holder_name: holderName,
         full_name: holderName,
+        status: comprehensive.status,
+        aadhaar_linked: comprehensive.aadhaarLinked,
       };
       return {
         ok: true as const,
@@ -758,6 +811,9 @@ export function DocumentVerificationStep({
           pan: ocrPan,
           source: "PAN verification",
           status: "valid",
+          panStatus: comprehensive.status,
+          aadhaarLinked: comprehensive.aadhaarLinked,
+          panComprehensiveVerifiedAt: new Date().toISOString(),
           panMatchMessage: "PAN details validated successfully from PAN verification.",
         },
         normalized,
@@ -1795,6 +1851,9 @@ export function DocumentVerificationStep({
         apiName: panDoc.apiData?.name,
         nameMatchScore: panDoc.nameMatchScore,
       };
+      out.panStatus = panDoc.apiData?.panStatus ?? panDoc.ocrData.status ?? null;
+      out.panAadhaarLinked = panDoc.apiData?.aadhaarLinked ?? normalizeBooleanLike(panDoc.ocrData.aadhaar_linked);
+      out.panComprehensiveVerifiedAt = panDoc.apiData?.panComprehensiveVerifiedAt ?? null;
     }
     out.isMsmeRegistered = isMsmeRegistered ?? false;
     if (isMsmeRegistered && msmeDoc.status === "verified" && msmeDoc.ocrData) {
@@ -2244,7 +2303,7 @@ export function DocumentVerificationStep({
                           {panApi.status && (
                             <EditableOcrField
                               label="PAN Status"
-                              value={panDoc.ocrData?.status || panApi.status}
+                              value={formatPanStatus(panDoc.ocrData?.status || panApi.status)}
                               originalValue={panApi.status}
                               onChange={(v) => setOcrField(setPanDoc, "status", v)}
                               verifiedValue={panApi.status}
@@ -2253,11 +2312,11 @@ export function DocumentVerificationStep({
                           )}
                           {panApi.aadhaar_linked != null && (
                             <EditableOcrField
-                              label="Aadhaar Linked"
-                              value={panDoc.ocrData?.aadhaar_linked != null ? String(panDoc.ocrData.aadhaar_linked) : String(panApi.aadhaar_linked)}
+                              label="Is Aadhaar Linked"
+                              value={formatAadhaarLinked(normalizeBooleanLike(panDoc.ocrData?.aadhaar_linked ?? panApi.aadhaar_linked))}
                               originalValue={String(panApi.aadhaar_linked)}
                               onChange={(v) => setOcrField(setPanDoc, "aadhaar_linked", v)}
-                              verifiedValue={String(panApi.aadhaar_linked)}
+                              verifiedValue={formatAadhaarLinked(normalizeBooleanLike(panApi.aadhaar_linked))}
                               verifiedLabel="Verified from registry"
                             />
                           )}
