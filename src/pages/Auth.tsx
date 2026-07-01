@@ -21,7 +21,7 @@ const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signIn, signUp } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signOut, isVendor, userRole } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +39,15 @@ export default function Auth() {
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
 
   useEffect(() => {
-    if (user && !authLoading) {
-      navigate('/dashboard');
+    if (!user || authLoading || !userRole) return;
+    if (isVendor) {
+      // Vendors are not allowed to sign in via the generic /auth screen.
+      void signOut();
+      setError('Vendor accounts must use the invitation link sent by email, or the Vendor Login page.');
+      return;
     }
-  }, [user, authLoading, navigate]);
+    navigate('/dashboard');
+  }, [user, authLoading, userRole, isVendor, navigate, signOut]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
