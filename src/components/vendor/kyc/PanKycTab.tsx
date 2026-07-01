@@ -249,7 +249,7 @@ export function PanKycTab(props: PanKycTabProps) {
               failedMsg={nameCheckMessage || 'PAN Holder Name does not match any verified name.'}
             />
           )}
-          {(panStatus != null || aadhaarLinked != null) && (
+          {(ocrPan || panStatus != null || aadhaarLinked != null) && (
             <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm space-y-1.5">
               <div className="flex flex-wrap gap-x-2">
                 <span className="text-xs text-muted-foreground">PAN Status:</span>
