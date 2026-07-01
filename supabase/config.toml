@@ -27,9 +27,6 @@ verify_jwt = false
 [functions.send-status-notification]
 verify_jwt = false
 
-[functions.validate-penny-drop]
-verify_jwt = false
-
 [functions.dynamic-api-executor]
 verify_jwt = false
 
