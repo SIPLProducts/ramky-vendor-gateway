@@ -113,6 +113,7 @@ export default function VendorRegistration() {
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [onBehalfInvitationId, setOnBehalfInvitationId] = useState<string | null>(null);
   const [isBootstrappingOnBehalf, setIsBootstrappingOnBehalf] = useState(false);
+  const [showTypeBackConfirm, setShowTypeBackConfirm] = useState(false);
   const onBehalfBootstrapStartedRef = useRef(false);
   const formDataLoadedRef = useRef(false);
   const [resetNonce, setResetNonce] = useState(0);
@@ -1054,6 +1055,11 @@ export default function VendorRegistration() {
     setVendorTypeChosen(false);
   };
 
+  const confirmBackToTypeSelector = async () => {
+    setShowTypeBackConfirm(false);
+    await handleBackToTypeSelector();
+  };
+
 
 
   // ----- International step setters -----
@@ -1457,7 +1463,7 @@ export default function VendorRegistration() {
               size="sm"
               className="text-xs rounded-lg gap-1.5"
               disabled={isSubmitting}
-              onClick={() => { void handleBackToTypeSelector(); }}
+              onClick={() => setShowTypeBackConfirm(true)}
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Back
@@ -1673,6 +1679,22 @@ export default function VendorRegistration() {
         errorMessage={submissionSuccess.errorMessage}
         onClose={handleSubmissionDialogClose}
       />
+      <AlertDialog open={showTypeBackConfirm} onOpenChange={setShowTypeBackConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Go back to main screen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              If you go back, the data entered will be cleared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void confirmBackToTypeSelector(); }}>
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

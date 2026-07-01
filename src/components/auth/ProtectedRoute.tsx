@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
 export function ProtectedRoute() {
-  const { user, loading } = useAuth();
+  const { user, loading, isVendor } = useAuth();
 
   if (loading) {
     return (
@@ -15,6 +15,10 @@ export function ProtectedRoute() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (isVendor) {
+    return <Navigate to="/vendor/registration" replace />;
   }
 
   return <Outlet />;
