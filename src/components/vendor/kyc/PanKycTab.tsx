@@ -11,6 +11,7 @@ import {
   type CrossNameMatchResult,
 } from '@/lib/nameMatch';
 import { mergeOcrExtracted } from '@/lib/kycExtract';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 import { useState } from 'react';
 
 export type PanCheckStatus = 'idle' | 'passed' | 'failed';
@@ -21,6 +22,10 @@ export interface PanTabResult {
   nameCheck: PanCheckStatus;
   nameCheckMessage?: string;
   nameMatchResult?: CrossNameMatchResult;
+  /** Raw `status` value from PAN Comprehensive API (e.g. "valid"). */
+  panStatus?: string | null;
+  /** Raw `aadhaar_linked` boolean from PAN Comprehensive API. */
+  aadhaarLinked?: boolean | null;
 }
 
 interface PanKycTabProps {
@@ -47,6 +52,8 @@ interface PanKycTabProps {
   /** Persisted OCR result (lifted to parent so it survives tab switches). */
   ocrResult?: PanTabResult;
   onOcrResultChange?: (r: PanTabResult) => void;
+  /** Fires when PAN Comprehensive API returns status/aadhaar_linked. */
+  onComprehensiveResult?: (v: { status?: string | null; aadhaarLinked?: boolean | null }) => void;
 }
 
 function pickStr(v: any): string {
@@ -62,7 +69,7 @@ export function PanKycTab(props: PanKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const [localResult, setLocalResult] = useState<PanTabResult>(EMPTY_RESULT);
   const result = props.ocrResult ?? localResult;
-  const { ocrPan, ocrName, panCheck, nameCheck, nameCheckMessage, nameMatchResult } = result;
+  const { ocrPan, ocrName, panCheck, nameCheck, nameCheckMessage, nameMatchResult, panStatus, aadhaarLinked } = result;
   const updateResult = (next: Partial<PanTabResult>) => {
     const merged = { ...result, ...next };
     if (props.onOcrResultChange) props.onOcrResultChange(merged);
@@ -136,6 +143,31 @@ export function PanKycTab(props: PanKycTabProps) {
 
     if (panOk && nameOk) {
       props.onStatusChange?.('passed');
+      // Fire-and-forget PAN Comprehensive call to fetch `status` + `aadhaar_linked`.
+      // Optional: if the provider isn't configured or the call fails, we silently
+      // skip — this must not block PAN verification.
+      (async () => {
+        try {
+          const cr = await callProvider({
+            providerName: 'PAN',
+            input: { id_number: extractedPan, pan: extractedPan },
+          });
+          if (cr?.ok && cr.data) {
+            const rawStatus = pickStr((cr.data as any).status) || null;
+            const rawLinked = (cr.data as any).aadhaar_linked;
+            const aadhaarLinked =
+              rawLinked === true || String(rawLinked).toLowerCase() === 'true'
+                ? true
+                : rawLinked === false || String(rawLinked).toLowerCase() === 'false'
+                  ? false
+                  : null;
+            updateResult({ panStatus: rawStatus, aadhaarLinked });
+            props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
+          }
+        } catch {
+          /* silent — comprehensive call is best-effort */
+        }
+      })();
       return {
         ok: true,
         message: `PAN Number verified with GST PAN Number. ${nameMessage}`,
@@ -209,6 +241,18 @@ export function PanKycTab(props: PanKycTabProps) {
               passedMsg={nameCheckMessage || 'PAN Holder Name verified.'}
               failedMsg={nameCheckMessage || 'PAN Holder Name does not match any verified name.'}
             />
+          )}
+          {(panStatus != null || aadhaarLinked != null) && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm space-y-1.5">
+              <div className="flex flex-wrap gap-x-2">
+                <span className="text-xs text-muted-foreground">PAN Status:</span>
+                <span className="font-medium">{formatPanStatus(panStatus)}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="text-xs text-muted-foreground">Is Aadhaar Linked:</span>
+                <span className="font-medium">{formatAadhaarLinked(aadhaarLinked)}</span>
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -22,7 +22,7 @@ interface ApiProviderConfigProps {
 const defaultProviders = [
   { provider_name: 'GST', display_name: 'GST Verification', description: 'Verify GSTIN and fetch business details' },
   { provider_name: 'PAN', display_name: 'PAN Verification', description: 'Verify PAN card and fetch holder details' },
-  { provider_name: 'BANK_PENNY_DROP', display_name: 'Bank Penny Drop', description: 'Verify bank account via micro transaction' },
+  
   { provider_name: 'MSME', display_name: 'MSME Verification', description: 'Verify MSME/Udyam registration' },
   { provider_name: 'NAME_MATCH', display_name: 'Name Matching', description: 'Match business name across documents' },
 ];

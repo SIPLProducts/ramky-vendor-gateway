@@ -28,6 +28,8 @@ import {
 const schema = z.object({
   firmRegistrationNo: z.string().optional(),
   pan: z.string().optional(),
+  panStatus: z.string().nullish(),
+  panAadhaarLinked: z.boolean().nullish(),
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
   isGstRegistered: z.boolean(),
@@ -399,6 +401,11 @@ export function ComplianceStep({
             bankAccountHolderName={bankAccountHolderName}
             ocrResult={panTabResult}
             onOcrResultChange={setPanTabResult}
+            onComprehensiveResult={({ status, aadhaarLinked }) => {
+              setValue('panStatus' as any, status ?? null);
+              setValue('panAadhaarLinked' as any, aadhaarLinked ?? null);
+              setValue('panComprehensiveVerifiedAt' as any, new Date().toISOString());
+            }}
           />
         }
         msme={
