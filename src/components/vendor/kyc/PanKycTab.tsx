@@ -77,6 +77,32 @@ export function PanKycTab(props: PanKycTabProps) {
   };
 
 
+  const runPanComprehensive = (pan: string) => {
+    // Fire-and-forget. Must never throw or block PAN verification.
+    (async () => {
+      try {
+        const cr = await callProvider({
+          providerName: 'PAN',
+          input: { id_number: pan, pan },
+        });
+        if (cr?.ok && cr.data) {
+          const rawStatus = pickStr((cr.data as any).status) || null;
+          const rawLinked = (cr.data as any).aadhaar_linked;
+          const aadhaarLinked =
+            rawLinked === true || String(rawLinked).toLowerCase() === 'true'
+              ? true
+              : rawLinked === false || String(rawLinked).toLowerCase() === 'false'
+                ? false
+                : null;
+          updateResult({ panStatus: rawStatus, aadhaarLinked });
+          props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
+        }
+      } catch {
+        /* silent — comprehensive call is best-effort */
+      }
+    })();
+  };
+
   const runPanOcr = async (file: File) => {
     if (!props.gstVerified) {
       return {
@@ -87,6 +113,7 @@ export function PanKycTab(props: PanKycTabProps) {
     props.onStatusChange?.('validating');
     const r = await callProvider({ providerName: 'PAN_OCR', file });
     toastKycResult('PAN OCR', r);
+
     if (!r.found && !r.message_code) {
       props.onStatusChange?.('failed');
       return {
@@ -111,7 +138,11 @@ export function PanKycTab(props: PanKycTabProps) {
 
     if (extractedPan && extractedPan.length === 10) {
       props.onPanChange(extractedPan);
+      // Trigger PAN Comprehensive Validation immediately after OCR captures a valid PAN.
+      // Independent of PAN-vs-GST match and independent of GST=Yes/No.
+      runPanComprehensive(extractedPan);
     }
+
 
     const panOk = panMatch(extractedPan, props.gstPanNumber);
 
@@ -143,31 +174,7 @@ export function PanKycTab(props: PanKycTabProps) {
 
     if (panOk && nameOk) {
       props.onStatusChange?.('passed');
-      // Fire-and-forget PAN Comprehensive call to fetch `status` + `aadhaar_linked`.
-      // Optional: if the provider isn't configured or the call fails, we silently
-      // skip — this must not block PAN verification.
-      (async () => {
-        try {
-          const cr = await callProvider({
-            providerName: 'PAN',
-            input: { id_number: extractedPan, pan: extractedPan },
-          });
-          if (cr?.ok && cr.data) {
-            const rawStatus = pickStr((cr.data as any).status) || null;
-            const rawLinked = (cr.data as any).aadhaar_linked;
-            const aadhaarLinked =
-              rawLinked === true || String(rawLinked).toLowerCase() === 'true'
-                ? true
-                : rawLinked === false || String(rawLinked).toLowerCase() === 'false'
-                  ? false
-                  : null;
-            updateResult({ panStatus: rawStatus, aadhaarLinked });
-            props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
-          }
-        } catch {
-          /* silent — comprehensive call is best-effort */
-        }
-      })();
+
       return {
         ok: true,
         message: `PAN Number verified with GST PAN Number. ${nameMessage}`,
@@ -242,7 +249,7 @@ export function PanKycTab(props: PanKycTabProps) {
               failedMsg={nameCheckMessage || 'PAN Holder Name does not match any verified name.'}
             />
           )}
-          {(panStatus != null || aadhaarLinked != null) && (
+          {(ocrPan || panStatus != null || aadhaarLinked != null) && (
             <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm space-y-1.5">
               <div className="flex flex-wrap gap-x-2">
                 <span className="text-xs text-muted-foreground">PAN Status:</span>
