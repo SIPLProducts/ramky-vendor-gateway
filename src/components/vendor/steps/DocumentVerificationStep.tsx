@@ -2304,26 +2304,43 @@ export function DocumentVerificationStep({
                               verifiedLabel="Verified from registry"
                             />
                           )}
-                          {panApi.status && (
-                            <EditableOcrField
-                              label="PAN Status"
-                              value={formatPanStatus(panDoc.ocrData?.status || panApi.status)}
-                              originalValue={panApi.status}
-                              onChange={(v) => setOcrField(setPanDoc, "status", v)}
-                              verifiedValue={panApi.status}
-                              verifiedLabel="Active per registry"
-                            />
-                          )}
-                          {panApi.aadhaar_linked != null && (
-                            <EditableOcrField
-                              label="Is Aadhaar Linked"
-                              value={formatAadhaarLinked(normalizeBooleanLike(panDoc.ocrData?.aadhaar_linked ?? panApi.aadhaar_linked))}
-                              originalValue={String(panApi.aadhaar_linked)}
-                              onChange={(v) => setOcrField(setPanDoc, "aadhaar_linked", v)}
-                              verifiedValue={formatAadhaarLinked(normalizeBooleanLike(panApi.aadhaar_linked))}
-                              verifiedLabel="Verified from registry"
-                            />
-                          )}
+                          {(() => {
+                            const rawStatus = panDoc.ocrData?.status ?? panApi.status ?? null;
+                            const panStatusLabel =
+                              rawStatus && String(rawStatus).trim().toLowerCase() === "valid"
+                                ? "Valid"
+                                : "Invalid";
+                            return (
+                              <EditableOcrField
+                                label="PAN Status"
+                                value={panStatusLabel}
+                                verifiedValue={panStatusLabel}
+                                verifiedLabel={panStatusLabel === "Valid" ? "Active per registry" : "Marked invalid by registry"}
+                                onChange={() => {}}
+                                readOnly
+                              />
+                            );
+                          })()}
+                          {(() => {
+                            const rawLinked = normalizeBooleanLike(
+                              panDoc.ocrData?.aadhaar_linked ?? panApi.aadhaar_linked
+                            );
+                            const linkedLabel =
+                              rawLinked === true
+                                ? "Aadhaar Linked with PAN"
+                                : "Aadhaar Not Linked with PAN";
+                            return (
+                              <EditableOcrField
+                                label="Is Aadhaar Linked"
+                                value={linkedLabel}
+                                verifiedValue={linkedLabel}
+                                verifiedLabel="Verified from registry"
+                                onChange={() => {}}
+                                readOnly
+                              />
+                            );
+                          })()}
+
                         </div>
                       </div>
                     );
@@ -3586,6 +3603,7 @@ function EditableOcrField({
   placeholder,
   verifiedValue,
   verifiedLabel,
+  readOnly = true,
 }: {
   label: string;
   value?: string;
@@ -3597,14 +3615,16 @@ function EditableOcrField({
   verifiedValue?: string;
   /** Label shown next to the green tick when the value matches the API. */
   verifiedLabel?: string;
+  /** When true, disables editing and hides Edited/Reset/Use registry affordances. */
+  readOnly?: boolean;
 }) {
   const current = value ?? "";
   const original = originalValue ?? "";
-  const isEdited = current.trim() !== original.trim() && original.length > 0;
+  const isEdited = !readOnly && current.trim() !== original.trim() && original.length > 0;
   const apiVal = (verifiedValue ?? "").toString();
   const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
   const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
-  const mismatchApi = hasApi && !matchesApi;
+  const mismatchApi = !readOnly && hasApi && !matchesApi;
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -3630,12 +3650,16 @@ function EditableOcrField({
         value={current}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? "—"}
+        readOnly={readOnly}
+        tabIndex={readOnly ? -1 : undefined}
+        aria-readonly={readOnly || undefined}
         className={cn(
           "mt-1 bg-muted/40 border-border/60",
           mono && "font-mono text-sm tracking-wide",
           isEdited && "border-warning/40 bg-warning/5",
           matchesApi && "border-success/40 bg-success/5",
           mismatchApi && "border-warning/50 bg-warning/5",
+          readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
         )}
       />
       {matchesApi && (
@@ -3663,6 +3687,7 @@ function EditableOcrField({
     </div>
   );
 }
+
 
 /**
  * One-line helper inside each verified panel telling the user they can
