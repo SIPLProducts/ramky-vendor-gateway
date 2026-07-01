@@ -1,12 +1,33 @@
-Fix only the PAN OCR → PAN Comprehensive Validation behavior.
+## Goal
 
-Plan:
-1. Update the current Document Verification PAN flow so after PAN OCR reads a valid PAN number, it always calls the configured `PAN` / `PAN Comprehensive Validation` API, even when GST is already verified.
-2. Keep existing PAN vs GST cross-check exactly as-is: GST mismatch/name mismatch will still fail the PAN tab; this change only adds the comprehensive call and fields.
-3. Map the comprehensive response fields into the PAN tab:
-   - `status` / `pan_status` → show as `PAN Status` (`Valid` / `Invalid`)
-   - `aadhaar_linked` / `aadhaarLinked` / `aadhaar_linked_with_pan` → show as `Is Aadhaar Linked` (`Aadhaar Linked with PAN` / `Aadhaar Not Linked with PAN`)
-4. Store those two values in Step 1 output so draft/save/submit persists them to the existing vendor fields: `pan_status`, `pan_aadhaar_linked`, `pan_comprehensive_verified_at`.
-5. When loading an existing draft/vendor, prefill those two values back into the PAN tab so they remain visible after Back, refresh, and View.
+Apply strict PAN Comprehensive mappings, lock down auto-extracted fields as read-only across GST, PAN, MSME, and Bank tabs. Only the Udyam number input and its Validate button stay editable in MSME.
 
-No changes to GST, MSME, Bank, Back, Refresh, final submit, OCR validation rules, or tab order.
+## Changes
+
+### 1. PAN tab — `DocumentVerificationStep.tsx`
+- **Mapping (exact rules):**
+  - `Is Aadhaar Linked`:
+    - `aadhaar_linked === true` → `"Aadhaar Linked with PAN"`
+    - `false` / `null` / missing → `"Aadhaar Not Linked with PAN"`
+  - `PAN Status`:
+    - `status === "valid"` (case-insensitive) → `"Valid"`
+    - anything else (invalid / null / missing) → `"Invalid"`
+- Both fields render as **read-only** (no "Edited / Reset to OCR" chip, no manual typing).
+- Values come only from the PAN Comprehensive API response (invoked right after PAN OCR, as already wired).
+
+### 2. Read-only lockdown for auto-filled fields
+
+Make every OCR/API-extracted field on these tabs read-only (disable inputs, remove "Edited / Reset to OCR" affordances):
+
+- **GST tab** — GSTIN, Legal Name, Trade Name, Address, State, all registry fields.
+- **PAN tab** — PAN Number, Holder Name, PAN Status, Is Aadhaar Linked.
+- **Bank tab** — IFSC, Bank Name, Branch, Account Holder Name, Account Number (as extracted / verified).
+- **MSME tab** — all extracted fields (Enterprise Name, Type, Registered On, etc.) read-only.
+  - **Exception:** the `Udyam Number` input and its `Validate` button remain editable and clickable.
+
+### 3. Review step
+- Continues to show `PAN Status` and `Is Aadhaar Linked` using the same mapping helpers (already added), no format drift.
+
+## Out of scope
+- No changes to OCR calls, API providers, save/submit, Back/Refresh, tab order, or MSME Udyam validation logic.
+- No DB / schema changes.
