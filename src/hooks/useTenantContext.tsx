@@ -17,15 +17,15 @@ interface TenantContextValue {
   isSuperAdmin: boolean;
   /** SAP Team — sees all tenants (needed for sync). */
   isCrossTenantReviewer: boolean;
-  /** True when the user has the SCM Manager custom role. */
+  /** True when the user has the SCM CO custom role. */
   isScmManager: boolean;
   /** True when the user is a stage approver (SCM Head / Finance 1 / Finance 2 / CEO Office / Finance Approval). */
   isStageApprover: boolean;
   /** True when the user is a Buyer (built-in 'purchase' role or 'Buyer' custom role). */
   isBuyerRole: boolean;
   /**
-   * Vendor ids visible to an SCM Manager via buyer_scm_mappings.
-   * `null` = not applicable. `[]` = SCM Manager with no mapped buyers.
+   * Vendor ids visible to an SCM CO via buyer_scm_mappings.
+   * `null` = not applicable. `[]` = SCM CO with no mapped buyers.
    */
   scmManagerVendorIds: string[] | null;
   /**
@@ -88,7 +88,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [userRole, customRoleNames],
   );
 
-  // SCM Manager vendor scoping (vendors invited by a mapped buyer OR routed via buyer_approval_flows).
+  // SCM CO vendor scoping (vendors invited by a mapped buyer OR routed via buyer_approval_flows).
   const { data: scmManagerVendorIds = null } = useQuery({
     queryKey: ['scm-manager-vendor-ids', user?.id],
     queryFn: async (): Promise<string[]> => {
@@ -291,7 +291,7 @@ export function useTenantContext() {
  * Precedence:
  *  1. Super admin / SAP Team → no restriction.
  *  2. Stage approver or Buyer (non-admin) → `vendorIds` from routed/invited list.
- *  3. SCM Manager → `vendorIds` from buyer-mapped invites.
+ *  3. SCM CO → `vendorIds` from buyer-mapped invites.
  *  4. Single active tenant → that tenant.
  *  5. Default → all assigned tenants.
  */
@@ -323,7 +323,7 @@ export function useTenantFilter(): {
     return { tenantIds: tenants, activeTenantId, vendorIds: scopedVendorIds ?? [] };
   }
 
-  // 3. SCM Manager scoping.
+  // 3. SCM CO scoping.
   if (isScmManager) {
     return { tenantIds: null, activeTenantId: null, vendorIds: scmManagerVendorIds ?? [] };
   }
