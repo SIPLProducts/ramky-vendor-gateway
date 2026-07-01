@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { VendorFormData } from '@/types/vendor';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 
 type DocTab = 'gst' | 'pan' | 'msme' | 'bank';
 
@@ -188,6 +189,8 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
         <SectionHeader icon={FileCheck} title="PAN" step={1} tab="pan" onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="PAN" value={data.statutory?.pan} />
+          <DataRow label="PAN Status" value={formatPanStatus(data.statutory?.panStatus)} />
+          <DataRow label="Is Aadhaar Linked" value={formatAadhaarLinked(data.statutory?.panAadhaarLinked)} />
         </div>
       </div>
 
