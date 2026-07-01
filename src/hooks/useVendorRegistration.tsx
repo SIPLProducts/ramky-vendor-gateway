@@ -40,6 +40,43 @@ interface DocumentUploadResult {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VendorRecord = Record<string, any>;
 
+const PAN_COMPREHENSIVE_COLUMNS = [
+  'pan_status',
+  'pan_aadhaar_linked',
+  'pan_comprehensive_verified_at',
+] as const;
+
+const stripPanComprehensiveColumns = (payload: VendorRecord): VendorRecord => {
+  const next = { ...payload };
+  PAN_COMPREHENSIVE_COLUMNS.forEach((column) => {
+    delete next[column];
+  });
+  return next;
+};
+
+const isMissingPanComprehensiveColumnError = (error: any) => {
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || error?.hint || '');
+  return (
+    code === 'PGRST204' &&
+    /Could not find/i.test(message) &&
+    PAN_COMPREHENSIVE_COLUMNS.some((column) => message.includes(column))
+  );
+};
+
+const writeVendorWithPanFallback = async (
+  action: string,
+  payload: VendorRecord,
+  write: (nextPayload: VendorRecord) => PromiseLike<{ data: any; error: any }>
+) => {
+  let result = await write(payload);
+  if (result.error && isMissingPanComprehensiveColumnError(result.error)) {
+    console.warn(`[saveVendor] ${action} retried without PAN Comprehensive columns; database schema/cache is not updated yet.`, result.error);
+    result = await write(stripPanComprehensiveColumns(payload));
+  }
+  return result;
+};
+
 export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const { toast } = useToast();
   const [vendorId, setVendorId] = useState<string | null>(null);
