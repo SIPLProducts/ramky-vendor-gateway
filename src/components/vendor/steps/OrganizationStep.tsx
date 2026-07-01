@@ -104,8 +104,8 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   const { data: sapMatGrp } = useSapMasterData('material_group_vendor');
   const { data: sapVendorCat } = useSapMasterData('vendor_category');
 
-
   const {
+
     register,
     handleSubmit,
     control,
