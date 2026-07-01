@@ -54,6 +54,7 @@ export default function SAPSync() {
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'sap' | 'dms' | 'rejected'>('sap');
   const [rejectVendor, setRejectVendor] = useState<VendorRow | null>(null);
+  const [commentsVendor, setCommentsVendor] = useState<VendorRow | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState('');
   const [rejectingVendorId, setRejectingVendorId] = useState<string | null>(null);
   const [returnVendor, setReturnVendor] = useState<VendorRow | null>(null);
