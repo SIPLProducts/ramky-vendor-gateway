@@ -116,7 +116,7 @@ const validationTypeLabels: Record<string, string> = {
   bank: 'Bank Account Verification',
   msme: 'MSME Verification',
   name_match: 'Name Match Verification',
-  penny_drop: 'Penny Drop Verification',
+  
 };
 
 const documentTypeLabels: Record<string, string> = {
