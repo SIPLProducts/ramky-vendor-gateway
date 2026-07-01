@@ -590,6 +590,8 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">MSME Category</p><p className="font-medium capitalize">{vendor.msme_category || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{vendor.firm_registration_no || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{vendor.iec_no || '-'}</p></div>
+                      <div className="space-y-1"><p className="text-muted-foreground">PAN Status</p><p className="font-medium">{(vendor as any).pan_status ? (String((vendor as any).pan_status).trim().toLowerCase() === 'valid' ? 'Valid' : 'Invalid') : '-'}</p></div>
+                      <div className="space-y-1"><p className="text-muted-foreground">Is Aadhaar Linked</p><p className="font-medium">{(vendor as any).pan_aadhaar_linked === true ? 'Aadhaar Linked with PAN' : (vendor as any).pan_aadhaar_linked === false ? 'Aadhaar Not Linked with PAN' : '-'}</p></div>
                     </div>
                   </div>
 

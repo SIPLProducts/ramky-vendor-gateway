@@ -221,6 +221,8 @@ export default function VendorList() {
       Name: v.legal_name,
       GSTIN: v.gstin,
       PAN: v.pan,
+      'PAN Status': (v as any).pan_status ? (String((v as any).pan_status).trim().toLowerCase() === 'valid' ? 'Valid' : 'Invalid') : '-',
+      'Is Aadhaar Linked': (v as any).pan_aadhaar_linked === true ? 'Aadhaar Linked with PAN' : (v as any).pan_aadhaar_linked === false ? 'Aadhaar Not Linked with PAN' : '-',
       City: v.registered_city,
       State: v.registered_state,
       Status: v.status,

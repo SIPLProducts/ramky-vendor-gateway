@@ -205,6 +205,13 @@ export interface StatutoryDetails {
   msmeCertificateFile: File | null;
   iecCertificateFile: File | null;
   swiftIbanProofFile: File | null;
+
+  /** From PAN Comprehensive API — raw `status` value (e.g. "valid"). */
+  panStatus?: string | null;
+  /** From PAN Comprehensive API — raw `aadhaar_linked` boolean. */
+  panAadhaarLinked?: boolean | null;
+  /** ISO timestamp of the last PAN Comprehensive API call. */
+  panComprehensiveVerifiedAt?: string | null;
 }
 
 // Step 5: Bank Details
