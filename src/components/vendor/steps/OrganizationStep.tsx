@@ -105,7 +105,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   const { data: sapVendorCat } = useSapMasterData('vendor_category');
 
   const {
-
     register,
     handleSubmit,
     control,
@@ -113,6 +112,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     setValue,
     formState: { errors },
   } = useForm<FormValues>({
+
     resolver: zodResolver(schema),
     defaultValues: {
       ...data,
