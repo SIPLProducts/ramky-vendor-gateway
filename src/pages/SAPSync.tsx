@@ -1008,6 +1008,14 @@ export default function SAPSync() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ApprovalCommentsDialog
+        open={!!commentsVendor}
+        onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
+        vendorId={commentsVendor?.id ?? null}
+        vendorName={commentsVendor ? (getSapName1(commentsVendor) || commentsVendor.legal_name || 'Vendor') : undefined}
+        referenceNumber={(commentsVendor as any)?.reference_number || commentsVendor?.id.slice(0, 8).toUpperCase()}
+      />
     </div>
   );
 }
