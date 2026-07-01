@@ -838,12 +838,16 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           updatePayload.tenant_id = (existingVendor as any).tenant_id;
         }
 
-        const { data, error } = await supabase
-          .from('vendors')
-          .update(updatePayload)
-          .eq('id', vendorId)
-          .select()
-          .single();
+        const { data, error } = await writeVendorWithPanFallback(
+          'update',
+          updatePayload,
+          (nextPayload) => supabase
+            .from('vendors')
+            .update(nextPayload)
+            .eq('id', vendorId)
+            .select()
+            .single()
+        );
 
         if (error) throw error;
 
@@ -851,11 +855,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         await uploadAllDocuments(formData, data.id);
         savedVendor = data;
       } else {
-        const { data, error } = await supabase
-          .from('vendors')
-          .insert(vendorData)
-          .select()
-          .single();
+        const { data, error } = await writeVendorWithPanFallback(
+          'insert',
+          vendorData,
+          (nextPayload) => supabase
+            .from('vendors')
+            .insert(nextPayload)
+            .select()
+            .single()
+        );
 
         if (error) throw error;
         setVendorId(data.id);
@@ -1218,12 +1226,16 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } : {}),
       };
 
-      const { data, error } = await supabase
-        .from('vendors')
-        .update(vendorData)
-        .eq('id', vendorId)
-        .select()
-        .single();
+      const { data, error } = await writeVendorWithPanFallback(
+        'resubmit update',
+        vendorData,
+        (nextPayload) => supabase
+          .from('vendors')
+          .update(nextPayload)
+          .eq('id', vendorId)
+          .select()
+          .single()
+      );
 
       if (error) throw error;
 
