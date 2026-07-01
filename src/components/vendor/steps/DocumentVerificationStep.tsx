@@ -2895,9 +2895,6 @@ export function DocumentVerificationStep({
                         </div>
                       }
                     />
-                    {bankDoc2.status === "verified" && (
-                      <CrossCheckStrip ok={true} text="Secondary account active · Penny-drop successful" className="mt-3" />
-                    )}
                   </div>
                 )}
               </div>
