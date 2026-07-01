@@ -190,20 +190,21 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     return '';
   })();
 
-  // Track the last value we auto-set so we can refresh it when GST changes,
-  // without ever overriding a manual selection by the user.
+  const isGstStateLocked = statutoryData?.isGstRegistered === true && !!resolvedGstState;
+
+  // Track the last value we auto-set so we can refresh it when GST changes.
+  // For GST-registered vendors, the GST-derived state is authoritative and
+  // must overwrite any stale/manual value; non-GST vendors remain editable.
   const lastAutoStateRef = useRef<string>('');
   useEffect(() => {
     if (!resolvedGstState) return;
     const current = watchedState || '';
-    // Only auto-fill when empty or when the field still holds our previous
-    // auto-set value (i.e. user has not manually picked a different state).
-    if (current && current !== lastAutoStateRef.current) return;
+    if (!isGstStateLocked && current && current !== lastAutoStateRef.current) return;
     if (current === resolvedGstState) return;
     setValue('state', resolvedGstState, { shouldValidate: true, shouldDirty: true });
     lastAutoStateRef.current = resolvedGstState;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedGstState]);
+  }, [resolvedGstState, isGstStateLocked]);
 
 
 
@@ -454,7 +455,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               name="state"
               control={control}
               render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isGstStateLocked}>
                   <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
