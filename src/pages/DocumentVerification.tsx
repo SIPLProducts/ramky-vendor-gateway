@@ -663,7 +663,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                 <TabsList>
                   <TabsTrigger value="validations">Standard Validations</TabsTrigger>
                   <TabsTrigger value="gst-compliance">GST Compliance</TabsTrigger>
-                  <TabsTrigger value="penny-drop">Penny Drop</TabsTrigger>
+                  
                   <TabsTrigger value="deviations" className="relative">
                     Deviations
                     {deviations.length > 0 && (
