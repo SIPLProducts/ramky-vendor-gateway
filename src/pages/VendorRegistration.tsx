@@ -114,6 +114,7 @@ export default function VendorRegistration() {
   const [onBehalfInvitationId, setOnBehalfInvitationId] = useState<string | null>(null);
   const [isBootstrappingOnBehalf, setIsBootstrappingOnBehalf] = useState(false);
   const [showTypeBackConfirm, setShowTypeBackConfirm] = useState(false);
+  const [isClearingForBack, setIsClearingForBack] = useState(false);
   const onBehalfBootstrapStartedRef = useRef(false);
   const formDataLoadedRef = useRef(false);
   const [resetNonce, setResetNonce] = useState(0);
@@ -1056,8 +1057,13 @@ export default function VendorRegistration() {
   };
 
   const confirmBackToTypeSelector = async () => {
-    setShowTypeBackConfirm(false);
-    await handleBackToTypeSelector();
+    setIsClearingForBack(true);
+    try {
+      await handleBackToTypeSelector();
+    } finally {
+      setIsClearingForBack(false);
+      setShowTypeBackConfirm(false);
+    }
   };
 
 
@@ -1679,8 +1685,11 @@ export default function VendorRegistration() {
         errorMessage={submissionSuccess.errorMessage}
         onClose={handleSubmissionDialogClose}
       />
-      <AlertDialog open={showTypeBackConfirm} onOpenChange={setShowTypeBackConfirm}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={showTypeBackConfirm}
+        onOpenChange={(o) => { if (!isClearingForBack) setShowTypeBackConfirm(o); }}
+      >
+        <AlertDialogContent onEscapeKeyDown={(e) => { if (isClearingForBack) e.preventDefault(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Go back to main screen?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -1688,13 +1697,26 @@ export default function VendorRegistration() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { void confirmBackToTypeSelector(); }}>
-              Yes
+            <AlertDialogCancel disabled={isClearingForBack}>No</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isClearingForBack}
+              onClick={(e) => { e.preventDefault(); void confirmBackToTypeSelector(); }}
+            >
+              {isClearingForBack ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Clearing…</>
+              ) : (
+                'Yes'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {isClearingForBack && (
+        <div className="fixed inset-0 z-[100] bg-background/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Clearing your data…</p>
+        </div>
+      )}
     </div>
   );
 }
