@@ -194,7 +194,22 @@ export default function Auth() {
               {error && (
                 <Alert variant="destructive" className="mb-4">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>
+                    {error}
+                    {error.toLowerCase().includes('vendor') && (
+                      <span className="block mt-2">
+                        Go to{' '}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/vendor/login')}
+                          className="underline font-medium"
+                        >
+                          Vendor Login
+                        </button>
+                        .
+                      </span>
+                    )}
+                  </AlertDescription>
                 </Alert>
               )}
               
