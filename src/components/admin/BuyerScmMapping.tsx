@@ -159,7 +159,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
 
       if (error) {
         if (error.code === '23505') {
-          toast({ title: 'Buyer already mapped', description: 'This buyer already has an SCM Manager assigned.', variant: 'destructive' });
+          toast({ title: 'Buyer already mapped', description: 'This buyer already has an SCM CO assigned.', variant: 'destructive' });
         } else throw error;
 
       } else {
@@ -212,17 +212,17 @@ export function BuyerScmMapping({ tenantId }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM Manager Mapping
+            <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM CO Mapping
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
             <div>
-              <label className="text-xs text-muted-foreground">SCM Manager</label>
+              <label className="text-xs text-muted-foreground">SCM CO</label>
               <Select value={scmId} onValueChange={setScmId}>
-                <SelectTrigger><SelectValue placeholder="Select SCM Manager" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select SCM CO" /></SelectTrigger>
                 <SelectContent>
-                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with SCM Manager role. Assign it in the Users tab.</div>}
+                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with SCM CO role. Assign it in the Users tab.</div>}
                   {scmUsers.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                   ))}
