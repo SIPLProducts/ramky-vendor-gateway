@@ -122,7 +122,7 @@ export default function AdminInvitations() {
   // Fetch invitations with role-scoped visibility.
   // - Admin / SAP Team: all (optionally filtered by active tenant).
   // - Buyer: only invitations they created.
-  // - Stage approver / SCM Manager: invitations created by buyers configured under them.
+  // - Stage approver / SCM CO: invitations created by buyers configured under them.
   const { data: invitations, isLoading } = useQuery({
     queryKey: [
       'vendor-invitations',
@@ -635,7 +635,7 @@ export default function AdminInvitations() {
     setIsTracking(true);
     try {
       // RLS (user_can_see_vendor) enforces visibility for buyers, on-behalf,
-      // SCM managers, stage approvers, admin, and SAP team. Query directly.
+      // SCM CO, stage approvers, admin, and SAP team. Query directly.
       const { data, error } = await supabase
         .from('vendors')
         .select('id')

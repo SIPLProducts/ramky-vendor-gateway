@@ -48,7 +48,7 @@ const STAGE_DEFS: Array<{
   roleNames: string[];
   helper?: string;
 }> = [
-  { stage: 'SCM_MANAGER', label: 'SCM Manager', userKey: 'scm_manager_user_id', skipKey: 'skip_scm_manager', roleNames: ['SCM Manager'] },
+  { stage: 'SCM_MANAGER', label: 'SCM CO', userKey: 'scm_manager_user_id', skipKey: 'skip_scm_manager', roleNames: ['SCM CO'] },
   { stage: 'SCM_HEAD', label: 'SCM Head', userKey: 'scm_head_user_id', skipKey: 'skip_scm_head', roleNames: ['SCM Head'] },
   { stage: 'FINANCE_1', label: 'Finance 1', userKey: 'finance_1_user_id', skipKey: 'skip_finance_1', roleNames: ['Finance 1', 'Finance Approval'] },
   { stage: 'FINANCE_2', label: 'Finance 2', userKey: 'finance_2_user_id', skipKey: 'skip_finance_2', roleNames: ['Finance 2', 'Finance Approval'] },
@@ -324,7 +324,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
           <div className="text-xs text-muted-foreground flex items-start gap-1.5 mt-1">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Approval Matrix is Buyer-based. Approvers (SCM Manager, SCM Head, Finance 1/2, CEO Office) are global — the chain you save applies to every tenant the buyer has access to. The Tenant filter at the top only narrows which buyers and saved flows you see.
+              Approval Matrix is Buyer-based. Approvers (SCM CO, SCM Head, Finance 1/2, CEO Office) are global — the chain you save applies to every tenant the buyer has access to. The Tenant filter at the top only narrows which buyers and saved flows you see.
             </span>
           </div>
         </CardHeader>

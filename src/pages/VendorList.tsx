@@ -186,8 +186,8 @@ export default function VendorList() {
       validation_pending: { label: 'Validating', variant: 'outline' },
       validation_failed: { label: 'Validation Failed', variant: 'destructive' },
       buyer_review: { label: 'Buyer Review', variant: 'outline' },
-      scm_manager_review: { label: 'SCM Manager Review', variant: 'outline' },
-      scm_manager_rejected: { label: 'SCM Manager Rejected', variant: 'destructive' },
+      scm_manager_review: { label: 'SCM CO', variant: 'outline' },
+      scm_manager_rejected: { label: 'SCM CO', variant: 'destructive' },
       scm_head_review: { label: 'SCM Head Review', variant: 'outline' },
       scm_head_rejected: { label: 'SCM Head Rejected', variant: 'destructive' },
       finance_1_review: { label: 'Finance 1 Review', variant: 'outline' },
@@ -323,7 +323,7 @@ export default function VendorList() {
                 <SelectItem value="validation_pending">Validation Pending</SelectItem>
                 <SelectItem value="validation_failed">Validation Failed</SelectItem>
                 <SelectItem value="buyer_review">Buyer Review</SelectItem>
-                <SelectItem value="scm_manager_review">SCM Manager Review</SelectItem>
+                <SelectItem value="scm_manager_review">SCM CO</SelectItem>
                 <SelectItem value="scm_head_review">SCM Head Review</SelectItem>
                 <SelectItem value="finance_1_review">Finance 1 Review</SelectItem>
                 <SelectItem value="finance_2_review">Finance 2 Review</SelectItem>
@@ -332,7 +332,7 @@ export default function VendorList() {
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
                 <SelectItem value="returned_to_buyer">Returned to Buyer</SelectItem>
                 <SelectItem value="returned_to_vendor">Returned to Vendor</SelectItem>
-                <SelectItem value="scm_manager_rejected">SCM Manager Rejected</SelectItem>
+                <SelectItem value="scm_manager_rejected">SCM CO</SelectItem>
                 <SelectItem value="scm_head_rejected">SCM Head Rejected</SelectItem>
                 <SelectItem value="finance_1_rejected">Finance 1 Rejected</SelectItem>
                 <SelectItem value="finance_2_rejected">Finance 2 Rejected</SelectItem>

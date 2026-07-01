@@ -88,7 +88,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // On-behalf mode without a resolved invitation id yet: do NOT load the
       // buyer's previous "self" draft — that would reuse an old vendor row and
       // its old approval chain for the brand-new submission, which is exactly
-      // the bug where SCM Manager never sees the new vendor.
+      // the bug where SCM CO never sees the new vendor.
       if (options?.isOnBehalfMode && !options?.onBehalfInvitationId) {
         return null;
       }
@@ -977,7 +977,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // New flow: submission goes to Purchase/SCM matrix first, then Finance
       const submitUpdate: Record<string, unknown> = {
         ...verificationStatuses,
-        status: 'scm_manager_review' as const, // Goes to SCM Manager approval first
+        status: 'scm_manager_review' as const, // Goes to SCM CO approval first
         submitted_at: new Date().toISOString(),
       };
       // Backfill invitation link in case the row was created before this fix

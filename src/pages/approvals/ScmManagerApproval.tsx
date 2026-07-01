@@ -5,8 +5,8 @@ export default function ScmManagerApproval() {
   return (
     <StageApprovalView
       stage="SCM_MANAGER"
-      title="SCM Manager Approval"
-      subtitle="Vendors waiting for SCM Manager (L2..Ln) review."
+      title="SCM CO"
+      subtitle="Vendors waiting for SCM CO (L2..Ln) review."
       Icon={ShoppingCart}
     />
   );

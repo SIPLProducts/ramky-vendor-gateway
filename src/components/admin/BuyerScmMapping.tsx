@@ -24,7 +24,7 @@ interface MappingRow {
 }
 
 
-const SCM_ROLE = 'SCM Manager';
+const SCM_ROLE = 'SCM CO';
 const BUYER_ROLE = 'Buyer';
 
 export function BuyerScmMapping({ tenantId }: Props) {
@@ -159,7 +159,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
 
       if (error) {
         if (error.code === '23505') {
-          toast({ title: 'Buyer already mapped', description: 'This buyer already has an SCM Manager assigned.', variant: 'destructive' });
+          toast({ title: 'Buyer already mapped', description: 'This buyer already has an SCM CO assigned.', variant: 'destructive' });
         } else throw error;
 
       } else {
@@ -212,17 +212,17 @@ export function BuyerScmMapping({ tenantId }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM Manager Mapping
+            <Link2 className="h-4 w-4" /> Add Buyer ↔ SCM CO Mapping
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
             <div>
-              <label className="text-xs text-muted-foreground">SCM Manager</label>
+              <label className="text-xs text-muted-foreground">SCM CO</label>
               <Select value={scmId} onValueChange={setScmId}>
-                <SelectTrigger><SelectValue placeholder="Select SCM Manager" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select SCM CO" /></SelectTrigger>
                 <SelectContent>
-                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with SCM Manager role. Assign it in the Users tab.</div>}
+                  {scmUsers.length === 0 && <div className="p-2 text-xs text-muted-foreground">No users with SCM CO role. Assign it in the Users tab.</div>}
                   {scmUsers.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
                   ))}
@@ -250,7 +250,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
             <Switch id="include-scm" checked={includeScm} onCheckedChange={setIncludeScm} />
             <div className="space-y-0.5">
               <label htmlFor="include-scm" className="text-sm font-medium cursor-pointer">
-                Include SCM Manager / SCM Head in approval flow
+                Include SCM CO / SCM Head in approval flow
               </label>
               <p className="text-xs text-muted-foreground">
                 When off, vendors invited by this buyer skip SCM stages and go directly to Finance 1.
@@ -277,7 +277,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>SCM Manager</TableHead>
+                  <TableHead>SCM CO</TableHead>
                   <TableHead>Buyer</TableHead>
                   <TableHead className="w-56">Include SCM in flow</TableHead>
                   

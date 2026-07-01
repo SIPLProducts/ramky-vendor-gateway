@@ -71,7 +71,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   submitted: { label: 'Submitted', variant: 'secondary' },
   validation_pending: { label: 'Validating', variant: 'secondary' },
   buyer_review: { label: 'Buyer Review', variant: 'secondary' },
-  scm_manager_review: { label: 'SCM Manager Review', variant: 'secondary' },
+  scm_manager_review: { label: 'SCM CO', variant: 'secondary' },
   scm_head_review: { label: 'SCM Head Review', variant: 'secondary' },
   finance_1_review: { label: 'Finance 1 Review', variant: 'secondary' },
   finance_2_review: { label: 'Finance 2 Review', variant: 'secondary' },

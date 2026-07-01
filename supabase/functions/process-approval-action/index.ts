@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
 
       // Non-buyer stage rejection: pre-flight buyer notification email first.
       const stageLabels: Record<string, string> = {
-        SCM_MANAGER: 'SCM Manager',
+        SCM_MANAGER: 'SCM CO',
         SCM_HEAD: 'SCM Head',
         FINANCE_1: 'Finance 1',
         FINANCE_2: 'Finance 2',

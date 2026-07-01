@@ -39,7 +39,7 @@ export function useVendors(statuses?: VendorStatus[]) {
       }
 
       if (vendorIds !== null) {
-        // SCM Manager scoping: restrict to vendors invited by mapped buyers.
+        // SCM CO scoping: restrict to vendors invited by mapped buyers.
         if (vendorIds.length === 0) return [] as VendorRow[];
         q = q.in('id', vendorIds);
       } else if (activeTenantId) {

@@ -99,11 +99,11 @@ FROM public.vendor_approval_progress
 WHERE vendor_id = '<vendor-uuid>'
 ORDER BY level_number;
 
--- 3. Is the buyer mapped to an SCM manager in that tenant?
+-- 3. Is the buyer mapped to an SCM CO in that tenant?
 SELECT * FROM public.buyer_scm_mappings
 WHERE buyer_user_id = '<buyer-uuid>';
 ```
 
 The first pending row’s `stage` should be `BUYER` — that’s why the request
 appears on the Buyer’s screen. After the Buyer approves, the next row
-(`SCM_MANAGER`) becomes pending and the SCM Manager screen lights up.
+(`SCM_MANAGER`) becomes pending and the SCM CO screen lights up.
