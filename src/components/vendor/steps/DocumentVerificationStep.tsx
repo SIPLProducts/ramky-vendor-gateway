@@ -3586,7 +3586,7 @@ function EditableOcrField({
   placeholder,
   verifiedValue,
   verifiedLabel,
-  readOnly,
+  readOnly = true,
 }: {
   label: string;
   value?: string;
