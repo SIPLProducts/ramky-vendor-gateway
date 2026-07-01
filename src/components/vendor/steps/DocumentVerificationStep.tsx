@@ -3586,6 +3586,7 @@ function EditableOcrField({
   placeholder,
   verifiedValue,
   verifiedLabel,
+  readOnly,
 }: {
   label: string;
   value?: string;
@@ -3597,14 +3598,16 @@ function EditableOcrField({
   verifiedValue?: string;
   /** Label shown next to the green tick when the value matches the API. */
   verifiedLabel?: string;
+  /** When true, disables editing and hides Edited/Reset/Use registry affordances. */
+  readOnly?: boolean;
 }) {
   const current = value ?? "";
   const original = originalValue ?? "";
-  const isEdited = current.trim() !== original.trim() && original.length > 0;
+  const isEdited = !readOnly && current.trim() !== original.trim() && original.length > 0;
   const apiVal = (verifiedValue ?? "").toString();
   const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
   const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
-  const mismatchApi = hasApi && !matchesApi;
+  const mismatchApi = !readOnly && hasApi && !matchesApi;
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -3630,12 +3633,16 @@ function EditableOcrField({
         value={current}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? "—"}
+        readOnly={readOnly}
+        tabIndex={readOnly ? -1 : undefined}
+        aria-readonly={readOnly || undefined}
         className={cn(
           "mt-1 bg-muted/40 border-border/60",
           mono && "font-mono text-sm tracking-wide",
           isEdited && "border-warning/40 bg-warning/5",
           matchesApi && "border-success/40 bg-success/5",
           mismatchApi && "border-warning/50 bg-warning/5",
+          readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
         )}
       />
       {matchesApi && (
@@ -3663,6 +3670,7 @@ function EditableOcrField({
     </div>
   );
 }
+
 
 /**
  * One-line helper inside each verified panel telling the user they can
