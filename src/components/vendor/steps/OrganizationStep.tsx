@@ -103,8 +103,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
 
   const { data: sapMatGrp } = useSapMasterData('material_group_vendor');
   const { data: sapVendorCat } = useSapMasterData('vendor_category');
-  const { data: sapVendorLoc } = useSapMasterData('vendor_location');
-  const { data: sapIdSource } = useSapMasterData('identification_source');
 
   const {
     register,
@@ -116,6 +114,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+
       ...data,
       state: data?.state || '',
       accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
@@ -510,40 +509,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
                 value={field.value || []}
                 onChange={field.onChange}
                 selectPlaceholder="Select vendor categories"
-              />
-            )}
-          />
-          <Controller
-            name="vendorLocation"
-            control={control}
-            render={({ field }) => {
-              const value = (field.value || [])[0] || '';
-              return (
-                <div className="grid gap-1.5">
-                  <Label htmlFor="vendorLocation">Vendor Location</Label>
-                  <Input
-                    id="vendorLocation"
-                    value={value}
-                    readOnly
-                    placeholder={watchedState ? '' : 'Auto-filled from State'}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Auto-filled from State.
-                  </p>
-                </div>
-              );
-            }}
-          />
-          <Controller
-            name="identificationSource"
-            control={control}
-            render={({ field }) => (
-              <ClassificationField
-                label="Vendor Identification Source"
-                masterType="identification_source"
-                value={field.value || []}
-                onChange={field.onChange}
-                selectPlaceholder="Select identification sources"
               />
             )}
           />
