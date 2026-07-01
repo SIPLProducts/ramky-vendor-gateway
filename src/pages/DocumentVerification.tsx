@@ -528,7 +528,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
   };
 
   const deviations = selectedVendor ? getDeviations() : [];
-  const stageLabels = ["IFSC Validation", "Account Lookup", "IMPS Transfer", "Transfer Confirmation", "Name Verification"];
+  
 
   return (
     <div className="space-y-6">
