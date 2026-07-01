@@ -1,27 +1,19 @@
 Plan:
 
-1. Registration Back button behavior
-   - On the registration form, when the user clicks the small Back button near “Vendor Type”, show a confirmation dialog:
-     - Title: “Go back to main screen?”
-     - Message: “If you go back, the data entered will be cleared.”
-     - Buttons: “Yes” and “No”
-   - If the user clicks “Yes”, clear the current registration data and return to the Domestic / International selection screen.
-   - If the user clicks “No”, keep the user on the current registration form with no data changes.
+1. Add a loading spinner during the Back → Yes reset
+   - When the user confirms "Yes" on the "Go back to main screen?" dialog, show a full-screen (or overlay) spinner with the message "Clearing your data…" while the reset runs.
+   - The reset already purges uploaded documents, validations, and saves a cleared draft — these calls take a few seconds, which is why the screen appears frozen.
 
-2. Keep normal step navigation unchanged
-   - The “Previous” button inside the form should continue to move between registration steps.
-   - Only the main Back button that returns to vendor type selection will show the confirmation.
+2. Disable dialog buttons while clearing
+   - Disable the Yes/No buttons and prevent closing the dialog until the reset finishes, so the user can't double-click and trigger multiple purges.
 
-3. Vendor invitation URL protection
-   - Prevent `/vendor/registration` from becoming a valid vendor login/registration screen when the required invitation context is missing.
-   - If a vendor removes `?token=...` from the registration URL, show Access Denied instead of sending them to the login/registration flow.
-   - Keep valid invited links like `/vendor/registration?token=...` working normally.
-   - Keep buyer on-behalf links like `/vendor/registration?onBehalfOf=...` working normally.
+3. Land on the Vendor Type selection screen
+   - Once the reset completes, hide the spinner and show the Domestic / International selection screen as before.
 
-4. Validation
-   - Check the registration page behavior for:
-     - Valid token URL.
-     - Token removed from URL.
-     - Back → Yes.
-     - Back → No.
-   - Run a TypeScript check after implementation.
+4. No other changes
+   - No changes to token/on-behalf validation, OCR, KYC, save/submit, or the normal Previous button.
+
+5. Validate
+   - Click Back → Yes: spinner appears, buttons disabled, then vendor type selector shows.
+   - Click Back → No: dialog closes with no changes.
+   - Run TypeScript check.
