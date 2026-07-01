@@ -147,9 +147,6 @@ export default function DocumentVerification() {
   const queryClient = useQueryClient();
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [runningValidation, setRunningValidation] = useState<string | null>(null);
-  const [pennyDropResult, setPennyDropResult] = useState<PennyDropResult | null>(null);
-  const [pennyDropStage, setPennyDropStage] = useState(0);
-  const [showPennyDropDialog, setShowPennyDropDialog] = useState(false);
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
   const [bulkValidationProgress, setBulkValidationProgress] = useState<{current: number; total: number} | null>(null);
   const [showDeviationDialog, setShowDeviationDialog] = useState(false);
