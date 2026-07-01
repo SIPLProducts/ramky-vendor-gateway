@@ -8,7 +8,7 @@ export const STAGE_ORDER: StageKey[] = [
 
 export const STAGE_LABEL: Record<StageKey, string> = {
   BUYER: 'Buyer',
-  SCM_MANAGER: 'SCM Manager',
+  SCM_MANAGER: 'SCM CO',
   SCM_HEAD: 'SCM Head',
   FINANCE_1: 'Finance 1',
   FINANCE_2: 'Finance 2',

@@ -470,7 +470,7 @@ export function VendorReviewDialog({
                             )}
                           </div>
                           <div className="space-y-1">
-                            <p className="text-muted-foreground">Mapped SCM Manager(s)</p>
+                            <p className="text-muted-foreground">Mapped SCM CO(s)</p>
                             {routing.mappedScm.length === 0 ? (
                               <p className="font-medium">-</p>
                             ) : (
