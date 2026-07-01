@@ -20,7 +20,7 @@ import {
   useVendors, useSAPSync, useMultipleSAPSync, useDMSSync, useBuyerCompanies, VendorRow,
 } from '@/hooks/useVendors';
 import {
-  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban, Undo2,
+  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban, Undo2, MessageSquare,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDialog';
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
+import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,6 +54,7 @@ export default function SAPSync() {
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'sap' | 'dms' | 'rejected'>('sap');
   const [rejectVendor, setRejectVendor] = useState<VendorRow | null>(null);
+  const [commentsVendor, setCommentsVendor] = useState<VendorRow | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState('');
   const [rejectingVendorId, setRejectingVendorId] = useState<string | null>(null);
   const [returnVendor, setReturnVendor] = useState<VendorRow | null>(null);
@@ -548,6 +550,14 @@ export default function SAPSync() {
                             <><Undo2 className="h-4 w-4 mr-2" />Reject &amp; Send to Buyer</>
                           )}
                         </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setCommentsVendor(vendor)}
+                          title="View approval comment history"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />Comments
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -998,6 +1008,14 @@ export default function SAPSync() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ApprovalCommentsDialog
+        open={!!commentsVendor}
+        onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
+        vendorId={commentsVendor?.id ?? null}
+        vendorName={commentsVendor ? (getSapName1(commentsVendor) || commentsVendor.legal_name || 'Vendor') : undefined}
+        referenceNumber={(commentsVendor as any)?.reference_number || commentsVendor?.id.slice(0, 8).toUpperCase()}
+      />
     </div>
   );
 }

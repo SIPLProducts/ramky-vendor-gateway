@@ -437,9 +437,13 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   ? `Send back to vendor — ${actionItem?.item.vendorName}`
                   : `Reject — ${actionItem?.item.vendorName}`}
             </DialogTitle>
-            {actionItem?.action === 'reject' && isBuyer && (
+            {actionItem?.action === 'reject' && isBuyer ? (
               <DialogDescription>
-                The vendor will receive an email and can edit the form and resubmit. Please add remarks describing what needs to be corrected.
+                The vendor will receive an email and can edit the form and resubmit. Please add remarks describing what needs to be corrected (required).
+              </DialogDescription>
+            ) : (
+              <DialogDescription>
+                Comments are required and will be recorded in the approval history.
               </DialogDescription>
             )}
           </DialogHeader>
@@ -453,8 +457,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               actionItem?.action === 'reject'
                 ? isBuyer
                   ? 'Describe what the vendor needs to correct (required)'
-                  : 'Reason for rejection (recommended)'
-                : 'Optional comments'
+                  : 'Reason for rejection (required)'
+                : 'Comments (required)'
             }
             value={comments}
             onChange={(e) => setComments(e.target.value)}
@@ -464,10 +468,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <Button variant="outline" onClick={() => setActionItem(null)}>Cancel</Button>
             <Button
               onClick={submit}
-              disabled={
-                submitting ||
-                (actionItem?.action === 'reject' && isBuyer && !comments.trim())
-              }
+              disabled={submitting || !comments.trim()}
+
               variant={actionItem?.action === 'reject' ? 'destructive' : 'default'}
             >
               {submitting
