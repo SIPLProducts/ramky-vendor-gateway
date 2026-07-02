@@ -540,14 +540,16 @@ export default function UserManagement() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell
-                            className={
-                              u.status === 'inactive'
-                                ? 'bg-red-100 text-red-800 font-medium text-center'
-                                : 'bg-green-100 text-green-800 font-medium text-center'
-                            }
-                          >
-                            {u.status === 'inactive' ? 'Inactive' : 'Active'}
+                          <TableCell className="text-center">
+                            <span
+                              className={
+                                u.status === 'inactive'
+                                  ? 'inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800'
+                                  : 'inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800'
+                              }
+                            >
+                              {u.status === 'inactive' ? 'Inactive' : 'Active'}
+                            </span>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {u.last_login_attempt_at
