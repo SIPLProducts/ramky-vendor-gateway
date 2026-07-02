@@ -17,6 +17,7 @@ import { useTenantUserCounts } from '@/hooks/useTenant';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
+import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
 import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
