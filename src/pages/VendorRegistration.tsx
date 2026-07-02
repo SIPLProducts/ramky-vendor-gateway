@@ -752,7 +752,7 @@ export default function VendorRegistration() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor]);
+  }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor, existingFormData]);
 
 
 
