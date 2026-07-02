@@ -652,13 +652,52 @@ export default function VendorRegistration() {
               filledSteps.push(1);
               // Pre-seed verifiedData so Step 1 shows green tiles when revisited
               setVerifiedData({
+                isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
+                isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
                 pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
                 panStatus: existingFormData.statutory.panStatus ?? null,
                 panAadhaarLinked: existingFormData.statutory.panAadhaarLinked ?? null,
                 panComprehensiveVerifiedAt: existingFormData.statutory.panComprehensiveVerifiedAt ?? null,
-                gst: { gstin: existingFormData.statutory.gstin, legalName: existingFormData.organization?.legalName || '' },
+                panCardFile: existingFormData.statutory?.panCardFile ?? null,
+                gst: existingFormData.statutory?.gstin
+                  ? {
+                      gstin: existingFormData.statutory.gstin,
+                      legalName: existingFormData.organization?.legalName || '',
+                      constitutionOfBusiness: existingFormData.statutory?.gstConstitutionOfBusiness || '',
+                      principalPlaceOfBusiness: existingFormData.statutory?.gstPrincipalPlaceOfBusiness || '',
+                      additionalPlaces: existingFormData.statutory?.gstAdditionalPlaces || [],
+                      registrationDate: existingFormData.statutory?.gstRegistrationDate || '',
+                      status: existingFormData.statutory?.gstStatus || '',
+                      taxpayerType: existingFormData.statutory?.gstTaxpayerType || '',
+                      businessNature: existingFormData.statutory?.gstBusinessNature || [],
+                      jurisdictionCentre: existingFormData.statutory?.gstJurisdictionCentre || '',
+                      jurisdictionState: existingFormData.statutory?.gstJurisdictionState || '',
+                    }
+                  : undefined,
+                gstCertificateFile: existingFormData.statutory?.gstCertificateFile ?? null,
+                gstSelfDeclarationFile: existingFormData.statutory?.gstSelfDeclarationFile ?? null,
+                gstDeclarationReason: existingFormData.statutory?.gstDeclarationReason || '',
+                manualLegalName: existingFormData.statutory?.isGstRegistered === false ? (existingFormData.organization?.legalName || '') : '',
+                manualAddress: existingFormData.statutory?.isGstRegistered === false ? {
+                  address: existingFormData.address?.registeredAddress || '',
+                  city: existingFormData.address?.registeredCity || '',
+                  state: existingFormData.address?.registeredState || '',
+                  pincode: existingFormData.address?.registeredPincode || '',
+                } : undefined,
                 msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
-                bank: { accountNumber: existingFormData.bank.accountNumber, ifsc: existingFormData.bank.ifscCode || '', bankName: existingFormData.bank.bankName || '' },
+                msmeCertificateFile: existingFormData.statutory?.msmeCertificateFile ?? null,
+                msmeSelfDeclarationFile: existingFormData.statutory?.msmeSelfDeclarationFile ?? null,
+                msmeDeclarationReason: existingFormData.statutory?.msmeDeclarationReason || '',
+                bank: {
+                  accountNumber: existingFormData.bank.accountNumber,
+                  ifsc: existingFormData.bank.ifscCode || '',
+                  bankName: existingFormData.bank.bankName || '',
+                  branchName: existingFormData.bank.branchName || '',
+                  accountHolderName: existingFormData.organization?.legalName || '',
+                  accountType: existingFormData.bank.accountType || 'current',
+                  bankAddress: existingFormData.bank.bankAddress || '',
+                },
+                cancelledChequeFile: existingFormData.bank?.cancelledChequeFile ?? null,
                 bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
                   ? {
                       accountNumber: existingFormData.bank.secondary.accountNumber,
@@ -670,7 +709,8 @@ export default function VendorRegistration() {
                       bankAddress: existingFormData.bank.secondary.bankAddress || '',
                     }
                   : undefined,
-              });
+                cancelledChequeFile2: existingFormData.bank?.secondary?.cancelledChequeFile ?? null,
+              } as any);
             }
             if (existingFormData.organization?.legalName) filledSteps.push(2);
             if (existingFormData.address?.registeredAddress) filledSteps.push(3);
