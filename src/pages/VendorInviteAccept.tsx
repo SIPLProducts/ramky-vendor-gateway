@@ -4,11 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, ShieldCheck, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldCheck, Mail, Ban } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
-type Phase = 'loading' | 'confirm' | 'validating' | 'signing_in' | 'error';
+type Phase = 'loading' | 'confirm' | 'validating' | 'signing_in' | 'error' | 'denied';
 
 export default function VendorInviteAccept() {
   const [searchParams] = useSearchParams();
