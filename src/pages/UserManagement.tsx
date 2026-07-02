@@ -595,6 +595,62 @@ export default function UserManagement() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base">Inactive User Login Attempts</CardTitle>
+              <Button variant="ghost" size="sm" onClick={loadLoginAttempts} disabled={attemptsLoading}>
+                {attemptsLoading ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Login Attempt Date &amp; Time</TableHead>
+                      <TableHead>Login Status</TableHead>
+                      <TableHead>Last Login Attempt</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attemptsLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                      ))
+                    ) : loginAttempts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No inactive login attempts recorded.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      loginAttempts.map((a) => {
+                        const u = users.find((x) => x.id === a.user_id || x.email.toLowerCase() === a.email.toLowerCase());
+                        return (
+                          <TableRow key={a.id}>
+                            <TableCell className="font-medium">{u?.full_name ?? '—'}</TableCell>
+                            <TableCell>{a.email}</TableCell>
+                            <TableCell className="text-sm">{new Date(a.attempted_at).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-destructive text-destructive">Inactive User</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {u?.last_login_attempt_at
+                                ? new Date(u.last_login_attempt_at).toLocaleString()
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* CUSTOM ROLES TAB */}
