@@ -467,7 +467,6 @@ export default function UserManagement() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Tenants</TableHead>
                       <TableHead>Status</TableHead>
@@ -479,10 +478,10 @@ export default function UserManagement() {
                   <TableBody>
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
                     ) : filtered.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No users found
                       </TableCell></TableRow>
                     ) : (
@@ -491,20 +490,11 @@ export default function UserManagement() {
                           <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
-                            {u.customRoles.length > 0 ? (
-                              <Badge variant="secondary" className="bg-primary/10">{u.customRoles[0].name}</Badge>
-                            ) : u.role ? (
-                              <Badge variant="secondary">{u.role}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {u.customRoles.length <= 1
+                              {u.customRoles.length === 0
                                 ? <span className="text-muted-foreground text-xs">—</span>
-                                : u.customRoles.slice(1).map((c) => (
-                                    <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
+                                : u.customRoles.map((c) => (
+                                    <Badge key={c.id} variant="secondary" className="bg-primary/10">{c.name}</Badge>
                                   ))}
                             </div>
                           </TableCell>
