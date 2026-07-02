@@ -746,6 +746,13 @@ export default function UserManagement() {
       </Tabs>
 
       {/* Dialogs */}
+      <EditUserDialog
+        open={!!editUser}
+        onOpenChange={(o) => !o && setEditUser(null)}
+        user={editUser}
+        onSave={handleSaveEditUser}
+      />
+
       {roleDialog && (
         <ChangeRoleDialog
           open={!!roleDialog}
