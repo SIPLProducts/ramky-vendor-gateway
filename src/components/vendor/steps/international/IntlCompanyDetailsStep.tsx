@@ -58,6 +58,8 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: data,
+    values: data as FormValues,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   const selectedCountry = watch('country');

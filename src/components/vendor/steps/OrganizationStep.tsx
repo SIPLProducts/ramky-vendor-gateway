@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -104,6 +104,27 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   const { data: sapMatGrp } = useSapMasterData('material_group_vendor');
   const { data: sapVendorCat } = useSapMasterData('vendor_category');
 
+  const formValues = useMemo<FormValues>(() => ({
+    ...(data as FormValues),
+    state: data?.state || '',
+    accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
+    materialGroupVendor: Array.isArray(data?.materialGroupVendor) ? data!.materialGroupVendor as string[] : (data?.materialGroupVendor ? [data.materialGroupVendor as unknown as string] : []),
+    vendorCategory: Array.isArray(data?.vendorCategory) ? data!.vendorCategory as string[] : (data?.vendorCategory ? [data.vendorCategory as unknown as string] : []),
+    vendorLocation: Array.isArray(data?.vendorLocation) ? data!.vendorLocation as string[] : (data?.vendorLocation ? [data.vendorLocation as unknown as string] : []),
+    identificationSource: Array.isArray(data?.identificationSource) ? data!.identificationSource as string[] : (data?.identificationSource ? [data.identificationSource as unknown as string] : []),
+    entityType: statutoryData?.entityType || '',
+    firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
+    pfNumber: statutoryData?.pfNumber || '',
+    esiNumber: statutoryData?.esiNumber || '',
+    iecNo: statutoryData?.iecNo || '',
+    swiftIbanCode: statutoryData?.swiftIbanCode || '',
+    labourPermitNo: statutoryData?.labourPermitNo || '',
+    memberships: statutoryData?.memberships || [],
+    enlistments: statutoryData?.enlistments || [],
+    certifications: statutoryData?.certifications || [],
+    operationalNetwork: statutoryData?.operationalNetwork || '',
+  }), [data, statutoryData]);
+
   const {
     register,
     handleSubmit,
@@ -113,28 +134,9 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-
-      ...data,
-      state: data?.state || '',
-      accountingGroup: (data?.accountingGroup as 'Import' | 'Domestic') || undefined,
-      
-      materialGroupVendor: Array.isArray(data?.materialGroupVendor) ? data!.materialGroupVendor as string[] : (data?.materialGroupVendor ? [data.materialGroupVendor as unknown as string] : []),
-      vendorCategory: Array.isArray(data?.vendorCategory) ? data!.vendorCategory as string[] : (data?.vendorCategory ? [data.vendorCategory as unknown as string] : []),
-      vendorLocation: Array.isArray(data?.vendorLocation) ? data!.vendorLocation as string[] : (data?.vendorLocation ? [data.vendorLocation as unknown as string] : []),
-      identificationSource: Array.isArray(data?.identificationSource) ? data!.identificationSource as string[] : (data?.identificationSource ? [data.identificationSource as unknown as string] : []),
-      entityType: statutoryData?.entityType || '',
-      firmRegistrationNo: statutoryData?.firmRegistrationNo || '',
-      pfNumber: statutoryData?.pfNumber || '',
-      esiNumber: statutoryData?.esiNumber || '',
-      iecNo: statutoryData?.iecNo || '',
-      swiftIbanCode: statutoryData?.swiftIbanCode || '',
-      labourPermitNo: statutoryData?.labourPermitNo || '',
-      memberships: statutoryData?.memberships || [],
-      enlistments: statutoryData?.enlistments || [],
-      certifications: statutoryData?.certifications || [],
-      operationalNetwork: statutoryData?.operationalNetwork || '',
-    },
+    defaultValues: formValues,
+    values: formValues,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
 

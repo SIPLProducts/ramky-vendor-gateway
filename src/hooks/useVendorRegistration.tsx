@@ -867,6 +867,41 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           updatePayload.tenant_id = (existingVendor as any).tenant_id;
         }
 
+        // ============================================================
+        // Preserve previously entered values on partial saves.
+        // If the incoming payload has an empty value (null / '' / []) for a
+        // column that already has a non-empty value in the DB, keep the DB
+        // value. This prevents autosave / step-level saves from wiping out
+        // data captured in other steps or in a previous session.
+        // Boolean columns and explicit JSON toggles are excluded so users
+        // can still clear checkboxes intentionally.
+        // ============================================================
+        {
+          const existingRow = (existingVendor as Record<string, unknown> | null) || {};
+          const isEmpty = (v: unknown) =>
+            v === null ||
+            v === undefined ||
+            (typeof v === 'string' && v.trim() === '') ||
+            (Array.isArray(v) && v.length === 0);
+          const preserveExempt = new Set<string>([
+            'status',
+            'user_id',
+            'tenant_id',
+            'invitation_id',
+            'is_gst_registered',
+            'is_msme_registered',
+            'updated_at',
+          ]);
+          for (const key of Object.keys(updatePayload)) {
+            if (preserveExempt.has(key)) continue;
+            const incoming = (updatePayload as Record<string, unknown>)[key];
+            const current = existingRow[key];
+            if (isEmpty(incoming) && !isEmpty(current)) {
+              (updatePayload as Record<string, unknown>)[key] = current;
+            }
+          }
+        }
+
         const { data, error } = await writeVendorWithPanFallback(
           'update',
           updatePayload,

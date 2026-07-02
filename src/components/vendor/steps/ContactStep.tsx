@@ -52,6 +52,8 @@ export function ContactStep({ data, tenantId, onNext }: ContactStepProps) {
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<ContactDetails>({
     resolver: zodResolver(schema),
     defaultValues: data,
+    values: data,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   // Wrap register() to enforce 10-digit numeric input on phone fields.

@@ -148,6 +148,8 @@ export function ComplianceStep({
   } = useForm<StatutoryDetails>({
     resolver: zodResolver(schema) as never,
     defaultValues: data,
+    values: data,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   const isGstRegistered = watch('isGstRegistered');
