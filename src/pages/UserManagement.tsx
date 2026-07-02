@@ -10,11 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, X } from 'lucide-react';
+import { Search, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantUserCounts } from '@/hooks/useTenant';
-import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
+import type { AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
@@ -68,7 +68,7 @@ export default function UserManagement() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [scopeTenantId, setScopeTenantId] = useState<string>(ALL_TENANTS);
-  const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
+  
   const [createOpen, setCreateOpen] = useState(false);
   const [editingCustomRole, setEditingCustomRole] = useState<CustomRoleData | null>(null);
   const [customRoleDialogOpen, setCustomRoleDialogOpen] = useState(false);
@@ -203,14 +203,71 @@ export default function UserManagement() {
     }
   };
 
-  const handleSaveEditUser = async (patch: { full_name: string; status: 'active' | 'inactive' }) => {
+  const handleSaveEditUser = async (patch: {
+    full_name: string;
+    status: 'active' | 'inactive';
+    role: AppRole;
+    tenantIds: string[];
+    customRoleIds: string[];
+  }) => {
     if (!editUser) return;
+    const isSelf = editUser.id === user?.id;
     try {
-      const { error } = await (supabase as any).from('profiles').update({
+      // 1. profile: name + status
+      const { error: profErr } = await (supabase as any).from('profiles').update({
         full_name: patch.full_name || null,
         status: patch.status,
       }).eq('id', editUser.id);
-      if (error) throw error;
+      if (profErr) throw profErr;
+
+      // 2. role/tenants/custom roles — skipped when editing self
+      if (!isSelf) {
+        if (patch.role !== editUser.role) {
+          const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', editUser.id);
+          if (delErr) throw delErr;
+          const { error: insErr } = await supabase.from('user_roles').insert({ user_id: editUser.id, role: patch.role });
+          if (insErr) throw insErr;
+          await supabase.from('audit_logs').insert({
+            action: 'role_changed', user_id: user?.id,
+            details: { target_user_id: editUser.id, target_email: editUser.email, old_role: editUser.role, new_role: patch.role },
+          });
+        }
+
+        const currentTenantIds = editUser.tenantIds;
+        const tToAdd = patch.tenantIds.filter((id) => !currentTenantIds.includes(id));
+        const tToRemove = currentTenantIds.filter((id) => !patch.tenantIds.includes(id));
+        if (tToRemove.length > 0) {
+          const { error } = await supabase.from('user_tenants').delete().eq('user_id', editUser.id).in('tenant_id', tToRemove);
+          if (error) throw error;
+        }
+        if (tToAdd.length > 0) {
+          const rows = tToAdd.map((tid) => ({ user_id: editUser.id, tenant_id: tid }));
+          const { error } = await supabase.from('user_tenants').insert(rows);
+          if (error) throw error;
+        }
+
+        const currentCustom = editUser.customRoleIds;
+        const cToAdd = patch.customRoleIds.filter((id) => !currentCustom.includes(id));
+        const cToRemove = currentCustom.filter((id) => !patch.customRoleIds.includes(id));
+        if (cToRemove.length > 0) {
+          const { error } = await supabase.from('user_custom_roles').delete().eq('user_id', editUser.id).in('custom_role_id', cToRemove);
+          if (error) throw error;
+          await supabase.from('audit_logs').insert({
+            action: 'custom_roles_unassigned', user_id: user?.id,
+            details: { target_user_id: editUser.id, custom_role_ids: cToRemove },
+          });
+        }
+        if (cToAdd.length > 0) {
+          const rows = cToAdd.map((cid) => ({ user_id: editUser.id, custom_role_id: cid, assigned_by: user?.id }));
+          const { error } = await supabase.from('user_custom_roles').insert(rows);
+          if (error) throw error;
+          await supabase.from('audit_logs').insert({
+            action: 'custom_roles_assigned', user_id: user?.id,
+            details: { target_user_id: editUser.id, custom_role_ids: cToAdd },
+          });
+        }
+      }
+
       await supabase.from('audit_logs').insert({
         action: 'user_edited', user_id: user?.id,
         details: {
@@ -218,6 +275,7 @@ export default function UserManagement() {
           full_name: patch.full_name, status: patch.status,
         },
       });
+
       toast({ title: 'User updated', description: editUser.email });
       await loadData();
     } catch (err: any) {
@@ -225,6 +283,7 @@ export default function UserManagement() {
       throw err;
     }
   };
+
 
   useEffect(() => { loadData(); loadLoginAttempts(); }, []);
 
@@ -235,81 +294,27 @@ export default function UserManagement() {
   const scopedCustomRoleRows = customRoleRows;
   const scopedUsers = users;
 
+  // Hide "pure vendor" users from the Users tab (vendor role with no custom roles)
+  const nonVendorUsers = useMemo(
+    () => scopedUsers.filter((u) => !(u.role === 'vendor' && u.customRoles.length === 0)),
+    [scopedUsers],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return scopedUsers.filter((u) => {
+    return nonVendorUsers.filter((u) => {
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (!q) return true;
       return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
     });
-  }, [scopedUsers, search, roleFilter]);
+  }, [nonVendorUsers, search, roleFilter]);
 
   const stats = useMemo(() => {
     const counts: Record<string, number> = {};
-    scopedUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
-    return { total: scopedUsers.length, counts };
-  }, [scopedUsers]);
+    nonVendorUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
+    return { total: nonVendorUsers.length, counts };
+  }, [nonVendorUsers]);
 
-
-  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
-    if (!roleDialog) return;
-    if (roleDialog.id === user?.id && newRole !== roleDialog.role) {
-      toast({ title: 'Action blocked', description: 'You cannot change your own role.', variant: 'destructive' });
-      return;
-    }
-    try {
-      if (newRole !== roleDialog.role) {
-        const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', roleDialog.id);
-        if (delErr) throw delErr;
-        const { error: insErr } = await supabase.from('user_roles').insert({ user_id: roleDialog.id, role: newRole });
-        if (insErr) throw insErr;
-        await supabase.from('audit_logs').insert({
-          action: 'role_changed', user_id: user?.id,
-          details: { target_user_id: roleDialog.id, target_email: roleDialog.email, old_role: roleDialog.role, new_role: newRole },
-        });
-      }
-
-      const currentIds = roleDialog.tenants.map((t) => t.id);
-      const toAdd = newTenantIds.filter((id) => !currentIds.includes(id));
-      const toRemove = currentIds.filter((id) => !newTenantIds.includes(id));
-      if (toRemove.length > 0) {
-        const { error } = await supabase.from('user_tenants').delete().eq('user_id', roleDialog.id).in('tenant_id', toRemove);
-        if (error) throw error;
-      }
-      if (toAdd.length > 0) {
-        const rows = toAdd.map((tid) => ({ user_id: roleDialog.id, tenant_id: tid }));
-        const { error } = await supabase.from('user_tenants').insert(rows);
-        if (error) throw error;
-      }
-
-      const currentCustom = roleDialog.customRoles.map((c) => c.id);
-      const cToAdd = newCustomRoleIds.filter((id) => !currentCustom.includes(id));
-      const cToRemove = currentCustom.filter((id) => !newCustomRoleIds.includes(id));
-      if (cToRemove.length > 0) {
-        const { error } = await supabase.from('user_custom_roles').delete().eq('user_id', roleDialog.id).in('custom_role_id', cToRemove);
-        if (error) throw error;
-        await supabase.from('audit_logs').insert({
-          action: 'custom_roles_unassigned', user_id: user?.id,
-          details: { target_user_id: roleDialog.id, custom_role_ids: cToRemove },
-        });
-      }
-      if (cToAdd.length > 0) {
-        const rows = cToAdd.map((cid) => ({ user_id: roleDialog.id, custom_role_id: cid, assigned_by: user?.id }));
-        const { error } = await supabase.from('user_custom_roles').insert(rows);
-        if (error) throw error;
-        await supabase.from('audit_logs').insert({
-          action: 'custom_roles_assigned', user_id: user?.id,
-          details: { target_user_id: roleDialog.id, custom_role_ids: cToAdd },
-        });
-      }
-
-      toast({ title: 'User updated', description: `${roleDialog.email} → ${newRole}` });
-      await loadData();
-    } catch (err: any) {
-      toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
-      throw err;
-    }
-  };
 
 
   const handleRemoveTenant = async (userId: string, tenantId: string) => {
@@ -462,7 +467,6 @@ export default function UserManagement() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Tenants</TableHead>
                       <TableHead>Status</TableHead>
@@ -474,10 +478,10 @@ export default function UserManagement() {
                   <TableBody>
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
                     ) : filtered.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No users found
                       </TableCell></TableRow>
                     ) : (
@@ -486,20 +490,11 @@ export default function UserManagement() {
                           <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
-                            {u.customRoles.length > 0 ? (
-                              <Badge variant="secondary" className="bg-primary/10">{u.customRoles[0].name}</Badge>
-                            ) : u.role ? (
-                              <Badge variant="secondary">{u.role}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {u.customRoles.length <= 1
+                              {u.customRoles.length === 0
                                 ? <span className="text-muted-foreground text-xs">—</span>
-                                : u.customRoles.slice(1).map((c) => (
-                                    <Badge key={c.id} variant="outline" className="bg-primary/5">{c.name}</Badge>
+                                : u.customRoles.map((c) => (
+                                    <Badge key={c.id} variant="secondary" className="bg-primary/10">{c.name}</Badge>
                                   ))}
                             </div>
                           </TableCell>
@@ -565,15 +560,13 @@ export default function UserManagement() {
                                 onClick={() => setEditUser({
                                   id: u.id, email: u.email,
                                   full_name: u.full_name, status: u.status,
+                                  role: u.role,
+                                  tenantIds: u.tenants.map((t) => t.id),
+                                  customRoleIds: u.customRoles.map((c) => c.id),
                                 })}
                                 title="Edit user"
                               >
                                 <Pencil className="h-4 w-4 mr-1" /> Edit
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setRoleDialog(u)}
-                                disabled={u.id === user?.id}
-                                title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
-                                <UserCog className="h-4 w-4 mr-1" /> Role
                               </Button>
                               <Button
                                 variant="ghost"
@@ -750,22 +743,12 @@ export default function UserManagement() {
         open={!!editUser}
         onOpenChange={(o) => !o && setEditUser(null)}
         user={editUser}
+        tenants={tenants}
+        customRoles={scopedCustomRoles}
+        disableRoleAndAccess={editUser?.id === user?.id}
         onSave={handleSaveEditUser}
       />
 
-      {roleDialog && (
-        <ChangeRoleDialog
-          open={!!roleDialog}
-          onOpenChange={(o) => !o && setRoleDialog(null)}
-          currentRole={roleDialog.role}
-          userName={roleDialog.full_name ?? roleDialog.email}
-          tenants={tenants}
-          currentTenantIds={roleDialog.tenants.map((t) => t.id)}
-          customRoles={scopedCustomRoles}
-          currentCustomRoleIds={roleDialog.customRoles.map((c) => c.id)}
-          onConfirm={handleChangeRole}
-        />
-      )}
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
