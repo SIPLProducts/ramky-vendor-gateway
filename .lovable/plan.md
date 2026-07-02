@@ -1,60 +1,34 @@
-# User Management — Active/Inactive Status, Login Blocking, Attempt Logging, Auto-Logout
+# User Management — Consolidate Edit, drop Role column, hide vendors
 
-## 1. Database (migration)
+## Changes to `src/pages/UserManagement.tsx`
 
-**Add columns to `profiles`:**
-- `status text not null default 'active'` — values: `active` | `inactive`
-- `last_login_attempt_at timestamptz` — timestamp of most recent login attempt (any status)
+1. **Hide vendor users** from the Users tab table:
+   - In the `filtered` memo, exclude any user where `role === 'vendor'` AND they have no custom roles (matches the existing `isVendor` definition — pure vendors only).
+   - Adjust the stats cards accordingly so the Vendor count card is removed (keep the other role counts).
 
-**New table `login_attempts`:**
-- `id uuid pk`, `user_id uuid`, `email text`, `attempt_status text` (`success` | `inactive_user` | `invalid_credentials`), `attempted_at timestamptz default now()`, `ip text null`, `user_agent text null`
-- RLS: admins/sharvi_admin/customer_admin can `select`; edge function (service role) inserts. Standard `GRANT` block.
+2. **Remove the Role column and Role button:**
+   - Delete the `<TableHead>Role</TableHead>` column and its `<TableCell>` (the badge showing primary role).
+   - Delete the `<Button>Role</Button>` in the actions cell.
+   - Keep the "Custom Roles" column.
 
-**Helper RPC `check_user_active(_email text)`** (SECURITY DEFINER) — returns `{ status, user_id }` so the sign-in flow can look up status without needing a session.
+3. **Extend Edit into a full Change Role & Access dialog:**
+   - Replace `EditUserDialog` usage with a new consolidated dialog `EditUserDialog` that includes:
+     - Full Name (text)
+     - Status (Active / Inactive)
+     - Role (Select of `ALL_ROLES` — same as ChangeRoleDialog)
+     - Tenant Access (multi-select checkboxes, same UX as current ChangeRoleDialog)
+     - Custom Roles (multi-select, same UX as current ChangeRoleDialog)
+   - Disable Role/Tenant/CustomRoles editing when the user being edited is the current logged-in user (matches existing "cannot change own role" guard).
+   - On Save: run the full-name + status update, then the existing role/tenant/custom-role diff logic (reuse `handleChangeRole` internals).
+   - Retire the standalone `ChangeRoleDialog` mount in this page (component file untouched — just no longer used here).
 
-## 2. Auth flow (`useAuth.signIn`)
+## Files to touch
 
-Before `signInWithPassword`:
-1. Call `check_user_active` RPC with email.
-2. If `status = 'inactive'`:
-   - Insert row in `login_attempts` (`attempt_status='inactive_user'`) via edge function `log-login-attempt` (service role).
-   - Update `profiles.last_login_attempt_at`.
-   - Return error: **"Your account is inactive. Please contact the Administrator to proceed."**
-3. Otherwise proceed with sign-in; on result log `success` or `invalid_credentials` and update `last_login_attempt_at`.
+- `src/components/admin/EditUserDialog.tsx` — extend props/UI to include role, tenants, custom roles.
+- `src/pages/UserManagement.tsx` — remove Role column & button, filter out vendors, wire new dialog to a single save handler.
 
-New edge function `log-login-attempt` (public/no-verify-jwt, service role writes) — since inactive users won't have a session.
+## Not changing
 
-## 3. Auto-logout after 30 min inactivity
-
-New hook `useIdleLogout(minutes=30)` mounted in `AuthProvider` (only when a session exists):
-- Listens to `mousemove`, `keydown`, `click`, `scroll`, `touchstart`, `visibilitychange`.
-- Resets a timer on any activity; on timeout calls `signOut()` and shows a toast "Signed out due to inactivity."
-- Also tracks `localStorage` timestamp so cross-tab activity resets the timer.
-
-## 4. User Management UI (`src/pages/UserManagement.tsx`)
-
-**Table changes:**
-- New column **Status** — `Active` / `Inactive` badge.
-- New column **Last Login Attempt** — formatted date/time (or `—`).
-- New **Edit** button (pencil icon) opens `EditUserDialog` with:
-  - Full Name (text)
-  - Status (Select: Active / Inactive)
-  - Save → updates `profiles.full_name` and `profiles.status`; audit log entry.
-
-**New "Inactive Login Attempts" panel** (collapsible card below the Users table):
-- Fetches last 100 rows from `login_attempts` where `attempt_status='inactive_user'`.
-- Columns: User Name, Login Attempt Date & Time, Login Status ("Inactive User"), Last Login Attempt (from `profiles.last_login_attempt_at`).
-
-**Files:**
-- `supabase/migrations/<ts>_user_status_and_login_attempts.sql` (new)
-- `supabase/functions/log-login-attempt/index.ts` (new)
-- `src/components/admin/EditUserDialog.tsx` (new)
-- `src/hooks/useIdleLogout.tsx` (new)
-- `src/hooks/useAuth.tsx` (edit `signIn`, mount idle logout)
-- `src/pages/UserManagement.tsx` (columns, Edit button, load `status`/`last_login_attempt_at`, attempts panel)
-
-## Notes / assumptions
-
-- Existing users default to `active`.
-- Auto-logout applies to **all** authenticated users (vendors + internal). Confirm if it should exclude vendors.
-- "Login Status" in the attempts table always shows "Inactive User" since we're filtering to that case; the underlying table also stores success/invalid_credentials for future use.
+- `ChangeRoleDialog.tsx` component stays (may be used elsewhere).
+- Backend, RLS, login logging, and auto-logout remain untouched.
+- Delete button still available in the actions column.
