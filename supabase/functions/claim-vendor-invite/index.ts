@@ -18,6 +18,11 @@ function json(status: number, body: Record<string, unknown>) {
   });
 }
 
+function isAuthError(error: unknown): boolean {
+  const msg = `${(error as { message?: string })?.message || error || ''}`.toLowerCase();
+  return msg.includes('invalid login credentials') || msg.includes('email not confirmed');
+}
+
 function normalizeActionLink(rawActionLink: string, redirectOrigin?: string): string {
   if (!redirectOrigin) return rawActionLink;
   try {
@@ -113,6 +118,31 @@ Deno.serve(async (req) => {
           vendor_id: invite.vendor_id,
         });
       }
+
+      // If the first click already provisioned the invited auth user but the browser
+      // never completed the magic-link redirect, let the invited mailbox open the
+      // same invite again. A forwarded/copy user still won't have the password.
+      if (invite.user_id) {
+        const { data: userRecord } = await admin.auth.admin.getUserById(invite.user_id);
+        const claimedEmail = (userRecord?.user?.email || '').toLowerCase();
+        if (claimedEmail === invitedEmail) {
+          const { data: signInData, error: signInErr } = await createClient(supabaseUrl, anonKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+          }).auth.signInWithPassword({
+            email: invitedEmail,
+            password: `${token}:${invite.id}`,
+          });
+
+          if (!signInErr && signInData?.session) {
+            return json(200, {
+              status: 'claimed',
+              session: signInData.session,
+              redirect: `/vendor/registration?token=${encodeURIComponent(token)}`,
+              vendor_id: invite.vendor_id,
+            });
+          }
+        }
+      }
       // Anyone else (re-click, forwarded, copied) is denied
       try {
         await admin.from('invitation_email_events').insert({
@@ -131,6 +161,7 @@ Deno.serve(async (req) => {
 
     // 3. First-click claim: ensure auth user exists for invitedEmail
     let authUserId: string | null = null;
+    const invitePassword = `${token}:${invite.id}`;
     try {
       const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
       const found = list?.users?.find(
@@ -144,7 +175,7 @@ Deno.serve(async (req) => {
     if (!authUserId) {
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email: invitedEmail,
-        password: randomPassword(),
+        password: invitePassword,
         email_confirm: true,
         user_metadata: { invited_via: 'vendor_invitation', invitation_id: invite.id },
       });
@@ -168,6 +199,17 @@ Deno.serve(async (req) => {
       return json(500, { status: 'error', code: 'provision_failed' });
     }
 
+    // Ensure re-entry works for an existing auth user too.
+    try {
+      await admin.auth.admin.updateUserById(authUserId, {
+        password: invitePassword,
+        email_confirm: true,
+        user_metadata: { invited_via: 'vendor_invitation', invitation_id: invite.id },
+      });
+    } catch (e) {
+      console.warn('update invited auth user failed:', e);
+    }
+
     // 4. Stamp used_at + user_id (atomic — only if still unclaimed)
     const { data: claimRow, error: claimErr } = await admin
       .from('vendor_invitations')
@@ -186,27 +228,15 @@ Deno.serve(async (req) => {
       return json(403, { status: 'denied', code: 'already_used' });
     }
 
-    // 5. Generate magic link → auto sign-in
-    const origin = (redirectOrigin || '').replace(/\/$/, '');
-    const redirectTo = origin
-      ? `${origin}/vendor/registration?token=${encodeURIComponent(token)}`
-      : undefined;
+    // 5. One-click sign-in without sending another email.
+    const { data: signInData, error: signInErr } = await createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }).auth.signInWithPassword({ email: invitedEmail, password: invitePassword });
 
-    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: invitedEmail,
-      options: redirectTo ? { redirectTo } : undefined,
-    });
-
-    if (linkErr || !linkData?.properties?.action_link) {
-      console.error('generateLink failed:', linkErr);
-      return json(500, { status: 'error', code: 'link_failed' });
+    if (signInErr || !signInData?.session) {
+      console.error('invite password sign-in failed:', signInErr);
+      return json(isAuthError(signInErr) ? 403 : 500, { status: 'error', code: 'signin_failed' });
     }
-
-    const actionLink = normalizeActionLink(
-      linkData.properties.action_link as string,
-      redirectOrigin,
-    );
 
     // Log successful claim
     try {
@@ -220,7 +250,8 @@ Deno.serve(async (req) => {
 
     return json(200, {
       status: 'claimed',
-      action_link: actionLink,
+      session: signInData.session,
+      redirect: `/vendor/registration?token=${encodeURIComponent(token)}`,
       vendor_id: invite.vendor_id,
     });
   } catch (err) {
