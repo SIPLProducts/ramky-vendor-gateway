@@ -194,6 +194,8 @@ interface DocState {
   fileSize?: number;
   /** The actual uploaded File — lifted to parent so draft save includes it */
   file?: File;
+  /** Storage path when the file was hydrated from a previously saved vendor row */
+  filePath?: string;
   ocrData?: Record<string, any>;
   /** Original OCR snapshot — used to power the "Edited" badge and "Reset to OCR" link */
   originalOcrData?: Record<string, any>;
@@ -288,6 +290,18 @@ function extractPanComprehensiveFields(result: any): { status: string | null; aa
   return {
     status: statusRaw == null || statusRaw === "" ? null : String(statusRaw),
     aadhaarLinked: normalizeBooleanLike(linkedRaw),
+  };
+}
+
+/** Extract the persisted-file bits (name/size/path) from a File-like coming from a previously saved vendor row. */
+function persistedFileMeta(f?: File | null): { fileName?: string; fileSize?: number; filePath?: string; file?: File } {
+  if (!f) return {};
+  const persisted = (f as any).__persistedDocument === true;
+  return {
+    file: f,
+    fileName: f.name,
+    fileSize: (f as any).size,
+    filePath: persisted ? (f as any).filePath : undefined,
   };
 }
 
@@ -395,6 +409,7 @@ export function DocumentVerificationStep({
       originalOcrData: data,
       apiData: { legalName: initialData.gst.apiName },
       nameMatchScore: initialData.gst.nameMatchScore,
+      ...persistedFileMeta(initialData.gstCertificateFile),
     };
   });
   const [editablePrincipalPlace, setEditablePrincipalPlace] = useState<string>(
@@ -455,6 +470,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
+      ...persistedFileMeta(initialData.panCardFile),
     };
   });
   const [panCrossCheckError, setPanCrossCheckError] = useState<string | null>(null);
@@ -477,6 +493,7 @@ export function DocumentVerificationStep({
       originalOcrData: data,
       apiData: { name: initialData.msme.apiName },
       nameMatchScore: initialData.msme.nameMatchScore,
+      ...persistedFileMeta(initialData.msmeCertificateFile),
     };
   });
 
@@ -495,6 +512,7 @@ export function DocumentVerificationStep({
       ocrData: data,
       originalOcrData: data,
       apiData: { name: initialData.bank.apiName },
+      ...persistedFileMeta(initialData.cancelledChequeFile),
     };
   });
   // Account Type + Bank Address — captured here (not on a cheque) so vendor
@@ -524,6 +542,7 @@ export function DocumentVerificationStep({
       ocrData: data,
       originalOcrData: data,
       apiData: { name: initialData.bank2.apiName },
+      ...persistedFileMeta(initialData.cancelledChequeFile2),
     };
   });
   const [bankAccountType2, setBankAccountType2] = useState<string>(
