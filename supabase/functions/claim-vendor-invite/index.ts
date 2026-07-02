@@ -122,10 +122,20 @@ Deno.serve(async (req) => {
       // If the first click already provisioned the invited auth user but the browser
       // never completed the magic-link redirect, let the invited mailbox open the
       // same invite again. A forwarded/copy user still won't have the password.
-      if (invite.user_id) {
+      if (invite.user_id && !invite.vendor_id) {
         const { data: userRecord } = await admin.auth.admin.getUserById(invite.user_id);
         const claimedEmail = (userRecord?.user?.email || '').toLowerCase();
         if (claimedEmail === invitedEmail) {
+          try {
+            await admin.auth.admin.updateUserById(invite.user_id, {
+              password: `${token}:${invite.id}`,
+              email_confirm: true,
+              user_metadata: { invited_via: 'vendor_invitation', invitation_id: invite.id },
+            });
+          } catch (e) {
+            console.warn('repair invited auth user failed:', e);
+          }
+
           const { data: signInData, error: signInErr } = await createClient(supabaseUrl, anonKey, {
             auth: { autoRefreshToken: false, persistSession: false },
           }).auth.signInWithPassword({
