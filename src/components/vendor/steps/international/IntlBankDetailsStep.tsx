@@ -16,6 +16,8 @@ interface Props {
 export function IntlBankDetailsStep({ data, onSubmit, onLiveUpdate }: Props) {
   const { register, control, handleSubmit, watch } = useForm<InternationalBankDetails>({
     defaultValues: data,
+    values: data,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   const { data: countries } = useSapMasterData('country');
