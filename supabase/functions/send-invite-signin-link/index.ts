@@ -69,6 +69,12 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if ((invite.email || "").trim().toLowerCase() !== confirmed_email.trim().toLowerCase()) {
+      return new Response(
+        JSON.stringify({ error: "Email does not match invitation", code: "email_mismatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
       return new Response(JSON.stringify({ error: "Invitation expired", code: "expired" }), {
         status: 410,
