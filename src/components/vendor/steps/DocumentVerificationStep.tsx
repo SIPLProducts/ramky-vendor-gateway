@@ -293,6 +293,18 @@ function extractPanComprehensiveFields(result: any): { status: string | null; aa
   };
 }
 
+/** Extract the persisted-file bits (name/size/path) from a File-like coming from a previously saved vendor row. */
+function persistedFileMeta(f?: File | null): { fileName?: string; fileSize?: number; filePath?: string; file?: File } {
+  if (!f) return {};
+  const persisted = (f as any).__persistedDocument === true;
+  return {
+    file: f,
+    fileName: f.name,
+    fileSize: (f as any).size,
+    filePath: persisted ? (f as any).filePath : undefined,
+  };
+}
+
 export function DocumentVerificationStep({
   vendorId,
   initialData,
