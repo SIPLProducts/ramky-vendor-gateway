@@ -28,14 +28,17 @@ const asArr = (v: unknown): string[] =>
 const firstStr = (v: string[] | undefined): string => (v && v.length > 0 ? v[0] : '');
 
 export function IntlClassificationStep({ data, onSubmit, onLiveUpdate }: Props) {
+  const formValues = useMemo<FormValues>(() => ({
+    materialGroupVendor: asArr(data.materialGroupVendor),
+    vendorLocation: asArr(data.vendorLocation),
+    vendorCategory: asArr(data.vendorCategory),
+    identificationSource: asArr(data.identificationSource),
+  }), [data]);
   const { control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      materialGroupVendor: asArr(data.materialGroupVendor),
-      vendorLocation: asArr(data.vendorLocation),
-      vendorCategory: asArr(data.vendorCategory),
-      identificationSource: asArr(data.identificationSource),
-    },
+    defaultValues: formValues,
+    values: formValues,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   useEffect(() => {
