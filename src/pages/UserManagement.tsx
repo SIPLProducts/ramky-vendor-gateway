@@ -161,11 +161,13 @@ export default function UserManagement() {
       setCustomRoles((customRolesRes.data ?? []) as any);
       setCustomRoleRows((customRolesRes.data ?? []).map((r: any) => ({ ...r, user_count: countsByRole.get(r.id) ?? 0 })));
       setUsers(
-        (profilesRes.data ?? []).map((p) => ({
+        (profilesRes.data ?? []).map((p: any) => ({
           id: p.id,
           email: p.email,
           full_name: p.full_name,
           created_at: p.created_at,
+          status: (p.status ?? 'active') as 'active' | 'inactive',
+          last_login_attempt_at: p.last_login_attempt_at ?? null,
           role: roleMap.get(p.id) ?? null,
           tenants: (utByUser.get(p.id) ?? [])
             .map((tid) => tenantMap.get(tid))
