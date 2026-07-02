@@ -86,6 +86,8 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
   const { register, handleSubmit, control, watch } = useForm<CombinedFormData>({
     resolver: zodResolver(schema),
     defaultValues,
+    values: defaultValues,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   const productTypes = watch('productTypes') || [];
