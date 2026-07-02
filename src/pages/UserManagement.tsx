@@ -124,7 +124,7 @@ export default function UserManagement() {
     setLoading(true);
     try {
       const [profilesRes, rolesRes, userTenantsData, tenantsRes, customRolesRes, userCustomData] = await Promise.all([
-        supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, email, full_name, created_at, status, last_login_attempt_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
         fetchAll<{ user_id: string; tenant_id: string }>('user_tenants', 'user_id, tenant_id'),
         supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
