@@ -1,64 +1,49 @@
-## Problem
+## Goal
+Make Edit Vendor Registration behave identically to a saved/in-progress registration: every field and every uploaded document that was saved must appear in the form on reopen, and each document must be viewable, downloadable, and replaceable.
 
-Vendor form fields (Organization, GST, PAN, MSME, Bank, Address, Contact, Classification, Documents) are being lost when the vendor edits or when the application is returned for corrections.
+## What's already correct
+- `useVendorRegistration.existingFormData` already rebuilds most text fields from the `vendors` row and attaches persisted documents (GST cert, GST self‑declaration, PAN card, MSME cert, MSME self‑declaration, cancelled cheques, financial docs, dealership cert) as `PersistedDocumentFile` placeholders (name + size + `filePath`).
+- `VendorRegistration.tsx` hydrates `formData` from `existingFormData` on `returned_to_vendor` / `returned_to_buyer` and lands the user on Review.
 
-## Root causes found
+## What's broken
+1. **Step 1 (Document Verification) does not receive persisted documents.** The `verifiedData` object built in `VendorRegistration.tsx` (the `useEffect` on `existingFormData`) omits:
+   - `isGstRegistered`, `gstDeclarationReason`, `gstSelfDeclarationFile`
+   - `isMsmeRegistered`, `msmeDeclarationReason`, `msmeSelfDeclarationFile`
+   - `gstCertificateFile`, `panCardFile`, `msmeCertificateFile`, `cancelledChequeFile`, `cancelledChequeFile2`
+   So on reopen: GST=No hides the saved declaration, MSME=No hides the saved declaration, and no GST/PAN/MSME/Bank certificate tile shows the previously uploaded file.
+2. **`DocumentVerificationStep` doesn't seed the `file` slot of each doc tile.** `gstDoc` / `panDoc` / `msmeDoc` / `bankDoc` initial state sets `ocrData` from `initialData` but ignores the corresponding `*File` props (which are already declared on `VerifiedDocumentData`). Tiles render "no file uploaded" even though the DB has one.
+3. **No View / Download for persisted files.** `PersistedDocumentFile` carries `filePath`, but no UI exposes a signed URL. Only `Replace` works today.
+4. **Register step revisits (Organization / Address / Contact / Financial / Infra) rely solely on the initial `setFormData(existingFormData)` snapshot.** They already pick up hydrated values, so text fields are fine — the outstanding gap is only doc‑related (points 1–3). No changes needed to those step components beyond a spot‑check of the declaration‑file props on Organization/Compliance.
 
-1. **Step forms don't re-sync with late-arriving data.** Every step (`OrganizationStep`, `AddressStep`, `ContactStep`, `FinancialInfrastructureStep`, `DocumentVerificationStep`, `ComplianceStep`, all `international/*` steps) initializes `useForm({ defaultValues: data })`. React Hook Form only reads `defaultValues` at mount. If the step renders before the vendor record has hydrated (fresh load, refetch after save, or when navigating into a step while `existingFormData` is still loading), the form keeps its empty defaults. When the user clicks **Next**, RHF submits those empty values, overwriting the previously saved slice in the parent `formData`.
+## Plan
 
-2. **Autosave writes the full record.** `saveVendor` builds a complete `vendors` row from the entire `formData` on every autosave via `formDataToVendorRecord`. Any slice that is still empty in `formData` (because the step form above never populated it) is written to the DB as `null`/empty string. This is what makes previously entered GST / PAN / MSME / Bank / Address / Contact fields disappear on the next reload.
+### 1. Pass persisted docs into Step 1
+In `src/pages/VendorRegistration.tsx`, extend the `verifiedData` seeded inside the `existingFormData` hydration effect to include, when present in `existingFormData.statutory` / `existingFormData.bank`:
+- `isGstRegistered`, `gstDeclarationReason`, `gstSelfDeclarationFile`
+- `isMsmeRegistered`, `msmeDeclarationReason`, `msmeSelfDeclarationFile`
+- `gstCertificateFile`, `panCardFile`, `msmeCertificateFile`
+- `cancelledChequeFile`, `cancelledChequeFile2` (secondary bank)
 
-3. **Hydration effect runs only once.** `formDataLoadedRef` in `VendorRegistration.tsx` guarantees `setFormData(existingFormData)` runs a single time. After a save/refetch, the ref never re-fires, so a fresh authoritative record from the DB is not re-applied even if the local `formData` has drifted.
+### 2. Seed file slots in Document Verification tiles
+In `src/components/vendor/steps/DocumentVerificationStep.tsx`, when initial `DocState` is built for `gstDoc` / `panDoc` / `msmeDoc` / `bankDoc` (and secondary bank), also populate `file`, `fileName`, `fileSize`, and (new) `filePath` from `initialData.gstCertificateFile` / `panCardFile` / `msmeCertificateFile` / `cancelledChequeFile` / `cancelledChequeFile2`. Add `filePath?: string` to the internal `DocState` interface so signed URLs can be generated.
 
-## Fix plan
+### 3. Add View / Download for persisted files
+In the shared doc‑tile UI inside `DocumentVerificationStep.tsx` (`onReplace` block around lines 3163‑3250), add a View and Download action next to Replace when the doc has a `filePath`. Both call `supabase.storage.from('vendor-documents').createSignedUrl(filePath, 300)` — View opens in a new tab, Download triggers an anchor download. Replace continues to work as today; uploading a new file clears `filePath`.
 
-### 1. Make every step re-sync when its `data` prop changes
+### 4. Repeat the same View/Download affordance for the other steps' file inputs
+The Organization/Compliance step already receives `gstCertificateFile`, `msmeCertificateFile`, `panCardFile`, `gstSelfDeclarationFile`, `msmeSelfDeclarationFile` via hydrated `formData.statutory`, and Financial receives `dealershipCertificateFile` / `financialDocsFile`, Bank has `cancelledChequeFile`. Where those steps render a file input, show file name + View + Download when the current value is a `PersistedDocumentFile` (has `__persistedDocument === true` and a `filePath`). Introduce a small shared helper component `PersistedFileActions` under `src/components/vendor/` to avoid duplication.
 
-For each step below, switch to RHF's controlled sync so late/refreshed data is applied:
+### 5. No changes to save/submit path
+Persisted files with no user replacement should continue to skip re-upload — that already works via the `__persistedDocument` check in `saveVendor` (line 278 of the hook). Verify (read only) that clearing a persisted file (Remove) also removes it from `vendor_documents`.
 
-- `src/components/vendor/steps/OrganizationStep.tsx`
-- `src/components/vendor/steps/AddressStep.tsx`
-- `src/components/vendor/steps/ContactStep.tsx`
-- `src/components/vendor/steps/FinancialInfrastructureStep.tsx`
-- `src/components/vendor/steps/ComplianceStep.tsx`
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` (mirror `verifiedData` + persisted files back into local stage state when the incoming props change)
-- `src/components/vendor/steps/international/IntlDocumentsStep.tsx`
-- `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`
-- `src/components/vendor/steps/international/IntlBankDetailsStep.tsx`
-- `src/components/vendor/steps/international/IntlClassificationStep.tsx`
+### Technical notes
+- `PersistedDocumentFile` (in `useVendorRegistration.tsx`) already exposes `filePath` — no schema change.
+- Storage bucket `vendor-documents` is private → use `createSignedUrl` (5 min expiry) for both View and Download.
+- Guard signed‑URL calls behind a `useState` loading flag per tile to prevent double clicks.
+- No DB migration, no edge function change.
 
-Change pattern: pass `values: data` to `useForm` (RHF v7 keeps this in sync automatically) **or** add a `useEffect(() => reset(data), [data])`. Guard the reset so it does not clobber the user's unsaved keystrokes (skip when `formState.isDirty` is `true`).
-
-### 2. Gate autosave and full-record writes until hydration is complete
-
-In `src/pages/VendorRegistration.tsx`:
-
-- Do not run the debounced autosave until `formDataLoadedRef.current === true` (existing record has been merged into `formData`). Today autosave only skips one tick via `isFirstAutoSaveRef`, which is not enough when the vendor record loads a few hundred ms after mount.
-- Recompute `lastSavedHashRef` from the hydrated `formData` right after the initial merge so the first user edit is what triggers autosave, not the hydration itself.
-
-### 3. Never write empty slices over saved data
-
-In `src/hooks/useVendorRegistration.tsx` `saveVendorMutation` (update branch, ~line 851):
-
-- After building `updatePayload` via `formDataToVendorRecord`, strip keys whose value is `null`/`''`/empty array **when the same key on the loaded `existingVendor` currently has a non-empty value**. This preserves DB values for any slice the user has not touched in this session.
-- Keep explicit clears working: allow through fields where `formData` explicitly sets `false`/`0`/`null` because the user toggled them (e.g. `is_gst_registered`, `same_as_registered`, secondary bank cleared). Handle those via an allow-list of boolean/flag columns that always pass through.
-
-### 4. Re-apply DB truth after each successful save
-
-- After `saveVendorMutation` resolves, invalidate the `existingVendor` query and let a small companion effect re-run hydration when the fetched row is newer than what's in `formData` (guard: only merge fields the user is not currently editing — reuse the `formState.isDirty` check from step 1 by keeping form syncing controlled).
-
-### 5. Document upload persistence
-
-Keep the recent `vendor_documents` hydration work in place. Extend the same `reset(data)` pattern to `DocumentVerificationStep` so that `persistedFile` metadata (name/size/status) reappears when the user returns to Step 1 during an edit, and the "Uploaded" pill / green tile stays lit even when the raw `File` object is not in memory.
-
-## Technical notes
-
-- RHF `values` prop reference: passing `values` to `useForm` makes the form fully controlled by the parent's data object — the correct primitive for "the source of truth can change after mount".
-- The autosave hash currently stringifies `formData`; after the hydration-gate fix, seed `lastSavedHashRef.current = JSON.stringify(hydratedFormData)` inside the same effect that sets `formDataLoadedRef.current = true` to avoid a spurious first save.
-- The whitelist for step 3 should include at minimum: `is_gst_registered`, `is_msme_registered`, `same_as_registered`, `self_declared`, `terms_accepted`, `bank_name_2` / `account_number_2` / etc. (when `secondary.enabled === false`), and any admin-defined custom flag columns.
-- No schema changes. No new tables. No new edge functions.
-
-## Out of scope
-
-- Buyer-side approval screen edits (no changes there).
-- SAP payload builder (already reads from `vendors` row directly).
+### Files touched
+- `src/pages/VendorRegistration.tsx` — extend `verifiedData` seeding
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` — seed `file`/`filePath` in each `DocState`, add View/Download in the shared tile
+- `src/components/vendor/steps/OrganizationStep.tsx`, `ComplianceStep.tsx`, `FinancialInfrastructureStep.tsx`, and the bank sections — wire `PersistedFileActions` next to their file inputs
+- `src/components/vendor/PersistedFileActions.tsx` — new small helper
