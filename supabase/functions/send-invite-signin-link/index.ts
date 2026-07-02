@@ -27,9 +27,15 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { token, redirectOrigin } = await req.json();
+    const { token, redirectOrigin, confirmed_email } = await req.json();
     if (!token || typeof token !== "string") {
       return new Response(JSON.stringify({ error: "Missing token", code: "invalid" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!confirmed_email || typeof confirmed_email !== "string") {
+      return new Response(JSON.stringify({ error: "Missing confirmed_email", code: "email_required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -62,6 +68,12 @@ serve(async (req: Request) => {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    if ((invite.email || "").trim().toLowerCase() !== confirmed_email.trim().toLowerCase()) {
+      return new Response(
+        JSON.stringify({ error: "Email does not match invitation", code: "email_mismatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
       return new Response(JSON.stringify({ error: "Invitation expired", code: "expired" }), {
