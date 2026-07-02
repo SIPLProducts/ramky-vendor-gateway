@@ -10,11 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Search, UserCog, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, X } from 'lucide-react';
+import { Search, Building2, Users, Plus, ShieldCheck, Pencil, Trash2, Settings, GitBranch, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantUserCounts } from '@/hooks/useTenant';
-import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
+import type { AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
