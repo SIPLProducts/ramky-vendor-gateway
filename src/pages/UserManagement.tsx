@@ -34,9 +34,19 @@ interface UserRow {
   email: string;
   full_name: string | null;
   created_at: string;
+  status: 'active' | 'inactive';
+  last_login_attempt_at: string | null;
   role: AppRole | null;
   tenants: { id: string; name: string }[];
   customRoles: { id: string; name: string }[];
+}
+
+interface LoginAttemptRow {
+  id: string;
+  user_id: string | null;
+  email: string;
+  attempt_status: string;
+  attempted_at: string;
 }
 
 interface Tenant { id: string; name: string; }
