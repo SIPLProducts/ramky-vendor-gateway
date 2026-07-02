@@ -194,6 +194,8 @@ interface DocState {
   fileSize?: number;
   /** The actual uploaded File — lifted to parent so draft save includes it */
   file?: File;
+  /** Storage path when the file was hydrated from a previously saved vendor row */
+  filePath?: string;
   ocrData?: Record<string, any>;
   /** Original OCR snapshot — used to power the "Edited" badge and "Reset to OCR" link */
   originalOcrData?: Record<string, any>;
