@@ -465,6 +465,8 @@ export default function UserManagement() {
                       <TableHead>Role</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Tenants</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login Attempt</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -472,10 +474,10 @@ export default function UserManagement() {
                   <TableBody>
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
                     ) : filtered.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         No users found
                       </TableCell></TableRow>
                     ) : (
