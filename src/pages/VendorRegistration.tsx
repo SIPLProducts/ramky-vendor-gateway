@@ -624,7 +624,7 @@ export default function VendorRegistration() {
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
       formDataLoadedRef.current = true;
-      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected', 'returned_to_vendor'];
+      const editableStatuses = ['draft', 'validation_failed', 'finance_rejected', 'purchase_rejected', 'returned_to_vendor', 'returned_to_buyer'];
       const pendingStatuses = ['submitted', 'validation_pending', 'finance_review', 'purchase_review', 'finance_approved', 'purchase_approved', 'sap_synced'];
 
       if (editableStatuses.includes(vendorStatus)) {
@@ -632,9 +632,10 @@ export default function VendorRegistration() {
         setVendorStatusState(vendorStatus);
         setVendorTypeChosen(true);
         setPendingChoiceType(existingFormData.vendorType);
-        // For returned_to_vendor we want to land on the Review step so the
-        // vendor can immediately see remarks + resubmit after editing.
-        const isReturned = vendorStatus === 'returned_to_vendor';
+        // For returned_to_vendor / returned_to_buyer we want to land on the
+        // Review step so the vendor/buyer can immediately see remarks +
+        // resubmit after editing.
+        const isReturned = vendorStatus === 'returned_to_vendor' || vendorStatus === 'returned_to_buyer';
         if (vendorStatus === 'draft' || isReturned) {
           const filledSteps: number[] = [];
           if (existingFormData.vendorType === 'international') {
