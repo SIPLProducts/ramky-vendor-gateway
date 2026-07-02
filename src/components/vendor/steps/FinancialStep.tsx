@@ -8,8 +8,9 @@ import { TrendingUp, Users, Building } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileUpload } from '@/components/vendor/FileUpload';
 import { FinancialDetails } from '@/types/vendor';
+import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/indianFy';
 
-const currentYear = new Date().getFullYear();
+const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
 const schema = z.object({
   turnoverYear1: z.string().optional(),
