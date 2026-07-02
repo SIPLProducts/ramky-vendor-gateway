@@ -1,33 +1,60 @@
-# Indian Financial Year for Turnover (Last 3 Years)
+# User Management — Active/Inactive Status, Login Blocking, Attempt Logging, Auto-Logout
 
-## Problem
-Turnover labels in the vendor registration form are derived from the calendar year (`new Date().getFullYear()`). Between January and March they show an FY that hasn't ended yet.
+## 1. Database (migration)
 
-## Fix
-Compute the **last completed Indian FY** and show it plus the two prior ones.
+**Add columns to `profiles`:**
+- `status text not null default 'active'` — values: `active` | `inactive`
+- `last_login_attempt_at timestamptz` — timestamp of most recent login attempt (any status)
 
-### Logic
-```
-const now = new Date();
-const y = now.getFullYear();
-const m = now.getMonth(); // 0 = Jan
-// Current Indian FY start year: if before April, it's y-1, else y
-const currentFyStart = m < 3 ? y - 1 : y;
-// Last completed FY start year = currentFyStart - 1
-const lastCompletedStart = currentFyStart - 1;
+**New table `login_attempts`:**
+- `id uuid pk`, `user_id uuid`, `email text`, `attempt_status text` (`success` | `inactive_user` | `invalid_credentials`), `attempted_at timestamptz default now()`, `ip text null`, `user_agent text null`
+- RLS: admins/sharvi_admin/customer_admin can `select`; edge function (service role) inserts. Standard `GRANT` block.
 
-// Show FYs: (lastCompletedStart-2), (lastCompletedStart-1), lastCompletedStart
-// Label format: `FY ${start}-${(start+1).toString().slice(-2)}`
-```
+**Helper RPC `check_user_active(_email text)`** (SECURITY DEFINER) — returns `{ status, user_id }` so the sign-in flow can look up status without needing a session.
 
-### Behavior
-- 02-Jul-2026 → FY 2023-24, 2024-25, 2025-26
-- 15-Feb-2027 → FY 2023-24, 2024-25, 2025-26 (unchanged, correct)
-- 01-Apr-2027 → FY 2024-25, 2025-26, 2026-27 (auto-rolls)
+## 2. Auth flow (`useAuth.signIn`)
 
-## Files to change
-- `src/components/vendor/steps/FinancialInfrastructureStep.tsx` — replace the `currentYear` constant and the three `<Label>` expressions with a small `getLastThreeIndianFYs()` helper.
-- `src/components/vendor/steps/FinancialStep.tsx` — apply the same helper if it renders the same labels.
+Before `signInWithPassword`:
+1. Call `check_user_active` RPC with email.
+2. If `status = 'inactive'`:
+   - Insert row in `login_attempts` (`attempt_status='inactive_user'`) via edge function `log-login-attempt` (service role).
+   - Update `profiles.last_login_attempt_at`.
+   - Return error: **"Your account is inactive. Please contact the Administrator to proceed."**
+3. Otherwise proceed with sign-in; on result log `success` or `invalid_credentials` and update `last_login_attempt_at`.
 
-## Out of scope
-No changes to stored field keys (`turnoverYear1/2/3`), form schema, backend, or SAP mapping — only display labels.
+New edge function `log-login-attempt` (public/no-verify-jwt, service role writes) — since inactive users won't have a session.
+
+## 3. Auto-logout after 30 min inactivity
+
+New hook `useIdleLogout(minutes=30)` mounted in `AuthProvider` (only when a session exists):
+- Listens to `mousemove`, `keydown`, `click`, `scroll`, `touchstart`, `visibilitychange`.
+- Resets a timer on any activity; on timeout calls `signOut()` and shows a toast "Signed out due to inactivity."
+- Also tracks `localStorage` timestamp so cross-tab activity resets the timer.
+
+## 4. User Management UI (`src/pages/UserManagement.tsx`)
+
+**Table changes:**
+- New column **Status** — `Active` / `Inactive` badge.
+- New column **Last Login Attempt** — formatted date/time (or `—`).
+- New **Edit** button (pencil icon) opens `EditUserDialog` with:
+  - Full Name (text)
+  - Status (Select: Active / Inactive)
+  - Save → updates `profiles.full_name` and `profiles.status`; audit log entry.
+
+**New "Inactive Login Attempts" panel** (collapsible card below the Users table):
+- Fetches last 100 rows from `login_attempts` where `attempt_status='inactive_user'`.
+- Columns: User Name, Login Attempt Date & Time, Login Status ("Inactive User"), Last Login Attempt (from `profiles.last_login_attempt_at`).
+
+**Files:**
+- `supabase/migrations/<ts>_user_status_and_login_attempts.sql` (new)
+- `supabase/functions/log-login-attempt/index.ts` (new)
+- `src/components/admin/EditUserDialog.tsx` (new)
+- `src/hooks/useIdleLogout.tsx` (new)
+- `src/hooks/useAuth.tsx` (edit `signIn`, mount idle logout)
+- `src/pages/UserManagement.tsx` (columns, Edit button, load `status`/`last_login_attempt_at`, attempts panel)
+
+## Notes / assumptions
+
+- Existing users default to `active`.
+- Auto-logout applies to **all** authenticated users (vendors + internal). Confirm if it should exclude vendors.
+- "Login Status" in the attempts table always shows "Inactive User" since we're filtering to that case; the underlying table also stores success/invalid_credentials for future use.
