@@ -1,40 +1,33 @@
-## Revert Vendor Type screen to clean centered card
+# Indian Financial Year for Turnover (Last 3 Years)
 
-**Scope:** Only the vendor-type selection screen inside `src/pages/VendorRegistration.tsx` (the `!vendorTypeChosen && !isSubmitted` block). No other screen or step changes.
+## Problem
+Turnover labels in the vendor registration form are derived from the calendar year (`new Date().getFullYear()`). Between January and March they show an FY that hasn't ended yet.
 
-### What changed earlier
-- The vendor-type `<main>` was rebuilt as a full-height split layout with the Ramky hero image as background.
-- A left-side brand panel and a right-side translucent selection card were added.
+## Fix
+Compute the **last completed Indian FY** and show it plus the two prior ones.
 
-### What to revert to
-- The screenshot you shared: a plain light grey background, the existing header at the top, and the original centered white selection card containing the invited-email banner, "Select Vendor Type" heading, the two vendor-type option cards, and the Continue button.
+### Logic
+```
+const now = new Date();
+const y = now.getFullYear();
+const m = now.getMonth(); // 0 = Jan
+// Current Indian FY start year: if before April, it's y-1, else y
+const currentFyStart = m < 3 ? y - 1 : y;
+// Last completed FY start year = currentFyStart - 1
+const lastCompletedStart = currentFyStart - 1;
 
-### Steps
+// Show FYs: (lastCompletedStart-2), (lastCompletedStart-1), lastCompletedStart
+// Label format: `FY ${start}-${(start+1).toString().slice(-2)}`
+```
 
-1. **Restore the centered card layout**
-   - Replace the current `<main>` block (split image layout + overlay + left brand messaging + right translucent card) with the original simple centered card:
-     ```
-     <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-       <div className="w-full max-w-2xl bg-card rounded-[10px] shadow-lg border p-6 sm:p-8 space-y-6">
-         {isTokenMode && invitationEmail && ...}
-         <div className="space-y-1">...</div>
-         <VendorTypeSelector ... />
-         <div className="flex justify-end pt-2">...
-         </div>
-       </div>
-     </main>
-     ```
+### Behavior
+- 02-Jul-2026 → FY 2023-24, 2024-25, 2025-26
+- 15-Feb-2027 → FY 2023-24, 2024-25, 2025-26 (unchanged, correct)
+- 01-Apr-2027 → FY 2024-25, 2025-26, 2026-27 (auto-rolls)
 
-2. **Remove the Ramky hero background**
-   - Delete the `ramkyHeroBg` import from `src/pages/VendorRegistration.tsx`.
-   - Remove the `src/assets/ramky-hero-bg.png.asset.json` asset pointer since it will no longer be referenced.
+## Files to change
+- `src/components/vendor/steps/FinancialInfrastructureStep.tsx` — replace the `currentYear` constant and the three `<Label>` expressions with a small `getLastThreeIndianFYs()` helper.
+- `src/components/vendor/steps/FinancialStep.tsx` — apply the same helper if it renders the same labels.
 
-3. **Keep everything else unchanged**
-   - Header stays exactly as-is (logo + "Vendor Registration" / "Vendor Portal").
-   - `VendorTypeSelector`, `pendingChoiceType`, `confirmChoice`, Continue button, invitation email banner, and submit disabled state remain untouched.
-   - All other registration steps and routing stay as-is.
-
-### Validation
-- Open `/vendor/registration` fresh → vendor-type screen shows the plain grey background and centered card matching the screenshot.
-- "Continue" still advances to Step 1.
-- `tsgo --noEmit` passes.
+## Out of scope
+No changes to stored field keys (`turnoverYear1/2/3`), form schema, backend, or SAP mapping — only display labels.
