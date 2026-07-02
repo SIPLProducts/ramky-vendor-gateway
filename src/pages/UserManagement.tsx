@@ -743,22 +743,12 @@ export default function UserManagement() {
         open={!!editUser}
         onOpenChange={(o) => !o && setEditUser(null)}
         user={editUser}
+        tenants={tenants}
+        customRoles={scopedCustomRoles}
+        disableRoleAndAccess={editUser?.id === user?.id}
         onSave={handleSaveEditUser}
       />
 
-      {roleDialog && (
-        <ChangeRoleDialog
-          open={!!roleDialog}
-          onOpenChange={(o) => !o && setRoleDialog(null)}
-          currentRole={roleDialog.role}
-          userName={roleDialog.full_name ?? roleDialog.email}
-          tenants={tenants}
-          currentTenantIds={roleDialog.tenants.map((t) => t.id)}
-          customRoles={scopedCustomRoles}
-          currentCustomRoleIds={roleDialog.customRoles.map((c) => c.id)}
-          onConfirm={handleChangeRole}
-        />
-      )}
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
