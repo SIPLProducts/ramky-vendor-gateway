@@ -540,10 +540,14 @@ export default function UserManagement() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
-                            {u.status === 'inactive'
-                              ? <Badge variant="outline" className="border-destructive text-destructive">Inactive</Badge>
-                              : <Badge variant="secondary">Active</Badge>}
+                          <TableCell
+                            className={
+                              u.status === 'inactive'
+                                ? 'bg-red-100 text-red-800 font-medium text-center'
+                                : 'bg-green-100 text-green-800 font-medium text-center'
+                            }
+                          >
+                            {u.status === 'inactive' ? 'Inactive' : 'Active'}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {u.last_login_attempt_at
