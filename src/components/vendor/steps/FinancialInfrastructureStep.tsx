@@ -160,21 +160,21 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         <div className="grid gap-5">
           <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear1">FY {currentYear - 3}-{(currentYear - 2).toString().slice(-2)}</Label>
+              <Label htmlFor="turnoverYear1">{formatIndianFy(fy1Start)}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                 <Input id="turnoverYear1" type="number" {...register('turnoverYear1')} placeholder="Amount in Lakhs" className="pl-8" />
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear2">FY {currentYear - 2}-{(currentYear - 1).toString().slice(-2)}</Label>
+              <Label htmlFor="turnoverYear2">{formatIndianFy(fy2Start)}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                 <Input id="turnoverYear2" type="number" {...register('turnoverYear2')} placeholder="Amount in Lakhs" className="pl-8" />
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear3">FY {currentYear - 1}-{currentYear.toString().slice(-2)}</Label>
+              <Label htmlFor="turnoverYear3">{formatIndianFy(fy3Start)}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                 <Input id="turnoverYear3" type="number" {...register('turnoverYear3')} placeholder="Amount in Lakhs" className="pl-8" />
