@@ -68,7 +68,7 @@ export default function UserManagement() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [scopeTenantId, setScopeTenantId] = useState<string>(ALL_TENANTS);
-  const [roleDialog, setRoleDialog] = useState<UserRow | null>(null);
+  
   const [createOpen, setCreateOpen] = useState(false);
   const [editingCustomRole, setEditingCustomRole] = useState<CustomRoleData | null>(null);
   const [customRoleDialogOpen, setCustomRoleDialogOpen] = useState(false);
