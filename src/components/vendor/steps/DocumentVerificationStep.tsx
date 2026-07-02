@@ -493,6 +493,7 @@ export function DocumentVerificationStep({
       originalOcrData: data,
       apiData: { name: initialData.msme.apiName },
       nameMatchScore: initialData.msme.nameMatchScore,
+      ...persistedFileMeta(initialData.msmeCertificateFile),
     };
   });
 
