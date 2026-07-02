@@ -50,3 +50,10 @@ verify_jwt = false
 
 [functions.log-login-attempt]
 verify_jwt = false
+
+[functions.send-invite-signin-link]
+verify_jwt = false
+
+[functions.verify-invite-session]
+verify_jwt = false
+
