@@ -31,6 +31,19 @@ const STAGE_LABEL: Record<string, string> = {
   CEO_OFFICE: 'CEO Office',
 };
 
+// Unified vendor display-name precedence: Trade → Legal → PAN/Account Holder.
+const NAME_PLACEHOLDERS = new Set(['-', '—', 'n/a', 'na', 'none', 'null', 'undefined']);
+const cleanNm = (x: unknown): string => {
+  if (x == null) return '';
+  const s = String(x).trim();
+  if (!s) return '';
+  if (NAME_PLACEHOLDERS.has(s.toLowerCase())) return '';
+  return s;
+};
+const pickVendorName = (v: any, fallback: string): string =>
+  cleanNm(v?.trade_name) || cleanNm(v?.legal_name) || cleanNm(v?.account_holder_name) || fallback;
+
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -64,7 +77,7 @@ Deno.serve(async (req) => {
         .eq('stage', 'BUYER').eq('status', 'pending').in('vendor_id', buyerVendorIds);
       const { data: rejectedVendors } = await admin
         .from('vendors')
-        .select('id, legal_name, trade_name, gstin, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number')
+        .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number')
         .in('id', buyerVendorIds).eq('status', 'returned_to_buyer');
 
       // Latest invitation per vendor (for on-behalf detection + deep-link).
@@ -80,7 +93,7 @@ Deno.serve(async (req) => {
 
       const pendingVIds = (buyerProgress ?? []).map((p: any) => p.vendor_id);
       const { data: vendors } = pendingVIds.length
-        ? await admin.from('vendors').select('id, legal_name, trade_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number').in('id', pendingVIds)
+        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number').in('id', pendingVIds)
         : { data: [] as any[] } as any;
       const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
@@ -92,7 +105,7 @@ Deno.serve(async (req) => {
           progressId: p.id,
           vendorId: p.vendor_id,
           referenceNumber: v?.reference_number ?? null,
-          vendorName: (v?.gstin ? (v?.trade_name || v?.legal_name) : (v?.legal_name || v?.trade_name)) || p.vendor_id.slice(0, 8),
+          vendorName: pickVendorName(v, p.vendor_id.slice(0, 8)),
           submittedAt: v?.submitted_at ?? null,
           isMsme: isIntl ? false : !!v?.is_msme_registered,
           isInternational: isIntl,
@@ -117,7 +130,7 @@ Deno.serve(async (req) => {
         return {
           progressId: null, vendorId: v.id,
           referenceNumber: v?.reference_number ?? null,
-          vendorName: (v?.gstin ? (v?.trade_name || v?.legal_name) : (v?.legal_name || v?.trade_name)) || v.id.slice(0, 8),
+          vendorName: pickVendorName(v, v.id.slice(0, 8)),
           submittedAt: v?.submitted_at ?? null,
           isMsme: isIntl ? false : !!v?.is_msme_registered,
           isInternational: isIntl,
@@ -188,7 +201,7 @@ Deno.serve(async (req) => {
 
     const { data: vendors } = await admin
       .from('vendors')
-      .select('id, legal_name, trade_name, gstin, submitted_at, is_msme_registered, vendor_type, tenant_id, reference_number')
+      .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, tenant_id, reference_number')
       .in('id', progressVendorIds);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
@@ -225,7 +238,7 @@ Deno.serve(async (req) => {
         progressId: p.id,
         vendorId: p.vendor_id,
         referenceNumber: v?.reference_number ?? null,
-        vendorName: (v?.gstin ? (v?.trade_name || v?.legal_name) : (v?.legal_name || v?.trade_name)) || p.vendor_id.slice(0, 8),
+        vendorName: pickVendorName(v, p.vendor_id.slice(0, 8)),
         submittedAt: v?.submitted_at ?? null,
         isMsme: isIntl ? false : !!v?.is_msme_registered,
         isInternational: isIntl,

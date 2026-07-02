@@ -26,10 +26,10 @@ export function resolveRegion(state: string | null | undefined): string {
 }
 
 /**
- * Resolve the SAP NAME1 value for a vendor row.
- * - If GSTIN present → Trade Name (fallback Legal Name, then Account Holder Name).
- * - If GSTIN absent → Account Holder Name (fallback Legal Name, then Trade Name).
- * Whitespace-only and placeholder tokens ("-", "—", "N/A", "NA") are treated as empty
+ * Unified vendor display-name precedence used everywhere in the app
+ * (approval tables, SAP sync, reports, dialogs, notifications):
+ *   Trade Name → Legal Name → PAN / Account Holder Name → ''
+ * Placeholder tokens ("-", "—", "N/A", "NA", ...) are treated as empty
  * so the fallback actually fires.
  */
 const PLACEHOLDER_TOKENS = new Set(["-", "—", "n/a", "na", "none", "null", "undefined"]);
@@ -40,17 +40,22 @@ function cleanName(x: any): string {
   if (PLACEHOLDER_TOKENS.has(s.toLowerCase())) return "";
   return s;
 }
-export function getSapName1(vendor: any): string {
+
+export function pickVendorDisplayName(vendor: any): string {
   const v = vendor || {};
-  const gstin = cleanName(v.gstin);
-  const trade = cleanName(v.trade_name);
-  const legal = cleanName(v.legal_name);
-  const ahn = cleanName(v.account_holder_name);
-  if (gstin) {
-    return trade || legal || ahn || "";
-  }
-  return ahn || legal || trade || "";
+  return (
+    cleanName(v.trade_name) ||
+    cleanName(v.legal_name) ||
+    cleanName(v.account_holder_name) ||
+    ""
+  );
 }
+
+/** SAP NAME1 mirrors the display-name precedence so labels & payload match. */
+export function getSapName1(vendor: any): string {
+  return pickVendorDisplayName(vendor);
+}
+
 
 export function getSapVenClass(vendor: any): string {
   const v = vendor || {};

@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+
 
 export type StageKey = 'BUYER' | 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE' | 'SAP_TEAM';
 
@@ -82,7 +84,7 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
 
   let q = supabase
     .from('vendors')
-    .select(isSingle ? '*' : 'id, reference_number, legal_name, trade_name, vendor_type, status, created_at, submitted_at, primary_email')
+    .select(isSingle ? '*' : 'id, reference_number, legal_name, trade_name, account_holder_name, vendor_type, status, created_at, submitted_at, primary_email')
     .order('created_at', { ascending: false });
 
   if (filters.referenceNumber) q = q.eq('reference_number', filters.referenceNumber);
@@ -233,7 +235,7 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
     const row: VendorReportRow = {
       vendor_id: v.id,
       reference_number: v.reference_number || '',
-      vendor_name: v.legal_name || v.trade_name || '—',
+      vendor_name: pickVendorDisplayName(v) || '—',
       vendor_type: v.vendor_type || 'domestic',
       status: v.status || '',
       invited_at: inv?.created_at ?? null,

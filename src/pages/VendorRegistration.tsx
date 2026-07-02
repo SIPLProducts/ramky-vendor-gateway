@@ -650,7 +650,7 @@ export default function VendorRegistration() {
             setCurrentStep(isReturned ? 5 : (nextStep || 5));
           } else {
             // Step 1 = doc verification — assume completed if we already have key fields
-            if (existingFormData.statutory?.pan && existingFormData.statutory?.gstin && existingFormData.bank?.accountNumber) {
+            if (existingFormData.statutory?.pan && existingFormData.bank?.accountNumber) {
               filledSteps.push(1);
               // Pre-seed verifiedData so Step 1 shows green tiles when revisited
               setVerifiedData({

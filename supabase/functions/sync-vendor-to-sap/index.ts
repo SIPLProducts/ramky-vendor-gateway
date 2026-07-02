@@ -179,9 +179,9 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
     value = v.registered_contact_2 || v.secondary_phone || "";
   } else if (head === "vendor.name1_value") {
     const v: any = ctx.vendor || {};
-    const has = (x: any) => x != null && String(x).trim().length > 0;
-    if (has(v.gstin)) value = String(v.trade_name || v.legal_name || "").trim();
-    else value = String(v.legal_name || v.account_holder_name || v.trade_name || "").trim();
+    // Unified precedence: Trade → Legal → PAN/Account Holder.
+    value = String(v.trade_name || v.legal_name || v.account_holder_name || "").trim();
+
   } else if (head === "vendor.ven_class_value") {
     const v: any = ctx.vendor || {};
     value = v.gstin && String(v.gstin).trim() ? "" : "0";

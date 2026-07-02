@@ -21,10 +21,13 @@ const row = (k: string, v: string) =>
   `<tr><td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f9fafb;font-weight:600;width:38%">${esc(k)}</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(v)}</td></tr>`;
 
 function getName1(v: any): string {
-  const hasGst = !!(v?.gstin && String(v.gstin).trim());
-  if (hasGst && v?.trade_name) return v.trade_name;
-  return v?.account_holder_name || v?.trade_name || v?.legal_name || 'Vendor';
+  const clean = (x: any) => {
+    const s = x == null ? '' : String(x).trim();
+    return s && !['-', '—', 'n/a', 'na', 'none', 'null', 'undefined'].includes(s.toLowerCase()) ? s : '';
+  };
+  return clean(v?.trade_name) || clean(v?.legal_name) || clean(v?.account_holder_name) || 'Vendor';
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

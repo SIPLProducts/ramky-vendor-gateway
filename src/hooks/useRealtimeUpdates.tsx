@@ -15,22 +15,12 @@ interface VendorUpdate {
   updated_at: string;
 }
 
-const NAME_PLACEHOLDERS = new Set(["-", "—", "n/a", "na", "none", "null", "undefined"]);
-const cleanNm = (x: unknown): string => {
-  if (x == null) return "";
-  const s = String(x).trim();
-  if (!s) return "";
-  if (NAME_PLACEHOLDERS.has(s.toLowerCase())) return "";
-  return s;
-};
-const pickVendorName = (rec: { gstin?: string | null; trade_name?: string | null; legal_name?: string | null; account_holder_name?: string | null }, fallback: string) => {
-  const gstin = cleanNm(rec.gstin);
-  const trade = cleanNm(rec.trade_name);
-  const legal = cleanNm(rec.legal_name);
-  const ahn = cleanNm(rec.account_holder_name);
-  if (gstin) return trade || legal || ahn || fallback;
-  return ahn || legal || trade || fallback;
-};
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+const pickVendorName = (
+  rec: { gstin?: string | null; trade_name?: string | null; legal_name?: string | null; account_holder_name?: string | null },
+  fallback: string,
+) => pickVendorDisplayName(rec) || fallback;
+
 
 interface RealtimeHookOptions {
   onVendorUpdate?: (vendor: VendorUpdate) => void;

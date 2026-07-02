@@ -87,13 +87,17 @@ export default function SAPSync() {
   const dmsSync = useDMSSync();
 
   const filterFn = (vendor: VendorRow) => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch =
-      (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
+      (vendor.trade_name || '').toLowerCase().includes(q) ||
+      (vendor.legal_name || '').toLowerCase().includes(q) ||
+      ((vendor as any).account_holder_name || '').toLowerCase().includes(q) ||
+      (vendor.gstin || '').toLowerCase().includes(q) ||
+      vendor.id.toLowerCase().includes(q);
     const matchesBuyer = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
     return matchesSearch && matchesBuyer;
   };
+
 
   const filteredSap = (sapVendors || []).filter(filterFn);
   const filteredDms = (dmsVendors || []).filter(filterFn);
