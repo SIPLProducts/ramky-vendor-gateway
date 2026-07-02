@@ -105,27 +105,49 @@ export function FileUpload({
       </label>
 
       {currentFile || isUploaded ? (
-        <div className="flex items-center justify-between p-3 bg-success/10 border border-success/20 rounded-lg">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
+        <div className="flex items-center justify-between gap-2 p-3 bg-success/10 border border-success/20 rounded-lg">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
                 {currentFile?.name || 'File uploaded'}
               </p>
               <p className="text-xs text-muted-foreground">
                 {currentFile ? `${(currentFile.size / 1024).toFixed(1)} KB` : 'Ready'}
+                {isPersistedFile(currentFile) && ' · Previously uploaded'}
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleRemove}
-            className="text-destructive hover:text-destructive"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            {isPersistedFile(currentFile) && (
+              <PersistedFileActions
+                filePath={(currentFile as any).filePath}
+                fileName={currentFile?.name}
+                className="flex items-center gap-1"
+              />
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+              className="h-8 px-2 text-xs"
+              title="Replace file"
+            >
+              <Upload className="h-3.5 w-3.5 mr-1" />
+              Replace
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRemove}
+              className="text-destructive hover:text-destructive h-8 px-2"
+              title="Remove file"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       ) : (
         <div
