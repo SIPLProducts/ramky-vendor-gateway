@@ -164,7 +164,7 @@ export function EditUserDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            Update
           </Button>
         </DialogFooter>
       </DialogContent>

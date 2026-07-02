@@ -214,11 +214,17 @@ export default function UserManagement() {
     const isSelf = editUser.id === user?.id;
     try {
       // 1. profile: name + status
-      const { error: profErr } = await (supabase as any).from('profiles').update({
+      const { data: updatedProfile, error: profErr } = await (supabase as any).from('profiles').update({
         full_name: patch.full_name || null,
         status: patch.status,
-      }).eq('id', editUser.id);
+      }).eq('id', editUser.id).select('id, status').maybeSingle();
       if (profErr) throw profErr;
+      if (!updatedProfile) {
+        throw new Error('Profile update did not apply. Please check admin access and try again.');
+      }
+      if (updatedProfile.status !== patch.status) {
+        throw new Error('Profile status was not updated. Please try again.');
+      }
 
       // 2. role/tenants/custom roles — skipped when editing self
       if (!isSelf) {
