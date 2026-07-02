@@ -470,6 +470,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
+      ...persistedFileMeta(initialData.panCardFile),
     };
   });
   const [panCrossCheckError, setPanCrossCheckError] = useState<string | null>(null);
