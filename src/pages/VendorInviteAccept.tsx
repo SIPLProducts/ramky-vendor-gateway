@@ -85,8 +85,7 @@ export default function VendorInviteAccept() {
       if (error || !data?.action_link) {
         const code = (data as any)?.code;
         if (code === 'email_mismatch') {
-          setMismatch(true);
-          setPhase('confirm');
+          setPhase('denied');
           setSubmitting(false);
           return;
         }
