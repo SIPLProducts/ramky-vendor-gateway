@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+
 
 export type StageKey = 'BUYER' | 'SCM_MANAGER' | 'SCM_HEAD' | 'FINANCE_1' | 'FINANCE_2' | 'CEO_OFFICE' | 'SAP_TEAM';
 
