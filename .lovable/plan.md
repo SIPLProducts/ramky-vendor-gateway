@@ -1,37 +1,30 @@
-## Issue
+## Situation
 
-On your self-hosted server, User Management shows **"Failed to load users — column profiles.status does not exist"**.
-
-The cloud database used in preview already has the `status` and `last_login_attempt_at` columns on `profiles`, plus a `login_attempts` table and a `check_user_active` RPC. Your self-hosted Supabase database is missing all of these because the migration was never applied there.
-
-Nothing needs to change in the app code — it already queries `profiles.status` correctly.
-
-## Fix
-
-Apply the existing migration file to your self-hosted Supabase database:
+The migration file exists in your Lovable project:
 
 `supabase/migrations/20260702094621_ac1ab483-2cfb-48e5-9baf-8fcb81b62b1d.sql`
 
-It will:
+But it's not showing on your connected GitHub repo. Lovable → GitHub sync is one-way automatic; I don't have `git` access from this environment, so I cannot manually `git push`. The sync must be re-triggered from Lovable's side.
 
-1. Add `status` (default `'active'`) and `last_login_attempt_at` columns to `public.profiles`, with a check constraint restricting status to `active` / `inactive`.
-2. Create `public.login_attempts` table with indexes, grants, RLS, and an admin-only SELECT policy.
-3. Create the `public.check_user_active(email)` SECURITY DEFINER RPC used during sign-in.
+## What to do
 
-### How to apply on the server
+Try these in order — stop at the first that works:
 
-Run the SQL file against your self-hosted Postgres, for example:
+1. **Refresh the GitHub page.** Confirm you're looking at the correct branch (usually `main`) and the `supabase/migrations/` folder. Sometimes it's just a stale browser view.
 
-```bash
-psql "$SUPABASE_DB_URL" -f supabase/migrations/20260702094621_ac1ab483-2cfb-48e5-9baf-8fcb81b62b1d.sql
-```
+2. **Force a resync by making a trivial edit in Lovable.** In the next chat message, ask me to "touch the migration file" — I'll add a harmless SQL comment to it in build mode, which forces Lovable to push a new commit that includes the file.
 
-Or use `supabase db push` from your self-hosted CLI setup if you have the migrations tracked.
+3. **Reconnect GitHub** if sync is broken:
+   - Plus (+) menu (bottom-left of chat) → GitHub → Disconnect
+   - Then Plus (+) → GitHub → Connect project again
+   - Lovable will push the full current state of the project, including all migration files.
 
-### Verify
+4. **Check GitHub App permissions.** In GitHub → Settings → Applications → Lovable, make sure it still has write access to the repository. If access was revoked, sync silently stops.
 
-After applying, reload User Management. The red "column profiles.status does not exist" error will be gone and users will load.
+## As a workaround
 
-## Also check
+If you need the file on the server right now and can't wait for the GitHub sync, copy the SQL directly from the Lovable code editor (open `supabase/migrations/20260702094621_ac1ab483-2cfb-48e5-9baf-8fcb81b62b1d.sql`) and paste it into a new file on your server, then run it with `psql`.
 
-Confirm all other migrations under `supabase/migrations/` are applied on the server — if this one was skipped, others may be too (approval matrix, tenants, etc.). Running `supabase db push` on the server will bring it fully in sync.
+## Next step
+
+Tell me which option you want, or just say "force resync" and I'll switch to build mode and make a trivial edit to trigger a fresh push to GitHub.
