@@ -112,6 +112,8 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
   } = useForm<AddressDetails>({
     resolver: zodResolver(schema),
     defaultValues: data,
+    values: data,
+    resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
 
   // Wrap register() so phone/pincode inputs strip non-digits + clamp length.
