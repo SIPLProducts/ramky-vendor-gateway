@@ -1,6 +1,8 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useIdleLogout } from './useIdleLogout';
+import { toast } from '@/hooks/use-toast';
 
 type AppRole = 'vendor' | 'finance' | 'purchase' | 'admin' | 'sharvi_admin' | 'customer_admin' | 'approver';
 
@@ -24,6 +26,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const INACTIVE_MESSAGE = 'Your account is inactive. Please contact the Administrator to proceed.';
+
+async function logAttempt(email: string, user_id: string | null, attempt_status: 'success' | 'inactive_user' | 'invalid_credentials') {
+  try {
+    await supabase.functions.invoke('log-login-attempt', {
+      body: { email, user_id, attempt_status },
+    });
+  } catch (err) {
+    console.warn('log-login-attempt failed:', err);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -32,17 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Defer role fetching with setTimeout to avoid deadlock
         if (session?.user) {
-          setTimeout(() => {
-            loadRoles(session.user.id);
-          }, 0);
+          setTimeout(() => { loadRoles(session.user.id); }, 0);
         } else {
           setUserRole(null);
           setCustomRoles([]);
@@ -51,11 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
       if (session?.user) {
         loadRoles(session.user.id);
       } else {
@@ -84,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (customRes.error) {
-        console.error('Error fetching custom roles:', customRes.error);
         setCustomRoles([]);
       } else {
         const active: CustomRoleRef[] = (customRes.data ?? [])
@@ -103,25 +109,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
+    // 1. Pre-check status
+    try {
+      const { data: statusRows, error: statusErr } = await supabase
+        .rpc('check_user_active', { _email: email });
+      if (!statusErr && Array.isArray(statusRows) && statusRows.length > 0) {
+        const row = statusRows[0] as { user_id: string; status: string };
+        if (row.status === 'inactive') {
+          await logAttempt(email, row.user_id, 'inactive_user');
+          return { error: new Error(INACTIVE_MESSAGE) };
+        }
+      }
+    } catch (err) {
+      console.warn('check_user_active failed, continuing:', err);
+    }
+
+    // 2. Attempt sign-in
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      await logAttempt(email, null, 'invalid_credentials');
+      return { error: error as Error };
+    }
+    await logAttempt(email, data.user?.id ?? null, 'success');
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
+      options: { emailRedirectTo: redirectUrl, data: { full_name: fullName } },
     });
     return { error: error as Error | null };
   };
@@ -137,19 +156,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasCustomRole = customRoles.length > 0;
   const isVendor = userRole === 'vendor' && !hasCustomRole;
 
+  // Auto-logout after 30 min inactivity (only when signed in)
+  const handleIdle = useCallback(async () => {
+    if (!session) return;
+    await signOut();
+    toast({
+      title: 'Signed out',
+      description: 'You have been signed out due to 30 minutes of inactivity.',
+    });
+  }, [session]);
+  useIdleLogout({ enabled: !!session, minutes: 30, onIdle: handleIdle });
+
   return (
     <AuthContext.Provider
       value={{
-        user,
-        session,
-        userRole,
-        customRoles,
-        hasCustomRole,
-        isVendor,
-        loading,
-        signIn,
-        signUp,
-        signOut,
+        user, session, userRole, customRoles, hasCustomRole, isVendor,
+        loading, signIn, signUp, signOut,
       }}
     >
       {children}

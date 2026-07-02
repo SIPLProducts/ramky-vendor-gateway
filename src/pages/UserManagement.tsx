@@ -17,6 +17,7 @@ import { useTenantUserCounts } from '@/hooks/useTenant';
 import { ChangeRoleDialog, AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
+import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
 import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
@@ -33,9 +34,19 @@ interface UserRow {
   email: string;
   full_name: string | null;
   created_at: string;
+  status: 'active' | 'inactive';
+  last_login_attempt_at: string | null;
   role: AppRole | null;
   tenants: { id: string; name: string }[];
   customRoles: { id: string; name: string }[];
+}
+
+interface LoginAttemptRow {
+  id: string;
+  user_id: string | null;
+  email: string;
+  attempt_status: string;
+  attempted_at: string;
 }
 
 interface Tenant { id: string; name: string; }
@@ -64,6 +75,9 @@ export default function UserManagement() {
   const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
   const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editUser, setEditUser] = useState<EditUserData | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState<LoginAttemptRow[]>([]);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
 
   const handleDeleteUser = async () => {
     if (!deleteUser) return;
@@ -110,7 +124,7 @@ export default function UserManagement() {
     setLoading(true);
     try {
       const [profilesRes, rolesRes, userTenantsData, tenantsRes, customRolesRes, userCustomData] = await Promise.all([
-        supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, email, full_name, created_at, status, last_login_attempt_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
         fetchAll<{ user_id: string; tenant_id: string }>('user_tenants', 'user_id, tenant_id'),
         supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
@@ -147,11 +161,13 @@ export default function UserManagement() {
       setCustomRoles((customRolesRes.data ?? []) as any);
       setCustomRoleRows((customRolesRes.data ?? []).map((r: any) => ({ ...r, user_count: countsByRole.get(r.id) ?? 0 })));
       setUsers(
-        (profilesRes.data ?? []).map((p) => ({
+        (profilesRes.data ?? []).map((p: any) => ({
           id: p.id,
           email: p.email,
           full_name: p.full_name,
           created_at: p.created_at,
+          status: (p.status ?? 'active') as 'active' | 'inactive',
+          last_login_attempt_at: p.last_login_attempt_at ?? null,
           role: roleMap.get(p.id) ?? null,
           tenants: (utByUser.get(p.id) ?? [])
             .map((tid) => tenantMap.get(tid))
@@ -169,7 +185,48 @@ export default function UserManagement() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  const loadLoginAttempts = async () => {
+    setAttemptsLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('login_attempts')
+        .select('id, user_id, email, attempt_status, attempted_at')
+        .eq('attempt_status', 'inactive_user')
+        .order('attempted_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setLoginAttempts((data ?? []) as LoginAttemptRow[]);
+    } catch (err: any) {
+      toast({ title: 'Failed to load login attempts', description: err.message, variant: 'destructive' });
+    } finally {
+      setAttemptsLoading(false);
+    }
+  };
+
+  const handleSaveEditUser = async (patch: { full_name: string; status: 'active' | 'inactive' }) => {
+    if (!editUser) return;
+    try {
+      const { error } = await (supabase as any).from('profiles').update({
+        full_name: patch.full_name || null,
+        status: patch.status,
+      }).eq('id', editUser.id);
+      if (error) throw error;
+      await supabase.from('audit_logs').insert({
+        action: 'user_edited', user_id: user?.id,
+        details: {
+          target_user_id: editUser.id, target_email: editUser.email,
+          full_name: patch.full_name, status: patch.status,
+        },
+      });
+      toast({ title: 'User updated', description: editUser.email });
+      await loadData();
+    } catch (err: any) {
+      toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
+      throw err;
+    }
+  };
+
+  useEffect(() => { loadData(); loadLoginAttempts(); }, []);
 
   // Users / Custom Roles / Role Permissions tabs are ALWAYS global — show everything
   // regardless of the tenant scope picker. The scope picker only narrows
@@ -408,6 +465,8 @@ export default function UserManagement() {
                       <TableHead>Role</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Tenants</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login Attempt</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -415,10 +474,10 @@ export default function UserManagement() {
                   <TableBody>
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
                     ) : filtered.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         No users found
                       </TableCell></TableRow>
                     ) : (
@@ -486,11 +545,31 @@ export default function UserManagement() {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            {u.status === 'inactive'
+                              ? <Badge variant="outline" className="border-destructive text-destructive">Inactive</Badge>
+                              : <Badge variant="secondary">Active</Badge>}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {u.last_login_attempt_at
+                              ? new Date(u.last_login_attempt_at).toLocaleString()
+                              : '—'}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {new Date(u.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost" size="sm"
+                                onClick={() => setEditUser({
+                                  id: u.id, email: u.email,
+                                  full_name: u.full_name, status: u.status,
+                                })}
+                                title="Edit user"
+                              >
+                                <Pencil className="h-4 w-4 mr-1" /> Edit
+                              </Button>
                               <Button variant="ghost" size="sm" onClick={() => setRoleDialog(u)}
                                 disabled={u.id === user?.id}
                                 title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
@@ -510,6 +589,62 @@ export default function UserManagement() {
                           </TableCell>
                         </TableRow>
                       ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base">Inactive User Login Attempts</CardTitle>
+              <Button variant="ghost" size="sm" onClick={loadLoginAttempts} disabled={attemptsLoading}>
+                {attemptsLoading ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Login Attempt Date &amp; Time</TableHead>
+                      <TableHead>Login Status</TableHead>
+                      <TableHead>Last Login Attempt</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attemptsLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                      ))
+                    ) : loginAttempts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No inactive login attempts recorded.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      loginAttempts.map((a) => {
+                        const u = users.find((x) => x.id === a.user_id || x.email.toLowerCase() === a.email.toLowerCase());
+                        return (
+                          <TableRow key={a.id}>
+                            <TableCell className="font-medium">{u?.full_name ?? '—'}</TableCell>
+                            <TableCell>{a.email}</TableCell>
+                            <TableCell className="text-sm">{new Date(a.attempted_at).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-destructive text-destructive">Inactive User</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {u?.last_login_attempt_at
+                                ? new Date(u.last_login_attempt_at).toLocaleString()
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -611,6 +746,13 @@ export default function UserManagement() {
       </Tabs>
 
       {/* Dialogs */}
+      <EditUserDialog
+        open={!!editUser}
+        onOpenChange={(o) => !o && setEditUser(null)}
+        user={editUser}
+        onSave={handleSaveEditUser}
+      />
+
       {roleDialog && (
         <ChangeRoleDialog
           open={!!roleDialog}

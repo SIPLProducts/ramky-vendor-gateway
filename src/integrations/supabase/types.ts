@@ -705,6 +705,36 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          attempt_status: string
+          attempted_at: string
+          email: string
+          id: string
+          ip: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          attempt_status: string
+          attempted_at?: string
+          email: string
+          id?: string
+          ip?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          attempt_status?: string
+          attempted_at?: string
+          email?: string
+          id?: string
+          ip?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ocr_extractions: {
         Row: {
           confidence: number | null
@@ -779,6 +809,8 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          last_login_attempt_at: string | null
+          status: string
           updated_at: string
         }
         Insert: {
@@ -786,6 +818,8 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          last_login_attempt_at?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -793,6 +827,8 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          last_login_attempt_at?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -2454,6 +2490,13 @@ export type Database = {
         Returns: string[]
       }
       check_my_smtp_configured: { Args: never; Returns: boolean }
+      check_user_active: {
+        Args: { _email: string }
+        Returns: {
+          status: string
+          user_id: string
+        }[]
+      }
       claim_invitation: {
         Args: { _token: string; _vendor_id?: string }
         Returns: {
