@@ -560,15 +560,13 @@ export default function UserManagement() {
                                 onClick={() => setEditUser({
                                   id: u.id, email: u.email,
                                   full_name: u.full_name, status: u.status,
+                                  role: u.role,
+                                  tenantIds: u.tenants.map((t) => t.id),
+                                  customRoleIds: u.customRoles.map((c) => c.id),
                                 })}
                                 title="Edit user"
                               >
                                 <Pencil className="h-4 w-4 mr-1" /> Edit
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setRoleDialog(u)}
-                                disabled={u.id === user?.id}
-                                title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
-                                <UserCog className="h-4 w-4 mr-1" /> Role
                               </Button>
                               <Button
                                 variant="ghost"
