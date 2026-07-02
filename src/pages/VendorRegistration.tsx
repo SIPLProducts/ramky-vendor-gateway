@@ -719,6 +719,9 @@ export default function VendorRegistration() {
   useEffect(() => {
     // Skip while loading / submitted / token still validating
     if (isLoadingVendor || isValidatingToken || isSubmitted) return;
+    // Wait until existing vendor data (if any) has been hydrated into formData before autosaving.
+    // Prevents empty/partial form state from overwriting saved DB values on refresh.
+    if ((vendorId || existingFormData) && !formDataLoadedRef.current) return;
     // Need at least an invitation token (vendor will be created on first save) or an existing vendorId
     if (!invitationToken && !vendorId) return;
 
