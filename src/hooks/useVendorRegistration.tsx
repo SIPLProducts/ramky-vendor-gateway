@@ -36,6 +36,19 @@ interface DocumentUploadResult {
   mimeType: string;
 }
 
+type PersistedDocumentFile = File & { __persistedDocument?: true; filePath?: string };
+
+const asPersistedFile = (doc?: any): PersistedDocumentFile | null => {
+  if (!doc?.file_name) return null;
+  return {
+    name: doc.file_name,
+    size: Number(doc.file_size || 0),
+    type: doc.mime_type || '',
+    __persistedDocument: true,
+    filePath: doc.file_path,
+  } as PersistedDocumentFile;
+};
+
 // Extended vendor record type to include all new fields
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VendorRecord = Record<string, any>;
@@ -148,6 +161,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       if (error) throw error;
 
+      if (data?.id) {
+        const { data: docs, error: docsError } = await supabase
+          .from('vendor_documents')
+          .select('id, document_type, file_name, file_size, file_path, mime_type')
+          .eq('vendor_id', data.id);
+        if (!docsError) {
+          (data as any).vendor_documents = docs || [];
+        } else {
+          console.warn('Failed to hydrate vendor documents:', docsError);
+        }
+      }
+
       // Initialize vendorId and vendorStatus from existing vendor
       if (data) {
         setVendorId(data.id);
@@ -250,6 +275,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       for (const doc of documentsToUpload) {
         if (!doc.file) continue;
+        if ((doc.file as PersistedDocumentFile).__persistedDocument) continue;
         const existing = existingByType.get(doc.type);
 
         // Skip ONLY if this exact File instance was already uploaded in this
@@ -538,6 +564,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const existingFormData = useMemo<VendorFormData | null>(() => {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
+    const docsByType = new Map<string, any>();
+    ((vendor as any).vendor_documents || []).forEach((doc: any) => docsByType.set(doc.document_type, doc));
+    const persisted = (type: DocumentType) => asPersistedFile(docsByType.get(type));
 
     return {
       vendorType: ((vendor as any).vendor_type as 'domestic' | 'international') || 'domestic',
@@ -630,7 +659,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         isGstRegistered: vendor.is_gst_registered ?? true,
         gstin: vendor.gstin || '',
         gstDeclarationReason: vendor.gst_declaration_reason || '',
-        gstSelfDeclarationFile: null,
+        gstSelfDeclarationFile: persisted('gst_self_declaration'),
         gstConstitutionOfBusiness: vendor.gst_constitution_of_business || '',
         gstPrincipalPlaceOfBusiness: vendor.gst_principal_place_of_business || '',
         gstAdditionalPlaces: vendor.gst_additional_places || [],
@@ -653,11 +682,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         enlistments: vendor.enlistments || [],
         certifications: vendor.certifications || [],
         operationalNetwork: vendor.operational_network || '',
-        gstCertificateFile: null,
-        panCardFile: null,
-        msmeCertificateFile: null,
-        msmeSelfDeclarationFile: null,
-        msmeDeclarationReason: '',
+        gstCertificateFile: persisted('gst_certificate'),
+        panCardFile: persisted('pan_card'),
+        msmeCertificateFile: persisted('msme_certificate'),
+        msmeSelfDeclarationFile: persisted('msme_self_declaration'),
+        msmeDeclarationReason: vendor.msme_declaration_reason || '',
         iecCertificateFile: null,
         swiftIbanProofFile: null,
       },
@@ -672,7 +701,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         micrCode: vendor.micr_code || '',
         bankAddress: vendor.bank_address || '',
         accountHolderName: (vendor as VendorRecord & { account_holder_name?: string }).account_holder_name || '',
-        cancelledChequeFile: null,
+        cancelledChequeFile: persisted('cancelled_cheque'),
         secondary: vendor.account_number_2
           ? {
               enabled: true,
@@ -684,7 +713,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
               micrCode: vendor.micr_2 || '',
               bankAddress: vendor.bank_address_2 || '',
               accountHolderName: vendor.account_holder_name_2 || '',
-              cancelledChequeFile: null,
+              cancelledChequeFile: persisted('cancelled_cheque_2'),
             }
           : undefined,
       },
@@ -698,8 +727,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         majorCustomer3: vendor.major_customer3 || '',
         authorizedDistributorName: vendor.authorized_distributor_name || '',
         authorizedDistributorAddress: vendor.authorized_distributor_address || '',
-        dealershipCertificateFile: null,
-        financialDocsFile: null,
+        dealershipCertificateFile: persisted('dealership_certificate'),
+        financialDocsFile: persisted('financial_docs'),
       },
       infrastructure: {
         rawMaterialsUsed: vendor.raw_materials_used || '',
