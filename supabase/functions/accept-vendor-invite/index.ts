@@ -17,9 +17,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { token, redirectOrigin } = await req.json();
+    const { token, redirectOrigin, confirmed_email } = await req.json();
     if (!token || typeof token !== 'string') {
       return new Response(JSON.stringify({ error: 'Missing token' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!confirmed_email || typeof confirmed_email !== 'string') {
+      return new Response(JSON.stringify({ error: 'Missing confirmed_email', code: 'email_required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -31,32 +37,56 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // 1. Validate + bump access count via SECURITY DEFINER RPC
-    const { data: rows, error: rpcError } = await admin.rpc('record_invitation_access', {
-      _token: token,
-    });
-    if (rpcError) {
-      console.error('record_invitation_access failed:', rpcError);
+    // 1. Look up invitation WITHOUT bumping access count (only bump on valid attempts)
+    const { data: lookup, error: lookupErr } = await admin
+      .from('vendor_invitations')
+      .select('id, email, expires_at, used_at')
+      .eq('token', token)
+      .maybeSingle();
+
+    if (lookupErr) {
+      console.error('invitation lookup failed:', lookupErr);
       return new Response(JSON.stringify({ error: 'Lookup failed', code: 'lookup_failed' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const invite = Array.isArray(rows) ? rows[0] : rows;
-    if (!invite) {
+    if (!lookup) {
       return new Response(JSON.stringify({ error: 'Invalid invitation', code: 'invalid' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    if (lookup.expires_at && new Date(lookup.expires_at) < new Date()) {
       return new Response(JSON.stringify({ error: 'Invitation expired', code: 'expired' }), {
         status: 410,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    // 2. Enforce email match — prevents forwarded links from being used by others
+    if (String(confirmed_email).trim().toLowerCase() !== String(lookup.email).toLowerCase()) {
+      try {
+        await admin.from('invitation_email_events').insert({
+          invitation_id: lookup.id,
+          email_id: null,
+          event_type: 'mismatch_attempt',
+          event_data: { attempted_email: String(confirmed_email).trim().toLowerCase() },
+        });
+      } catch (e) {
+        console.warn('failed to log mismatch_attempt:', e);
+      }
+      return new Response(
+        JSON.stringify({ error: 'Email does not match invitation', code: 'email_mismatch' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 3. Record access now that the check passed
+    await admin.rpc('record_invitation_access', { _token: token });
+
+    const invite = lookup;
     const email: string = invite.email;
 
     // 2. Ensure auth user exists for invited email
