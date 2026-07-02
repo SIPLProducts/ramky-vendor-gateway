@@ -294,14 +294,29 @@ export default function UserManagement() {
   const scopedCustomRoleRows = customRoleRows;
   const scopedUsers = users;
 
+  const scopedUsers = users;
+
+  // Hide "pure vendor" users from the Users tab (vendor role with no custom roles)
+  const nonVendorUsers = useMemo(
+    () => scopedUsers.filter((u) => !(u.role === 'vendor' && u.customRoles.length === 0)),
+    [scopedUsers],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return scopedUsers.filter((u) => {
+    return nonVendorUsers.filter((u) => {
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (!q) return true;
       return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
     });
-  }, [scopedUsers, search, roleFilter]);
+  }, [nonVendorUsers, search, roleFilter]);
+
+  const stats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    nonVendorUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
+    return { total: nonVendorUsers.length, counts };
+  }, [nonVendorUsers]);
+
 
   const stats = useMemo(() => {
     const counts: Record<string, number> = {};
