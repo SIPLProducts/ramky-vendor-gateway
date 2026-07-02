@@ -57,3 +57,8 @@ verify_jwt = false
 [functions.verify-invite-session]
 verify_jwt = false
 
+[functions.claim-vendor-invite]
+verify_jwt = false
+
+
+
