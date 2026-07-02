@@ -31,6 +31,19 @@ const STAGE_LABEL: Record<string, string> = {
   CEO_OFFICE: 'CEO Office',
 };
 
+// Unified vendor display-name precedence: Trade → Legal → PAN/Account Holder.
+const NAME_PLACEHOLDERS = new Set(['-', '—', 'n/a', 'na', 'none', 'null', 'undefined']);
+const cleanNm = (x: unknown): string => {
+  if (x == null) return '';
+  const s = String(x).trim();
+  if (!s) return '';
+  if (NAME_PLACEHOLDERS.has(s.toLowerCase())) return '';
+  return s;
+};
+const pickVendorName = (v: any, fallback: string): string =>
+  cleanNm(v?.trade_name) || cleanNm(v?.legal_name) || cleanNm(v?.account_holder_name) || fallback;
+
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
