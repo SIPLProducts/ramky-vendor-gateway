@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { HorizontalStepIndicator } from '@/components/vendor/HorizontalStepIndicator';
 import { SuccessScreen } from '@/components/vendor/SuccessScreen';
-import { FeedbackPopup } from '@/components/vendor/FeedbackPopup';
+import { SubmissionSuccessDialog } from '@/components/vendor/SubmissionSuccessDialog';
 import { SubmissionSuccessDialog } from '@/components/vendor/SubmissionSuccessDialog';
 import { OrganizationStep } from '@/components/vendor/steps/OrganizationStep';
 import { AddressStep } from '@/components/vendor/steps/AddressStep';
@@ -90,7 +90,6 @@ export default function VendorRegistration() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     open: boolean;
     inviter: { name?: string; email?: string } | null;
@@ -1188,7 +1187,6 @@ export default function VendorRegistration() {
       setIsSubmitted(true);
       setIsEditMode(false);
       setVendorStatusState(pendingPostSubmitStatus ?? 'scm_manager_review');
-      setShowFeedback(true);
       setPendingPostSubmit(false);
       setPendingPostSubmitStatus(null);
     }
@@ -1299,7 +1297,6 @@ export default function VendorRegistration() {
           onEdit={isTokenMode ? undefined : handleStartEdit}
           onBack={isTokenMode ? undefined : () => navigate('/admin/invitations')}
         />
-        <FeedbackPopup open={showFeedback} onOpenChange={setShowFeedback} vendorId={vendorId || undefined} />
       </div>
     );
   }

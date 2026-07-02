@@ -33,7 +33,6 @@ import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
 import UserManagement from "./pages/UserManagement";
 import SupportHelp from "./pages/SupportHelp";
-import VendorFeedback from "./pages/VendorFeedback";
 import DemoShowcase from "./pages/DemoShowcase";
 import GstCompliance from "./pages/GstCompliance";
 import ScheduledChecks from "./pages/ScheduledChecks";
@@ -70,7 +69,7 @@ const App = () => (
             <Route path="/vendor/invite" element={<VendorInviteAccept />} />
             <Route path="/vendor/registration" element={<VendorRegistration />} />
             <Route path="/install" element={<Install />} />
-            <Route path="/feedback" element={<VendorFeedback />} />
+            
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
