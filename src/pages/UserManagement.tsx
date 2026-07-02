@@ -75,6 +75,9 @@ export default function UserManagement() {
   const [permsRole, setPermsRole] = useState<CustomRoleRow | null>(null);
   const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editUser, setEditUser] = useState<EditUserData | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState<LoginAttemptRow[]>([]);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
 
   const handleDeleteUser = async () => {
     if (!deleteUser) return;
