@@ -4,6 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, X, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { PersistedFileActions, isPersistedFile } from '@/components/vendor/PersistedFileActions';
 
 interface FileUploadProps {
   label: string;
