@@ -17,6 +17,7 @@ import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
 
 import VendorLogin from "./pages/VendorLogin";
 import VendorInviteAccept from "./pages/VendorInviteAccept";
+import VendorInviteCallback from "./pages/VendorInviteCallback";
 import Dashboard from "./pages/Dashboard";
 import FinanceReview from "./pages/FinanceReview";
 import PurchaseApproval from "./pages/PurchaseApproval";
@@ -67,6 +68,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/vendor/login" element={<VendorLogin />} />
             <Route path="/vendor/invite" element={<VendorInviteAccept />} />
+            <Route path="/vendor/invite/accept" element={<VendorInviteAccept />} />
+            <Route path="/vendor/invite/callback" element={<VendorInviteCallback />} />
             <Route path="/vendor/registration" element={<VendorRegistration />} />
             <Route path="/install" element={<Install />} />
             

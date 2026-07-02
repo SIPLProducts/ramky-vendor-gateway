@@ -1,90 +1,81 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, AlertCircle, ShieldCheck, Ban } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, AlertCircle, ShieldCheck, Ban, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
-type Phase = 'verifying' | 'signing_in' | 'denied' | 'error';
+type Phase = 'verifying' | 'sent' | 'denied' | 'error';
 
 export default function VendorInviteAccept() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const token = searchParams.get('token');
 
   const [phase, setPhase] = useState<Phase>('verifying');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [maskedEmail, setMaskedEmail] = useState<string>('');
+  const [cooldown, setCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
+  const ranRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (!token) {
-        setErrorMsg('No invitation token provided. Please use the link from your email.');
+  const requestLink = async (isResend = false) => {
+    if (!token) {
+      setErrorMsg('No invitation token provided. Please use the link from your email.');
+      setPhase('error');
+      return;
+    }
+    if (isResend) setResending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invite-signin-link', {
+        body: { token, redirectOrigin: window.location.origin },
+      });
+      const code = (data as any)?.code;
+      if (error || !(data as any)?.ok) {
+        if (code === 'already_used') {
+          setPhase('denied');
+          return;
+        }
+        if (code === 'expired') {
+          setErrorMsg('This invitation link has expired. Please request a new one.');
+        } else if (code === 'invalid') {
+          setErrorMsg('Invalid invitation link. Please contact the administrator.');
+        } else if (code === 'rate_limited') {
+          setErrorMsg('Too many sign-in attempts. Please try again in an hour.');
+        } else if (code === 'smtp_missing') {
+          setErrorMsg('Email service is not configured. Please contact the administrator.');
+        } else if (code === 'link_failed') {
+          setErrorMsg('We could not create the secure sign-in link. Please contact the administrator.');
+        } else {
+          setErrorMsg('We could not send your sign-in link. Please try again shortly.');
+        }
         setPhase('error');
         return;
       }
+      setMaskedEmail((data as any).masked_email || '');
+      setPhase('sent');
+      setCooldown(30);
+    } catch (err) {
+      console.error('send-invite-signin-link failed:', err);
+      setErrorMsg('An unexpected error occurred. Please try again.');
+      setPhase('error');
+    } finally {
+      if (isResend) setResending(false);
+    }
+  };
 
-      try {
-        const { data, error } = await supabase.functions.invoke('accept-vendor-invite', {
-          body: { token, redirectOrigin: window.location.origin },
-        });
+  useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+    requestLink(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
-        if (cancelled) return;
-
-        if (error || !data?.action_link) {
-          const code = (data as any)?.code;
-          if (code === 'already_used' || code === 'email_mismatch') {
-            setPhase('denied');
-            return;
-          }
-          const msg =
-            code === 'expired'
-              ? 'This invitation link has expired. Please request a new one.'
-              : code === 'invalid'
-              ? 'Invalid invitation link. Please contact the administrator.'
-              : code === 'link_failed'
-              ? 'We could not create the secure sign-in link. Please contact the administrator.'
-              : 'We could not verify your invitation. Please try again shortly.';
-          console.error('Invite accept failed:', error || data);
-          setErrorMsg(msg);
-          setPhase('error');
-          return;
-        }
-
-        setPhase('signing_in');
-
-        if ((data as any).token_hash && (data as any).otp_type) {
-          const { error: vErr } = await supabase.auth.verifyOtp({
-            token_hash: (data as any).token_hash,
-            type: (data as any).otp_type as 'magiclink',
-          });
-          if (!vErr) {
-            navigate(`/vendor/registration?token=${encodeURIComponent(token)}`, { replace: true });
-            return;
-          }
-          console.warn('verifyOtp failed, falling back to action_link:', vErr);
-        }
-
-        try {
-          const actionUrl = new URL(String(data.action_link));
-          window.location.assign(actionUrl.toString());
-        } catch (e) {
-          console.error('Invalid invite action link:', data.action_link, e);
-          setErrorMsg('The invitation sign-in link is invalid. Please contact the administrator.');
-          setPhase('error');
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.error('accept failed:', err);
-        setErrorMsg('An unexpected error occurred. Please try again.');
-        setPhase('error');
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, navigate]);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -97,23 +88,59 @@ export default function VendorInviteAccept() {
 
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="w-full max-w-md shadow-xl border-0">
-          {(phase === 'verifying' || phase === 'signing_in') && (
+          {phase === 'verifying' && (
             <>
               <CardHeader className="text-center pb-2">
                 <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
                   <ShieldCheck className="h-7 w-7 text-primary" />
                 </div>
-                <CardTitle className="text-2xl">
-                  {phase === 'verifying' ? 'Verifying your invitation' : 'Signing you in'}
-                </CardTitle>
-                <CardDescription>
-                  {phase === 'verifying'
-                    ? 'Please wait while we validate your invitation link…'
-                    : 'Redirecting you to your registration form…'}
-                </CardDescription>
+                <CardTitle className="text-2xl">Verifying your invitation</CardTitle>
+                <CardDescription>Please wait while we prepare your secure sign-in link…</CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </CardContent>
+            </>
+          )}
+
+          {phase === 'sent' && (
+            <>
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mail className="h-7 w-7 text-primary" />
+                </div>
+                <CardTitle className="text-2xl">Check your inbox</CardTitle>
+                <CardDescription className="pt-2">
+                  For security, we've sent a one-time sign-in link to the invited email address
+                  {maskedEmail ? (
+                    <> — <strong className="text-foreground">{maskedEmail}</strong></>
+                  ) : null}
+                  . Open that email and click the button to continue your vendor registration.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Only the original recipient can complete sign-in. Forwarded links cannot be opened by anyone else.
+                </p>
+                <Button
+                  variant="outline"
+                  disabled={cooldown > 0 || resending}
+                  onClick={() => requestLink(true)}
+                >
+                  {resending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resending…</>
+                  ) : cooldown > 0 ? (
+                    `Resend link (${cooldown}s)`
+                  ) : (
+                    'Resend link'
+                  )}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Need help?{' '}
+                  <a href="mailto:support@sharviinfotech.com" className="text-primary hover:underline">
+                    support@sharviinfotech.com
+                  </a>
+                </p>
               </CardContent>
             </>
           )}

@@ -1749,8 +1749,10 @@ export type Database = {
           email_sent_at: string | null
           expires_at: string
           id: string
+          last_signin_sent_at: string | null
           phone_number: string | null
           resend_email_id: string | null
+          signin_sent_count: number
           tenant_id: string | null
           token: string
           used_at: string | null
@@ -1769,8 +1771,10 @@ export type Database = {
           email_sent_at?: string | null
           expires_at: string
           id?: string
+          last_signin_sent_at?: string | null
           phone_number?: string | null
           resend_email_id?: string | null
+          signin_sent_count?: number
           tenant_id?: string | null
           token: string
           used_at?: string | null
@@ -1789,8 +1793,10 @@ export type Database = {
           email_sent_at?: string | null
           expires_at?: string
           id?: string
+          last_signin_sent_at?: string | null
           phone_number?: string | null
           resend_email_id?: string | null
+          signin_sent_count?: number
           tenant_id?: string | null
           token?: string
           used_at?: string | null
