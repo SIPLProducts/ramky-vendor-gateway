@@ -84,7 +84,7 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
 
   let q = supabase
     .from('vendors')
-    .select(isSingle ? '*' : 'id, reference_number, legal_name, trade_name, vendor_type, status, created_at, submitted_at, primary_email')
+    .select(isSingle ? '*' : 'id, reference_number, legal_name, trade_name, account_holder_name, vendor_type, status, created_at, submitted_at, primary_email')
     .order('created_at', { ascending: false });
 
   if (filters.referenceNumber) q = q.eq('reference_number', filters.referenceNumber);
