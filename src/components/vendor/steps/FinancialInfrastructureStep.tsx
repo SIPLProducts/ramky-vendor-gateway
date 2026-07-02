@@ -19,9 +19,10 @@ import { FileUpload } from '@/components/vendor/FileUpload';
 import { FinancialDetails, InfrastructureDetails, QHSEDetails, PRODUCT_TYPES, PRODUCTION_FACILITIES, WATER_SUPPLY_TYPES, INSPECTION_TYPES } from '@/types/vendor';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/indianFy';
 
 
-const currentYear = new Date().getFullYear();
+const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
 const schema = z.object({
   // Financial
