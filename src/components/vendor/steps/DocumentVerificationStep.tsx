@@ -409,6 +409,7 @@ export function DocumentVerificationStep({
       originalOcrData: data,
       apiData: { legalName: initialData.gst.apiName },
       nameMatchScore: initialData.gst.nameMatchScore,
+      ...persistedFileMeta(initialData.gstCertificateFile),
     };
   });
   const [editablePrincipalPlace, setEditablePrincipalPlace] = useState<string>(
