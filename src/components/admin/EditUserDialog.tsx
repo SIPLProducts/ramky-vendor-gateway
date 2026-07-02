@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -25,31 +25,15 @@ export function EditUserDialog({ open, onOpenChange, user, onSave }: Props) {
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [saving, setSaving] = useState(false);
 
-  // Reset when user changes
-  useState(() => {
-    if (user) {
+  useEffect(() => {
+    if (open && user) {
       setFullName(user.full_name ?? '');
       setStatus(user.status);
     }
-    return undefined;
-  });
-
-  // Sync on open
-  if (user && open && fullName === '' && user.full_name) {
-    // no-op guard; handled by effect below
-  }
+  }, [open, user]);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (o && user) {
-          setFullName(user.full_name ?? '');
-          setStatus(user.status);
-        }
-        onOpenChange(o);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Edit User</DialogTitle>
