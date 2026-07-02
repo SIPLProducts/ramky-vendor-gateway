@@ -43,6 +43,25 @@ export default function VendorInviteAccept() {
           return;
         }
 
+        if (status === 'claimed' && d.session?.access_token && d.session?.refresh_token) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: d.session.access_token,
+            refresh_token: d.session.refresh_token,
+          });
+          if (sessionError) {
+            console.error('Unable to set invite session:', sessionError);
+            setErrorMsg('We could not sign you in from this invitation. Please try again shortly.');
+            setPhase('error');
+            return;
+          }
+          setPhase('redirecting');
+          navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
+            replace: true,
+          });
+          return;
+        }
+
+        // Backward compatibility for older deployed edge functions.
         if (status === 'claimed' && d.action_link) {
           setPhase('redirecting');
           window.location.href = d.action_link as string;
