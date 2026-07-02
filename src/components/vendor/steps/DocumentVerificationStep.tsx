@@ -512,6 +512,7 @@ export function DocumentVerificationStep({
       ocrData: data,
       originalOcrData: data,
       apiData: { name: initialData.bank.apiName },
+      ...persistedFileMeta(initialData.cancelledChequeFile),
     };
   });
   // Account Type + Bank Address — captured here (not on a cheque) so vendor
