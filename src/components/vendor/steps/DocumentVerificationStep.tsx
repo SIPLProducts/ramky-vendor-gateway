@@ -542,6 +542,7 @@ export function DocumentVerificationStep({
       ocrData: data,
       originalOcrData: data,
       apiData: { name: initialData.bank2.apiName },
+      ...persistedFileMeta(initialData.cancelledChequeFile2),
     };
   });
   const [bankAccountType2, setBankAccountType2] = useState<string>(
