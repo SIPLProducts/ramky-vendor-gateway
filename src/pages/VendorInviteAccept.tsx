@@ -4,11 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, ShieldCheck, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldCheck, Mail, Ban } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
-type Phase = 'loading' | 'confirm' | 'validating' | 'signing_in' | 'error';
+type Phase = 'loading' | 'confirm' | 'validating' | 'signing_in' | 'error' | 'denied';
 
 export default function VendorInviteAccept() {
   const [searchParams] = useSearchParams();
@@ -85,8 +85,7 @@ export default function VendorInviteAccept() {
       if (error || !data?.action_link) {
         const code = (data as any)?.code;
         if (code === 'email_mismatch') {
-          setMismatch(true);
-          setPhase('confirm');
+          setPhase('denied');
           setSubmitting(false);
           return;
         }
@@ -248,6 +247,30 @@ export default function VendorInviteAccept() {
                     support@sharviinfotech.com
                   </a>{' '}
                   for help.
+                </p>
+              </CardContent>
+            </>
+          )}
+
+          {phase === 'denied' && (
+            <>
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <Ban className="h-7 w-7 text-destructive" />
+                </div>
+                <CardTitle className="text-2xl text-destructive">Access Denied</CardTitle>
+                <CardDescription className="pt-2">
+                  This invitation link is tied to a different email address. Only the
+                  originally invited recipient can open it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  If you believe this is a mistake, please contact{' '}
+                  <a href="mailto:support@sharviinfotech.com" className="text-primary hover:underline">
+                    support@sharviinfotech.com
+                  </a>
+                  .
                 </p>
               </CardContent>
             </>
