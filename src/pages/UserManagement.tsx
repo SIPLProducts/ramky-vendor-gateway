@@ -545,11 +545,31 @@ export default function UserManagement() {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            {u.status === 'inactive'
+                              ? <Badge variant="outline" className="border-destructive text-destructive">Inactive</Badge>
+                              : <Badge variant="secondary">Active</Badge>}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {u.last_login_attempt_at
+                              ? new Date(u.last_login_attempt_at).toLocaleString()
+                              : '—'}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {new Date(u.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost" size="sm"
+                                onClick={() => setEditUser({
+                                  id: u.id, email: u.email,
+                                  full_name: u.full_name, status: u.status,
+                                })}
+                                title="Edit user"
+                              >
+                                <Pencil className="h-4 w-4 mr-1" /> Edit
+                              </Button>
                               <Button variant="ghost" size="sm" onClick={() => setRoleDialog(u)}
                                 disabled={u.id === user?.id}
                                 title={u.id === user?.id ? 'Cannot change own role' : 'Change role'}>
