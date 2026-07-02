@@ -251,6 +251,30 @@ export default function VendorInviteAccept() {
               </CardContent>
             </>
           )}
+
+          {phase === 'denied' && (
+            <>
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <Ban className="h-7 w-7 text-destructive" />
+                </div>
+                <CardTitle className="text-2xl text-destructive">Access Denied</CardTitle>
+                <CardDescription className="pt-2">
+                  This invitation link is tied to a different email address. Only the
+                  originally invited recipient can open it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  If you believe this is a mistake, please contact{' '}
+                  <a href="mailto:support@sharviinfotech.com" className="text-primary hover:underline">
+                    support@sharviinfotech.com
+                  </a>
+                  .
+                </p>
+              </CardContent>
+            </>
+          )}
         </Card>
       </div>
 
