@@ -235,7 +235,7 @@ export async function loadVendorReports(filters: ReportFilters): Promise<VendorR
     const row: VendorReportRow = {
       vendor_id: v.id,
       reference_number: v.reference_number || '',
-      vendor_name: v.legal_name || v.trade_name || '—',
+      vendor_name: pickVendorDisplayName(v) || '—',
       vendor_type: v.vendor_type || 'domestic',
       status: v.status || '',
       invited_at: inv?.created_at ?? null,
