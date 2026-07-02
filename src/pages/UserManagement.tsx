@@ -203,14 +203,71 @@ export default function UserManagement() {
     }
   };
 
-  const handleSaveEditUser = async (patch: { full_name: string; status: 'active' | 'inactive' }) => {
+  const handleSaveEditUser = async (patch: {
+    full_name: string;
+    status: 'active' | 'inactive';
+    role: AppRole;
+    tenantIds: string[];
+    customRoleIds: string[];
+  }) => {
     if (!editUser) return;
+    const isSelf = editUser.id === user?.id;
     try {
-      const { error } = await (supabase as any).from('profiles').update({
+      // 1. profile: name + status
+      const { error: profErr } = await (supabase as any).from('profiles').update({
         full_name: patch.full_name || null,
         status: patch.status,
       }).eq('id', editUser.id);
-      if (error) throw error;
+      if (profErr) throw profErr;
+
+      // 2. role/tenants/custom roles — skipped when editing self
+      if (!isSelf) {
+        if (patch.role !== editUser.role) {
+          const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', editUser.id);
+          if (delErr) throw delErr;
+          const { error: insErr } = await supabase.from('user_roles').insert({ user_id: editUser.id, role: patch.role });
+          if (insErr) throw insErr;
+          await supabase.from('audit_logs').insert({
+            action: 'role_changed', user_id: user?.id,
+            details: { target_user_id: editUser.id, target_email: editUser.email, old_role: editUser.role, new_role: patch.role },
+          });
+        }
+
+        const currentTenantIds = editUser.tenantIds;
+        const tToAdd = patch.tenantIds.filter((id) => !currentTenantIds.includes(id));
+        const tToRemove = currentTenantIds.filter((id) => !patch.tenantIds.includes(id));
+        if (tToRemove.length > 0) {
+          const { error } = await supabase.from('user_tenants').delete().eq('user_id', editUser.id).in('tenant_id', tToRemove);
+          if (error) throw error;
+        }
+        if (tToAdd.length > 0) {
+          const rows = tToAdd.map((tid) => ({ user_id: editUser.id, tenant_id: tid }));
+          const { error } = await supabase.from('user_tenants').insert(rows);
+          if (error) throw error;
+        }
+
+        const currentCustom = editUser.customRoleIds;
+        const cToAdd = patch.customRoleIds.filter((id) => !currentCustom.includes(id));
+        const cToRemove = currentCustom.filter((id) => !patch.customRoleIds.includes(id));
+        if (cToRemove.length > 0) {
+          const { error } = await supabase.from('user_custom_roles').delete().eq('user_id', editUser.id).in('custom_role_id', cToRemove);
+          if (error) throw error;
+          await supabase.from('audit_logs').insert({
+            action: 'custom_roles_unassigned', user_id: user?.id,
+            details: { target_user_id: editUser.id, custom_role_ids: cToRemove },
+          });
+        }
+        if (cToAdd.length > 0) {
+          const rows = cToAdd.map((cid) => ({ user_id: editUser.id, custom_role_id: cid, assigned_by: user?.id }));
+          const { error } = await supabase.from('user_custom_roles').insert(rows);
+          if (error) throw error;
+          await supabase.from('audit_logs').insert({
+            action: 'custom_roles_assigned', user_id: user?.id,
+            details: { target_user_id: editUser.id, custom_role_ids: cToAdd },
+          });
+        }
+      }
+
       await supabase.from('audit_logs').insert({
         action: 'user_edited', user_id: user?.id,
         details: {
@@ -218,6 +275,7 @@ export default function UserManagement() {
           full_name: patch.full_name, status: patch.status,
         },
       });
+
       toast({ title: 'User updated', description: editUser.email });
       await loadData();
     } catch (err: any) {
@@ -225,6 +283,7 @@ export default function UserManagement() {
       throw err;
     }
   };
+
 
   useEffect(() => { loadData(); loadLoginAttempts(); }, []);
 
