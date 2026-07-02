@@ -294,8 +294,6 @@ export default function UserManagement() {
   const scopedCustomRoleRows = customRoleRows;
   const scopedUsers = users;
 
-  const scopedUsers = users;
-
   // Hide "pure vendor" users from the Users tab (vendor role with no custom roles)
   const nonVendorUsers = useMemo(
     () => scopedUsers.filter((u) => !(u.role === 'vendor' && u.customRoles.length === 0)),
@@ -317,73 +315,6 @@ export default function UserManagement() {
     return { total: nonVendorUsers.length, counts };
   }, [nonVendorUsers]);
 
-
-  const stats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    scopedUsers.forEach((u) => { if (u.role) counts[u.role] = (counts[u.role] ?? 0) + 1; });
-    return { total: scopedUsers.length, counts };
-  }, [scopedUsers]);
-
-
-  const handleChangeRole = async (newRole: AppRole, newTenantIds: string[], newCustomRoleIds: string[]) => {
-    if (!roleDialog) return;
-    if (roleDialog.id === user?.id && newRole !== roleDialog.role) {
-      toast({ title: 'Action blocked', description: 'You cannot change your own role.', variant: 'destructive' });
-      return;
-    }
-    try {
-      if (newRole !== roleDialog.role) {
-        const { error: delErr } = await supabase.from('user_roles').delete().eq('user_id', roleDialog.id);
-        if (delErr) throw delErr;
-        const { error: insErr } = await supabase.from('user_roles').insert({ user_id: roleDialog.id, role: newRole });
-        if (insErr) throw insErr;
-        await supabase.from('audit_logs').insert({
-          action: 'role_changed', user_id: user?.id,
-          details: { target_user_id: roleDialog.id, target_email: roleDialog.email, old_role: roleDialog.role, new_role: newRole },
-        });
-      }
-
-      const currentIds = roleDialog.tenants.map((t) => t.id);
-      const toAdd = newTenantIds.filter((id) => !currentIds.includes(id));
-      const toRemove = currentIds.filter((id) => !newTenantIds.includes(id));
-      if (toRemove.length > 0) {
-        const { error } = await supabase.from('user_tenants').delete().eq('user_id', roleDialog.id).in('tenant_id', toRemove);
-        if (error) throw error;
-      }
-      if (toAdd.length > 0) {
-        const rows = toAdd.map((tid) => ({ user_id: roleDialog.id, tenant_id: tid }));
-        const { error } = await supabase.from('user_tenants').insert(rows);
-        if (error) throw error;
-      }
-
-      const currentCustom = roleDialog.customRoles.map((c) => c.id);
-      const cToAdd = newCustomRoleIds.filter((id) => !currentCustom.includes(id));
-      const cToRemove = currentCustom.filter((id) => !newCustomRoleIds.includes(id));
-      if (cToRemove.length > 0) {
-        const { error } = await supabase.from('user_custom_roles').delete().eq('user_id', roleDialog.id).in('custom_role_id', cToRemove);
-        if (error) throw error;
-        await supabase.from('audit_logs').insert({
-          action: 'custom_roles_unassigned', user_id: user?.id,
-          details: { target_user_id: roleDialog.id, custom_role_ids: cToRemove },
-        });
-      }
-      if (cToAdd.length > 0) {
-        const rows = cToAdd.map((cid) => ({ user_id: roleDialog.id, custom_role_id: cid, assigned_by: user?.id }));
-        const { error } = await supabase.from('user_custom_roles').insert(rows);
-        if (error) throw error;
-        await supabase.from('audit_logs').insert({
-          action: 'custom_roles_assigned', user_id: user?.id,
-          details: { target_user_id: roleDialog.id, custom_role_ids: cToAdd },
-        });
-      }
-
-      toast({ title: 'User updated', description: `${roleDialog.email} → ${newRole}` });
-      await loadData();
-    } catch (err: any) {
-      toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
-      throw err;
-    }
-  };
 
 
   const handleRemoveTenant = async (userId: string, tenantId: string) => {
