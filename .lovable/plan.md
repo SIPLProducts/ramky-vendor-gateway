@@ -1,55 +1,68 @@
-# Restore "Confirm your email" gate on vendor invite link
 
-## Problem
+## Goal
 
-Currently, anyone who opens the invite URL (including forwarders) instantly sees "Check your inbox" AND the real vendor receives a sign-in email they didn't request. We want forwarders blocked with **Access Denied** before any email is sent.
+Restore a true single-click invitation experience for the original vendor while keeping forwarded/reused links blocked. No "Confirm your email" screen. No extra DB columns — reuse `vendor_invitations.used_at` and `vendor_invitations.user_id`.
 
-## Desired flow
+## Important technical honesty (please read)
 
-1. Vendor (or anyone) opens `/vendor/invite?token=...`.
-2. Page shows a **"Confirm your email to continue"** card with an email input, Continue button, and a masked hint (e.g. `s****r@sharviinfotech.com`).
-3. On Continue:
-   - **Match** → call `send-invite-signin-link`, show "Check your inbox". After they click the mailed magic link, `/vendor/invite/callback` verifies and takes them into registration.
-   - **Mismatch** → full-screen red **Access Denied** card, no email is sent to the real vendor, and the attempt is logged for audit.
-4. Invalid / expired / already-used token → existing error / denied states (unchanged).
+There is a hard limit on what's possible with a link-based invitation:
 
-## Changes
+- **After the original vendor has claimed the invite** → we can perfectly block anyone else (forwarders, re-clicks, copied links). This is enforceable server-side using `used_at` + `user_id`.
+- **Before the original vendor has clicked even once** → the link is just a URL. If the vendor forwards the email *before* they themselves click, the server has no way to tell the forwarded recipient apart from the real vendor. The only way to block this case is to require the opener to prove they own the invited inbox (magic link to that inbox, OTP, or type-your-email gate) — which breaks the single-click UX you want.
 
-### Frontend — `src/pages/VendorInviteAccept.tsx`
-- Remove the auto-call to `send-invite-signin-link` on mount.
-- New initial phase `confirm_email`:
-  - On mount, call existing `get-invitation-summary` to get `masked_email`, `expired`, `used`. If token bad/expired/used → go straight to `error` / `denied`.
-  - Render email input, Continue button, masked hint, support link.
-- On Continue → call new `verify-invite-email` function:
-  - `ok: true` → call `send-invite-signin-link` and transition to existing `sent` ("Check your inbox") phase.
-  - `code: 'email_mismatch'` → transition to existing `denied` phase (Access Denied).
-  - Other codes → `error` phase.
-- Rate-limit clicks locally (disable Continue for a couple of seconds between tries).
+Given your instruction to keep it single-click and skip the confirm-email screen, the plan treats **first click = claim**. Forwarded-before-first-click cannot be blocked under those constraints; every other forward/reuse case is blocked.
 
-### Backend — new edge function `verify-invite-email` (`supabase/functions/verify-invite-email/index.ts`)
-- Public function (no JWT), CORS + input validation.
-- Input: `{ token, email }`.
-- Uses service role to look up `vendor_invitations` by token.
-- Returns:
-  - `{ ok: true }` when `lower(email.trim()) === lower(invite.email)` and token is valid/not expired/not used.
-  - `{ ok: false, code: 'email_mismatch' | 'expired' | 'used' | 'invalid' }` otherwise.
-- Never returns the invited email itself — only a boolean + code.
-- Logs every attempt into existing `invitation_email_events` with `event_type = 'email_confirm_attempt'` and `event_data = { matched: boolean, attempted_domain }` (domain only, not the full guessed email) for audit / brute-force review.
-- Simple rate check: reject if more than 10 attempts for the same `invitation_id` in the last 15 minutes (`code: 'rate_limited'`).
+## Behavior
 
-### Backend — `send-invite-signin-link` (harden existing)
-- Also accept `confirmed_email` in the body and re-verify it against the invitation before generating/sending the magic link. This ensures the frontend gate can't be bypassed by calling the function directly (forwarder can't script around it).
-- Return `{ code: 'email_mismatch' }` if it doesn't match.
+1. Buyer sends invite → vendor gets email with `.../vendor/invite?token=XYZ`.
+2. Vendor clicks **Begin Registration**:
+   - Page shows a brief "Signing you in…" spinner.
+   - Client calls `claim-vendor-invite` edge function with the token.
+   - Server logic:
+     - Look up invitation by token. If missing/expired → error card.
+     - If `used_at IS NULL`:
+       - Ensure an auth user exists for `invitation.email` (create if missing, email_confirm=true).
+       - Set `used_at = now()`, `user_id = <that auth user id>`.
+       - Generate a one-shot magiclink for that email, normalized for the caller's origin (same normalization already in `accept-vendor-invite`).
+       - Return `{ action_link, status: "claimed" }`.
+     - If `used_at IS NOT NULL`:
+       - If the caller is already authenticated **and** their `auth.uid()` matches `invitation.user_id` → return `{ status: "already_claimed_same_user", redirect: "/vendor/registration?token=..." }` (lets the original vendor reopen from the same email later).
+       - Otherwise → return `{ status: "denied" }` (Access Denied card, no email sent, no session created).
+3. Client:
+   - `claimed` → `window.location.href = action_link` (auto sign-in → lands on registration form).
+   - `already_claimed_same_user` → navigate straight to registration.
+   - `denied` / `expired` / `invalid` → render the existing full-screen red Access Denied / error card. No email is triggered.
 
-### Backend — `verify-invite-session` (unchanged)
-- Already enforces that the authenticated email must equal the invited email at callback time. Kept as the last line of defense.
+## Return-to-vendor (approval workflow) flow — unchanged behavior, no new invitation
 
-## Out of scope
-- No database schema changes. `vendor_invitations` and `invitation_email_events` already have everything needed.
-- No changes to the invitation email template or to buyer/admin invite creation.
-- `/vendor/invite/callback` route stays as is.
+- The approval "returned to vendor" notification email should link to `/vendor/registration?token=<original invite token>` (what it already does).
+- Because `used_at` is set and `user_id` matches the original vendor, `claim-vendor-invite` returns `already_claimed_same_user` and the vendor is routed straight in. If their session has expired, we fall through to a normal sign-in prompt on `/vendor/login` (existing page), then back to the form.
+- Nothing about the approval workflow, statuses, or vendor record changes.
 
-## Result
+## Files to change (reuse existing pieces)
 
-- Forwarder / copier who doesn't know the exact invited email → **Access Denied** immediately, no email sent to the real vendor, attempt logged.
-- Real vendor → types their address → magic link → auto sign-in → registration. Same one-click experience as before.
+- `supabase/functions/claim-vendor-invite/index.ts` **(new, but replaces the current two-step `send-invite-signin-link` + `verify-invite-session` roundtrip for the first-click case).** Uses existing `used_at`, `user_id`, `expires_at` columns. Reuses the action-link normalization already present in `accept-vendor-invite`.
+- `src/pages/VendorInviteAccept.tsx` — remove the "Confirm your email" phase entirely; on mount, call `claim-vendor-invite` and branch on the response. Keep the existing Access Denied and error UIs.
+- `src/pages/VendorInviteCallback.tsx` — keep only as a thin passthrough (magiclink lands here → redirect to `/vendor/registration?token=...`). No further server verification needed since the claim already happened.
+- `src/App.tsx` — no route changes.
+- `supabase/config.toml` — add `[functions.claim-vendor-invite] verify_jwt = false`.
+- Leave `send-invite-signin-link`, `verify-invite-email`, `verify-invite-session`, `accept-vendor-invite`, and the `signin_sent_count` / `last_signin_sent_at` columns in place so nothing else breaks. They simply stop being called by the vendor invite page.
+
+## What is explicitly NOT changed
+
+- No database migration.
+- No changes to vendor registration form logic, approval workflow, SAP sync, or email templates.
+- No changes to buyer / admin / finance login flows.
+- No changes to `/vendor/login` (still available as the manual fallback).
+
+## Summary of the trade-off
+
+| Scenario | Blocked? |
+|---|---|
+| Original vendor clicks once | ✅ Signed in automatically |
+| Original vendor re-opens later (same account) | ✅ Allowed |
+| Same link re-clicked by anyone else after claim | ✅ Access Denied |
+| Link copied/forwarded after claim | ✅ Access Denied |
+| Link forwarded **before** original vendor's first click | ❌ Not blockable without breaking single-click UX |
+
+If the last row is unacceptable, the only fix is to reintroduce an inbox-proof step (magic link or OTP to the invited email) — say the word and I'll switch to that variant instead.
