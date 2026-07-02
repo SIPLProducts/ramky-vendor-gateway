@@ -185,7 +185,48 @@ export default function UserManagement() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  const loadLoginAttempts = async () => {
+    setAttemptsLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('login_attempts')
+        .select('id, user_id, email, attempt_status, attempted_at')
+        .eq('attempt_status', 'inactive_user')
+        .order('attempted_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setLoginAttempts((data ?? []) as LoginAttemptRow[]);
+    } catch (err: any) {
+      toast({ title: 'Failed to load login attempts', description: err.message, variant: 'destructive' });
+    } finally {
+      setAttemptsLoading(false);
+    }
+  };
+
+  const handleSaveEditUser = async (patch: { full_name: string; status: 'active' | 'inactive' }) => {
+    if (!editUser) return;
+    try {
+      const { error } = await (supabase as any).from('profiles').update({
+        full_name: patch.full_name || null,
+        status: patch.status,
+      }).eq('id', editUser.id);
+      if (error) throw error;
+      await supabase.from('audit_logs').insert({
+        action: 'user_edited', user_id: user?.id,
+        details: {
+          target_user_id: editUser.id, target_email: editUser.email,
+          full_name: patch.full_name, status: patch.status,
+        },
+      });
+      toast({ title: 'User updated', description: editUser.email });
+      await loadData();
+    } catch (err: any) {
+      toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
+      throw err;
+    }
+  };
+
+  useEffect(() => { loadData(); loadLoginAttempts(); }, []);
 
   // Users / Custom Roles / Role Permissions tabs are ALWAYS global — show everything
   // regardless of the tenant scope picker. The scope picker only narrows
