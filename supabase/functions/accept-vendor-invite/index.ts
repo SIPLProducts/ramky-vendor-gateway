@@ -17,15 +17,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { token, redirectOrigin, confirmed_email } = await req.json();
+    const { token, redirectOrigin } = await req.json();
     if (!token || typeof token !== 'string') {
       return new Response(JSON.stringify({ error: 'Missing token' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (!confirmed_email || typeof confirmed_email !== 'string') {
-      return new Response(JSON.stringify({ error: 'Missing confirmed_email', code: 'email_required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -37,7 +31,7 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // 1. Look up invitation WITHOUT bumping access count (only bump on valid attempts)
+    // 1. Look up invitation
     const { data: lookup, error: lookupErr } = await admin
       .from('vendor_invitations')
       .select('id, email, expires_at, used_at')
@@ -65,25 +59,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Enforce email match — prevents forwarded links from being used by others
-    if (String(confirmed_email).trim().toLowerCase() !== String(lookup.email).toLowerCase()) {
+    // 2. One-time use: if this invitation has already been claimed, block further
+    // sign-ins from the same link. Prevents forwarded links from working after
+    // the original recipient has already used them.
+    if (lookup.used_at) {
       try {
         await admin.from('invitation_email_events').insert({
           invitation_id: lookup.id,
           email_id: null,
-          event_type: 'mismatch_attempt',
-          event_data: { attempted_email: String(confirmed_email).trim().toLowerCase() },
+          event_type: 'reuse_attempt',
+          event_data: { used_at: lookup.used_at },
         });
       } catch (e) {
-        console.warn('failed to log mismatch_attempt:', e);
+        console.warn('failed to log reuse_attempt:', e);
       }
       return new Response(
-        JSON.stringify({ error: 'Email does not match invitation', code: 'email_mismatch' }),
+        JSON.stringify({ error: 'Invitation already used', code: 'already_used' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // 3. Record access now that the check passed
+    // 3. Record access
     await admin.rpc('record_invitation_access', { _token: token });
 
     const invite = lookup;
