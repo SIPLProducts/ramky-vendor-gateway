@@ -144,9 +144,18 @@ export default function VendorInviteAccept() {
             return;
           }
 
+          const friendly: Record<string, string> = {
+            smtp_not_configured: "Email service isn't configured yet. Please contact vendxsupport@ramky.com.",
+            smtp_send_failed: "We couldn't send the verification email. Please contact vendxsupport@ramky.com.",
+            generate_link_failed: "We couldn't generate your secure link. Please contact vendxsupport@ramky.com.",
+            provision_failed: "We couldn't prepare your account. Please contact vendxsupport@ramky.com.",
+            rate_limited: 'Too many verification emails were sent. Please try again in an hour.',
+            env_missing: 'Server is missing required configuration. Please contact support.',
+          };
+          const codeKey = code || status;
           setErrorDetails({
-            message: d.message || 'We could not open your invitation.',
-            code: code || status,
+            message: (codeKey && friendly[codeKey]) || d.message || 'We could not open your invitation.',
+            code: codeKey,
             raw: JSON.stringify(d),
           });
           setPhase('error');
