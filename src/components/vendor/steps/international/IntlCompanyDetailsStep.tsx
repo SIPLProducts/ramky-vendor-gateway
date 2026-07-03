@@ -270,6 +270,9 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                   </Button>
                 </div>
               )}
+              {!countriesFetching && !countriesError && usingCachedCountries && (
+                <p className="text-[11px] text-muted-foreground">Using cached SAP values.</p>
+              )}
             </div>
 
             <div className="grid gap-1.5">
