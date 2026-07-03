@@ -27,9 +27,14 @@ const MONTH_INDEX: Record<string, number> = {
   july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
 };
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 /**
  * "Latest expected period" = previous calendar month.
- * Returns true if a GSTR3B (or GSTR1 fallback) row for that period is Filed.
+ * Returns true only if a GSTR1 row for that period is Filed.
  */
 export function isLatestPeriodFiled(rows: FilingStatusRow[]): boolean {
   if (!rows || rows.length === 0) return false;
@@ -41,17 +46,35 @@ export function isLatestPeriodFiled(rows: FilingStatusRow[]): boolean {
   const fyStartYear = targetMonth >= 3 ? targetYear : targetYear - 1;
   const fyString = `${fyStartYear}-${fyStartYear + 1}`;
 
-  const matches = (returnType: string) =>
-    rows.some((r) => {
-      if ((r.return_type || "").toUpperCase() !== returnType) return false;
-      if ((r.status || "").toLowerCase() !== "filed") return false;
-      const monthIdx = MONTH_INDEX[(r.tax_period || "").toLowerCase()];
-      if (monthIdx !== targetMonth) return false;
-      const fy = (r.financial_year || "").replace(/\s/g, "");
-      return fy === fyString || fy.startsWith(`${fyStartYear}-`);
-    });
+  return rows.some((r) => {
+    if ((r.return_type || "").toUpperCase() !== "GSTR1") return false;
+    if ((r.status || "").toLowerCase() !== "filed") return false;
+    const monthIdx = MONTH_INDEX[(r.tax_period || "").toLowerCase()];
+    if (monthIdx !== targetMonth) return false;
+    const fy = (r.financial_year || "").replace(/\s/g, "");
+    return fy === fyString || fy.startsWith(`${fyStartYear}-`);
+  });
+}
 
-  return matches("GSTR3B") || matches("GSTR1");
+/**
+ * Evaluates GSTR1 compliance with the 11th-of-month grace rule.
+ * - Declaration is required only when today's date > 11 AND the previous
+ *   month's GSTR1 is not filed.
+ * - On or before the 11th, no declaration is required regardless of status,
+ *   because the filing due date hasn't passed.
+ */
+export function evaluateGstr1Compliance(
+  rows: FilingStatusRow[],
+  now: Date = new Date(),
+): { previousMonthFiled: boolean; declarationRequired: boolean; checkedPeriod: string } {
+  const target = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthFiled = isLatestPeriodFiled(rows);
+  const withinGrace = now.getDate() <= 11;
+  return {
+    previousMonthFiled,
+    declarationRequired: !previousMonthFiled && !withinGrace,
+    checkedPeriod: `${MONTH_NAMES[target.getMonth()]} ${target.getFullYear()}`,
+  };
 }
 
 function formatDateDMY(value?: string): string {
