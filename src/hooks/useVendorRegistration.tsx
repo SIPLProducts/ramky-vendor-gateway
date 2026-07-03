@@ -1046,7 +1046,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (isUserFk) {
         toast({
           title: 'Session out of sync',
-          description: 'Your login session is invalid. Please reopen the invitation link and sign in again.',
+          description: 'Your login session is invalid. Please reopen the invitation link.',
           variant: 'destructive',
         });
         try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
@@ -1239,7 +1239,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (isUserFk) {
         toast({
           title: 'Session out of sync',
-          description: 'Your login session is invalid. Please reopen the invitation link and sign in again.',
+          description: 'Your login session is invalid. Please reopen the invitation link.',
           variant: 'destructive',
         });
         try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
