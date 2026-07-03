@@ -258,15 +258,13 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       return json(500, {
         status: 'error',
         code: 'env_missing',
         message: `Missing env: ${[
           !supabaseUrl && 'SUPABASE_URL',
           !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
-          !anonKey && 'SUPABASE_ANON_KEY',
         ].filter(Boolean).join(', ')}`,
       });
     }
@@ -335,14 +333,26 @@ Deno.serve(async (req) => {
       }
 
       if (!invite.user_id && callerUserId) {
-        const { error: bindErr } = await admin
+        const { data: boundInvite, error: bindErr } = await admin
           .from('vendor_invitations')
           .update({ user_id: callerUserId })
           .eq('id', invite.id)
-          .is('user_id', null);
+          .is('user_id', null)
+          .select('user_id')
+          .maybeSingle();
         if (bindErr) {
           console.error('invite bind failed:', bindErr);
           return json(500, { status: 'error', code: 'bind_failed', message: bindErr.message });
+        }
+        if (!boundInvite?.user_id) {
+          const { data: latestInvite } = await admin
+            .from('vendor_invitations')
+            .select('user_id')
+            .eq('id', invite.id)
+            .maybeSingle();
+          if (latestInvite?.user_id && latestInvite.user_id !== callerUserId) {
+            return json(403, { status: 'denied', code: 'already_claimed', message: 'This invitation is already bound to another user' });
+          }
         }
       }
 
