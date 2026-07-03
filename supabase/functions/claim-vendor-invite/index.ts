@@ -69,6 +69,9 @@ function looksLikePrefetch(req: Request, attempt: number): boolean {
     }
   }
   return false;
+  const purpose = (req.headers.get('purpose') || req.headers.get('sec-purpose') || '').toLowerCase();
+  if (purpose.includes('prefetch')) return true;
+  return false;
 }
 
 Deno.serve(async (req) => {
