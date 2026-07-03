@@ -60,6 +60,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 
 type VendorStatus =
   | 'draft'
