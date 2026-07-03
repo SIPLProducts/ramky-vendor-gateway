@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadRoles = async (userId: string) => {
     try {
       const [roleRes, customRes] = await Promise.all([
-        supabase.from('user_roles').select('role').eq('user_id', userId).single(),
+        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
         supabase
           .from('user_custom_roles')
           .select('custom_role_id, custom_roles!inner(id, name, is_active)')

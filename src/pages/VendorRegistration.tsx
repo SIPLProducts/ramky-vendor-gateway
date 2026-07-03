@@ -447,10 +447,13 @@ export default function VendorRegistration() {
 
         const maxAuthChecks = isFreshInviteHandoff ? 80 : 30;
         for (let i = 0; i < maxAuthChecks; i++) {
-          const [{ data: sessionData }, { data: userData }] = await Promise.all([
-            supabase.auth.getSession(),
-            supabase.auth.getUser(),
-          ]);
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (isFreshInviteHandoff && sessionData.session?.access_token && sessionData.session.user?.id) {
+            session = sessionData.session;
+            userReady = true;
+            break;
+          }
+          const { data: userData } = await supabase.auth.getUser();
           if (sessionData.session?.access_token && userData.user?.id) {
             session = sessionData.session;
             userReady = true;

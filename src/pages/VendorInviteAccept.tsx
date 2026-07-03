@@ -44,32 +44,21 @@ export default function VendorInviteAccept() {
 
       const waitForHydratedSession = async () => {
         for (let i = 0; i < 60; i++) {
-          const [{ data: sd }, { data: ud }] = await Promise.all([
-            supabase.auth.getSession(),
-            supabase.auth.getUser(),
-          ]);
-          if (sd.session?.access_token && ud.user?.id) return sd.session;
+          const { data: sd } = await supabase.auth.getSession();
+          if (sd.session?.access_token && sd.session.user?.id) return sd.session;
           await new Promise((r) => setTimeout(r, 100));
         }
         return null;
       };
 
-      const signOutIfDifferentUserIsActive = async () => {
+      const clearLocalInviteSession = async () => {
         try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          const activeEmail = sessionData.session?.user?.email?.toLowerCase();
-          if (!activeEmail) return;
-
-          const { data: rows } = await supabase.rpc('get_invitation_by_token', { _token: token });
-          const invite = Array.isArray(rows) ? rows[0] : rows;
-          const invitedEmail = invite?.email?.toLowerCase?.();
-          if (invitedEmail && activeEmail !== invitedEmail) {
-            await supabase.auth.signOut({ scope: 'local' });
-            await new Promise((r) => setTimeout(r, 150));
-          }
+          await supabase.auth.signOut({ scope: 'local' });
+          await new Promise((r) => setTimeout(r, 150));
         } catch {
-          // If this pre-check fails, continue with the normal claim path so the
-          // server still returns the authoritative invitation status.
+          // The invite handler must not depend on any cached browser session.
+          // A stale JWT can make /auth/v1/user return session_not_found and keep
+          // the vendor on the signing-in screen. Continue with a clean claim.
         }
       };
 
@@ -84,7 +73,7 @@ export default function VendorInviteAccept() {
       };
 
       let attempt = 0;
-      await signOutIfDifferentUserIsActive();
+      await clearLocalInviteSession();
       // eslint-disable-next-line no-constant-condition
       while (true) {
         attempt += 1;
@@ -141,6 +130,7 @@ export default function VendorInviteAccept() {
           }
 
           if (status === 'signin_ready' && d.token_hash) {
+            try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
             const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
               token_hash: d.token_hash,
               type: (d.otp_type || 'magiclink') as any,
