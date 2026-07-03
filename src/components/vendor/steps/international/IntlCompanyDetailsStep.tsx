@@ -200,9 +200,9 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                       } />
                     </SelectTrigger>
                     <SelectContent>
-                      {(countries || []).map((c) => (
+                      {countries.map((c) => (
                         <SelectItem key={c.id} value={c.code}>
-                          {c.code}{c.description ? ` — ${c.description}` : ''}
+                          {c.code}{c.desc ? ` — ${c.desc}` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
