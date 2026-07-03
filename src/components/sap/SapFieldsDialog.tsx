@@ -239,45 +239,52 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
             <Separator />
 
             {/* Classification — editable here (no longer captured during registration) */}
-            <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <div className="md:col-span-2">
-                <SapF4MultiSelectField
-                  label="Material Group for Vendors"
-                  masterType="material_group_vendor"
-                  value={form.classify.MGV || []}
-                  onChange={(v) => setClassify('MGV', v)}
-                  placeholder="Select material groups"
-                />
+            <div className="space-y-3">
+              <h4 className="font-semibold flex items-center gap-2 text-primary">
+                <Tags className="h-4 w-4" />Classification
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-border rounded-lg p-4 space-y-3">
+                  <h5 className="text-sm font-medium text-primary">Vendor_Details</h5>
+                  <SapF4MultiSelectField
+                    label="Material Group for Vendors"
+                    masterType="material_group_vendor"
+                    value={form.classify.MGV || []}
+                    onChange={(v) => setClassify('MGV', v)}
+                    placeholder="Select material groups"
+                  />
+                  <SapF4MultiSelectField
+                    label="Vendor Category"
+                    masterType="vendor_category"
+                    value={form.classify.CATV || []}
+                    onChange={(v) => setClassify('CATV', v)}
+                    placeholder="Select vendor categories"
+                  />
+                </div>
+                <div className="border border-border rounded-lg p-4 space-y-3">
+                  <h5 className="text-sm font-medium text-primary">Vendor_CFSTMT</h5>
+                  <SapF4MultiSelectField
+                    label="Vendor Cash Flow"
+                    masterType="vendor_cashflow"
+                    value={form.classify.CASH || []}
+                    onChange={(v) => setClassify('CASH', v)}
+                    liveItems={liveF4?.CFSTMT}
+                    placeholder="Select cash flow"
+                  />
+                  <SapF4MultiSelectField
+                    label="Tier Category"
+                    masterType="tier_category"
+                    value={form.classify.TIER || []}
+                    onChange={(v) => setClassify('TIER', v)}
+                    liveItems={liveF4?.CP_TIER}
+                    placeholder="Select tier category"
+                  />
+                </div>
               </div>
-              <div className="md:col-span-2">
-                <SapF4MultiSelectField
-                  label="Vendor Category"
-                  masterType="vendor_category"
-                  value={form.classify.CATV || []}
-                  onChange={(v) => setClassify('CATV', v)}
-                  placeholder="Select vendor categories"
-                />
-              </div>
-              <SapF4MultiSelectField
-                label="Vendor Cash Flow"
-                masterType="vendor_cashflow"
-                value={form.classify.CASH || []}
-                onChange={(v) => setClassify('CASH', v)}
-                liveItems={liveF4?.CFSTMT}
-                placeholder="Select cash flow"
-              />
-              <SapF4MultiSelectField
-                label="Tier Category"
-                masterType="tier_category"
-                value={form.classify.TIER || []}
-                onChange={(v) => setClassify('TIER', v)}
-                liveItems={liveF4?.CP_TIER}
-                placeholder="Select tier category"
-              />
-              <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
+              <p className="text-[11px] text-muted-foreground">
                 Select Classification values to send to SAP. Defaults are pre-filled when available.
               </p>
-            </Section>
+            </div>
 
 
           </div>
