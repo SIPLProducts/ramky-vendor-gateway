@@ -28,9 +28,13 @@ export default function VendorInviteAccept() {
         return;
       }
 
-      try {
+      let attempt = 0;
+      // Retry loop for the "pending" (prefetch-suspected) response.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        attempt += 1;
         const { data, error } = await supabase.functions.invoke('claim-vendor-invite', {
-          body: { token, redirectOrigin: window.location.origin },
+          body: { token, redirectOrigin: window.location.origin, attempt },
         });
 
         const d = (data as any) || {};
