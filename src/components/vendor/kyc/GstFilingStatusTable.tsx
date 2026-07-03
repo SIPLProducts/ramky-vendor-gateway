@@ -85,18 +85,15 @@ function formatDateDMY(value?: string): string {
 }
 
 /**
- * Keep one row per (financial_year + tax_period), preferring GSTR3B over GSTR1.
+ * Keep one GSTR1 row per (financial_year + tax_period). Non-GSTR1 rows are
+ * dropped because the compliance view is GSTR1-only.
  */
 function dedupeByPeriod(rows: FilingStatusRow[]): FilingStatusRow[] {
-  const priority: Record<string, number> = { GSTR3B: 0, GSTR1: 1 };
   const byKey = new Map<string, FilingStatusRow>();
   for (const r of rows) {
+    if ((r.return_type || "").toUpperCase() !== "GSTR1") continue;
     const key = `${r.financial_year || ""}|${r.tax_period || ""}`;
-    const existing = byKey.get(key);
-    if (!existing) { byKey.set(key, r); continue; }
-    const pNew = priority[(r.return_type || "").toUpperCase()] ?? 99;
-    const pOld = priority[(existing.return_type || "").toUpperCase()] ?? 99;
-    if (pNew < pOld) byKey.set(key, r);
+    if (!byKey.has(key)) byKey.set(key, r);
   }
   return Array.from(byKey.values());
 }
@@ -111,11 +108,13 @@ export function GstFilingStatusTable({ rows, limit }: { rows: FilingStatusRow[];
   });
   const sorted = typeof limit === "number" ? sortedAll.slice(0, limit) : sortedAll;
 
+  if (sorted.length === 0) return null;
+
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-4 py-2.5 border-b bg-muted/40">
         <h4 className="text-sm font-semibold">GST Return Filing Status</h4>
-        <p className="text-xs text-muted-foreground">Latest returns reported by the GST registry</p>
+        <p className="text-xs text-muted-foreground">GSTR1 — last {sorted.length} return{sorted.length === 1 ? "" : "s"} reported by the GST registry</p>
       </div>
       <div className="max-h-72 overflow-auto">
         <Table className="[&_th]:border [&_td]:border [&_th]:text-center [&_td]:text-center">
