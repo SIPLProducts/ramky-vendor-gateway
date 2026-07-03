@@ -2,11 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { CardTitle } from '@/components/ui/card';
-import { Loader2, AlertCircle, ShieldCheck, Ban } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, AlertCircle, ShieldCheck, Ban, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
 type Phase = 'loading' | 'redirecting' | 'denied' | 'error';
+
+interface ErrorDetails {
+  message: string;
+  code?: string;
+  status?: string | number;
+  raw?: string;
+}
 
 export default function VendorInviteAccept() {
   const [searchParams] = useSearchParams();
@@ -14,8 +22,13 @@ export default function VendorInviteAccept() {
   const token = searchParams.get('token');
 
   const [phase, setPhase] = useState<Phase>('loading');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
+  const [attemptKey, setAttemptKey] = useState(0);
   const ranRef = useRef(false);
+
+  useEffect(() => {
+    ranRef.current = false;
+  }, [attemptKey]);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -23,13 +36,12 @@ export default function VendorInviteAccept() {
 
     (async () => {
       if (!token) {
-        setErrorMsg('No invitation token provided. Please use the link from your email.');
+        setErrorDetails({ message: 'No invitation token provided. Please use the link from your email.' });
         setPhase('error');
         return;
       }
 
       let attempt = 0;
-      // Retry loop for the "pending" (prefetch-suspected) response.
       // eslint-disable-next-line no-constant-condition
       while (true) {
         attempt += 1;
@@ -43,7 +55,16 @@ export default function VendorInviteAccept() {
           const code = d.code;
 
           if (error && !status) {
-            setErrorMsg('We could not open your invitation. Please try again shortly.');
+            let raw: string | undefined;
+            const ctx: any = (error as any).context;
+            try {
+              if (ctx?.response?.text) raw = await ctx.response.text();
+            } catch { /* ignore */ }
+            setErrorDetails({
+              message: error.message || 'We could not open your invitation.',
+              status: ctx?.status,
+              raw,
+            });
             setPhase('error');
             return;
           }
@@ -54,8 +75,11 @@ export default function VendorInviteAccept() {
               refresh_token: d.session.refresh_token,
             });
             if (sessionError) {
-              console.error('Unable to set invite session:', sessionError);
-              setErrorMsg('We could not sign you in from this invitation. Please try again shortly.');
+              setErrorDetails({
+                message: 'We could not sign you in from this invitation.',
+                code: 'set_session_failed',
+                raw: sessionError.message,
+              });
               setPhase('error');
               return;
             }
@@ -63,12 +87,6 @@ export default function VendorInviteAccept() {
             navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
               replace: true,
             });
-            return;
-          }
-
-          if (status === 'claimed' && d.action_link) {
-            setPhase('redirecting');
-            window.location.href = d.action_link as string;
             return;
           }
 
@@ -81,7 +99,6 @@ export default function VendorInviteAccept() {
           }
 
           if (status === 'pending' && attempt < 4) {
-            // Mail-security scanner prefetch suspected; wait briefly and retry.
             await new Promise((r) => setTimeout(r, 1000));
             continue;
           }
@@ -92,29 +109,53 @@ export default function VendorInviteAccept() {
           }
 
           if (status === 'expired' || code === 'expired') {
-            setErrorMsg('This invitation link has expired. Please contact the administrator.');
+            setErrorDetails({
+              message: 'This invitation link has expired. Please contact the administrator.',
+              code,
+            });
             setPhase('error');
             return;
           }
 
           if (status === 'invalid' || code === 'invalid') {
-            setErrorMsg('Invalid invitation link. Please contact the administrator.');
+            setErrorDetails({
+              message: 'Invalid invitation link. Please contact the administrator.',
+              code,
+            });
             setPhase('error');
             return;
           }
 
-          setErrorMsg('We could not open your invitation. Please contact the administrator.');
+          setErrorDetails({
+            message: d.message || 'We could not open your invitation.',
+            code: code || status,
+            raw: JSON.stringify(d),
+          });
           setPhase('error');
           return;
-        } catch (err) {
-          console.error('claim-vendor-invite failed:', err);
-          setErrorMsg('An unexpected error occurred. Please try again.');
+        } catch (err: any) {
+          setErrorDetails({
+            message: err?.message || 'An unexpected error occurred.',
+            raw: String(err),
+          });
           setPhase('error');
           return;
         }
       }
     })();
-  }, [token, navigate]);
+  }, [token, navigate, attemptKey]);
+
+  const copyDetails = () => {
+    if (!errorDetails) return;
+    const text = [
+      `Message: ${errorDetails.message}`,
+      errorDetails.code && `Code: ${errorDetails.code}`,
+      errorDetails.status && `HTTP: ${errorDetails.status}`,
+      errorDetails.raw && `Raw: ${errorDetails.raw}`,
+      token && `Token: ${token}`,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard?.writeText(text).catch(() => {});
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -154,7 +195,6 @@ export default function VendorInviteAccept() {
                 <CardDescription className="pt-2">
                   This invitation was already opened by another device or recipient.
                   For security, only the originally invited vendor can use this link.
-                  If you are the intended vendor, please contact support to request a fresh invitation.
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center">
@@ -162,24 +202,38 @@ export default function VendorInviteAccept() {
                   If you believe this is a mistake, please contact{' '}
                   <a href="mailto:vendxsupport@ramky.com" className="text-primary hover:underline">
                     vendxsupport@ramky.com
-                  </a>
-                  .
+                  </a>.
                 </p>
               </CardContent>
             </>
           )}
 
-          {phase === 'error' && (
+          {phase === 'error' && errorDetails && (
             <>
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
                   <AlertCircle className="h-6 w-6 text-destructive" />
                 </div>
                 <CardTitle>Unable to open invitation</CardTitle>
-                <CardDescription>{errorMsg}</CardDescription>
+                <CardDescription>{errorDetails.message}</CardDescription>
               </CardHeader>
-              <CardContent className="text-center">
-                <p className="text-sm text-muted-foreground">
+              <CardContent className="space-y-4">
+                {(errorDetails.code || errorDetails.status || errorDetails.raw) && (
+                  <div className="rounded-md bg-muted p-3 text-xs font-mono text-left space-y-1 break-all">
+                    {errorDetails.code && <div><span className="text-muted-foreground">code:</span> {errorDetails.code}</div>}
+                    {errorDetails.status && <div><span className="text-muted-foreground">http:</span> {String(errorDetails.status)}</div>}
+                    {errorDetails.raw && <div><span className="text-muted-foreground">raw:</span> {errorDetails.raw.slice(0, 500)}</div>}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Button size="sm" variant="outline" onClick={() => setAttemptKey((k) => k + 1)}>
+                    Retry
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={copyDetails}>
+                    <Copy className="h-3.5 w-3.5 mr-1" /> Copy details
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground text-center">
                   Please contact{' '}
                   <a href="mailto:vendxsupport@ramky.com" className="text-primary hover:underline">
                     vendxsupport@ramky.com
