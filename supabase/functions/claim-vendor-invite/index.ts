@@ -173,11 +173,22 @@ Deno.serve(async (req) => {
 
     let tokenHash: string | null = null;
     let otpType: string | null = null;
-    try {
-      const raw = new URL(linkData.properties.action_link as string);
-      tokenHash = raw.searchParams.get('token');
-      otpType = raw.searchParams.get('type');
-    } catch { /* ignore */ }
+    const props = linkData.properties as Record<string, unknown>;
+
+    // verifyOtp({ token_hash }) expects GoTrue's hashed token. The action_link
+    // also contains a short-lived raw token in some deployments; using that raw
+    // URL token causes intermittent `otp_expired` / `invalid` failures on the
+    // self-hosted auth endpoint. Prefer the official hashed_token returned by
+    // generateLink and only fall back to URL parsing for older auth versions.
+    tokenHash = typeof props.hashed_token === 'string' ? props.hashed_token : null;
+    otpType = typeof props.verification_type === 'string' ? props.verification_type : null;
+    if (!tokenHash) {
+      try {
+        const raw = new URL(linkData.properties.action_link as string);
+        tokenHash = raw.searchParams.get('token_hash') || raw.searchParams.get('token');
+        otpType = otpType || raw.searchParams.get('type');
+      } catch { /* ignore */ }
+    }
 
     if (!tokenHash) {
       return json(500, { status: 'error', code: 'token_hash_missing', message: 'Could not extract token_hash from action_link' });

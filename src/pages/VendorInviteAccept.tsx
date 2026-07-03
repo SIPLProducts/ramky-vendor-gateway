@@ -42,6 +42,25 @@ export default function VendorInviteAccept() {
         return;
       }
 
+      const waitForHydratedSession = async () => {
+        for (let i = 0; i < 30; i++) {
+          const { data: sd } = await supabase.auth.getSession();
+          if (sd.session?.access_token) return sd.session;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return null;
+      };
+
+      const openRegistration = (redirect?: string) => {
+        try {
+          window.sessionStorage.setItem('vendorInviteJustSignedIn', token);
+        } catch { /* ignore */ }
+        setPhase('redirecting');
+        navigate(redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
+          replace: true,
+        });
+      };
+
       let attempt = 0;
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -84,39 +103,37 @@ export default function VendorInviteAccept() {
               setPhase('error');
               return;
             }
-            setPhase('redirecting');
-            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
-              replace: true,
-            });
+            openRegistration(d.redirect);
             return;
           }
 
           if (status === 'verified') {
-            setPhase('redirecting');
-            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
-              replace: true,
-            });
+            openRegistration(d.redirect);
             return;
           }
 
           if (status === 'already_claimed_same_user') {
-            setPhase('redirecting');
-            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
-              replace: true,
-            });
+            openRegistration(d.redirect);
             return;
           }
 
           if (status === 'signin_ready' && d.token_hash) {
-            const { error: verifyError } = await supabase.auth.verifyOtp({
+            const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
               token_hash: d.token_hash,
               type: (d.otp_type || 'magiclink') as any,
             });
             if (verifyError) {
+              const verifyMessage = verifyError.message || String(verifyError);
+              const retryableOtpFailure = /expired|invalid|otp|token/i.test(verifyMessage);
+              if (retryableOtpFailure && attempt < 3) {
+                try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+                await new Promise((r) => setTimeout(r, 300));
+                continue;
+              }
               setErrorDetails({
                 message: 'We could not sign you in from this invitation.',
                 code: 'verify_otp_failed',
-                raw: verifyError.message,
+                raw: verifyMessage,
               });
               setPhase('error');
               return;
@@ -124,13 +141,8 @@ export default function VendorInviteAccept() {
             // Wait for session to persist to localStorage before navigating,
             // otherwise VendorRegistration mounts before hydration and bounces
             // back to /auth with a false "Session expired" toast.
-            let hydrated = false;
-            for (let i = 0; i < 20; i++) {
-              const { data: sd } = await supabase.auth.getSession();
-              if (sd.session?.access_token) { hydrated = true; break; }
-              await new Promise((r) => setTimeout(r, 100));
-            }
-            if (!hydrated) {
+            const session = verifyData.session?.access_token ? verifyData.session : await waitForHydratedSession();
+            if (!session?.access_token) {
               setErrorDetails({
                 message: 'We signed you in but could not confirm the session. Please reopen the invitation link.',
                 code: 'session_hydration_timeout',
@@ -138,10 +150,7 @@ export default function VendorInviteAccept() {
               setPhase('error');
               return;
             }
-            setPhase('redirecting');
-            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
-              replace: true,
-            });
+            openRegistration(d.redirect);
             return;
           }
 
