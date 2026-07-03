@@ -14,7 +14,7 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
-import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled } from './GstFilingStatusTable';
+import { GstFilingStatusTable, normalizeFilingStatus, evaluateGstr1Compliance } from './GstFilingStatusTable';
 import { GstDeclarationDialog } from './GstDeclarationDialog';
 import { supabase } from '@/integrations/supabase/client';
 
