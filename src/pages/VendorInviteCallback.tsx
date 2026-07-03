@@ -68,7 +68,6 @@ export default function VendorInviteCallback() {
       if (data.session) return verifyAndGo();
       const { data: sub } = supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_IN') {
-          sub.subscription.unsubscribe();
           if (timeoutId) window.clearTimeout(timeoutId);
           verifyAndGo();
         }
