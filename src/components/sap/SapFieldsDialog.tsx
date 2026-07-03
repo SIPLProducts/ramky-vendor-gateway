@@ -447,6 +447,8 @@ const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: strin
   vendor_category:       { code: 'ATWRT', desc: 'ATWTB' },
   vendor_location:       { code: 'ATWRT', desc: 'ATWTB' },
   identification_source: { code: 'ATWRT', desc: 'ATWTB' },
+  vendor_cashflow:       { code: 'ATWRT', desc: 'ATWTB' },
+  tier_category:         { code: 'ATWRT', desc: 'ATWTB' },
 };
 
 export function SapF4SelectField({
