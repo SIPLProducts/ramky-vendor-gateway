@@ -43,10 +43,3 @@ for f in $(ls -1 "$MIG_SRC"/*.sql 2>/dev/null | sort); do
 done
 echo "Migrations: applied=$applied skipped=$skipped failed=$failed"
 [[ $failed -eq 0 ]] || { echo "Stopping: migration failures."; exit 1; }
-
-SAP_LOCATION_SEED="${SOURCE_DIR}/scripts/seed-sap-country-region.sql"
-if [[ -f "$SAP_LOCATION_SEED" ]]; then
-  log "Seeding SAP country/region master data"
-  docker compose -f "$BACKEND_DIR/docker-compose.yml" exec -T db \
-    psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$SAP_LOCATION_SEED" >/dev/null
-fi
