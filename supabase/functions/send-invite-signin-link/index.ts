@@ -26,6 +26,15 @@ serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Deprecated for security. This endpoint accepted a client-supplied email and
+  // could send a login credential for an invitation token. The supported flow is
+  // claim-vendor-invite, which sends verification only to the invitation email
+  // stored on the server and then verifies/binds the authenticated user.
+  return new Response(
+    JSON.stringify({ error: "Deprecated invite sign-in flow", code: "deprecated_invite_flow" }),
+    { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+
   try {
     const { token, redirectOrigin, confirmed_email } = await req.json();
     if (!token || typeof token !== "string") {
@@ -175,7 +184,7 @@ serve(async (req: Request) => {
 
     // 6. Resolve company name for the email
     let companyName = "Vendor Portal";
-    let supportEmail = "support@sharviinfotech.com";
+    let supportEmail = "vendxsupport@ramky.com";
     try {
       if (invite.tenant_id) {
         const { data: branding } = await admin
