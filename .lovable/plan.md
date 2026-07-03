@@ -1,49 +1,34 @@
-## Goal
-Make Edit Vendor Registration behave identically to a saved/in-progress registration: every field and every uploaded document that was saved must appear in the form on reopen, and each document must be viewable, downloadable, and replaceable.
+## Problem
 
-## What's already correct
-- `useVendorRegistration.existingFormData` already rebuilds most text fields from the `vendors` row and attaches persisted documents (GST cert, GST self‑declaration, PAN card, MSME cert, MSME self‑declaration, cancelled cheques, financial docs, dealership cert) as `PersistedDocumentFile` placeholders (name + size + `filePath`).
-- `VendorRegistration.tsx` hydrates `formData` from `existingFormData` on `returned_to_vendor` / `returned_to_buyer` and lands the user on Review.
+On the Edit vendor registration flow, Document Verification tabs (GST / PAN / MSME / Bank) hydrate the extracted values into the UI but do NOT show the same "verified" affordances that appear right after successful validation:
 
-## What's broken
-1. **Step 1 (Document Verification) does not receive persisted documents.** The `verifiedData` object built in `VendorRegistration.tsx` (the `useEffect` on `existingFormData`) omits:
-   - `isGstRegistered`, `gstDeclarationReason`, `gstSelfDeclarationFile`
-   - `isMsmeRegistered`, `msmeDeclarationReason`, `msmeSelfDeclarationFile`
-   - `gstCertificateFile`, `panCardFile`, `msmeCertificateFile`, `cancelledChequeFile`, `cancelledChequeFile2`
-   So on reopen: GST=No hides the saved declaration, MSME=No hides the saved declaration, and no GST/PAN/MSME/Bank certificate tile shows the previously uploaded file.
-2. **`DocumentVerificationStep` doesn't seed the `file` slot of each doc tile.** `gstDoc` / `panDoc` / `msmeDoc` / `bankDoc` initial state sets `ocrData` from `initialData` but ignores the corresponding `*File` props (which are already declared on `VerifiedDocumentData`). Tiles render "no file uploaded" even though the DB has one.
-3. **No View / Download for persisted files.** `PersistedDocumentFile` carries `filePath`, but no UI exposes a signed URL. Only `Replace` works today.
-4. **Register step revisits (Organization / Address / Contact / Financial / Infra) rely solely on the initial `setFormData(existingFormData)` snapshot.** They already pick up hydrated values, so text fields are fine — the outstanding gap is only doc‑related (points 1–3). No changes needed to those step components beyond a spot‑check of the declaration‑file props on Organization/Compliance.
+- Green input borders on each field
+- "X is verified" / "matches registry" success text under each field
+- "verified · Xh ago" timestamp on the stage header
 
-## Plan
+Reason: `EditableOcrField` marks a field verified only when the current value equals the corresponding `apiData` (or `apiData.normalized`) value. When we seed `DocState` from `initialData` in `DocumentVerificationStep.tsx`, we set only a partial `apiData` (`{ legalName }`, `{ name }`, etc.) and no `verifiedAt`. PAN already seeds `apiData.normalized` correctly — that's why the PAN screenshot looks right — but GST, MSME, Bank, and Bank2 do not.
 
-### 1. Pass persisted docs into Step 1
-In `src/pages/VendorRegistration.tsx`, extend the `verifiedData` seeded inside the `existingFormData` hydration effect to include, when present in `existingFormData.statutory` / `existingFormData.bank`:
-- `isGstRegistered`, `gstDeclarationReason`, `gstSelfDeclarationFile`
-- `isMsmeRegistered`, `msmeDeclarationReason`, `msmeSelfDeclarationFile`
-- `gstCertificateFile`, `panCardFile`, `msmeCertificateFile`
-- `cancelledChequeFile`, `cancelledChequeFile2` (secondary bank)
+## Fix
 
-### 2. Seed file slots in Document Verification tiles
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`, when initial `DocState` is built for `gstDoc` / `panDoc` / `msmeDoc` / `bankDoc` (and secondary bank), also populate `file`, `fileName`, `fileSize`, and (new) `filePath` from `initialData.gstCertificateFile` / `panCardFile` / `msmeCertificateFile` / `cancelledChequeFile` / `cancelledChequeFile2`. Add `filePath?: string` to the internal `DocState` interface so signed URLs can be generated.
+Edit `src/components/vendor/steps/DocumentVerificationStep.tsx` — only the four `useState<DocState>` initializers for `gstDoc`, `msmeDoc`, `bankDoc`, `bankDoc2`. For each, when `initialData.<section>` exists:
 
-### 3. Add View / Download for persisted files
-In the shared doc‑tile UI inside `DocumentVerificationStep.tsx` (`onReplace` block around lines 3163‑3250), add a View and Download action next to Replace when the doc has a `filePath`. Both call `supabase.storage.from('vendor-documents').createSignedUrl(filePath, 300)` — View opens in a new tab, Download triggers an anchor download. Replace continues to work as today; uploading a new file clears `filePath`.
+1. Build `apiData` to match the shape each verified-field block reads from:
+   - GST → flat keys on `apiData` (`legal_name`, `trade_name`, `gstin`, `constitution_of_business`, `principal_place_of_business`, `gst_status`, `registration_date`, `taxpayer_type`, `jurisdiction_centre`, `jurisdiction_state`, plus a `pan_number` if derivable).
+   - MSME → `apiData.normalized = { udyam_number, enterprise_name, enterprise_type, major_activity }`.
+   - Bank / Bank2 → `apiData.normalized = { account_number, ifsc_code, bank_name, branch_name, account_holder_name }`.
+2. Populate `verifiedAt: Date.now()` so `StageShell` shows the "verified · Xh ago" pill and stage tick.
 
-### 4. Repeat the same View/Download affordance for the other steps' file inputs
-The Organization/Compliance step already receives `gstCertificateFile`, `msmeCertificateFile`, `panCardFile`, `gstSelfDeclarationFile`, `msmeSelfDeclarationFile` via hydrated `formData.statutory`, and Financial receives `dealershipCertificateFile` / `financialDocsFile`, Bank has `cancelledChequeFile`. Where those steps render a file input, show file name + View + Download when the current value is a `PersistedDocumentFile` (has `__persistedDocument === true` and a `filePath`). Introduce a small shared helper component `PersistedFileActions` under `src/components/vendor/` to avoid duplication.
+No other behavior changes: fields stay editable, "Replace" still resets the doc state, and re-verification still overwrites `apiData` with fresh registry values. PAN seeding is already correct — leave it untouched.
 
-### 5. No changes to save/submit path
-Persisted files with no user replacement should continue to skip re-upload — that already works via the `__persistedDocument` check in `saveVendor` (line 278 of the hook). Verify (read only) that clearing a persisted file (Remove) also removes it from `vendor_documents`.
+## Verification
 
-### Technical notes
-- `PersistedDocumentFile` (in `useVendorRegistration.tsx`) already exposes `filePath` — no schema change.
-- Storage bucket `vendor-documents` is private → use `createSignedUrl` (5 min expiry) for both View and Download.
-- Guard signed‑URL calls behind a `useState` loading flag per tile to prevent double clicks.
-- No DB migration, no edge function change.
+1. Open a previously-saved (returned-to-vendor) application → Document Verification → each tab (GST, PAN, MSME, Bank).
+2. Confirm every populated field has the green border, the "…is verified" caption, and the stage header shows "verified · …".
+3. Edit a field → "Edited" badge appears (mismatch state), matches initial-registration behavior.
+4. Click Replace → fields reset as before.
 
-### Files touched
-- `src/pages/VendorRegistration.tsx` — extend `verifiedData` seeding
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — seed `file`/`filePath` in each `DocState`, add View/Download in the shared tile
-- `src/components/vendor/steps/OrganizationStep.tsx`, `ComplianceStep.tsx`, `FinancialInfrastructureStep.tsx`, and the bank sections — wire `PersistedFileActions` next to their file inputs
-- `src/components/vendor/PersistedFileActions.tsx` — new small helper
+## Out of scope
+
+- No changes to save/hydration logic in `useVendorRegistration` or `VendorRegistration.tsx`.
+- No changes to validation APIs or verification pipelines.
+- Feedback popup, invitation flow, and other screens untouched.
