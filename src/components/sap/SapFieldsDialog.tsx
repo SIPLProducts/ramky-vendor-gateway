@@ -576,8 +576,8 @@ export function SapF4MultiSelectField({
   placeholder?: string;
 }) {
   const map = F4_FIELD_MAP[masterType];
-  const isLive = Array.isArray(liveItems);
-  const { data: cachedRows, isLoading } = useSapMasterData(isLive ? undefined : masterType);
+  const isLive = Array.isArray(liveItems) && liveItems.length > 0;
+  const { data: cachedRows, isLoading } = useSapMasterData(masterType);
 
   const options = (() => {
     if (isLive) {
