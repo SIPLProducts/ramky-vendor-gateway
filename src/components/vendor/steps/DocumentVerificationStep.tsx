@@ -25,7 +25,7 @@ import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
-import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
+import { GstFilingStatusTable, normalizeFilingStatus, evaluateGstr1Compliance, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
