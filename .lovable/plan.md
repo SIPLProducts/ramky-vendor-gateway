@@ -1,47 +1,38 @@
 ## Goal
+When a vendor who already submitted clicks **Begin Registration** in the invite email, they should land **directly on the Application Progress screen** — no extra email, no extra click.
 
-Original vendor clicks **Begin Registration** in the invite email → registration form opens directly (no email-confirmation step). Any forwarded / copied / re-clicked link → **Access Denied**.
+## Current behavior
+`claim-vendor-invite` marks the invite as used on the first click. On a second click, if the browser has no matching Supabase session (they closed the tab, switched devices, etc.), the function returns `denied / already_used` and the vendor sees the red **Access Denied** card.
 
-## Current state
+## Proposed change
 
-The flow already matches this behavior end-to-end:
+### 1. Edge function `claim-vendor-invite` — allow original vendor to re-enter
+Inside the existing `if (invite.used_at)` block, add a new branch **before** the "denied" fallback:
 
-- Invite email button → `/vendor/invite?token=<token>` (`VendorInviteAccept.tsx`).
-- That page auto-invokes the `claim-vendor-invite` edge function on mount — no user interaction, no confirm-email screen.
-- `claim-vendor-invite` performs an **atomic first-click claim**:
-  1. Looks up the invitation by token.
-  2. If unused → provisions/updates the invited auth user, stamps `used_at + user_id` in a single `UPDATE ... WHERE used_at IS NULL`, signs the vendor in, returns the session, and redirects to `/vendor/registration?token=...`.
-  3. If already used by someone else (forwarded/copied) → returns `status: denied`, `VendorInviteAccept` shows the **Access Denied** card.
-  4. Only the same signed-in vendor (matching `user_id` or invited email) can reopen a claimed invite.
-- All reuse attempts are logged to `invitation_email_events` as `reuse_attempt`.
+- If `invite.user_id` is set (the auth user we provisioned on first claim) and its email equals `invite.email`, sign that user back in using the stored invite password (`${token}:${invite.id}`) and return `status: 'claimed'` with the fresh session and `redirect: /vendor/registration?token=...`.
+- Log the event as `reopen` in `invitation_email_events` (separate from `reuse_attempt`) so we still audit every re-click.
+- The prefetch guard and non-POST rejection stay in place, so mail scanners cannot trigger this branch.
+- The existing `already_claimed_same_user` shortcut (caller already signed in as invited user) still runs first, so no extra work when the session is already valid.
 
-So the requested behavior is already implemented. The plan below only tightens loose ends and documents the one residual risk.
+### 2. Front-end `VendorInviteAccept.tsx`
+No new UI phase. Existing `status: 'claimed'` handler already:
+- Calls `supabase.auth.setSession(...)`
+- Navigates to `/vendor/registration?token=...`
 
-## Changes
+That page already renders the **read-only Application Progress / status tracker** for submitted vendors, so the vendor immediately sees their approval status.
 
-1. **Remove dead legacy code** — `src/App.tsx` still imports `VendorRegisterWithInvite` but no route uses it. Delete the import and delete `src/pages/VendorRegisterWithInvite.tsx` so no stale confirmation-based flow can be linked to by accident.
-2. **Make the Access Denied page copy match the spec** in `src/pages/VendorInviteAccept.tsx`: explicitly say "This invitation was already opened by another device/recipient. If you are the intended vendor, please contact <support>." (Current copy is close; adjust wording only.)
-3. **Harden the claim endpoint against non-human prefetch**:
-   - Reject `GET` / `HEAD` on `claim-vendor-invite` (already POST-only via `functions.invoke`, but add an explicit method guard so any accidental preflight scanner request is a no-op).
-   - Add a lightweight bot/prefetch heuristic: skip the claim (return `status: 'pending'`) when the request carries headers commonly set by mail-security scanners (`X-MS-Exchange-Organization-*`, `X-Barracuda-*`, `X-Proofpoint-*`, or `User-Agent` containing `bot|crawler|preview|scanner|linkcheck`). `VendorInviteAccept` will retry the claim from the real browser click.
-4. **Document the residual risk** in `email.md`: aggressive corporate mail scanners that fully execute JS in a real browser context can still consume an invite. Mitigation (short TTL + admin re-issue) is already in place; no code change required beyond (3).
+### 3. Routing check
+Confirm `/vendor/registration` shows the progress tracker (not an editable form) whenever the vendor's status is `submitted / *_review / approved / rejected`. This is already the behavior (RegistrationStatusTracker + gating we set earlier); no route change required.
 
-## Out of scope
+## Files to change
+- `supabase/functions/claim-vendor-invite/index.ts` — add the "re-open" branch inside the already-used block; log `reopen` audit event.
+- No frontend changes required.
 
-- No new confirmation UI, OTP, or email-match prompt for the original vendor.
-- No changes to the registration form, application-progress screen, or approval flow.
-- No changes to `send-vendor-invitation` template or link format.
+## Security trade-off (please confirm)
+Because the sign-in is triggered by possession of the invite link, **anyone the vendor forwards the link to after submission could also land on the Application Progress screen** (and, since it signs them in as the vendor, into the vendor account itself). Options:
 
-## Technical notes
+- **A — Ship as planned above:** smoothest UX, matches your request, but forwarded recipients regain access post-submission.
+- **B — Restrict re-open to progress-only, read-only URL:** sign in a limited "viewer" session that can only read this one vendor's status page. More work; still link-holder based.
+- **C — Keep magic-link (previous plan):** email a fresh sign-in link to the invited mailbox on re-click. One extra click for the vendor, but forwarded holders cannot open it.
 
-- Edge function: `supabase/functions/claim-vendor-invite/index.ts` — add method guard + prefetch header check at the top of `Deno.serve`.
-- Frontend: `src/pages/VendorInviteAccept.tsx` — handle a new `status: 'pending'` response by re-invoking the claim after a small delay / on visible user gesture (retain current UX: still no explicit button unless the prefetch heuristic fires).
-- Cleanup: delete `src/pages/VendorRegisterWithInvite.tsx`, remove its import from `src/App.tsx`.
-
-## Verification
-
-1. Fresh invite → click from real browser → land on registration form, signed in, `used_at` stamped.
-2. Forward same email → recipient clicks → **Access Denied** card; `invitation_email_events` row with `reuse_attempt`.
-3. Copy the URL to an incognito window → **Access Denied**.
-4. Original vendor re-opens their inbox link after submitting → allowed (already-claimed-same-user branch).
-5. Simulated scanner UA (`curl -A "Mimecast-Link-Preview"`) hitting `/vendor/invite?token=...` → no claim written; real browser click after still succeeds.
+Default in this plan is **A**. Reply with B or C if you want the safer variant instead.
