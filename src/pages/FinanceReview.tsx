@@ -389,6 +389,8 @@ export default function FinanceReview() {
                     <CardContent className="text-sm space-y-3">
                       <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">GSTIN</span><span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.gstin || 'N/A'}</span></div>
                       <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">PAN</span><span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.pan || 'N/A'}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">PAN Status</span><span>{formatPanStatus((selectedVendor as any).pan_status)}</span></div>
+                      <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Is Aadhaar Linked</span><span>{formatAadhaarLinked((selectedVendor as any).pan_aadhaar_linked)}</span></div>
                       <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Entity Type</span><span>{selectedVendor.entity_type || 'N/A'}</span></div>
                       {selectedVendor.msme_number && (
                         <>
