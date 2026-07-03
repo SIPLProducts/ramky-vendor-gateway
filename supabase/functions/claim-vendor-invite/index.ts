@@ -49,9 +49,17 @@ async function findUserByEmail(admin: ReturnType<typeof createClient>, email: st
 }
 
 async function ensureVendorAccount(admin: ReturnType<typeof createClient>, userId: string, email: string): Promise<void> {
-  await admin
+  const { data: profileRow } = await admin
     .from('profiles')
-    .upsert({ id: userId, email, full_name: null, status: 'active' }, { onConflict: 'id' });
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!profileRow) {
+    await admin
+      .from('profiles')
+      .insert({ id: userId, email, full_name: null, status: 'active' });
+  }
 
   const { data: roleRow } = await admin
     .from('user_roles')
