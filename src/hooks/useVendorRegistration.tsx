@@ -1031,7 +1031,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (code === 'AUTH_REQUIRED') {
         toast({
           title: 'Session expired',
-          description: 'Please sign in again to continue your registration.',
+          description: 'Please reopen the invitation link to continue your registration.',
           variant: 'destructive',
         });
         const token = options?.invitationToken;
@@ -1226,7 +1226,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (code === 'AUTH_REQUIRED') {
         toast({
           title: 'Session expired',
-          description: 'Please sign in again to submit your registration.',
+          description: 'Please reopen the invitation link to submit your registration.',
           variant: 'destructive',
         });
         const token = options?.invitationToken;
