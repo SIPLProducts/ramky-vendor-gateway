@@ -440,6 +440,31 @@ export default function VendorRegistration() {
           return;
         }
 
+        // Server-side authorization is the source of truth. It binds the
+        // invitation to the verified invited mailbox on first successful access
+        // and rejects any later access from a different auth user/session.
+        const { data: claimData, error: claimAccessError } = await supabase.functions.invoke('claim-vendor-invite', {
+          body: { token, redirectOrigin: window.location.origin, attempt: 2 },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const claimStatus = (claimData as any)?.status;
+        if (claimAccessError && !claimStatus) {
+          console.error('Invitation access verification failed:', claimAccessError);
+          setTokenError('We could not verify your invitation access right now. Please reopen the invitation link.');
+          setIsValidatingToken(false);
+          return;
+        }
+        if (claimStatus === 'denied') {
+          setTokenError('Access Denied. This invitation belongs to the originally invited vendor only.');
+          setIsValidatingToken(false);
+          return;
+        }
+        if (claimStatus !== 'verified' && claimStatus !== 'already_claimed_same_user') {
+          setTokenError((claimData as any)?.message || 'Access Denied. Please reopen the invitation link from the invited mailbox.');
+          setIsValidatingToken(false);
+          return;
+        }
+
         // Check if authenticated user already has a vendor record
         if (session) {
           const { data: existingVendorRecord } = await supabase
@@ -452,7 +477,7 @@ export default function VendorRegistration() {
 
           if (existingVendorRecord) {
             // Editable statuses: vendor can continue/edit the same application.
-            const EDITABLE = ['draft', 'returned_to_vendor', 'validation_failed', 'finance_rejected'];
+            const EDITABLE = ['draft', 'returned_to_vendor', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
             if (EDITABLE.includes(existingVendorRecord.status as string)) {
               console.log('[Token] Editable vendor record found - allowing form editing', existingVendorRecord.status);
               setInvitationToken(token);
