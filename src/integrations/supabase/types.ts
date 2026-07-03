@@ -2058,12 +2058,14 @@ export type Database = {
           swift_iban_code: string | null
           tenant_id: string | null
           terms_accepted: boolean | null
+          tier_category: string[]
           trade_name: string | null
           turnover_year1: number | null
           turnover_year2: number | null
           turnover_year3: number | null
           updated_at: string
           user_id: string | null
+          vendor_cashflow: string[]
           vendor_categories: string[]
           vendor_category: string | null
           vendor_location: string | null
@@ -2255,12 +2257,14 @@ export type Database = {
           swift_iban_code?: string | null
           tenant_id?: string | null
           terms_accepted?: boolean | null
+          tier_category?: string[]
           trade_name?: string | null
           turnover_year1?: number | null
           turnover_year2?: number | null
           turnover_year3?: number | null
           updated_at?: string
           user_id?: string | null
+          vendor_cashflow?: string[]
           vendor_categories?: string[]
           vendor_category?: string | null
           vendor_location?: string | null
@@ -2452,12 +2456,14 @@ export type Database = {
           swift_iban_code?: string | null
           tenant_id?: string | null
           terms_accepted?: boolean | null
+          tier_category?: string[]
           trade_name?: string | null
           turnover_year1?: number | null
           turnover_year2?: number | null
           turnover_year3?: number | null
           updated_at?: string
           user_id?: string | null
+          vendor_cashflow?: string[]
           vendor_categories?: string[]
           vendor_category?: string | null
           vendor_location?: string | null
