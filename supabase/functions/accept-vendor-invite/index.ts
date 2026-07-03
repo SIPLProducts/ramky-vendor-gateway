@@ -16,6 +16,19 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Deprecated for security: this endpoint used to return a Supabase magic-link
+  // credential to whoever possessed the invitation token. That made forwarded
+  // invitation emails usable by unauthorized recipients. The active flow is
+  // claim-vendor-invite, which sends the auth link only to the originally
+  // invited mailbox and then binds access to that verified auth user.
+  return new Response(
+    JSON.stringify({
+      error: 'Deprecated invite flow. Please open /vendor/invite?token=... instead.',
+      code: 'deprecated_invite_flow',
+    }),
+    { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  );
+
   try {
     const { token, redirectOrigin } = await req.json();
     if (!token || typeof token !== 'string') {
