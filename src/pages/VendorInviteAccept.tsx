@@ -152,8 +152,9 @@ export default function VendorInviteAccept() {
                 </div>
                 <CardTitle className="text-2xl text-destructive">Access Denied</CardTitle>
                 <CardDescription className="pt-2">
-                  This invitation link has already been used or cannot be opened by this account.
-                  Only the originally invited vendor can access it.
+                  This invitation was already opened by another device or recipient.
+                  For security, only the originally invited vendor can use this link.
+                  If you are the intended vendor, please contact support to request a fresh invitation.
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center">
