@@ -332,6 +332,10 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                   </div>
                 </div>
               )}
+              {!regionsFetching && !regionsError && usingCachedRegions && (
+                <p className="text-[11px] text-muted-foreground">Using cached SAP values.</p>
+              )}
+              )}
             </div>
           </div>
 
