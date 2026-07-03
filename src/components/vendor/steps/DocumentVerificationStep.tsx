@@ -1307,8 +1307,10 @@ export function DocumentVerificationStep({
       const rows = normalizeFilingStatus(filingSrc);
       setGstFilingRows(rows);
       setGstFilingChecked(true);
-      const filed = rows.length ? isLatestPeriodFiled(rows) : false;
-      setGstLatestFiled(filed);
+      const evalRes = rows.length
+        ? evaluateGstr1Compliance(rows)
+        : { previousMonthFiled: false, declarationRequired: false, checkedPeriod: "" };
+      setGstCompliance(evalRes);
       // Persist the filing status onto the vendor_validations GST row so the
       // View Details "GST Compliance Report" popup can render the real table.
       if (vendorId) {
@@ -1318,11 +1320,16 @@ export function DocumentVerificationStep({
             .delete()
             .eq("vendor_id", vendorId)
             .eq("validation_type", "gst");
+          const msg = evalRes.previousMonthFiled
+            ? `GST verified — GSTR1 filed for ${evalRes.checkedPeriod}`
+            : evalRes.declarationRequired
+              ? `GST verified — GSTR1 for ${evalRes.checkedPeriod} not filed (declaration required)`
+              : `GST verified — GSTR1 for ${evalRes.checkedPeriod} not yet filed (within grace period, due 11th)`;
           await supabase.from("vendor_validations").insert({
             vendor_id: vendorId,
             validation_type: "gst",
             status: "passed",
-            message: filed ? "GST verified — filing compliant" : "GST verified — latest month not filed",
+            message: msg,
             details: { ...baseGstData, filing_status: filingSrc },
           });
         } catch (err) {
