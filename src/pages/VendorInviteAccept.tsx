@@ -107,12 +107,24 @@ export default function VendorInviteAccept() {
             return;
           }
 
-          if (status === 'verification_sent') {
-            setVerificationInfo({
-              maskedEmail: d.masked_email,
-              sendsRemaining: typeof d.sends_remaining === 'number' ? d.sends_remaining : undefined,
+          if (status === 'signin_ready' && d.token_hash) {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+              token_hash: d.token_hash,
+              type: (d.otp_type || 'magiclink') as any,
             });
-            setPhase('verification_sent');
+            if (verifyError) {
+              setErrorDetails({
+                message: 'We could not sign you in from this invitation.',
+                code: 'verify_otp_failed',
+                raw: verifyError.message,
+              });
+              setPhase('error');
+              return;
+            }
+            setPhase('redirecting');
+            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
+              replace: true,
+            });
             return;
           }
 
