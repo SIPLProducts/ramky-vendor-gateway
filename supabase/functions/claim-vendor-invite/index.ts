@@ -273,17 +273,66 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Diagnostics: GET returns env-presence so we can confirm deployment on self-hosted.
+  // Diagnostics: GET returns env-presence, SMTP availability, and (optionally)
+  // whether an auth user exists / generateLink succeeds for a probe email.
+  //   GET .../claim-vendor-invite                       -> env + smtp check
+  //   GET .../claim-vendor-invite?probe=1&email=x@y.z   -> full preflight
   if (req.method === 'GET') {
-    return json(200, {
+    const url = new URL(req.url);
+    const probe = url.searchParams.get('probe') === '1';
+    const probeEmail = (url.searchParams.get('email') || '').toLowerCase().trim();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const result: Record<string, unknown> = {
       ok: true,
       env_ok: {
-        SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
-        SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+        SUPABASE_URL: !!supabaseUrl,
+        SUPABASE_SERVICE_ROLE_KEY: !!serviceRoleKey,
         SUPABASE_ANON_KEY: !!Deno.env.get('SUPABASE_ANON_KEY'),
       },
       time: new Date().toISOString(),
-    });
+    };
+    if (supabaseUrl && serviceRoleKey) {
+      const admin = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      try {
+        const { data: smtpCfg, error: smtpErr } = await admin
+          .from('smtp_email_configs')
+          .select('id, smtp_host, is_active, app_password')
+          .eq('is_active', true)
+          .not('app_password', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        result.smtp = smtpErr
+          ? { ok: false, error: smtpErr.message }
+          : { ok: !!smtpCfg?.app_password, host: smtpCfg?.smtp_host || null };
+      } catch (e) {
+        result.smtp = { ok: false, error: (e as Error)?.message || String(e) };
+      }
+      if (probe && probeEmail) {
+        try {
+          const uid = await findUserByEmail(admin, probeEmail);
+          result.user = { exists: !!uid };
+        } catch (e) {
+          result.user = { exists: false, error: (e as Error)?.message || String(e) };
+        }
+        try {
+          const origin = url.origin;
+          const { data, error } = await admin.auth.admin.generateLink({
+            type: 'magiclink',
+            email: probeEmail,
+            options: { redirectTo: `${origin}/vendor/invite/callback?token=probe` },
+          });
+          result.generateLink = error
+            ? { ok: false, error: error.message }
+            : { ok: !!data?.properties?.action_link };
+        } catch (e) {
+          result.generateLink = { ok: false, error: (e as Error)?.message || String(e) };
+        }
+      }
+    }
+    return json(200, result);
   }
 
   if (req.method !== 'POST') {
