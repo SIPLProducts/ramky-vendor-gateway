@@ -1,53 +1,66 @@
-## Plan: Secure vendor invitation access
 
-### Goal
-Allow the invited vendor to click **Begin Registration** and continue normally, while preventing forwarded/copied links from opening the registration for unauthorized people.
+## Goal
 
-### Root cause to fix
-The current invitation token acts like a login credential. The edge function creates/signs in the invited account using only the URL token, so whoever clicks the forwarded link first can become the vendor session.
+Keep the "secondary email verification" security model (chosen in the last question), but fix the current situation where clicking **Begin Registration** in the invite email shows *"Unable to open invitation"* instead of sending the verification email to the vendor's mailbox.
 
-### Secure workflow to implement
-1. **Begin Registration link opens invite page**
-   - Keep `/vendor/invite?token=...` as the email entry point.
-   - Validate the token and invitation status.
+## What the vendor should see (unchanged UX contract)
 
-2. **Silent email ownership check for first-time access**
-   - The invite page will trigger the backend to send a short-lived one-time OTP/magic verification to the originally invited email.
-   - The page will show a simple “Check your email to continue” screen.
-   - This avoids asking the user to type email again, but proves they control the invited mailbox.
+1. Vendor clicks **Begin Registration** in the buyer's email.
+2. Page loads `/vendor/invite?token=…` and shows **"Verification email sent to v•••r@domain.com"**.
+3. Vendor opens that second email and clicks **Open Registration** → lands on the registration form, signed in.
+4. Anyone whose email doesn't match sees **Access Denied**.
 
-3. **Authorized vendor opens form directly after verification**
-   - After the OTP/magic verification succeeds, the app will create/restore the vendor session and navigate to `/vendor/registration?token=...`.
-   - Existing form autosave, submit, status tracking, and edit-on-return behavior stays unchanged.
+Today step 2 is failing with a generic error on the self-hosted instance (206.1.23.95:9009).
 
-4. **Forwarded/copied link is denied**
-   - A forwarded recipient can open the public invite URL, but cannot complete verification because the OTP goes only to the originally invited email.
-   - If the invitation is already bound to another user/session, show **Access Denied**.
+## Root cause investigation
 
-5. **Submitted vendors can reopen progress**
-   - If the original vendor clicks the same invitation later, the same email-ownership check/session restoration will let them view Application Progress.
-   - If the application is sent back by Buyer, the existing editable statuses will continue to show the form for editing.
+The `claim-vendor-invite` edge function fails silently at one of three points and returns codes like `verification_send_failed` / `provision_failed` without telling the user which step:
 
-6. **Fix current `provision_failed` issue**
-   - Remove the fragile “find user by first 200 auth users” dependency.
-   - Provision/recover the invited auth user using a safer backend flow and return detailed error codes when something fails.
+1. **SMTP lookup** — requires an `is_active=true` row with a non-null `app_password` in `smtp_email_configs`. If none exists on this environment, the send throws "No active SMTP configuration found".
+2. **`auth.admin.generateLink`** — on self-hosted, this can 500 if the auth user doesn't yet exist for that email. Current code creates the user only best-effort and swallows errors.
+3. **Action link rewriting** — the code rewrites the Supabase action link to the app origin and prefixes `/supabase/auth/v1/…`. If the self-hosted deployment doesn't proxy `/supabase/*` back to GoTrue, the emailed link 404s (a different failure mode, but worth verifying).
 
-### Files/areas to change
-- `supabase/functions/claim-vendor-invite/index.ts`
-  - Stop signing in users based only on the invite token.
-  - Add/adjust backend logic to send verification only to the invited email and bind the invitation to the verified user.
-  - Keep reopen behavior for the same verified vendor.
+## Plan
 
-- `src/pages/VendorInviteAccept.tsx`
-  - Replace automatic token-login with a verification-pending flow.
-  - Handle verified session, denied, expired, invalid, and backend error states cleanly.
+### 1. Add a preflight diagnostics endpoint (already partly there)
+Extend the existing `GET` handler on `claim-vendor-invite` to also report:
+- Whether an active SMTP config exists.
+- Whether `auth.admin.generateLink` succeeds for a probe email.
+- Whether an auth user exists for a given `?email=` query param.
 
-- `src/pages/VendorInviteCallback.tsx` if needed
-  - Ensure callback returns to `/vendor/registration?token=...` after email verification.
+This lets us hit `GET /functions/v1/claim-vendor-invite?probe=1&email=…` from the browser and see the exact broken subsystem on 206.1.23.95:9009.
 
-- Database migration if needed
-  - Add safe invite binding fields such as claim/verification timestamps if missing.
-  - Preserve existing invitation/vendor relationships.
+### 2. Harden the POST path
 
-### Important limitation
-No system can identify “the original person” from a forwarded link alone without proving mailbox ownership, because the URL itself is shareable. The secure way is to send the login/verification only to the originally invited email and deny anyone who cannot access that mailbox.
+In `supabase/functions/claim-vendor-invite/index.ts`:
+- Make user provisioning **required, not best-effort**. If `findUserByEmail` returns null AND `createUser` fails with anything other than "already registered", return `{code: 'provision_failed', message: <real reason>}` so the UI shows it.
+- Wrap `generateLink` in its own try/catch and return `{code: 'generate_link_failed', message}` distinctly from `verification_send_failed` (SMTP).
+- Wrap the SMTP transport step and return `{code: 'smtp_send_failed', message}` with the nodemailer error text.
+- If no active `smtp_email_configs` row exists, return `{code: 'smtp_not_configured'}` with a human message pointing admins to the SMTP settings screen.
+
+### 3. Fix the action-link origin rewrite
+
+Only rewrite `action_link` to the app origin when `SUPABASE_URL` points at an internal/private host (i.e. the same origin as the app). On self-hosted where GoTrue lives at a different public host, leave the link pointing at the real GoTrue URL so the magic link actually resolves. Detect by comparing `new URL(supabaseUrl).host` to `new URL(redirectOrigin).host` and only prepend `/supabase` when they match.
+
+### 4. Surface the specific error in the UI
+
+`src/pages/VendorInviteAccept.tsx` already displays `code` / `raw`. Add friendly messages for the new codes:
+
+| code | Message to vendor |
+|---|---|
+| `smtp_not_configured` | "Email service isn't configured yet. Please contact vendxsupport@ramky.com." |
+| `smtp_send_failed` | "We couldn't send the verification email. Please contact support." |
+| `generate_link_failed` | "We couldn't generate your secure link. Please contact support." |
+| `provision_failed` | "We couldn't prepare your account. Please contact support." |
+
+The technical `code` + `raw` box stays visible so support can act on it.
+
+### 5. Verify
+
+- Deploy the function.
+- Call `GET …/claim-vendor-invite?probe=1&email=<invited-address>` from the browser on 206.1.23.95:9009 and confirm SMTP + generateLink both report OK.
+- Re-send an invitation, click Begin Registration, confirm we now either (a) reach the *Verification email sent* screen, or (b) see the exact failing subsystem in the error card.
+
+## Out of scope
+- No change to the security model — forwarded recipients still cannot access the form.
+- No change to buyer, approval, or registration UI.
