@@ -156,6 +156,99 @@ async function findUserByEmail(admin: ReturnType<typeof createClient>, email: st
   return null;
 }
 
+class StepError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+async function provisionUser(
+  admin: ReturnType<typeof createClient>,
+  invitedEmail: string,
+  inviteId: string,
+): Promise<void> {
+  try {
+    const existingUserId = await findUserByEmail(admin, invitedEmail);
+    if (existingUserId) return;
+    const { error: createErr } = await admin.auth.admin.createUser({
+      email: invitedEmail,
+      password: crypto.randomUUID() + 'Aa1!',
+      email_confirm: true,
+      user_metadata: { invited_via: 'vendor_invitation', invitation_id: inviteId },
+    });
+    if (createErr && !`${createErr.message}`.toLowerCase().includes('already')) {
+      throw new StepError('provision_failed', createErr.message);
+    }
+  } catch (e) {
+    if (e instanceof StepError) throw e;
+    throw new StepError('provision_failed', (e as Error)?.message || String(e));
+  }
+}
+
+async function generateVerificationLink(
+  admin: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  invitedEmail: string,
+  token: string,
+  redirectOrigin: string,
+): Promise<string> {
+  const origin = String(redirectOrigin || '').replace(/\/+$/, '');
+  if (!origin) throw new StepError('invalid_origin', 'Missing redirect origin');
+
+  const redirectTo = `${origin}/vendor/invite/callback?token=${encodeURIComponent(token)}`;
+  let linkData: any;
+  try {
+    const result = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: invitedEmail,
+      options: { redirectTo },
+    });
+    if (result.error || !result.data?.properties?.action_link) {
+      throw new StepError('generate_link_failed', result.error?.message || 'No action_link returned');
+    }
+    linkData = result.data;
+  } catch (e) {
+    if (e instanceof StepError) throw e;
+    throw new StepError('generate_link_failed', (e as Error)?.message || String(e));
+  }
+
+  let actionLink = linkData.properties.action_link as string;
+  // Only rewrite the action link's host to the app origin when Supabase auth is
+  // served under the same host as the app (managed Cloud / same-origin proxy).
+  // On self-hosted deployments where GoTrue lives at a different public host,
+  // leaving the original action_link ensures the magic link actually resolves.
+  try {
+    const actionUrl = new URL(actionLink);
+    const originUrl = new URL(origin);
+    let supabaseHost = '';
+    try { supabaseHost = new URL(supabaseUrl).host; } catch { /* ignore */ }
+
+    const sameOrigin = supabaseHost && originUrl.host === supabaseHost;
+    if (sameOrigin) {
+      actionUrl.protocol = originUrl.protocol;
+      actionUrl.host = originUrl.host;
+      if (actionUrl.pathname.startsWith('/auth/v1/')) {
+        actionUrl.pathname = '/supabase' + actionUrl.pathname;
+      }
+      const rt = actionUrl.searchParams.get('redirect_to');
+      if (rt) {
+        try {
+          const rtUrl = new URL(rt);
+          rtUrl.protocol = originUrl.protocol;
+          rtUrl.host = originUrl.host;
+          actionUrl.searchParams.set('redirect_to', rtUrl.toString());
+        } catch { /* ignore */ }
+      }
+      actionLink = actionUrl.toString();
+    }
+  } catch (e) {
+    console.warn('verification action link normalization failed:', e);
+  }
+  return actionLink;
+}
+
 async function sendInviteAccessVerification(
   admin: ReturnType<typeof createClient>,
   supabaseUrl: string,
@@ -164,63 +257,15 @@ async function sendInviteAccessVerification(
   redirectOrigin: string,
 ) {
   const invitedEmail = String(invite.email || '').toLowerCase();
-  const origin = String(redirectOrigin || '').replace(/\/+$/, '');
-  if (!origin) throw new Error('Missing redirect origin');
-
-  // Best-effort provisioning. If the user already exists, generateLink can still
-  // create the login link; we do not need to discover the auth user id here.
+  await provisionUser(admin, invitedEmail, invite.id);
+  const actionLink = await generateVerificationLink(admin, supabaseUrl, invitedEmail, token, redirectOrigin);
   try {
-    const existingUserId = await findUserByEmail(admin, invitedEmail);
-    if (!existingUserId) {
-      const { error: createErr } = await admin.auth.admin.createUser({
-        email: invitedEmail,
-        password: crypto.randomUUID() + 'Aa1!',
-        email_confirm: true,
-        user_metadata: { invited_via: 'vendor_invitation', invitation_id: invite.id },
-      });
-      if (createErr && !`${createErr.message}`.toLowerCase().includes('already')) {
-        throw createErr;
-      }
-    }
+    await sendVerificationEmail(admin, invite, actionLink);
   } catch (e) {
-    console.warn('best-effort user provisioning failed:', e);
+    const msg = (e as Error)?.message || String(e);
+    const code = /no active smtp/i.test(msg) ? 'smtp_not_configured' : 'smtp_send_failed';
+    throw new StepError(code, msg);
   }
-
-  const redirectTo = `${origin}/vendor/invite/callback?token=${encodeURIComponent(token)}`;
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: invitedEmail,
-    options: { redirectTo },
-  });
-
-  if (linkErr || !linkData?.properties?.action_link) {
-    throw new Error(linkErr?.message || 'Could not create verification link');
-  }
-
-  let actionLink = linkData.properties.action_link as string;
-  try {
-    const actionUrl = new URL(actionLink);
-    const originUrl = new URL(origin);
-    actionUrl.protocol = originUrl.protocol;
-    actionUrl.host = originUrl.host;
-    if (actionUrl.pathname.startsWith('/auth/v1/')) {
-      actionUrl.pathname = '/supabase' + actionUrl.pathname;
-    }
-    const rt = actionUrl.searchParams.get('redirect_to');
-    if (rt) {
-      try {
-        const rtUrl = new URL(rt);
-        rtUrl.protocol = originUrl.protocol;
-        rtUrl.host = originUrl.host;
-        actionUrl.searchParams.set('redirect_to', rtUrl.toString());
-      } catch { /* ignore */ }
-    }
-    actionLink = actionUrl.toString();
-  } catch (e) {
-    console.warn('verification action link normalization failed:', e);
-  }
-
-  await sendVerificationEmail(admin, invite, actionLink);
 }
 
 Deno.serve(async (req) => {
