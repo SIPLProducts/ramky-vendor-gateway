@@ -326,12 +326,18 @@ export async function buildSapPayload(
     IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
       : (toArr((vendor as any).identification_sources).length ? toArr((vendor as any).identification_sources)
       : toArr((vendor as any).identification_source)),
+    CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+      : toArr((vendor as any).vendor_cashflow),
+    TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+      : toArr((vendor as any).tier_category),
   };
   const classifyCtx = {
     MGV: classifyArrays.MGV[0] || "",
     CATV: classifyArrays.CATV[0] || "",
     LOCV: classifyArrays.LOCV[0] || "",
     IDS: classifyArrays.IDS[0] || "",
+    CASH: classifyArrays.CASH[0] || "",
+    TIER: classifyArrays.TIER[0] || "",
   };
 
   const isMsme = !!vendorForPayload.msme_number;
