@@ -3,11 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, ShieldCheck, Ban, Copy, MailCheck } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldCheck, Ban, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
-type Phase = 'loading' | 'redirecting' | 'verification_sent' | 'denied' | 'error';
+type Phase = 'loading' | 'redirecting' | 'denied' | 'error';
 
 interface ErrorDetails {
   message: string;
@@ -23,7 +23,7 @@ export default function VendorInviteAccept() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
-  const [verificationInfo, setVerificationInfo] = useState<{ maskedEmail?: string; sendsRemaining?: number } | null>(null);
+  
   const [attemptKey, setAttemptKey] = useState(0);
   const ranRef = useRef(false);
 
@@ -107,12 +107,24 @@ export default function VendorInviteAccept() {
             return;
           }
 
-          if (status === 'verification_sent') {
-            setVerificationInfo({
-              maskedEmail: d.masked_email,
-              sendsRemaining: typeof d.sends_remaining === 'number' ? d.sends_remaining : undefined,
+          if (status === 'signin_ready' && d.token_hash) {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+              token_hash: d.token_hash,
+              type: (d.otp_type || 'magiclink') as any,
             });
-            setPhase('verification_sent');
+            if (verifyError) {
+              setErrorDetails({
+                message: 'We could not sign you in from this invitation.',
+                code: 'verify_otp_failed',
+                raw: verifyError.message,
+              });
+              setPhase('error');
+              return;
+            }
+            setPhase('redirecting');
+            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
+              replace: true,
+            });
             return;
           }
 
@@ -235,34 +247,6 @@ export default function VendorInviteAccept() {
             </>
           )}
 
-          {phase === 'verification_sent' && (
-            <>
-              <CardHeader className="text-center">
-                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
-                  <MailCheck className="h-7 w-7 text-primary" />
-                </div>
-                <CardTitle className="text-2xl">Verification email sent</CardTitle>
-                <CardDescription className="pt-2">
-                  For security, the registration can only be opened from the originally invited mailbox
-                  {verificationInfo?.maskedEmail ? <> ({verificationInfo.maskedEmail})</> : null}.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  If you are the invited vendor, please open the latest email and click <strong>Open Registration</strong>.
-                  If this invitation was forwarded, you will not receive that verification email and cannot access the form.
-                </p>
-                {typeof verificationInfo?.sendsRemaining === 'number' && (
-                  <p className="text-xs text-muted-foreground">
-                    Verification sends remaining this hour: {verificationInfo.sendsRemaining}
-                  </p>
-                )}
-                <Button size="sm" variant="outline" onClick={() => setAttemptKey((k) => k + 1)}>
-                  Resend verification
-                </Button>
-              </CardContent>
-            </>
-          )}
 
           {phase === 'error' && errorDetails && (
             <>

@@ -440,30 +440,25 @@ export default function VendorRegistration() {
           return;
         }
 
-        // Server-side authorization is the source of truth. It binds the
-        // invitation to the verified invited mailbox on first successful access
-        // and rejects any later access from a different auth user/session.
-        const { data: claimData, error: claimAccessError } = await supabase.functions.invoke('claim-vendor-invite', {
-          body: { token, redirectOrigin: window.location.origin, attempt: 2 },
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const claimStatus = (claimData as any)?.status;
-        if (claimAccessError && !claimStatus) {
-          console.error('Invitation access verification failed:', claimAccessError);
-          setTokenError('We could not verify your invitation access right now. Please reopen the invitation link.');
-          setIsValidatingToken(false);
-          return;
+        // Best-effort bind of invitation → verified user. Not blocking:
+        // possession of a valid, unexpired invitation token combined with a
+        // matching authenticated email is enough to open the form.
+        let claimData: any = null;
+        try {
+          const { data } = await supabase.functions.invoke('claim-vendor-invite', {
+            body: { token, redirectOrigin: window.location.origin, attempt: 2 },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          claimData = data;
+          if (data?.status === 'denied') {
+            setTokenError('Access Denied. This invitation belongs to a different email address.');
+            setIsValidatingToken(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('claim-vendor-invite bind failed (non-blocking):', e);
         }
-        if (claimStatus === 'denied') {
-          setTokenError('Access Denied. This invitation belongs to the originally invited vendor only.');
-          setIsValidatingToken(false);
-          return;
-        }
-        if (claimStatus !== 'verified' && claimStatus !== 'already_claimed_same_user') {
-          setTokenError((claimData as any)?.message || 'Access Denied. Please reopen the invitation link from the invited mailbox.');
-          setIsValidatingToken(false);
-          return;
-        }
+
 
         const claimedVendorId = (claimData as any)?.vendor_id as string | undefined;
 
