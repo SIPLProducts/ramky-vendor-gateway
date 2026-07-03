@@ -266,15 +266,11 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {regionsForCountry.map((r) => {
-                          const extra = (r.extra || {}) as Record<string, unknown>;
-                          const bland = (extra.BLAND as string | undefined) ?? r.code;
-                          return (
-                            <SelectItem key={r.id} value={bland}>
-                              {bland}{r.description ? ` — ${r.description}` : ''}
-                            </SelectItem>
-                          );
-                        })}
+                        {regionsForCountry.map((r) => (
+                          <SelectItem key={r.id} value={r.code}>
+                            {r.code}{r.desc ? ` — ${r.desc}` : ''}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   );
