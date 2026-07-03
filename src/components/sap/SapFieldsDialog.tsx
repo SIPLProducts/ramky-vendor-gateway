@@ -376,6 +376,8 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
       CATV: Array.isArray(v.vendor_categories) ? v.vendor_categories : [],
       LOCV: Array.isArray(v.vendor_locations) ? v.vendor_locations : [],
       IDS: Array.isArray(v.identification_sources) ? v.identification_sources : [],
+      CASH: Array.isArray(v.vendor_cashflow) ? v.vendor_cashflow : [],
+      TIER: Array.isArray(v.tier_category) ? v.tier_category : [],
     },
   };
 }
