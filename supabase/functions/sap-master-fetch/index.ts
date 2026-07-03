@@ -41,6 +41,8 @@ const CLASSIFICATION_TYPES = new Set([
   "vendor_category",
   "vendor_location",
   "identification_source",
+  "vendor_cashflow",
+  "tier_category",
 ]);
 
 const CLASSIFICATION_SAP_KEYS = new Set([
@@ -48,6 +50,8 @@ const CLASSIFICATION_SAP_KEYS = new Set([
   "CAT_VENDOR",
   "LOCATION_VENDOR",
   "IDENTIFICATION_SOURCE",
+  "CFSTMT",
+  "CP_TIER",
 ]);
 
 const CONFIG_NAME_CLASSIFICATION = "Classification F4s";
