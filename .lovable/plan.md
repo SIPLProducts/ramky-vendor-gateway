@@ -1,39 +1,33 @@
-## Problem
+## Goal
+Fix the International Vendor country and region dropdowns so they read the existing cached SAP master rows and send the SAP sync payload as:
 
-International Vendor → Company Details → Country and Region dropdowns render empty even though `sap_master_data` holds 245 country rows and 1583 region rows.
-
-Root cause: the `public.sap_master_data` table has RLS policies (including "Authenticated users can read SAP master data" → `USING (true)`) but **no table-level GRANT** to `authenticated` / `service_role`. Supabase's Data API (PostgREST) requires an explicit GRANT — RLS alone is not enough — so every `select` from the client returns zero rows and the dropdowns fall back to "empty". This also silently affects every other consumer of that table (Classification F4, SAP Sync popup fallback, etc.).
-
-Confirmed via `information_schema.role_table_grants` — the table has zero grants.
-
-## Fix
-
-### Single migration — add missing grants on `public.sap_master_data`
-
-```sql
-GRANT SELECT ON public.sap_master_data TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.sap_master_data TO authenticated;  -- admin CRUD is already gated by existing RLS policies
-GRANT ALL ON public.sap_master_data TO service_role;                       -- edge functions (sap-master-fetch) write here
+```json
+{
+  "country": "IN",
+  "region": "13"
+}
 ```
 
-No policy changes, no schema changes. The existing policies already limit writes to admin roles; the grants just let PostgREST forward the request to Postgres so RLS can evaluate.
+## Findings
+- The database already contains SAP master data: 245 country rows and 1583 region rows.
+- The dropdown query is blocked because `public.sap_master_data` still has no Data API table grants, even though row-level read policy exists.
+- The external `sap-master-fetch` test returned empty `sap_response.COUNTRY` / `REGION`, but the cached master rows already exist, so the immediate dropdown issue is database access, not missing master data.
+- The SAP fetch function also returns `success: true` with empty arrays when SAP returns no data, which makes failures look successful.
 
-### No code changes required
+## Implementation Plan
+1. **Apply missing backend grants**
+   - Add explicit access grants on `public.sap_master_data` for signed-in app users and backend functions.
+   - Keep existing row-level rules unchanged: signed-in users can read; only admin-like roles can manage rows.
 
-- Country label already renders as `LAND1 — LANDX` (e.g. `IN — India`) via `{c.code} — {c.description}`.
-- Region label already renders as `BLAND — BEZEI` (e.g. `13 — Maharashtra`) and is filtered by selected country via `extra.LAND1`.
-- SAP payload already sends `country = LAND1` and `region = BLAND` (matches the requested `"country": "IN", "region": "13"` shape).
+2. **Harden `sap-master-fetch` response handling**
+   - If a requested type like `country` returns zero SAP rows but cached rows already exist, keep using the cache and return a clear warning instead of making the UI look broken.
+   - If SAP returns zero rows and no cache exists, return `success: false` with a clear message.
 
-## Verification
+3. **Confirm country/region value mapping**
+   - Country dropdown continues to display `LAND1 — LANDX` and stores `LAND1`.
+   - Region dropdown continues to filter by selected country and stores `BLAND`, so SAP sync sends `country: LAND1`, `region: BLAND`.
 
-After the migration runs:
-1. Open International vendor registration → Company Details step.
-2. Country dropdown shows the full SAP country list (LAND1 — LANDX).
-3. Selecting a country enables Region and shows only that country's regions (BLAND — BEZEI).
-4. On SAP sync, the built payload contains `"country": "<LAND1>"` and `"region": "<BLAND>"` as before.
-
-## Files touched
-
-```text
-supabase migration — GRANTs on public.sap_master_data (no code files)
-```
+4. **Verify**
+   - Re-check grants on `sap_master_data`.
+   - Re-check cached country/region counts through the app-accessible path.
+   - Test `sap-master-fetch` for `master_type: country` and confirm the response no longer masks empty SAP results as a clean success.
