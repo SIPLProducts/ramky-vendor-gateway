@@ -395,9 +395,12 @@ export async function buildSapPayload(
       LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
       IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
       CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
-      TIER_CATEGORY:         wrap(classifyArrays.TIER, "TIER"),
+      VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
     };
     delete (row as any).classify;
+    // TODO: populate WHOLDTAX entries (WITHT / WT_WITHCD / WT_SUBJCT / QSREC / QLAND) once withholding tax capture is wired.
+    delete (row as any).wholdtax;
+    row.WHOLDTAX = [];
     row.UPLOAD = [];
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
