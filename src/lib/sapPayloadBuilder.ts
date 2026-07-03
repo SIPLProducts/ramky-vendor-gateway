@@ -383,7 +383,7 @@ export async function buildSapPayload(
 
   // Post-process CLASSIFY block — emit one wrapper object per selected value,
   // empty array when nothing selected, and never leak the lowercase `classify` shape.
-  const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+  const wrap = (arr: string[], key: string) =>
     (arr || [])
       .map((v) => (v == null ? "" : String(v).trim()))
       .filter(Boolean)
@@ -394,6 +394,8 @@ export async function buildSapPayload(
       CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
       LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
       IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+      CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
+      TIER_CATEGORY:         wrap(classifyArrays.TIER, "TIER"),
     };
     delete (row as any).classify;
     row.UPLOAD = [];
