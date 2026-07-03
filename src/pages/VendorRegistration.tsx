@@ -435,17 +435,32 @@ export default function VendorRegistration() {
           return;
         }
 
-        // Check if user is authenticated. Poll briefly since the magic-link
-        // sign-in from /vendor/invite may still be persisting to localStorage.
+        // Check if user is authenticated. Poll generously because the silent
+        // invite sign-in can finish before the auth client has fully persisted
+        // and rehydrated the session on this route.
         let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'] = null;
-        for (let i = 0; i < 15; i++) {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) { session = data.session; break; }
+        let userReady = false;
+        let isFreshInviteHandoff = false;
+        try {
+          isFreshInviteHandoff = window.sessionStorage.getItem('vendorInviteJustSignedIn') === token;
+        } catch { /* ignore */ }
+
+        const maxAuthChecks = isFreshInviteHandoff ? 80 : 30;
+        for (let i = 0; i < maxAuthChecks; i++) {
+          const [{ data: sessionData }, { data: userData }] = await Promise.all([
+            supabase.auth.getSession(),
+            supabase.auth.getUser(),
+          ]);
+          if (sessionData.session?.access_token && userData.user?.id) {
+            session = sessionData.session;
+            userReady = true;
+            break;
+          }
           await new Promise((r) => setTimeout(r, 100));
         }
 
         // Always require authentication for vendor registration
-        if (!session) {
+        if (!session || !userReady) {
           // Redirect back to the invite handler (never to /auth for vendors)
           navigate(`/vendor/invite?token=${token}`);
           return;

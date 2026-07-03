@@ -1,29 +1,29 @@
 ## Goal
-Make `/vendor/invite?token=...` auto sign the invited vendor in and open `/vendor/registration?token=...` directly, without showing `/auth` and without requiring a second email.
+Restore the vendor invitation flow so clicking **Begin Registration** or opening `/vendor/invite?token=...` silently signs in the invited vendor and opens `/vendor/registration?token=...` without showing `/auth`, second emails, or a false “Session expired” toast.
 
-## What I will fix
-1. **Stop using stale/fragile magic-link URL tokens**
-   - Update `claim-vendor-invite` so it returns the generated link’s official `hashed_token` value instead of parsing the `token` query string from `action_link`.
-   - Keep the response shape compatible with the existing page (`signin_ready`, `token_hash`, `otp_type`, `redirect`).
+## Root cause to address
+The current flow is getting stuck between the invite auto-sign-in page and the registration page. The registration page can still decide the session is missing before the newly verified invite session has fully hydrated, then redirects back to `/vendor/invite` and shows the “Session expired” toast. This creates the visible loop shown in your screenshot.
 
-2. **Make invite claim idempotent for repeated clicks/retries**
-   - If the same invitation is opened multiple times quickly, avoid generating competing magic-link tokens that invalidate each other.
-   - Bind the invitation to the intended auth user when possible and return a stable direct sign-in result for that request.
+## Implementation plan
+1. **Stabilize invite auto sign-in**
+   - Update `VendorInviteAccept` so after `verifyOtp()` succeeds it explicitly calls `setSession()` when session tokens are returned.
+   - Wait for both `getSession()` and `getUser()` to confirm the signed-in user before navigating.
+   - Keep retry only for real expired/invalid OTP failures, not for successful-but-slow hydration.
 
-3. **Harden the browser auto-sign-in step**
-   - In `VendorInviteAccept`, verify the returned token once, wait for the session to persist, then navigate to registration.
-   - If verification returns `otp_expired`/`invalid`, retry the claim once to get a fresh token and verify again before showing an error.
-   - Never redirect vendor invitation users to `/auth`; if session is missing, send them back through `/vendor/invite?token=...`.
+2. **Make registration wait for auth readiness**
+   - Update `VendorRegistration` token validation to wait longer and trust the fresh invite handoff flag before redirecting.
+   - During a fresh invite handoff, do not show “Session expired” and do not send the vendor to `/auth`.
+   - If auth is still not ready, send the user back through `/vendor/invite?token=...` only after a controlled timeout.
 
-4. **Improve registration session handoff**
-   - Keep the existing registration session polling, but make the invite handler pass a clear “fresh invite sign-in” path so the registration screen does not fire the misleading “Session expired” toast during handoff.
+3. **Prevent stale signed-in users from breaking vendor links**
+   - In `VendorInviteAccept`, if the browser already has a different logged-in user, sign out locally before processing the invite token.
+   - This keeps buyer/admin testing sessions from blocking a vendor invite link.
 
-5. **Deploy the edge function**
-   - Deploy the updated `claim-vendor-invite` function so the self-hosted URL uses the corrected sign-in behavior.
+4. **Keep backend behavior simple**
+   - Keep `claim-vendor-invite` in the direct-sign-in mode: provision/find invited auth user, generate link, return `hashed_token`, and let the client verify it immediately.
+   - Do not reintroduce secondary verification emails.
 
-## Expected result
-- Buyer sends invitation.
-- Vendor clicks **Begin Registration** or opens `/vendor/invite?token=...`.
-- Page silently signs the vendor in.
-- Vendor lands directly on `/vendor/registration?token=...` and sees the registration form.
-- `/auth` login page is not shown for this vendor flow.
+5. **Deploy and verify**
+   - Deploy the updated `claim-vendor-invite` function if backend code changes are needed.
+   - Verify the path: invitation link → signing screen → registration form, with no `/auth` and no second email.
+   - Also verify direct `/vendor/registration?token=...` without a session routes back through invite handling rather than generic login.
