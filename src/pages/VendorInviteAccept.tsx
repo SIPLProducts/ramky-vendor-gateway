@@ -42,6 +42,15 @@ export default function VendorInviteAccept() {
         return;
       }
 
+      const waitForHydratedSession = async () => {
+        for (let i = 0; i < 60; i++) {
+          const { data: sd } = await supabase.auth.getSession();
+          if (sd.session?.access_token && sd.session.user?.id) return sd.session;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return null;
+      };
+
       const clearLocalInviteSession = async () => {
         try {
           await supabase.auth.signOut({ scope: 'local' });
@@ -61,15 +70,6 @@ export default function VendorInviteAccept() {
         navigate(redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
           replace: true,
         });
-      };
-
-      const waitForStoredSession = async () => {
-        for (let i = 0; i < 40; i++) {
-          const { data } = await supabase.auth.getSession();
-          if (data.session?.access_token && data.session.user?.id) return true;
-          await new Promise((r) => setTimeout(r, 100));
-        }
-        return false;
       };
 
       let attempt = 0;
@@ -115,15 +115,6 @@ export default function VendorInviteAccept() {
               setPhase('error');
               return;
             }
-            const stored = await waitForStoredSession();
-            if (!stored) {
-              setErrorDetails({
-                message: 'We signed you in but could not confirm the session. Please reopen the invitation link.',
-                code: 'session_hydration_timeout',
-              });
-              setPhase('error');
-              return;
-            }
             openRegistration(d.redirect);
             return;
           }
@@ -138,16 +129,51 @@ export default function VendorInviteAccept() {
             return;
           }
 
-          if (status === 'password_signin_ready' && d.email && d.password) {
-            const { error: signInError } = await supabase.auth.signInWithPassword({
-              email: d.email,
-              password: d.password,
+          if (status === 'signin_ready' && d.token_hash) {
+            try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+            const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+              token_hash: d.token_hash,
+              type: (d.otp_type || 'magiclink') as any,
             });
-            if (signInError) {
+            if (verifyError) {
+              const verifyMessage = verifyError.message || String(verifyError);
+              const retryableOtpFailure = /expired|invalid|otp|token/i.test(verifyMessage);
+              if (retryableOtpFailure && attempt < 3) {
+                try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+                await new Promise((r) => setTimeout(r, 300));
+                continue;
+              }
               setErrorDetails({
                 message: 'We could not sign you in from this invitation.',
-                code: 'password_signin_failed',
-                raw: signInError.message,
+                code: 'verify_otp_failed',
+                raw: verifyMessage,
+              });
+              setPhase('error');
+              return;
+            }
+            if (verifyData.session?.access_token && verifyData.session?.refresh_token) {
+              const { error: sessionError } = await supabase.auth.setSession({
+                access_token: verifyData.session.access_token,
+                refresh_token: verifyData.session.refresh_token,
+              });
+              if (sessionError) {
+                setErrorDetails({
+                  message: 'We could not sign you in from this invitation.',
+                  code: 'set_session_failed',
+                  raw: sessionError.message,
+                });
+                setPhase('error');
+                return;
+              }
+            }
+            // Wait for session to persist to localStorage before navigating,
+            // otherwise VendorRegistration mounts before hydration and bounces
+            // back to /auth with a false "Session expired" toast.
+            const session = verifyData.session?.access_token ? verifyData.session : await waitForHydratedSession();
+            if (!session?.access_token) {
+              setErrorDetails({
+                message: 'We signed you in but could not confirm the session. Please reopen the invitation link.',
+                code: 'session_hydration_timeout',
               });
               setPhase('error');
               return;
@@ -187,7 +213,7 @@ export default function VendorInviteAccept() {
           const friendly: Record<string, string> = {
             smtp_not_configured: "Email service isn't configured yet. Please contact vendxsupport@ramky.com.",
             smtp_send_failed: "We couldn't send the verification email. Please contact vendxsupport@ramky.com.",
-            password_signin_failed: "We couldn't open your registration session. Please contact vendxsupport@ramky.com.",
+            generate_link_failed: "We couldn't generate your secure link. Please contact vendxsupport@ramky.com.",
             provision_failed: "We couldn't prepare your account. Please contact vendxsupport@ramky.com.",
             rate_limited: 'Too many verification emails were sent. Please try again in an hour.',
             env_missing: 'Server is missing required configuration. Please contact support.',
