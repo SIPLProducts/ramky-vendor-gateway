@@ -35,6 +35,10 @@ const MASTER_MAP: Record<string, { type: string; code: string; desc?: string; co
   CP_TIER:            { type: "tier_category",            code: "ATWRT", desc: "ATWTB" },
 };
 
+const SAP_KEY_BY_TYPE = Object.fromEntries(
+  Object.entries(MASTER_MAP).map(([sapKey, mapping]) => [mapping.type, sapKey]),
+) as Record<string, string>;
+
 // Which master types belong to which named SAP API config.
 const CLASSIFICATION_TYPES = new Set([
   "material_group_vendor",
@@ -123,6 +127,15 @@ function legacyFindConfig(configs: any[]): any | null {
   const byName = configs.find((c) => /f4|master/i.test(c.name || ""));
   if (byName) return byName;
   return configs[0];
+}
+
+async function countCachedRows(supabase: any, masterType: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("sap_master_data")
+    .select("id", { count: "exact", head: true })
+    .eq("master_type", masterType);
+  if (error) throw error;
+  return count || 0;
 }
 
 async function fetchSapForConfig(
@@ -399,7 +412,44 @@ serve(async (req) => {
       if (!sapResponse[sapKey]) sapResponse[sapKey] = [];
     }
 
-    const anyData = Object.values(summary).some((s) => s.upserted > 0);
+    const cacheWarnings: string[] = [];
+    const emptyRequestedTypes: string[] = [];
+    if (requestedTypes && requestedTypes.length > 0) {
+      for (const masterType of requestedTypes) {
+        const sapKey = SAP_KEY_BY_TYPE[masterType];
+        if (!sapKey) continue;
+        const sapRows = Array.isArray(sapResponse[sapKey]) ? sapResponse[sapKey] : [];
+        const stat = summary[masterType] || { upserted: 0, skipped: 0 };
+        if (sapRows.length === 0 && stat.upserted === 0) {
+          try {
+            const cachedCount = await countCachedRows(supabase, masterType);
+            if (cachedCount > 0) {
+              cacheWarnings.push(`${masterType}: SAP returned 0 rows; keeping ${cachedCount} cached values available to the app.`);
+            } else {
+              emptyRequestedTypes.push(`${masterType}: SAP returned 0 rows and no cached values exist.`);
+            }
+          } catch (e: any) {
+            emptyRequestedTypes.push(`${masterType}: SAP returned 0 rows and cache check failed (${e?.message || e}).`);
+          }
+        }
+      }
+    }
+
+    if (emptyRequestedTypes.length > 0) {
+      trace(reqId, SVC, "response.sent", { success: false, elapsedTotalMs: Date.now() - tStart, emptyRequestedTypes });
+      return ok({
+        success: false,
+        message: emptyRequestedTypes.join(" | "),
+        hint: "Check the configured SAP F4 endpoint response for the requested master type. The app can only show cached values when cache rows exist.",
+        summary,
+        fetched_at: now,
+        sap_response: sapResponse,
+        warnings: errors.length > 0 ? errors : undefined,
+        reqId,
+      });
+    }
+
+    const anyData = Object.values(summary).some((s) => s.upserted > 0) || cacheWarnings.length > 0;
     if (!anyData && errors.length > 0) {
       trace(reqId, SVC, "response.sent", { success: false, elapsedTotalMs: Date.now() - tStart, errorCount: errors.length });
       return ok({
@@ -416,7 +466,7 @@ serve(async (req) => {
       summary,
       fetched_at: now,
       sap_response: sapResponse,
-      warnings: errors.length > 0 ? errors : undefined,
+      warnings: [...cacheWarnings, ...errors].length > 0 ? [...cacheWarnings, ...errors] : undefined,
       reqId,
     });
   } catch (e: any) {
