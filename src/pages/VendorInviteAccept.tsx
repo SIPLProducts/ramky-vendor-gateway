@@ -121,6 +121,23 @@ export default function VendorInviteAccept() {
               setPhase('error');
               return;
             }
+            // Wait for session to persist to localStorage before navigating,
+            // otherwise VendorRegistration mounts before hydration and bounces
+            // back to /auth with a false "Session expired" toast.
+            let hydrated = false;
+            for (let i = 0; i < 20; i++) {
+              const { data: sd } = await supabase.auth.getSession();
+              if (sd.session?.access_token) { hydrated = true; break; }
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            if (!hydrated) {
+              setErrorDetails({
+                message: 'We signed you in but could not confirm the session. Please reopen the invitation link.',
+                code: 'session_hydration_timeout',
+              });
+              setPhase('error');
+              return;
+            }
             setPhase('redirecting');
             navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
               replace: true,
