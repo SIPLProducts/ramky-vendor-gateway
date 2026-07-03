@@ -126,8 +126,9 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceRoleKey) {
-      return json(500, { status: 'error', code: 'env_missing', message: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      return json(500, { status: 'error', code: 'env_missing', message: 'Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ANON_KEY' });
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -189,9 +190,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Case B: no session — provision/reset a temporary invite password and let
-    // the client sign in silently with signInWithPassword(). This avoids the
-    // recent magic-link OTP/session handoff that was failing with
+    // Case B: no session — provision/reset a temporary invite password and sign
+    // in server-side with the normal password flow. This avoids the recent
+    // magic-link OTP/session handoff that was failing with
     // `otp_expired` / `session_not_found` on the self-hosted auth endpoint.
     // NOTE: Forwarded-link protection is intentionally deferred; possession of
     // the token grants access for now to restore the direct registration flow.
@@ -211,10 +212,27 @@ Deno.serve(async (req) => {
         .is('user_id', null);
     }
 
-    return json(200, {
-      status: 'password_signin_ready',
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: signInData, error: signInErr } = await authClient.auth.signInWithPassword({
       email: invitedEmail,
       password: invitePassword,
+    });
+    if (signInErr || !signInData.session?.access_token || !signInData.session?.refresh_token) {
+      return json(500, {
+        status: 'error',
+        code: 'signin_failed',
+        message: signInErr?.message || 'Could not create invite session',
+      });
+    }
+
+    return json(200, {
+      status: 'claimed',
+      session: {
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+      },
       redirect: redirectPath,
       vendor_id: invite.vendor_id,
     });
