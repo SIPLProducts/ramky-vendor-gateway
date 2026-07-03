@@ -763,6 +763,14 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                             <Label className="text-muted-foreground">Email</Label>
                             <p>{selectedVendor.primary_email || 'Not provided'}</p>
                           </div>
+                          <div>
+                            <Label className="text-muted-foreground">PAN Status</Label>
+                            <p>{formatPanStatus((selectedVendor as any).pan_status)}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Is Aadhaar Linked</Label>
+                            <p>{formatAadhaarLinked((selectedVendor as any).pan_aadhaar_linked)}</p>
+                          </div>
                         </div>
 
                         {/* GST Validation Result */}
