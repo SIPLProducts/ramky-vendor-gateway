@@ -104,12 +104,15 @@ export function GstKycTab(props: GstKycTabProps) {
       const rows = normalizeFilingStatus(filingSrc);
       setFilingStatusRows(rows);
       setFilingChecked(true);
-      const filed = isLatestPeriodFiled(rows);
-      setLatestFiled(filed);
+      const evalRes = evaluateGstr1Compliance(rows);
+      setCompliance(evalRes);
       const merged = { ...baseGstData, filing_status: filingSrc };
-      if (filed) {
+      if (!evalRes.declarationRequired) {
         props.onVerifiedDetails?.(merged);
-        void persistGstValidation(merged, 'GST verified — filing compliant');
+        const note = evalRes.previousMonthFiled
+          ? `GST verified — GSTR1 filed for ${evalRes.checkedPeriod}`
+          : `GST verified — GSTR1 for ${evalRes.checkedPeriod} not yet filed (within grace period, due 11th)`;
+        void persistGstValidation(merged, note);
       } else {
         setPendingVerifiedData(merged);
         setDeclarationDialogOpen(true);
