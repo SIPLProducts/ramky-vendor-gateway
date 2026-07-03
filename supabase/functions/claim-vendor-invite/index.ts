@@ -63,9 +63,7 @@ function looksLikePrefetch(req: Request, attempt: number): boolean {
       lower.startsWith('x-ms-exchange-') ||
       lower.startsWith('x-barracuda-') ||
       lower.startsWith('x-proofpoint-') ||
-      lower.startsWith('x-mimecast-') ||
-      lower === 'x-forwarded-proto-scanner' ||
-      lower === 'purpose' && (req.headers.get('purpose') || '').toLowerCase() === 'prefetch'
+      lower.startsWith('x-mimecast-')
     ) {
       return true;
     }
