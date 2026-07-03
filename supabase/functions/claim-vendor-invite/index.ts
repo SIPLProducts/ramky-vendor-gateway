@@ -493,7 +493,8 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         console.error('reopen verification send failed:', e);
-        return json(500, { status: 'error', code: 'verification_send_failed', message: (e as Error)?.message || String(e) });
+        const code = e instanceof StepError ? e.code : 'verification_send_failed';
+        return json(500, { status: 'error', code, message: (e as Error)?.message || String(e) });
       }
     }
 
