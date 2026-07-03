@@ -443,10 +443,10 @@ export function DocumentVerificationStep({
     () => normalizeFilingStatus((initialData?.gst as any)?.filing_status).length > 0,
   );
   const [gstFilingChecking, setGstFilingChecking] = useState(false);
-  const [gstLatestFiled, setGstLatestFiled] = useState<boolean | null>(
+  const [gstCompliance, setGstCompliance] = useState<{ previousMonthFiled: boolean; declarationRequired: boolean; checkedPeriod: string } | null>(
     () => {
       const rows = normalizeFilingStatus((initialData?.gst as any)?.filing_status);
-      return rows.length ? isLatestPeriodFiled(rows) : null;
+      return rows.length ? evaluateGstr1Compliance(rows) : null;
     },
   );
 
