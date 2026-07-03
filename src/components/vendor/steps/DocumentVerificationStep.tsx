@@ -577,7 +577,17 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { name: initialData.bank2.apiName },
+      apiData: {
+        name: initialData.bank2.apiName,
+        normalized: {
+          account_number: initialData.bank2.accountNumber,
+          ifsc_code: initialData.bank2.ifsc,
+          bank_name: initialData.bank2.bankName,
+          branch_name: initialData.bank2.branchName,
+          account_holder_name: initialData.bank2.apiName || initialData.bank2.accountHolderName,
+        },
+      },
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.cancelledChequeFile2),
     };
   });
