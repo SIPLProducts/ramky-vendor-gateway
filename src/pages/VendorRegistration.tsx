@@ -440,19 +440,64 @@ export default function VendorRegistration() {
           return;
         }
 
-        // Check if authenticated user already has a vendor record
+        // Server-side authorization is the source of truth. It binds the
+        // invitation to the verified invited mailbox on first successful access
+        // and rejects any later access from a different auth user/session.
+        const { data: claimData, error: claimAccessError } = await supabase.functions.invoke('claim-vendor-invite', {
+          body: { token, redirectOrigin: window.location.origin, attempt: 2 },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const claimStatus = (claimData as any)?.status;
+        if (claimAccessError && !claimStatus) {
+          console.error('Invitation access verification failed:', claimAccessError);
+          setTokenError('We could not verify your invitation access right now. Please reopen the invitation link.');
+          setIsValidatingToken(false);
+          return;
+        }
+        if (claimStatus === 'denied') {
+          setTokenError('Access Denied. This invitation belongs to the originally invited vendor only.');
+          setIsValidatingToken(false);
+          return;
+        }
+        if (claimStatus !== 'verified' && claimStatus !== 'already_claimed_same_user') {
+          setTokenError((claimData as any)?.message || 'Access Denied. Please reopen the invitation link from the invited mailbox.');
+          setIsValidatingToken(false);
+          return;
+        }
+
+        const claimedVendorId = (claimData as any)?.vendor_id as string | undefined;
+
+        // Check if this invitation already has a vendor record for this user.
+        // Important: do not load an unrelated old vendor row just because the
+        // same email/user received a new invitation later.
         if (session) {
-          const { data: existingVendorRecord } = await supabase
-            .from('vendors')
-            .select('id, status')
-            .eq('user_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          let existingVendorRecord: { id: string; status: string } | null = null;
+
+          if (claimedVendorId) {
+            const { data } = await supabase
+              .from('vendors')
+              .select('id, status')
+              .eq('id', claimedVendorId)
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            existingVendorRecord = data as typeof existingVendorRecord;
+          }
+
+          if (!existingVendorRecord && invitation.id) {
+            const { data } = await supabase
+              .from('vendors')
+              .select('id, status')
+              .eq('invitation_id', invitation.id)
+              .eq('user_id', session.user.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            existingVendorRecord = data as typeof existingVendorRecord;
+          }
 
           if (existingVendorRecord) {
             // Editable statuses: vendor can continue/edit the same application.
-            const EDITABLE = ['draft', 'returned_to_vendor', 'validation_failed', 'finance_rejected'];
+            const EDITABLE = ['draft', 'returned_to_vendor', 'returned_to_buyer', 'validation_failed', 'finance_rejected', 'purchase_rejected'];
             if (EDITABLE.includes(existingVendorRecord.status as string)) {
               console.log('[Token] Editable vendor record found - allowing form editing', existingVendorRecord.status);
               setInvitationToken(token);
@@ -485,13 +530,27 @@ export default function VendorRegistration() {
           setIsSubmitted(true); // Show success screen instead of form
 
           // Fetch vendor status for the authenticated user (RLS-safe)
-          const { data: vendor } = await supabase
-            .from('vendors')
-            .select('status')
-            .eq('user_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          let vendor: { status: string } | null = null;
+          if (claimedVendorId) {
+            const { data } = await supabase
+              .from('vendors')
+              .select('status')
+              .eq('id', claimedVendorId)
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            vendor = data as typeof vendor;
+          }
+          if (!vendor && invitation.id) {
+            const { data } = await supabase
+              .from('vendors')
+              .select('status')
+              .eq('invitation_id', invitation.id)
+              .eq('user_id', session.user.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            vendor = data as typeof vendor;
+          }
 
           if (vendor) {
             setVendorStatusState(vendor.status as RegistrationStatus);
