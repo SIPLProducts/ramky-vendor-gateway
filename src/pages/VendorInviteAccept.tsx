@@ -63,6 +63,15 @@ export default function VendorInviteAccept() {
         });
       };
 
+      const waitForStoredSession = async () => {
+        for (let i = 0; i < 40; i++) {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.access_token && data.session.user?.id) return true;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return false;
+      };
+
       let attempt = 0;
       await clearLocalInviteSession();
       // eslint-disable-next-line no-constant-condition
@@ -102,6 +111,15 @@ export default function VendorInviteAccept() {
                 message: 'We could not sign you in from this invitation.',
                 code: 'set_session_failed',
                 raw: sessionError.message,
+              });
+              setPhase('error');
+              return;
+            }
+            const stored = await waitForStoredSession();
+            if (!stored) {
+              setErrorDetails({
+                message: 'We signed you in but could not confirm the session. Please reopen the invitation link.',
+                code: 'session_hydration_timeout',
               });
               setPhase('error');
               return;
