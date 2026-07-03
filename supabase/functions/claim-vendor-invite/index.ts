@@ -75,15 +75,20 @@ async function ensureVendorAccount(admin: ReturnType<typeof createClient>, userI
   }
 }
 
-async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: string, inviteId: string): Promise<string> {
+async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: string, inviteId: string, password: string): Promise<string> {
   const existing = await findUserByEmail(admin, email);
   if (existing) {
+    const { error: updateErr } = await admin.auth.admin.updateUserById(existing, {
+      password,
+      user_metadata: { invited_via: 'vendor_invitation', invitation_id: inviteId },
+    });
+    if (updateErr) throw new Error(updateErr.message);
     await ensureVendorAccount(admin, existing, email);
     return existing;
   }
   const { data, error } = await admin.auth.admin.createUser({
     email,
-    password: randomPassword(),
+    password,
     email_confirm: true,
     user_metadata: { invited_via: 'vendor_invitation', invitation_id: inviteId },
   });
@@ -184,13 +189,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Case B: no session — provision user and return a magic-link token_hash
-    // so the client can sign the vendor in via verifyOtp() and land directly
-    // on the registration form. NOTE: Forwarded-link protection is intentionally
-    // deferred; possession of the token grants access.
+    // Case B: no session — provision/reset a temporary invite password and let
+    // the client sign in silently with signInWithPassword(). This avoids the
+    // recent magic-link OTP/session handoff that was failing with
+    // `otp_expired` / `session_not_found` on the self-hosted auth endpoint.
+    // NOTE: Forwarded-link protection is intentionally deferred; possession of
+    // the token grants access for now to restore the direct registration flow.
     let invitedUserId: string;
+    const invitePassword = randomPassword();
     try {
-      invitedUserId = await ensureAuthUser(admin, invitedEmail, invite.id);
+      invitedUserId = await ensureAuthUser(admin, invitedEmail, invite.id, invitePassword);
     } catch (e) {
       return json(500, { status: 'error', code: 'provision_failed', message: (e as Error).message });
     }
@@ -203,46 +211,10 @@ Deno.serve(async (req) => {
         .is('user_id', null);
     }
 
-    const origin = String(redirectOrigin || '').replace(/\/+$/, '');
-    const redirectTo = origin ? `${origin}${redirectPath}` : undefined;
-
-    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: invitedEmail,
-      options: redirectTo ? { redirectTo } : undefined,
-    });
-    if (linkErr || !linkData?.properties?.action_link) {
-      return json(500, { status: 'error', code: 'generate_link_failed', message: linkErr?.message || 'No action_link' });
-    }
-
-    let tokenHash: string | null = null;
-    let otpType: string | null = null;
-    const props = linkData.properties as Record<string, unknown>;
-
-    // verifyOtp({ token_hash }) expects GoTrue's hashed token. The action_link
-    // also contains a short-lived raw token in some deployments; using that raw
-    // URL token causes intermittent `otp_expired` / `invalid` failures on the
-    // self-hosted auth endpoint. Prefer the official hashed_token returned by
-    // generateLink and only fall back to URL parsing for older auth versions.
-    tokenHash = typeof props.hashed_token === 'string' ? props.hashed_token : null;
-    otpType = typeof props.verification_type === 'string' ? props.verification_type : null;
-    if (!tokenHash) {
-      try {
-        const raw = new URL(linkData.properties.action_link as string);
-        tokenHash = raw.searchParams.get('token_hash') || raw.searchParams.get('token');
-        otpType = otpType || raw.searchParams.get('type');
-      } catch { /* ignore */ }
-    }
-
-    if (!tokenHash) {
-      return json(500, { status: 'error', code: 'token_hash_missing', message: 'Could not extract token_hash from action_link' });
-    }
-
     return json(200, {
-      status: 'signin_ready',
-      token_hash: tokenHash,
-      otp_type: otpType || 'magiclink',
+      status: 'password_signin_ready',
       email: invitedEmail,
+      password: invitePassword,
       redirect: redirectPath,
       vendor_id: invite.vendor_id,
     });
