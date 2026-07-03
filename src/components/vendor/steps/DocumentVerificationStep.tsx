@@ -407,8 +407,24 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { legalName: initialData.gst.apiName },
+      // Seed apiData with the same registry-canonical values so EditableOcrField
+      // renders green borders + "…is verified" text on the Edit screen exactly
+      // as after a fresh verification.
+      apiData: {
+        legalName: initialData.gst.apiName,
+        legal_name: initialData.gst.apiName || initialData.gst.legalName,
+        trade_name: initialData.gst.tradeName,
+        gstin: initialData.gst.gstin,
+        constitution_of_business: initialData.gst.constitutionOfBusiness,
+        principal_place_of_business: initialData.gst.principalPlaceOfBusiness,
+        gst_status: initialData.gst.status,
+        registration_date: initialData.gst.registrationDate,
+        taxpayer_type: initialData.gst.taxpayerType,
+        jurisdiction_centre: initialData.gst.jurisdictionCentre,
+        jurisdiction_state: initialData.gst.jurisdictionState,
+      },
       nameMatchScore: initialData.gst.nameMatchScore,
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.gstCertificateFile),
     };
   });
@@ -470,6 +486,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.panCardFile),
     };
   });
@@ -491,8 +508,17 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { name: initialData.msme.apiName },
+      apiData: {
+        name: initialData.msme.apiName,
+        normalized: {
+          udyam_number: initialData.msme.udyamNumber,
+          enterprise_name: initialData.msme.apiName || initialData.msme.enterpriseName,
+          enterprise_type: initialData.msme.enterpriseType,
+          major_activity: initialData.msme.majorActivity,
+        },
+      },
       nameMatchScore: initialData.msme.nameMatchScore,
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.msmeCertificateFile),
     };
   });
@@ -511,7 +537,17 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { name: initialData.bank.apiName },
+      apiData: {
+        name: initialData.bank.apiName,
+        normalized: {
+          account_number: initialData.bank.accountNumber,
+          ifsc_code: initialData.bank.ifsc,
+          bank_name: initialData.bank.bankName,
+          branch_name: initialData.bank.branchName,
+          account_holder_name: initialData.bank.apiName || initialData.bank.accountHolderName,
+        },
+      },
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.cancelledChequeFile),
     };
   });
@@ -541,7 +577,17 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { name: initialData.bank2.apiName },
+      apiData: {
+        name: initialData.bank2.apiName,
+        normalized: {
+          account_number: initialData.bank2.accountNumber,
+          ifsc_code: initialData.bank2.ifsc,
+          bank_name: initialData.bank2.bankName,
+          branch_name: initialData.bank2.branchName,
+          account_holder_name: initialData.bank2.apiName || initialData.bank2.accountHolderName,
+        },
+      },
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.cancelledChequeFile2),
     };
   });
