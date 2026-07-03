@@ -458,6 +458,12 @@ export default function VendorRegistration() {
           return;
         }
 
+        try {
+          if (window.sessionStorage.getItem('vendorInviteJustSignedIn') === token) {
+            window.sessionStorage.removeItem('vendorInviteJustSignedIn');
+          }
+        } catch { /* ignore */ }
+
         // Best-effort bind of invitation → verified user. Not blocking:
         // possession of a valid, unexpired invitation token combined with a
         // matching authenticated email is enough to open the form.
