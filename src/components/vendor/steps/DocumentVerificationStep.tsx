@@ -407,8 +407,24 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { legalName: initialData.gst.apiName },
+      // Seed apiData with the same registry-canonical values so EditableOcrField
+      // renders green borders + "…is verified" text on the Edit screen exactly
+      // as after a fresh verification.
+      apiData: {
+        legalName: initialData.gst.apiName,
+        legal_name: initialData.gst.apiName || initialData.gst.legalName,
+        trade_name: initialData.gst.tradeName,
+        gstin: initialData.gst.gstin,
+        constitution_of_business: initialData.gst.constitutionOfBusiness,
+        principal_place_of_business: initialData.gst.principalPlaceOfBusiness,
+        gst_status: initialData.gst.status,
+        registration_date: initialData.gst.registrationDate,
+        taxpayer_type: initialData.gst.taxpayerType,
+        jurisdiction_centre: initialData.gst.jurisdictionCentre,
+        jurisdiction_state: initialData.gst.jurisdictionState,
+      },
       nameMatchScore: initialData.gst.nameMatchScore,
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.gstCertificateFile),
     };
   });
