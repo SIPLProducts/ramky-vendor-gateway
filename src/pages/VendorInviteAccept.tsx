@@ -7,7 +7,7 @@ import { Loader2, AlertCircle, ShieldCheck, Ban, Copy, MailCheck } from 'lucide-
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
-type Phase = 'loading' | 'redirecting' | 'verification_sent' | 'denied' | 'error';
+type Phase = 'loading' | 'redirecting' | 'denied' | 'error';
 
 interface ErrorDetails {
   message: string;
