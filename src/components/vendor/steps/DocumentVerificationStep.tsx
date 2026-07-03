@@ -1347,7 +1347,7 @@ export function DocumentVerificationStep({
     // Reset filing-status state for the new upload
     setGstFilingRows([]);
     setGstFilingChecked(false);
-    setGstLatestFiled(null);
+    setGstCompliance(null);
     // Clear stale address up front so a previous upload's value can never
     // bleed through if the new registry response is missing the field.
     setEditablePrincipalPlace("");
