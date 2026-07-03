@@ -1899,7 +1899,7 @@ export function DocumentVerificationStep({
         jurisdictionCentre: gstDoc.ocrData.jurisdiction_centre,
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
         filing_status: gstFilingRows.length ? gstFilingRows : undefined,
-        filingCompliant: gstLatestFiled ?? undefined,
+        filingCompliant: gstCompliance?.previousMonthFiled ?? undefined,
         addressParts: (gstDoc.ocrData.address_city || gstDoc.ocrData.address_state || gstDoc.ocrData.address_pincode || gstDoc.ocrData.address_line)
           ? {
               address: gstDoc.ocrData.address_line || undefined,
