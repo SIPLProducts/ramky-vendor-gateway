@@ -1911,7 +1911,7 @@ export function DocumentVerificationStep({
       };
       // If GST filing was not compliant and a self-declaration was uploaded,
       // carry the file through so the parent saves it under gst_self_declaration.
-      if (gstLatestFiled === false && gstDeclarationFile) {
+      if (gstCompliance?.declarationRequired && gstDeclarationFile) {
         out.gstSelfDeclarationFile = gstDeclarationFile;
       }
     } else if (isGstRegistered === false) {
