@@ -1,33 +1,36 @@
 ## Goal
-Fix the International Vendor country and region dropdowns so they read the existing cached SAP master rows and send the SAP sync payload as:
+Make the **Country** and **Region** dropdowns in the international vendor registration step behave the same way as the **Classification / Company Code** dropdowns in the SAP Sync dialog: fetch **live from SAP F4** on the fly, instead of reading from the cached `sap_master_data` table.
 
-```json
-{
-  "country": "IN",
-  "region": "13"
-}
-```
+## Why the current version fails
+`IntlCompanyDetailsStep.tsx` uses `useEnsureSapMaster('country' | 'region')` which reads rows from the local `sap_master_data` cache table. On self-hosted / fresh environments that cache is empty, so the dropdowns appear blank — even though the SAP Fields F4 API is returning data (as seen in your `sap-master-fetch` response).
 
-## Findings
-- The database already contains SAP master data: 245 country rows and 1583 region rows.
-- The dropdown query is blocked because `public.sap_master_data` still has no Data API table grants, even though row-level read policy exists.
-- The external `sap-master-fetch` test returned empty `sap_response.COUNTRY` / `REGION`, but the cached master rows already exist, so the immediate dropdown issue is database access, not missing master data.
-- The SAP fetch function also returns `success: true` with empty arrays when SAP returns no data, which makes failures look successful.
+Meanwhile, `SapFieldsDialog` (SAP Sync screen) calls `sap-master-fetch` on mount and renders directly from `res.sap_response.COUNTRY` / `.REGION` / `.COMPANY_CODE` / `.CFSTMT` etc. — no dependency on the cache.
 
-## Implementation Plan
-1. **Apply missing backend grants**
-   - Add explicit access grants on `public.sap_master_data` for signed-in app users and backend functions.
-   - Keep existing row-level rules unchanged: signed-in users can read; only admin-like roles can manage rows.
+## Plan
 
-2. **Harden `sap-master-fetch` response handling**
-   - If a requested type like `country` returns zero SAP rows but cached rows already exist, keep using the cache and return a clear warning instead of making the UI look broken.
-   - If SAP returns zero rows and no cache exists, return `success: false` with a clear message.
+1. **Refactor `IntlCompanyDetailsStep.tsx`** to load live F4 data on mount:
+   - Add `liveF4` state and, in a `useEffect`, invoke the `sap-master-fetch` edge function (same pattern as `SapFieldsDialog` lines 61–107).
+   - Track loading / error / retry states locally (fetching, errorMessage, retry handler).
+   - Remove the two `useEnsureSapMaster('country' | 'region')` calls.
 
-3. **Confirm country/region value mapping**
-   - Country dropdown continues to display `LAND1 — LANDX` and stores `LAND1`.
-   - Region dropdown continues to filter by selected country and stores `BLAND`, so SAP sync sends `country: LAND1`, `region: BLAND`.
+2. **Render Country dropdown from `liveF4.COUNTRY`**:
+   - Each item uses `LAND1` as the SAP key (value sent in payload, e.g. `"IN"`) and `LANDX` / `NATIO` as the display label.
+   - Keep the existing shadcn `Select` UI, disabled/placeholder states, and "Fetching from SAP…/Fetch failed — Retry" messaging.
 
-4. **Verify**
-   - Re-check grants on `sap_master_data`.
-   - Re-check cached country/region counts through the app-accessible path.
-   - Test `sap-master-fetch` for `master_type: country` and confirm the response no longer masks empty SAP results as a clean success.
+3. **Render Region dropdown from `liveF4.REGION`, filtered by selected country**:
+   - Filter items where `extra.LAND1 === selectedCountry` (same rule as today).
+   - Value = `BLAND` (SAP region key, e.g. `"13"`); label = `BEZEI` / description.
+   - Reset region when country changes (already done).
+   - Show "Select country first" / "No regions for this country" states.
+
+4. **Payload compatibility**:
+   - Ensure the values persisted are the raw SAP keys (`LAND1`, `BLAND`) so the SAP Sync payload receives `"country": "IN", "region": "13"` as required.
+
+5. **No changes** to the cache table, migrations, or the `sap-master-fetch` edge function. Classification / other cached fields remain unchanged (out of scope).
+
+## Files to change
+- `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx` — swap cache-backed hooks for a live F4 fetch and update Select rendering.
+
+## Verification
+- Open international vendor registration → Company Details step: Country populates from live SAP; selecting a country populates matching Regions; on submit, the payload carries the SAP keys (`IN`, `13`).
+- If SAP F4 call fails, the fields show a clear "Fetch failed — Retry" message (matching Classification's UX).

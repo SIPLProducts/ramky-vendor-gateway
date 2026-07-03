@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Building2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { InternationalCompanyDetails } from '@/types/vendor';
-import { useEnsureSapMaster } from '@/hooks/useSapMasterData';
 import { supabase } from '@/integrations/supabase/client';
 
 const schema = z.object({
@@ -34,9 +33,36 @@ interface Props {
   tenantId?: string | null;
 }
 
+type F4Item = Record<string, unknown>;
+
 export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId }: Props) {
-  const { rows: countries, fetching: countriesFetching, errorMessage: countriesError, retry: retryCountries } = useEnsureSapMaster('country');
-  const { rows: regions, fetching: regionsFetching, errorMessage: regionsError, retry: retryRegions } = useEnsureSapMaster('region');
+  const [liveF4, setLiveF4] = useState<Record<string, F4Item[]> | null>(null);
+  const [f4Fetching, setF4Fetching] = useState(false);
+  const [f4Error, setF4Error] = useState<string | null>(null);
+
+  const fetchF4 = useCallback(async () => {
+    setF4Fetching(true);
+    setF4Error(null);
+    try {
+      const { data: res, error } = await supabase.functions.invoke('sap-master-fetch', {
+        body: { master_type: ['country', 'region'] },
+      });
+      if (error) throw error;
+      if (res?.sap_response && typeof res.sap_response === 'object') {
+        setLiveF4(res.sap_response as Record<string, F4Item[]>);
+      }
+      if (res && res.success === false) {
+        const msg = [res.message, res.hint].filter(Boolean).join(' — ');
+        setF4Error(msg || 'SAP F4 fetch failed');
+      }
+    } catch (e: any) {
+      setF4Error(e?.message || 'Could not reach SAP');
+    } finally {
+      setF4Fetching(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchF4(); }, [fetchF4]);
 
   const { data: buyerCompany, isLoading: buyerCompanyLoading } = useQuery({
     queryKey: ['tenant-buyer-company', tenantId],
@@ -69,18 +95,38 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
     return () => sub.unsubscribe();
   }, [watch, onLiveUpdate]);
 
-  // Strict filter: only regions whose extra.LAND1 matches the selected country.
-  const regionsForCountry = useMemo(() => {
-    const list = regions || [];
-    if (!selectedCountry) return [];
-    return list.filter((r) => {
-      const extra = (r.extra || {}) as Record<string, unknown>;
-      return (extra.LAND1 as string | undefined) === selectedCountry;
-    });
-  }, [regions, selectedCountry]);
+  const countries = useMemo(() => {
+    const raw = (liveF4?.COUNTRY || []) as F4Item[];
+    return raw
+      .map((it, idx) => {
+        const code = String((it.LAND1 ?? (it as any).code ?? '') as string);
+        const desc = String((it.LANDX ?? it.NATIO ?? (it as any).description ?? '') as string);
+        return { id: `c-${idx}-${code}`, code, desc };
+      })
+      .filter((c) => c.code);
+  }, [liveF4]);
 
-  const hasCountries = !!(countries && countries.length > 0);
-  const countryDisabled = countriesFetching || !!countriesError || !hasCountries;
+  const regionsForCountry = useMemo(() => {
+    if (!selectedCountry) return [] as { id: string; code: string; desc: string }[];
+    const raw = (liveF4?.REGION || []) as F4Item[];
+    return raw
+      .filter((it) => String((it.LAND1 ?? '') as string) === selectedCountry)
+      .map((it, idx) => {
+        const code = String((it.BLAND ?? (it as any).code ?? '') as string);
+        const desc = String((it.BEZEI ?? (it as any).description ?? '') as string);
+        return { id: `r-${idx}-${code}`, code, desc };
+      })
+      .filter((r) => r.code);
+  }, [liveF4, selectedCountry]);
+
+  const countriesFetching = f4Fetching;
+  const countriesError = f4Error;
+  const regionsFetching = f4Fetching;
+  const regionsError = f4Error;
+  const retryCountries = fetchF4;
+  const retryRegions = fetchF4;
+  const hasCountries = countries.length > 0;
+  const countryDisabled = countriesFetching || (!hasCountries);
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -154,9 +200,9 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                       } />
                     </SelectTrigger>
                     <SelectContent>
-                      {(countries || []).map((c) => (
+                      {countries.map((c) => (
                         <SelectItem key={c.id} value={c.code}>
-                          {c.code}{c.description ? ` — ${c.description}` : ''}
+                          {c.code}{c.desc ? ` — ${c.desc}` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -220,15 +266,11 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {regionsForCountry.map((r) => {
-                          const extra = (r.extra || {}) as Record<string, unknown>;
-                          const bland = (extra.BLAND as string | undefined) ?? r.code;
-                          return (
-                            <SelectItem key={r.id} value={bland}>
-                              {bland}{r.description ? ` — ${r.description}` : ''}
-                            </SelectItem>
-                          );
-                        })}
+                        {regionsForCountry.map((r) => (
+                          <SelectItem key={r.id} value={r.code}>
+                            {r.code}{r.desc ? ` — ${r.desc}` : ''}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   );
