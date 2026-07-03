@@ -1,36 +1,29 @@
-## Goal
-Make the **Country** and **Region** dropdowns in the international vendor registration step behave the same way as the **Classification / Company Code** dropdowns in the SAP Sync dialog: fetch **live from SAP F4** on the fly, instead of reading from the cached `sap_master_data` table.
+## Root cause
+`SapF4SelectField` (used by Company Code / Rec-Account in SAP Sync) is a **hybrid**: prefer live SAP F4 rows when present, otherwise render from the cached `sap_master_data` table (`useSapMasterData`). See `src/components/sap/SapFieldsDialog.tsx` lines 475–513.
 
-## Why the current version fails
-`IntlCompanyDetailsStep.tsx` uses `useEnsureSapMaster('country' | 'region')` which reads rows from the local `sap_master_data` cache table. On self-hosted / fresh environments that cache is empty, so the dropdowns appear blank — even though the SAP Fields F4 API is returning data (as seen in your `sap-master-fetch` response).
+My previous edit stripped the cache fallback out of `IntlCompanyDetailsStep` and made Country/Region **live-only**. On Lovable Cloud the on-prem SAP middleware isn't reachable, so the live call returns empty arrays and there's nothing to render — even though 245 countries and 1583 regions already exist in the cache table.
 
-Meanwhile, `SapFieldsDialog` (SAP Sync screen) calls `sap-master-fetch` on mount and renders directly from `res.sap_response.COUNTRY` / `.REGION` / `.COMPANY_CODE` / `.CFSTMT` etc. — no dependency on the cache.
+## Fix: apply the same live-then-cache hybrid to Country/Region
 
-## Plan
+Update `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`:
 
-1. **Refactor `IntlCompanyDetailsStep.tsx`** to load live F4 data on mount:
-   - Add `liveF4` state and, in a `useEffect`, invoke the `sap-master-fetch` edge function (same pattern as `SapFieldsDialog` lines 61–107).
-   - Track loading / error / retry states locally (fetching, errorMessage, retry handler).
-   - Remove the two `useEnsureSapMaster('country' | 'region')` calls.
-
-2. **Render Country dropdown from `liveF4.COUNTRY`**:
-   - Each item uses `LAND1` as the SAP key (value sent in payload, e.g. `"IN"`) and `LANDX` / `NATIO` as the display label.
-   - Keep the existing shadcn `Select` UI, disabled/placeholder states, and "Fetching from SAP…/Fetch failed — Retry" messaging.
-
-3. **Render Region dropdown from `liveF4.REGION`, filtered by selected country**:
-   - Filter items where `extra.LAND1 === selectedCountry` (same rule as today).
-   - Value = `BLAND` (SAP region key, e.g. `"13"`); label = `BEZEI` / description.
-   - Reset region when country changes (already done).
-   - Show "Select country first" / "No regions for this country" states.
-
-4. **Payload compatibility**:
-   - Ensure the values persisted are the raw SAP keys (`LAND1`, `BLAND`) so the SAP Sync payload receives `"country": "IN", "region": "13"` as required.
-
-5. **No changes** to the cache table, migrations, or the `sap-master-fetch` edge function. Classification / other cached fields remain unchanged (out of scope).
+1. **Keep the live fetch on mount** — `sap-master-fetch` with `master_type: ['country','region']`.
+2. **Re-add the cache reader** — `useSapMasterData('country')` and `useSapMasterData('region')`.
+3. **Per-field source pick** (same rule as `SapF4SelectField`):
+   - `countries = liveF4.COUNTRY?.length > 0 ? mapLive() : mapCache()`
+   - `regions   = liveF4.REGION?.length  > 0 ? mapLive() : mapCache()` then filter by `LAND1 === selectedCountry`.
+   - Mappers pull `LAND1`/`LANDX` for country and `BLAND`/`BEZEI` for region (from top-level fields on live items or from `extra` on cached rows).
+4. **Status messaging**
+   - Fetching → only when both live and cache are still loading with no rows.
+   - Live failed but cache has rows → dropdowns stay enabled; small muted "Using cached SAP values" hint (no red error).
+   - Both empty → keep the existing red "Fetch failed — Retry" block.
+5. **Payload keys unchanged** — still `LAND1` for country, `BLAND` for region, so the sync payload keeps `"country":"IN","region":"13"`.
+6. No changes to the edge function, cache table, or any other screen.
 
 ## Files to change
-- `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx` — swap cache-backed hooks for a live F4 fetch and update Select rendering.
+- `src/components/vendor/steps/international/IntlCompanyDetailsStep.tsx`
 
 ## Verification
-- Open international vendor registration → Company Details step: Country populates from live SAP; selecting a country populates matching Regions; on submit, the payload carries the SAP keys (`IN`, `13`).
-- If SAP F4 call fails, the fields show a clear "Fetch failed — Retry" message (matching Classification's UX).
+- Lovable Cloud (live unreachable): dropdowns populate from cache; muted "Using cached SAP values" hint appears.
+- Self-hosted (live reachable): dropdowns populate from live F4; no cache hint.
+- Selecting a country filters regions; submitted payload carries the SAP keys.
