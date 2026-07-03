@@ -326,12 +326,18 @@ export async function buildSapPayload(
     IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
       : (toArr((vendor as any).identification_sources).length ? toArr((vendor as any).identification_sources)
       : toArr((vendor as any).identification_source)),
+    CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+      : toArr((vendor as any).vendor_cashflow),
+    TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+      : toArr((vendor as any).tier_category),
   };
   const classifyCtx = {
     MGV: classifyArrays.MGV[0] || "",
     CATV: classifyArrays.CATV[0] || "",
     LOCV: classifyArrays.LOCV[0] || "",
     IDS: classifyArrays.IDS[0] || "",
+    CASH: classifyArrays.CASH[0] || "",
+    TIER: classifyArrays.TIER[0] || "",
   };
 
   const isMsme = !!vendorForPayload.msme_number;
@@ -377,7 +383,7 @@ export async function buildSapPayload(
 
   // Post-process CLASSIFY block — emit one wrapper object per selected value,
   // empty array when nothing selected, and never leak the lowercase `classify` shape.
-  const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+  const wrap = (arr: string[], key: string) =>
     (arr || [])
       .map((v) => (v == null ? "" : String(v).trim()))
       .filter(Boolean)
@@ -388,6 +394,8 @@ export async function buildSapPayload(
       CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
       LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
       IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+      CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
+      TIER_CATEGORY:         wrap(classifyArrays.TIER, "TIER"),
     };
     delete (row as any).classify;
     row.UPLOAD = [];

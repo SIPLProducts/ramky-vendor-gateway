@@ -41,6 +41,8 @@ async function persistClassification(vendorIds: string[], overrides: SapFieldOve
     vendor_categories: c.CATV || [],
     vendor_locations: c.LOCV || [],
     identification_sources: c.IDS || [],
+    vendor_cashflow: c.CASH || [],
+    tier_category: c.TIER || [],
   };
   try {
     await supabase.from('vendors').update(payload as any).in('id', vendorIds);

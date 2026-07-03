@@ -25,7 +25,7 @@ export type SapFieldOverrides = {
   reg_city: string; reg_state: string; reg_pincode: string;
   reg_contact1: string; reg_contact2: string; reg_email1: string; reg_email2: string;
   reg_is_msme: boolean; reg_msme_no: string; reg_msme_cat: string; reg_msme_act: string;
-  classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[] };
+  classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[]; CASH: string[]; TIER: string[] };
 };
 
 interface Props {
@@ -240,37 +240,39 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
             {/* Classification — editable here (no longer captured during registration) */}
             <Section icon={<Tags className="h-4 w-4" />} title="Classification">
-              <SapF4MultiSelectField
-                label="Material Group for Vendors"
-                masterType="material_group_vendor"
-                value={form.classify.MGV || []}
-                onChange={(v) => setClassify('MGV', v)}
-                placeholder="Select material groups"
-              />
-              <SapF4MultiSelectField
-                label="Vendor Category"
-                masterType="vendor_category"
-                value={form.classify.CATV || []}
-                onChange={(v) => setClassify('CATV', v)}
-                placeholder="Select vendor categories"
-              />
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Vendor Location</Label>
-                <Input
-                  value={getLocationLabel((form.classify.LOCV || [])[0], vendorLocRows)}
-                  readOnly
-                  disabled
-                  placeholder="Auto-filled from State"
-                  className="bg-muted/40 cursor-not-allowed"
+              <div className="md:col-span-2">
+                <SapF4MultiSelectField
+                  label="Material Group for Vendors"
+                  masterType="material_group_vendor"
+                  value={form.classify.MGV || []}
+                  onChange={(v) => setClassify('MGV', v)}
+                  placeholder="Select material groups"
                 />
-                <p className="text-[11px] text-muted-foreground">Auto-filled from registration State (read-only).</p>
+              </div>
+              <div className="md:col-span-2">
+                <SapF4MultiSelectField
+                  label="Vendor Category"
+                  masterType="vendor_category"
+                  value={form.classify.CATV || []}
+                  onChange={(v) => setClassify('CATV', v)}
+                  placeholder="Select vendor categories"
+                />
               </div>
               <SapF4MultiSelectField
-                label="Vendor Identification Source"
-                masterType="identification_source"
-                value={form.classify.IDS || []}
-                onChange={(v) => setClassify('IDS', v)}
-                placeholder="Select identification sources"
+                label="Vendor Cash Flow"
+                masterType="vendor_cashflow"
+                value={form.classify.CASH || []}
+                onChange={(v) => setClassify('CASH', v)}
+                liveItems={liveF4?.CFSTMT}
+                placeholder="Select cash flow"
+              />
+              <SapF4MultiSelectField
+                label="Tier Category"
+                masterType="tier_category"
+                value={form.classify.TIER || []}
+                onChange={(v) => setClassify('TIER', v)}
+                liveItems={liveF4?.CP_TIER}
+                placeholder="Select tier category"
               />
               <p className="md:col-span-2 text-[11px] text-muted-foreground -mt-1">
                 Select Classification values to send to SAP. Defaults are pre-filled when available.
@@ -376,6 +378,8 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
       CATV: Array.isArray(v.vendor_categories) ? v.vendor_categories : [],
       LOCV: Array.isArray(v.vendor_locations) ? v.vendor_locations : [],
       IDS: Array.isArray(v.identification_sources) ? v.identification_sources : [],
+      CASH: Array.isArray(v.vendor_cashflow) ? v.vendor_cashflow : [],
+      TIER: Array.isArray(v.tier_category) ? v.tier_category : [],
     },
   };
 }
@@ -443,6 +447,8 @@ const F4_FIELD_MAP: Record<string, { code: string; desc?: string; prefix?: strin
   vendor_category:       { code: 'ATWRT', desc: 'ATWTB' },
   vendor_location:       { code: 'ATWRT', desc: 'ATWTB' },
   identification_source: { code: 'ATWRT', desc: 'ATWTB' },
+  vendor_cashflow:       { code: 'ATWRT', desc: 'ATWTB' },
+  tier_category:         { code: 'ATWRT', desc: 'ATWTB' },
 };
 
 export function SapF4SelectField({
