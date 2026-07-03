@@ -14,7 +14,7 @@ import { OcrUploadAndVerify } from './OcrUploadAndVerify';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { useProviderVerify } from '@/hooks/useProviderVerify';
 import { toastKycResult } from '@/lib/kycToast';
-import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled } from './GstFilingStatusTable';
+import { GstFilingStatusTable, normalizeFilingStatus, evaluateGstr1Compliance } from './GstFilingStatusTable';
 import { GstDeclarationDialog } from './GstDeclarationDialog';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -55,7 +55,7 @@ export function GstKycTab(props: GstKycTabProps) {
   const [legalNameCheckMessage, setLegalNameCheckMessage] = useState<string>('');
   const [verifiedLegalName, setVerifiedLegalName] = useState<string>('');
   const [filingStatusRows, setFilingStatusRows] = useState<any[]>([]);
-  const [latestFiled, setLatestFiled] = useState<boolean | null>(null);
+  const [compliance, setCompliance] = useState<{ previousMonthFiled: boolean; declarationRequired: boolean; checkedPeriod: string } | null>(null);
   const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
   const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
   const [verifiedGstData, setVerifiedGstData] = useState<Record<string, any> | null>(null);
@@ -104,12 +104,15 @@ export function GstKycTab(props: GstKycTabProps) {
       const rows = normalizeFilingStatus(filingSrc);
       setFilingStatusRows(rows);
       setFilingChecked(true);
-      const filed = isLatestPeriodFiled(rows);
-      setLatestFiled(filed);
+      const evalRes = evaluateGstr1Compliance(rows);
+      setCompliance(evalRes);
       const merged = { ...baseGstData, filing_status: filingSrc };
-      if (filed) {
+      if (!evalRes.declarationRequired) {
         props.onVerifiedDetails?.(merged);
-        void persistGstValidation(merged, 'GST verified — filing compliant');
+        const note = evalRes.previousMonthFiled
+          ? `GST verified — GSTR1 filed for ${evalRes.checkedPeriod}`
+          : `GST verified — GSTR1 for ${evalRes.checkedPeriod} not yet filed (within grace period, due 11th)`;
+        void persistGstValidation(merged, note);
       } else {
         setPendingVerifiedData(merged);
         setDeclarationDialogOpen(true);
@@ -380,16 +383,21 @@ export function GstKycTab(props: GstKycTabProps) {
               <h4 className="font-semibold text-sm">GST Filing Status Check</h4>
             </div>
             <div className="flex items-center gap-2">
-              {filingChecked && latestFiled === true && (
+              {filingChecked && compliance?.previousMonthFiled && (
                 <Badge className="bg-success text-success-foreground hover:bg-success">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
-                  GST Filing: COMPLIANT
+                  GSTR1 Filed for {compliance.checkedPeriod}
                 </Badge>
               )}
-              {filingChecked && latestFiled === false && (
+              {filingChecked && compliance && !compliance.previousMonthFiled && !compliance.declarationRequired && (
+                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground bg-muted/40">
+                  GSTR1 for {compliance.checkedPeriod} not yet filed — within grace period (due 11th)
+                </Badge>
+              )}
+              {filingChecked && compliance?.declarationRequired && (
                 <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  GST Not Filed for Last Month
+                  GSTR1 for {compliance.checkedPeriod} not filed — declaration required
                 </Badge>
               )}
               <Button
