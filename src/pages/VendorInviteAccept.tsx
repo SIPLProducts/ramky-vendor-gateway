@@ -23,7 +23,7 @@ export default function VendorInviteAccept() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
-  const [verificationInfo, setVerificationInfo] = useState<{ maskedEmail?: string; sendsRemaining?: number } | null>(null);
+  
   const [attemptKey, setAttemptKey] = useState(0);
   const ranRef = useRef(false);
 
