@@ -2188,16 +2188,21 @@ export function DocumentVerificationStep({
                             <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
                           </div>
                           <div className="flex items-center gap-2">
-                            {gstFilingChecked && gstLatestFiled === true && (
+                            {gstFilingChecked && gstCompliance?.previousMonthFiled && (
                               <Badge className="bg-success text-success-foreground hover:bg-success">
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Filed up to last month
+                                GSTR1 Filed for {gstCompliance.checkedPeriod}
                               </Badge>
                             )}
-                            {gstFilingChecked && gstLatestFiled === false && (
+                            {gstFilingChecked && gstCompliance && !gstCompliance.previousMonthFiled && !gstCompliance.declarationRequired && (
+                              <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground bg-muted/40">
+                                GSTR1 for {gstCompliance.checkedPeriod} not yet filed — within grace period (due 11th)
+                              </Badge>
+                            )}
+                            {gstFilingChecked && gstCompliance?.declarationRequired && (
                               <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                Not filed for last month
+                                GSTR1 for {gstCompliance.checkedPeriod} not filed — declaration required
                               </Badge>
                             )}
                             <Button
