@@ -1278,7 +1278,7 @@ export function DocumentVerificationStep({
     setEditablePrincipalPlace("");
     setGstFilingRows([]);
     setGstFilingChecked(false);
-    setGstLatestFiled(null);
+    setGstCompliance(null);
   }, []);
 
   const effectiveLegalName = useMemo(() => {
