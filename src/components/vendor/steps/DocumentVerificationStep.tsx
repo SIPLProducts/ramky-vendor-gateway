@@ -25,7 +25,7 @@ import { normalizeUploadToImage } from "@/lib/pdfToImage";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
-import { GstFilingStatusTable, normalizeFilingStatus, isLatestPeriodFiled, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
+import { GstFilingStatusTable, normalizeFilingStatus, evaluateGstr1Compliance, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
@@ -443,10 +443,10 @@ export function DocumentVerificationStep({
     () => normalizeFilingStatus((initialData?.gst as any)?.filing_status).length > 0,
   );
   const [gstFilingChecking, setGstFilingChecking] = useState(false);
-  const [gstLatestFiled, setGstLatestFiled] = useState<boolean | null>(
+  const [gstCompliance, setGstCompliance] = useState<{ previousMonthFiled: boolean; declarationRequired: boolean; checkedPeriod: string } | null>(
     () => {
       const rows = normalizeFilingStatus((initialData?.gst as any)?.filing_status);
-      return rows.length ? isLatestPeriodFiled(rows) : null;
+      return rows.length ? evaluateGstr1Compliance(rows) : null;
     },
   );
 
@@ -1278,7 +1278,7 @@ export function DocumentVerificationStep({
     setEditablePrincipalPlace("");
     setGstFilingRows([]);
     setGstFilingChecked(false);
-    setGstLatestFiled(null);
+    setGstCompliance(null);
   }, []);
 
   const effectiveLegalName = useMemo(() => {
@@ -1307,8 +1307,10 @@ export function DocumentVerificationStep({
       const rows = normalizeFilingStatus(filingSrc);
       setGstFilingRows(rows);
       setGstFilingChecked(true);
-      const filed = rows.length ? isLatestPeriodFiled(rows) : false;
-      setGstLatestFiled(filed);
+      const evalRes = rows.length
+        ? evaluateGstr1Compliance(rows)
+        : { previousMonthFiled: false, declarationRequired: false, checkedPeriod: "" };
+      setGstCompliance(evalRes);
       // Persist the filing status onto the vendor_validations GST row so the
       // View Details "GST Compliance Report" popup can render the real table.
       if (vendorId) {
@@ -1318,11 +1320,16 @@ export function DocumentVerificationStep({
             .delete()
             .eq("vendor_id", vendorId)
             .eq("validation_type", "gst");
+          const msg = evalRes.previousMonthFiled
+            ? `GST verified — GSTR1 filed for ${evalRes.checkedPeriod}`
+            : evalRes.declarationRequired
+              ? `GST verified — GSTR1 for ${evalRes.checkedPeriod} not filed (declaration required)`
+              : `GST verified — GSTR1 for ${evalRes.checkedPeriod} not yet filed (within grace period, due 11th)`;
           await supabase.from("vendor_validations").insert({
             vendor_id: vendorId,
             validation_type: "gst",
             status: "passed",
-            message: filed ? "GST verified — filing compliant" : "GST verified — latest month not filed",
+            message: msg,
             details: { ...baseGstData, filing_status: filingSrc },
           });
         } catch (err) {
@@ -1340,7 +1347,7 @@ export function DocumentVerificationStep({
     // Reset filing-status state for the new upload
     setGstFilingRows([]);
     setGstFilingChecked(false);
-    setGstLatestFiled(null);
+    setGstCompliance(null);
     // Clear stale address up front so a previous upload's value can never
     // bleed through if the new registry response is missing the field.
     setEditablePrincipalPlace("");
@@ -1855,7 +1862,7 @@ export function DocumentVerificationStep({
   // GST stage requires: validation verified AND filing check completed AND
   // (latest month filed OR a self-declaration was uploaded).
   const gstFilingOk =
-    gstFilingChecked && (gstLatestFiled === true || !!gstDeclarationFile);
+    gstFilingChecked && (!gstCompliance?.declarationRequired || !!gstDeclarationFile);
   const stage1Done =
     isGstRegistered === true
       ? gstDoc.status === "verified" && gstFilingOk
@@ -1892,7 +1899,7 @@ export function DocumentVerificationStep({
         jurisdictionCentre: gstDoc.ocrData.jurisdiction_centre,
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
         filing_status: gstFilingRows.length ? gstFilingRows : undefined,
-        filingCompliant: gstLatestFiled ?? undefined,
+        filingCompliant: gstCompliance?.previousMonthFiled ?? undefined,
         addressParts: (gstDoc.ocrData.address_city || gstDoc.ocrData.address_state || gstDoc.ocrData.address_pincode || gstDoc.ocrData.address_line)
           ? {
               address: gstDoc.ocrData.address_line || undefined,
@@ -1904,7 +1911,7 @@ export function DocumentVerificationStep({
       };
       // If GST filing was not compliant and a self-declaration was uploaded,
       // carry the file through so the parent saves it under gst_self_declaration.
-      if (gstLatestFiled === false && gstDeclarationFile) {
+      if (gstCompliance?.declarationRequired && gstDeclarationFile) {
         out.gstSelfDeclarationFile = gstDeclarationFile;
       }
     } else if (isGstRegistered === false) {
@@ -1995,7 +2002,7 @@ export function DocumentVerificationStep({
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstLatestFiled]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstCompliance]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
@@ -2181,16 +2188,21 @@ export function DocumentVerificationStep({
                             <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
                           </div>
                           <div className="flex items-center gap-2">
-                            {gstFilingChecked && gstLatestFiled === true && (
+                            {gstFilingChecked && gstCompliance?.previousMonthFiled && (
                               <Badge className="bg-success text-success-foreground hover:bg-success">
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Filed up to last month
+                                GSTR1 Filed for {gstCompliance.checkedPeriod}
                               </Badge>
                             )}
-                            {gstFilingChecked && gstLatestFiled === false && (
+                            {gstFilingChecked && gstCompliance && !gstCompliance.previousMonthFiled && !gstCompliance.declarationRequired && (
+                              <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground bg-muted/40">
+                                GSTR1 for {gstCompliance.checkedPeriod} not yet filed — within grace period (due 11th)
+                              </Badge>
+                            )}
+                            {gstFilingChecked && gstCompliance?.declarationRequired && (
                               <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                Not filed for last month
+                                GSTR1 for {gstCompliance.checkedPeriod} not filed — declaration required
                               </Badge>
                             )}
                             <Button
@@ -2217,12 +2229,12 @@ export function DocumentVerificationStep({
                         )}
 
                         {/* Non-compliant -> require self-declaration upload */}
-                        {gstFilingChecked && gstLatestFiled === false && (
+                        {gstFilingChecked && gstCompliance?.declarationRequired && (
                           <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50/60 p-3">
                             <div className="flex items-start gap-2">
                               <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
                               <div className="text-sm text-amber-900">
-                                GST return for the last month has not been filed. Please download the
+                                GSTR1 for {gstCompliance.checkedPeriod} has not been filed and the due date (11th) has passed. Please download the
                                 GST Returns Declaration, sign it, and upload the signed copy to continue.
                               </div>
                             </div>

@@ -1,47 +1,56 @@
-## Goal
+## Problem
 
-Switch the GST filing compliance logic in vendor registration from **GSTR3B** to **GSTR1**, and make the GST self-declaration upload conditional on the **11th-of-month** rule.
+The GST filing UI shown on the vendor registration form lives in `src/components/vendor/steps/DocumentVerificationStep.tsx`, not `GstKycTab.tsx`. It still uses the old boolean helper `isLatestPeriodFiled` and forces a mandatory declaration upload whenever last month's GSTR1 is not filed — with no 11th-of-month grace period. That's why on 03‑Jul‑2026 the UI shows "Not filed for last month" and requires the declaration, even though we're inside the grace window.
 
-The `GST_FILING` provider (Surepass `gstin-advanced` with `filing_status_get: true`) is already seeded in `KycApiSettings.tsx` — no new provider row needed. It returns the same `filing_status` array containing both GSTR1 and GSTR3B rows.
+The shared helper `evaluateGstr1Compliance` (already added to `GstFilingStatusTable.tsx`) already implements:
+- GSTR1-only match (ignores GSTR3B)
+- Previous calendar month as the target period
+- Grace rule: `declarationRequired = !previousMonthFiled && now.getDate() > 11`
+
+We just need to wire the DocumentVerificationStep to it.
 
 ## Changes
 
-### 1. `src/components/vendor/kyc/GstFilingStatusTable.tsx`
-- **`isLatestPeriodFiled(rows)` → replace with `evaluateGstr1Compliance(rows, now)`** returning:
+### 1. `src/components/vendor/steps/DocumentVerificationStep.tsx`
+
+- Replace the `isLatestPeriodFiled` import with `evaluateGstr1Compliance`.
+- Replace state:
   ```
-  {
-    previousMonthFiled: boolean,   // is previous month's GSTR1 filed?
-    declarationRequired: boolean,  // true only if today > 11th AND previous month GSTR1 not filed
-    checkedPeriod: string          // e.g. "November 2026"
-  }
+  gstLatestFiled: boolean | null
   ```
-  - Match only `return_type === "GSTR1"` (drop the GSTR3B primary + GSTR1 fallback).
-  - "Previous month" = current month − 1, in the correct Indian FY.
-  - Grace period: if `now.getDate() <= 11`, `declarationRequired` is always `false` regardless of filing status.
-- **`dedupeByPeriod`** — change priority so `GSTR1` wins over `GSTR3B` (so the table row shown per period is the GSTR1 one).
-- Table filter: only render `GSTR1` rows (drop GSTR3B entirely from the table). Header already labels the table "GST Return Filing Status" — add a small caption clarifying "GSTR1 (last 3 months)".
+  with:
+  ```
+  gstCompliance: { previousMonthFiled, declarationRequired, checkedPeriod } | null
+  ```
+  Initial value derived from `evaluateGstr1Compliance(rows)` when initial data has filing rows.
+- In `runGstFilingStatusCheck`, compute `evaluateGstr1Compliance(rows)` and store it. Update the persisted `vendor_validations.message` to reflect the three states (filed / within grace / declaration required).
+- Update gating (`stage1Done` / `gstFilingOk`):
+  - Compliant when: filing check done AND (previous month filed OR within grace OR declaration file uploaded).
+  - i.e. `gstFilingOk = gstFilingChecked && (!gstCompliance?.declarationRequired || !!gstDeclarationFile)`.
+- Update `buildOutput`:
+  - `filingCompliant = gstCompliance?.previousMonthFiled ?? undefined`.
+  - Only attach `gstSelfDeclarationFile` when `gstCompliance?.declarationRequired` is true.
+- Update the UI badges (lines 2184–2195) to three states:
+  - Success ("GSTR1 Filed for {period}") when `previousMonthFiled` is true.
+  - Muted outline ("GSTR1 for {period} not yet filed — within grace period, due 11th") when not filed but not required.
+  - Amber warning ("GSTR1 for {period} not filed — declaration required") when `declarationRequired` is true.
+- The declaration upload block (lines 2220–2249) renders only when `gstCompliance?.declarationRequired` is true. Update the alert copy to mention the checked period.
+- Include `gstCompliance` in the `useEffect` deps array on line 1998 (replacing `gstLatestFiled`).
 
-### 2. `src/components/vendor/kyc/GstKycTab.tsx`
-- Replace the `isLatestPeriodFiled` import + `latestFiled` boolean with the new `evaluateGstr1Compliance` result.
-- In `runFilingStatusCheck`:
-  - If `declarationRequired === false` → auto-advance (compliant OR within grace period).
-  - If `declarationRequired === true` → open the declaration dialog (mandatory upload).
-- Update the badge UI:
-  - `previousMonthFiled === true` → green "GSTR1 Filed for {previousMonth}" badge.
-  - `previousMonthFiled === false && declarationRequired === false` → neutral badge "GSTR1 for {previousMonth} not yet filed — within grace period (due 11th)".
-  - `declarationRequired === true` → amber "GSTR1 for {previousMonth} not filed — declaration required".
+### 2. No changes required elsewhere
 
-### 3. `src/components/vendor/steps/ComplianceStep.tsx`
-- The `isStepValid` gate already requires `statuses.gst === 'passed'`. GstKycTab only sets `passed` after either (a) filing compliant or (b) declaration uploaded via dialog, so behaviour naturally follows.
-- No schema change needed — `gstSelfDeclarationFile` stays optional at the Zod level; the mandatory-ness is enforced by the GstKycTab dialog gating tab-status.
+- `GstFilingStatusTable.tsx` — already GSTR1-only, dedupes GSTR1 rows, and exports `evaluateGstr1Compliance`.
+- `GstKycTab.tsx` — already uses the new helper.
+- `KycApiSettings.tsx` / `GST_FILING` provider — already seeded with `filing_status_get: true`; no config change needed.
+- Zod schema — `gstSelfDeclarationFile` stays optional; mandatory-ness is enforced by the gating logic.
 
-### 4. `src/components/vendor/steps/DocumentVerificationStep.tsx` and `src/components/vendor/VendorReviewDialog.tsx`
-- These also render the filing table and consume `filing_status`. Update them to pass only GSTR1 rows into the table (via the same normalized helper) so the review/reports views stay consistent with the vendor-facing view.
+## Behaviour after the fix (verified against today = 03‑Jul‑2026)
 
-### 5. KYC API Settings (no code change)
-- The `GST_FILING` provider config is already present in the seed list in `src/pages/KycApiSettings.tsx` (lines 90–98) pointing to Surepass `gstin-advanced` with `filing_status_get: true`. Admins can open it from the settings screen and paste their API token if not already saved. Nothing to change in the provider record for the GSTR1 switch — the switch is purely client-side interpretation of the same response.
+- 03‑Jul, June GSTR1 not filed → within grace → declaration NOT required, stage passes.
+- 12‑Jul, June GSTR1 not filed → grace passed → declaration required, stage blocked until upload.
+- Any date, previous month GSTR1 filed → no declaration ever required.
 
-## Notes / Assumptions
-- "After the 11th" is interpreted strictly as `day-of-month > 11` in the server/browser local time (India). If you need Asia/Kolkata explicitly regardless of browser TZ, we can compute using `Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata' })`.
-- Table continues to show last 3 periods (`limit={3}`), now GSTR1-only.
-- No DB migration required.
+## Verification
+
+- Manually confirm the badge and declaration block behaviour on the vendor registration page at `/vendor/registration` for a GSTIN whose previous month is unfiled, before and after the 11th (using the shared helper's `now` parameter path if needed for debugging).
+- Confirm `tsgo` typechecks pass after the state-shape change.
