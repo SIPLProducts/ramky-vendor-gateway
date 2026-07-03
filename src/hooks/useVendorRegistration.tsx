@@ -703,6 +703,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         msmeDeclarationReason: vendor.msme_declaration_reason || '',
         iecCertificateFile: null,
         swiftIbanProofFile: null,
+        gstFilingStatus: (() => {
+          const raw = (vendor as any).__gst_validation_details?.filing_status;
+          if (!raw) return [];
+          if (Array.isArray(raw) && raw.length > 0 && Array.isArray(raw[0])) return raw[0];
+          return Array.isArray(raw) ? raw : [];
+        })(),
       },
       bank: {
         bankName: vendor.bank_name || '',
