@@ -153,10 +153,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // If the first click already provisioned the invited auth user but the browser
-      // never completed the magic-link redirect, let the invited mailbox open the
-      // same invite again. A forwarded/copy user still won't have the password.
-      if (invite.user_id && !invite.vendor_id) {
+      // Re-open branch: sign the originally invited auth user back in so they
+      // land directly on the Application Progress screen without another email.
+      if (invite.user_id) {
         const { data: userRecord } = await admin.auth.admin.getUserById(invite.user_id);
         const claimedEmail = (userRecord?.user?.email || '').toLowerCase();
         if (claimedEmail === invitedEmail) {
@@ -178,6 +177,19 @@ Deno.serve(async (req) => {
           });
 
           if (!signInErr && signInData?.session) {
+            try {
+              await admin.from('invitation_email_events').insert({
+                invitation_id: invite.id,
+                email_id: null,
+                event_type: 'reopen',
+                event_data: {
+                  used_at: invite.used_at,
+                  caller_email: callerEmail,
+                  caller_user_id: callerUserId,
+                },
+              });
+            } catch { /* ignore */ }
+
             return json(200, {
               status: 'claimed',
               session: signInData.session,
@@ -185,9 +197,11 @@ Deno.serve(async (req) => {
               vendor_id: invite.vendor_id,
             });
           }
+          console.warn('re-open sign-in failed:', signInErr);
         }
       }
-      // Anyone else (re-click, forwarded, copied) is denied
+
+      // Fallback: log and deny
       try {
         await admin.from('invitation_email_events').insert({
           invitation_id: invite.id,
@@ -202,6 +216,7 @@ Deno.serve(async (req) => {
       } catch { /* ignore */ }
       return json(403, { status: 'denied', code: 'already_used' });
     }
+
 
     // 3. First-click claim: ensure auth user exists for invitedEmail
     let authUserId: string | null = null;
