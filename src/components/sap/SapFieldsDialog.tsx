@@ -472,8 +472,8 @@ export function SapF4SelectField({
   filter?: { key: string; value: string; emptyHint?: string };
 }) {
   const map = F4_FIELD_MAP[masterType];
-  const isLive = Array.isArray(liveItems);
-  const { data: cachedRows, isLoading: isLoadingCache } = useSapMasterData(isLive ? undefined : masterType);
+  const isLive = Array.isArray(liveItems) && liveItems.length > 0;
+  const { data: cachedRows, isLoading: isLoadingCache } = useSapMasterData(masterType);
 
   const filterActive = !!filter;
   const filterReady = !filter || !!String(filter.value || '').trim();
@@ -576,8 +576,8 @@ export function SapF4MultiSelectField({
   placeholder?: string;
 }) {
   const map = F4_FIELD_MAP[masterType];
-  const isLive = Array.isArray(liveItems);
-  const { data: cachedRows, isLoading } = useSapMasterData(isLive ? undefined : masterType);
+  const isLive = Array.isArray(liveItems) && liveItems.length > 0;
+  const { data: cachedRows, isLoading } = useSapMasterData(masterType);
 
   const options = (() => {
     if (isLive) {
