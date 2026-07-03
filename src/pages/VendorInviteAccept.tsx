@@ -32,83 +32,87 @@ export default function VendorInviteAccept() {
       // Retry loop for the "pending" (prefetch-suspected) response.
       // eslint-disable-next-line no-constant-condition
       while (true) {
+      while (true) {
         attempt += 1;
-        const { data, error } = await supabase.functions.invoke('claim-vendor-invite', {
-          body: { token, redirectOrigin: window.location.origin, attempt },
-        });
-
-        const d = (data as any) || {};
-        const status = d.status;
-        const code = d.code;
-
-        if (error && !status) {
-          setErrorMsg('We could not open your invitation. Please try again shortly.');
-          setPhase('error');
-          return;
-        }
-
-        if (status === 'claimed' && d.session?.access_token && d.session?.refresh_token) {
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: d.session.access_token,
-            refresh_token: d.session.refresh_token,
+        try {
+          const { data, error } = await supabase.functions.invoke('claim-vendor-invite', {
+            body: { token, redirectOrigin: window.location.origin, attempt },
           });
-          if (sessionError) {
-            console.error('Unable to set invite session:', sessionError);
-            setErrorMsg('We could not sign you in from this invitation. Please try again shortly.');
+
+          const d = (data as any) || {};
+          const status = d.status;
+          const code = d.code;
+
+          if (error && !status) {
+            setErrorMsg('We could not open your invitation. Please try again shortly.');
             setPhase('error');
             return;
           }
-          setPhase('redirecting');
-          navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
-            replace: true,
-          });
-          return;
-        }
 
-        // Backward compatibility for older deployed edge functions.
-        if (status === 'claimed' && d.action_link) {
-          setPhase('redirecting');
-          window.location.href = d.action_link as string;
-          return;
-        }
+          if (status === 'claimed' && d.session?.access_token && d.session?.refresh_token) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: d.session.access_token,
+              refresh_token: d.session.refresh_token,
+            });
+            if (sessionError) {
+              console.error('Unable to set invite session:', sessionError);
+              setErrorMsg('We could not sign you in from this invitation. Please try again shortly.');
+              setPhase('error');
+              return;
+            }
+            setPhase('redirecting');
+            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
+              replace: true,
+            });
+            return;
+          }
 
-        if (status === 'already_claimed_same_user') {
-          setPhase('redirecting');
-          navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
-            replace: true,
-          });
-          return;
-        }
+          if (status === 'claimed' && d.action_link) {
+            setPhase('redirecting');
+            window.location.href = d.action_link as string;
+            return;
+          }
 
-        if (status === 'pending') {
-          // Likely a mail-security scanner prefetch; retry from the real browser click.
-          setTimeout(() => { ranRef.current = false; setPhase('loading'); }, 800);
-          return;
-        }
+          if (status === 'already_claimed_same_user') {
+            setPhase('redirecting');
+            navigate(d.redirect || `/vendor/registration?token=${encodeURIComponent(token)}`, {
+              replace: true,
+            });
+            return;
+          }
 
-        if (status === 'denied' || code === 'already_used') {
-          setPhase('denied');
-          return;
-        }
+          if (status === 'pending' && attempt < 4) {
+            // Mail-security scanner prefetch suspected; wait briefly and retry.
+            await new Promise((r) => setTimeout(r, 1000));
+            continue;
+          }
 
-        if (status === 'expired' || code === 'expired') {
-          setErrorMsg('This invitation link has expired. Please contact the administrator.');
+          if (status === 'denied' || code === 'already_used') {
+            setPhase('denied');
+            return;
+          }
+
+          if (status === 'expired' || code === 'expired') {
+            setErrorMsg('This invitation link has expired. Please contact the administrator.');
+            setPhase('error');
+            return;
+          }
+
+          if (status === 'invalid' || code === 'invalid') {
+            setErrorMsg('Invalid invitation link. Please contact the administrator.');
+            setPhase('error');
+            return;
+          }
+
+          setErrorMsg('We could not open your invitation. Please contact the administrator.');
+          setPhase('error');
+          return;
+        } catch (err) {
+          console.error('claim-vendor-invite failed:', err);
+          setErrorMsg('An unexpected error occurred. Please try again.');
           setPhase('error');
           return;
         }
-
-        if (status === 'invalid' || code === 'invalid') {
-          setErrorMsg('Invalid invitation link. Please contact the administrator.');
-          setPhase('error');
-          return;
-        }
-
-        setErrorMsg('We could not open your invitation. Please contact the administrator.');
-        setPhase('error');
-      } catch (err) {
-        console.error('claim-vendor-invite failed:', err);
-        setErrorMsg('An unexpected error occurred. Please try again.');
-        setPhase('error');
       }
     })();
   }, [token, navigate]);
