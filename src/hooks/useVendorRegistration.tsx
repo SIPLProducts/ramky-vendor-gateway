@@ -171,6 +171,20 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else {
           console.warn('Failed to hydrate vendor documents:', docsError);
         }
+
+        // Hydrate the latest GST validation row so the persisted filing status
+        // (last 3 months) is available when opening the vendor for edit.
+        const { data: gstVal, error: gstValError } = await supabase
+          .from('vendor_validations')
+          .select('details')
+          .eq('vendor_id', data.id)
+          .eq('validation_type', 'gst')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!gstValError && gstVal) {
+          (data as any).__gst_validation_details = (gstVal as any).details ?? null;
+        }
       }
 
       // Initialize vendorId and vendorStatus from existing vendor
@@ -689,6 +703,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         msmeDeclarationReason: vendor.msme_declaration_reason || '',
         iecCertificateFile: null,
         swiftIbanProofFile: null,
+        gstFilingStatus: (() => {
+          const raw = (vendor as any).__gst_validation_details?.filing_status;
+          if (!raw) return [];
+          if (Array.isArray(raw) && raw.length > 0 && Array.isArray(raw[0])) return raw[0];
+          return Array.isArray(raw) ? raw : [];
+        })(),
       },
       bank: {
         bankName: vendor.bank_name || '',
