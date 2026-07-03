@@ -1862,7 +1862,7 @@ export function DocumentVerificationStep({
   // GST stage requires: validation verified AND filing check completed AND
   // (latest month filed OR a self-declaration was uploaded).
   const gstFilingOk =
-    gstFilingChecked && (gstLatestFiled === true || !!gstDeclarationFile);
+    gstFilingChecked && (!gstCompliance?.declarationRequired || !!gstDeclarationFile);
   const stage1Done =
     isGstRegistered === true
       ? gstDoc.status === "verified" && gstFilingOk
