@@ -508,8 +508,17 @@ export function DocumentVerificationStep({
       status: "verified",
       ocrData: data,
       originalOcrData: data,
-      apiData: { name: initialData.msme.apiName },
+      apiData: {
+        name: initialData.msme.apiName,
+        normalized: {
+          udyam_number: initialData.msme.udyamNumber,
+          enterprise_name: initialData.msme.apiName || initialData.msme.enterpriseName,
+          enterprise_type: initialData.msme.enterpriseType,
+          major_activity: initialData.msme.majorActivity,
+        },
+      },
       nameMatchScore: initialData.msme.nameMatchScore,
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.msmeCertificateFile),
     };
   });
