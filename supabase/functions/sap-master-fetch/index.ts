@@ -31,6 +31,8 @@ const MASTER_MAP: Record<string, { type: string; code: string; desc?: string; co
   CAT_VENDOR:         { type: "vendor_category",          code: "ATWRT", desc: "ATWTB" },
   LOCATION_VENDOR:    { type: "vendor_location",          code: "ATWRT", desc: "ATWTB" },
   IDENTIFICATION_SOURCE: { type: "identification_source", code: "ATWRT", desc: "ATWTB" },
+  CFSTMT:             { type: "vendor_cashflow",          code: "ATWRT", desc: "ATWTB" },
+  CP_TIER:            { type: "tier_category",            code: "ATWRT", desc: "ATWTB" },
 };
 
 // Which master types belong to which named SAP API config.
