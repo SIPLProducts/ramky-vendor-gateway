@@ -1,49 +1,39 @@
 ## Problem
 
-The SAP sync payload (sample in `sapsending_payload.txt`) currently emits:
+International Vendor → Company Details → Country and Region dropdowns render empty even though `sap_master_data` holds 245 country rows and 1583 region rows.
 
-```json
-"CLASSIFY": {
-  ...
-  "TIER_CATEGORY": [ { "TIER": "TIER 1" } ]
-}
+Root cause: the `public.sap_master_data` table has RLS policies (including "Authenticated users can read SAP master data" → `USING (true)`) but **no table-level GRANT** to `authenticated` / `service_role`. Supabase's Data API (PostgREST) requires an explicit GRANT — RLS alone is not enough — so every `select` from the client returns zero rows and the dropdowns fall back to "empty". This also silently affects every other consumer of that table (Classification F4, SAP Sync popup fallback, etc.).
+
+Confirmed via `information_schema.role_table_grants` — the table has zero grants.
+
+## Fix
+
+### Single migration — add missing grants on `public.sap_master_data`
+
+```sql
+GRANT SELECT ON public.sap_master_data TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.sap_master_data TO authenticated;  -- admin CRUD is already gated by existing RLS policies
+GRANT ALL ON public.sap_master_data TO service_role;                       -- edge functions (sap-master-fetch) write here
 ```
 
-The actual SAP contract (`SAP_New_Payload-2.txt` / user spec) expects the last classify block to be named `VENCATEGORY` with inner key `VENCAT`, and the payload must also carry a top‑level `WHOLDTAX` array (withholding tax). `WHOLDTAX` is not yet ready on our side, so we ship it as an empty array `[]` for now — matching SAP's schema so their parser doesn't fail.
+No policy changes, no schema changes. The existing policies already limit writes to admin roles; the grants just let PostgREST forward the request to Postgres so RLS can evaluate.
 
-## Fix (single file — `src/lib/sapPayloadBuilder.ts`)
+### No code changes required
 
-1. **Rename the tier classify block** (~L398)
-   - Change wrapper key `TIER_CATEGORY` → `VENCATEGORY`
-   - Change inner element key from `TIER` → `VENCAT`
-   - Source data (`classifyArrays.TIER`, seeded from overrides `classify.TIER` and `vendor.tier_category`) is unchanged — only the emitted JSON shape changes.
+- Country label already renders as `LAND1 — LANDX` (e.g. `IN — India`) via `{c.code} — {c.description}`.
+- Region label already renders as `BLAND — BEZEI` (e.g. `13 — Maharashtra`) and is filtered by selected country via `extra.LAND1`.
+- SAP payload already sends `country = LAND1` and `region = BLAND` (matches the requested `"country": "IN", "region": "13"` shape).
 
-   After change, the CLASSIFY block will look like:
-   ```json
-   "CLASSIFY": {
-     "MAT_GRP_VENDOR":        [ { "MGV": "..." } ],
-     "CAT_VENDOR":            [ { "CATV": "..." } ],
-     "LOCATION_VENDOR":       [ { "LOCV": "..." } ],
-     "IDENTIFICATION_SOURCE": [ { "IDS": "..." } ],
-     "CASHFLOW":              [ { "CASH": "..." } ],
-     "VENCATEGORY":           [ { "VENCAT": "..." } ]
-   }
-   ```
+## Verification
 
-2. **Add `WHOLDTAX` block** (right after CLASSIFY assignment, ~L399)
-   - Set `row.WHOLDTAX = []` unconditionally (empty for now; SAP accepts the empty array).
-   - Ensure it isn't overwritten by any existing template field — if the current default template happens to set a `WHOLDTAX`/`wholdtax` key, delete it before assigning so casing is consistent (`WHOLDTAX`).
-   - Leave a short code comment: `// TODO: populate WHOLDTAX entries (WITHT / WT_WITHCD / WT_SUBJCT / QSREC / QLAND) once withholding tax capture is wired.`
-
-## Out of scope
-
-- No UI/overrides changes — the "Tier Category" F4 field, its label, and the `TIER` override key stay as-is (only the outbound JSON key is renamed).
-- No changes to `sync-vendor-to-sap` / bulk edge functions — they forward the built payload verbatim.
-- No DB, migration, or type changes.
-- Actual withholding tax data collection and mapping is a separate follow-up.
+After the migration runs:
+1. Open International vendor registration → Company Details step.
+2. Country dropdown shows the full SAP country list (LAND1 — LANDX).
+3. Selecting a country enables Region and shows only that country's regions (BLAND — BEZEI).
+4. On SAP sync, the built payload contains `"country": "<LAND1>"` and `"region": "<BLAND>"` as before.
 
 ## Files touched
 
 ```text
-src/lib/sapPayloadBuilder.ts   (CLASSIFY rename + WHOLDTAX: [])
+supabase migration — GRANTs on public.sap_master_data (no code files)
 ```
