@@ -1,38 +1,31 @@
 ## Goal
-When a vendor who already submitted clicks **Begin Registration** in the invite email, they should land **directly on the Application Progress screen** — no extra email, no extra click.
+Full wipe of **every vendor** in the system so you can start inviting fresh. Admin / buyer / finance / SCM / SAP users stay intact.
 
-## Current behavior
-`claim-vendor-invite` marks the invite as used on the first click. On a second click, if the browser has no matching Supabase session (they closed the tab, switched devices, etc.), the function returns `denied / already_used` and the vendor sees the red **Access Denied** card.
+## What gets deleted
+Executed in one migration (respects FKs):
 
-## Proposed change
+1. `invitation_email_events` — all rows
+2. `vendor_approval_progress` — all rows
+3. `vendor_documents` — all rows
+4. `vendor_validations` — all rows
+5. `ocr_extractions` — rows tied to vendor uploads
+6. `vendor_feedback` — all rows
+7. `vendors` — all rows
+8. `vendor_invitations` — all rows
+9. `login_attempts` — rows for vendor emails
+10. `user_custom_roles` / `user_roles` / `profiles` — rows for users whose role is `vendor`
+11. `auth.users` — same set (users whose `user_roles.role = 'vendor'`)
 
-### 1. Edge function `claim-vendor-invite` — allow original vendor to re-enter
-Inside the existing `if (invite.used_at)` block, add a new branch **before** the "denied" fallback:
+## What is preserved
+- Admin, buyer, finance_1, finance_2, scm_head, scm_manager, ceo_office, sap_team, sharvi_admin users
+- Approval flow configs (`buyer_approval_flows`, `buyer_scm_mappings`)
+- Tenants, SMTP configs, form configs, SAP configs
+- Custom roles and screen permissions
+- `vendor_reference_counters` (kept so new reference numbers keep incrementing; tell me if you want it reset too)
 
-- If `invite.user_id` is set (the auth user we provisioned on first claim) and its email equals `invite.email`, sign that user back in using the stored invite password (`${token}:${invite.id}`) and return `status: 'claimed'` with the fresh session and `redirect: /vendor/registration?token=...`.
-- Log the event as `reopen` in `invitation_email_events` (separate from `reuse_attempt`) so we still audit every re-click.
-- The prefetch guard and non-POST rejection stay in place, so mail scanners cannot trigger this branch.
-- The existing `already_claimed_same_user` shortcut (caller already signed in as invited user) still runs first, so no extra work when the session is already valid.
+## Safety
+- **Irreversible.** No backup taken.
+- Any vendor currently mid-registration will be logged out and their data gone.
+- If a vendor auth user was reused for something non-vendor (unlikely), it will still be deleted.
 
-### 2. Front-end `VendorInviteAccept.tsx`
-No new UI phase. Existing `status: 'claimed'` handler already:
-- Calls `supabase.auth.setSession(...)`
-- Navigates to `/vendor/registration?token=...`
-
-That page already renders the **read-only Application Progress / status tracker** for submitted vendors, so the vendor immediately sees their approval status.
-
-### 3. Routing check
-Confirm `/vendor/registration` shows the progress tracker (not an editable form) whenever the vendor's status is `submitted / *_review / approved / rejected`. This is already the behavior (RegistrationStatusTracker + gating we set earlier); no route change required.
-
-## Files to change
-- `supabase/functions/claim-vendor-invite/index.ts` — add the "re-open" branch inside the already-used block; log `reopen` audit event.
-- No frontend changes required.
-
-## Security trade-off (please confirm)
-Because the sign-in is triggered by possession of the invite link, **anyone the vendor forwards the link to after submission could also land on the Application Progress screen** (and, since it signs them in as the vendor, into the vendor account itself). Options:
-
-- **A — Ship as planned above:** smoothest UX, matches your request, but forwarded recipients regain access post-submission.
-- **B — Restrict re-open to progress-only, read-only URL:** sign in a limited "viewer" session that can only read this one vendor's status page. More work; still link-holder based.
-- **C — Keep magic-link (previous plan):** email a fresh sign-in link to the invited mailbox on re-click. One extra click for the vendor, but forwarded holders cannot open it.
-
-Default in this plan is **A**. Reply with B or C if you want the safer variant instead.
+Reply approve and I'll run the migration. If you want to also reset `vendor_reference_counters` to start numbering from 001 again, say so and I'll add it.
