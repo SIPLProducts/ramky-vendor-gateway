@@ -96,38 +96,73 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
     return () => sub.unsubscribe();
   }, [watch, onLiveUpdate]);
 
+  // Cache fallback (same source that Company Code / Rec-Account rely on in SAP Sync)
+  const { data: cachedCountries, isLoading: cachedCountriesLoading } = useSapMasterData('country');
+  const { data: cachedRegions, isLoading: cachedRegionsLoading } = useSapMasterData('region');
+
+  const liveCountries = (liveF4?.COUNTRY || []) as F4Item[];
+  const liveRegions = (liveF4?.REGION || []) as F4Item[];
+  const useLiveCountry = liveCountries.length > 0;
+  const useLiveRegion = liveRegions.length > 0;
+
   const countries = useMemo(() => {
-    const raw = (liveF4?.COUNTRY || []) as F4Item[];
-    return raw
-      .map((it, idx) => {
-        const code = String((it.LAND1 ?? (it as any).code ?? '') as string);
-        const desc = String((it.LANDX ?? it.NATIO ?? (it as any).description ?? '') as string);
-        return { id: `c-${idx}-${code}`, code, desc };
+    if (useLiveCountry) {
+      return liveCountries
+        .map((it, idx) => {
+          const code = String((it.LAND1 ?? (it as any).code ?? '') as string);
+          const desc = String((it.LANDX ?? it.NATIO ?? (it as any).description ?? '') as string);
+          return { id: `c-live-${idx}-${code}`, code, desc };
+        })
+        .filter((c) => c.code);
+    }
+    return (cachedCountries || [])
+      .map((r, idx) => {
+        const extra = (r.extra || {}) as Record<string, unknown>;
+        const code = String((extra.LAND1 ?? r.code ?? '') as string);
+        const desc = String((extra.LANDX ?? extra.NATIO ?? r.description ?? '') as string);
+        return { id: `c-cache-${idx}-${r.id}`, code, desc };
       })
       .filter((c) => c.code);
-  }, [liveF4]);
+  }, [useLiveCountry, liveCountries, cachedCountries]);
 
   const regionsForCountry = useMemo(() => {
     if (!selectedCountry) return [] as { id: string; code: string; desc: string }[];
-    const raw = (liveF4?.REGION || []) as F4Item[];
-    return raw
-      .filter((it) => String((it.LAND1 ?? '') as string) === selectedCountry)
-      .map((it, idx) => {
-        const code = String((it.BLAND ?? (it as any).code ?? '') as string);
-        const desc = String((it.BEZEI ?? (it as any).description ?? '') as string);
-        return { id: `r-${idx}-${code}`, code, desc };
+    if (useLiveRegion) {
+      return liveRegions
+        .filter((it) => String((it.LAND1 ?? '') as string) === selectedCountry)
+        .map((it, idx) => {
+          const code = String((it.BLAND ?? (it as any).code ?? '') as string);
+          const desc = String((it.BEZEI ?? (it as any).description ?? '') as string);
+          return { id: `r-live-${idx}-${code}`, code, desc };
+        })
+        .filter((r) => r.code);
+    }
+    return (cachedRegions || [])
+      .filter((r) => {
+        const extra = (r.extra || {}) as Record<string, unknown>;
+        return String((extra.LAND1 ?? '') as string) === selectedCountry;
+      })
+      .map((r, idx) => {
+        const extra = (r.extra || {}) as Record<string, unknown>;
+        const code = String((extra.BLAND ?? r.code ?? '') as string);
+        const desc = String((extra.BEZEI ?? r.description ?? '') as string);
+        return { id: `r-cache-${idx}-${r.id}`, code, desc };
       })
       .filter((r) => r.code);
-  }, [liveF4, selectedCountry]);
+  }, [useLiveRegion, liveRegions, cachedRegions, selectedCountry]);
 
-  const countriesFetching = f4Fetching;
-  const countriesError = f4Error;
-  const regionsFetching = f4Fetching;
-  const regionsError = f4Error;
+  const hasCountries = countries.length > 0;
+  const usingCachedCountries = !useLiveCountry && hasCountries;
+  const usingCachedRegions = !useLiveRegion && regionsForCountry.length > 0;
+
+  const countriesFetching = (f4Fetching || cachedCountriesLoading) && !hasCountries;
+  const regionsFetching = (f4Fetching || cachedRegionsLoading) && regionsForCountry.length === 0 && !!selectedCountry;
+  // Only surface the red error state when we have nothing to show at all.
+  const countriesError = !hasCountries ? f4Error : null;
+  const regionsError = !!selectedCountry && regionsForCountry.length === 0 && !regionsFetching ? f4Error : null;
   const retryCountries = fetchF4;
   const retryRegions = fetchF4;
-  const hasCountries = countries.length > 0;
-  const countryDisabled = countriesFetching || (!hasCountries);
+  const countryDisabled = countriesFetching || !hasCountries;
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
