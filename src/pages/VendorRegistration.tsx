@@ -308,22 +308,28 @@ export default function VendorRegistration() {
   // If the auth session is lost while the form is open, redirect back to the
   // invite/login page so subsequent saves don't fail with confusing RLS errors.
   useEffect(() => {
+    let sawInitial = false;
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || (!session && event === 'TOKEN_REFRESHED')) {
-        toast({
-          title: 'Session expired',
-          description: 'Please sign in again to continue your registration.',
-          variant: 'destructive',
-        });
-        if (invitationToken) {
-          navigate(`/vendor/invite?token=${invitationToken}`);
-        } else {
-          navigate('/auth');
-        }
+      // Skip the first INITIAL_SESSION event — it fires during hydration and
+      // can race the magic-link sign-in, causing a false "Session expired".
+      if (!sawInitial) { sawInitial = true; return; }
+      // Only react to an explicit sign-out. A TOKEN_REFRESHED with no session
+      // is a transient state during hydration, not a real logout.
+      if (event !== 'SIGNED_OUT') return;
+      toast({
+        title: 'Session expired',
+        description: 'Please sign in again to continue your registration.',
+        variant: 'destructive',
+      });
+      const tokenParam = invitationToken || searchParams.get('token');
+      if (tokenParam) {
+        navigate(`/vendor/invite?token=${tokenParam}`);
+      } else {
+        navigate('/auth');
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [invitationToken, navigate, toast]);
+  }, [invitationToken, navigate, toast, searchParams]);
 
 
 
