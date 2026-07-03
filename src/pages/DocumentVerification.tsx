@@ -58,6 +58,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 
 type ValidationStatus = 'pending' | 'passed' | 'failed' | 'skipped';
 
