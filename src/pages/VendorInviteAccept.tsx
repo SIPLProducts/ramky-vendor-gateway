@@ -76,6 +76,12 @@ export default function VendorInviteAccept() {
           return;
         }
 
+        if (status === 'pending') {
+          // Likely a mail-security scanner prefetch; retry from the real browser click.
+          setTimeout(() => { ranRef.current = false; setPhase('loading'); }, 800);
+          return;
+        }
+
         if (status === 'denied' || code === 'already_used') {
           setPhase('denied');
           return;
