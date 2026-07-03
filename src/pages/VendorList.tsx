@@ -614,6 +614,14 @@ export default function VendorList() {
                           <p className="text-muted-foreground">MSME Category</p>
                           <p className="font-medium capitalize">{selectedVendor.msme_category || '-'}</p>
                         </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">PAN Status</p>
+                          <p className="font-medium">{formatPanStatus((selectedVendor as any).pan_status)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Is Aadhaar Linked</p>
+                          <p className="font-medium">{formatAadhaarLinked((selectedVendor as any).pan_aadhaar_linked)}</p>
+                        </div>
                       </div>
                     </div>
 
