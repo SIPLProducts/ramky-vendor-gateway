@@ -39,6 +39,16 @@ const SAP_KEY_BY_TYPE = Object.fromEntries(
   Object.entries(MASTER_MAP).map(([sapKey, mapping]) => [mapping.type, sapKey]),
 ) as Record<string, string>;
 
+function normalizeRequestedTypes(body: any): string[] | undefined {
+  const raw = body?.master_types ?? body?.master_type;
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const values = Array.isArray(raw) ? raw.flat(Infinity) : [raw];
+  const normalized = values
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+}
+
 // Which master types belong to which named SAP API config.
 const CLASSIFICATION_TYPES = new Set([
   "material_group_vendor",
@@ -289,9 +299,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const requestedTypes: string[] | undefined = Array.isArray(body?.master_types)
-      ? body.master_types
-      : (body?.master_type ? [body.master_type] : undefined);
+    const requestedTypes = normalizeRequestedTypes(body);
     trace(reqId, SVC, "body.parsed", { requestedTypes: requestedTypes || null });
 
     const supabase = createClient(
@@ -338,6 +346,24 @@ serve(async (req) => {
       runs.push({ config: generalCfg, allowedSapKeys: generalKeys, label: CONFIG_NAME_GENERAL });
     }
 
+    // Some installations expose COUNTRY/REGION in the Classification F4 endpoint.
+    // If those are specifically requested, call Classification F4s as a live fallback too.
+    const requestedGeneralSapKeys = new Set(
+      (requestedTypes || [])
+        .map((t) => SAP_KEY_BY_TYPE[t])
+        .filter((k): k is string => !!k && !CLASSIFICATION_SAP_KEYS.has(k)),
+    );
+    if (requestedGeneralSapKeys.size > 0 && classificationCfg) {
+      const alreadyQueued = runs.some((r) => r.config.id === classificationCfg.id && r.label === `${CONFIG_NAME_CLASSIFICATION} fallback`);
+      if (!alreadyQueued) {
+        runs.push({
+          config: classificationCfg,
+          allowedSapKeys: requestedGeneralSapKeys,
+          label: `${CONFIG_NAME_CLASSIFICATION} fallback`,
+        });
+      }
+    }
+
     // Fallback: if neither named config exists, use legacy single-config behavior.
     if (runs.length === 0) {
       const legacy = legacyFindConfig(allConfigs);
@@ -366,7 +392,7 @@ serve(async (req) => {
         if (requestedTypes && !requestedTypes.includes(mapping.type)) continue;
         const arr: any[] = Array.isArray(sapJson?.[sapKey]) ? sapJson[sapKey] : [];
         // Capture raw response slice for UI
-        if (!sapResponse[sapKey]) sapResponse[sapKey] = arr;
+        if (!sapResponse[sapKey] || (sapResponse[sapKey].length === 0 && arr.length > 0)) sapResponse[sapKey] = arr;
 
         let skipped = 0;
         const rows: any[] = [];
