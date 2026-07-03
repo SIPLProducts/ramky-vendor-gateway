@@ -55,7 +55,7 @@ export function GstKycTab(props: GstKycTabProps) {
   const [legalNameCheckMessage, setLegalNameCheckMessage] = useState<string>('');
   const [verifiedLegalName, setVerifiedLegalName] = useState<string>('');
   const [filingStatusRows, setFilingStatusRows] = useState<any[]>([]);
-  const [latestFiled, setLatestFiled] = useState<boolean | null>(null);
+  const [compliance, setCompliance] = useState<{ previousMonthFiled: boolean; declarationRequired: boolean; checkedPeriod: string } | null>(null);
   const [declarationDialogOpen, setDeclarationDialogOpen] = useState(false);
   const [pendingVerifiedData, setPendingVerifiedData] = useState<Record<string, any> | null>(null);
   const [verifiedGstData, setVerifiedGstData] = useState<Record<string, any> | null>(null);
