@@ -62,6 +62,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 
 export default function FinanceReview() {
   const [searchTerm, setSearchTerm] = useState('');
