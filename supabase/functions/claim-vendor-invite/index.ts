@@ -3,13 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
-
-function randomPassword(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('') + 'Aa1!';
-}
 
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -23,37 +18,10 @@ function isAuthError(error: unknown): boolean {
   return msg.includes('invalid login credentials') || msg.includes('email not confirmed');
 }
 
-function normalizeActionLink(rawActionLink: string, redirectOrigin?: string): string {
-  if (!redirectOrigin) return rawActionLink;
-  try {
-    const actionUrl = new URL(rawActionLink);
-    const originUrl = new URL(redirectOrigin);
-    actionUrl.protocol = originUrl.protocol;
-    actionUrl.host = originUrl.host;
-    if (actionUrl.pathname.startsWith('/auth/v1/')) {
-      actionUrl.pathname = '/supabase' + actionUrl.pathname;
-    }
-    const rt = actionUrl.searchParams.get('redirect_to');
-    if (rt) {
-      try {
-        const rtUrl = new URL(rt);
-        rtUrl.protocol = originUrl.protocol;
-        rtUrl.host = originUrl.host;
-        actionUrl.searchParams.set('redirect_to', rtUrl.toString());
-      } catch { /* keep as-is */ }
-    }
-    return actionUrl.toString();
-  } catch {
-    return rawActionLink;
-  }
-}
-
 const PREFETCH_UA_RE =
   /(bot|crawler|spider|preview|scanner|linkcheck|fetch|slurp|mimecast|proofpoint|barracuda|forcepoint|symantec|urldefense|safelinks|outlook|microsoft-safelinks)/i;
 
 function looksLikePrefetch(req: Request, attempt: number): boolean {
-  // Real browser retries from VendorInviteAccept bump `attempt` past 1, so we
-  // only block the very first "scanner-style" hit and let the actual click through.
   if (attempt > 1) return false;
   const ua = req.headers.get('user-agent') || '';
   if (PREFETCH_UA_RE.test(ua)) return true;
@@ -73,34 +41,79 @@ function looksLikePrefetch(req: Request, attempt: number): boolean {
   return false;
 }
 
+async function findUserByEmail(admin: ReturnType<typeof createClient>, email: string): Promise<string | null> {
+  const target = email.toLowerCase();
+  for (let page = 1; page <= 20; page++) {
+    try {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+      if (error) {
+        console.warn('listUsers error page', page, error);
+        return null;
+      }
+      const users = data?.users || [];
+      const found = users.find((u: any) => (u.email || '').toLowerCase() === target);
+      if (found) return found.id;
+      if (users.length < 200) return null;
+    } catch (e) {
+      console.warn('listUsers threw page', page, e);
+      return null;
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Never claim on non-POST requests (GET/HEAD prefetches from mail scanners).
+  // Diagnostics: GET returns env-presence so we can confirm deployment on self-hosted.
+  if (req.method === 'GET') {
+    return json(200, {
+      ok: true,
+      env_ok: {
+        SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
+        SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+        SUPABASE_ANON_KEY: !!Deno.env.get('SUPABASE_ANON_KEY'),
+      },
+      time: new Date().toISOString(),
+    });
+  }
+
   if (req.method !== 'POST') {
-    return json(405, { status: 'pending', code: 'method_not_allowed' });
+    return json(405, { status: 'pending', code: 'method_not_allowed', message: `Method ${req.method} not allowed` });
   }
 
   try {
-    const { token, redirectOrigin, attempt } = await req.json();
+    const { token, attempt } = await req.json().catch(() => ({}));
     if (!token || typeof token !== 'string') {
-      return json(400, { status: 'invalid', error: 'Missing token' });
+      return json(400, { status: 'invalid', code: 'missing_token', message: 'Missing token' });
     }
 
     if (looksLikePrefetch(req, Number(attempt) || 1)) {
-      return json(200, { status: 'pending', code: 'prefetch_suspected' });
+      console.log('claim: prefetch suspected, deferring');
+      return json(200, { status: 'pending', code: 'prefetch_suspected', message: 'Mail scanner prefetch suspected' });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      return json(500, {
+        status: 'error',
+        code: 'env_missing',
+        message: `Missing env: ${[
+          !supabaseUrl && 'SUPABASE_URL',
+          !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
+          !anonKey && 'SUPABASE_ANON_KEY',
+        ].filter(Boolean).join(', ')}`,
+      });
+    }
+
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Optional: caller may already be signed in (return-to-vendor re-open scenario)
     const authHeader = req.headers.get('Authorization') || '';
     const jwt = authHeader.replace(/^Bearer\s+/i, '');
     let callerUserId: string | null = null;
@@ -115,7 +128,6 @@ Deno.serve(async (req) => {
       } catch { /* ignore */ }
     }
 
-    // 1. Look up invitation
     const { data: invite, error: lookupErr } = await admin
       .from('vendor_invitations')
       .select('id, email, expires_at, used_at, user_id, vendor_id')
@@ -123,22 +135,22 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (lookupErr) {
-      console.error('invitation lookup failed:', lookupErr);
-      return json(500, { status: 'error', code: 'lookup_failed' });
+      console.error('lookup failed:', lookupErr);
+      return json(500, { status: 'error', code: 'lookup_failed', message: lookupErr.message });
     }
     if (!invite) {
-      return json(404, { status: 'invalid', code: 'invalid' });
+      return json(404, { status: 'invalid', code: 'invalid', message: 'Invitation not found for token' });
     }
+    console.log('claim: lookup ok', { invite_id: invite.id, used: !!invite.used_at });
 
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-      return json(410, { status: 'expired', code: 'expired' });
+      return json(410, { status: 'expired', code: 'expired', message: 'Invitation expired' });
     }
 
     const invitedEmail = String(invite.email || '').toLowerCase();
+    const invitePassword = `${token}:${invite.id}`;
 
-    // 2. Already claimed?
     if (invite.used_at) {
-      // Allow the original vendor to reopen if their existing session matches
       if (
         callerUserId &&
         (
@@ -153,83 +165,57 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Re-open branch: sign the originally invited auth user back in so they
-      // land directly on the Application Progress screen without another email.
-      if (invite.user_id) {
-        const { data: userRecord } = await admin.auth.admin.getUserById(invite.user_id);
-        const claimedEmail = (userRecord?.user?.email || '').toLowerCase();
-        if (claimedEmail === invitedEmail) {
-          try {
-            await admin.auth.admin.updateUserById(invite.user_id, {
-              password: `${token}:${invite.id}`,
-              email_confirm: true,
-              user_metadata: { invited_via: 'vendor_invitation', invitation_id: invite.id },
-            });
-          } catch (e) {
-            console.warn('repair invited auth user failed:', e);
-          }
-
-          const { data: signInData, error: signInErr } = await createClient(supabaseUrl, anonKey, {
-            auth: { autoRefreshToken: false, persistSession: false },
-          }).auth.signInWithPassword({
-            email: invitedEmail,
-            password: `${token}:${invite.id}`,
+      // Re-open: sign the originally invited user back in.
+      const targetUserId = invite.user_id || await findUserByEmail(admin, invitedEmail);
+      if (targetUserId) {
+        try {
+          await admin.auth.admin.updateUserById(targetUserId, {
+            password: invitePassword,
+            email_confirm: true,
+            user_metadata: { invited_via: 'vendor_invitation', invitation_id: invite.id },
           });
-
-          if (!signInErr && signInData?.session) {
-            try {
-              await admin.from('invitation_email_events').insert({
-                invitation_id: invite.id,
-                email_id: null,
-                event_type: 'reopen',
-                event_data: {
-                  used_at: invite.used_at,
-                  caller_email: callerEmail,
-                  caller_user_id: callerUserId,
-                },
-              });
-            } catch { /* ignore */ }
-
-            return json(200, {
-              status: 'claimed',
-              session: signInData.session,
-              redirect: `/vendor/registration?token=${encodeURIComponent(token)}`,
-              vendor_id: invite.vendor_id,
-            });
-          }
-          console.warn('re-open sign-in failed:', signInErr);
+        } catch (e) {
+          console.warn('reopen update user failed:', e);
         }
+
+        const { data: signInData, error: signInErr } = await createClient(supabaseUrl, anonKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        }).auth.signInWithPassword({ email: invitedEmail, password: invitePassword });
+
+        if (!signInErr && signInData?.session) {
+          try {
+            await admin.from('invitation_email_events').insert({
+              invitation_id: invite.id,
+              email_id: null,
+              event_type: 'reopen',
+              event_data: { caller_email: callerEmail, caller_user_id: callerUserId },
+            });
+          } catch { /* ignore */ }
+
+          return json(200, {
+            status: 'claimed',
+            session: signInData.session,
+            redirect: `/vendor/registration?token=${encodeURIComponent(token)}`,
+            vendor_id: invite.vendor_id,
+          });
+        }
+        console.warn('reopen sign-in failed:', signInErr);
       }
 
-      // Fallback: log and deny
       try {
         await admin.from('invitation_email_events').insert({
           invitation_id: invite.id,
           email_id: null,
           event_type: 'reuse_attempt',
-          event_data: {
-            used_at: invite.used_at,
-            caller_email: callerEmail,
-            caller_user_id: callerUserId,
-          },
+          event_data: { used_at: invite.used_at, caller_email: callerEmail, caller_user_id: callerUserId },
         });
       } catch { /* ignore */ }
-      return json(403, { status: 'denied', code: 'already_used' });
+      return json(403, { status: 'denied', code: 'already_used', message: 'Invitation already opened' });
     }
 
-
-    // 3. First-click claim: ensure auth user exists for invitedEmail
-    let authUserId: string | null = null;
-    const invitePassword = `${token}:${invite.id}`;
-    try {
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-      const found = list?.users?.find(
-        (u) => (u.email || '').toLowerCase() === invitedEmail,
-      );
-      if (found) authUserId = found.id;
-    } catch (e) {
-      console.warn('listUsers failed:', e);
-    }
+    // First-click claim
+    let authUserId = await findUserByEmail(admin, invitedEmail);
+    console.log('claim: user resolved (existing?)', !!authUserId);
 
     if (!authUserId) {
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -240,25 +226,19 @@ Deno.serve(async (req) => {
       });
       if (createErr && !`${createErr.message}`.toLowerCase().includes('already')) {
         console.error('createUser failed:', createErr);
-        return json(500, { status: 'error', code: 'provision_failed' });
+        return json(500, { status: 'error', code: 'provision_failed', message: createErr.message });
       }
       if (created?.user) {
         authUserId = created.user.id;
       } else {
-        // race: re-list
-        try {
-          const { data: list2 } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-          const f2 = list2?.users?.find((u) => (u.email || '').toLowerCase() === invitedEmail);
-          if (f2) authUserId = f2.id;
-        } catch { /* ignore */ }
+        authUserId = await findUserByEmail(admin, invitedEmail);
       }
     }
 
     if (!authUserId) {
-      return json(500, { status: 'error', code: 'provision_failed' });
+      return json(500, { status: 'error', code: 'provision_failed', message: 'Could not provision auth user' });
     }
 
-    // Ensure re-entry works for an existing auth user too.
     try {
       await admin.auth.admin.updateUserById(authUserId, {
         password: invitePassword,
@@ -269,7 +249,6 @@ Deno.serve(async (req) => {
       console.warn('update invited auth user failed:', e);
     }
 
-    // 4. Stamp used_at + user_id (atomic — only if still unclaimed)
     const { data: claimRow, error: claimErr } = await admin
       .from('vendor_invitations')
       .update({ used_at: new Date().toISOString(), user_id: authUserId })
@@ -280,24 +259,48 @@ Deno.serve(async (req) => {
 
     if (claimErr) {
       console.error('claim update failed:', claimErr);
-      return json(500, { status: 'error', code: 'claim_failed' });
+      return json(500, { status: 'error', code: 'claim_failed', message: claimErr.message });
     }
     if (!claimRow) {
-      // Someone else claimed in the meantime
-      return json(403, { status: 'denied', code: 'already_used' });
+      return json(403, { status: 'denied', code: 'already_used', message: 'Invitation was claimed concurrently' });
     }
+    console.log('claim: stamped used_at');
 
-    // 5. One-click sign-in without sending another email.
-    const { data: signInData, error: signInErr } = await createClient(supabaseUrl, anonKey, {
+    // Sign in (retry once with password reset if it fails)
+    const anon = createClient(supabaseUrl, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
-    }).auth.signInWithPassword({ email: invitedEmail, password: invitePassword });
+    });
+    let { data: signInData, error: signInErr } = await anon.auth.signInWithPassword({
+      email: invitedEmail,
+      password: invitePassword,
+    });
+
+    if (signInErr || !signInData?.session) {
+      console.warn('signin failed, retrying after password reset:', signInErr?.message);
+      try {
+        await admin.auth.admin.updateUserById(authUserId, {
+          password: invitePassword,
+          email_confirm: true,
+        });
+      } catch (e) {
+        console.warn('retry password reset failed:', e);
+      }
+      ({ data: signInData, error: signInErr } = await anon.auth.signInWithPassword({
+        email: invitedEmail,
+        password: invitePassword,
+      }));
+    }
 
     if (signInErr || !signInData?.session) {
       console.error('invite password sign-in failed:', signInErr);
-      return json(isAuthError(signInErr) ? 403 : 500, { status: 'error', code: 'signin_failed' });
+      return json(isAuthError(signInErr) ? 403 : 500, {
+        status: 'error',
+        code: 'signin_failed',
+        message: signInErr?.message || 'Sign-in failed',
+      });
     }
+    console.log('claim: signin ok');
 
-    // Log successful claim
     try {
       await admin.from('invitation_email_events').insert({
         invitation_id: invite.id,
@@ -315,6 +318,10 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error('claim-vendor-invite error:', err);
-    return json(500, { status: 'error', code: 'unknown' });
+    return json(500, {
+      status: 'error',
+      code: 'unknown',
+      message: (err as Error)?.message || String(err),
+    });
   }
 });
