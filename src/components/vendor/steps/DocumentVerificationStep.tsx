@@ -486,6 +486,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
+      verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.panCardFile),
     };
   });
