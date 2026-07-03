@@ -750,7 +750,12 @@ export default function VendorRegistration() {
               setVerifiedData({
                 isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
                 isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
-                pan: { number: existingFormData.statutory.pan, holderName: existingFormData.organization?.legalName || '' },
+                pan: {
+                  number: existingFormData.statutory.pan,
+                  holderName: existingFormData.organization?.legalName || '',
+                  apiName: existingFormData.organization?.legalName || '',
+                  nameMatchScore: 100,
+                },
                 panStatus: existingFormData.statutory.panStatus ?? null,
                 panAadhaarLinked: existingFormData.statutory.panAadhaarLinked ?? null,
                 panComprehensiveVerifiedAt: existingFormData.statutory.panComprehensiveVerifiedAt ?? null,
@@ -759,6 +764,9 @@ export default function VendorRegistration() {
                   ? {
                       gstin: existingFormData.statutory.gstin,
                       legalName: existingFormData.organization?.legalName || '',
+                      tradeName: existingFormData.organization?.tradeName || '',
+                      apiName: existingFormData.organization?.legalName || '',
+                      nameMatchScore: 100,
                       constitutionOfBusiness: existingFormData.statutory?.gstConstitutionOfBusiness || '',
                       principalPlaceOfBusiness: existingFormData.statutory?.gstPrincipalPlaceOfBusiness || '',
                       additionalPlaces: existingFormData.statutory?.gstAdditionalPlaces || [],
@@ -768,6 +776,7 @@ export default function VendorRegistration() {
                       businessNature: existingFormData.statutory?.gstBusinessNature || [],
                       jurisdictionCentre: existingFormData.statutory?.gstJurisdictionCentre || '',
                       jurisdictionState: existingFormData.statutory?.gstJurisdictionState || '',
+                      filing_status: existingFormData.statutory?.gstFilingStatus || [],
                     }
                   : undefined,
                 gstCertificateFile: existingFormData.statutory?.gstCertificateFile ?? null,
