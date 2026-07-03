@@ -1,49 +1,49 @@
 ## Problem
 
-**Edit mode — Step 1 (Document Verification):**
-- The GST Filing Status table is empty because the pre-seeded `verifiedData.gst` object in `VendorRegistration.tsx` (~L758) omits `filing_status`. `DocumentVerificationStep` already hydrates its `gstFilingRows` from `initialData.gst.filing_status` (it just never receives any).
-- The persisted filing rows live in `vendor_validations.details.filing_status` (written by `useVendorRegistration.saveVendor`) but are never read back into `formData.statutory.gstFilingStatus` when a draft/returned vendor is opened for edit.
-- Because `gstFilingRows` stays empty, `evaluateGstr1Compliance` isn't computed, "Continue to PAN" stays disabled, and the PAN pill also never becomes verified (PAN card is seeded but the PAN tab needs GST verified to proceed).
+The SAP sync payload (sample in `sapsending_payload.txt`) currently emits:
 
-**View Details screens — PAN Status / Is Aadhaar Linked:**
-- Values are stored on the vendor row (`vendors.pan_status`, `vendors.pan_aadhaar_linked`) and are already rendered in `ReviewStep`, `VendorReviewDialog` (SAP sync popup / approvals), Reports export and VendorList Excel export.
-- They are missing from three visible view surfaces: **VendorList "View Details" dialog** (Statutory Details grid), **FinanceReview details panel**, and **DocumentVerification vendor details panel**.
+```json
+"CLASSIFY": {
+  ...
+  "TIER_CATEGORY": [ { "TIER": "TIER 1" } ]
+}
+```
 
-## Fix
+The actual SAP contract (`SAP_New_Payload-2.txt` / user spec) expects the last classify block to be named `VENCATEGORY` with inner key `VENCAT`, and the payload must also carry a top‑level `WHOLDTAX` array (withholding tax). `WHOLDTAX` is not yet ready on our side, so we ship it as an empty array `[]` for now — matching SAP's schema so their parser doesn't fail.
 
-### 1. Restore GST filing status + PAN details during edit
+## Fix (single file — `src/lib/sapPayloadBuilder.ts`)
 
-**`src/hooks/useVendorRegistration.tsx` (loadDraft / mapper around L651-692)**
-- After loading the vendor row, also fetch the latest `vendor_validations` row of type `gst` for that vendor and populate `formData.statutory.gstFilingStatus` from `details.filing_status` (normalised via `normalizeFilingStatus`).
-- (Non-invasive addition; `pan_status` / `pan_aadhaar_linked` are already mapped at L654-656.)
+1. **Rename the tier classify block** (~L398)
+   - Change wrapper key `TIER_CATEGORY` → `VENCATEGORY`
+   - Change inner element key from `TIER` → `VENCAT`
+   - Source data (`classifyArrays.TIER`, seeded from overrides `classify.TIER` and `vendor.tier_category`) is unchanged — only the emitted JSON shape changes.
 
-**`src/pages/VendorRegistration.tsx` (~L758 seeded `verifiedData.gst`)**
-- Add `filing_status: existingFormData.statutory.gstFilingStatus` so `DocumentVerificationStep` can seed `gstFilingRows`, `gstFilingChecked=true` and `gstCompliance`.
-- Add `apiName: existingFormData.organization.legalName`, `tradeName: existingFormData.organization.tradeName`, and a `nameMatchScore` of 100 so the GST tile renders verified on Edit exactly as it does after a fresh check.
-- Extend the seeded `verifiedData.pan` (currently only `{ number, holderName: legalName }`) with `apiName: legalName` and pass through the already-loaded `panStatus` / `panAadhaarLinked` / `panComprehensiveVerifiedAt` (already present at L754-756) — `DocumentVerificationStep` already knows how to render these when they come through `initialData.pan…`.
+   After change, the CLASSIFY block will look like:
+   ```json
+   "CLASSIFY": {
+     "MAT_GRP_VENDOR":        [ { "MGV": "..." } ],
+     "CAT_VENDOR":            [ { "CATV": "..." } ],
+     "LOCATION_VENDOR":       [ { "LOCV": "..." } ],
+     "IDENTIFICATION_SOURCE": [ { "IDS": "..." } ],
+     "CASHFLOW":              [ { "CASH": "..." } ],
+     "VENCATEGORY":           [ { "VENCAT": "..." } ]
+   }
+   ```
 
-Result: On edit, GST tab shows the persisted filing table + green compliance badge → "Continue to PAN" becomes enabled → PAN tab renders with saved PAN, PAN Status and Is Aadhaar Linked without needing re-verification.
+2. **Add `WHOLDTAX` block** (right after CLASSIFY assignment, ~L399)
+   - Set `row.WHOLDTAX = []` unconditionally (empty for now; SAP accepts the empty array).
+   - Ensure it isn't overwritten by any existing template field — if the current default template happens to set a `WHOLDTAX`/`wholdtax` key, delete it before assigning so casing is consistent (`WHOLDTAX`).
+   - Leave a short code comment: `// TODO: populate WHOLDTAX entries (WITHT / WT_WITHCD / WT_SUBJCT / QSREC / QLAND) once withholding tax capture is wired.`
 
-### 2. Show PAN Status & Is Aadhaar Linked on every PAN view
+## Out of scope
 
-Use the existing helpers `formatPanStatus` / `formatAadhaarLinked` from `@/lib/panComprehensive` for consistent labels ("Valid" / "Invalid" and "Aadhaar Linked with PAN" / "Aadhaar Not Linked with PAN", `-` when null).
-
-Add both fields alongside PAN in these view surfaces:
-
-- **`src/pages/VendorList.tsx`** — Statutory Details grid (~L599-616): add PAN Status and Is Aadhaar Linked cells.
-- **`src/pages/FinanceReview.tsx`** — vendor details panel (~L390): add two more rows below PAN.
-- **`src/pages/DocumentVerification.tsx`** — vendor details grid (~L757-760): add two more grid items.
-
-Already correct (no change): `ReviewStep`, `VendorReviewDialog` (used by SAP Sync popup, approvals, Reports preview), Reports Excel export, VendorList Excel export.
+- No UI/overrides changes — the "Tier Category" F4 field, its label, and the `TIER` override key stay as-is (only the outbound JSON key is renamed).
+- No changes to `sync-vendor-to-sap` / bulk edge functions — they forward the built payload verbatim.
+- No DB, migration, or type changes.
+- Actual withholding tax data collection and mapping is a separate follow-up.
 
 ## Files touched
 
 ```text
-src/hooks/useVendorRegistration.tsx        (load gstFilingStatus from vendor_validations)
-src/pages/VendorRegistration.tsx           (seed filing_status, apiName, tradeName, PAN apiName)
-src/pages/VendorList.tsx                   (add PAN Status + Aadhaar Linked)
-src/pages/FinanceReview.tsx                (add PAN Status + Aadhaar Linked)
-src/pages/DocumentVerification.tsx         (add PAN Status + Aadhaar Linked)
+src/lib/sapPayloadBuilder.ts   (CLASSIFY rename + WHOLDTAX: [])
 ```
-
-No DB migrations, no edge function changes, no changes to save-side logic — PAN Comprehensive fields are already persisted and the filing rows are already written to `vendor_validations`.
