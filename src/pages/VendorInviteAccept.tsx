@@ -43,12 +43,34 @@ export default function VendorInviteAccept() {
       }
 
       const waitForHydratedSession = async () => {
-        for (let i = 0; i < 30; i++) {
-          const { data: sd } = await supabase.auth.getSession();
-          if (sd.session?.access_token) return sd.session;
+        for (let i = 0; i < 60; i++) {
+          const [{ data: sd }, { data: ud }] = await Promise.all([
+            supabase.auth.getSession(),
+            supabase.auth.getUser(),
+          ]);
+          if (sd.session?.access_token && ud.user?.id) return sd.session;
           await new Promise((r) => setTimeout(r, 100));
         }
         return null;
+      };
+
+      const signOutIfDifferentUserIsActive = async () => {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const activeEmail = sessionData.session?.user?.email?.toLowerCase();
+          if (!activeEmail) return;
+
+          const { data: rows } = await supabase.rpc('get_invitation_by_token', { _token: token });
+          const invite = Array.isArray(rows) ? rows[0] : rows;
+          const invitedEmail = invite?.email?.toLowerCase?.();
+          if (invitedEmail && activeEmail !== invitedEmail) {
+            await supabase.auth.signOut({ scope: 'local' });
+            await new Promise((r) => setTimeout(r, 150));
+          }
+        } catch {
+          // If this pre-check fails, continue with the normal claim path so the
+          // server still returns the authoritative invitation status.
+        }
       };
 
       const openRegistration = (redirect?: string) => {
@@ -62,6 +84,7 @@ export default function VendorInviteAccept() {
       };
 
       let attempt = 0;
+      await signOutIfDifferentUserIsActive();
       // eslint-disable-next-line no-constant-condition
       while (true) {
         attempt += 1;
@@ -137,6 +160,21 @@ export default function VendorInviteAccept() {
               });
               setPhase('error');
               return;
+            }
+            if (verifyData.session?.access_token && verifyData.session?.refresh_token) {
+              const { error: sessionError } = await supabase.auth.setSession({
+                access_token: verifyData.session.access_token,
+                refresh_token: verifyData.session.refresh_token,
+              });
+              if (sessionError) {
+                setErrorDetails({
+                  message: 'We could not sign you in from this invitation.',
+                  code: 'set_session_failed',
+                  raw: sessionError.message,
+                });
+                setPhase('error');
+                return;
+              }
             }
             // Wait for session to persist to localStorage before navigating,
             // otherwise VendorRegistration mounts before hydration and bounces
