@@ -2229,12 +2229,12 @@ export function DocumentVerificationStep({
                         )}
 
                         {/* Non-compliant -> require self-declaration upload */}
-                        {gstFilingChecked && gstLatestFiled === false && (
+                        {gstFilingChecked && gstCompliance?.declarationRequired && (
                           <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50/60 p-3">
                             <div className="flex items-start gap-2">
                               <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
                               <div className="text-sm text-amber-900">
-                                GST return for the last month has not been filed. Please download the
+                                GSTR1 for {gstCompliance.checkedPeriod} has not been filed and the due date (11th) has passed. Please download the
                                 GST Returns Declaration, sign it, and upload the signed copy to continue.
                               </div>
                             </div>
