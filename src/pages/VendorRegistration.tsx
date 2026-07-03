@@ -316,12 +316,18 @@ export default function VendorRegistration() {
       // Only react to an explicit sign-out. A TOKEN_REFRESHED with no session
       // is a transient state during hydration, not a real logout.
       if (event !== 'SIGNED_OUT') return;
-      toast({
-        title: 'Session expired',
-        description: 'Please sign in again to continue your registration.',
-        variant: 'destructive',
-      });
       const tokenParam = invitationToken || searchParams.get('token');
+      let isFreshInviteHandoff = false;
+      try {
+        isFreshInviteHandoff = !!tokenParam && window.sessionStorage.getItem('vendorInviteJustSignedIn') === tokenParam;
+      } catch { /* ignore */ }
+      if (!isFreshInviteHandoff) {
+        toast({
+          title: 'Session expired',
+          description: 'Please reopen the invitation link to continue your registration.',
+          variant: 'destructive',
+        });
+      }
       if (tokenParam) {
         navigate(`/vendor/invite?token=${tokenParam}`);
       } else {
