@@ -429,12 +429,18 @@ export default function VendorRegistration() {
           return;
         }
 
-        // Check if user is authenticated
-        const { data: { session } } = await supabase.auth.getSession();
+        // Check if user is authenticated. Poll briefly since the magic-link
+        // sign-in from /vendor/invite may still be persisting to localStorage.
+        let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'] = null;
+        for (let i = 0; i < 15; i++) {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) { session = data.session; break; }
+          await new Promise((r) => setTimeout(r, 100));
+        }
 
         // Always require authentication for vendor registration
         if (!session) {
-          // Redirect to login page
+          // Redirect back to the invite handler (never to /auth for vendors)
           navigate(`/vendor/invite?token=${token}`);
           return;
         }
