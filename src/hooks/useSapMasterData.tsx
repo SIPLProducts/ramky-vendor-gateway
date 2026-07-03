@@ -67,7 +67,9 @@ export function useEnsureSapMaster(masterType: string | undefined) {
       if (data && data.success === false) {
         const msg = [data.message, data.hint].filter(Boolean).join(" — ");
         setSyncError(msg || "Unknown SAP error");
+        await qc.invalidateQueries({ queryKey: ["sap_master_data", masterType] });
       } else {
+        setSyncError(null);
         await qc.invalidateQueries({ queryKey: ["sap_master_data", masterType] });
       }
     } catch (e: any) {
@@ -94,8 +96,11 @@ export function useEnsureSapMaster(masterType: string | undefined) {
     runSync();
   }, [runSync]);
 
-  const fetching = query.isLoading || query.isFetching || syncing;
-  const errorMessage = syncError || (query.isError ? (query.error as any)?.message || "Failed to load data" : null);
+  const hasCachedRows = !!(query.data && query.data.length > 0);
+  const fetching = query.isLoading || query.isFetching || (syncing && !hasCachedRows);
+  const errorMessage = hasCachedRows
+    ? null
+    : syncError || (query.isError ? (query.error as any)?.message || "Failed to load data" : null);
 
   return {
     rows: query.data,
