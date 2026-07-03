@@ -48,15 +48,49 @@ function normalizeActionLink(rawActionLink: string, redirectOrigin?: string): st
   }
 }
 
+const PREFETCH_UA_RE =
+  /(bot|crawler|spider|preview|scanner|linkcheck|fetch|slurp|mimecast|proofpoint|barracuda|forcepoint|symantec|urldefense|safelinks|outlook|microsoft-safelinks)/i;
+
+function looksLikePrefetch(req: Request, attempt: number): boolean {
+  // Real browser retries from VendorInviteAccept bump `attempt` past 1, so we
+  // only block the very first "scanner-style" hit and let the actual click through.
+  if (attempt > 1) return false;
+  const ua = req.headers.get('user-agent') || '';
+  if (PREFETCH_UA_RE.test(ua)) return true;
+  for (const h of req.headers.keys()) {
+    const lower = h.toLowerCase();
+    if (
+      lower.startsWith('x-ms-exchange-') ||
+      lower.startsWith('x-barracuda-') ||
+      lower.startsWith('x-proofpoint-') ||
+      lower.startsWith('x-mimecast-')
+    ) {
+      return true;
+    }
+  }
+  const purpose = (req.headers.get('purpose') || req.headers.get('sec-purpose') || '').toLowerCase();
+  if (purpose.includes('prefetch')) return true;
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Never claim on non-POST requests (GET/HEAD prefetches from mail scanners).
+  if (req.method !== 'POST') {
+    return json(405, { status: 'pending', code: 'method_not_allowed' });
+  }
+
   try {
-    const { token, redirectOrigin } = await req.json();
+    const { token, redirectOrigin, attempt } = await req.json();
     if (!token || typeof token !== 'string') {
       return json(400, { status: 'invalid', error: 'Missing token' });
+    }
+
+    if (looksLikePrefetch(req, Number(attempt) || 1)) {
+      return json(200, { status: 'pending', code: 'prefetch_suspected' });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

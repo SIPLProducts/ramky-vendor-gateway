@@ -1,34 +1,47 @@
-## Problem
+## Goal
 
-On the Edit vendor registration flow, Document Verification tabs (GST / PAN / MSME / Bank) hydrate the extracted values into the UI but do NOT show the same "verified" affordances that appear right after successful validation:
+Original vendor clicks **Begin Registration** in the invite email → registration form opens directly (no email-confirmation step). Any forwarded / copied / re-clicked link → **Access Denied**.
 
-- Green input borders on each field
-- "X is verified" / "matches registry" success text under each field
-- "verified · Xh ago" timestamp on the stage header
+## Current state
 
-Reason: `EditableOcrField` marks a field verified only when the current value equals the corresponding `apiData` (or `apiData.normalized`) value. When we seed `DocState` from `initialData` in `DocumentVerificationStep.tsx`, we set only a partial `apiData` (`{ legalName }`, `{ name }`, etc.) and no `verifiedAt`. PAN already seeds `apiData.normalized` correctly — that's why the PAN screenshot looks right — but GST, MSME, Bank, and Bank2 do not.
+The flow already matches this behavior end-to-end:
 
-## Fix
+- Invite email button → `/vendor/invite?token=<token>` (`VendorInviteAccept.tsx`).
+- That page auto-invokes the `claim-vendor-invite` edge function on mount — no user interaction, no confirm-email screen.
+- `claim-vendor-invite` performs an **atomic first-click claim**:
+  1. Looks up the invitation by token.
+  2. If unused → provisions/updates the invited auth user, stamps `used_at + user_id` in a single `UPDATE ... WHERE used_at IS NULL`, signs the vendor in, returns the session, and redirects to `/vendor/registration?token=...`.
+  3. If already used by someone else (forwarded/copied) → returns `status: denied`, `VendorInviteAccept` shows the **Access Denied** card.
+  4. Only the same signed-in vendor (matching `user_id` or invited email) can reopen a claimed invite.
+- All reuse attempts are logged to `invitation_email_events` as `reuse_attempt`.
 
-Edit `src/components/vendor/steps/DocumentVerificationStep.tsx` — only the four `useState<DocState>` initializers for `gstDoc`, `msmeDoc`, `bankDoc`, `bankDoc2`. For each, when `initialData.<section>` exists:
+So the requested behavior is already implemented. The plan below only tightens loose ends and documents the one residual risk.
 
-1. Build `apiData` to match the shape each verified-field block reads from:
-   - GST → flat keys on `apiData` (`legal_name`, `trade_name`, `gstin`, `constitution_of_business`, `principal_place_of_business`, `gst_status`, `registration_date`, `taxpayer_type`, `jurisdiction_centre`, `jurisdiction_state`, plus a `pan_number` if derivable).
-   - MSME → `apiData.normalized = { udyam_number, enterprise_name, enterprise_type, major_activity }`.
-   - Bank / Bank2 → `apiData.normalized = { account_number, ifsc_code, bank_name, branch_name, account_holder_name }`.
-2. Populate `verifiedAt: Date.now()` so `StageShell` shows the "verified · Xh ago" pill and stage tick.
+## Changes
 
-No other behavior changes: fields stay editable, "Replace" still resets the doc state, and re-verification still overwrites `apiData` with fresh registry values. PAN seeding is already correct — leave it untouched.
-
-## Verification
-
-1. Open a previously-saved (returned-to-vendor) application → Document Verification → each tab (GST, PAN, MSME, Bank).
-2. Confirm every populated field has the green border, the "…is verified" caption, and the stage header shows "verified · …".
-3. Edit a field → "Edited" badge appears (mismatch state), matches initial-registration behavior.
-4. Click Replace → fields reset as before.
+1. **Remove dead legacy code** — `src/App.tsx` still imports `VendorRegisterWithInvite` but no route uses it. Delete the import and delete `src/pages/VendorRegisterWithInvite.tsx` so no stale confirmation-based flow can be linked to by accident.
+2. **Make the Access Denied page copy match the spec** in `src/pages/VendorInviteAccept.tsx`: explicitly say "This invitation was already opened by another device/recipient. If you are the intended vendor, please contact <support>." (Current copy is close; adjust wording only.)
+3. **Harden the claim endpoint against non-human prefetch**:
+   - Reject `GET` / `HEAD` on `claim-vendor-invite` (already POST-only via `functions.invoke`, but add an explicit method guard so any accidental preflight scanner request is a no-op).
+   - Add a lightweight bot/prefetch heuristic: skip the claim (return `status: 'pending'`) when the request carries headers commonly set by mail-security scanners (`X-MS-Exchange-Organization-*`, `X-Barracuda-*`, `X-Proofpoint-*`, or `User-Agent` containing `bot|crawler|preview|scanner|linkcheck`). `VendorInviteAccept` will retry the claim from the real browser click.
+4. **Document the residual risk** in `email.md`: aggressive corporate mail scanners that fully execute JS in a real browser context can still consume an invite. Mitigation (short TTL + admin re-issue) is already in place; no code change required beyond (3).
 
 ## Out of scope
 
-- No changes to save/hydration logic in `useVendorRegistration` or `VendorRegistration.tsx`.
-- No changes to validation APIs or verification pipelines.
-- Feedback popup, invitation flow, and other screens untouched.
+- No new confirmation UI, OTP, or email-match prompt for the original vendor.
+- No changes to the registration form, application-progress screen, or approval flow.
+- No changes to `send-vendor-invitation` template or link format.
+
+## Technical notes
+
+- Edge function: `supabase/functions/claim-vendor-invite/index.ts` — add method guard + prefetch header check at the top of `Deno.serve`.
+- Frontend: `src/pages/VendorInviteAccept.tsx` — handle a new `status: 'pending'` response by re-invoking the claim after a small delay / on visible user gesture (retain current UX: still no explicit button unless the prefetch heuristic fires).
+- Cleanup: delete `src/pages/VendorRegisterWithInvite.tsx`, remove its import from `src/App.tsx`.
+
+## Verification
+
+1. Fresh invite → click from real browser → land on registration form, signed in, `used_at` stamped.
+2. Forward same email → recipient clicks → **Access Denied** card; `invitation_email_events` row with `reuse_attempt`.
+3. Copy the URL to an incognito window → **Access Denied**.
+4. Original vendor re-opens their inbox link after submitting → allowed (already-claimed-same-user branch).
+5. Simulated scanner UA (`curl -A "Mimecast-Link-Preview"`) hitting `/vendor/invite?token=...` → no claim written; real browser click after still succeeds.

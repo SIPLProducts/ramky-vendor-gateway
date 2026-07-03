@@ -121,3 +121,10 @@ Gmail free account → ~500 emails/day
 For high volume → move to SendGrid / Amazon SES
 
 Always keep SMTP secrets in Supabase secrets
+## Vendor invitation link security (updated 2026-07-03)
+
+- Invitation email button → `/vendor/invite?token=...` → `claim-vendor-invite` edge function.
+- **First-click-wins**: the edge function atomically stamps `used_at + user_id` on `vendor_invitations` and signs the vendor in. Any subsequent click (forwarded/copied link, different device) is denied with an Access Denied card.
+- No email-confirmation UI is shown to the original vendor — the registration form opens directly.
+- **Prefetch hardening**: `claim-vendor-invite` rejects non-POST requests and returns `status: pending` (no claim) for requests whose UA / headers look like a mail-security scanner (Mimecast, Proofpoint, Barracuda, Microsoft SafeLinks, generic bots). The frontend retries with `attempt > 1`, which bypasses the heuristic so the real human click always succeeds.
+- **Residual risk**: aggressive scanners that fully execute JS in a real headless browser and POST from a clean UA can still consume an invite. Mitigation is short TTL + admin re-issue via Admin → Invitations.

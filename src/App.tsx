@@ -13,7 +13,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Landing from "./pages/Landing";
 
 import VendorRegistration from "./pages/VendorRegistration";
-import VendorRegisterWithInvite from "./pages/VendorRegisterWithInvite";
+
 
 import VendorLogin from "./pages/VendorLogin";
 import VendorInviteAccept from "./pages/VendorInviteAccept";
