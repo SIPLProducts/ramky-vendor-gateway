@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { InternationalCompanyDetails } from '@/types/vendor';
 import { supabase } from '@/integrations/supabase/client';
+import { useSapMasterData } from '@/hooks/useSapMasterData';
 
 const schema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required'),
