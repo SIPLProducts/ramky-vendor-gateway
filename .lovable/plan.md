@@ -1,29 +1,30 @@
 ## Goal
-Restore the vendor invitation flow so clicking **Begin Registration** or opening `/vendor/invite?token=...` silently signs in the invited vendor and opens `/vendor/registration?token=...` without showing `/auth`, second emails, or a false “Session expired” toast.
+Make the vendor invitation link open the Vendor Registration Form directly again, without sending vendors to the normal login page.
 
-## Root cause to address
-The current flow is getting stuck between the invite auto-sign-in page and the registration page. The registration page can still decide the session is missing before the newly verified invite session has fully hydrated, then redirects back to `/vendor/invite` and shows the “Session expired” toast. This creates the visible loop shown in your screenshot.
+## What I will fix
+1. **Stop stale sessions breaking invite login**
+   - When `/vendor/invite?token=...` opens, clear any invalid/stale local auth session before attempting silent invite sign-in.
+   - This directly addresses the `session_not_found` 403 from `/auth/v1/user`.
 
-## Implementation plan
-1. **Stabilize invite auto sign-in**
-   - Update `VendorInviteAccept` so after `verifyOtp()` succeeds it explicitly calls `setSession()` when session tokens are returned.
-   - Wait for both `getSession()` and `getUser()` to confirm the signed-in user before navigating.
-   - Keep retry only for real expired/invalid OTP failures, not for successful-but-slow hydration.
+2. **Avoid `getUser()` during the invite handoff**
+   - The invite handler currently waits for both `getSession()` and `getUser()`.
+   - Because `getUser()` returns `session_not_found` when the old JWT session id no longer exists, the page can stay stuck on “Signing you in…” or bounce.
+   - I will change the handoff to trust the freshly returned `verifyOtp` session, persist it with `setSession`, then navigate to registration.
 
-2. **Make registration wait for auth readiness**
-   - Update `VendorRegistration` token validation to wait longer and trust the fresh invite handoff flag before redirecting.
-   - During a fresh invite handoff, do not show “Session expired” and do not send the vendor to `/auth`.
-   - If auth is still not ready, send the user back through `/vendor/invite?token=...` only after a controlled timeout.
+3. **Prevent missing vendor role from blocking the form**
+   - The `user_roles` request returns `PGRST116` because no role row exists yet for the newly provisioned vendor.
+   - I will make role loading tolerate “no row” as vendor instead of treating it as an error, and ensure the backend creates/binds the vendor role where needed.
 
-3. **Prevent stale signed-in users from breaking vendor links**
-   - In `VendorInviteAccept`, if the browser already has a different logged-in user, sign out locally before processing the invite token.
-   - This keeps buyer/admin testing sessions from blocking a vendor invite link.
+4. **Keep vendors away from `/auth`**
+   - If registration still cannot confirm the invite session, it will route back to `/vendor/invite?token=...`, not the normal login screen.
 
-4. **Keep backend behavior simple**
-   - Keep `claim-vendor-invite` in the direct-sign-in mode: provision/find invited auth user, generate link, return `hashed_token`, and let the client verify it immediately.
-   - Do not reintroduce secondary verification emails.
+5. **Verify the flow**
+   - Test the invite URL flow in the browser: `/vendor/invite?token=...` → silent sign-in → `/vendor/registration?token=...` → Select Vendor Type / registration form.
 
-5. **Deploy and verify**
-   - Deploy the updated `claim-vendor-invite` function if backend code changes are needed.
-   - Verify the path: invitation link → signing screen → registration form, with no `/auth` and no second email.
-   - Also verify direct `/vendor/registration?token=...` without a session routes back through invite handling rather than generic login.
+## Files expected to change
+- `src/pages/VendorInviteAccept.tsx`
+- `src/hooks/useAuth.tsx`
+- Possibly `supabase/functions/claim-vendor-invite/index.ts` if the invite-created user is missing a vendor role row.
+
+## Expected result
+The vendor clicks **Begin Registration** and reaches the Vendor Registration Form directly; the normal login page should not appear for this invite flow.

@@ -48,10 +48,40 @@ async function findUserByEmail(admin: ReturnType<typeof createClient>, email: st
   return null;
 }
 
-async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: string, inviteId: string): Promise<void> {
+async function ensureVendorAccount(admin: ReturnType<typeof createClient>, userId: string, email: string): Promise<void> {
+  const { data: profileRow } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!profileRow) {
+    await admin
+      .from('profiles')
+      .insert({ id: userId, email, full_name: null, status: 'active' });
+  }
+
+  const { data: roleRow } = await admin
+    .from('user_roles')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('role', 'vendor')
+    .maybeSingle();
+
+  if (!roleRow) {
+    await admin
+      .from('user_roles')
+      .insert({ user_id: userId, role: 'vendor' });
+  }
+}
+
+async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: string, inviteId: string): Promise<string> {
   const existing = await findUserByEmail(admin, email);
-  if (existing) return;
-  const { error } = await admin.auth.admin.createUser({
+  if (existing) {
+    await ensureVendorAccount(admin, existing, email);
+    return existing;
+  }
+  const { data, error } = await admin.auth.admin.createUser({
     email,
     password: randomPassword(),
     email_confirm: true,
@@ -60,6 +90,10 @@ async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: str
   if (error && !`${error.message}`.toLowerCase().includes('already')) {
     throw new Error(error.message);
   }
+  const userId = data?.user?.id || await findUserByEmail(admin, email);
+  if (!userId) throw new Error('Unable to create or locate invited user');
+  await ensureVendorAccount(admin, userId, email);
+  return userId;
 }
 
 Deno.serve(async (req) => {
@@ -142,6 +176,7 @@ Deno.serve(async (req) => {
           .eq('id', invite.id)
           .is('user_id', null);
       }
+      await ensureVendorAccount(admin, callerUserId, invitedEmail);
       return json(200, {
         status: 'verified',
         redirect: redirectPath,
@@ -153,10 +188,19 @@ Deno.serve(async (req) => {
     // so the client can sign the vendor in via verifyOtp() and land directly
     // on the registration form. NOTE: Forwarded-link protection is intentionally
     // deferred; possession of the token grants access.
+    let invitedUserId: string;
     try {
-      await ensureAuthUser(admin, invitedEmail, invite.id);
+      invitedUserId = await ensureAuthUser(admin, invitedEmail, invite.id);
     } catch (e) {
       return json(500, { status: 'error', code: 'provision_failed', message: (e as Error).message });
+    }
+
+    if (!invite.user_id) {
+      await admin
+        .from('vendor_invitations')
+        .update({ user_id: invitedUserId })
+        .eq('id', invite.id)
+        .is('user_id', null);
     }
 
     const origin = String(redirectOrigin || '').replace(/\/+$/, '');

@@ -784,6 +784,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         session = refreshed.data.session ?? null;
       }
       let { data: userResp, error: userErr } = await supabase.auth.getUser();
+      if ((userErr || !userResp?.user?.id) && options?.invitationToken && session?.user?.id) {
+        userResp = { user: session.user } as typeof userResp;
+        userErr = null;
+      }
       if (userErr || !userResp?.user?.id) {
         const refreshed = await supabase.auth.refreshSession();
         userResp = { user: refreshed.data.user } as typeof userResp;
