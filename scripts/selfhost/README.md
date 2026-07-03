@@ -52,14 +52,15 @@ That single command will:
 
 1. Copy `supabase/migrations/*.sql` into `backend/migrations/`
 2. Run them as `supabase_admin` (fixes the ownership error)
-3. Copy `supabase/functions/` into `backend/volumes/functions/`
-4. Restart the `functions` container
-5. `npm run build` and copy `dist/` into the nginx root
-6. Reload nginx
-7. Re-seed `vendor_approval_progress` for any vendor that submitted but has
+3. Seed cached SAP country/region F4 values so International Vendor dropdowns work even when live SAP returns empty data
+4. Copy `supabase/functions/` into `backend/volumes/functions/`
+5. Restart the `functions` container
+6. `npm run build` and copy `dist/` into the nginx root
+7. Reload nginx
+8. Re-seed `vendor_approval_progress` for any vendor that submitted but has
    no approval chain yet (this is what makes the request show up in the
    Buyer / SCM / Finance approval screens)
-8. `NOTIFY pgrst, 'reload schema'` so PostgREST sees new tables/columns
+9. `NOTIFY pgrst, 'reload schema'` so PostgREST sees new tables/columns
 
 Flags if you want to skip steps:
 

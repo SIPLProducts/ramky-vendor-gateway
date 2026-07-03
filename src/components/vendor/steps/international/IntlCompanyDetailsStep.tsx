@@ -75,12 +75,13 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
     if (!selectedCountry) return [];
     return list.filter((r) => {
       const extra = (r.extra || {}) as Record<string, unknown>;
-      return (extra.LAND1 as string | undefined) === selectedCountry;
+      const land1 = String(extra.LAND1 ?? (r.code.includes('_') ? r.code.split('_')[0] : '')).trim();
+      return land1 === selectedCountry;
     });
   }, [regions, selectedCountry]);
 
   const hasCountries = !!(countries && countries.length > 0);
-  const countryDisabled = countriesFetching || !!countriesError || !hasCountries;
+  const countryDisabled = (countriesFetching && !hasCountries) || !hasCountries;
 
   return (
     <form id="step-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -169,7 +170,7 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                   <Loader2 className="h-3 w-3 animate-spin" /> Fetching country from SAP…
                 </p>
               )}
-              {!countriesFetching && countriesError && (
+              {!countriesFetching && countriesError && !hasCountries && (
                 <div className="text-xs text-destructive flex items-start gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
@@ -197,7 +198,7 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                 control={control}
                 render={({ field }) => {
                   const hasRegions = regionsForCountry.length > 0;
-                  const regionDisabled = !selectedCountry || regionsFetching || !!regionsError || !hasRegions;
+                  const regionDisabled = !selectedCountry || (regionsFetching && !hasRegions) || !hasRegions;
                   return (
                     <Select
                       value={field.value}
@@ -222,7 +223,10 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                       <SelectContent>
                         {regionsForCountry.map((r) => {
                           const extra = (r.extra || {}) as Record<string, unknown>;
-                          const bland = (extra.BLAND as string | undefined) ?? r.code;
+                          const code = String(r.code || '');
+                          const bland = String(
+                            extra.BLAND ?? (code.startsWith(`${selectedCountry}_`) ? code.slice(selectedCountry.length + 1) : code),
+                          );
                           return (
                             <SelectItem key={r.id} value={bland}>
                               {bland}{r.description ? ` — ${r.description}` : ''}
@@ -240,7 +244,7 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
                   <Loader2 className="h-3 w-3 animate-spin" /> Fetching region from SAP…
                 </p>
               )}
-              {!regionsFetching && regionsError && (
+              {!regionsFetching && regionsError && regionsForCountry.length === 0 && (
                 <div className="text-xs text-destructive flex items-start gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">

@@ -59,6 +59,13 @@ if [[ $SKIP_MIG -eq 0 && -d "$SOURCE_DIR/supabase/migrations" ]]; then
     chmod +x "$RUNNER"
   fi
   bash "$RUNNER"
+
+  SAP_LOCATION_SEED="$SOURCE_DIR/scripts/seed-sap-country-region.sql"
+  if [[ -f "$SAP_LOCATION_SEED" ]]; then
+    echo ">> Seeding SAP country/region master data"
+    docker compose -f "$COMPOSE_FILE" exec -T db \
+      psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < "$SAP_LOCATION_SEED"
+  fi
 fi
 
 # ---------- 2. Edge functions ----------
