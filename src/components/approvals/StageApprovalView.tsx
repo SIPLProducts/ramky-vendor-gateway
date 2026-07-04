@@ -348,6 +348,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
                       <FileText className="h-4 w-4 mr-1" /> Preview
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
+                      <MessageSquare className="h-4 w-4 mr-1" /> Comments
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
