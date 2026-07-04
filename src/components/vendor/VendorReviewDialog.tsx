@@ -587,6 +587,7 @@ export function VendorReviewDialog({
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">GSTIN</p><p className="font-mono font-medium">{vendor.gstin || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">PAN</p><p className="font-mono font-medium">{vendor.pan || '-'}</p></div>
+                      <div className="space-y-1"><p className="text-muted-foreground">PAN Holder Name</p><p className="font-medium">{(vendor as any).pan_holder_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">MSME Number</p><p className="font-mono font-medium">{vendor.msme_number || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">MSME Category</p><p className="font-medium capitalize">{vendor.msme_category || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{vendor.firm_registration_no || '-'}</p></div>

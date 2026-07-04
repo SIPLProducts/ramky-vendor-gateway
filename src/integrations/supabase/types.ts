@@ -1997,6 +1997,7 @@ export type Database = {
           pan: string | null
           pan_aadhaar_linked: boolean | null
           pan_comprehensive_verified_at: string | null
+          pan_holder_name: string | null
           pan_status: string | null
           pan_verification_status: string | null
           pennydrop_init: boolean | null
@@ -2196,6 +2197,7 @@ export type Database = {
           pan?: string | null
           pan_aadhaar_linked?: boolean | null
           pan_comprehensive_verified_at?: string | null
+          pan_holder_name?: string | null
           pan_status?: string | null
           pan_verification_status?: string | null
           pennydrop_init?: boolean | null
@@ -2395,6 +2397,7 @@ export type Database = {
           pan?: string | null
           pan_aadhaar_linked?: boolean | null
           pan_comprehensive_verified_at?: string | null
+          pan_holder_name?: string | null
           pan_status?: string | null
           pan_verification_status?: string | null
           pennydrop_init?: boolean | null

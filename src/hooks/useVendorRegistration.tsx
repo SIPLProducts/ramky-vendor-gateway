@@ -487,6 +487,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       gst_jurisdiction_centre: formData.statutory.gstJurisdictionCentre || null,
       gst_jurisdiction_state: formData.statutory.gstJurisdictionState || null,
       pan: formData.statutory.pan || null,
+      pan_holder_name: formData.statutory.panHolderName || null,
       pan_status: formData.statutory.panStatus ?? null,
       pan_aadhaar_linked: formData.statutory.panAadhaarLinked ?? null,
       pan_comprehensive_verified_at: formData.statutory.panComprehensiveVerifiedAt ?? null,
@@ -665,6 +666,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       statutory: {
         firmRegistrationNo: vendor.firm_registration_no || '',
         pan: vendor.pan || '',
+        panHolderName: (vendor as any).pan_holder_name ?? '',
         panStatus: (vendor as any).pan_status ?? null,
         panAadhaarLinked: (vendor as any).pan_aadhaar_linked ?? null,
         panComprehensiveVerifiedAt: (vendor as any).pan_comprehensive_verified_at ?? null,

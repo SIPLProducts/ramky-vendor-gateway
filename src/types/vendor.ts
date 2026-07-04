@@ -212,6 +212,8 @@ export interface StatutoryDetails {
   panAadhaarLinked?: boolean | null;
   /** ISO timestamp of the last PAN Comprehensive API call. */
   panComprehensiveVerifiedAt?: string | null;
+  /** Name registered against this PAN (from OCR + PAN Comprehensive API). */
+  panHolderName?: string | null;
 }
 
 // Step 5: Bank Details
