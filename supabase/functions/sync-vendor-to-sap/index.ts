@@ -401,8 +401,12 @@ serve(async (req) => {
         IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
           : (toArr(vendor.identification_sources).length ? toArr(vendor.identification_sources)
           : toArr(vendor.identification_source)),
+        CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+          : toArr(vendor.vendor_cashflow),
+        TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+          : toArr(vendor.tier_category),
       };
-      const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+      const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS" | "CASH" | "VENCAT") =>
         (arr || [])
           .map((v) => (v == null ? "" : String(v).trim()))
           .filter(Boolean)
@@ -412,6 +416,8 @@ serve(async (req) => {
         CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
         LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
         IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+        CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
+        VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
       };
       delete (row as any).classify;
 
@@ -463,12 +469,18 @@ serve(async (req) => {
         IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
           : (toArr(vendor.identification_sources).length ? toArr(vendor.identification_sources)
           : toArr(vendor.identification_source)),
+        CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+          : toArr(vendor.vendor_cashflow),
+        TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+          : toArr(vendor.tier_category),
       };
       const classifyCtx = {
         MGV: classifyArrays.MGV[0] || "",
         CATV: classifyArrays.CATV[0] || "",
         LOCV: classifyArrays.LOCV[0] || "",
         IDS: classifyArrays.IDS[0] || "",
+        CASH: classifyArrays.CASH[0] || "",
+        TIER: classifyArrays.TIER[0] || "",
       };
 
       const isMsme = !!vendor.msme_number;
@@ -516,7 +528,7 @@ serve(async (req) => {
 
       // Post-process CLASSIFY — one wrapper object per value, [] when empty,
       // and strip any lowercase `classify` key from the outgoing row.
-      const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+      const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS" | "CASH" | "VENCAT") =>
         (arr || [])
           .map((v) => (v == null ? "" : String(v).trim()))
           .filter(Boolean)
@@ -527,6 +539,8 @@ serve(async (req) => {
           CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
           LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
           IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+          CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
+          VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
         };
         delete (row as any).classify;
         row.UPLOAD = [];
