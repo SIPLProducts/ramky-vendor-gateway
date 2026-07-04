@@ -72,21 +72,21 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
         <div className="grid gap-5">
           <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear1">{formatIndianFy(fy1Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear1" type="number" {...register('turnoverYear1')} placeholder="Enter amount" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear1">Turnover {formatIndianFy(fy1Start)}</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear1" {...numericFieldProps('turnoverYear1')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear2">{formatIndianFy(fy2Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear2" type="number" {...register('turnoverYear2')} placeholder="Enter amount" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear2">Turnover {formatIndianFy(fy2Start)}</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear2" {...numericFieldProps('turnoverYear2')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear3">{formatIndianFy(fy3Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear3" type="number" {...register('turnoverYear3')} placeholder="Enter amount" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear3">Turnover {formatIndianFy(fy3Start)}</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear3" {...numericFieldProps('turnoverYear3')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
             </div>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
-            <Input id="creditPeriodExpected" type="number" {...register('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
+            <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
           </div>
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
         </div>
