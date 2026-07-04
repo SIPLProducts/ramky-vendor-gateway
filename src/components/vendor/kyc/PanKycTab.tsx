@@ -13,6 +13,7 @@ import {
 import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export type PanCheckStatus = 'idle' | 'passed' | 'failed';
 export interface PanTabResult {

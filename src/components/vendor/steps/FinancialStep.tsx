@@ -12,11 +12,16 @@ import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/i
 
 const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
+const nonNegNumericString = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d+(\.\d+)?$/.test(v), { message: 'Enter a valid non-negative number' });
+
 const schema = z.object({
-  turnoverYear1: z.string().optional(),
-  turnoverYear2: z.string().optional(),
-  turnoverYear3: z.string().optional(),
-  creditPeriodExpected: z.string().optional(),
+  turnoverYear1: nonNegNumericString,
+  turnoverYear2: nonNegNumericString,
+  turnoverYear3: nonNegNumericString,
+  creditPeriodExpected: nonNegNumericString,
   majorCustomer1: z.string().optional(),
   majorCustomer2: z.string().optional(),
   majorCustomer3: z.string().optional(),
@@ -33,11 +38,31 @@ interface FinancialStepProps {
 export function FinancialStep({ data, onNext }: FinancialStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(data.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(data.financialDocsFile);
-  const { register, handleSubmit } = useForm<FinancialDetails>({ resolver: zodResolver(schema), defaultValues: data });
+  const { register, handleSubmit, setValue, watch } = useForm<FinancialDetails>({ resolver: zodResolver(schema), defaultValues: data });
 
   const handleFormSubmit = (formData: FinancialDetails) => {
     onNext({ ...formData, dealershipCertificateFile, financialDocsFile });
   };
+
+  const blockInvalidNumericKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+  };
+  const sanitizeNonNegNumeric = (raw: string) => {
+    // Keep digits and at most one decimal point
+    const cleaned = raw.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    return parts.length <= 1 ? cleaned : parts[0] + '.' + parts.slice(1).join('');
+  };
+  const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') => ({
+    type: 'number' as const,
+    min: 0,
+    step: 'any',
+    inputMode: 'decimal' as const,
+    onKeyDown: blockInvalidNumericKeys,
+    value: (watch(name) as string) ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setValue(name, sanitizeNonNegNumeric(e.target.value), { shouldValidate: true }),
+  });
 
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
