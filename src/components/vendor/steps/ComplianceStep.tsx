@@ -211,7 +211,10 @@ export function ComplianceStep({
       return '';
     };
     const name = pickStr(d.full_name || d.holder_name || d.name).trim();
-    if (name) setPanHolderName(name);
+    if (name) {
+      setPanHolderName(name);
+      setValue('panHolderName' as any, name);
+    }
   };
 
   // Coerce Surepass `{ value, confidence }` shapes (from OCR) and plain strings.

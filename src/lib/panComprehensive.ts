@@ -7,7 +7,9 @@ export function formatPanStatus(status: string | null | undefined): string {
 }
 
 export function formatAadhaarLinked(linked: boolean | null | undefined): string {
-  return linked === true ? 'Aadhaar Linked with PAN' : 'Aadhaar Not Linked with PAN';
+  if (linked === true) return 'Aadhaar Linked with PAN';
+  if (linked === false) return 'Aadhaar Not Linked with PAN';
+  return '-';
 }
 
 /** Human label used across the app. */
