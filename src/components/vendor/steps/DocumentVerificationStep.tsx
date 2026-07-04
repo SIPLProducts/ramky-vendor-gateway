@@ -1954,6 +1954,7 @@ export function DocumentVerificationStep({
       out.panStatus = panDoc.apiData?.panStatus ?? panDoc.ocrData.status ?? null;
       out.panAadhaarLinked = panDoc.apiData?.aadhaarLinked ?? normalizeBooleanLike(panDoc.ocrData.aadhaar_linked);
       out.panComprehensiveVerifiedAt = panDoc.apiData?.panComprehensiveVerifiedAt ?? null;
+      out.panHolderName = panDoc.apiData?.name ?? panDoc.ocrData.holder_name ?? null;
     }
     out.isMsmeRegistered = isMsmeRegistered ?? false;
     if (isMsmeRegistered && msmeDoc.status === "verified" && msmeDoc.ocrData) {
