@@ -1,30 +1,56 @@
-## Goal
-Change the Vendor_Details / Vendor_CFSTMT radio behavior in the SAP Sync dialog so switching the radio does NOT reset/clear the user's dropdown selections. Instead, keep both groups' selections intact in the UI, and only at payload-send time include the selected group's arrays while sending `[]` for the other group.
+## Root cause
 
-## Current behavior (to change)
-`handleClassifyModeChange` in `src/components/sap/SapFieldsDialog.tsx` currently wipes `classify.CASH/TIER` (or `MGV/CATV/IDS`) from form state whenever the user toggles the radio. This means the user loses their previous picks if they switch back.
+The SAP Sync dialog's Confirm handler already sends the correct `classify` override — e.g., in `cfstmt` mode it sets `CATV: []`, `MGV: []`, `IDS: []` (and vice versa for `details` mode).
 
-## New behavior
-- Switching the radio only updates `classifyMode`. No `setForm` reset of any `classify.*` arrays.
-- Both cards keep showing their previously selected values. The inactive card stays visually disabled (greyed, non-interactive) as today, but its underlying state is preserved.
-- On Confirm (the button that calls `onConfirm(form)`), build a final `classify` object based on `classifyMode`:
-  - `mode === 'details'` → send `MGV`, `CATV`, `LOCV`, `IDS` from form; force `CASH: []` and `TIER: []`.
-  - `mode === 'cfstmt'` → send `CASH`, `TIER` from form; force `MGV: []`, `CATV: []`, `IDS: []`. (`LOCV` left as-is per user spec — only CASHFLOW/VENCATEGORY listed for cfstmt; LOCATION_VENDOR is not mentioned so keep current behavior: empty for cfstmt.)
-- Result: SAP payload always contains only the active group's values; the other group is `[]`, matching the requirement, but the user's picks are not destroyed when toggling.
+However, the payload construction in three places treats an empty override array as "not provided" and falls back to the vendor DB row. That's why `CAT_VENDOR` (and friends) still appear in the outgoing SAP payload even after selecting Vendor_CFSTMT.
 
-## Technical details
-File: `src/components/sap/SapFieldsDialog.tsx`
-1. Remove the array-clearing `setForm` inside `handleClassifyModeChange` — leave only `setClassifyMode(mode)`.
-2. In the Confirm handler (where `onConfirm(form)` is called), compute:
-   ```ts
-   const finalClassify = classifyMode === 'details'
-     ? { ...form.classify, CASH: [], TIER: [] }
-     : { ...form.classify, MGV: [], CATV: [], IDS: [] };
-   onConfirm({ ...form, classify: finalClassify });
-   ```
-3. Keep the existing `opacity-50 pointer-events-none` styling on the inactive card so it's clear which group is active.
-4. Keep the initial-mode `useEffect` unchanged.
+Current logic pattern (all three sites):
+```ts
+CATV: toArr(ovClassify.CATV).length
+  ? toArr(ovClassify.CATV)
+  : toArr(vendor.vendor_categories)   // ← runs even when caller sent []
+```
+
+## Fix
+
+Treat `overrides.classify` (or `row.classify` in the bulk edge function) as authoritative **when the key exists on that object** — even if the array is empty. Only fall back to the vendor row when no `classify` object was supplied at all (legacy/direct API callers).
+
+Per site, add:
+```ts
+const hasClassifyOverride =
+  overrides && typeof overrides.classify === 'object' && overrides.classify !== null;
+const hasOv = (k: string) =>
+  hasClassifyOverride && Object.prototype.hasOwnProperty.call(overrides.classify, k);
+
+MGV:  hasOv('MGV')  ? toArr(ovClassify.MGV)  : <existing vendor fallback>,
+CATV: hasOv('CATV') ? toArr(ovClassify.CATV) : <existing vendor fallback>,
+LOCV: hasOv('LOCV') ? toArr(ovClassify.LOCV) : <existing vendor fallback>,
+IDS:  hasOv('IDS')  ? toArr(ovClassify.IDS)  : <existing vendor fallback>,
+CASH: hasOv('CASH') ? toArr(ovClassify.CASH) : <existing vendor fallback>,
+TIER: hasOv('TIER') ? toArr(ovClassify.TIER) : <existing vendor fallback>,
+```
+
+Additionally, in `SapFieldsDialog.tsx` Confirm handler, extend the `cfstmt` branch to also clear `LOCV` (so the outgoing payload matches the spec: `LOCATION_VENDOR` empty in CFSTMT mode). The `details` branch already handles `CASH`/`TIER` correctly.
+
+```ts
+const finalClassify = classifyMode === 'details'
+  ? { ...form.classify, CASH: [], TIER: [] }
+  : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
+```
+
+No UI reset — user's on-screen selections in the inactive card remain intact.
+
+## Files to change
+
+1. `src/components/sap/SapFieldsDialog.tsx` — add `LOCV: []` to the `cfstmt` `finalClassify`.
+2. `src/lib/sapPayloadBuilder.ts` (~lines 312–333) — apply `hasOv(...)` gating for all six classify arrays.
+3. `supabase/functions/sync-vendor-to-sap/index.ts` — two duplicated `classifyArrays` blocks (~lines 389 and 455): same `hasOv(...)` gating.
+4. `supabase/functions/sync-vendors-to-sap-bulk/index.ts` (~line 102) — same `hasOv(...)` gating, using `row.classify` as the source-of-truth object.
+
+Edge functions `sync-vendor-to-sap` and `sync-vendors-to-sap-bulk` will be redeployed after the edits.
 
 ## Out of scope
-- No backend / edge function changes.
-- No changes to `MultipleSapSyncDialog` (unless you want the same treatment there — please confirm).
+
+- No UI changes to the classification cards; the user's picks are preserved.
+- No SAP template or mapping changes.
+- No changes to `MultipleSapSyncDialog` UI (it flows through the same fixed edge functions).
