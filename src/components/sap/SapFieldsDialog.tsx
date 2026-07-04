@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2, FileCheck } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +53,7 @@ const REQUIRED_LABELS: Record<string, string> = {
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
+  const [classifyMode, setClassifyMode] = useState<'details' | 'cfstmt'>('details');
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
@@ -62,7 +64,11 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     if (!open) return;
     let cancelled = false;
     const tenantId = (vendor as any)?.tenant_id;
-    setForm(buildDefaults(vendor, null));
+    const initial = buildDefaults(vendor, null);
+    setForm(initial);
+    const hasCfstmt = (initial.classify.CASH?.length || 0) + (initial.classify.TIER?.length || 0) > 0;
+    const hasDetails = (initial.classify.MGV?.length || 0) + (initial.classify.CATV?.length || 0) > 0;
+    setClassifyMode(hasCfstmt && !hasDetails ? 'cfstmt' : 'details');
     setLiveF4(null);
     setMissingFields([]);
     if (tenantId) {
@@ -111,6 +117,16 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
   const setClassify = (k: keyof SapFieldOverrides['classify'], v: string[]) =>
     setForm(prev => ({ ...prev, classify: { ...prev.classify, [k]: v } }));
+
+  const handleClassifyModeChange = (mode: 'details' | 'cfstmt') => {
+    setClassifyMode(mode);
+    setForm(prev => {
+      if (mode === 'details') {
+        return { ...prev, classify: { ...prev.classify, CASH: [], TIER: [] } };
+      }
+      return { ...prev, classify: { ...prev.classify, MGV: [], CATV: [], IDS: [] } };
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -243,8 +259,22 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <h4 className="font-semibold flex items-center gap-2 text-primary">
                 <Tags className="h-4 w-4" />Classification
               </h4>
+              <RadioGroup
+                value={classifyMode}
+                onValueChange={(v) => handleClassifyModeChange(v as 'details' | 'cfstmt')}
+                className="flex flex-wrap gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="classify-details" value="details" />
+                  <Label htmlFor="classify-details" className="text-sm cursor-pointer">Vendor_Details</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="classify-cfstmt" value="cfstmt" />
+                  <Label htmlFor="classify-cfstmt" className="text-sm cursor-pointer">Vendor_CFSTMT</Label>
+                </div>
+              </RadioGroup>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-border rounded-lg p-4 space-y-3">
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'details' ? 'opacity-50 pointer-events-none' : ''}`}>
                   <h5 className="text-sm font-medium text-primary">Vendor_Details</h5>
                   <SapF4MultiSelectField
                     label="Material Group for Vendors"
@@ -261,7 +291,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                     placeholder="Select vendor categories"
                   />
                 </div>
-                <div className="border border-border rounded-lg p-4 space-y-3">
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'cfstmt' ? 'opacity-50 pointer-events-none' : ''}`}>
                   <h5 className="text-sm font-medium text-primary">Vendor_CFSTMT</h5>
                   <SapF4MultiSelectField
                     label="Vendor Cash Flow"
@@ -282,7 +312,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Select Classification values to send to SAP. Defaults are pre-filled when available.
+                Only one group is sent to SAP at a time. Switching resets the other group's selections.
               </p>
             </div>
 
