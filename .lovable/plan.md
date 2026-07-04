@@ -1,73 +1,51 @@
-## Goal
+## Diagnosis
 
-Persist **PAN Holder Name** (the name returned by the PAN Comprehensive / OCR APIs — the name as registered with Income Tax against that PAN) on the vendor row, and display it everywhere PAN Number / PAN Status / Aadhaar Linked are shown.
+The submission fails at the file-upload step with **"new row violates row-level security policy"** on the `vendor-documents` storage bucket.
 
-## Current state
-
-- The name is captured during document verification (`DocumentVerificationStep.tsx` → `formData.pan.holderName`, populated from OCR + PAN Comprehensive API) and only used indirectly (to prefill CEO name / legal name).
-- There is **no `pan_holder_name` column** on `public.vendors`. It is not saved to the vendor row and therefore cannot be shown on any approval / review screen.
-- Reports & built-in field metadata already reference a label `"PAN Holder Name"` (`src/lib/builtInFields.ts`, `src/pages/Reports.tsx`) but the column doesn't exist, so the export is always blank.
-
-## Changes
-
-### 1. Database — add column
-
-Migration on `public.vendors`:
-
-```sql
-ALTER TABLE public.vendors
-  ADD COLUMN IF NOT EXISTS pan_holder_name text;
-```
-
-(No RLS / grants changes needed — inherits existing policies.)
-
-### 2. Save the value
-
-- `src/types/vendor.ts` — add `panHolderName?: string | null` to `StatutoryDetails`.
-- `src/hooks/useVendorRegistration.tsx`
-  - Submit payload (~line 489): add `pan_holder_name: formData.statutory.panHolderName || null`.
-  - Rehydration (~line 667): `panHolderName: (vendor as any).pan_holder_name || ''`.
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — inside the two `runPanVerify` success branches where `pan_status` / `pan_aadhaar_linked` are already flushed to `vendors`, also set `pan_holder_name: holderName` in the same `supabase.from('vendors').update(...)` block, and mirror into form state via `updateFormData({ statutory: { ...formData.statutory, panHolderName: holderName } })`.
-
-### 3. Show it wherever PAN is displayed
-
-Add a **PAN Holder Name** row directly under the PAN Number row, using the same styling already used for PAN Status / Aadhaar Linked. Files:
-
-- `src/components/vendor/VendorReviewDialog.tsx` (used by SAP Sync and every stage approval screen via `StageApprovalView`)
-- `src/pages/PurchaseApproval.tsx` — Details tab
-- `src/pages/FinanceReview.tsx`
-- `src/pages/DocumentVerification.tsx`
-- `src/pages/VendorList.tsx` — vendor detail view
-- `src/components/vendor/steps/ReviewStep.tsx` — vendor's own review before submit
-- `src/lib/reports/loadVendorReport.ts` — include `pan_holder_name` in the report select so the existing `Reports.tsx` label finally has data.
-
-Render pattern (matches existing rows):
+Root cause: the current storage INSERT policy on `storage.objects` for `vendor-documents` only allows the upload if the uploader is the **vendor's own `user_id`** (or an internal reviewer):
 
 ```
-<div>
-  <span className="text-muted-foreground">PAN Holder Name:</span>{' '}
-  <span className="font-medium">{(vendor as any).pan_holder_name || '-'}</span>
-</div>
+v.user_id = auth.uid()  OR  lower(v.primary_email) = lower(auth.jwt().email)  OR  <admin/reviewer roles>
 ```
 
-No wording variants — single label "PAN Holder Name" everywhere.
+For "submit on behalf of vendor", the buyer is signed in but:
+- The `vendors` row being written to has `user_id` set to a different auth user (see the two rows found for invitation `d879cfe2…`: one owned by the buyer `5fceecd3…`, another owned by `9e57348c…`). The client picks one of them at upload time, and when it picks the row whose `user_id ≠ buyer`, the storage INSERT is denied.
+- `primary_email` on both rows is empty, so the email-match branch also fails.
+- The buyer holds no admin/reviewer role, so the role branches don't help.
 
-## Verification
+Result: PDF/image uploads (gst_certificate, pan_card, cheque, msme, etc.) are rejected → "Submission Failed".
 
-1. Register/verify a vendor via PAN → confirm `vendors.pan_holder_name` is populated (matches OCR/API name).
-2. Open every screen listed above → "PAN Holder Name" row appears next to PAN Number with the correct value.
-3. Export a report → PAN Holder Name column is filled.
+There is also a secondary data issue: **two vendor rows exist for the same invitation** because the on-behalf flow created a second draft when a different auth user visited the invite. That's a follow-up to clean up but isn't required to unblock submission.
+
+## Fix
+
+Extend the four `vendor-documents` storage policies (INSERT, SELECT, UPDATE, DELETE) so a **buyer who created the invitation for that vendor** is also allowed. This mirrors the existing `user_can_see_vendor(...)` model already used for vendor RLS.
+
+New matching condition to add (in addition to existing ones):
+
+```
+EXISTS (
+  SELECT 1
+  FROM public.vendors v
+  JOIN public.vendor_invitations vi ON vi.vendor_id = v.id OR vi.id = v.invitation_id
+  WHERE (v.id)::text = (storage.foldername(objects.name))[1]
+    AND vi.created_by = auth.uid()
+)
+```
+
+Migration will `DROP` the four existing `vendor-documents` policies and recreate them with the buyer branch added. No table-schema changes.
 
 ## Files touched
 
-- New migration adding `pan_holder_name` column.
-- `src/types/vendor.ts`
-- `src/hooks/useVendorRegistration.tsx`
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-- `src/components/vendor/VendorReviewDialog.tsx`
-- `src/pages/PurchaseApproval.tsx`
-- `src/pages/FinanceReview.tsx`
-- `src/pages/DocumentVerification.tsx`
-- `src/pages/VendorList.tsx`
-- `src/components/vendor/steps/ReviewStep.tsx`
-- `src/lib/reports/loadVendorReport.ts`
+- One migration file that drops + recreates the four `storage.objects` policies scoped to `bucket_id = 'vendor-documents'`.
+- No app-code changes.
+
+## Verification
+
+1. As the buyer, resubmit the on-behalf application → upload succeeds, submission completes.
+2. Vendor themselves can still upload/view their own files (existing branch preserved).
+3. Admin/finance/purchase reviewers can still view (existing branches preserved).
+
+## Follow-up (not in this change)
+
+The duplicate vendors row for invitation `d879cfe2…` should be reconciled (delete or merge the stale row) — I can do that separately once you confirm which of the two is the intended one; the RLS fix above unblocks submission regardless.
