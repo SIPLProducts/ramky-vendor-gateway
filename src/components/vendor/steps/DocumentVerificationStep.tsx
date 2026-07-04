@@ -848,6 +848,16 @@ export function DocumentVerificationStep({
           status: comprehensive.status,
           aadhaar_linked: comprehensive.aadhaarLinked,
         };
+        if (vendorId) {
+          try {
+            await supabase.from('vendors').update({
+              pan_status: comprehensive.status ?? null,
+              pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
+            }).eq('id', vendorId);
+          } catch (e) {
+            console.warn('[PAN Comprehensive] persist failed', e);
+          }
+        }
         return {
           ok: true as const,
           apiData: {
@@ -863,6 +873,18 @@ export function DocumentVerificationStep({
           normalized,
           registeredName: holderName,
         };
+      }
+
+      // Persist PAN Comprehensive result on the vendor row so approvers can see it.
+      if (vendorId) {
+        try {
+          await supabase.from('vendors').update({
+            pan_status: comprehensive.status ?? null,
+            pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
+          }).eq('id', vendorId);
+        } catch (e) {
+          console.warn('[PAN Comprehensive] persist failed', e);
+        }
       }
 
       const holderName = ocrName || apiName;
