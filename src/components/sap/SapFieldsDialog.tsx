@@ -341,7 +341,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                   : 'MIC';
                 const finalClassify = classifyMode === 'details'
                   ? { ...form.classify, CASH: [], TIER: [] }
-                  : { ...form.classify, MGV: [], CATV: [], IDS: [] };
+                  : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
                 onConfirm({
                   ...form,
                   classify: finalClassify,

@@ -309,26 +309,28 @@ export async function buildSapPayload(
   }
 
   const productCats = Array.isArray((vendor as any).product_categories) ? (vendor as any).product_categories : [];
-  const ovClassify = (overrides && overrides.classify) || {};
+  const ovClassify = (overrides && (overrides as any).classify) || {};
+  const hasClassifyOverride = !!(overrides && typeof (overrides as any).classify === 'object' && (overrides as any).classify !== null);
+  const hasOv = (k: string) => hasClassifyOverride && Object.prototype.hasOwnProperty.call((overrides as any).classify, k);
   const toArr = (v: any): string[] =>
     Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
   const classifyArrays = {
-    MGV: toArr(ovClassify.MGV).length ? toArr(ovClassify.MGV)
+    MGV: hasOv('MGV') ? toArr(ovClassify.MGV)
       : (toArr((vendor as any).material_group_vendors).length ? toArr((vendor as any).material_group_vendors)
       : (toArr((vendor as any).material_group_vendor).length ? toArr((vendor as any).material_group_vendor)
       : productCats.map(String))),
-    CATV: toArr(ovClassify.CATV).length ? toArr(ovClassify.CATV)
+    CATV: hasOv('CATV') ? toArr(ovClassify.CATV)
       : (toArr((vendor as any).vendor_categories).length ? toArr((vendor as any).vendor_categories)
       : toArr((vendor as any).vendor_category || (vendor as any).organization_type || (vendor as any).entity_type)),
-    LOCV: toArr(ovClassify.LOCV).length ? toArr(ovClassify.LOCV)
+    LOCV: hasOv('LOCV') ? toArr(ovClassify.LOCV)
       : (toArr((vendor as any).vendor_locations).length ? toArr((vendor as any).vendor_locations)
       : toArr((vendor as any).vendor_location || vendor.registered_state)),
-    IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
+    IDS: hasOv('IDS') ? toArr(ovClassify.IDS)
       : (toArr((vendor as any).identification_sources).length ? toArr((vendor as any).identification_sources)
       : toArr((vendor as any).identification_source)),
-    CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+    CASH: hasOv('CASH') ? toArr(ovClassify.CASH)
       : toArr((vendor as any).vendor_cashflow),
-    TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+    TIER: hasOv('TIER') ? toArr(ovClassify.TIER)
       : toArr((vendor as any).tier_category),
   };
   const classifyCtx = {
