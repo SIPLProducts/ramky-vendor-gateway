@@ -1,61 +1,73 @@
 ## Goal
 
-Make sure `PAN Status` (Valid/Invalid) and `Is Aadhaar Linked` (from the PAN Comprehensive API) are:
-1. Reliably saved on the vendor row.
-2. Displayed in every approver/reviewer "View" screen alongside PAN — using the same wording already used elsewhere.
+Persist **PAN Holder Name** (the name returned by the PAN Comprehensive / OCR APIs — the name as registered with Income Tax against that PAN) on the vendor row, and display it everywhere PAN Number / PAN Status / Aadhaar Linked are shown.
 
-## Current state (verified)
+## Current state
 
-- Columns exist: `vendors.pan_status`, `vendors.pan_aadhaar_linked`.
-- Client save path already writes them (`useVendorRegistration.tsx` lines 490–491) and re-hydrates them on load (lines 668–669).
-- Extraction from PAN doc → form state exists (`DocumentVerificationStep.tsx` lines 1930–1931, 858/883).
-- View already renders them in: `VendorReviewDialog` (used by SAP Sync + all stage approval screens via `StageApprovalView`), `FinanceReview`, `DocumentVerification`, `VendorList`, `ReviewStep`, `Reports` export.
-- **Missing / broken**:
-  - `PurchaseApproval` "Details" tab does NOT show these two fields.
-  - Save only happens through the registration submit path; if a buyer approves/edits without going through `DocumentVerificationStep`, values captured from the live PAN Comprehensive call are not flushed back to the vendor row. DB check: 0 of the recent PAN-having vendors have `pan_aadhaar_linked` populated.
-  - `PurchaseApproval` details tab is missing several statutory rows too.
+- The name is captured during document verification (`DocumentVerificationStep.tsx` → `formData.pan.holderName`, populated from OCR + PAN Comprehensive API) and only used indirectly (to prefill CEO name / legal name).
+- There is **no `pan_holder_name` column** on `public.vendors`. It is not saved to the vendor row and therefore cannot be shown on any approval / review screen.
+- Reports & built-in field metadata already reference a label `"PAN Holder Name"` (`src/lib/builtInFields.ts`, `src/pages/Reports.tsx`) but the column doesn't exist, so the export is always blank.
 
 ## Changes
 
-### 1. Save reliably (business logic — minimal)
+### 1. Database — add column
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`, when the PAN Comprehensive API call succeeds inside `runPanVerify` (the two success branches around lines 851 and 876), in addition to updating form state also persist directly to the vendor row when a `vendorId` is available:
+Migration on `public.vendors`:
 
-```
-if (vendorId) {
-  await supabase.from('vendors')
-    .update({
-      pan_status: comprehensive.status ?? null,
-      pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
-    })
-    .eq('id', vendorId);
-}
+```sql
+ALTER TABLE public.vendors
+  ADD COLUMN IF NOT EXISTS pan_holder_name text;
 ```
 
-This guarantees the two fields are stored the moment the API returns, independent of whether the user clicks Save/Submit afterwards. No other business logic changes.
+(No RLS / grants changes needed — inherits existing policies.)
 
-### 2. Show in `PurchaseApproval` view dialog (presentation only)
+### 2. Save the value
 
-In `src/pages/PurchaseApproval.tsx` "Details" tab (~lines 413–425), add two rows after the PAN row using the existing shared formatters:
+- `src/types/vendor.ts` — add `panHolderName?: string | null` to `StatutoryDetails`.
+- `src/hooks/useVendorRegistration.tsx`
+  - Submit payload (~line 489): add `pan_holder_name: formData.statutory.panHolderName || null`.
+  - Rehydration (~line 667): `panHolderName: (vendor as any).pan_holder_name || ''`.
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` — inside the two `runPanVerify` success branches where `pan_status` / `pan_aadhaar_linked` are already flushed to `vendors`, also set `pan_holder_name: holderName` in the same `supabase.from('vendors').update(...)` block, and mirror into form state via `updateFormData({ statutory: { ...formData.statutory, panHolderName: holderName } })`.
+
+### 3. Show it wherever PAN is displayed
+
+Add a **PAN Holder Name** row directly under the PAN Number row, using the same styling already used for PAN Status / Aadhaar Linked. Files:
+
+- `src/components/vendor/VendorReviewDialog.tsx` (used by SAP Sync and every stage approval screen via `StageApprovalView`)
+- `src/pages/PurchaseApproval.tsx` — Details tab
+- `src/pages/FinanceReview.tsx`
+- `src/pages/DocumentVerification.tsx`
+- `src/pages/VendorList.tsx` — vendor detail view
+- `src/components/vendor/steps/ReviewStep.tsx` — vendor's own review before submit
+- `src/lib/reports/loadVendorReport.ts` — include `pan_holder_name` in the report select so the existing `Reports.tsx` label finally has data.
+
+Render pattern (matches existing rows):
 
 ```
-import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
-
-<div><span className="text-muted-foreground">{PAN_STATUS_LABEL}:</span> <span className="font-medium">{formatPanStatus((selectedVendor as any).pan_status)}</span></div>
-<div><span className="text-muted-foreground">{AADHAAR_LINKED_LABEL}:</span> <span className="font-medium">{formatAadhaarLinked((selectedVendor as any).pan_aadhaar_linked)}</span></div>
+<div>
+  <span className="text-muted-foreground">PAN Holder Name:</span>{' '}
+  <span className="font-medium">{(vendor as any).pan_holder_name || '-'}</span>
+</div>
 ```
 
-### 3. Normalise wording in `VendorReviewDialog`
-
-Replace the inline ternaries at lines 593–594 with `formatPanStatus` / `formatAadhaarLinked` from `@/lib/panComprehensive` so every screen renders the exact same text ("Valid"/"Invalid", "Aadhaar Linked with PAN"/"Aadhaar Not Linked with PAN"). Wording and layout unchanged — this just centralises formatting.
-
-## Files touched
-
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — persist to `vendors` when API confirms.
-- `src/pages/PurchaseApproval.tsx` — add 2 rows in Details tab.
-- `src/components/vendor/VendorReviewDialog.tsx` — use shared formatter helpers.
+No wording variants — single label "PAN Holder Name" everywhere.
 
 ## Verification
 
-- Register/verify a new vendor via PAN → check `vendors` row has `pan_status = 'valid'` and `pan_aadhaar_linked` boolean set.
-- Open each approval screen (Buyer, SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office, SAP Sync, Finance Review, Purchase Approval, Document Verification) → View → confirm `PAN Status` and `Is Aadhaar Linked` rows appear next to PAN.
+1. Register/verify a vendor via PAN → confirm `vendors.pan_holder_name` is populated (matches OCR/API name).
+2. Open every screen listed above → "PAN Holder Name" row appears next to PAN Number with the correct value.
+3. Export a report → PAN Holder Name column is filled.
+
+## Files touched
+
+- New migration adding `pan_holder_name` column.
+- `src/types/vendor.ts`
+- `src/hooks/useVendorRegistration.tsx`
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- `src/components/vendor/VendorReviewDialog.tsx`
+- `src/pages/PurchaseApproval.tsx`
+- `src/pages/FinanceReview.tsx`
+- `src/pages/DocumentVerification.tsx`
+- `src/pages/VendorList.tsx`
+- `src/components/vendor/steps/ReviewStep.tsx`
+- `src/lib/reports/loadVendorReport.ts`
