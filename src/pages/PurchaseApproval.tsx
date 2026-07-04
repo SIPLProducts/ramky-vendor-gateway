@@ -417,6 +417,8 @@ export default function PurchaseApproval() {
                   <div><span className="text-muted-foreground">Trade Name:</span> <span className="font-medium">{selectedVendor.trade_name || '-'}</span></div>
                   <div><span className="text-muted-foreground">GSTIN:</span> <span className="font-mono font-medium">{selectedVendor.gstin || '-'}</span></div>
                   <div><span className="text-muted-foreground">PAN:</span> <span className="font-mono font-medium">{selectedVendor.pan || '-'}</span></div>
+                  <div><span className="text-muted-foreground">{PAN_STATUS_LABEL}:</span> <span className="font-medium">{formatPanStatus((selectedVendor as any).pan_status)}</span></div>
+                  <div><span className="text-muted-foreground">{AADHAAR_LINKED_LABEL}:</span> <span className="font-medium">{formatAadhaarLinked((selectedVendor as any).pan_aadhaar_linked)}</span></div>
                   <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{selectedVendor.industry_type || '-'}</span></div>
                   <div><span className="text-muted-foreground">Entity Type:</span> <span className="font-medium">{selectedVendor.entity_type || '-'}</span></div>
                   <div><span className="text-muted-foreground">Location:</span> <span className="font-medium">{selectedVendor.registered_city}, {selectedVendor.registered_state}</span></div>
