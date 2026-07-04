@@ -851,6 +851,7 @@ export function DocumentVerificationStep({
         if (vendorId) {
           try {
             await supabase.from('vendors').update({
+              pan_holder_name: holderName || null,
               pan_status: comprehensive.status ?? null,
               pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
             }).eq('id', vendorId);
@@ -875,10 +876,12 @@ export function DocumentVerificationStep({
         };
       }
 
+      const holderName = ocrName || apiName;
       // Persist PAN Comprehensive result on the vendor row so approvers can see it.
       if (vendorId) {
         try {
           await supabase.from('vendors').update({
+            pan_holder_name: holderName || null,
             pan_status: comprehensive.status ?? null,
             pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
           }).eq('id', vendorId);
@@ -887,7 +890,6 @@ export function DocumentVerificationStep({
         }
       }
 
-      const holderName = ocrName || apiName;
       const normalized: Record<string, any> = {
         pan_number: ocrPan,
         holder_name: holderName,
