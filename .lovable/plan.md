@@ -1,49 +1,54 @@
-## Source of the label
+## Issue found
 
-The "SCM CO1 / SCM CO2" labels are generated in `src/lib/approvalLabels.ts` by the `formatStageLevel` function. For any `SCM_MANAGER` stage it returns `SCM CO${level}` using the approval level number stored in the database.
+The frontend payload builder already includes these fields inside `CLASSIFY`:
 
-## What we will change
-
-Scope: **Approval Comments History dialog only** — the approval list rows will continue to show "SCM CO1" / "SCM CO2" so they still reflect the exact level.
-
-### 1. Add a history-specific label helper
-
-File: `src/lib/approvalLabels.ts`
-
-Add a new exported function `formatStageLevelHistory` that returns plain stage names for the history view:
-
-- `SCM_MANAGER` → `SCM CO` (no level number)
-- `SCM_HEAD` → `SCM Head`
-- `BUYER` → `Buyer`
-- `FINANCE_1` → `Finance 1`
-- `FINANCE_2` → `Finance 2`
-- `CEO_OFFICE` → `CEO Office`
-- Fallback → `L${n}`
-
-Keep the existing `formatStageLevel` unchanged so other screens remain unaffected.
-
-### 2. Use the helper in the comments history dialog
-
-File: `src/components/sap/ApprovalCommentsDialog.tsx`
-
-Replace the `Approval Stage` column rendering:
-
-```tsx
-{formatStageLevel(r.stage as ApprovalStage, r.level_number)}
+```json
+"CASHFLOW": [{ "CASH": "..." }],
+"VENCATEGORY": [{ "VENCAT": "..." }]
 ```
 
-with:
+But the backend sync function rebuilds/normalizes `CLASSIFY` before sending to SAP, and in that backend path it only keeps:
 
-```tsx
-{formatStageLevelHistory(r.stage as ApprovalStage, r.level_number)}
+- `MAT_GRP_VENDOR`
+- `CAT_VENDOR`
+- `LOCATION_VENDOR`
+- `IDENTIFICATION_SOURCE`
+
+So `CASHFLOW` and `VENCATEGORY` are being dropped by the app sync function before the request reaches SAP. That is why the same payload works from Postman but SAP does not receive those two blocks from the application.
+
+## Plan
+
+1. Update `sync-vendor-to-sap` backend function:
+   - Include `CASH` and `TIER` in the `classifyArrays` mapping for both paths:
+     - client-supplied `sapPayload` path
+     - server-side template fallback path
+   - Emit:
+     - `CLASSIFY.CASHFLOW` as `[{ CASH: value }]`
+     - `CLASSIFY.VENCATEGORY` as `[{ VENCAT: value }]`
+
+2. Update `sync-vendors-to-sap-bulk` backend function:
+   - Apply the same mapping for bulk SAP sync so multiple-vendor sync does not drop these fields.
+
+3. Keep existing frontend behavior unchanged:
+   - SAP confirmation dialog already captures `CASH` and `TIER`.
+   - `buildSapPayload` already creates the correct `CLASSIFY` shape.
+   - No UI changes needed.
+
+4. Verify the outgoing app-built payload shape:
+   - Confirm `CLASSIFY` includes all six blocks before SAP call:
+
+```json
+{
+  "MAT_GRP_VENDOR": [{ "MGV": "..." }],
+  "CAT_VENDOR": [{ "CATV": "..." }],
+  "LOCATION_VENDOR": [{ "LOCV": "..." }],
+  "IDENTIFICATION_SOURCE": [{ "IDS": "..." }],
+  "CASHFLOW": [{ "CASH": "..." }],
+  "VENCATEGORY": [{ "VENCAT": "..." }]
+}
 ```
 
-### 3. Leave approval list badges untouched
+## Files to change
 
-File: `src/components/approvals/StageApprovalView.tsx`
-
-Continue using `formatStageLevel` for the stage badges in approval list rows so they still display the exact level (e.g., "SCM CO2").
-
-## No backend changes
-
-This is a frontend presentation-only change. No database migrations, edge functions, or API changes are required.
+- `supabase/functions/sync-vendor-to-sap/index.ts`
+- `supabase/functions/sync-vendors-to-sap-bulk/index.ts`

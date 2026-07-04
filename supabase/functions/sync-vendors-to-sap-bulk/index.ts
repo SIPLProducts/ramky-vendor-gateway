@@ -87,7 +87,7 @@ serve(async (req) => {
     const idnumToVendor: Record<string, any> = {};
     const toArr = (v: any): string[] =>
       Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
-    const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS") =>
+    const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS" | "CASH" | "VENCAT") =>
       (arr || [])
         .map((v) => (v == null ? "" : String(v).trim()))
         .filter(Boolean)
@@ -113,6 +113,10 @@ serve(async (req) => {
         IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
           : (toArr(vendor?.identification_sources).length ? toArr(vendor?.identification_sources)
           : toArr(vendor?.identification_source)),
+        CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+          : toArr(vendor?.vendor_cashflow),
+        TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+          : toArr(vendor?.tier_category),
       };
 
       const { classify: _drop, ...rest } = row || {};
@@ -123,6 +127,8 @@ serve(async (req) => {
           CAT_VENDOR:            wrap(classifyArrays.CATV, "CATV"),
           LOCATION_VENDOR:       wrap(classifyArrays.LOCV, "LOCV"),
           IDENTIFICATION_SOURCE: wrap(classifyArrays.IDS,  "IDS"),
+          CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
+          VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
         },
         UPLOAD: [],
         idtype: "SOLMN1",
