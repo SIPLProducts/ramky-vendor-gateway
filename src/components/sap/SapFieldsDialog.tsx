@@ -64,7 +64,11 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     if (!open) return;
     let cancelled = false;
     const tenantId = (vendor as any)?.tenant_id;
-    setForm(buildDefaults(vendor, null));
+    const initial = buildDefaults(vendor, null);
+    setForm(initial);
+    const hasCfstmt = (initial.classify.CASH?.length || 0) + (initial.classify.TIER?.length || 0) > 0;
+    const hasDetails = (initial.classify.MGV?.length || 0) + (initial.classify.CATV?.length || 0) > 0;
+    setClassifyMode(hasCfstmt && !hasDetails ? 'cfstmt' : 'details');
     setLiveF4(null);
     setMissingFields([]);
     if (tenantId) {
