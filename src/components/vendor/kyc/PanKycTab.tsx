@@ -77,6 +77,33 @@ export function PanKycTab(props: PanKycTabProps) {
   };
 
 
+  const parseAadhaarLinked = (data: any): boolean | null => {
+    if (!data || typeof data !== 'object') return null;
+    // Common keys across providers (Surepass, Signzy, Karza, etc.)
+    const candidates = [
+      data.aadhaar_linked,
+      data.is_aadhaar_linked,
+      data.aadhaar_link_status,
+      data.aadhaar_seeding_status,
+      data.aadhaar_seeding_status_desc,
+      data?.pan_aadhaar_linked,
+      data?.pan_aadhaar_link_status,
+    ];
+    for (const raw of candidates) {
+      if (raw === true) return true;
+      if (raw === false) return false;
+      if (raw === 1 || raw === '1') return true;
+      if (raw === 0 || raw === '0') return false;
+      if (typeof raw === 'string') {
+        const s = raw.trim().toLowerCase();
+        if (!s) continue;
+        if (['true', 'yes', 'y', 'linked', 'seeded', 'active', 'valid', 'verified'].includes(s)) return true;
+        if (['false', 'no', 'n', 'not_linked', 'notlinked', 'not linked', 'not seeded', 'notseeded', 'inactive', 'invalid'].includes(s)) return false;
+      }
+    }
+    return null;
+  };
+
   const runPanComprehensive = (pan: string) => {
     // Fire-and-forget. Must never throw or block PAN verification.
     (async () => {
@@ -87,15 +114,24 @@ export function PanKycTab(props: PanKycTabProps) {
         });
         if (cr?.ok && cr.data) {
           const rawStatus = pickStr((cr.data as any).status) || null;
-          const rawLinked = (cr.data as any).aadhaar_linked;
-          const aadhaarLinked =
-            rawLinked === true || String(rawLinked).toLowerCase() === 'true'
-              ? true
-              : rawLinked === false || String(rawLinked).toLowerCase() === 'false'
-                ? false
-                : null;
+          const aadhaarLinked = parseAadhaarLinked(cr.data);
           updateResult({ panStatus: rawStatus, aadhaarLinked });
           props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
+
+          // Immediate persistence — don't wait for final registration save.
+          if (props.vendorId) {
+            supabase
+              .from('vendors')
+              .update({
+                pan_status: rawStatus,
+                pan_aadhaar_linked: aadhaarLinked,
+                pan_comprehensive_verified_at: new Date().toISOString(),
+              })
+              .eq('id', props.vendorId)
+              .then(({ error }) => {
+                if (error) console.warn('[PanKycTab] persist pan_aadhaar_linked failed', error);
+              });
+          }
         }
       } catch {
         /* silent — comprehensive call is best-effort */
