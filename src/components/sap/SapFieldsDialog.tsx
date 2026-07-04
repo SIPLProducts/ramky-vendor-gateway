@@ -120,13 +120,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
   const handleClassifyModeChange = (mode: 'details' | 'cfstmt') => {
     setClassifyMode(mode);
-    setForm(prev => {
-      if (mode === 'details') {
-        return { ...prev, classify: { ...prev.classify, CASH: [], TIER: [] } };
-      }
-      return { ...prev, classify: { ...prev.classify, MGV: [], CATV: [], IDS: [] } };
-    });
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
