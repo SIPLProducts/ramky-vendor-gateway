@@ -48,6 +48,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     { item: StageApprovalItem; comments: string; error: string } | null
   >(null);
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
+  const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
 
   const isBuyer = stage === 'BUYER';
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
