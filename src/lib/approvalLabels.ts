@@ -21,6 +21,20 @@ export function formatStageLevel(stage: ApprovalStage | string, n: number): stri
   return `L${n}`;
 }
 
+/**
+ * Display label for the Approval Comments History dialog.
+ * SCM CO stage is always shown as plain "SCM CO" without the level number.
+ */
+export function formatStageLevelHistory(stage: ApprovalStage | string, n: number): string {
+  if (stage === 'SCM_MANAGER') return 'SCM CO';
+  if (stage === 'SCM_HEAD') return 'SCM Head';
+  if (stage === 'BUYER') return 'Buyer';
+  if (stage === 'FINANCE_1') return 'Finance 1';
+  if (stage === 'FINANCE_2') return 'Finance 2';
+  if (stage === 'CEO_OFFICE') return 'CEO Office';
+  return `L${n}`;
+}
+
 /** Parse a stored levelName like "L2 · ..." / "Level 2 · ..." / "SCM CO2 · ..." → 2 */
 export function parseLevelOrdinal(levelName: string | null | undefined): number | null {
   if (!levelName) return null;
