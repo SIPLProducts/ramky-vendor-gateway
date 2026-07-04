@@ -386,24 +386,26 @@ serve(async (req) => {
 
       const toArr = (v: any): string[] =>
         Array.isArray(v) ? v.filter(Boolean).map(String) : (v ? [String(v)] : []);
-      const ovClassify = (overrides && overrides.classify) || {};
+      const ovClassify = (overrides && (overrides as any).classify) || {};
+      const hasClassifyOverride = !!(overrides && typeof (overrides as any).classify === 'object' && (overrides as any).classify !== null);
+      const hasOv = (k: string) => hasClassifyOverride && Object.prototype.hasOwnProperty.call((overrides as any).classify, k);
       const classifyArrays = {
-        MGV: toArr(ovClassify.MGV).length ? toArr(ovClassify.MGV)
+        MGV: hasOv('MGV') ? toArr(ovClassify.MGV)
           : (toArr(vendor.material_group_vendors).length ? toArr(vendor.material_group_vendors)
           : (toArr(vendor.material_group_vendor).length ? toArr(vendor.material_group_vendor)
           : toArr(vendor.product_categories))),
-        CATV: toArr(ovClassify.CATV).length ? toArr(ovClassify.CATV)
+        CATV: hasOv('CATV') ? toArr(ovClassify.CATV)
           : (toArr(vendor.vendor_categories).length ? toArr(vendor.vendor_categories)
           : toArr(vendor.vendor_category || vendor.organization_type || vendor.entity_type)),
-        LOCV: toArr(ovClassify.LOCV).length ? toArr(ovClassify.LOCV)
+        LOCV: hasOv('LOCV') ? toArr(ovClassify.LOCV)
           : (toArr(vendor.vendor_locations).length ? toArr(vendor.vendor_locations)
           : toArr(vendor.vendor_location || vendor.registered_state)),
-        IDS: toArr(ovClassify.IDS).length ? toArr(ovClassify.IDS)
+        IDS: hasOv('IDS') ? toArr(ovClassify.IDS)
           : (toArr(vendor.identification_sources).length ? toArr(vendor.identification_sources)
           : toArr(vendor.identification_source)),
-        CASH: toArr(ovClassify.CASH).length ? toArr(ovClassify.CASH)
+        CASH: hasOv('CASH') ? toArr(ovClassify.CASH)
           : toArr(vendor.vendor_cashflow),
-        TIER: toArr(ovClassify.TIER).length ? toArr(ovClassify.TIER)
+        TIER: hasOv('TIER') ? toArr(ovClassify.TIER)
           : toArr(vendor.tier_category),
       };
       const wrap = (arr: string[], key: "MGV" | "CATV" | "LOCV" | "IDS" | "CASH" | "VENCAT") =>
