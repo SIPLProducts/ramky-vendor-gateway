@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
+import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import {
   Building2,
   MapPin,
@@ -247,45 +248,31 @@ export function VendorSubmissionPreviewDialog({
               </div>
 
               {/* Financial */}
-              <div className="form-section">
-                <SectionHeader icon={TrendingUp} title="Financial Information" />
-                <div className="space-y-1">
-                  <DataRow
-                    label="Turnover Year 1"
-                    value={
-                      vendor.turnover_year1
-                        ? `₹ ${Number(vendor.turnover_year1).toLocaleString('en-IN')}`
-                        : null
-                    }
-                  />
-                  <DataRow
-                    label="Turnover Year 2"
-                    value={
-                      vendor.turnover_year2
-                        ? `₹ ${Number(vendor.turnover_year2).toLocaleString('en-IN')}`
-                        : null
-                    }
-                  />
-                  <DataRow
-                    label="Turnover Year 3"
-                    value={
-                      vendor.turnover_year3
-                        ? `₹ ${Number(vendor.turnover_year3).toLocaleString('en-IN')}`
-                        : null
-                    }
-                  />
-                  <DataRow
-                    label="Credit Period Expected"
-                    value={
-                      vendor.credit_period_expected
-                        ? `${vendor.credit_period_expected} days`
-                        : null
-                    }
-                  />
-                  <DataRow label="Major Customer 1" value={vendor.major_customer_1} />
-                  <DataRow label="Major Customer 2" value={vendor.major_customer_2} />
-                </div>
-              </div>
+              {(() => {
+                const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
+                const fmt = (v: any) =>
+                  v === 0 || v ? `₹ ${Number(v).toLocaleString('en-IN')} Lakhs` : null;
+                return (
+                  <div className="form-section">
+                    <SectionHeader icon={TrendingUp} title="Financial Information" />
+                    <div className="space-y-1">
+                      <DataRow label={`Turnover ${formatIndianFy(fy1)}`} value={fmt(vendor.turnover_year1)} />
+                      <DataRow label={`Turnover ${formatIndianFy(fy2)}`} value={fmt(vendor.turnover_year2)} />
+                      <DataRow label={`Turnover ${formatIndianFy(fy3)}`} value={fmt(vendor.turnover_year3)} />
+                      <DataRow
+                        label="Credit Period Expected"
+                        value={
+                          vendor.credit_period_expected
+                            ? `${vendor.credit_period_expected} days`
+                            : null
+                        }
+                      />
+                      <DataRow label="Major Customer 1" value={vendor.major_customer_1} />
+                      <DataRow label="Major Customer 2" value={vendor.major_customer_2} />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </ScrollArea>
         ) : (

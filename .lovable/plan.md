@@ -1,62 +1,33 @@
-## Why approvers see "-" for PAN Holder Name / PAN Status
+## Changes
 
-The approver's "All Details" dialog reads `vendors.pan_holder_name`, `vendors.pan_status`, `vendors.pan_aadhaar_linked` directly from the row. For most recently-verified vendors these columns are `NULL`, so the dialog shows "-".
+### 1. Aadhaar Linked value not showing (approver side)
+Apply the previously-identified fix in `src/components/vendor/kyc/PanKycTab.tsx`:
+- **Robust parser** for Aadhaar-linked flag: accept `true/false`, `"Y"/"N"`, `"yes"/"no"`, `1/0`, `"linked"/"not_linked"`, `"seeded"`, `aadhaar_seeding_status`, `is_aadhaar_linked`, `aadhaar_link_status`, etc.
+- **Immediate DB persistence** — after PAN comprehensive verification succeeds and `vendorId` is known, fire-and-forget update `vendors.pan_status`, `vendors.pan_aadhaar_linked`, `vendors.pan_comprehensive_verified_at` so the value lands in the DB without waiting for final registration save.
+- Backfill existing verified vendors' `pan_aadhaar_linked` where parseable from `validation_api_logs` response payload.
 
-Root cause (verified against the DB and code):
+### 2. Turnover input validation (Financial step)
+In `src/components/vendor/steps/FinancialStep.tsx`:
+- Change all 3 turnover inputs (`turnoverYear1/2/3`) and `creditPeriodExpected` to:
+  - Reject alphabets and negative sign
+  - Accept only digits (and optionally a single decimal point) ≥ 0
+  - `min={0}`, `onKeyDown` blocks `-`, `e`, `+`, `E`
+  - `onChange` strips non-numeric chars
+- Update zod schema to enforce non-negative numeric string.
+- Change placeholder from "Enter amount" to **"Enter Amount in Lakhs"**.
 
-1. In `src/components/vendor/steps/ComplianceStep.tsx`, `panHolderName` returned by the PAN OCR is stored only in a **local `useState`** (line 134) and passed to sibling tabs for cross-checks. It is **never written back to `formData.statutory.panHolderName`**, so on final save `useVendorRegistration` writes `null` into `vendors.pan_holder_name` (line 490).
-2. `panStatus` and `panAadhaarLinked` *are* saved via `onComprehensiveResult` → `setValue(...)`, but only when the PAN Comprehensive provider returns them. For older rows verified before that wiring, they remain `NULL`.
-3. The dialog has no fallback: when the column is `NULL`, it prints "-" even though the same information exists elsewhere on the vendor row (legal/trade name for holder, verified PAN with a passed validation for status).
+### 3. Turnover labels — clarify "last three years"
+In `FinancialStep.tsx`, the section header already says "Audited Turnover (Last 3 Years)". Update the field labels to include "Turnover" prefix, e.g. `Turnover FY 2023-24`, so it's explicit in preview/approval too.
 
-DB check confirms the pattern: only 1 of 2 verified vendors has `pan_holder_name`; none have `pan_aadhaar_linked`.
+### 4. Preview & Approval screens — Financial Information card
+In `src/components/vendor/VendorSubmissionPreviewDialog.tsx` and `src/components/vendor/VendorReviewDialog.tsx` (Financial Information section):
+- Rename row labels from "Turnover Year 1/2/3" to the actual FY label using `formatIndianFy` from `src/lib/indianFy.ts` (matching what vendor saw when entering) — e.g. "Turnover FY 2023-24".
+- Append " Lakhs" suffix to displayed amount, e.g. `₹ 12,50,000 Lakhs`.
+- Ensure only these turnover-related fields appear under "Financial Information" (they already do; verify no unrelated fields).
 
-## Fix
-
-### 1. Persist PAN Holder Name during registration
-`src/components/vendor/steps/ComplianceStep.tsx` — in `handlePanVerified`, also push the extracted holder name into the form state so it saves to `vendors.pan_holder_name`:
-
-```ts
-if (name) {
-  setPanHolderName(name);
-  setValue('panHolderName' as any, name);   // <— new
-}
-```
-
-No schema change needed — `useVendorRegistration` already maps `formData.statutory.panHolderName` → `pan_holder_name` and loads it back on edit.
-
-### 2. Safe display fallbacks in the approver dialog
-`src/components/vendor/VendorReviewDialog.tsx` (Statutory Details block around lines 590–596). Only affects presentation when the DB column is `NULL`:
-
-- **PAN Holder Name**: fall back to `msme_enterprise_name` → `account_holder_name` → `trade_name` → `legal_name`, then "-".
-- **PAN Status**: if `pan_status` is null but the vendor has a PAN and `pan_verification_status = 'passed'`, show "Valid"; else keep existing `formatPanStatus` output.
-- **Is Aadhaar Linked**: leave `formatAadhaarLinked` behavior but change the label for `null` to a neutral "-" instead of the current misleading "Aadhaar Not Linked with PAN" (a `NULL` value is unknown, not "not linked").
-
-`src/lib/panComprehensive.ts` — update `formatAadhaarLinked` to return `-` for `null`/`undefined`, `Aadhaar Linked with PAN` for `true`, `Aadhaar Not Linked with PAN` for `false`.
-
-### 3. Backfill existing rows (one-off migration)
-Migration to fill obvious gaps so approvers see values on already-submitted vendors:
-
-```sql
-UPDATE public.vendors
-   SET pan_holder_name = COALESCE(
-         pan_holder_name,
-         NULLIF(trim(msme_enterprise_name), ''),
-         NULLIF(trim(account_holder_name), ''),
-         NULLIF(trim(trade_name), ''),
-         NULLIF(trim(legal_name), '')
-       )
- WHERE pan IS NOT NULL AND pan <> '' AND (pan_holder_name IS NULL OR pan_holder_name = '');
-
-UPDATE public.vendors
-   SET pan_status = 'valid'
- WHERE pan IS NOT NULL AND pan <> ''
-   AND pan_status IS NULL
-   AND pan_verification_status = 'passed';
-```
-(No change to `pan_aadhaar_linked` — leave `NULL` where genuinely unknown; UI will now render "-" for it.)
-
-## Scope
-
-- No changes to KYC verification logic, edge functions, SAP payloads, or approval flow.
-- Only touches: `ComplianceStep.tsx` (1 line added), `VendorReviewDialog.tsx` (3 field renders), `panComprehensive.ts` (1 helper), 1 migration.
-- After the fix, all newly verified vendors persist PAN Holder Name; existing vendors get a sensible display via backfill + fallback.
+## Files to change
+- `src/components/vendor/kyc/PanKycTab.tsx` — parser + immediate persistence
+- `src/components/vendor/steps/FinancialStep.tsx` — input validation, placeholders, labels
+- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — FY labels, Lakhs suffix
+- `src/components/vendor/VendorReviewDialog.tsx` — FY labels, Lakhs suffix
+- One-time SQL backfill for `pan_aadhaar_linked` from existing validation logs

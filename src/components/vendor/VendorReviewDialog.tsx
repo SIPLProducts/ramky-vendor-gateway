@@ -23,6 +23,7 @@ import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationResult } from '@/types/vendor';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
+import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import {
   Building2,
   MapPin,
@@ -618,18 +619,25 @@ export function VendorReviewDialog({
                   <Separator />
 
                   {/* Financial */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <CreditCard className="h-4 w-4" />
-                      Financial Details
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="space-y-1"><p className="text-muted-foreground">Turnover Year 1</p><p className="font-medium">₹ {vendor.turnover_year1?.toLocaleString('en-IN') || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Turnover Year 2</p><p className="font-medium">₹ {vendor.turnover_year2?.toLocaleString('en-IN') || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Turnover Year 3</p><p className="font-medium">₹ {vendor.turnover_year3?.toLocaleString('en-IN') || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{vendor.credit_period_expected ? `${vendor.credit_period_expected} days` : '-'}</p></div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
+                    const fmt = (v: any) =>
+                      v === 0 || v ? `₹ ${Number(v).toLocaleString('en-IN')} Lakhs` : '-';
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold flex items-center gap-2 text-primary">
+                          <CreditCard className="h-4 w-4" />
+                          Financial Information
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy1)}</p><p className="font-medium">{fmt(vendor.turnover_year1)}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy2)}</p><p className="font-medium">{fmt(vendor.turnover_year2)}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy3)}</p><p className="font-medium">{fmt(vendor.turnover_year3)}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{vendor.credit_period_expected ? `${vendor.credit_period_expected} days` : '-'}</p></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
 
                   {(vendor.finance_comments || vendor.purchase_comments) && (

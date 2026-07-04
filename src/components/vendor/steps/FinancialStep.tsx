@@ -12,11 +12,16 @@ import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/i
 
 const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
+const nonNegNumericString = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d+(\.\d+)?$/.test(v), { message: 'Enter a valid non-negative number' });
+
 const schema = z.object({
-  turnoverYear1: z.string().optional(),
-  turnoverYear2: z.string().optional(),
-  turnoverYear3: z.string().optional(),
-  creditPeriodExpected: z.string().optional(),
+  turnoverYear1: nonNegNumericString,
+  turnoverYear2: nonNegNumericString,
+  turnoverYear3: nonNegNumericString,
+  creditPeriodExpected: nonNegNumericString,
   majorCustomer1: z.string().optional(),
   majorCustomer2: z.string().optional(),
   majorCustomer3: z.string().optional(),
@@ -33,11 +38,31 @@ interface FinancialStepProps {
 export function FinancialStep({ data, onNext }: FinancialStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(data.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(data.financialDocsFile);
-  const { register, handleSubmit } = useForm<FinancialDetails>({ resolver: zodResolver(schema), defaultValues: data });
+  const { register, handleSubmit, setValue, watch } = useForm<FinancialDetails>({ resolver: zodResolver(schema), defaultValues: data });
 
   const handleFormSubmit = (formData: FinancialDetails) => {
     onNext({ ...formData, dealershipCertificateFile, financialDocsFile });
   };
+
+  const blockInvalidNumericKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+  };
+  const sanitizeNonNegNumeric = (raw: string) => {
+    // Keep digits and at most one decimal point
+    const cleaned = raw.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    return parts.length <= 1 ? cleaned : parts[0] + '.' + parts.slice(1).join('');
+  };
+  const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') => ({
+    type: 'number' as const,
+    min: 0,
+    step: 'any',
+    inputMode: 'decimal' as const,
+    onKeyDown: blockInvalidNumericKeys,
+    value: (watch(name) as string) ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setValue(name, sanitizeNonNegNumeric(e.target.value), { shouldValidate: true }),
+  });
 
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
@@ -47,21 +72,21 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
         <div className="grid gap-5">
           <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear1">{formatIndianFy(fy1Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear1" type="number" {...register('turnoverYear1')} placeholder="Enter amount" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear1">Turnover {formatIndianFy(fy1Start)}</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear1" {...numericFieldProps('turnoverYear1')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear2">{formatIndianFy(fy2Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear2" type="number" {...register('turnoverYear2')} placeholder="Enter amount" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear2">Turnover {formatIndianFy(fy2Start)}</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear2" {...numericFieldProps('turnoverYear2')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear3">{formatIndianFy(fy3Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear3" type="number" {...register('turnoverYear3')} placeholder="Enter amount" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear3">Turnover {formatIndianFy(fy3Start)}</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear3" {...numericFieldProps('turnoverYear3')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
             </div>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
-            <Input id="creditPeriodExpected" type="number" {...register('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
+            <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
           </div>
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
         </div>
