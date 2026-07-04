@@ -1,54 +1,26 @@
-## Issue found
+## Goal
+Make the two Classification groups in the SAP Field Confirmation dialog (`Vendor_Details` and `Vendor_CFSTMT`) mutually exclusive, so only one contributes values to the SAP payload at a time.
 
-The frontend payload builder already includes these fields inside `CLASSIFY`:
+## Behavior
+- Add a small selector at the top of the Classification section (radio group with two options: `Vendor_Details` and `Vendor_CFSTMT`). Default to `Vendor_Details`.
+- When the user switches to `Vendor_Details`:
+  - Clear `classify.CASH` and `classify.TIER` (so `CASHFLOW` and `VENCATEGORY` go out as `[]`).
+  - Disable the Vendor_CFSTMT card (greyed out, dropdowns non-interactive) to visually indicate it is unchecked.
+- When the user switches to `Vendor_CFSTMT`:
+  - Clear `classify.MGV`, `classify.CATV`, and `classify.IDS` (so `MAT_GRP_VENDOR`, `CAT_VENDOR`, `IDENTIFICATION_SOURCE` go out as `[]`).
+  - Disable the Vendor_Details card.
+- Initial default when opening the dialog: pick `Vendor_CFSTMT` if the vendor already has cashflow/tier defaults but no material-group/category defaults; otherwise `Vendor_Details`.
 
-```json
-"CASHFLOW": [{ "CASH": "..." }],
-"VENCATEGORY": [{ "VENCAT": "..." }]
-```
+## Technical details
+- File: `src/components/sap/SapFieldsDialog.tsx`
+  - Add local state `classifyMode: 'details' | 'cfstmt'`.
+  - Add a `RadioGroup` (shadcn) above the two cards.
+  - On mode change, call `setForm` to reset the arrays of the opposite side to `[]`.
+  - Pass a `disabled` prop through to the `MultiSelect` used inside `SapF4MultiSelectField` on the inactive card (or wrap the card in a `pointer-events-none opacity-50` container as a lightweight approach).
+  - Initial mode chosen inside the existing `useEffect` that builds defaults from the vendor, based on which side has any prefilled values.
+- No changes to the backend edge functions: they already send whatever arrays the frontend supplies, so empty arrays will map to `[]` in the SAP payload for the disabled side.
+- No changes to `sapPayloadBuilder.ts` needed — the dialog owns the final `classify` state passed to `onConfirm`.
 
-But the backend sync function rebuilds/normalizes `CLASSIFY` before sending to SAP, and in that backend path it only keeps:
-
-- `MAT_GRP_VENDOR`
-- `CAT_VENDOR`
-- `LOCATION_VENDOR`
-- `IDENTIFICATION_SOURCE`
-
-So `CASHFLOW` and `VENCATEGORY` are being dropped by the app sync function before the request reaches SAP. That is why the same payload works from Postman but SAP does not receive those two blocks from the application.
-
-## Plan
-
-1. Update `sync-vendor-to-sap` backend function:
-   - Include `CASH` and `TIER` in the `classifyArrays` mapping for both paths:
-     - client-supplied `sapPayload` path
-     - server-side template fallback path
-   - Emit:
-     - `CLASSIFY.CASHFLOW` as `[{ CASH: value }]`
-     - `CLASSIFY.VENCATEGORY` as `[{ VENCAT: value }]`
-
-2. Update `sync-vendors-to-sap-bulk` backend function:
-   - Apply the same mapping for bulk SAP sync so multiple-vendor sync does not drop these fields.
-
-3. Keep existing frontend behavior unchanged:
-   - SAP confirmation dialog already captures `CASH` and `TIER`.
-   - `buildSapPayload` already creates the correct `CLASSIFY` shape.
-   - No UI changes needed.
-
-4. Verify the outgoing app-built payload shape:
-   - Confirm `CLASSIFY` includes all six blocks before SAP call:
-
-```json
-{
-  "MAT_GRP_VENDOR": [{ "MGV": "..." }],
-  "CAT_VENDOR": [{ "CATV": "..." }],
-  "LOCATION_VENDOR": [{ "LOCV": "..." }],
-  "IDENTIFICATION_SOURCE": [{ "IDS": "..." }],
-  "CASHFLOW": [{ "CASH": "..." }],
-  "VENCATEGORY": [{ "VENCAT": "..." }]
-}
-```
-
-## Files to change
-
-- `supabase/functions/sync-vendor-to-sap/index.ts`
-- `supabase/functions/sync-vendors-to-sap-bulk/index.ts`
+## Out of scope
+- No changes to `sync-vendor-to-sap` / `sync-vendors-to-sap-bulk` edge functions.
+- No changes to registration-time capture of classification defaults.
