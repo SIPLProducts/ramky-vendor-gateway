@@ -53,6 +53,7 @@ const REQUIRED_LABELS: Record<string, string> = {
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildDefaults(vendor, null));
+  const [classifyMode, setClassifyMode] = useState<'details' | 'cfstmt'>('details');
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
