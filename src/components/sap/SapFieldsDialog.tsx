@@ -307,8 +307,9 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Only one group is sent to SAP at a time. Switching resets the other group's selections.
+                Only the selected group is sent to SAP; the other group is sent as empty. Your selections in the other group are preserved.
               </p>
+
             </div>
 
 
