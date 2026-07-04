@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
-import { formatStageLevel, type ApprovalStage } from '@/lib/approvalLabels';
+import { formatStageLevelHistory, type ApprovalStage } from '@/lib/approvalLabels';
 
 interface Props {
   open: boolean;
@@ -115,7 +115,7 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">
-                        {formatStageLevel(r.stage as ApprovalStage, r.level_number)}
+                        {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number)}
                       </TableCell>
                       <TableCell>{r.acted_by_name ?? '—'}</TableCell>
                       <TableCell>

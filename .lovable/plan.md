@@ -1,30 +1,49 @@
-## Goal
-On every approval screen (Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office), show a "Comments" button beside the Preview button in each row — matching the behavior already present on the SAP Sync screen. Clicking it opens the existing `ApprovalCommentsDialog` showing full approval history (stage, approver, status, comment, timestamp).
+## Source of the label
 
-## Changes
+The "SCM CO1 / SCM CO2" labels are generated in `src/lib/approvalLabels.ts` by the `formatStageLevel` function. For any `SCM_MANAGER` stage it returns `SCM CO${level}` using the approval level number stored in the database.
 
-**`src/components/approvals/StageApprovalView.tsx`** (single file — powers all six approval pages)
+## What we will change
 
-1. Import `MessageSquare` from `lucide-react` and `ApprovalCommentsDialog` from `@/components/sap/ApprovalCommentsDialog`.
-2. Add state:
-   ```ts
-   const [commentsVendor, setCommentsVendor] = useState<StageApprovalItem | null>(null);
-   ```
-3. In both `renderTable` (pending/waiting rows) and `renderRejectedTable` (rejected rows), insert a new button between the Preview button and Approve/next button:
-   ```tsx
-   <Button size="sm" variant="outline" onClick={() => setCommentsVendor(it)}>
-     <MessageSquare className="h-4 w-4 mr-1" /> Comments
-   </Button>
-   ```
-4. At the bottom of the component (alongside other dialogs), render:
-   ```tsx
-   <ApprovalCommentsDialog
-     open={!!commentsVendor}
-     onOpenChange={(o) => !o && setCommentsVendor(null)}
-     vendorId={commentsVendor?.vendorId ?? null}
-     vendorName={commentsVendor?.vendorName}
-     referenceNumber={commentsVendor?.referenceNumber}
-   />
-   ```
+Scope: **Approval Comments History dialog only** — the approval list rows will continue to show "SCM CO1" / "SCM CO2" so they still reflect the exact level.
 
-No changes to backend, data hooks, or the six per-stage page files — they all render through `StageApprovalView`, so this single edit covers all approval screens.
+### 1. Add a history-specific label helper
+
+File: `src/lib/approvalLabels.ts`
+
+Add a new exported function `formatStageLevelHistory` that returns plain stage names for the history view:
+
+- `SCM_MANAGER` → `SCM CO` (no level number)
+- `SCM_HEAD` → `SCM Head`
+- `BUYER` → `Buyer`
+- `FINANCE_1` → `Finance 1`
+- `FINANCE_2` → `Finance 2`
+- `CEO_OFFICE` → `CEO Office`
+- Fallback → `L${n}`
+
+Keep the existing `formatStageLevel` unchanged so other screens remain unaffected.
+
+### 2. Use the helper in the comments history dialog
+
+File: `src/components/sap/ApprovalCommentsDialog.tsx`
+
+Replace the `Approval Stage` column rendering:
+
+```tsx
+{formatStageLevel(r.stage as ApprovalStage, r.level_number)}
+```
+
+with:
+
+```tsx
+{formatStageLevelHistory(r.stage as ApprovalStage, r.level_number)}
+```
+
+### 3. Leave approval list badges untouched
+
+File: `src/components/approvals/StageApprovalView.tsx`
+
+Continue using `formatStageLevel` for the stage badges in approval list rows so they still display the exact level (e.g., "SCM CO2").
+
+## No backend changes
+
+This is a frontend presentation-only change. No database migrations, edge functions, or API changes are required.
