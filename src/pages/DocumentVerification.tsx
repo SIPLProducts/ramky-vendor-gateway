@@ -760,6 +760,10 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                             <p className="font-mono">{selectedVendor.pan || 'Not provided'}</p>
                           </div>
                           <div>
+                            <Label className="text-muted-foreground">PAN Holder Name</Label>
+                            <p>{(selectedVendor as any).pan_holder_name || 'Not provided'}</p>
+                          </div>
+                          <div>
                             <Label className="text-muted-foreground">Email</Label>
                             <p>{selectedVendor.primary_email || 'Not provided'}</p>
                           </div>

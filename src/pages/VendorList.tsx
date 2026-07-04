@@ -607,6 +607,10 @@ export default function VendorList() {
                           <p className="font-mono font-medium">{selectedVendor.pan || '-'}</p>
                         </div>
                         <div className="space-y-1">
+                          <p className="text-muted-foreground">PAN Holder Name</p>
+                          <p className="font-medium">{(selectedVendor as any).pan_holder_name || '-'}</p>
+                        </div>
+                        <div className="space-y-1">
                           <p className="text-muted-foreground">MSME Number</p>
                           <p className="font-mono font-medium">{selectedVendor.msme_number || '-'}</p>
                         </div>

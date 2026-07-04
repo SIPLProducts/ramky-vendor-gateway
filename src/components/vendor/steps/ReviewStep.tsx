@@ -189,6 +189,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
         <SectionHeader icon={FileCheck} title="PAN" step={1} tab="pan" onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="PAN" value={data.statutory?.pan} />
+          <DataRow label="PAN Holder Name" value={data.statutory?.panHolderName || '-'} />
           <DataRow label="PAN Status" value={formatPanStatus(data.statutory?.panStatus)} />
           <DataRow label="Is Aadhaar Linked" value={formatAadhaarLinked(data.statutory?.panAadhaarLinked)} />
         </div>
