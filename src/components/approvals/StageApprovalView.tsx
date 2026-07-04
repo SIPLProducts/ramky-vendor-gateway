@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2 } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare } from 'lucide-react';
+import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
@@ -47,6 +48,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     { item: StageApprovalItem; comments: string; error: string } | null
   >(null);
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
+  const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
 
   const isBuyer = stage === 'BUYER';
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
@@ -252,6 +254,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
                         <FileText className="h-4 w-4 mr-1" /> Preview
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
+                        <MessageSquare className="h-4 w-4 mr-1" /> Comments
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -342,6 +347,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
                       <FileText className="h-4 w-4 mr-1" /> Preview
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
+                      <MessageSquare className="h-4 w-4 mr-1" /> Comments
                     </Button>
                     <Button
                       size="sm"
@@ -540,6 +548,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         vendorId={previewVendorId}
         open={!!previewVendorId}
         onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
+      />
+
+      <ApprovalCommentsDialog
+        open={!!commentsItem}
+        onOpenChange={(o) => { if (!o) setCommentsItem(null); }}
+        vendorId={commentsItem?.vendorId ?? null}
+        vendorName={commentsItem?.vendorName}
+        referenceNumber={commentsItem?.referenceNumber}
       />
 
       <Dialog
