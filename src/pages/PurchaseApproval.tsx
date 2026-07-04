@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
