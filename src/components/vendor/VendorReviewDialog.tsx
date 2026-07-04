@@ -22,6 +22,7 @@ import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationResult } from '@/types/vendor';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
 import {
   Building2,
   MapPin,
