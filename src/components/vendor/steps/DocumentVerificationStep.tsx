@@ -865,6 +865,18 @@ export function DocumentVerificationStep({
         };
       }
 
+      // Persist PAN Comprehensive result on the vendor row so approvers can see it.
+      if (vendorId) {
+        try {
+          await supabase.from('vendors').update({
+            pan_status: comprehensive.status ?? null,
+            pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
+          }).eq('id', vendorId);
+        } catch (e) {
+          console.warn('[PAN Comprehensive] persist failed', e);
+        }
+      }
+
       const holderName = ocrName || apiName;
       const normalized: Record<string, any> = {
         pan_number: ocrPan,
