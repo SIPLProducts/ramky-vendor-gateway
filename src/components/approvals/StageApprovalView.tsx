@@ -550,6 +550,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
       />
 
+      <ApprovalCommentsDialog
+        open={!!commentsItem}
+        onOpenChange={(o) => { if (!o) setCommentsItem(null); }}
+        vendorId={commentsItem?.vendorId ?? null}
+        vendorName={commentsItem?.vendorName}
+        referenceNumber={commentsItem?.referenceNumber}
+      />
+
       <Dialog
         open={!!forceRejectPrompt}
         onOpenChange={(o) => { if (!o && !forceRejectSubmitting) setForceRejectPrompt(null); }}
