@@ -161,6 +161,7 @@ export interface VerifiedDocumentData {
   panStatus?: string | null;
   panAadhaarLinked?: boolean | null;
   panComprehensiveVerifiedAt?: string | null;
+  panHolderName?: string | null;
   // Step-1 uploaded files — lifted so parent draft saves include them
   gstCertificateFile?: File | null;
   panCardFile?: File | null;
