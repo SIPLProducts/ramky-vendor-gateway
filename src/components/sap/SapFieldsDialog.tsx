@@ -339,12 +339,17 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                   : cat === 'small' ? 'SMA'
                   : cat === 'medium' ? 'MED'
                   : 'MIC';
+                const finalClassify = classifyMode === 'details'
+                  ? { ...form.classify, CASH: [], TIER: [] }
+                  : { ...form.classify, MGV: [], CATV: [], IDS: [] };
                 onConfirm({
                   ...form,
+                  classify: finalClassify,
                   msme: msmeCode,
                   idtype: form.reg_is_msme ? 'ZMSMEN' : '',
                   idnum: form.reg_is_msme ? (form.reg_msme_no || '') : '',
                 });
+
               }
             }}
             disabled={isSubmitting || f4Status.state === 'loading'}
