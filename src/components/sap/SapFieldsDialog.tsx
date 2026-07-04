@@ -259,8 +259,22 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               <h4 className="font-semibold flex items-center gap-2 text-primary">
                 <Tags className="h-4 w-4" />Classification
               </h4>
+              <RadioGroup
+                value={classifyMode}
+                onValueChange={(v) => handleClassifyModeChange(v as 'details' | 'cfstmt')}
+                className="flex flex-wrap gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="classify-details" value="details" />
+                  <Label htmlFor="classify-details" className="text-sm cursor-pointer">Vendor_Details</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="classify-cfstmt" value="cfstmt" />
+                  <Label htmlFor="classify-cfstmt" className="text-sm cursor-pointer">Vendor_CFSTMT</Label>
+                </div>
+              </RadioGroup>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-border rounded-lg p-4 space-y-3">
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'details' ? 'opacity-50 pointer-events-none' : ''}`}>
                   <h5 className="text-sm font-medium text-primary">Vendor_Details</h5>
                   <SapF4MultiSelectField
                     label="Material Group for Vendors"
@@ -277,7 +291,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                     placeholder="Select vendor categories"
                   />
                 </div>
-                <div className="border border-border rounded-lg p-4 space-y-3">
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'cfstmt' ? 'opacity-50 pointer-events-none' : ''}`}>
                   <h5 className="text-sm font-medium text-primary">Vendor_CFSTMT</h5>
                   <SapF4MultiSelectField
                     label="Vendor Cash Flow"
@@ -298,7 +312,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Select Classification values to send to SAP. Defaults are pre-filled when available.
+                Only one group is sent to SAP at a time. Switching resets the other group's selections.
               </p>
             </div>
 
