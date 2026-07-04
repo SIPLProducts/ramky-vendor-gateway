@@ -1,26 +1,30 @@
 ## Goal
-Make the two Classification groups in the SAP Field Confirmation dialog (`Vendor_Details` and `Vendor_CFSTMT`) mutually exclusive, so only one contributes values to the SAP payload at a time.
+Change the Vendor_Details / Vendor_CFSTMT radio behavior in the SAP Sync dialog so switching the radio does NOT reset/clear the user's dropdown selections. Instead, keep both groups' selections intact in the UI, and only at payload-send time include the selected group's arrays while sending `[]` for the other group.
 
-## Behavior
-- Add a small selector at the top of the Classification section (radio group with two options: `Vendor_Details` and `Vendor_CFSTMT`). Default to `Vendor_Details`.
-- When the user switches to `Vendor_Details`:
-  - Clear `classify.CASH` and `classify.TIER` (so `CASHFLOW` and `VENCATEGORY` go out as `[]`).
-  - Disable the Vendor_CFSTMT card (greyed out, dropdowns non-interactive) to visually indicate it is unchecked.
-- When the user switches to `Vendor_CFSTMT`:
-  - Clear `classify.MGV`, `classify.CATV`, and `classify.IDS` (so `MAT_GRP_VENDOR`, `CAT_VENDOR`, `IDENTIFICATION_SOURCE` go out as `[]`).
-  - Disable the Vendor_Details card.
-- Initial default when opening the dialog: pick `Vendor_CFSTMT` if the vendor already has cashflow/tier defaults but no material-group/category defaults; otherwise `Vendor_Details`.
+## Current behavior (to change)
+`handleClassifyModeChange` in `src/components/sap/SapFieldsDialog.tsx` currently wipes `classify.CASH/TIER` (or `MGV/CATV/IDS`) from form state whenever the user toggles the radio. This means the user loses their previous picks if they switch back.
+
+## New behavior
+- Switching the radio only updates `classifyMode`. No `setForm` reset of any `classify.*` arrays.
+- Both cards keep showing their previously selected values. The inactive card stays visually disabled (greyed, non-interactive) as today, but its underlying state is preserved.
+- On Confirm (the button that calls `onConfirm(form)`), build a final `classify` object based on `classifyMode`:
+  - `mode === 'details'` → send `MGV`, `CATV`, `LOCV`, `IDS` from form; force `CASH: []` and `TIER: []`.
+  - `mode === 'cfstmt'` → send `CASH`, `TIER` from form; force `MGV: []`, `CATV: []`, `IDS: []`. (`LOCV` left as-is per user spec — only CASHFLOW/VENCATEGORY listed for cfstmt; LOCATION_VENDOR is not mentioned so keep current behavior: empty for cfstmt.)
+- Result: SAP payload always contains only the active group's values; the other group is `[]`, matching the requirement, but the user's picks are not destroyed when toggling.
 
 ## Technical details
-- File: `src/components/sap/SapFieldsDialog.tsx`
-  - Add local state `classifyMode: 'details' | 'cfstmt'`.
-  - Add a `RadioGroup` (shadcn) above the two cards.
-  - On mode change, call `setForm` to reset the arrays of the opposite side to `[]`.
-  - Pass a `disabled` prop through to the `MultiSelect` used inside `SapF4MultiSelectField` on the inactive card (or wrap the card in a `pointer-events-none opacity-50` container as a lightweight approach).
-  - Initial mode chosen inside the existing `useEffect` that builds defaults from the vendor, based on which side has any prefilled values.
-- No changes to the backend edge functions: they already send whatever arrays the frontend supplies, so empty arrays will map to `[]` in the SAP payload for the disabled side.
-- No changes to `sapPayloadBuilder.ts` needed — the dialog owns the final `classify` state passed to `onConfirm`.
+File: `src/components/sap/SapFieldsDialog.tsx`
+1. Remove the array-clearing `setForm` inside `handleClassifyModeChange` — leave only `setClassifyMode(mode)`.
+2. In the Confirm handler (where `onConfirm(form)` is called), compute:
+   ```ts
+   const finalClassify = classifyMode === 'details'
+     ? { ...form.classify, CASH: [], TIER: [] }
+     : { ...form.classify, MGV: [], CATV: [], IDS: [] };
+   onConfirm({ ...form, classify: finalClassify });
+   ```
+3. Keep the existing `opacity-50 pointer-events-none` styling on the inactive card so it's clear which group is active.
+4. Keep the initial-mode `useEffect` unchanged.
 
 ## Out of scope
-- No changes to `sync-vendor-to-sap` / `sync-vendors-to-sap-bulk` edge functions.
-- No changes to registration-time capture of classification defaults.
+- No backend / edge function changes.
+- No changes to `MultipleSapSyncDialog` (unless you want the same treatment there — please confirm).
