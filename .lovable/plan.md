@@ -1,33 +1,36 @@
-## Changes
+## Problem
 
-### 1. Aadhaar Linked value not showing (approver side)
-Apply the previously-identified fix in `src/components/vendor/kyc/PanKycTab.tsx`:
-- **Robust parser** for Aadhaar-linked flag: accept `true/false`, `"Y"/"N"`, `"yes"/"no"`, `1/0`, `"linked"/"not_linked"`, `"seeded"`, `aadhaar_seeding_status`, `is_aadhaar_linked`, `aadhaar_link_status`, etc.
-- **Immediate DB persistence** — after PAN comprehensive verification succeeds and `vendorId` is known, fire-and-forget update `vendors.pan_status`, `vendors.pan_aadhaar_linked`, `vendors.pan_comprehensive_verified_at` so the value lands in the DB without waiting for final registration save.
-- Backfill existing verified vendors' `pan_aadhaar_linked` where parseable from `validation_api_logs` response payload.
+On the International vendor flow, clicking **Continue** on Step 2 (Company Details) does nothing.
 
-### 2. Turnover input validation (Financial step)
-In `src/components/vendor/steps/FinancialStep.tsx`:
-- Change all 3 turnover inputs (`turnoverYear1/2/3`) and `creditPeriodExpected` to:
-  - Reject alphabets and negative sign
-  - Accept only digits (and optionally a single decimal point) ≥ 0
-  - `min={0}`, `onKeyDown` blocks `-`, `e`, `+`, `E`
-  - `onChange` strips non-numeric chars
-- Update zod schema to enforce non-negative numeric string.
-- Change placeholder from "Enter amount" to **"Enter Amount in Lakhs"**.
+## Root cause
 
-### 3. Turnover labels — clarify "last three years"
-In `FinancialStep.tsx`, the section header already says "Audited Turnover (Last 3 Years)". Update the field labels to include "Turnover" prefix, e.g. `Turnover FY 2023-24`, so it's explicit in preview/approval too.
+In `src/pages/VendorRegistration.tsx` (~line 1809), the Continue button's `form` attribute is hardcoded per step number:
 
-### 4. Preview & Approval screens — Financial Information card
-In `src/components/vendor/VendorSubmissionPreviewDialog.tsx` and `src/components/vendor/VendorReviewDialog.tsx` (Financial Information section):
-- Rename row labels from "Turnover Year 1/2/3" to the actual FY label using `formatIndianFy` from `src/lib/indianFy.ts` (matching what vendor saw when entering) — e.g. "Turnover FY 2023-24".
-- Append " Lakhs" suffix to displayed amount, e.g. `₹ 12,50,000 Lakhs`.
-- Ensure only these turnover-related fields appear under "Financial Information" (they already do; verify no unrelated fields).
+```tsx
+form={currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
+```
 
-## Files to change
-- `src/components/vendor/kyc/PanKycTab.tsx` — parser + immediate persistence
-- `src/components/vendor/steps/FinancialStep.tsx` — input validation, placeholders, labels
-- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — FY labels, Lakhs suffix
-- `src/components/vendor/VendorReviewDialog.tsx` — FY labels, Lakhs suffix
-- One-time SQL backfill for `pan_aadhaar_linked` from existing validation logs
+That mapping is written for the **domestic** flow, where `OrganizationStep` (step 2) uses `id="step-form-2"`.
+
+The international step 2 component `IntlCompanyDetailsStep` uses `id="step-form"` (same as `IntlBankDetailsStep` and `IntlClassificationStep`). So on international step 2 the button targets a form that isn't on the page → click does nothing, no validation, no submit.
+
+## Fix
+
+Make the form-id resolution aware of `isInternational`. For international, always target `"step-form"` (since intl step 1 uses its own `handleIntlDocsContinue` handler and isn't a submit button, this is safe):
+
+```tsx
+form={
+  isInternational
+    ? "step-form"
+    : currentStep === 1 ? "step-form-1"
+    : currentStep === 2 ? "step-form-2"
+    : "step-form"
+}
+```
+
+Single-file change: `src/pages/VendorRegistration.tsx`.
+
+## Verification
+
+- International flow → fill Company Details → click Continue → form validates and advances to step 3 (Bank Details).
+- Domestic flow → unchanged (still uses `step-form-1` / `step-form-2` / `step-form`).
