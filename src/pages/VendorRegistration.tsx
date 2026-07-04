@@ -1806,7 +1806,7 @@ export default function VendorRegistration() {
                     ) : (
                       <Button
                         type="submit"
-                        form={currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
+                        form={isInternational ? "step-form" : currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
                         disabled={!canProceed}
                         className={cn(
                           "min-w-[120px]",
