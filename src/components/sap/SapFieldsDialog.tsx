@@ -118,6 +118,16 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const setClassify = (k: keyof SapFieldOverrides['classify'], v: string[]) =>
     setForm(prev => ({ ...prev, classify: { ...prev.classify, [k]: v } }));
 
+  const handleClassifyModeChange = (mode: 'details' | 'cfstmt') => {
+    setClassifyMode(mode);
+    setForm(prev => {
+      if (mode === 'details') {
+        return { ...prev, classify: { ...prev.classify, CASH: [], TIER: [] } };
+      }
+      return { ...prev, classify: { ...prev.classify, MGV: [], CATV: [], IDS: [] } };
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
