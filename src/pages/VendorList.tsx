@@ -694,27 +694,70 @@ export default function VendorList() {
 
                     <Separator />
 
+                    {/* Classification Details */}
+                    {(() => {
+                      const v = selectedVendor as any;
+                      const fmtArr = (arr: any) => Array.isArray(arr) && arr.length ? arr.join(', ') : '-';
+                      return (
+                        <div className="space-y-3">
+                          <h4 className="font-semibold flex items-center gap-2 text-primary">
+                            <Tags className="h-4 w-4" />
+                            Classification Details
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="border border-border rounded-lg p-3 space-y-2">
+                              <p className="text-xs font-semibold text-primary">Vendor_Details</p>
+                              <div className="grid grid-cols-1 gap-2 text-sm">
+                                <div><p className="text-muted-foreground">Material Group for Vendors</p><p className="font-medium">{fmtArr(v.material_group_vendors)}</p></div>
+                                <div><p className="text-muted-foreground">Vendor Category</p><p className="font-medium">{fmtArr(v.vendor_categories)}</p></div>
+                              </div>
+                            </div>
+                            <div className="border border-border rounded-lg p-3 space-y-2">
+                              <p className="text-xs font-semibold text-primary">Vendor_CFSTMT</p>
+                              <div className="grid grid-cols-1 gap-2 text-sm">
+                                <div><p className="text-muted-foreground">Vendor Cash Flow</p><p className="font-medium">{fmtArr(v.vendor_cashflow)}</p></div>
+                                <div><p className="text-muted-foreground">Tier Category</p><p className="font-medium">{fmtArr(v.tier_category)}</p></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <Separator />
+
                     {/* Financial Details */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold flex items-center gap-2 text-primary">
-                        <CreditCard className="h-4 w-4" />
-                        Financial Details
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Turnover Year 1</p>
-                          <p className="font-medium">₹ {selectedVendor.turnover_year1?.toLocaleString('en-IN') || '-'}</p>
+                    {(() => {
+                      const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
+                      const fmt = (v: any) => (v === 0 || v ? `₹ ${Number(v).toLocaleString('en-IN')} Lakhs` : '-');
+                      return (
+                        <div className="space-y-3">
+                          <h4 className="font-semibold flex items-center gap-2 text-primary">
+                            <CreditCard className="h-4 w-4" />
+                            Financial Information
+                          </h4>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="space-y-1">
+                              <p className="text-muted-foreground">Turnover {formatIndianFy(fy1)}</p>
+                              <p className="font-medium">{fmt(selectedVendor.turnover_year1)}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-muted-foreground">Turnover {formatIndianFy(fy2)}</p>
+                              <p className="font-medium">{fmt(selectedVendor.turnover_year2)}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-muted-foreground">Turnover {formatIndianFy(fy3)}</p>
+                              <p className="font-medium">{fmt(selectedVendor.turnover_year3)}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-muted-foreground">Credit Period Expected</p>
+                              <p className="font-medium">{(selectedVendor as any).credit_period_expected ? `${(selectedVendor as any).credit_period_expected} days` : '-'}</p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Turnover Year 2</p>
-                          <p className="font-medium">₹ {selectedVendor.turnover_year2?.toLocaleString('en-IN') || '-'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Turnover Year 3</p>
-                          <p className="font-medium">₹ {selectedVendor.turnover_year3?.toLocaleString('en-IN') || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
+
 
                     <Separator />
 
