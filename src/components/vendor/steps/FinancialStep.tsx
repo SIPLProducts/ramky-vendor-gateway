@@ -91,7 +91,7 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
       if (text && isNegativeAmount(text)) {
         e.preventDefault();
         setAmountErrors((p) => ({ ...p, [name]: getNegativeMessage(name) }));
-        setValue(name, '', { shouldValidate: true, shouldDirty: true });
+        setValue(name, '', { shouldValidate: false, shouldDirty: true });
       }
     },
     value: (watch(name) as string) ?? '',
@@ -99,7 +99,7 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
       const raw = e.target.value;
       const isNegative = isNegativeAmount(raw);
       setAmountErrors((p) => ({ ...p, [name]: isNegative ? getNegativeMessage(name) : undefined }));
-      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: true, shouldDirty: true });
+      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: false, shouldDirty: true });
     },
   });
 
