@@ -49,10 +49,9 @@ const formatArray = (value?: string[] | null) =>
 const formatTurnover = (value?: string | number | null) => {
   if (value === 0 || value) {
     const numericValue = Number(String(value).replace(/,/g, ''));
-    if (Number.isFinite(numericValue)) {
+    if (Number.isFinite(numericValue) && numericValue >= 0) {
       return `₹ ${numericValue.toLocaleString('en-IN')} Lakhs`;
     }
-    return String(value);
   }
   return '-';
 };
