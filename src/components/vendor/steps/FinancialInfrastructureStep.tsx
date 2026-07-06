@@ -83,10 +83,21 @@ interface FinancialInfrastructureStepProps {
 export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, tenantId: _tenantId, onNext }: FinancialInfrastructureStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(financialData.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(financialData.financialDocsFile);
-  const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>({});
+  const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>(() => {
+    const initialErrors: Record<string, string | undefined> = {};
+    (['turnoverYear1', 'turnoverYear2', 'turnoverYear3', 'creditPeriodExpected'] as const).forEach((field) => {
+      const value = financialData[field];
+      if (typeof value === 'string' && value.trim().startsWith('-')) initialErrors[field] = NEGATIVE_MSG;
+    });
+    return initialErrors;
+  });
   
   const defaultValues: CombinedFormData = {
     ...financialData,
+    turnoverYear1: financialData.turnoverYear1?.trim().startsWith('-') ? '' : financialData.turnoverYear1,
+    turnoverYear2: financialData.turnoverYear2?.trim().startsWith('-') ? '' : financialData.turnoverYear2,
+    turnoverYear3: financialData.turnoverYear3?.trim().startsWith('-') ? '' : financialData.turnoverYear3,
+    creditPeriodExpected: financialData.creditPeriodExpected?.trim().startsWith('-') ? '' : financialData.creditPeriodExpected,
     ...infrastructureData,
     ...qhseData,
   };
