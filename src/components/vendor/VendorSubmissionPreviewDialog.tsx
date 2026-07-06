@@ -287,7 +287,7 @@ export function VendorSubmissionPreviewDialog({
                       <DataRow
                         label="Credit Period Expected"
                         value={
-                          vendor.credit_period_expected
+                          vendor.credit_period_expected === 0 || vendor.credit_period_expected
                             ? `${vendor.credit_period_expected} days`
                             : null
                         }
