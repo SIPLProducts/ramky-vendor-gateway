@@ -67,8 +67,25 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [wtAll, setWtAll] = useState<Array<{ LAND1: string; TAXTYPE: string; TEXT40: string }>>([]);
+  const [wtLoading, setWtLoading] = useState(false);
+  const [wtError, setWtError] = useState<string | null>(null);
   const refreshMaster = useRefreshSapMaster();
   const { data: vendorLocRows } = useSapMasterData('vendor_location');
+
+  const vendorCountry = (() => {
+    const v: any = vendor || {};
+    const isIntl = String(v.vendor_type || 'domestic') === 'international';
+    if (isIntl) {
+      const c = v.international_data?.company?.country || v.country || '';
+      return String(c || '').trim().toUpperCase();
+    }
+    return 'IN';
+  })();
+
+  const wtFiltered = wtAll.filter(
+    (r) => String(r.LAND1 || '').trim().toUpperCase() === vendorCountry,
+  );
 
   useEffect(() => {
     if (!open) return;
