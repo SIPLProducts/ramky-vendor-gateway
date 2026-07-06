@@ -745,14 +745,16 @@ export function SapF4MultiSelectField({
 type WTaxOption = { LAND1: string; TAXTYPE: string; TEXT40: string };
 
 function WithholdingTaxSection({
-  country, rows, onChange, options, loading, error,
+  country, rows, onChange, options, allOptions, loading, error, onRetry,
 }: {
   country: string;
   rows: WTaxRow[];
   onChange: (rows: WTaxRow[]) => void;
   options: WTaxOption[];
+  allOptions: WTaxOption[];
   loading: boolean;
   error: string | null;
+  onRetry: () => void;
 }) {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
@@ -770,6 +772,10 @@ function WithholdingTaxSection({
   const removeRow = (idx: number) => {
     onChange(rows.filter((_, i) => i !== idx));
   };
+
+  // Popover list: prefer country-filtered rows; if none, fall back to all.
+  const filteredEmpty = options.length === 0 && allOptions.length > 0;
+  const listOptions = filteredEmpty ? allOptions : options;
 
   return (
     <div className="space-y-3">
@@ -793,14 +799,14 @@ function WithholdingTaxSection({
         </div>
       )}
       {!loading && error && (
-        <div className="flex items-start gap-2 text-xs text-destructive">
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
-      {!loading && !error && options.length === 0 && (
-        <div className="text-xs text-muted-foreground">
-          No withholding tax types available{country ? ` for country ${country}` : ''}.
+        <div className="flex items-start justify-between gap-2 text-xs text-destructive rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-3.5 w-3.5 mt-0.5" />
+            <span>{error}</span>
+          </div>
+          <Button type="button" size="sm" variant="ghost" onClick={onRetry} className="h-6 px-2 text-destructive">
+            Retry
+          </Button>
         </div>
       )}
 
@@ -841,33 +847,82 @@ function WithholdingTaxSection({
                             size="sm"
                             variant="outline"
                             className="h-8 w-8 p-0 shrink-0"
-                            disabled={options.length === 0}
                           >
                             <Search className="h-3.5 w-3.5" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[420px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search WTax Type / description…" />
-                            <CommandList>
-                              <CommandEmpty>No matching WTax types.</CommandEmpty>
-                              <CommandGroup>
-                                {options.map((opt) => (
-                                  <CommandItem
-                                    key={`${opt.TAXTYPE}-${opt.LAND1}`}
-                                    value={`${opt.TAXTYPE} ${opt.TEXT40}`}
-                                    onSelect={() => {
-                                      updateRow(idx, {
-                                        witht: opt.TAXTYPE,
-                                        text40: opt.TEXT40,
-                                        wt_withcd: r.wt_withcd || opt.TAXTYPE,
-                                        qland: opt.LAND1 || country,
-                                      });
-                                      setOpenIdx(null);
-                                    }}
-                                  >
-                                    <span className="font-medium mr-2">{opt.TAXTYPE}</span>
-                                    <span className="text-muted-foreground text-xs">{opt.TEXT40}</span>
+                        <PopoverContent className="w-[560px] p-0" align="start">
+                          <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
+                            <div className="text-xs font-semibold">
+                              Withholding Tax Type {listOptions.length > 0 && (
+                                <span className="text-muted-foreground font-normal">
+                                  — {listOptions.length} Entries found
+                                </span>
+                              )}
+                            </div>
+                            {(loading || error) && (
+                              <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={onRetry}>
+                                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Retry'}
+                              </Button>
+                            )}
+                          </div>
+                          {filteredEmpty && (
+                            <div className="px-3 py-1.5 text-[11px] text-muted-foreground bg-amber-50 border-b border-amber-200">
+                              No entries for country {country || '—'} — showing all countries.
+                            </div>
+                          )}
+                          <Command shouldFilter={true}>
+                            <CommandInput placeholder="Search WTax Type / description / country…" />
+                            <CommandList className="max-h-[340px]">
+                              {loading ? (
+                                <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
+                                  <Loader2 className="h-4 w-4 animate-spin" />Loading…
+                                </div>
+                              ) : error && listOptions.length === 0 ? (
+                                <div className="flex flex-col items-center gap-2 py-8 text-xs text-destructive px-4 text-center">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <span>{error}</span>
+                                  <Button type="button" size="sm" variant="outline" onClick={onRetry} className="h-7">
+                                    Retry
+                                  </Button>
+                                </div>
+                              ) : listOptions.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-muted-foreground">
+                                  No withholding tax types available.
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="grid grid-cols-[80px_1fr_60px] gap-2 px-3 py-1.5 text-[10px] font-medium uppercase text-muted-foreground border-b bg-muted/20">
+                                    <span>WTax Type</span>
+                                    <span>Name</span>
+                                    <span>Country</span>
+                                  </div>
+                                  <CommandEmpty>No matching WTax types.</CommandEmpty>
+                                  <CommandGroup>
+                                    {listOptions.map((opt) => (
+                                      <CommandItem
+                                        key={`${opt.TAXTYPE}-${opt.LAND1}`}
+                                        value={`${opt.TAXTYPE} ${opt.TEXT40} ${opt.LAND1}`}
+                                        onSelect={() => {
+                                          updateRow(idx, {
+                                            witht: opt.TAXTYPE,
+                                            text40: opt.TEXT40,
+                                            wt_withcd: r.wt_withcd || opt.TAXTYPE,
+                                            qland: opt.LAND1 || country,
+                                          });
+                                          setOpenIdx(null);
+                                        }}
+                                        className="grid grid-cols-[80px_1fr_60px] gap-2 items-center"
+                                      >
+                                        <span className="font-semibold text-xs">{opt.TAXTYPE}</span>
+                                        <span className="text-xs">{opt.TEXT40}</span>
+                                        <span className="text-[10px] text-muted-foreground">{opt.LAND1}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </>
+                              )}
+
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
