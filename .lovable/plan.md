@@ -1,51 +1,24 @@
-## Goal
-On the All Vendors screen (`src/pages/VendorList.tsx`), add **Preview** and **Comments** action buttons next to the existing eye/View icon in each row, reusing the exact same components already used in the Approval screens so behavior and UI match 1:1.
+## Update turnover amount fields in Financial step
 
-## Changes (single file: `src/pages/VendorList.tsx`)
+**File:** `src/components/vendor/steps/FinancialStep.tsx`
 
-1. **Imports**
-   - Add icons: `FileText`, `MessageSquare` (from `lucide-react`, already imported).
-   - Import the three dialog components already used by `StageApprovalView`:
-     - `VendorSubmissionPreviewDialog` from `@/components/vendor/VendorSubmissionPreviewDialog`
-     - `ApprovalCommentsDialog` from `@/components/sap/ApprovalCommentsDialog`
+### Changes
+1. **Relabel** the three turnover fields from `Turnover FY YYYY-YY` to `Turnover FY YYYY-YY (₹)` and change placeholder from `Enter Amount in Lakhs` to `Enter Amount in Rupees` (e.g. 100000).
+2. **Validation:** keep non-negative numeric; allow decimals and any magnitude ≥ 0 (already supported by `nonNegNumericString` — no schema change needed).
+3. **Live lakhs preview:** below each turnover input, render small helper text `≈ ₹X.XX Lakhs` when a valid value > 0 is entered. Format with 2-decimal precision using `value / 100000`. Show nothing when empty/0.
+4. Keep the `₹` prefix icon inside the input.
+5. No change to `creditPeriodExpected` field.
+6. No backend/schema change — the value is stored as-is (string) in `FinancialDetails`. Downstream consumers currently treat it as lakhs; since we're switching semantics to rupees, we will:
+   - Leave the stored value as raw rupees (what the user typed).
+   - Since these fields are informational-only (no calculations elsewhere), no other file needs updating.
 
-2. **State**
-   - `const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);`
-   - `const [commentsVendor, setCommentsVendor] = useState<{ id: string; name: string; ref: string } | null>(null);`
+### Preview format helper (inline)
+```ts
+const toLakhsPreview = (v?: string) => {
+  const n = Number(v);
+  if (!v || !isFinite(n) || n <= 0) return '';
+  return `≈ ₹${(n / 100000).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Lakhs`;
+};
+```
 
-3. **Row actions cell (around lines 458–470)** — add two buttons next to the existing View eye button:
-   ```tsx
-   <Button variant="ghost" size="sm" title="Preview"
-     onClick={() => setPreviewVendorId(vendor.id)}>
-     <FileText className="h-4 w-4" />
-   </Button>
-   <Button variant="ghost" size="sm" title="Comments"
-     onClick={() => setCommentsVendor({
-       id: vendor.id,
-       name: pickVendorDisplayName(vendor) || vendor.legal_name || '',
-       ref: vendor.reference_number || '',
-     })}>
-     <MessageSquare className="h-4 w-4" />
-   </Button>
-   ```
-
-4. **Mount dialogs** once (near the end of the component, alongside the existing details drawer):
-   ```tsx
-   <VendorSubmissionPreviewDialog
-     vendorId={previewVendorId}
-     open={!!previewVendorId}
-     onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
-   />
-   <ApprovalCommentsDialog
-     open={!!commentsVendor}
-     onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
-     vendorId={commentsVendor?.id ?? null}
-     vendorName={commentsVendor?.name}
-     referenceNumber={commentsVendor?.ref}
-   />
-   ```
-
-## Notes
-- No changes to the Preview or Comments dialogs themselves — they already render the full vendor preview (documents, details) and the full approval comment history (approver name, stage, level, status, remarks, date/time) exactly as shown on the Approval screens.
-- No backend/schema changes. RLS already permits admins/sharvi_admin (who view All Vendors) to read `vendor_approval_progress` and `vendors`.
-- Existing eye/View button and details drawer remain unchanged.
+Rendered as `<p className="text-xs text-muted-foreground">{toLakhsPreview(watch('turnoverYear1'))}</p>` under each input.
