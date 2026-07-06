@@ -64,6 +64,12 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
       setValue(name, sanitizeNonNegNumeric(e.target.value), { shouldValidate: true }),
   });
 
+  const toLakhsPreview = (v?: string) => {
+    const n = Number(v);
+    if (!v || !isFinite(n) || n <= 0) return '';
+    return `≈ ₹${(n / 100000).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Lakhs`;
+  };
+
   return (
     <form id="step-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="form-section">
@@ -72,16 +78,19 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
         <div className="grid gap-5">
           <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear1">Turnover {formatIndianFy(fy1Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear1" {...numericFieldProps('turnoverYear1')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear1">Turnover {formatIndianFy(fy1Start)} (₹)</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear1" {...numericFieldProps('turnoverYear1')} placeholder="Enter Amount in Rupees" className="pl-8" /></div>
+              {toLakhsPreview(watch('turnoverYear1')) && (<p className="text-xs text-muted-foreground">{toLakhsPreview(watch('turnoverYear1'))}</p>)}
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear2">Turnover {formatIndianFy(fy2Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear2" {...numericFieldProps('turnoverYear2')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear2">Turnover {formatIndianFy(fy2Start)} (₹)</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear2" {...numericFieldProps('turnoverYear2')} placeholder="Enter Amount in Rupees" className="pl-8" /></div>
+              {toLakhsPreview(watch('turnoverYear2')) && (<p className="text-xs text-muted-foreground">{toLakhsPreview(watch('turnoverYear2'))}</p>)}
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="turnoverYear3">Turnover {formatIndianFy(fy3Start)}</Label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear3" {...numericFieldProps('turnoverYear3')} placeholder="Enter Amount in Lakhs" className="pl-8" /></div>
+              <Label htmlFor="turnoverYear3">Turnover {formatIndianFy(fy3Start)} (₹)</Label>
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span><Input id="turnoverYear3" {...numericFieldProps('turnoverYear3')} placeholder="Enter Amount in Rupees" className="pl-8" /></div>
+              {toLakhsPreview(watch('turnoverYear3')) && (<p className="text-xs text-muted-foreground">{toLakhsPreview(watch('turnoverYear3'))}</p>)}
             </div>
           </div>
           <div className="grid gap-1.5">
