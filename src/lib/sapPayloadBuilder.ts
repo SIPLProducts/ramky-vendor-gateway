@@ -400,9 +400,19 @@ export async function buildSapPayload(
       VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
     };
     delete (row as any).classify;
-    // TODO: populate WHOLDTAX entries (WITHT / WT_WITHCD / WT_SUBJCT / QSREC / QLAND) once withholding tax capture is wired.
+    // WHOLDTAX — populated from SAP Field Confirmation dialog (overrides.withholding)
     delete (row as any).wholdtax;
-    row.WHOLDTAX = [];
+    const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
+    row.WHOLDTAX = wt
+      .filter((r: any) => r && String(r.witht || "").trim())
+      .map((r: any) => ({
+        LIFNR: "",
+        WITHT: String(r.witht || "").trim(),
+        WT_WITHCD: String(r.wt_withcd ?? r.witht ?? "").trim(),
+        WT_SUBJCT: r.wt_subjct ? "X" : "",
+        QSREC: String(r.qsrec ?? "OT").trim(),
+        QLAND: String(r.qland || "").trim(),
+      }));
     row.UPLOAD = [];
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
