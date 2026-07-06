@@ -79,7 +79,12 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     const v: any = vendor || {};
     const isIntl = String(v.vendor_type || 'domestic') === 'international';
     if (isIntl) {
-      const c = v.international_data?.company?.country || v.country || '';
+      const c =
+        v.international_data?.company?.country ||
+        v.international_data?.address?.country ||
+        v.country ||
+        v.reg_country ||
+        '';
       return String(c || '').trim().toUpperCase();
     }
     return 'IN';
@@ -88,6 +93,43 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const wtFiltered = wtAll.filter(
     (r) => String(r.LAND1 || '').trim().toUpperCase() === vendorCountry,
   );
+
+  const fetchWtTypes = async () => {
+    setWtLoading(true);
+    setWtError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-fetch-withholding-tax', {
+        body: { config_name: 'Fetch_Withholding_TaxType' },
+      });
+      if (error) {
+        setWtError(error.message || 'Failed to load withholding tax types');
+      } else if (data?.success) {
+        const records = Array.isArray(data.records) ? data.records : Array.isArray(data.raw) ? data.raw : [];
+        const norm = records
+          .map((r: any) => {
+            const get = (k: string) => {
+              for (const key of Object.keys(r || {})) {
+                if (key.toLowerCase() === k.toLowerCase()) return r[key];
+              }
+              return '';
+            };
+            return {
+              LAND1: String(get('LAND1') || '').trim().toUpperCase(),
+              TAXTYPE: String(get('TAXTYPE') || '').trim(),
+              TEXT40: String(get('TEXT40') || '').trim(),
+            };
+          })
+          .filter((r: any) => r.TAXTYPE);
+        setWtAll(norm);
+      } else {
+        setWtError(data?.message || 'Failed to load withholding tax types');
+      }
+    } catch (e: any) {
+      setWtError(e?.message || 'Failed to load withholding tax types');
+    } finally {
+      setWtLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
