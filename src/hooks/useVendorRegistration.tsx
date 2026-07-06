@@ -77,6 +77,14 @@ const isMissingPanComprehensiveColumnError = (error: any) => {
   );
 };
 
+const nonNegativeNumberString = (value: unknown) => {
+  if (value === 0 || value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? n.toString() : '';
+  }
+  return '';
+};
+
 const writeVendorWithPanFallback = async (
   action: string,
   payload: VendorRecord,
@@ -740,10 +748,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           : undefined,
       },
       financial: {
-        turnoverYear1: vendor.turnover_year1 === 0 || vendor.turnover_year1 ? Math.max(0, Number(vendor.turnover_year1)).toString() : '',
-        turnoverYear2: vendor.turnover_year2 === 0 || vendor.turnover_year2 ? Math.max(0, Number(vendor.turnover_year2)).toString() : '',
-        turnoverYear3: vendor.turnover_year3 === 0 || vendor.turnover_year3 ? Math.max(0, Number(vendor.turnover_year3)).toString() : '',
-        creditPeriodExpected: vendor.credit_period_expected === 0 || vendor.credit_period_expected ? Math.max(0, Number(vendor.credit_period_expected)).toString() : '',
+        turnoverYear1: nonNegativeNumberString(vendor.turnover_year1),
+        turnoverYear2: nonNegativeNumberString(vendor.turnover_year2),
+        turnoverYear3: nonNegativeNumberString(vendor.turnover_year3),
+        creditPeriodExpected: nonNegativeNumberString(vendor.credit_period_expected),
         majorCustomer1: vendor.major_customer1 || '',
         majorCustomer2: vendor.major_customer2 || '',
         majorCustomer3: vendor.major_customer3 || '',
