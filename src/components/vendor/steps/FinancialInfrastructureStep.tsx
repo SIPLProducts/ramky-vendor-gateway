@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -83,10 +83,11 @@ interface FinancialInfrastructureStepProps {
   qhseData: QHSEDetails;
   tenantId?: string | null;
   onNext: (data: { financial: FinancialDetails; infrastructure: InfrastructureDetails; qhse: QHSEDetails }) => void;
+  onLiveUpdate?: (data: { financial: FinancialDetails; infrastructure: InfrastructureDetails; qhse: QHSEDetails }) => void;
   onBack: () => void;
 }
 
-export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, tenantId: _tenantId, onNext }: FinancialInfrastructureStepProps) {
+export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, tenantId: _tenantId, onNext, onLiveUpdate }: FinancialInfrastructureStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(financialData.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(financialData.financialDocsFile);
   const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>({});
@@ -109,6 +110,18 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
   });
 
   const productTypes = watch('productTypes') || [];
+  const latestFinancialRef = useRef<FinancialDetails>(financialData);
+
+  useEffect(() => {
+    latestFinancialRef.current = financialData;
+  }, [financialData]);
+
+  const emitFinancialLiveUpdate = (patch: Partial<FinancialDetails>) => {
+    if (!onLiveUpdate) return;
+    const financial = { ...latestFinancialRef.current, ...patch };
+    latestFinancialRef.current = financial;
+    onLiveUpdate({ financial, infrastructure: infrastructureData, qhse: qhseData });
+  };
 
   const blockInvalidNumericKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
@@ -150,13 +163,16 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         e.preventDefault();
         setAmountErrors((previous) => ({ ...previous, [name]: getNegativeMessage(name) }));
         setValue(name, '', { shouldValidate: false, shouldDirty: true });
+        emitFinancialLiveUpdate({ [name]: '' } as Partial<FinancialDetails>);
       }
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
       const isNegative = isNegativeAmount(raw);
+      const nextValue = isNegative ? '' : sanitizeNonNegNumeric(raw);
       setAmountErrors((previous) => ({ ...previous, [name]: isNegative ? getNegativeMessage(name) : undefined }));
-      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: false, shouldDirty: true });
+      setValue(name, nextValue, { shouldValidate: false, shouldDirty: true });
+      emitFinancialLiveUpdate({ [name]: nextValue } as Partial<FinancialDetails>);
     },
   });
 
