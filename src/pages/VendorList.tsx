@@ -108,6 +108,8 @@ export default function VendorList() {
   const [returnTarget, setReturnTarget] = useState<VendorRow | null>(null);
   const [returnRemarks, setReturnRemarks] = useState('');
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
+  const [commentsVendor, setCommentsVendor] = useState<{ id: string; name: string; ref: string } | null>(null);
 
 
   // Fetch all vendors from database
