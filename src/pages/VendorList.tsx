@@ -850,6 +850,19 @@ export default function VendorList() {
         </DialogContent>
       </Dialog>
 
+      <VendorSubmissionPreviewDialog
+        vendorId={previewVendorId}
+        open={!!previewVendorId}
+        onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
+      />
+      <ApprovalCommentsDialog
+        open={!!commentsVendor}
+        onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
+        vendorId={commentsVendor?.id ?? null}
+        vendorName={commentsVendor?.name}
+        referenceNumber={commentsVendor?.ref}
+      />
+
     </div>
   );
 }
