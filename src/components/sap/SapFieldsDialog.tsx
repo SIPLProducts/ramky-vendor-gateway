@@ -331,8 +331,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               rows={form.withholding}
               onChange={(rows) => set('withholding', rows)}
               options={wtFiltered}
+              allOptions={wtAll}
               loading={wtLoading}
               error={wtError}
+              onRetry={fetchWtTypes}
             />
 
             <Separator />
