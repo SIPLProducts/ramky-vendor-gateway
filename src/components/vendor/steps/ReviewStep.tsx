@@ -276,16 +276,11 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
 
       <div className="form-section">
         <SectionHeader icon={Tags} title="Classification Details" step={2} onEdit={onEditStep} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="border border-border rounded-lg p-3 space-y-2">
             <p className="text-xs font-semibold text-primary">Vendor_Details</p>
             <DataRow label="Material Group for Vendors" value={formatArray(data.organization?.materialGroupVendor)} />
             <DataRow label="Vendor Category" value={formatArray(data.organization?.vendorCategory)} />
-          </div>
-          <div className="border border-border rounded-lg p-3 space-y-2">
-            <p className="text-xs font-semibold text-primary">Vendor_CFSTMT</p>
-            <DataRow label="Vendor Cash Flow" value="-" />
-            <DataRow label="Tier Category" value="-" />
           </div>
         </div>
       </div>
