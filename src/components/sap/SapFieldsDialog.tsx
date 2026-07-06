@@ -429,6 +429,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
       CASH: Array.isArray(v.vendor_cashflow) ? v.vendor_cashflow : [],
       TIER: Array.isArray(v.tier_category) ? v.tier_category : [],
     },
+    withholding: [],
   };
 }
 
