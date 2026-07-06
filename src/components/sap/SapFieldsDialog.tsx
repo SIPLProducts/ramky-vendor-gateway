@@ -136,6 +136,31 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setF4Status({ state: 'error', message: `${e?.message || 'SAP Fields F4 refresh failed.'} Showing cached F4 options if available.` });
       }
     })();
+
+    // Fetch Withholding Tax types via saved SAP API config "Fetch_Withholding_TaxType"
+    setWtLoading(true);
+    setWtError(null);
+    setWtAll([]);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('sap-fetch-withholding-tax', {
+          body: { config_name: 'Fetch_Withholding_TaxType' },
+        });
+        if (cancelled) return;
+        if (error) {
+          setWtError(error.message || 'Failed to load withholding tax types');
+        } else if (data?.success) {
+          setWtAll(Array.isArray(data.records) ? data.records : []);
+        } else {
+          setWtError(data?.message || 'Failed to load withholding tax types');
+        }
+      } catch (e: any) {
+        if (!cancelled) setWtError(e?.message || 'Failed to load withholding tax types');
+      } finally {
+        if (!cancelled) setWtLoading(false);
+      }
+    })();
+
     return () => { cancelled = true; window.clearTimeout(slowTimer); };
   }, [open, vendor]);
 
