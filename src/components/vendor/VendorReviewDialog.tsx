@@ -654,8 +654,13 @@ export function VendorReviewDialog({
                   {/* Financial */}
                   {(() => {
                     const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
-                    const fmt = (v: any) =>
-                      v === 0 || v ? `₹ ${Number(v).toLocaleString('en-IN')} Lakhs` : '-';
+                    const fmt = (v: any) => {
+                      const n = Number(v);
+                      return (v === 0 || v) && Number.isFinite(n) && n >= 0
+                        ? `₹ ${n.toLocaleString('en-IN')} Lakhs`
+                        : '-';
+                    };
+                    const creditPeriod = Number(vendor.credit_period_expected);
                     return (
                       <div className="space-y-3">
                         <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -666,7 +671,7 @@ export function VendorReviewDialog({
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy1)}</p><p className="font-medium">{fmt(vendor.turnover_year1)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy2)}</p><p className="font-medium">{fmt(vendor.turnover_year2)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy3)}</p><p className="font-medium">{fmt(vendor.turnover_year3)}</p></div>
-                          <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{vendor.credit_period_expected ? `${vendor.credit_period_expected} days` : '-'}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{(vendor.credit_period_expected === 0 || vendor.credit_period_expected) && Number.isFinite(creditPeriod) && creditPeriod >= 0 ? `${vendor.credit_period_expected} days` : '-'}</p></div>
                         </div>
                       </div>
                     );

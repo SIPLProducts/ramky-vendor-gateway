@@ -275,8 +275,13 @@ export function VendorSubmissionPreviewDialog({
               {/* Financial */}
               {(() => {
                 const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
-                const fmt = (v: any) =>
-                  v === 0 || v ? `₹ ${Number(v).toLocaleString('en-IN')} Lakhs` : null;
+                const fmt = (v: any) => {
+                  const n = Number(v);
+                  return (v === 0 || v) && Number.isFinite(n) && n >= 0
+                    ? `₹ ${n.toLocaleString('en-IN')} Lakhs`
+                    : null;
+                };
+                const creditPeriod = Number(vendor.credit_period_expected);
                 return (
                   <div className="form-section">
                     <SectionHeader icon={TrendingUp} title="Financial Information" />
@@ -287,7 +292,9 @@ export function VendorSubmissionPreviewDialog({
                       <DataRow
                         label="Credit Period Expected"
                         value={
-                          vendor.credit_period_expected
+                          (vendor.credit_period_expected === 0 || vendor.credit_period_expected) &&
+                          Number.isFinite(creditPeriod) &&
+                          creditPeriod >= 0
                             ? `${vendor.credit_period_expected} days`
                             : null
                         }

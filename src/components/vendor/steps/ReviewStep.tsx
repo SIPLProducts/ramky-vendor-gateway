@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Building2, MapPin, Users, FileCheck, Landmark, TrendingUp, CheckCircle2, Edit2, Globe2, Award, FileText } from 'lucide-react';
+import { Building2, MapPin, Users, FileCheck, Landmark, TrendingUp, CheckCircle2, Edit2, Globe2, Award, FileText, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { VendorFormData } from '@/types/vendor';
 import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
+import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 
 type DocTab = 'gst' | 'pan' | 'msme' | 'bank';
 
@@ -35,12 +36,33 @@ const SectionHeader = ({
   </div>
 );
 
-const DataRow = ({ label, value }: { label: string; value: string | undefined }) => (
+const DataRow = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
   <div className="grid grid-cols-2 gap-2 py-2 border-b border-border last:border-0">
     <span className="text-sm text-muted-foreground">{label}</span>
-    <span className="text-sm font-medium text-foreground">{value || '-'}</span>
+    <span className="text-sm font-medium text-foreground break-words">{value === 0 || value ? String(value) : '-'}</span>
   </div>
 );
+
+const formatArray = (value?: string[] | null) =>
+  Array.isArray(value) && value.length ? value.join(', ') : '-';
+
+const formatTurnover = (value?: string | number | null) => {
+  if (value === 0 || value) {
+    const numericValue = Number(String(value).replace(/,/g, ''));
+    if (Number.isFinite(numericValue) && numericValue >= 0) {
+      return `₹ ${numericValue.toLocaleString('en-IN')} Lakhs`;
+    }
+  }
+  return '-';
+};
+
+const formatCreditPeriod = (value?: string | number | null) => {
+  if (value === 0 || value) {
+    const numericValue = Number(String(value).replace(/,/g, ''));
+    return Number.isFinite(numericValue) && numericValue >= 0 ? `${numericValue} days` : '-';
+  }
+  return '-';
+};
 
 export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: ReviewStepProps) {
   const [selfDeclared, setSelfDeclared] = useState(data.declaration?.selfDeclared || false);
@@ -62,6 +84,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
   //  3 Address  4 Contact  5 Financial/Infra  6 Review
   const isInternational = data.vendorType === 'international';
   const intl = data.international;
+  const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
   return (
     <div className="space-y-6">
       {isInternational ? (
@@ -252,10 +275,31 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       </div>
 
       <div className="form-section">
+        <SectionHeader icon={Tags} title="Classification Details" step={2} onEdit={onEditStep} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-border rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-primary">Vendor_Details</p>
+            <DataRow label="Material Group for Vendors" value={formatArray(data.organization?.materialGroupVendor)} />
+            <DataRow label="Vendor Category" value={formatArray(data.organization?.vendorCategory)} />
+          </div>
+          <div className="border border-border rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-primary">Vendor_CFSTMT</p>
+            <DataRow label="Vendor Cash Flow" value="-" />
+            <DataRow label="Tier Category" value="-" />
+          </div>
+        </div>
+      </div>
+
+      <div className="form-section">
         <SectionHeader icon={TrendingUp} title="Financial Information" step={5} onEdit={onEditStep} />
         <div className="space-y-1">
-          <DataRow label="Expected Credit Period" value={data.financial?.creditPeriodExpected ? `${data.financial.creditPeriodExpected} days` : '-'} />
+          <DataRow label={`Turnover ${formatIndianFy(fy1Start)}`} value={formatTurnover(data.financial?.turnoverYear1)} />
+          <DataRow label={`Turnover ${formatIndianFy(fy2Start)}`} value={formatTurnover(data.financial?.turnoverYear2)} />
+          <DataRow label={`Turnover ${formatIndianFy(fy3Start)}`} value={formatTurnover(data.financial?.turnoverYear3)} />
+          <DataRow label="Expected Credit Period" value={formatCreditPeriod(data.financial?.creditPeriodExpected)} />
           <DataRow label="Major Customer 1" value={data.financial?.majorCustomer1} />
+          <DataRow label="Major Customer 2" value={data.financial?.majorCustomer2} />
+          <DataRow label="Major Customer 3" value={data.financial?.majorCustomer3} />
         </div>
       </div>
       </>

@@ -1373,7 +1373,22 @@ export default function VendorRegistration() {
       case 4:
         return <ContactStep tenantId={tenantId} data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
       case 5:
-        return <FinancialInfrastructureStep tenantId={tenantId} financialData={formData.financial} infrastructureData={formData.infrastructure} qhseData={formData.qhse} onNext={handleFinancialInfraComplete} onBack={handleBack} />;
+        return (
+          <FinancialInfrastructureStep
+            tenantId={tenantId}
+            financialData={formData.financial}
+            infrastructureData={formData.infrastructure}
+            qhseData={formData.qhse}
+            onNext={handleFinancialInfraComplete}
+            onLiveUpdate={(data) => setFormData((prev) => ({
+              ...prev,
+              financial: data.financial,
+              infrastructure: data.infrastructure,
+              qhse: data.qhse,
+            }))}
+            onBack={handleBack}
+          />
+        );
     }
     // Last step is always Review
     if (currentStep === registrationSteps.length) {

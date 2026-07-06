@@ -729,7 +729,13 @@ export default function VendorList() {
                     {/* Financial Details */}
                     {(() => {
                       const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
-                      const fmt = (v: any) => (v === 0 || v ? `₹ ${Number(v).toLocaleString('en-IN')} Lakhs` : '-');
+                      const fmt = (v: any) => {
+                        const n = Number(v);
+                        return (v === 0 || v) && Number.isFinite(n) && n >= 0
+                          ? `₹ ${n.toLocaleString('en-IN')} Lakhs`
+                          : '-';
+                      };
+                      const creditPeriod = Number((selectedVendor as any).credit_period_expected);
                       return (
                         <div className="space-y-3">
                           <h4 className="font-semibold flex items-center gap-2 text-primary">
@@ -751,7 +757,7 @@ export default function VendorList() {
                             </div>
                             <div className="space-y-1">
                               <p className="text-muted-foreground">Credit Period Expected</p>
-                              <p className="font-medium">{(selectedVendor as any).credit_period_expected ? `${(selectedVendor as any).credit_period_expected} days` : '-'}</p>
+                              <p className="font-medium">{((selectedVendor as any).credit_period_expected === 0 || (selectedVendor as any).credit_period_expected) && Number.isFinite(creditPeriod) && creditPeriod >= 0 ? `${(selectedVendor as any).credit_period_expected} days` : '-'}</p>
                             </div>
                           </div>
                         </div>
