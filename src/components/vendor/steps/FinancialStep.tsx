@@ -13,18 +13,24 @@ import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/i
 const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
 const NEGATIVE_MSG = 'Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.';
+const CREDIT_PERIOD_NEGATIVE_MSG = 'Negative values are not allowed.';
 
 const nonNegNumericString = z
   .string()
   .optional()
   .refine((v) => !v || (/^\d+(\.\d+)?$/.test(v) && Number(v) >= 0), { message: NEGATIVE_MSG });
 
+const nonNegCreditPeriodString = z
+  .string()
+  .optional()
+  .refine((v) => !v || (/^\d+(\.\d+)?$/.test(v) && Number(v) >= 0), { message: CREDIT_PERIOD_NEGATIVE_MSG });
+
 
 const schema = z.object({
   turnoverYear1: nonNegNumericString,
   turnoverYear2: nonNegNumericString,
   turnoverYear3: nonNegNumericString,
-  creditPeriodExpected: nonNegNumericString,
+  creditPeriodExpected: nonNegCreditPeriodString,
   majorCustomer1: z.string().optional(),
   majorCustomer2: z.string().optional(),
   majorCustomer3: z.string().optional(),
@@ -70,6 +76,10 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
     if (!isFinite(n) || n < 0) return '';
     return normalized;
   };
+
+  const getNegativeMessage = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') =>
+    name === 'creditPeriodExpected' ? CREDIT_PERIOD_NEGATIVE_MSG : NEGATIVE_MSG;
+
   const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') => ({
     type: 'text' as const,
     min: 0,
@@ -80,7 +90,7 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
       const text = e.clipboardData.getData('text');
       if (text && isNegativeAmount(text)) {
         e.preventDefault();
-        setAmountErrors((p) => ({ ...p, [name]: NEGATIVE_MSG }));
+        setAmountErrors((p) => ({ ...p, [name]: getNegativeMessage(name) }));
         setValue(name, '', { shouldValidate: true, shouldDirty: true });
       }
     },
@@ -88,7 +98,7 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
       const isNegative = isNegativeAmount(raw);
-      setAmountErrors((p) => ({ ...p, [name]: isNegative ? NEGATIVE_MSG : undefined }));
+      setAmountErrors((p) => ({ ...p, [name]: isNegative ? getNegativeMessage(name) : undefined }));
       setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: true, shouldDirty: true });
     },
   });
@@ -121,7 +131,7 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
           <div className="grid gap-1.5">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
             <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
-            {amountErrors.creditPeriodExpected && (<p className="text-xs text-destructive">{amountErrors.creditPeriodExpected}</p>)}
+            {amountErrors.creditPeriodExpected && (<p className="text-xs text-destructive">{CREDIT_PERIOD_NEGATIVE_MSG}</p>)}
 
           </div>
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
