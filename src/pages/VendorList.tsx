@@ -471,6 +471,26 @@ export default function VendorList() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Preview"
+                                onClick={() => setPreviewVendorId(vendor.id)}
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Comments"
+                                onClick={() => setCommentsVendor({
+                                  id: vendor.id,
+                                  name: pickVendorDisplayName(vendor as any) || vendor.legal_name || '',
+                                  ref: vendor.reference_number || '',
+                                })}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
                             </div>
                           </TableCell>
 
