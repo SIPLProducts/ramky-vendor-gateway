@@ -666,7 +666,7 @@ export function VendorReviewDialog({
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy1)}</p><p className="font-medium">{fmt(vendor.turnover_year1)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy2)}</p><p className="font-medium">{fmt(vendor.turnover_year2)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy3)}</p><p className="font-medium">{fmt(vendor.turnover_year3)}</p></div>
-                          <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{vendor.credit_period_expected ? `${vendor.credit_period_expected} days` : '-'}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{vendor.credit_period_expected === 0 || vendor.credit_period_expected ? `${vendor.credit_period_expected} days` : '-'}</p></div>
                         </div>
                       </div>
                     );
