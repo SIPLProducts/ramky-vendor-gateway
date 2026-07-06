@@ -24,12 +24,19 @@ import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/i
 
 const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
+const NEGATIVE_MSG = 'Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.';
+
+const nonNegNumericString = z
+  .string()
+  .optional()
+  .refine((v) => !v || (/^\d+(\.\d*)?$/.test(v) && Number(v) >= 0), { message: NEGATIVE_MSG });
+
 const schema = z.object({
   // Financial
-  turnoverYear1: z.string().optional(),
-  turnoverYear2: z.string().optional(),
-  turnoverYear3: z.string().optional(),
-  creditPeriodExpected: z.string().optional(),
+  turnoverYear1: nonNegNumericString,
+  turnoverYear2: nonNegNumericString,
+  turnoverYear3: nonNegNumericString,
+  creditPeriodExpected: nonNegNumericString,
   majorCustomer1: z.string().optional(),
   majorCustomer2: z.string().optional(),
   majorCustomer3: z.string().optional(),
@@ -76,14 +83,26 @@ interface FinancialInfrastructureStepProps {
 export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, tenantId: _tenantId, onNext }: FinancialInfrastructureStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(financialData.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(financialData.financialDocsFile);
+  const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>(() => {
+    const initialErrors: Record<string, string | undefined> = {};
+    (['turnoverYear1', 'turnoverYear2', 'turnoverYear3', 'creditPeriodExpected'] as const).forEach((field) => {
+      const value = financialData[field];
+      if (typeof value === 'string' && value.trim().startsWith('-')) initialErrors[field] = NEGATIVE_MSG;
+    });
+    return initialErrors;
+  });
   
   const defaultValues: CombinedFormData = {
     ...financialData,
+    turnoverYear1: financialData.turnoverYear1?.trim().startsWith('-') ? '' : financialData.turnoverYear1,
+    turnoverYear2: financialData.turnoverYear2?.trim().startsWith('-') ? '' : financialData.turnoverYear2,
+    turnoverYear3: financialData.turnoverYear3?.trim().startsWith('-') ? '' : financialData.turnoverYear3,
+    creditPeriodExpected: financialData.creditPeriodExpected?.trim().startsWith('-') ? '' : financialData.creditPeriodExpected,
     ...infrastructureData,
     ...qhseData,
   };
 
-  const { register, handleSubmit, control, watch } = useForm<CombinedFormData>({
+  const { register, handleSubmit, control, watch, setValue } = useForm<CombinedFormData>({
     resolver: zodResolver(schema),
     defaultValues,
     values: defaultValues,
@@ -91,6 +110,53 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
   });
 
   const productTypes = watch('productTypes') || [];
+
+  const blockInvalidNumericKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+  };
+
+  const isNegativeAmount = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return false;
+    return trimmed.startsWith('-') || Number(trimmed) < 0;
+  };
+
+  const sanitizeNonNegNumeric = (raw: string) => {
+    if (isNegativeAmount(raw)) return '';
+
+    const cleaned = raw.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    const normalized = parts.length <= 1 ? cleaned : parts[0] + '.' + parts.slice(1).join('');
+    if (!normalized) return '';
+
+    const numericValue = Number(normalized);
+    if (!isFinite(numericValue) || numericValue < 0) return '';
+
+    return normalized;
+  };
+
+  const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') => ({
+    type: 'text' as const,
+    min: 0,
+    inputMode: 'decimal' as const,
+    pattern: '[0-9]*[.]?[0-9]*',
+    value: (watch(name) as string) ?? '',
+    onKeyDown: blockInvalidNumericKeys,
+    onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
+      const text = e.clipboardData.getData('text');
+      if (text && isNegativeAmount(text)) {
+        e.preventDefault();
+        setAmountErrors((previous) => ({ ...previous, [name]: NEGATIVE_MSG }));
+        setValue(name, '', { shouldValidate: true, shouldDirty: true });
+      }
+    },
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      const isNegative = isNegativeAmount(raw);
+      setAmountErrors((previous) => ({ ...previous, [name]: isNegative ? NEGATIVE_MSG : undefined }));
+      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: true, shouldDirty: true });
+    },
+  });
 
   const handleFormSubmit = (formData: CombinedFormData) => {
     const financial: FinancialDetails = {
@@ -165,27 +231,31 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
               <Label htmlFor="turnoverYear1">{formatIndianFy(fy1Start)}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                <Input id="turnoverYear1" type="number" {...register('turnoverYear1')} placeholder="Amount in Lakhs" className="pl-8" />
+                <Input id="turnoverYear1" {...numericFieldProps('turnoverYear1')} placeholder="Amount in Lakhs" className="pl-8" />
               </div>
+              {amountErrors.turnoverYear1 && <p className="text-xs text-destructive">{amountErrors.turnoverYear1}</p>}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="turnoverYear2">{formatIndianFy(fy2Start)}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                <Input id="turnoverYear2" type="number" {...register('turnoverYear2')} placeholder="Amount in Lakhs" className="pl-8" />
+                <Input id="turnoverYear2" {...numericFieldProps('turnoverYear2')} placeholder="Amount in Lakhs" className="pl-8" />
               </div>
+              {amountErrors.turnoverYear2 && <p className="text-xs text-destructive">{amountErrors.turnoverYear2}</p>}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="turnoverYear3">{formatIndianFy(fy3Start)}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                <Input id="turnoverYear3" type="number" {...register('turnoverYear3')} placeholder="Amount in Lakhs" className="pl-8" />
+                <Input id="turnoverYear3" {...numericFieldProps('turnoverYear3')} placeholder="Amount in Lakhs" className="pl-8" />
               </div>
+              {amountErrors.turnoverYear3 && <p className="text-xs text-destructive">{amountErrors.turnoverYear3}</p>}
             </div>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
-            <Input id="creditPeriodExpected" type="number" {...register('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
+            <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
+            {amountErrors.creditPeriodExpected && <p className="text-xs text-destructive">{amountErrors.creditPeriodExpected}</p>}
           </div>
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
         </div>

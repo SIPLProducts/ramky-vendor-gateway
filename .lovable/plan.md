@@ -1,32 +1,34 @@
-## Plan: Block negative Amount values correctly
+## Plan: Fix negative amount validation in the actual rendered form
 
-I will update the Financial step amount inputs so negative values cannot remain in the field and the exact validation message is shown whenever a negative entry is attempted.
+I found the issue: the screen in your screenshot is not using the already-edited `FinancialStep.tsx`. It is rendering `FinancialInfrastructureStep.tsx`, which still has plain `type="number"` fields and therefore still accepts `-20000` and `-2`.
 
 ### Changes
 
-1. **Use controlled text/decimal inputs instead of fragile browser number behavior**
-   - Keep `min={0}` and decimal support.
-   - Avoid relying only on `type="number"`, because browsers can still allow temporary negative states through paste, spinner behavior, or programmatic input.
+1. **Update the active component**
+   - Apply the fix in `src/components/vendor/steps/FinancialInfrastructureStep.tsx`.
+   - Keep the existing layout and labels shown in your screenshot.
 
-2. **Strictly sanitize Amount values before storing**
-   - Allow only digits and one decimal point.
-   - Allow `0` and any value greater than `0`.
-   - If input starts with `-` or parses below `0`, immediately clear/prevent the invalid value from being stored.
+2. **Block negative turnover values**
+   - Replace fragile `type="number"` amount inputs with controlled decimal text inputs.
+   - Prevent typing `-`, `+`, `e`, and `E`.
+   - Reject pasted or programmatic negative values.
+   - Keep minimum allowed value as `0`.
 
-3. **Show the exact validation message inline**
-   - Message:
-     `Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.`
-   - Show it below the affected Amount field when a negative value is typed, pasted, or otherwise entered.
+3. **Show the exact validation message**
+   - Display this below the affected turnover amount field whenever a negative value is attempted:
 
-4. **Preserve existing rupee input + live lakhs preview**
-   - Valid examples remain accepted: `0`, `0.1`, `0.9`, `1.5`, `90000`, `100000`, `1500000`.
-   - Lakhs preview stays visible only for valid positive amounts.
+   `Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.`
 
-5. **Apply the same non-negative guard to Expected Credit Period**
-   - Prevent values below `0` there as well, using the same validation behavior currently planned.
+4. **Fix Expected Credit Period too**
+   - Prevent values less than `0` for `Expected Credit Period (Days)`.
+   - Show the same validation message when a negative value is entered there, matching the issue in your screenshot.
 
-### Technical notes
+5. **Preserve valid inputs**
+   - Allow `0`, decimal lakhs such as `0.9`, and rupee amounts such as `90000`.
+   - Do not change submit behavior, file upload, or other financial/infrastructure fields.
 
-- Update only `src/components/vendor/steps/FinancialStep.tsx`.
-- Use the existing zod schema plus field-level input handling.
-- Ensure form state never contains a negative value for these numeric fields.
+6. **Verify in the browser**
+   - Test the actual `/vendor/registration` form.
+   - Confirm `-20000` and `-2` cannot remain in the fields.
+   - Confirm the validation message appears when negatives are attempted.
+   - Confirm valid values like `0.9` and `90000` still work.
