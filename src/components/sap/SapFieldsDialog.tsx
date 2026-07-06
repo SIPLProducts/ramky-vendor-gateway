@@ -300,8 +300,21 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={v => set('lebre', v ? 'X' : '')} />
             </Section>
 
+            <Separator />
+
+            {/* Withholding Tax — captured on SAP sync, filtered by vendor country */}
+            <WithholdingTaxSection
+              country={vendorCountry}
+              rows={form.withholding}
+              onChange={(rows) => set('withholding', rows)}
+              options={wtFiltered}
+              loading={wtLoading}
+              error={wtError}
+            />
 
             <Separator />
+
+
 
             {/* Classification — editable here (no longer captured during registration) */}
             <div className="space-y-3">
