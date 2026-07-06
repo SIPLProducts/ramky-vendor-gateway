@@ -1,34 +1,46 @@
-## Plan: Fix negative amount validation in the actual rendered form
+## Goal
 
-I found the issue: the screen in your screenshot is not using the already-edited `FinancialStep.tsx`. It is rendering `FinancialInfrastructureStep.tsx`, which still has plain `type="number"` fields and therefore still accepts `-20000` and `-2`.
+Make every vendor View/Preview surface show the same complete vendor information — including Turnover in the Financial card and a new **Classification Details** card immediately after **Bank Details**.
 
-### Changes
+## Where the changes apply
 
-1. **Update the active component**
-   - Apply the fix in `src/components/vendor/steps/FinancialInfrastructureStep.tsx`.
-   - Keep the existing layout and labels shown in your screenshot.
+These three components render every "View / Preview" popup across the app (Vendor List, Approvals — Buyer/SCM/CEO/Finance1/Finance2, SAP Sync, Reports drill-in, etc.), so updating them fixes every entry point consistently:
 
-2. **Block negative turnover values**
-   - Replace fragile `type="number"` amount inputs with controlled decimal text inputs.
-   - Prevent typing `-`, `+`, `e`, and `E`.
-   - Reject pasted or programmatic negative values.
-   - Keep minimum allowed value as `0`.
+1. `src/pages/VendorList.tsx` — inline "All Details" tab (the popup shown in the screenshot)
+2. `src/components/vendor/VendorReviewDialog.tsx` — approval / SAP Sync review dialog
+3. `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — read-only preview dialog
 
-3. **Show the exact validation message**
-   - Display this below the affected turnover amount field whenever a negative value is attempted:
+## Changes
 
-   `Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.`
+### A. Financial Information — Turnover
 
-4. **Fix Expected Credit Period too**
-   - Prevent values less than `0` for `Expected Credit Period (Days)`.
-   - Show the same validation message when a negative value is entered there, matching the issue in your screenshot.
+- `VendorList.tsx` financial card: already shows Turnover Year 1/2/3 in raw ₹. Update labels to Indian FY (e.g., `Turnover FY 2024-25`) using `formatIndianFy(getLastThreeCompletedIndianFyStartYears())`, and format value as `₹ X Lakhs` for consistency with the other two dialogs. Also add `Credit Period Expected`.
+- `VendorReviewDialog.tsx` and `VendorSubmissionPreviewDialog.tsx`: already display Turnover — no change needed beyond verifying they render (they do).
 
-5. **Preserve valid inputs**
-   - Allow `0`, decimal lakhs such as `0.9`, and rupee amounts such as `90000`.
-   - Do not change submit behavior, file upload, or other financial/infrastructure fields.
+### B. New "Classification Details" card (after Bank Details in all three surfaces)
 
-6. **Verify in the browser**
-   - Test the actual `/vendor/registration` form.
-   - Confirm `-20000` and `-2` cannot remain in the fields.
-   - Confirm the validation message appears when negatives are attempted.
-   - Confirm valid values like `0.9` and `90000` still work.
+Data source = vendor row columns (populated at registration or edited in the SAP Fields dialog). Displayed as two sub-groups matching SAP structure:
+
+**Vendor_Details**
+- Material Group for Vendors → `vendor.material_group_vendors` (text[])
+- Vendor Category → `vendor.vendor_categories` (text[])
+
+**Vendor_CFSTMT**
+- Vendor Cash Flow → `vendor.vendor_cashflow` (text[])
+- Tier Category → `vendor.tier_category` (text[])
+
+Rendering rules:
+- Show each value as comma-separated codes; render `-` if the array is empty.
+- Use the same section header style already used in each dialog (icon + title, then a grid of label/value rows). Icon: `Tags` from `lucide-react`.
+- Card is inserted directly under the Bank Details card and above Financial Information in all three files.
+
+### C. Consistency sweep
+
+- Confirm the three dialogs are the only view/preview surfaces (grep confirmed: SAPSync, VendorList, StageApprovalView all use these). No other module needs edits.
+- No changes to registration form, schema, or business logic.
+
+## Out of scope
+
+- No DB migration (all four columns already exist).
+- No changes to SAP payload / sync behavior.
+- No new editing UI — classification remains editable only in the SAP Fields dialog.
