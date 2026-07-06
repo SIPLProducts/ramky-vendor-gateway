@@ -48,6 +48,9 @@ verify_jwt = false
 [functions.sap-master-fetch]
 verify_jwt = false
 
+[functions.sap-fetch-withholding-tax]
+verify_jwt = false
+
 [functions.log-login-attempt]
 verify_jwt = false
 

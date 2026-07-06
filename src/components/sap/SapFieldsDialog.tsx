@@ -10,12 +10,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2, FileCheck } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2, FileCheck, Receipt, Search, Plus, Trash2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
 import { getLocationLabel } from '@/lib/stateToSapLocation';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
+
+export type WTaxRow = {
+  witht: string;
+  text40: string;
+  wt_withcd: string;
+  wt_subjct: boolean;
+  qsrec: string;
+  qland: string;
+};
 
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
@@ -27,6 +38,7 @@ export type SapFieldOverrides = {
   reg_contact1: string; reg_contact2: string; reg_email1: string; reg_email2: string;
   reg_is_msme: boolean; reg_msme_no: string; reg_msme_cat: string; reg_msme_act: string;
   classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[]; CASH: string[]; TIER: string[] };
+  withholding: WTaxRow[];
 };
 
 interface Props {
@@ -57,8 +69,25 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [wtAll, setWtAll] = useState<Array<{ LAND1: string; TAXTYPE: string; TEXT40: string }>>([]);
+  const [wtLoading, setWtLoading] = useState(false);
+  const [wtError, setWtError] = useState<string | null>(null);
   const refreshMaster = useRefreshSapMaster();
   const { data: vendorLocRows } = useSapMasterData('vendor_location');
+
+  const vendorCountry = (() => {
+    const v: any = vendor || {};
+    const isIntl = String(v.vendor_type || 'domestic') === 'international';
+    if (isIntl) {
+      const c = v.international_data?.company?.country || v.country || '';
+      return String(c || '').trim().toUpperCase();
+    }
+    return 'IN';
+  })();
+
+  const wtFiltered = wtAll.filter(
+    (r) => String(r.LAND1 || '').trim().toUpperCase() === vendorCountry,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +138,31 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         if (!cancelled) setF4Status({ state: 'error', message: `${e?.message || 'SAP Fields F4 refresh failed.'} Showing cached F4 options if available.` });
       }
     })();
+
+    // Fetch Withholding Tax types via saved SAP API config "Fetch_Withholding_TaxType"
+    setWtLoading(true);
+    setWtError(null);
+    setWtAll([]);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('sap-fetch-withholding-tax', {
+          body: { config_name: 'Fetch_Withholding_TaxType' },
+        });
+        if (cancelled) return;
+        if (error) {
+          setWtError(error.message || 'Failed to load withholding tax types');
+        } else if (data?.success) {
+          setWtAll(Array.isArray(data.records) ? data.records : []);
+        } else {
+          setWtError(data?.message || 'Failed to load withholding tax types');
+        }
+      } catch (e: any) {
+        if (!cancelled) setWtError(e?.message || 'Failed to load withholding tax types');
+      } finally {
+        if (!cancelled) setWtLoading(false);
+      }
+    })();
+
     return () => { cancelled = true; window.clearTimeout(slowTimer); };
   }, [open, vendor]);
 
@@ -246,8 +300,21 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                 onChange={v => set('lebre', v ? 'X' : '')} />
             </Section>
 
+            <Separator />
+
+            {/* Withholding Tax — captured on SAP sync, filtered by vendor country */}
+            <WithholdingTaxSection
+              country={vendorCountry}
+              rows={form.withholding}
+              onChange={(rows) => set('withholding', rows)}
+              options={wtFiltered}
+              loading={wtLoading}
+              error={wtError}
+            />
 
             <Separator />
+
+
 
             {/* Classification — editable here (no longer captured during registration) */}
             <div className="space-y-3">
@@ -419,6 +486,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
       CASH: Array.isArray(v.vendor_cashflow) ? v.vendor_cashflow : [],
       TIER: Array.isArray(v.tier_category) ? v.tier_category : [],
     },
+    withholding: [],
   };
 }
 
@@ -644,6 +712,199 @@ export function SapF4MultiSelectField({
         {isLoading
           ? 'Loading F4 values…'
           : `${options.length} option${options.length === 1 ? '' : 's'} loaded${isLive ? ' from live SAP F4.' : '.'}`}
+      </p>
+    </div>
+  );
+}
+
+type WTaxOption = { LAND1: string; TAXTYPE: string; TEXT40: string };
+
+function WithholdingTaxSection({
+  country, rows, onChange, options, loading, error,
+}: {
+  country: string;
+  rows: WTaxRow[];
+  onChange: (rows: WTaxRow[]) => void;
+  options: WTaxOption[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  const addRow = () => {
+    onChange([
+      ...rows,
+      { witht: '', text40: '', wt_withcd: '', wt_subjct: true, qsrec: 'OT', qland: country },
+    ]);
+  };
+
+  const updateRow = (idx: number, patch: Partial<WTaxRow>) => {
+    onChange(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  };
+
+  const removeRow = (idx: number) => {
+    onChange(rows.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold flex items-center gap-2 text-primary">
+          <Receipt className="h-4 w-4" />Withholding Tax
+          {country && (
+            <span className="text-xs font-normal text-muted-foreground">
+              (Country: <span className="font-medium">{country}</span>)
+            </span>
+          )}
+        </h4>
+        <Button type="button" size="sm" variant="outline" onClick={addRow} className="h-8 rounded-lg">
+          <Plus className="h-3.5 w-3.5 mr-1" />Add row
+        </Button>
+      </div>
+
+      {loading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading withholding tax types…
+        </div>
+      )}
+      {!loading && error && (
+        <div className="flex items-start gap-2 text-xs text-destructive">
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+      {!loading && !error && options.length === 0 && (
+        <div className="text-xs text-muted-foreground">
+          No withholding tax types available{country ? ` for country ${country}` : ''}.
+        </div>
+      )}
+
+      <div className="border border-border rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40">
+            <tr className="text-left">
+              <th className="px-3 py-2 font-medium w-[140px]">WTax Type</th>
+              <th className="px-3 py-2 font-medium">WTax Type Description</th>
+              <th className="px-3 py-2 font-medium w-[120px]">WTax Code</th>
+              <th className="px-3 py-2 font-medium w-[80px] text-center">Subject</th>
+              <th className="px-3 py-2 font-medium w-[110px]">Rec.Type</th>
+              <th className="px-3 py-2 w-[40px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  No withholding tax rows. Click "Add row" to search and add.
+                </td>
+              </tr>
+            ) : (
+              rows.map((r, idx) => (
+                <tr key={idx} className="border-t border-border">
+                  <td className="px-2 py-1.5">
+                    <div className="flex gap-1">
+                      <Input
+                        value={r.witht}
+                        onChange={(e) => updateRow(idx, { witht: e.target.value.toUpperCase() })}
+                        className="h-8 rounded-md text-xs"
+                        placeholder="WTax"
+                      />
+                      <Popover open={openIdx === idx} onOpenChange={(v) => setOpenIdx(v ? idx : null)}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0 shrink-0"
+                            disabled={options.length === 0}
+                          >
+                            <Search className="h-3.5 w-3.5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[420px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search WTax Type / description…" />
+                            <CommandList>
+                              <CommandEmpty>No matching WTax types.</CommandEmpty>
+                              <CommandGroup>
+                                {options.map((opt) => (
+                                  <CommandItem
+                                    key={`${opt.TAXTYPE}-${opt.LAND1}`}
+                                    value={`${opt.TAXTYPE} ${opt.TEXT40}`}
+                                    onSelect={() => {
+                                      updateRow(idx, {
+                                        witht: opt.TAXTYPE,
+                                        text40: opt.TEXT40,
+                                        wt_withcd: r.wt_withcd || opt.TAXTYPE,
+                                        qland: opt.LAND1 || country,
+                                      });
+                                      setOpenIdx(null);
+                                    }}
+                                  >
+                                    <span className="font-medium mr-2">{opt.TAXTYPE}</span>
+                                    <span className="text-muted-foreground text-xs">{opt.TEXT40}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={r.text40}
+                      onChange={(e) => updateRow(idx, { text40: e.target.value })}
+                      className="h-8 rounded-md text-xs"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={r.wt_withcd}
+                      onChange={(e) => updateRow(idx, { wt_withcd: e.target.value.toUpperCase() })}
+                      className="h-8 rounded-md text-xs"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Checkbox
+                      checked={r.wt_subjct}
+                      onCheckedChange={(v) => updateRow(idx, { wt_subjct: !!v })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Select
+                      value={r.qsrec || 'OT'}
+                      onValueChange={(v) => updateRow(idx, { qsrec: v })}
+                    >
+                      <SelectTrigger className="h-8 rounded-md text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="OT">OT</SelectItem>
+                        <SelectItem value="ST">ST</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => removeRow(idx)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Rows are pushed to SAP as <code>WHOLDTAX</code> entries with LIFNR bound at sync time. QLAND is set to the vendor country ({country || '—'}).
       </p>
     </div>
   );
