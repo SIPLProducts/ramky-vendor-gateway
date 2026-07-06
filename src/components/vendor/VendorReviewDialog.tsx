@@ -39,6 +39,7 @@ import {
   Shield,
   Download,
   Eye,
+  Tags,
 } from 'lucide-react';
 
 interface GstFilingRow {
@@ -615,6 +616,38 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">MICR Code</p><p className="font-mono font-medium">{vendor.micr_code || '-'}</p></div>
                     </div>
                   </div>
+
+                  <Separator />
+
+                  {/* Classification Details */}
+                  {(() => {
+                    const v = vendor as any;
+                    const fmtArr = (arr: any) => Array.isArray(arr) && arr.length ? arr.join(', ') : '-';
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold flex items-center gap-2 text-primary">
+                          <Tags className="h-4 w-4" />
+                          Classification Details
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="border border-border rounded-lg p-3 space-y-2">
+                            <p className="text-xs font-semibold text-primary">Vendor_Details</p>
+                            <div className="grid grid-cols-1 gap-2 text-sm">
+                              <div><p className="text-muted-foreground">Material Group for Vendors</p><p className="font-medium">{fmtArr(v.material_group_vendors)}</p></div>
+                              <div><p className="text-muted-foreground">Vendor Category</p><p className="font-medium">{fmtArr(v.vendor_categories)}</p></div>
+                            </div>
+                          </div>
+                          <div className="border border-border rounded-lg p-3 space-y-2">
+                            <p className="text-xs font-semibold text-primary">Vendor_CFSTMT</p>
+                            <div className="grid grid-cols-1 gap-2 text-sm">
+                              <div><p className="text-muted-foreground">Vendor Cash Flow</p><p className="font-medium">{fmtArr(v.vendor_cashflow)}</p></div>
+                              <div><p className="text-muted-foreground">Tier Category</p><p className="font-medium">{fmtArr(v.tier_category)}</p></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <Separator />
 
