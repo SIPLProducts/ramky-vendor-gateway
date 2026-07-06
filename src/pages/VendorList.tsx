@@ -28,7 +28,9 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { getSapName1, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -106,6 +108,8 @@ export default function VendorList() {
   const [returnTarget, setReturnTarget] = useState<VendorRow | null>(null);
   const [returnRemarks, setReturnRemarks] = useState('');
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
+  const [commentsVendor, setCommentsVendor] = useState<{ id: string; name: string; ref: string } | null>(null);
 
 
   // Fetch all vendors from database
@@ -467,6 +471,26 @@ export default function VendorList() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Preview"
+                                onClick={() => setPreviewVendorId(vendor.id)}
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Comments"
+                                onClick={() => setCommentsVendor({
+                                  id: vendor.id,
+                                  name: pickVendorDisplayName(vendor as any) || vendor.legal_name || '',
+                                  ref: vendor.reference_number || '',
+                                })}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
                             </div>
                           </TableCell>
 
@@ -825,6 +849,19 @@ export default function VendorList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VendorSubmissionPreviewDialog
+        vendorId={previewVendorId}
+        open={!!previewVendorId}
+        onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
+      />
+      <ApprovalCommentsDialog
+        open={!!commentsVendor}
+        onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
+        vendorId={commentsVendor?.id ?? null}
+        vendorName={commentsVendor?.name}
+        referenceNumber={commentsVendor?.ref}
+      />
 
     </div>
   );
