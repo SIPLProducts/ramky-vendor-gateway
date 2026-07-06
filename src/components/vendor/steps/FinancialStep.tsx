@@ -51,8 +51,17 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
   const blockInvalidNumericKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
   };
+
+  const isNegativeAmount = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return false;
+    return trimmed.startsWith('-') || Number(trimmed) < 0;
+  };
+
   const sanitizeNonNegNumeric = (raw: string) => {
-    // Strip anything that isn't a digit or dot (removes leading '-' from paste)
+    if (isNegativeAmount(raw)) return '';
+
+    // Strip anything that isn't a digit or dot and keep only the first dot.
     const cleaned = raw.replace(/[^\d.]/g, '');
     const parts = cleaned.split('.');
     const normalized = parts.length <= 1 ? cleaned : parts[0] + '.' + parts.slice(1).join('');
@@ -62,23 +71,25 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
     return normalized;
   };
   const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') => ({
-    type: 'number' as const,
+    type: 'text' as const,
     min: 0,
-    step: 'any',
     inputMode: 'decimal' as const,
+    pattern: '[0-9]*[.]?[0-9]*',
     onKeyDown: blockInvalidNumericKeys,
     onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
       const text = e.clipboardData.getData('text');
-      if (text && (text.trim().startsWith('-') || Number(text) < 0)) {
+      if (text && isNegativeAmount(text)) {
+        e.preventDefault();
         setAmountErrors((p) => ({ ...p, [name]: NEGATIVE_MSG }));
+        setValue(name, '', { shouldValidate: true, shouldDirty: true });
       }
     },
     value: (watch(name) as string) ?? '',
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
-      const isNegative = raw.trim().startsWith('-') || Number(raw) < 0;
+      const isNegative = isNegativeAmount(raw);
       setAmountErrors((p) => ({ ...p, [name]: isNegative ? NEGATIVE_MSG : undefined }));
-      setValue(name, sanitizeNonNegNumeric(raw), { shouldValidate: true });
+      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: true, shouldDirty: true });
     },
   });
 
