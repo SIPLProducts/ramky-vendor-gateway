@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2, FileCheck } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Server, Loader2, Building2, Briefcase, Landmark, Tags, MapPin, AlertCircle, CheckCircle2, FileCheck, Receipt, Search, Plus, Trash2 } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
