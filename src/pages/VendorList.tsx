@@ -751,7 +751,7 @@ export default function VendorList() {
                             </div>
                             <div className="space-y-1">
                               <p className="text-muted-foreground">Credit Period Expected</p>
-                              <p className="font-medium">{(selectedVendor as any).credit_period_expected ? `${(selectedVendor as any).credit_period_expected} days` : '-'}</p>
+                              <p className="font-medium">{(selectedVendor as any).credit_period_expected === 0 || (selectedVendor as any).credit_period_expected ? `${(selectedVendor as any).credit_period_expected} days` : '-'}</p>
                             </div>
                           </div>
                         </div>
