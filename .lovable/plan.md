@@ -1,27 +1,24 @@
 ## Plan
 
-1. **Fix registration Review & Submit preview**
-   - Update the Review screen’s **Financial Information** card to display all saved financial fields:
-     - Turnover for the last 3 completed financial years
-     - Expected Credit Period
-     - Major Customer 1/2/3 where available
-   - Use the same financial-year labels already used in the financial form.
+**Goal:** Remove the `Vendor_CFSTMT` block from the vendor registration flow only. Keep it visible in all View/Preview surfaces used by approvers, All Vendors, Reports, and SAP Sync.
 
-2. **Make financial display consistent in all View/Preview popups**
-   - Review the shared preview dialogs used by All Vendors, Approval screens, Reports, SAP Sync, and related modules.
-   - Ensure all preview surfaces show:
-     - Financial Information with Turnover and Expected Credit Period
-     - Classification Details after Bank Details
-     - Other saved vendor details
-   - Keep Classification Details sourced from the saved vendor columns mapped from `Vendor_Details` and `Vendor_CFSTMT`.
+### Changes
 
-3. **Correct validation timing for turnover and credit period fields**
-   - Remove validation-error initialization on page load for financial fields.
-   - Show inline validation only after the user interacts with a field or pastes an invalid value.
-   - Keep invalid negative values blocked/cleared, but do not show errors just because the form or step loaded.
-   - Keep the Expected Credit Period message as only: `Negative values are not allowed.`
+1. **`src/components/vendor/steps/ReviewStep.tsx`** (Review & Submit step in registration)
+   - In the "Classification Details" section, remove the right-hand `Vendor_CFSTMT` card (Vendor Cash Flow, Tier Category — currently hardcoded to `-`).
+   - Collapse the grid to a single-column layout so the remaining `Vendor_Details` card (Material Group for Vendors, Vendor Category) renders full width.
+   - Keep the section header "Classification Details" and its edit link unchanged.
 
-4. **Verify the affected flow**
-   - Check the Review & Submit preview with saved turnover and credit period values.
-   - Check that validation errors do not appear on initial load/focus, and only appear after invalid input.
-   - Confirm existing shared preview dialogs still render Financial Information and Classification Details consistently.
+### Left unchanged (CFSTMT stays visible)
+
+- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — View popup used across app.
+- `src/components/vendor/VendorReviewDialog.tsx` — Approval/review dialog.
+- `src/pages/VendorList.tsx` — All Vendors view popup.
+- Approval screens, Reports, SAP Sync — they use the shared dialogs above.
+- `OrganizationStep.tsx` registration classification inputs (already only Material Group + Vendor Category, no CFSTMT fields to remove).
+
+### Verification
+
+- Open vendor registration → Review & Submit: confirm only `Vendor_Details` card appears under Classification Details, no `Vendor_CFSTMT`.
+- Open All Vendors → View: confirm Classification Details still shows both `Vendor_Details` and `Vendor_CFSTMT`.
+- Open an approval screen preview: confirm both cards present.
