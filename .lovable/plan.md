@@ -1,36 +1,51 @@
-## Problem
+## Goal
+On the All Vendors screen (`src/pages/VendorList.tsx`), add **Preview** and **Comments** action buttons next to the existing eye/View icon in each row, reusing the exact same components already used in the Approval screens so behavior and UI match 1:1.
 
-On the International vendor flow, clicking **Continue** on Step 2 (Company Details) does nothing.
+## Changes (single file: `src/pages/VendorList.tsx`)
 
-## Root cause
+1. **Imports**
+   - Add icons: `FileText`, `MessageSquare` (from `lucide-react`, already imported).
+   - Import the three dialog components already used by `StageApprovalView`:
+     - `VendorSubmissionPreviewDialog` from `@/components/vendor/VendorSubmissionPreviewDialog`
+     - `ApprovalCommentsDialog` from `@/components/sap/ApprovalCommentsDialog`
 
-In `src/pages/VendorRegistration.tsx` (~line 1809), the Continue button's `form` attribute is hardcoded per step number:
+2. **State**
+   - `const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);`
+   - `const [commentsVendor, setCommentsVendor] = useState<{ id: string; name: string; ref: string } | null>(null);`
 
-```tsx
-form={currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
-```
+3. **Row actions cell (around lines 458–470)** — add two buttons next to the existing View eye button:
+   ```tsx
+   <Button variant="ghost" size="sm" title="Preview"
+     onClick={() => setPreviewVendorId(vendor.id)}>
+     <FileText className="h-4 w-4" />
+   </Button>
+   <Button variant="ghost" size="sm" title="Comments"
+     onClick={() => setCommentsVendor({
+       id: vendor.id,
+       name: pickVendorDisplayName(vendor) || vendor.legal_name || '',
+       ref: vendor.reference_number || '',
+     })}>
+     <MessageSquare className="h-4 w-4" />
+   </Button>
+   ```
 
-That mapping is written for the **domestic** flow, where `OrganizationStep` (step 2) uses `id="step-form-2"`.
+4. **Mount dialogs** once (near the end of the component, alongside the existing details drawer):
+   ```tsx
+   <VendorSubmissionPreviewDialog
+     vendorId={previewVendorId}
+     open={!!previewVendorId}
+     onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
+   />
+   <ApprovalCommentsDialog
+     open={!!commentsVendor}
+     onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
+     vendorId={commentsVendor?.id ?? null}
+     vendorName={commentsVendor?.name}
+     referenceNumber={commentsVendor?.ref}
+   />
+   ```
 
-The international step 2 component `IntlCompanyDetailsStep` uses `id="step-form"` (same as `IntlBankDetailsStep` and `IntlClassificationStep`). So on international step 2 the button targets a form that isn't on the page → click does nothing, no validation, no submit.
-
-## Fix
-
-Make the form-id resolution aware of `isInternational`. For international, always target `"step-form"` (since intl step 1 uses its own `handleIntlDocsContinue` handler and isn't a submit button, this is safe):
-
-```tsx
-form={
-  isInternational
-    ? "step-form"
-    : currentStep === 1 ? "step-form-1"
-    : currentStep === 2 ? "step-form-2"
-    : "step-form"
-}
-```
-
-Single-file change: `src/pages/VendorRegistration.tsx`.
-
-## Verification
-
-- International flow → fill Company Details → click Continue → form validates and advances to step 3 (Bank Details).
-- Domestic flow → unchanged (still uses `step-form-1` / `step-form-2` / `step-form`).
+## Notes
+- No changes to the Preview or Comments dialogs themselves — they already render the full vendor preview (documents, details) and the full approval comment history (approver name, stage, level, status, remarks, date/time) exactly as shown on the Approval screens.
+- No backend/schema changes. RLS already permits admins/sharvi_admin (who view All Vendors) to read `vendor_approval_progress` and `vendors`.
+- Existing eye/View button and details drawer remain unchanged.
