@@ -17,6 +17,15 @@ import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData'
 import { getLocationLabel } from '@/lib/stateToSapLocation';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 
+export type WTaxRow = {
+  witht: string;
+  text40: string;
+  wt_withcd: string;
+  wt_subjct: boolean;
+  qsrec: string;
+  qland: string;
+};
+
 export type SapFieldOverrides = {
   partn_cat: string; partn_grp: string; title: string; taxtype: string;
   msme: string; idtype: string; idnum: string;
@@ -27,6 +36,7 @@ export type SapFieldOverrides = {
   reg_contact1: string; reg_contact2: string; reg_email1: string; reg_email2: string;
   reg_is_msme: boolean; reg_msme_no: string; reg_msme_cat: string; reg_msme_act: string;
   classify: { MGV: string[]; CATV: string[]; LOCV: string[]; IDS: string[]; CASH: string[]; TIER: string[] };
+  withholding: WTaxRow[];
 };
 
 interface Props {
