@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -41,14 +41,27 @@ const schema = z.object({
 interface FinancialStepProps {
   data: FinancialDetails;
   onNext: (data: FinancialDetails) => void;
+  onLiveUpdate?: (data: FinancialDetails) => void;
   onBack: () => void;
 }
 
-export function FinancialStep({ data, onNext }: FinancialStepProps) {
+export function FinancialStep({ data, onNext, onLiveUpdate }: FinancialStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(data.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(data.financialDocsFile);
   const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>({});
   const { register, handleSubmit, setValue, watch } = useForm<FinancialDetails>({ resolver: zodResolver(schema), defaultValues: data });
+  const latestDataRef = useRef<FinancialDetails>(data);
+
+  useEffect(() => {
+    latestDataRef.current = data;
+  }, [data]);
+
+  const emitLiveUpdate = (patch: Partial<FinancialDetails>) => {
+    if (!onLiveUpdate) return;
+    const nextData = { ...latestDataRef.current, ...patch };
+    latestDataRef.current = nextData;
+    onLiveUpdate(nextData);
+  };
 
   const handleFormSubmit = (formData: FinancialDetails) => {
     onNext({ ...formData, dealershipCertificateFile, financialDocsFile });
@@ -92,14 +105,17 @@ export function FinancialStep({ data, onNext }: FinancialStepProps) {
         e.preventDefault();
         setAmountErrors((p) => ({ ...p, [name]: getNegativeMessage(name) }));
         setValue(name, '', { shouldValidate: false, shouldDirty: true });
+        emitLiveUpdate({ [name]: '' } as Partial<FinancialDetails>);
       }
     },
     value: (watch(name) as string) ?? '',
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
       const isNegative = isNegativeAmount(raw);
+      const nextValue = isNegative ? '' : sanitizeNonNegNumeric(raw);
       setAmountErrors((p) => ({ ...p, [name]: isNegative ? getNegativeMessage(name) : undefined }));
-      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: false, shouldDirty: true });
+      setValue(name, nextValue, { shouldValidate: false, shouldDirty: true });
+      emitLiveUpdate({ [name]: nextValue } as Partial<FinancialDetails>);
     },
   });
 
