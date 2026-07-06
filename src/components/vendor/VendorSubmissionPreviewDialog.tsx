@@ -248,6 +248,30 @@ export function VendorSubmissionPreviewDialog({
                 </div>
               </div>
 
+              {/* Classification Details */}
+              {(() => {
+                const v = vendor as any;
+                const fmtArr = (arr: any) => Array.isArray(arr) && arr.length ? arr.join(', ') : '-';
+                return (
+                  <div className="form-section">
+                    <SectionHeader icon={Tags} title="Classification Details" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="border border-border rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-semibold text-primary">Vendor_Details</p>
+                        <DataRow label="Material Group for Vendors" value={fmtArr(v.material_group_vendors)} />
+                        <DataRow label="Vendor Category" value={fmtArr(v.vendor_categories)} />
+                      </div>
+                      <div className="border border-border rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-semibold text-primary">Vendor_CFSTMT</p>
+                        <DataRow label="Vendor Cash Flow" value={fmtArr(v.vendor_cashflow)} />
+                        <DataRow label="Tier Category" value={fmtArr(v.tier_category)} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+
               {/* Financial */}
               {(() => {
                 const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
