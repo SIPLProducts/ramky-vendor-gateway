@@ -56,6 +56,14 @@ const formatTurnover = (value?: string | number | null) => {
   return '-';
 };
 
+const formatCreditPeriod = (value?: string | number | null) => {
+  if (value === 0 || value) {
+    const numericValue = Number(String(value).replace(/,/g, ''));
+    return Number.isFinite(numericValue) && numericValue >= 0 ? `${numericValue} days` : '-';
+  }
+  return '-';
+};
+
 export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: ReviewStepProps) {
   const [selfDeclared, setSelfDeclared] = useState(data.declaration?.selfDeclared || false);
   const [termsAccepted, setTermsAccepted] = useState(data.declaration?.termsAccepted || false);
@@ -288,7 +296,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
           <DataRow label={`Turnover ${formatIndianFy(fy1Start)}`} value={formatTurnover(data.financial?.turnoverYear1)} />
           <DataRow label={`Turnover ${formatIndianFy(fy2Start)}`} value={formatTurnover(data.financial?.turnoverYear2)} />
           <DataRow label={`Turnover ${formatIndianFy(fy3Start)}`} value={formatTurnover(data.financial?.turnoverYear3)} />
-          <DataRow label="Expected Credit Period" value={data.financial?.creditPeriodExpected ? `${data.financial.creditPeriodExpected} days` : '-'} />
+          <DataRow label="Expected Credit Period" value={formatCreditPeriod(data.financial?.creditPeriodExpected)} />
           <DataRow label="Major Customer 1" value={data.financial?.majorCustomer1} />
           <DataRow label="Major Customer 2" value={data.financial?.majorCustomer2} />
           <DataRow label="Major Customer 3" value={data.financial?.majorCustomer3} />
