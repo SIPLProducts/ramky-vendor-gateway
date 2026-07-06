@@ -1,77 +1,34 @@
-## Goal
+## Problem
 
-Add a **Withholding Tax** table to the SAP Field Confirmation dialog (SAP Sync popup), placed directly below the "Service-Based Invoice Verification" checkbox. Rows are captured via an F4-style Search that calls the `Fetch_Withholding_TaxType` SAP API config, filtered by the vendor's country, and are pushed to SAP as `WHOLDTAX[]` entries in the sync payload.
+In SAP Sync, the Withholding Tax "Search" icon does not reveal any data. Investigation shows the edge function `sap-fetch-withholding-tax` is working and returns 134 SAP records (keys `LAND1`, `TAXTYPE`, `TEXT40`). The failure is on the client in `SapFieldsDialog.tsx`:
 
-## Scope
+1. The search button is `disabled={options.length === 0}`, and `options` = `wtFiltered` (records where `LAND1 === vendorCountry`). If the vendor's resolved country doesn't match any row (e.g. missing/blank country for an international vendor, or `IN` records not yet loaded when the popover is opened), the button is inert and the user sees nothing happen.
+2. Even when it opens, the popover shows no loading / error / empty state, so a failed fetch is invisible.
+3. Field-name matching is strict-case; harmless today but brittle.
 
-Only the shared `SapFieldsDialog` (used by SAP Sync, Multiple Sync, and any View → Sync entrypoint) and the SAP payload builder are touched. No changes to vendor registration.
+## Fix — `src/components/sap/SapFieldsDialog.tsx` only
 
-## UI (SapFieldsDialog.tsx)
+**Search button**
+- Always enable the Search icon; open the popover regardless of options length.
 
-New section rendered right after the Company Code Data section, before Classification:
+**Popover contents (mimic SAP F4 helper in screenshot 2)**
+- Header row inside the popover: "Withholding Tax Type — N Entries found" (shows filtered count / total).
+- While loading: spinner + "Loading withholding tax types…".
+- On error: red inline message with the edge-function error text and a "Retry" button that re-invokes `sap-fetch-withholding-tax`.
+- When the country filter yields zero rows but the full list is non-empty: show all rows and a subtle note "No entries for country {X} — showing all".
+- CommandList rendered as a compact two/three-column layout: **WTax Type** | **Name (TEXT40)** | **Country (LAND1)**, matching the SAP lookup style.
+- Increase popover width (e.g. `w-[520px]`) and cap list height with scroll.
 
-```text
-Withholding Tax
-+------+-------------------+-----------+---------+----------+---+
-| WTax | WTax Type         | WTax Code | Subject | Rec.Type | × |
-| Type | Description       |           | (chk)   | (Select) |   |
-+------+-------------------+-----------+---------+----------+---+
-| [Search 🔍] [ Add row ]                                       |
-```
+**Data handling**
+- Normalize incoming records to `{ LAND1, TAXTYPE, TEXT40 }` case-insensitively (accept `Land1`/`land1`, etc.) before storing in `wtAll`.
+- Compute `wtFiltered` as before; expose both `wtFiltered` and `wtAll` to the section so the popover can gracefully fall back.
+- Keep on-select behaviour: populate `witht`, `text40`, default `wt_withcd` to TAXTYPE, and set `qland` from the row's LAND1 (or vendor country).
 
-- Each row is stored in local state: `{ witht, text40, wt_withcd, wt_subjct, qsrec }`.
-- "WTax Type" cell shows the value plus a Search icon button; click opens a lookup popover listing the vendor-country-filtered records.
-- Selecting a record populates `witht = TAXTYPE`, `text40 = TEXT40`, and defaults `wt_withcd = TAXTYPE` (user editable), `wt_subjct = 'X'`, `qsrec = 'OT'`.
-- "Add row" appends an empty row; each row has a delete (×) button.
-- Rec.Type is a Select (`OT`, ` `) so the operator can override.
-- Subject is a checkbox mapped to `X` / empty string.
-
-## Vendor Country resolution
-
-- Domestic vendors: use the fixed value `IN` (Ramky group is India-only for domestic).
-- International vendors: use `vendor.company_details.country` (already populated during international registration; falls back to `vendor.country`/`reg_country` if present).
-- Resolved once when the dialog opens; passed to the lookup popover and stored in each row as `qland` for payload building.
-
-## Lookup data fetch
-
-- `Fetch_Withholding_TaxType` is a saved SAP API config maintained under **Admin → SAP API Settings** (already-supported "Separate SAP API config" path). No new edge function is created.
-- When the dialog opens, in parallel with the existing F4 fetch, invoke the existing `dynamic-api-executor` edge function with `{ config_name: 'Fetch_Withholding_TaxType' }` and cache the returned array in local state (`wtRaw`).
-- Response shape expected: `[{ LAND1, TAXTYPE, TEXT40 }, ...]`.
-- Filter once by `LAND1 === vendorCountry` → `wtOptions`.
-- If the API call fails or returns empty for that country, the Search popover shows: "No withholding tax types available for country {X}" with a retry link.
-
-## Search popover
-
-- Reuses the existing `Command` / `Popover` combobox pattern (see `SapMasterCombobox.tsx`).
-- Columns: `TAXTYPE — TEXT40`.
-- Type-ahead filter over `TAXTYPE` and `TEXT40`.
-- On select → populate the row as described above and close the popover.
-
-## Payload wiring (sapPayloadBuilder.ts)
-
-- Extend `SapFieldOverrides` with `withholding: Array<{ witht; wt_withcd; wt_subjct; qsrec; qland }>`.
-- In the builder (currently a TODO around line 403), emit:
-
-```json
-"WHOLDTAX": [
-  { "LIFNR": "", "WITHT": "...", "WT_WITHCD": "...", "WT_SUBJCT": "X", "QSREC": "OT", "QLAND": "IN" }
-]
-```
-
-- If no rows are entered, emit `"WHOLDTAX": []` (unchanged from today's behaviour).
-
-## Persistence
-
-- Rows are held in dialog-local state only; on Sync click they flow through `onConfirm(overrides)` into the existing sync pipeline. No new DB tables are added in this change. (Persisting captured WTax rows on the vendor record can be a follow-up if needed.)
-
-## Files to change
-
-- `src/components/sap/SapFieldsDialog.tsx` — new section, lookup popover, state, country resolution, extend `SapFieldOverrides`.
-- `src/lib/sapPayloadBuilder.ts` — build `WHOLDTAX[]` from `overrides.withholding`.
-- (No changes to `MultipleSapSyncDialog` beyond passing through overrides — it already re-uses `SapFieldsDialog`.)
+**Vendor country resolution** (unchanged behaviour, hardened)
+- Domestic → `IN`.
+- International → first non-empty of `international_data.company.country`, `international_data.address.country`, `country`, uppercased and trimmed.
 
 ## Out of scope
-
-- Managing the `Fetch_Withholding_TaxType` config itself (admins already do this under SAP API Settings).
-- Persisting withholding rows into the `vendors` table.
-- Editing withholding rows from View-only screens (dialog is capture-on-sync, matching existing Classification behaviour).
+- No edge-function changes (already returns correct records).
+- No payload-builder or MultipleSapSyncDialog changes.
+- No new tables or migrations.
