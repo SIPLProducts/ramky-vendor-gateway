@@ -922,10 +922,6 @@ function WithholdingTaxSection({
                                   </CommandGroup>
                                 </>
                               )}
-
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
                             </CommandList>
                           </Command>
                         </PopoverContent>
