@@ -12,10 +12,13 @@ import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/i
 
 const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
+const NEGATIVE_MSG = 'Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.';
+
 const nonNegNumericString = z
   .string()
   .optional()
-  .refine((v) => !v || /^\d+(\.\d+)?$/.test(v), { message: 'Enter a valid non-negative number' });
+  .refine((v) => !v || (/^\d+(\.\d+)?$/.test(v) && Number(v) >= 0), { message: NEGATIVE_MSG });
+
 
 const schema = z.object({
   turnoverYear1: nonNegNumericString,

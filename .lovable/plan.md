@@ -1,24 +1,26 @@
-## Update turnover amount fields in Financial step
+## Prevent negative turnover values in Financial step
 
 **File:** `src/components/vendor/steps/FinancialStep.tsx`
 
+### Problem
+Even though `type="number"` has `min={0}` and `-`/`+`/`e` keys are blocked, users can still paste negative values or use browser spinner in some cases, and the current sanitizer (`sanitizeNonNegNumeric`) only strips non-digit/dot characters — it silently drops the `-` sign but the raw form value can still hold negatives via other paths. No visible error appears; the field just accepts `-20000`.
+
 ### Changes
-1. **Relabel** the three turnover fields from `Turnover FY YYYY-YY` to `Turnover FY YYYY-YY (₹)` and change placeholder from `Enter Amount in Lakhs` to `Enter Amount in Rupees` (e.g. 100000).
-2. **Validation:** keep non-negative numeric; allow decimals and any magnitude ≥ 0 (already supported by `nonNegNumericString` — no schema change needed).
-3. **Live lakhs preview:** below each turnover input, render small helper text `≈ ₹X.XX Lakhs` when a valid value > 0 is entered. Format with 2-decimal precision using `value / 100000`. Show nothing when empty/0.
-4. Keep the `₹` prefix icon inside the input.
-5. No change to `creditPeriodExpected` field.
-6. No backend/schema change — the value is stored as-is (string) in `FinancialDetails`. Downstream consumers currently treat it as lakhs; since we're switching semantics to rupees, we will:
-   - Leave the stored value as raw rupees (what the user typed).
-   - Since these fields are informational-only (no calculations elsewhere), no other file needs updating.
 
-### Preview format helper (inline)
-```ts
-const toLakhsPreview = (v?: string) => {
-  const n = Number(v);
-  if (!v || !isFinite(n) || n <= 0) return '';
-  return `≈ ₹${(n / 100000).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Lakhs`;
-};
-```
+1. **Harden the sanitizer** — `sanitizeNonNegNumeric` will also strip leading `-` explicitly and clamp any parsed negative to empty string, guaranteeing the stored value is always `""` or `>= 0`.
 
-Rendered as `<p className="text-xs text-muted-foreground">{toLakhsPreview(watch('turnoverYear1'))}</p>` under each input.
+2. **Add per-field validation state** — track a `turnoverErrors` object (`{ turnoverYear1?: string; turnoverYear2?: string; turnoverYear3?: string }`) in `useState`.
+
+3. **Detect negative input attempts** — in `numericFieldProps.onChange`, if the raw input string starts with `-` or parses to a negative number, set the error message for that field:
+   > "Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed."
+   
+   Clear the error as soon as a valid non-negative value is entered.
+
+4. **Render inline error** — below each of the 3 turnover inputs (and the lakhs preview), show the error in `text-destructive text-xs` when present. Preview and error are mutually exclusive (error takes priority).
+
+5. **Also apply to `creditPeriodExpected`** — same negative guard (it's already numeric non-negative).
+
+6. **Schema** — tighten `nonNegNumericString` to also reject a leading `-` explicitly (belt-and-suspenders); the regex already does but we'll add a `.refine` to reject `Number(v) < 0` for defensive parsing.
+
+### No changes to
+- Field labels, placeholders, lakhs preview helper, backend, or other steps.
