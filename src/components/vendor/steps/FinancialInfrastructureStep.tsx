@@ -89,16 +89,7 @@ interface FinancialInfrastructureStepProps {
 export function FinancialInfrastructureStep({ financialData, infrastructureData, qhseData, tenantId: _tenantId, onNext }: FinancialInfrastructureStepProps) {
   const [dealershipCertificateFile, setDealershipCertificateFile] = useState<File | null>(financialData.dealershipCertificateFile);
   const [financialDocsFile, setFinancialDocsFile] = useState<File | null>(financialData.financialDocsFile);
-  const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>(() => {
-    const initialErrors: Record<string, string | undefined> = {};
-    (['turnoverYear1', 'turnoverYear2', 'turnoverYear3', 'creditPeriodExpected'] as const).forEach((field) => {
-      const value = financialData[field];
-      if (typeof value === 'string' && value.trim().startsWith('-')) {
-        initialErrors[field] = field === 'creditPeriodExpected' ? CREDIT_PERIOD_NEGATIVE_MSG : NEGATIVE_MSG;
-      }
-    });
-    return initialErrors;
-  });
+  const [amountErrors, setAmountErrors] = useState<Record<string, string | undefined>>({});
   
   const defaultValues: CombinedFormData = {
     ...financialData,
@@ -158,14 +149,14 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
       if (text && isNegativeAmount(text)) {
         e.preventDefault();
         setAmountErrors((previous) => ({ ...previous, [name]: getNegativeMessage(name) }));
-        setValue(name, '', { shouldValidate: true, shouldDirty: true });
+        setValue(name, '', { shouldValidate: false, shouldDirty: true });
       }
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
       const isNegative = isNegativeAmount(raw);
       setAmountErrors((previous) => ({ ...previous, [name]: isNegative ? getNegativeMessage(name) : undefined }));
-      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: true, shouldDirty: true });
+      setValue(name, isNegative ? '' : sanitizeNonNegNumeric(raw), { shouldValidate: false, shouldDirty: true });
     },
   });
 
