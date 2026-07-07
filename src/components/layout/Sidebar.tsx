@@ -192,8 +192,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
 
       {/* Navigation */}
       <nav className={cn(
-        "sidebar-scroll flex-1 space-y-1 overflow-y-auto py-2",
-        collapsed ? "px-2" : "px-3"
+        "sidebar-scroll flex-1 space-y-0.5 overflow-y-auto py-2",
+        collapsed ? "px-2" : "px-2"
       )}>
         {filteredItems.map((item) => {
           const isActive = location.pathname === item.href;
@@ -204,10 +204,10 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               key={item.href}
               to={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 group relative',
-                collapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5',
+                'flex items-center gap-3 rounded-md text-sm font-medium transition-all duration-200 group relative',
+                collapsed ? 'justify-center p-2.5 mx-0' : 'justify-between px-3 py-2 mx-1',
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
               )}
             >
@@ -215,19 +215,16 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                 "flex items-center gap-3",
                 collapsed && "justify-center"
               )}>
-                <Icon className={cn(
-                  "h-4 w-4 flex-shrink-0 transition-transform duration-200",
-                  !collapsed && isActive && "scale-110"
-                )} />
+                <Icon className="h-4 w-4 flex-shrink-0" />
                 {!collapsed && <span className="truncate">{item.label}</span>}
               </div>
-              {!collapsed && isActive && <ChevronRight className="h-4 w-4 flex-shrink-0" />}
               {/* Active indicator for collapsed state */}
               {collapsed && isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-sidebar-primary-foreground rounded-r-full" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r-full" />
               )}
             </Link>
           );
+
 
           if (collapsed) {
             return (
