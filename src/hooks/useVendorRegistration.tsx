@@ -355,7 +355,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     const intlJoinedAddr = [intlAddrLine1, intlAddrLine2, intlAddrLine3, intlAddrLine4].filter(Boolean).join(', ');
     const intlAddr = intlJoinedAddr || intl?.company.companyAddress || '';
     const intlCity = intl?.company.city || '';
-    const intlState = intl?.company.state || '';
+    const intlState = '';
     const intlPin = intl?.company.pincode || '';
     const intlCountry = intl?.company.country || '';
     const intlRegion = intl?.company.region || '';
