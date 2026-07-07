@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const SVC = "sync-vendors-to-sap-bulk";
-const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v1";
+const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v2";
 
 function ok(body: any) {
   return new Response(JSON.stringify(body), {
@@ -21,19 +21,21 @@ function fail(message: string, extra: Record<string, any> = {}) {
   return ok({ success: false, message, ACC_RES: [], ...extra });
 }
 
-function normalizeWholdtax(overrides: any, vendorCountry: string) {
+function normalizeWholdtax(overrides: any, vendorCountry: string, lifnr = "") {
   const wt = Array.isArray(overrides?.withholding) ? overrides.withholding : [];
+  const resolvedLifnr = String(lifnr ?? "").trim();
   return wt
     .map((r: any) => {
       const witht = String(r?.witht ?? r?.WITHT ?? "").trim();
       if (!witht) return null;
       const wtWithcd = String(r?.wt_withcd ?? r?.WT_WITHCD ?? "").trim();
       const rawSubject = r?.wt_subjct ?? r?.WT_SUBJCT;
-      const subject = rawSubject === true || String(rawSubject || "").trim().toUpperCase() === "X";
+      const subjectText = String(rawSubject || "").trim().toUpperCase();
+      const subject = rawSubject === true || rawSubject === 1 || ["X", "Y", "YES", "TRUE", "1"].includes(subjectText);
       const qsrec = String(r?.qsrec ?? r?.QSREC ?? "").trim();
       const qland = String(r?.qland ?? r?.QLAND ?? vendorCountry ?? "IN").trim().toUpperCase();
       return {
-        LIFNR: "",
+        LIFNR: resolvedLifnr,
         WITHT: witht,
         WT_WITHCD: wtWithcd,
         WT_SUBJCT: subject ? "X" : "",
@@ -44,9 +46,9 @@ function normalizeWholdtax(overrides: any, vendorCountry: string) {
     .filter(Boolean);
 }
 
-function applyFinalWholdtax(row: any, overrides: any, vendorCountry: string) {
+function applyFinalWholdtax(row: any, overrides: any, vendorCountry: string, lifnr = "") {
   if (!row || typeof row !== "object") return [];
-  const wholdtax = normalizeWholdtax(overrides, vendorCountry);
+  const wholdtax = normalizeWholdtax(overrides, vendorCountry, lifnr);
   row.WHOLDTAX = wholdtax;
   delete row.wholdtax;
   return wholdtax;
@@ -174,7 +176,8 @@ serve(async (req) => {
       const { classify: _drop, wholdtax: _dropWt, ...rest } = row || {};
 
       const vendorCountry = String((vendor as any)?.country || "IN").toUpperCase();
-      const WHOLDTAX = normalizeWholdtax(overrides, vendorCountry);
+      const lifnr = String(vendor?.sap_vendor_code || row?.LIFNR || row?.lifnr || "").trim();
+      const WHOLDTAX = normalizeWholdtax(overrides, vendorCountry, lifnr);
 
       return {
         ...rest,
@@ -201,7 +204,8 @@ serve(async (req) => {
     const finalWholdtaxRows = enriched.map((row: any, i: number) => {
       const vendor = (vendors || []).find((v: any) => v.id === vendorIds[i]);
       const vendorCountry = String((vendor as any)?.country || "IN").toUpperCase();
-      return applyFinalWholdtax(row, overrides, vendorCountry);
+      const lifnr = String(vendor?.sap_vendor_code || row?.LIFNR || row?.lifnr || "").trim();
+      return applyFinalWholdtax(row, overrides, vendorCountry, lifnr);
     });
     console.log(JSON.stringify({
       svc: SVC,

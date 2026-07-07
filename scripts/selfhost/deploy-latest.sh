@@ -71,7 +71,7 @@ if [[ $SKIP_FN -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
     rsync -a "$SOURCE_DIR/supabase/functions/_shared/" "$FN_DST/_shared/"
   fi
   echo ">> Verifying WHOLDTAX final-boundary fix in deployed functions"
-  grep -R "wholdtax-final-boundary" "$FN_DST/sync-vendor-to-sap" "$FN_DST/sync-vendors-to-sap-bulk" >/dev/null \
+  grep -R "wholdtax-final-boundary-v2" "$FN_DST/sync-vendor-to-sap" "$FN_DST/sync-vendors-to-sap-bulk" >/dev/null \
     && echo "   WHOLDTAX fix marker found" \
     || { echo "ERROR: WHOLDTAX fix marker missing from deployed functions"; exit 1; }
   echo ">> Restarting functions container"
