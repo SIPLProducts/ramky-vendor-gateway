@@ -513,7 +513,7 @@ export default function SAPSync() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
-                          <Eye className="h-4 w-4 mr-2" />View
+                          <Eye className="h-4 w-4 mr-2" />View Details
                         </Button>
                         <Button variant="outline" className="rounded-xl" onClick={() => setPreviewVendorId(vendor.id)}>
                           <FileText className="h-4 w-4 mr-2" />Preview
@@ -723,7 +723,7 @@ export default function SAPSync() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
-                            <Eye className="h-4 w-4 mr-2" />View
+                            <Eye className="h-4 w-4 mr-2" />View Details
                           </Button>
                         </div>
                       </div>
