@@ -510,9 +510,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       gst_jurisdiction_state: formData.statutory.gstJurisdictionState || null,
       pan: formData.statutory.pan || null,
       pan_holder_name: formData.statutory.panHolderName || null,
-      pan_status: formData.statutory.panStatus ?? null,
-      pan_aadhaar_linked: formData.statutory.panAadhaarLinked ?? null,
-      pan_comprehensive_verified_at: formData.statutory.panComprehensiveVerifiedAt ?? null,
+      // Preserve saved PAN Comprehensive values — don't overwrite with null on edit-save
+      ...(formData.statutory.panStatus != null ? { pan_status: formData.statutory.panStatus } : {}),
+      ...(formData.statutory.panAadhaarLinked != null ? { pan_aadhaar_linked: formData.statutory.panAadhaarLinked } : {}),
+      ...(formData.statutory.panComprehensiveVerifiedAt != null ? { pan_comprehensive_verified_at: formData.statutory.panComprehensiveVerifiedAt } : {}),
       pf_number: formData.statutory.pfNumber || null,
       esi_number: formData.statutory.esiNumber || null,
       is_msme_registered: formData.statutory.isMsmeRegistered,
