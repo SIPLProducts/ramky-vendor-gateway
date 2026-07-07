@@ -87,6 +87,7 @@ type ResolverCtx = {
   classify: Record<string, any>;
   uploads: any[];
   isMsme: boolean;
+  wt?: Record<string, any>;
 };
 
 function getPath(obj: any, path: string): any {
@@ -400,19 +401,39 @@ export async function buildSapPayload(
       VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
     };
     delete (row as any).classify;
-    // WHOLDTAX — populated from SAP Field Confirmation dialog (overrides.withholding)
+    // WHOLDTAX — populated from SAP Field Confirmation dialog (overrides.withholding).
+    // If the template provides a WHOLDTAX array with a single mapping template,
+    // use it to render one entry per withholding row (configurable via SAP API
+    // Settings → SAP Payload Template). Otherwise fall back to the fixed shape.
     delete (row as any).wholdtax;
     const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
-    row.WHOLDTAX = wt
-      .filter((r: any) => r && String(r.witht || "").trim())
-      .map((r: any) => ({
+    const wtRows = wt.filter((r: any) => r && String(r.witht || "").trim());
+    const vendorCountryForWt = String((vendorForPayload as any)?.country || "IN").toUpperCase();
+
+    const tplWhold: any = (row as any).WHOLDTAX;
+    if (Array.isArray(tplWhold) && tplWhold.length > 0 && typeof tplWhold[0] === "object") {
+      const mapTpl = tplWhold[0];
+      row.WHOLDTAX = wtRows.map((r: any) => {
+        const wtCtx = {
+          witht: String(r.witht || "").trim(),
+          wt_withcd: String(r.wt_withcd || "").trim(),
+          wt_subjct: r.wt_subjct ? "X" : "",
+          wt_subjct_flag: r.wt_subjct ? "X" : "",
+          qsrec: String(r.qsrec || "").trim(),
+          qland: String(r.qland || vendorCountryForWt || "").trim(),
+        };
+        return resolveTemplate(mapTpl, { ...ctx, wt: wtCtx } as any);
+      });
+    } else {
+      row.WHOLDTAX = wtRows.map((r: any) => ({
         LIFNR: "",
         WITHT: String(r.witht || "").trim(),
-        WT_WITHCD: String(r.wt_withcd ?? r.witht ?? "").trim(),
+        WT_WITHCD: String(r.wt_withcd || "").trim(),
         WT_SUBJCT: r.wt_subjct ? "X" : "",
-        QSREC: String(r.qsrec ?? "OT").trim(),
-        QLAND: String(r.qland || "").trim(),
+        QSREC: String(r.qsrec || "").trim(),
+        QLAND: String(r.qland || vendorCountryForWt || "").trim(),
       }));
+    }
     row.UPLOAD = [];
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();

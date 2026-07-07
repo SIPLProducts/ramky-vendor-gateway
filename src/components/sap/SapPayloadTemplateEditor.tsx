@@ -82,7 +82,12 @@ export function SapPayloadTemplateEditor() {
               <code className="text-xs bg-muted px-1 rounded">{"{{override.key|default:X}}"}</code>,{" "}
               <code className="text-xs bg-muted px-1 rounded">{"{{classify.MGV|upper}}"}</code>,{" "}
               <code className="text-xs bg-muted px-1 rounded">{"{{region(vendor.registered_state)}}"}</code>,{" "}
-              <code className="text-xs bg-muted px-1 rounded">{"{{uploads}}"}</code>.
+              <code className="text-xs bg-muted px-1 rounded">{"{{uploads}}"}</code>,{" "}
+              <code className="text-xs bg-muted px-1 rounded">{"{{wt.witht}}"}</code>,{" "}
+              <code className="text-xs bg-muted px-1 rounded">{"{{wt.wt_withcd}}"}</code>,{" "}
+              <code className="text-xs bg-muted px-1 rounded">{"{{wt.wt_subjct_flag}}"}</code>,{" "}
+              <code className="text-xs bg-muted px-1 rounded">{"{{wt.qsrec}}"}</code>,{" "}
+              <code className="text-xs bg-muted px-1 rounded">{"{{wt.qland}}"}</code> (WHOLDTAX per-row mapping).
             </p>
           </div>
           <div className="flex gap-2 shrink-0">

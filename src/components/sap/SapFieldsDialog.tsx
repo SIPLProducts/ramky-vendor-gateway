@@ -996,11 +996,13 @@ function WithholdingTaxSection({
         onRetry={onRetry}
         onSelect={(opt) => {
           if (openIdx === null) return;
-          const current = rows[openIdx];
           updateRow(openIdx, {
             witht: opt.TAXTYPE,
             text40: opt.TEXT40,
-            wt_withcd: current?.wt_withcd || opt.TAXTYPE,
+            wt_withcd: '',
+            wt_withcd_desc: '',
+            qsrec: '',
+            qsrec_desc: '',
             qland: opt.LAND1 || country,
           });
           setOpenIdx(null);
