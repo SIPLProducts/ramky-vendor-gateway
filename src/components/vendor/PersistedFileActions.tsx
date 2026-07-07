@@ -85,7 +85,7 @@ export function PersistedFileActions({
         ) : (
           <Eye className="h-3.5 w-3.5 mr-1" />
         )}
-        View
+        View Details
       </Button>
       <Button
         type="button"

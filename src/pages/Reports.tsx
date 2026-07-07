@@ -345,7 +345,7 @@ function AllVendorsTable({ rows, onView }: { rows: VendorReportRow[]; onView: (r
                 <TableCell><Badge variant={statusVariant(r.final_status)}>{r.final_status}</Badge></TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm" onClick={() => onView(r.reference_number)}>
-                    <Eye className="h-4 w-4 mr-1" /> View
+                    <Eye className="h-4 w-4 mr-1" /> View Details
                   </Button>
                 </TableCell>
               </TableRow>
