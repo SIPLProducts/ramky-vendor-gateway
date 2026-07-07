@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const SVC = "sync-vendors-to-sap-bulk";
+const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v1";
+
 function ok(body: any) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -16,6 +19,47 @@ function ok(body: any) {
 
 function fail(message: string, extra: Record<string, any> = {}) {
   return ok({ success: false, message, ACC_RES: [], ...extra });
+}
+
+function normalizeWholdtax(overrides: any, vendorCountry: string) {
+  const wt = Array.isArray(overrides?.withholding) ? overrides.withholding : [];
+  return wt
+    .map((r: any) => {
+      const witht = String(r?.witht ?? r?.WITHT ?? "").trim();
+      if (!witht) return null;
+      const wtWithcd = String(r?.wt_withcd ?? r?.WT_WITHCD ?? "").trim();
+      const rawSubject = r?.wt_subjct ?? r?.WT_SUBJCT;
+      const subject = rawSubject === true || String(rawSubject || "").trim().toUpperCase() === "X";
+      const qsrec = String(r?.qsrec ?? r?.QSREC ?? "").trim();
+      const qland = String(r?.qland ?? r?.QLAND ?? vendorCountry ?? "IN").trim().toUpperCase();
+      return {
+        LIFNR: "",
+        WITHT: witht,
+        WT_WITHCD: wtWithcd,
+        WT_SUBJCT: subject ? "X" : "",
+        QSREC: qsrec,
+        QLAND: qland || "IN",
+      };
+    })
+    .filter(Boolean);
+}
+
+function applyFinalWholdtax(row: any, overrides: any, vendorCountry: string) {
+  if (!row || typeof row !== "object") return [];
+  const wholdtax = normalizeWholdtax(overrides, vendorCountry);
+  row.WHOLDTAX = wholdtax;
+  delete row.wholdtax;
+  return wholdtax;
+}
+
+function summarizeWholdtax(rows: any[]) {
+  return (rows || []).map((r: any) => ({
+    WITHT: r?.WITHT || "",
+    WT_WITHCD: r?.WT_WITHCD || "",
+    WT_SUBJCT: r?.WT_SUBJCT || "",
+    QSREC: r?.QSREC || "",
+    QLAND: r?.QLAND || "",
+  }));
 }
 
 function parseHostRewrites(): { from: string; to: string }[] {
@@ -72,6 +116,12 @@ serve(async (req) => {
     if (!Array.isArray(sapPayload) || sapPayload.length === 0) {
       return fail("sapPayload (array) is required");
     }
+    console.log(JSON.stringify({
+      svc: SVC,
+      stage: "version",
+      version: WHOLDTAX_FINAL_NORMALIZE_VERSION,
+      vendorCount: vendorIds.length,
+    }));
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -123,19 +173,8 @@ serve(async (req) => {
 
       const { classify: _drop, wholdtax: _dropWt, ...rest } = row || {};
 
-      // WHOLDTAX — rebuild from shared overrides.withholding so stale
-      // frontend bundles or legacy templates can't send empty rows to SAP.
-      const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
-      const wtRows = wt.filter((r: any) => r && String(r?.witht || "").trim());
       const vendorCountry = String((vendor as any)?.country || "IN").toUpperCase();
-      const WHOLDTAX = wtRows.map((r: any) => ({
-        LIFNR: "",
-        WITHT: String(r.witht || "").trim(),
-        WT_WITHCD: String(r.wt_withcd || "").trim(),
-        WT_SUBJCT: r.wt_subjct ? "X" : "",
-        QSREC: String(r.qsrec || "").trim(),
-        QLAND: String(r.qland || vendorCountry || "IN").trim(),
-      }));
+      const WHOLDTAX = normalizeWholdtax(overrides, vendorCountry);
 
       return {
         ...rest,
@@ -156,6 +195,22 @@ serve(async (req) => {
         IDCATG: vendor?.msme_major_activity ? String(vendor.msme_major_activity) : "",
       };
     });
+
+    // Final WHOLDTAX boundary: overwrite stale/blank client/template rows on
+    // every outgoing row immediately before the SAP request is prepared.
+    const finalWholdtaxRows = enriched.map((row: any, i: number) => {
+      const vendor = (vendors || []).find((v: any) => v.id === vendorIds[i]);
+      const vendorCountry = String((vendor as any)?.country || "IN").toUpperCase();
+      return applyFinalWholdtax(row, overrides, vendorCountry);
+    });
+    console.log(JSON.stringify({
+      svc: SVC,
+      stage: "wholdtax.final",
+      version: WHOLDTAX_FINAL_NORMALIZE_VERSION,
+      selectedRows: Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding.length : 0,
+      rowsPerVendor: finalWholdtaxRows.map((rows: any[]) => rows.length),
+      rows: summarizeWholdtax(finalWholdtaxRows[0] || []),
+    }));
 
     // Resolve SAP API config (proxy/middleware)
     const { data: configs } = await supabase
