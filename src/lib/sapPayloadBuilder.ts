@@ -401,42 +401,27 @@ export async function buildSapPayload(
       VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
     };
     delete (row as any).classify;
-    // WHOLDTAX — populated from SAP Field Confirmation dialog (overrides.withholding).
-    // If the template provides a WHOLDTAX array with a single mapping template,
-    // use it to render one entry per withholding row (configurable via SAP API
-    // Settings → SAP Payload Template). Otherwise fall back to the fixed shape.
-    // Note: the edge functions (sync-vendor-to-sap / sync-vendors-to-sap-bulk)
-    // also re-normalize WHOLDTAX from overrides.withholding, so stale frontend
-    // builds or legacy stored templates can never leak empty rows to SAP.
+    // WHOLDTAX is generated only from SAP Field Confirmation dialog selections.
+    // Stored templates often contain blank placeholder rows; never reuse those
+    // rows because they can overwrite the selected WTax values before sync.
     delete (row as any).wholdtax;
     const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
-    const wtRows = wt.filter((r: any) => r && String(r.witht || "").trim());
+    const wtRows = wt.filter((r: any) => r && String(r.witht ?? r.WITHT ?? "").trim());
     const vendorCountryForWt = String((vendorForPayload as any)?.country || "IN").toUpperCase();
-
-    const tplWhold: any = (row as any).WHOLDTAX;
-    if (Array.isArray(tplWhold) && tplWhold.length > 0 && typeof tplWhold[0] === "object") {
-      const mapTpl = tplWhold[0];
-      row.WHOLDTAX = wtRows.map((r: any) => {
-        const wtCtx = {
-          witht: String(r.witht || "").trim(),
-          wt_withcd: String(r.wt_withcd || "").trim(),
-          wt_subjct: r.wt_subjct ? "X" : "",
-          wt_subjct_flag: r.wt_subjct ? "X" : "",
-          qsrec: String(r.qsrec || "").trim(),
-          qland: String(r.qland || vendorCountryForWt || "").trim(),
-        };
-        return resolveTemplate(mapTpl, { ...ctx, wt: wtCtx } as any);
-      });
-    } else {
-      row.WHOLDTAX = wtRows.map((r: any) => ({
-        LIFNR: "",
-        WITHT: String(r.witht || "").trim(),
-        WT_WITHCD: String(r.wt_withcd || "").trim(),
-        WT_SUBJCT: r.wt_subjct ? "X" : "",
-        QSREC: String(r.qsrec || "").trim(),
-        QLAND: String(r.qland || vendorCountryForWt || "").trim(),
-      }));
-    }
+    const lifnrForWt = String((vendorForPayload as any)?.sap_vendor_code || (row as any).LIFNR || (row as any).lifnr || "").trim();
+    row.WHOLDTAX = wtRows.map((r: any) => {
+      const rawSubject = r?.wt_subjct ?? r?.WT_SUBJCT;
+      const subjectText = String(rawSubject || "").trim().toUpperCase();
+      const isSubject = rawSubject === true || rawSubject === 1 || ["X", "Y", "YES", "TRUE", "1"].includes(subjectText);
+      return {
+        LIFNR: lifnrForWt,
+        WITHT: String(r.witht ?? r.WITHT ?? "").trim(),
+        WT_WITHCD: String(r.wt_withcd ?? r.WT_WITHCD ?? "").trim(),
+        WT_SUBJCT: isSubject ? "X" : "",
+        QSREC: String(r.qsrec ?? r.QSREC ?? "").trim(),
+        QLAND: String(r.qland ?? r.QLAND ?? vendorCountryForWt ?? "IN").trim().toUpperCase() || "IN",
+      };
+    });
     row.UPLOAD = [];
     row.idtype = "SOLMN1";
     row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
