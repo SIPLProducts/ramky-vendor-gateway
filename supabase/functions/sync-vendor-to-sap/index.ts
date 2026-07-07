@@ -437,7 +437,26 @@ serve(async (req) => {
       row.idtype2 = "ZMSMEN";
       row.idnum2 = effMsmeNo ? String(effMsmeNo).slice(0, 20) : "";
       row.IDCATG = effMsmeAct ? String(effMsmeAct) : "";
-      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "uploads: 0 (DMS handled separately)");
+
+      // WHOLDTAX — always rebuild from overrides.withholding so stale frontend
+      // bundles or legacy stored templates can't leak empty rows to SAP.
+      {
+        const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
+        const wtRows = wt.filter((r: any) => r && String(r?.witht || "").trim());
+        const vendorCountry = isIntl
+          ? (intlCountry || "IN")
+          : String((vendor as any)?.country || "IN").toUpperCase();
+        row.WHOLDTAX = wtRows.map((r: any) => ({
+          LIFNR: "",
+          WITHT: String(r.witht || "").trim(),
+          WT_WITHCD: String(r.wt_withcd || "").trim(),
+          WT_SUBJCT: r.wt_subjct ? "X" : "",
+          QSREC: String(r.qsrec || "").trim(),
+          QLAND: String(r.qland || vendorCountry || "IN").trim(),
+        }));
+        delete (row as any).wholdtax;
+      }
+      console.log("Using client-supplied SAP payload, topLevelKeys:", Object.keys(row).length, "WHOLDTAX rows:", Array.isArray(row.WHOLDTAX) ? row.WHOLDTAX.length : 0);
     } else {
       // Legacy path: resolve template server-side.
       const mergedOverrides: Record<string, any> = { ...(overrides || {}) };
