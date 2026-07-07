@@ -1,34 +1,33 @@
 ## Problem
 
-In SAP Sync, the Withholding Tax "Search" icon does not reveal any data. Investigation shows the edge function `sap-fetch-withholding-tax` is working and returns 134 SAP records (keys `LAND1`, `TAXTYPE`, `TEXT40`). The failure is on the client in `SapFieldsDialog.tsx`:
-
-1. The search button is `disabled={options.length === 0}`, and `options` = `wtFiltered` (records where `LAND1 === vendorCountry`). If the vendor's resolved country doesn't match any row (e.g. missing/blank country for an international vendor, or `IN` records not yet loaded when the popover is opened), the button is inert and the user sees nothing happen.
-2. Even when it opens, the popover shows no loading / error / empty state, so a failed fetch is invisible.
-3. Field-name matching is strict-case; harmless today but brittle.
+The WTax Type "Search" icon currently opens a `Popover` inside the SAP Field Confirmation dialog. The requirement is a **separate modal popup** (like SAP Field Confirmation) that appears on top, always calls the `Fetch_Withholding_TaxType` API, and stays open until the user selects a record or explicitly closes it.
 
 ## Fix — `src/components/sap/SapFieldsDialog.tsx` only
 
-**Search button**
-- Always enable the Search icon; open the popover regardless of options length.
+### 1. New `WithholdingTaxSearchDialog` component
+A standalone modal Dialog (using shadcn `Dialog`) with:
+- **Header:** "Withholding Tax Type Search" + subtitle "Select a withholding tax type for country {LAND1}".
+- **Body:**
+  - Status line: "N entries found for {country}" (or "N entries — showing all countries" fallback).
+  - Loading spinner state / Error state with Retry button (re-invokes `sap-fetch-withholding-tax`).
+  - Search input (filters by TAXTYPE / TEXT40 / LAND1).
+  - Scrollable table with columns: **WTax Type | Description (TEXT40) | Country (LAND1)**, styled like SAP F4 helper (matches screenshot 2).
+  - Rows are clickable; single-click selects.
+- **Footer:** Cancel button only. Dialog closes only via Cancel (X), ESC, or record selection — never by clicking outside the parent dialog's overlay.
+- Uses `onOpenChange` guarded so backdrop-click still works (standard Dialog behaviour), but no auto-close on data load / re-render.
 
-**Popover contents (mimic SAP F4 helper in screenshot 2)**
-- Header row inside the popover: "Withholding Tax Type — N Entries found" (shows filtered count / total).
-- While loading: spinner + "Loading withholding tax types…".
-- On error: red inline message with the edge-function error text and a "Retry" button that re-invokes `sap-fetch-withholding-tax`.
-- When the country filter yields zero rows but the full list is non-empty: show all rows and a subtle note "No entries for country {X} — showing all".
-- CommandList rendered as a compact two/three-column layout: **WTax Type** | **Name (TEXT40)** | **Country (LAND1)**, matching the SAP lookup style.
-- Increase popover width (e.g. `w-[520px]`) and cap list height with scroll.
+### 2. Wire-up in `WithholdingTaxSection`
+- Remove the per-row `Popover` + `Command` block around the Search icon.
+- Search icon button opens `WithholdingTaxSearchDialog` for the active row index.
+- On select: populate `witht` = TAXTYPE, `text40` = TEXT40, default `wt_withcd` = TAXTYPE if empty, `qland` = LAND1 or vendor country. Then close the search dialog.
+- Search button is always enabled — clicking always opens the new dialog, which triggers a fetch if data isn't already loaded (or was previously errored).
 
-**Data handling**
-- Normalize incoming records to `{ LAND1, TAXTYPE, TEXT40 }` case-insensitively (accept `Land1`/`land1`, etc.) before storing in `wtAll`.
-- Compute `wtFiltered` as before; expose both `wtFiltered` and `wtAll` to the section so the popover can gracefully fall back.
-- Keep on-select behaviour: populate `witht`, `text40`, default `wt_withcd` to TAXTYPE, and set `qland` from the row's LAND1 (or vendor country).
-
-**Vendor country resolution** (unchanged behaviour, hardened)
-- Domestic → `IN`.
-- International → first non-empty of `international_data.company.country`, `international_data.address.country`, `country`, uppercased and trimmed.
+### 3. Data source (unchanged)
+- Continue using existing `fetchWtTypes` (calls `sap-fetch-withholding-tax` edge function).
+- `wtAll` / `wtFiltered` state stays in `SapFieldsDialog` and is passed as props to the new search dialog.
+- Country resolution logic unchanged.
 
 ## Out of scope
-- No edge-function changes (already returns correct records).
-- No payload-builder or MultipleSapSyncDialog changes.
-- No new tables or migrations.
+- No edge-function changes.
+- No changes to payload builder, MultipleSapSyncDialog, or the SAP Field Confirmation dialog itself.
+- No schema/migration changes.
