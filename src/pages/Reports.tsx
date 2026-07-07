@@ -23,6 +23,7 @@ import {
 } from '@/lib/reports/loadVendorReport';
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 
 
 type ReportType = 'vendor' | 'approval' | 'both';
