@@ -1166,4 +1166,215 @@ function WithholdingTaxSearchDialog({
   );
 }
 
+function WithholdingTaxCodeSearchDialog({
+  open, onOpenChange, country, witht, all, loading, error, onRetry, onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  country: string;
+  witht: string;
+  all: WTaxCodeOption[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onSelect: (opt: WTaxCodeOption) => void;
+}) {
+  const [query, setQuery] = useState('');
+  useEffect(() => { if (open) setQuery(''); }, [open]);
+
+  const filtered = all.filter(
+    (r) =>
+      String(r.LAND1 || '').toUpperCase() === country.toUpperCase() &&
+      String(r.WITHT || '').toUpperCase() === witht.toUpperCase(),
+  );
+  const q = query.trim().toLowerCase();
+  const list = q
+    ? filtered.filter((o) => `${o.WT_WITHCD} ${o.TCDESC} ${o.WITHT}`.toLowerCase().includes(q))
+    : filtered;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            Withholding Tax Code Search
+          </DialogTitle>
+          <DialogDescription>
+            Select a WTax Code for country {country || '—'} and WTax Type {witht || '—'}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {loading ? 'Loading…' : `${list.length} ${list.length === 1 ? 'entry' : 'entries'} found`}
+          </div>
+          <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onRetry} disabled={loading}>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Refresh'}
+          </Button>
+        </div>
+
+        <Input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search WTax Code / description…"
+          className="h-9"
+        />
+
+        <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : error && all.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-sm text-destructive px-4 text-center">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+              <Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry</Button>
+            </div>
+          ) : list.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              No WTax Codes found for country {country || '—'} and WTax Type {witht || '—'}.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 sticky top-0">
+                <tr className="text-left">
+                  <th className="px-3 py-2 font-medium w-[120px]">WTax Code</th>
+                  <th className="px-3 py-2 font-medium">Description</th>
+                  <th className="px-3 py-2 font-medium w-[100px]">WTax Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((opt, i) => (
+                  <tr
+                    key={`${opt.WT_WITHCD}-${opt.WITHT}-${opt.LAND1}-${i}`}
+                    className="border-t border-border cursor-pointer hover:bg-accent/50"
+                    onClick={() => onSelect(opt)}
+                  >
+                    <td className="px-3 py-2 font-semibold">{opt.WT_WITHCD}</td>
+                    <td className="px-3 py-2">{opt.TCDESC}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{opt.WITHT}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RecTypeSearchDialog({
+  open, onOpenChange, country, witht, all, loading, error, onRetry, onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  country: string;
+  witht: string;
+  all: RecTypeOption[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onSelect: (opt: RecTypeOption) => void;
+}) {
+  const [query, setQuery] = useState('');
+  useEffect(() => { if (open) setQuery(''); }, [open]);
+
+  const filtered = all.filter(
+    (r) =>
+      String(r.LAND1 || '').toUpperCase() === country.toUpperCase() &&
+      String(r.WITHT || '').toUpperCase() === witht.toUpperCase(),
+  );
+  const q = query.trim().toLowerCase();
+  const list = q
+    ? filtered.filter((o) => `${o.QSREC} ${o.RCTXT} ${o.WITHT}`.toLowerCase().includes(q))
+    : filtered;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            Recipient Type Search
+          </DialogTitle>
+          <DialogDescription>
+            Select a Rec.Type for country {country || '—'} and WTax Type {witht || '—'}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {loading ? 'Loading…' : `${list.length} ${list.length === 1 ? 'entry' : 'entries'} found`}
+          </div>
+          <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onRetry} disabled={loading}>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Refresh'}
+          </Button>
+        </div>
+
+        <Input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search Rec.Type / description…"
+          className="h-9"
+        />
+
+        <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : error && all.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-sm text-destructive px-4 text-center">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+              <Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry</Button>
+            </div>
+          ) : list.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              No Rec.Types found for country {country || '—'} and WTax Type {witht || '—'}.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 sticky top-0">
+                <tr className="text-left">
+                  <th className="px-3 py-2 font-medium w-[100px]">Rec.Type</th>
+                  <th className="px-3 py-2 font-medium">Description</th>
+                  <th className="px-3 py-2 font-medium w-[100px]">WTax Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((opt, i) => (
+                  <tr
+                    key={`${opt.QSREC}-${opt.WITHT}-${opt.LAND1}-${i}`}
+                    className="border-t border-border cursor-pointer hover:bg-accent/50"
+                    onClick={() => onSelect(opt)}
+                  >
+                    <td className="px-3 py-2 font-semibold">{opt.QSREC}</td>
+                    <td className="px-3 py-2">{opt.RCTXT}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{opt.WITHT}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 
