@@ -121,7 +121,22 @@ serve(async (req) => {
           : toArr(vendor?.tier_category),
       };
 
-      const { classify: _drop, ...rest } = row || {};
+      const { classify: _drop, wholdtax: _dropWt, ...rest } = row || {};
+
+      // WHOLDTAX — rebuild from shared overrides.withholding so stale
+      // frontend bundles or legacy templates can't send empty rows to SAP.
+      const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
+      const wtRows = wt.filter((r: any) => r && String(r?.witht || "").trim());
+      const vendorCountry = String((vendor as any)?.country || "IN").toUpperCase();
+      const WHOLDTAX = wtRows.map((r: any) => ({
+        LIFNR: "",
+        WITHT: String(r.witht || "").trim(),
+        WT_WITHCD: String(r.wt_withcd || "").trim(),
+        WT_SUBJCT: r.wt_subjct ? "X" : "",
+        QSREC: String(r.qsrec || "").trim(),
+        QLAND: String(r.qland || vendorCountry || "IN").trim(),
+      }));
+
       return {
         ...rest,
         CLASSIFY: {
@@ -132,6 +147,7 @@ serve(async (req) => {
           CASHFLOW:              wrap(classifyArrays.CASH, "CASH"),
           VENCATEGORY:           wrap(classifyArrays.TIER, "VENCAT"),
         },
+        WHOLDTAX,
         UPLOAD: [],
         idtype: "SOLMN1",
         idnum: refNo,
