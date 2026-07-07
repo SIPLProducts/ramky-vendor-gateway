@@ -74,6 +74,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const [wtAll, setWtAll] = useState<Array<{ LAND1: string; TAXTYPE: string; TEXT40: string }>>([]);
   const [wtLoading, setWtLoading] = useState(false);
   const [wtError, setWtError] = useState<string | null>(null);
+  const [wtcAll, setWtcAll] = useState<Array<{ LAND1: string; WITHT: string; WT_WITHCD: string; TCDESC: string }>>([]);
+  const [wtrAll, setWtrAll] = useState<Array<{ LAND1: string; WITHT: string; QSREC: string; RCTXT: string }>>([]);
+  const [wtcLoading, setWtcLoading] = useState(false);
+  const [wtcError, setWtcError] = useState<string | null>(null);
   const refreshMaster = useRefreshSapMaster();
   const { data: vendorLocRows } = useSapMasterData('vendor_location');
 
