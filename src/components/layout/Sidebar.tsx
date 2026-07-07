@@ -204,12 +204,13 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               key={item.href}
               to={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-md text-sm font-medium transition-all duration-200 group relative',
+                'flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 group relative',
                 collapsed ? 'justify-center p-2.5 mx-0' : 'justify-between px-3 py-2 mx-1',
                 isActive
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
               )}
+
             >
               <div className={cn(
                 "flex items-center gap-3",
