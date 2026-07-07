@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { PdfPreview } from '@/components/vendor/PdfPreview';
 
 interface VendorDocument {
   id: string;
