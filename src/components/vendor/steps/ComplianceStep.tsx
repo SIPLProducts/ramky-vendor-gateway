@@ -139,7 +139,12 @@ export function ComplianceStep({
 
   const [activeTab, setActiveTab] = useState<'gst' | 'pan' | 'msme' | 'bank'>('gst');
   const [panTabResult, setPanTabResult] = useState<PanTabResult>({
-    ocrPan: '', ocrName: '', panCheck: 'idle', nameCheck: 'idle',
+    ocrPan: data.pan || '',
+    ocrName: (data as any).panHolderName || '',
+    panCheck: 'idle',
+    nameCheck: 'idle',
+    panStatus: (data as any).panStatus ?? null,
+    aadhaarLinked: (data as any).panAadhaarLinked ?? null,
   });
 
   const {
