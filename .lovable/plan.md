@@ -1,83 +1,35 @@
-## Diagnosis
+## Plan
 
-Your attached payload proves two things:
+1. **Confirm the failing boundary**
+   - Treat the attached request as the evidence: `overrides.withholding` contains the selected values, but `sapPayload[0].WHOLDTAX` contains empty rows.
+   - This means the table selection is preserved, but the payload builder/template path is producing or carrying blank `WHOLDTAX` rows before the SAP call.
 
-1. The **SAP Sync popup is saving withholding correctly** — `overrides.withholding` has both rows (W2/P2/CO/IN and W7/W8/OT/IN). Nothing is broken on the UI side.
-2. The **client-built `sapPayload[0].WHOLDTAX` is empty** — because the built frontend on the server is still using the old builder / old stored SAP payload template that emits blank WHOLDTAX rows.
+2. **Make backend mapping authoritative**
+   - In `sync-vendor-to-sap`, add a single shared `normalizeWholdtax(overrides, vendorCountry)` helper.
+   - Apply it immediately before the final SAP/middleware request, after all client payload/template processing.
+   - This guarantees the outgoing payload uses:
+     - `WITHT` ← `overrides.withholding[].witht`
+     - `WT_WITHCD` ← `overrides.withholding[].wt_withcd`
+     - `WT_SUBJCT` ← `X` when selected
+     - `QSREC` ← `overrides.withholding[].qsrec`
+     - `QLAND` ← selected row country or vendor country
+   - Remove any lowercase/legacy `wholdtax` key and overwrite stale blank `WHOLDTAX` rows.
 
-The current codebase in this repo already contains the correct server-side protection: `supabase/functions/sync-vendor-to-sap/index.ts` (lines 441–458 and 579–596) rebuilds `WHOLDTAX` from `overrides.withholding` and ignores the empty rows in the client payload before forwarding to the middleware/SAP.
+3. **Mirror the same safeguard for bulk SAP sync**
+   - Ensure `sync-vendors-to-sap-bulk` uses the same final normalization pattern so multiple-vendor sync cannot send blank withholding rows either.
 
-So if the server were running the latest edge function code, the outgoing SAP request would contain your W2/W7 rows even though the client payload has blanks.
+4. **Add safe runtime diagnostics**
+   - Log only non-sensitive WHOLDTAX diagnostics in the backend function: selected row count and final mapped codes.
+   - Add a small version marker log so the server can prove it is running the updated function code.
 
-**Root cause on the server:** the edge function `sync-vendor-to-sap` on `206.1.23.95:9009` is running an older build. The fix is a deployment step, not a code change.
+5. **Verify deployment path**
+   - Update/confirm the self-host deploy script copies latest functions and restarts the functions container.
+   - Provide exact server verification commands to confirm the deployed function contains the WHOLDTAX normalization and the container has restarted.
 
-## What you need to do (no new code changes required)
+6. **Validation expected result**
+   - With the attached payload, the final outgoing SAP payload should contain:
+     - `WITHT: W7`, `WT_WITHCD: W8`, `WT_SUBJCT: X`, `QSREC: CO`, `QLAND: IN`
+     - `WITHT: W2`, `WT_WITHCD: P2`, `WT_SUBJCT: X`, `QSREC: OT`, `QLAND: IN`
 
-### Step 1 — Redeploy edge functions on the self-hosted server
-
-SSH into the server and run the existing deploy script from the latest checked-out repo:
-
-```bash
-cd /path/to/latest/repo   # the repo that contains this fixed code
-sudo bash scripts/selfhost/deploy-latest.sh --skip-frontend --skip-migrations
-```
-
-This does exactly what's needed:
-- `rsync` `supabase/functions/` → `/opt/Ramky_Applications/DEV/VMS/backend/volumes/functions/`
-- `docker compose restart functions`
-
-### Step 2 — Verify the deployed function actually contains the WHOLDTAX rebuild
-
-```bash
-grep -n "WHOLDTAX — always rebuild from overrides.withholding" \
-  /opt/Ramky_Applications/DEV/VMS/backend/volumes/functions/sync-vendor-to-sap/index.ts
-```
-
-You should see **two matches** (lines ~441 and ~579). If you see zero matches, the rsync didn't pick up the new file — re-run Step 1 from the correct repo path.
-
-### Step 3 — Confirm the container restarted with the new code
-
-```bash
-docker compose -f /opt/Ramky_Applications/DEV/VMS/backend/docker-compose.yml \
-  restart functions
-docker compose -f /opt/Ramky_Applications/DEV/VMS/backend/docker-compose.yml \
-  logs --tail=50 functions
-```
-
-### Step 4 — Re-test SAP Sync from the server UI
-
-Open the SAP Field Confirmation popup, add the same two withholding rows, click Sync to SAP, then check the function logs:
-
-```bash
-docker compose -f /opt/Ramky_Applications/DEV/VMS/backend/docker-compose.yml \
-  logs -f functions | grep -i "WHOLDTAX rows"
-```
-
-You should see: `Using client-supplied SAP payload, topLevelKeys: XX WHOLDTAX rows: 2`
-
-The outgoing SAP payload will now contain:
-
-```json
-"WHOLDTAX": [
-  { "LIFNR": "", "WITHT": "W2", "WT_WITHCD": "P2", "WT_SUBJCT": "X", "QSREC": "CO", "QLAND": "IN" },
-  { "LIFNR": "", "WITHT": "W7", "WT_WITHCD": "W8", "WT_SUBJCT": "X", "QSREC": "OT", "QLAND": "IN" }
-]
-```
-
-### Step 5 (optional but recommended) — Rebuild & deploy the frontend too
-
-To also fix the client-built payload shown in browser DevTools (so it's not misleading during future debugging):
-
-```bash
-cd /path/to/latest/repo
-sudo bash scripts/selfhost/deploy-latest.sh --skip-migrations
-```
-
-This runs `npm run build` and copies `dist/` into nginx. The frontend is not required for the SAP fix (the backend already rebuilds WHOLDTAX), but it makes browser Network tab match what actually gets sent to SAP.
-
-## Summary
-
-- **No code changes needed** — this repo already has the fix.
-- **The server is running old edge function code.** Redeploy edge functions and restart the `functions` container using `scripts/selfhost/deploy-latest.sh --skip-frontend --skip-migrations`.
-- Verify with the `grep` + logs commands above.
-- Optionally rebuild the frontend so the browser payload also shows the correct WHOLDTAX values.
+## Technical note
+The frontend already sends the selected withholding values under `overrides.withholding`. The fix is to make the backend ignore stale/blank `sapPayload[0].WHOLDTAX` and rebuild `WHOLDTAX` from `overrides.withholding` at the final server-side boundary before SAP is called.
