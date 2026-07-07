@@ -367,7 +367,13 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
               loading={wtLoading}
               error={wtError}
               onRetry={fetchWtTypes}
+              taxcodesAll={wtcAll}
+              rectypesAll={wtrAll}
+              codeLoading={wtcLoading}
+              codeError={wtcError}
+              onCodeRetry={fetchWtCodesRectypes}
             />
+
 
             <Separator />
 
