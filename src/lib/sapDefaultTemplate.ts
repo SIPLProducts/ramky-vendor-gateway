@@ -114,7 +114,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
       district: "",
       due_digi: "",
       house_no: "",
-      location: "",
+      location: "{{vendor.registered_state|trunc:40}}",
       taxnumxl: "{{vendor.gstin|trunc:20}}",
       j_1ipanno: "{{vendor.pan|trunc:10}}",
       partn_cat: "{{override.partn_cat|default:2}}",
