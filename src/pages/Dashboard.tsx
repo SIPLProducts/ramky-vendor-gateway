@@ -231,10 +231,11 @@ export default function Dashboard() {
     <div className="space-y-5">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-[32px] font-bold tracking-tight text-foreground leading-tight">Dashboard</h1>
+          <p className="text-[15px] text-muted-foreground mt-1.5">
             Vendor applications summary for the selected date range.
           </p>
+
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
