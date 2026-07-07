@@ -228,18 +228,19 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-5">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Vendor applications summary for the selected date range.
           </p>
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="from" className="text-xs text-muted-foreground">From</Label>
+            <Label htmlFor="from" className="text-xs font-medium text-muted-foreground">From</Label>
+
             <Input
               id="from"
               type="date"
