@@ -121,15 +121,17 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
   };
 
   const handlePreview = async (doc: VendorDocument) => {
-    const url = await getSignedUrl(doc.file_path);
-    if (url) {
-      setPreviewUrl(url);
-      setPreviewDoc(doc);
-      return;
-    }
+    // Prefer a same-origin blob: URL so Microsoft Edge / SmartScreen doesn't
+    // block the embedded PDF iframe from a foreign Storage origin.
     const blob = await downloadBlob(doc.file_path);
     if (blob) {
       setPreviewUrl(URL.createObjectURL(blob));
+      setPreviewDoc(doc);
+      return;
+    }
+    const url = await getSignedUrl(doc.file_path);
+    if (url) {
+      setPreviewUrl(url);
       setPreviewDoc(doc);
       return;
     }
@@ -139,6 +141,7 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
       variant: 'destructive',
     });
   };
+
 
   const triggerBrowserDownload = (href: string, fileName: string) => {
     const a = document.createElement('a');
