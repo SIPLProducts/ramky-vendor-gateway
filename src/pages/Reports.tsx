@@ -60,7 +60,9 @@ function fmt(d: string | null | undefined): string {
   try { return new Date(d).toLocaleString(); } catch { return d; }
 }
 
-function fmtValue(v: any): string {
+function fmtValue(v: any, key?: string): string {
+  if (key === 'pan_aadhaar_linked') return formatAadhaarLinked(v as any) ?? '';
+  if (key === 'pan_status') return formatPanStatus(v as any) ?? '';
   if (v === null || v === undefined || v === '') return '';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   return String(v);
