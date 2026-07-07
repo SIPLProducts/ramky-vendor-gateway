@@ -1,21 +1,16 @@
-## Sidebar selection + card polish
+Make the active dashboard KPI card use the same 1px green border treatment as the active sidebar item.
 
-### 1. Sidebar selected item (`src/components/layout/Sidebar.tsx`)
-Change selected item from solid emerald fill to a **tinted green pill with a green border and green text** — same treatment as a soft "chip":
-- Selected: `bg-primary/10 text-primary border border-primary/30 rounded-lg` (was `bg-primary text-primary-foreground shadow-sm`)
-- Icon inherits `text-primary`.
-- Hover on non-active stays `bg-sidebar-hover`.
-- Collapsed active indicator bar stays the same (already `bg-primary`).
+### Change
 
-### 2. Dashboard KPI cards (`src/pages/Dashboard.tsx`)
-Match the reference exactly:
-- Card container: keep `p-5 rounded-xl border bg-card shadow-card`.
-- Value color: ensure `text-foreground` bold `text-[32px]`.
-- Icon tile: `h-10 w-10 rounded-lg bg-primary/10 text-primary` (slightly larger, softer green like reference).
-- Add a subtle "vs last month" placeholder row below the value using existing status color tokens — **skipped** since we have no delta data; keep the current single-value layout as-is, only bump icon tile size.
+**File: `src/pages/Dashboard.tsx`**
 
-### 3. Export button (`src/pages/Dashboard.tsx`)
-Already uses default primary variant with rounded-lg + shadow — matches the reference. No change needed unless icon spacing off; keep as-is.
+Update the active state on the clickable KPI cards:
 
-### Not touched
-Vendor Registration, business logic, routes, workflows, hooks.
+- Current: `ring-2 ring-primary border-primary` (creates a 2px focus ring look).
+- Target: `bg-primary/15 text-primary border border-primary/40` to match the selected sidebar item style — 1px green border with a light green tinted background.
+- Keep the light hover shadow and cursor behavior unchanged.
+- Do not touch business logic, data fetching, filtering, the vendor table, or the vendor registration form.
+
+### Visual result
+
+Selected dashboard card will look like the selected sidebar item: a soft green pill/cell with a 1px green border, green text/icon, and a light green background fill. No functional changes.
