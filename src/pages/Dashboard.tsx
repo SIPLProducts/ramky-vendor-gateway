@@ -228,18 +228,18 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-5">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Vendor applications summary for the selected date range.
           </p>
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="from" className="text-xs text-muted-foreground">From</Label>
+            <Label htmlFor="from" className="text-xs font-medium text-muted-foreground">From</Label>
             <Input
               id="from"
               type="date"
@@ -249,7 +249,8 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="to" className="text-xs text-muted-foreground">To</Label>
+            <Label htmlFor="to" className="text-xs font-medium text-muted-foreground">To</Label>
+
             <Input
               id="to"
               type="date"
@@ -282,22 +283,32 @@ export default function Dashboard() {
               onClick={() => toggleFilter(c.key)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
               className={cn(
-                'cursor-pointer transition hover:shadow-md',
+                'cursor-pointer p-5 transition hover:shadow-md',
                 active && 'ring-2 ring-primary border-primary'
               )}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
-                <c.icon className={cn('h-5 w-5', c.color)} />
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <div className="text-3xl font-semibold">{c.value}</div>
-                )}
-              </CardContent>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    {c.label}
+                  </p>
+                  {isLoading ? (
+                    <Skeleton className="mt-2 h-9 w-20" />
+                  ) : (
+                    <div className="mt-1.5 text-[32px] leading-none font-semibold tracking-tight text-foreground">
+                      {c.value}
+                    </div>
+                  )}
+                </div>
+                <div className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0',
+                  c.color
+                )}>
+                  <c.icon className="h-5 w-5" />
+                </div>
+              </div>
             </Card>
+
           );
         })}
       </section>

@@ -104,13 +104,14 @@ export function AppLayout() {
           "flex-1 overflow-auto animate-fade-in",
           // Mobile: Add padding for header and bottom nav
           showMobileLayout && "pt-14 pb-20",
-          // Desktop with sidebar — content padding
-          showDesktopSidebar && "px-4 py-6 lg:px-8 lg:py-8",
+          // Desktop with sidebar — tighter content padding
+          showDesktopSidebar && "px-4 py-4 lg:px-6 lg:py-5",
           // Vendor on any device (true vendor only — not custom-role users)
           isVendor && "p-4 md:p-8",
           // Mobile without sidebar (true vendor only)
           isMobile && isVendor && "px-4"
         )}>
+
           <Outlet />
         </main>
       </div>
