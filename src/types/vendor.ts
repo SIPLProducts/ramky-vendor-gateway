@@ -313,7 +313,6 @@ export interface InternationalCompanyDetails {
   addressLine3: string;
   addressLine4: string;
   city: string;
-  state: string;
   pincode: string;
   officePhone: string;
   fax: string;
