@@ -212,6 +212,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     // Fetch Withholding Tax types via saved SAP API config "Fetch_Withholding_TaxType"
     setWtAll([]);
     fetchWtTypes();
+    // Fetch WTax Code + Rec.Type via "Fetch_Withholding_WTX_Code_REC_Type"
+    setWtcAll([]);
+    setWtrAll([]);
+    fetchWtCodesRectypes();
 
 
     return () => { cancelled = true; window.clearTimeout(slowTimer); };
