@@ -87,6 +87,7 @@ type ResolverCtx = {
   classify: Record<string, any>;
   uploads: any[];
   isMsme: boolean;
+  wt?: Record<string, any>;
 };
 
 function getPath(obj: any, path: string): any {

@@ -143,6 +143,16 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
     LOCATION_VENDOR: [{ LOCV: "{{classify.LOCV|upper}}" }],
     IDENTIFICATION_SOURCE: [{ IDS: "{{classify.IDS|upper}}" }],
   },
+  WHOLDTAX: [
+    {
+      LIFNR: "",
+      WITHT: "{{wt.witht}}",
+      WT_WITHCD: "{{wt.wt_withcd}}",
+      WT_SUBJCT: "{{wt.wt_subjct_flag}}",
+      QSREC: "{{wt.qsrec}}",
+      QLAND: "{{wt.qland}}",
+    },
+  ],
   bank_key: "{{vendor.ifsc_code|trunc:15}}",
   bpartner: "",
   ctrl_key: "",
