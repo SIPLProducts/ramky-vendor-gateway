@@ -1,74 +1,73 @@
+## Updated plan (incorporating your clarifications)
+
+- Item 2 (Vidyasagar buyer dashboard) is dropped — you confirmed it's working now.
+- Item 3 gains a routing rule: when an approval stage is **not selected** (user_id = null and skip = false), the workflow must **skip that stage and move to the next approver**, exactly the same way it does for an explicitly skipped stage.
+
 ## 1. Save & display "Is Aadhaar Linked" everywhere
 
-**Root cause (Preview / View Details shows `-`):**
-In `src/components/vendor/steps/DocumentVerificationStep.tsx` (line ~1948), the PAN block that builds the payload for the parent form (`out.pan = ...`) only runs when `panDoc.status === "verified"`. But the PAN Comprehensive result (`status`, `aadhaar_linked`) is also captured from a fire-and-forget call and stored on `panDoc.apiData` / `panDoc.ocrData` before the doc reaches `verified`, and `out.panAadhaarLinked` uses `??` which is correct for `false` but the update is only pushed on step transition. The stored `apiData.aadhaarLinked` also isn't re-mapped when the parent later re-hydrates a saved draft, so a fresh session shows `-` on Review.
+**Save path** — the DB column `vendors.pan_aadhaar_linked` already exists, and `useVendorRegistration.finalize` already writes `formData.statutory.panAadhaarLinked`. The gap is that when the PAN Comprehensive result resolves, the value must always propagate into `formData.statutory` before submit, so drafts and re-hydrated sessions keep it.
 
-The `pan_aadhaar_linked` DB column already exists and `useVendorRegistration.finalize` already writes `formData.statutory.panAadhaarLinked`. The gap is:
-- The value is not always propagated into `formData.statutory` before the vendor is submitted (only on stage-navigation).
-- Some display screens don't use the shared `formatAadhaarLinked` helper.
+Fixes:
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` — after each PAN Comprehensive resolution (around lines 852 and 882), ensure the `apiData` written on `panDoc` includes `panStatus` + `aadhaarLinked` (already done), and continue persisting to `vendors` when `vendorId` exists (already done). Add a safety net that also pushes the value through `onStageChange` immediately, not only on the next reactive render.
+- `src/hooks/useVendorRegistration.tsx` — verify `pan_aadhaar_linked` is written in `finalize()` (already true, keep).
 
-**Fix**
-- In `DocumentVerificationStep.tsx`, whenever the PAN Comprehensive result resolves (both branches around lines 852 and 882), also call `onDataChange({ panStatus, panAadhaarLinked })` immediately so the parent `formData.statutory` is updated in real time (mirroring how `PanKycTab` already persists via `onComprehensiveResult`).
-- Also fire an immediate `supabase.from('vendors').update({...})` when a `vendorId` exists (already done) and additionally when the vendor row is first created — no schema change needed.
-- Confirm `finalize()` in `useVendorRegistration.tsx` keeps writing `pan_aadhaar_linked` (already does — verify only).
+**Display audit** — add "PAN Status" and "Is Aadhaar Linked" rows using the shared `formatAadhaarLinked` / `formatPanStatus` helpers everywhere PAN details are shown.
 
-**Display audit (add "Is Aadhaar Linked" using `formatAadhaarLinked` where missing):**
-Already present:
-- `VendorList` view details (`src/pages/VendorList.tsx` line 654)
-- `VendorReviewDialog` preview (line 598)
-- `DocumentVerification` page (line 776)
-- `FinanceReview` (line 394)
-- `PurchaseApproval` (line 422)
-- `ReviewStep` registration preview (line 217)
-- `Reports` export column (line 464)
+Already correct:
+- `ReviewStep` (registration Review), `VendorList` (View Details), `VendorReviewDialog` (approvals + SAP Sync View Details), `DocumentVerification` page, `FinanceReview`, `PurchaseApproval`, `Reports` export.
 
-Screens to update (add the row if missing / switch to `formatAadhaarLinked`):
-- `src/components/approvals/StageApprovalView.tsx` — vendor review drawer/dialog (Buyer / SCM CO / SCM Head / Finance / CEO approval screens all use this). Add "PAN Status" and "Is Aadhaar Linked" rows in the PAN details section.
-- `src/pages/SAPSync.tsx` — the SAP Sync preview / details drawer. Add both rows in the PAN section.
-- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — submission preview PAN block.
-- `src/pages/Reports.tsx` — table view (currently only in export). Add column or details row.
-- Any other component rendering PAN details discovered during implementation (grep `pan_holder_name` / `PAN Holder Name`).
+Screens to update:
+- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — the shared Preview dialog used by Vendor List, SAP Sync, and every approval screen (via `StageApprovalView`). Currently only shows `PAN`; add `PAN Holder Name`, `PAN Status`, `Is Aadhaar Linked` in the Compliance & Statutory section.
+- `src/pages/Reports.tsx` — the on-screen table currently omits both fields (only the CSV export has them). Add "PAN Status" and "Is Aadhaar Linked" columns/rows so the UI matches the export.
 
-All screens will read from `vendors.pan_aadhaar_linked` and render through `formatAadhaarLinked` from `src/lib/panComprehensive.ts` for consistency.
+Because SAP Sync and every approval screen open PAN details through `VendorReviewDialog` + `VendorSubmissionPreviewDialog`, updating just those two components covers SAP Sync View Details/Preview and all approval screens in one change.
 
-## 2. Vidyasagar (Buyer) missing on dashboard
+## 2. Vidyasagar dashboard
 
-Need one clarification: which dashboard is showing incorrect data for Vidyasagar?
-- (a) The **SCM CO approval dashboard** (`/approvals/scm-manager`) — vendors invited by Vidyasagar not appearing for his mapped SCM Manager (Soumendu Kumar Sengupta per screenshot 3).
-- (b) The main **Dashboard** page — Vidyasagar's invited vendors don't show in "Invited By" filter.
-- (c) The **Buyer approval dashboard** (`/approvals/buyer`) when Vidyasagar logs in.
+Dropped — confirmed working.
 
-I'll investigate the specific path once confirmed. Most likely fix is in `usePendingApprovalsByStage` / `list-pending-approvals-by-stage` edge function or the `buyer_approval_flows` lookup that resolves Vidyasagar's SCM Mgr to Soumendu — the query probably joins on the wrong id or filters out mappings where certain slots are null.
+## 3. Approval Matrix — "not selected" must skip forward
 
-## 3. Approval Matrix "skipped" shown when nothing was selected
+**Root cause of the mislabelling:** in `src/components/admin/ApprovalMatrixConfig.tsx` the summary table (line ~450) currently prints "skipped" whenever `skip_<stage> = true` in the DB. Existing rows (e.g. Viplava's SCM Head / Finance 2) have `skip = true` written explicitly, so the label is technically correct, but the label is misleading vs. an unselected stage. There is no auto-toggle in the current save path — `handleSave` spreads `flow` which is initialised to all `skip_* = false`; the DB column defaults are also `false`.
 
-**Root cause:** In `src/components/admin/ApprovalMatrixConfig.tsx`, the "Configured Buyers" summary table (line ~450) renders:
-```
-skipped ? "skipped" : uid ? name : "—"
-```
-The `skipped` flag comes from `buyer_approval_flows.skip_<stage>`. Somewhere the skip flag is being written as `true` even when the admin did not toggle the skip switch — most likely in the save path (`handleSave` around line 238) when the user picks no approver, or in a legacy migration default. Result: rows like Viplava M / Srinagaraju show "skipped" for stages the admin never intentionally skipped.
+**Fixes**
 
-**Fix**
-- In `handleSave`, when a stage has `user_id = null` AND the admin did not explicitly toggle skip, write `skip_<stage> = false` (not `true`). Only send `skip_<stage> = true` when the switch is on.
-- In the summary table cell renderer, change semantics to:
-  - `skipped === true` → "skipped"
-  - `uid` set → approver name
-  - else → "—" (not selected)
+A. Display in `ApprovalMatrixConfig.tsx`
+- Keep the tri-state cell renderer:
+  - `skip = true` → "skipped"
+  - `user_id` set → approver name
+  - otherwise → "—"
 
-So "skipped" is only shown when the admin explicitly checked the Skip toggle for that stage. Stages left blank display "—".
+B. Routing (the important change) — treat "not selected" the same as "skipped"
+- Edge function and DB routine that iterates the stages (`supabase/migrations/20260608080354_*.sql` — `route-vendor-approval` / pending-approvals query at lines 65-83) currently uses:
+  ```
+  IF v_flow.scm_head_user_id IS NOT NULL AND NOT v_flow.skip_scm_head THEN
+      queue stage
+  ```
+  A stage with `user_id = null` and `skip = false` is silently ignored, which stalls the chain.
+- Update the condition (across every stage in that function and any sibling functions/edge functions that iterate the flow — `route-vendor-approval`, `list-pending-approvals-by-stage`, `useVendorApprovalChain`) to:
+  ```
+  IF v_flow.<stage>_user_id IS NOT NULL AND NOT v_flow.skip_<stage> THEN
+      queue stage       -- run it
+  ELSE
+      skip to next      -- both "explicitly skipped" and "not selected" fall through
+  ```
+- Effect: whether a stage is toggled "Skip" or simply left unselected, the workflow advances to the next configured approver in the same way. CEO Office stays governed by the existing MSME rule.
 
-- Also review the routing logic (`route-vendor-approval` edge function / `useVendorApprovalChain`) so a stage with `skip = false` and `user_id = null` is treated as "not configured" and either falls back to a default approver or blocks with a clear error, instead of silently skipping.
+C. Client-side helpers
+- `src/pages/AdminInvitations.tsx` (line ~471) currently gates the invitation flow on `(!!user_id && !skip)`. Keep the OR chain but simplify: treat any stage where that condition is false as skipped (no user-facing change, just alignment with the new routing rule).
+- `useVendorApprovalChain` (if present under `src/hooks/`) — same alignment.
+
+D. Migration
+- Add a new SQL migration replacing the affected function bodies so the new rule is applied server-side. No schema change.
 
 ## Files to change
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — push `panStatus` / `panAadhaarLinked` to parent immediately after comprehensive call.
-- `src/components/approvals/StageApprovalView.tsx` — add PAN Status / Is Aadhaar Linked rows.
-- `src/pages/SAPSync.tsx` — add PAN Status / Is Aadhaar Linked in preview.
-- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — add rows.
-- `src/pages/Reports.tsx` — add table column (optional) + ensure export uses helper.
-- `src/components/admin/ApprovalMatrixConfig.tsx` — fix skip default in `handleSave` and summary rendering.
-- Whichever dashboard is confirmed for #2 (edge function or hook).
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` — ensure PAN comprehensive result propagates + persists.
+- `src/components/vendor/VendorSubmissionPreviewDialog.tsx` — add PAN Holder Name / PAN Status / Is Aadhaar Linked rows.
+- `src/pages/Reports.tsx` — add PAN Status + Is Aadhaar Linked columns to the on-screen table.
+- `src/components/admin/ApprovalMatrixConfig.tsx` — tri-state renderer for the summary table.
+- `supabase/migrations/<new>.sql` — update the pending-approvals / routing SQL functions so "not selected" behaves like "skipped".
+- Any TS route/chain helper that mirrors that SQL rule.
 
-## Question before build
-
-For item 2, please confirm which dashboard is affected for Vidyasagar (options a/b/c above) so I can target the correct query.
+Approve to build.

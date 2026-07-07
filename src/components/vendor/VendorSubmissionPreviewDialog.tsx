@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
+import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import {
   Building2,
@@ -196,6 +197,9 @@ export function VendorSubmissionPreviewDialog({
                 <SectionHeader icon={FileCheck} title="Compliance & Statutory" />
                 <div className="space-y-1">
                   <DataRow label="PAN" value={vendor.pan} />
+                  <DataRow label="PAN Holder Name" value={vendor.pan_holder_name} />
+                  <DataRow label="PAN Status" value={formatPanStatus((vendor as any).pan_status)} />
+                  <DataRow label="Is Aadhaar Linked" value={formatAadhaarLinked((vendor as any).pan_aadhaar_linked)} />
                   <DataRow label="Entity Type" value={vendor.entity_type} />
                   <DataRow
                     label="GST Registered"
