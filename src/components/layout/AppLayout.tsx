@@ -101,7 +101,7 @@ export function AppLayout() {
         {showDesktopSidebar && <EnterpriseHeader />}
 
         <main className={cn(
-          "flex-1 overflow-auto",
+          "flex-1 overflow-auto animate-fade-in",
           // Mobile: Add padding for header and bottom nav
           showMobileLayout && "pt-14 pb-20",
           // Desktop with sidebar — content padding
