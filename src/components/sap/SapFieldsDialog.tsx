@@ -906,7 +906,148 @@ function WithholdingTaxSection({
       <p className="text-[11px] text-muted-foreground">
         Rows are pushed to SAP as <code>WHOLDTAX</code> entries with LIFNR bound at sync time. QLAND is set to the vendor country ({country || '—'}).
       </p>
+
+      <WithholdingTaxSearchDialog
+        open={openIdx !== null}
+        onOpenChange={(v) => { if (!v) setOpenIdx(null); }}
+        country={country}
+        options={options}
+        allOptions={allOptions}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        onSelect={(opt) => {
+          if (openIdx === null) return;
+          const current = rows[openIdx];
+          updateRow(openIdx, {
+            witht: opt.TAXTYPE,
+            text40: opt.TEXT40,
+            wt_withcd: current?.wt_withcd || opt.TAXTYPE,
+            qland: opt.LAND1 || country,
+          });
+          setOpenIdx(null);
+        }}
+      />
     </div>
   );
 }
+
+function WithholdingTaxSearchDialog({
+  open, onOpenChange, country, options, allOptions, loading, error, onRetry, onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  country: string;
+  options: WTaxOption[];
+  allOptions: WTaxOption[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onSelect: (opt: WTaxOption) => void;
+}) {
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (open) setQuery('');
+  }, [open]);
+
+  const filteredEmpty = options.length === 0 && allOptions.length > 0;
+  const baseList = filteredEmpty ? allOptions : options;
+
+  const q = query.trim().toLowerCase();
+  const list = q
+    ? baseList.filter((o) =>
+        `${o.TAXTYPE} ${o.TEXT40} ${o.LAND1}`.toLowerCase().includes(q),
+      )
+    : baseList;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            Withholding Tax Type Search
+          </DialogTitle>
+          <DialogDescription>
+            Select a withholding tax type{country ? ` for country ${country}` : ''}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {loading
+              ? 'Loading…'
+              : `${list.length} ${list.length === 1 ? 'entry' : 'entries'} found${filteredEmpty ? ' — showing all countries' : country ? ` for ${country}` : ''}`}
+          </div>
+          {(error || !loading) && (
+            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onRetry} disabled={loading}>
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Refresh'}
+            </Button>
+          )}
+        </div>
+
+        <Input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search WTax Type / description / country…"
+          className="h-9"
+        />
+
+        <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading withholding tax types…
+            </div>
+          ) : error && baseList.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-sm text-destructive px-4 text-center">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+              <Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry</Button>
+            </div>
+          ) : list.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              No withholding tax types found.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 sticky top-0">
+                <tr className="text-left">
+                  <th className="px-3 py-2 font-medium w-[110px]">WTax Type</th>
+                  <th className="px-3 py-2 font-medium">Description</th>
+                  <th className="px-3 py-2 font-medium w-[90px]">Country</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((opt) => (
+                  <tr
+                    key={`${opt.TAXTYPE}-${opt.LAND1}`}
+                    className="border-t border-border cursor-pointer hover:bg-accent/50"
+                    onClick={() => onSelect(opt)}
+                  >
+                    <td className="px-3 py-2 font-semibold">{opt.TAXTYPE}</td>
+                    <td className="px-3 py-2">{opt.TEXT40}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{opt.LAND1}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {filteredEmpty && (
+          <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+            No entries for country {country || '—'}. Showing all countries.
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
