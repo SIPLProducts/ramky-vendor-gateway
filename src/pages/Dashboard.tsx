@@ -357,8 +357,11 @@ export default function Dashboard() {
                 ) : (
                   filteredVendors.map((v) => (
                     <TableRow key={v.id}>
-                      <TableCell className="font-mono text-[13px] font-semibold text-foreground">
-                        <Link to={`/vendors/${v.id}`} className="hover:text-primary transition-colors">
+                      <TableCell>
+                        <Link
+                          to={`/vendors/${v.id}`}
+                          className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[13px] font-semibold text-primary hover:bg-primary/15 transition-colors"
+                        >
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
