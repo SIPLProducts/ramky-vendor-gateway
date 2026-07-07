@@ -1,74 +1,53 @@
-## Goal
-Fix both reported issues across the vendor flow:
+## Root cause
 
-1. `Is Aadhaar Linked` must be saved from PAN Comprehensive Validation and displayed consistently everywhere.
-2. Vendor submission must not fail because of non-critical post-submit logging/routing checks, and the actual error must be clearer if a required submit update fails.
+Local (Lovable) sends the correct `WHOLDTAX` array; the self-hosted server sends two empty rows. That difference is produced entirely by the **browser** — the edge function currently trusts whatever `sapPayload` the client posts and only re-normalizes `CLASSIFY`, never `WHOLDTAX`.
 
-## Findings
-- The database already has `vendors.pan_aadhaar_linked` as a nullable boolean.
-- Several screens already read `pan_aadhaar_linked`, but formatting is inconsistent: some places show `-` for null, while the requested behavior is `false/null → Aadhaar Not Linked with PAN`.
-- PAN Comprehensive parsing misses common response shapes such as nested `data.data`, `raw.response.data`, and string values like `Y/N`, `seeded/not seeded` in some paths.
-- In the new Step-1 document flow, PAN Comprehensive persistence currently writes `pan_aadhaar_linked: null` when parsing cannot find a value, which can erase a previously saved value.
-- Vendor submission includes non-critical writes after the main status update, especially audit logging/progress checks. If those fail due to permissions or server policy, the user can see `Submission Failed` even though the vendor row may already have been submitted.
+Two things combine on your server:
 
-## Implementation Plan
+1. **Stale frontend build.** The current `src/lib/sapPayloadBuilder.ts` (lines 404–436) overwrites `row.WHOLDTAX` from `overrides.withholding` before sending. The server's built frontend predates that logic, so it emits the template's static `WHOLDTAX` (two empty rows) instead.
+2. **Legacy stored template.** `sap_payload_templates.template.WHOLDTAX` on that server still contains two hardcoded empty entries. That is why you see *exactly two* empty rows in the SAP request — it's the template shape, not user input.
 
-### 1. Make Aadhaar-linked formatting match the requirement
-Update `src/lib/panComprehensive.ts`:
-- `true` → `Aadhaar Linked with PAN`
-- `false`, `null`, `undefined` → `Aadhaar Not Linked with PAN`
-- Keep PAN status formatting unchanged unless the source explicitly says invalid.
+Locally both are already up-to-date, so it works.
 
-This automatically fixes display in Preview, View Details, approval screens, Document Verification, Reports UI, and SAP Sync Preview where they use the shared helper.
+## Fix
 
-### 2. Strengthen PAN Comprehensive value extraction
-Update both PAN flows:
-- `src/components/vendor/kyc/PanKycTab.tsx`
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+Make the edge function the source of truth for `WHOLDTAX`, so it is correct even when the deployed frontend or stored template is stale. Then rebuild the frontend on the server.
 
-Changes:
-- Parse Aadhaar-linked from more provider response shapes:
-  - `aadhaar_linked`, `aadhaarLinked`, `aadhaar_seeding`, `aadhaar_seeding_status`, `aadhaar_linked_with_pan`
-  - nested `data.data`, `raw.data`, `raw.response.data`
-  - values like `Y`, `N`, `yes`, `no`, `linked`, `not linked`, `seeded`, `not seeded`
-- Only persist `pan_aadhaar_linked` when the API returns a definitive boolean.
-- If the API does not return the field, do not overwrite an existing saved value.
-- Still display null as “Aadhaar Not Linked with PAN” per your requirement.
+### 1. `supabase/functions/sync-vendor-to-sap/index.ts` — client-supplied branch (~L381–440)
 
-### 3. Preserve false values correctly through form state
-Update form merge/save logic where needed:
-- Ensure `false` is treated as a real saved value, not as empty/missing.
-- Keep `panAadhaarLinked: false` in form state, review screen, save payload, and preview payload.
-- Avoid converting `false` to `null` during edit, save draft, submit, or resubmit.
+After `row = clientPayload[0]`, rebuild `row.WHOLDTAX` from `overrides.withholding` using the same rules as the client builder:
 
-### 4. Normalize exports and reports
-Update export-only formatting paths:
-- `src/pages/VendorList.tsx` CSV export currently returns `-` for null; change it to “Aadhaar Not Linked with PAN”.
-- `src/lib/reports/exportExcel.ts` and `src/lib/reports/exportPdf.ts` currently stringify raw booleans in single-vendor details; format `pan_aadhaar_linked` using the shared helper.
+- Filter to rows where `witht` is truthy.
+- Emit one entry per row:
+  ```
+  {
+    LIFNR: "",
+    WITHT:     String(r.witht).trim(),
+    WT_WITHCD: String(r.wt_withcd || "").trim(),
+    WT_SUBJCT: r.wt_subjct ? "X" : "",
+    QSREC:     String(r.qsrec || "").trim(),
+    QLAND:     String(r.qland || vendorCountry || "IN").trim(),
+  }
+  ```
+- If `overrides.withholding` is missing/empty, set `row.WHOLDTAX = []` (never leave the template's static empties).
+- Delete any lowercase `wholdtax` key.
 
-### 5. Make submission robust against non-critical failures
-Update `src/hooks/useVendorRegistration.tsx`:
-- Keep the main vendor submit update as a hard failure if it fails.
-- Make post-submit audit-log insert non-blocking so an audit permission/server issue does not show `Submission Failed` after the vendor has already moved into review.
-- Keep notification failure non-blocking as it already is.
-- Keep approval-routing warnings visible, but do not throw unless the vendor status update itself fails.
-- Improve the final toast error message by preferring backend `details/hint/code` when present.
+### 2. `supabase/functions/sync-vendors-to-sap-bulk/index.ts` — enrichment loop (~L95)
 
-### 6. Validate after implementation
-After changes:
-- Check TypeScript/build signals.
-- Use the preview/runtime logs and backend logs again for submission errors.
-- Verify source paths show:
-  - PAN tab: Aadhaar value retained.
-  - Preview: Aadhaar value visible.
-  - View Details/SAP Sync Preview/approval screens/reports: same label.
-  - Submit flow: no false failure from audit/logging after the status update.
+Same treatment inside the `sapPayload.map` loop, using each row's `withholding` override (the bulk caller sends the shared `overrides` object; read `withholding` from it and apply per row). Ensure `WHOLDTAX` in the enriched row is always the freshly-built array (or `[]`), never the template's empties.
 
-## Files expected to change
-- `src/lib/panComprehensive.ts`
-- `src/components/vendor/kyc/PanKycTab.tsx`
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-- `src/hooks/useVendorRegistration.tsx`
-- `src/pages/VendorList.tsx`
-- `src/lib/reports/exportExcel.ts`
-- `src/lib/reports/exportPdf.ts`
+### 3. `src/lib/sapPayloadBuilder.ts`
+
+No behavior change; add a short comment noting the server also re-normalizes `WHOLDTAX` so stale client bundles still produce a correct SAP request.
+
+### 4. Server-side follow-ups (surfaced in the reply, not code changes)
+
+- Rebuild and redeploy the **frontend** on the self-hosted server so the client also sends correct `WHOLDTAX` (belt-and-braces).
+- Optionally clean up `sap_payload_templates` on that server: remove the static `WHOLDTAX` block from the stored template so it is always constructed by code.
+
+## Verification
+
+- On the self-hosted server, open SAP Sync, select two withholding rows in the popup, submit.
+- Inspect the outgoing SAP request: `WHOLDTAX` should now contain the selected `WITHT / WT_WITHCD / WT_SUBJCT / QSREC / QLAND`, matching your local example.
+- With zero rows selected, `WHOLDTAX` must be `[]`, not two empty rows.
+- Local behavior unchanged.
