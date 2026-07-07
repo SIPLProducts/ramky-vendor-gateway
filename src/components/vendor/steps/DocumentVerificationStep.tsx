@@ -273,6 +273,15 @@ function normalizeBooleanLike(value: unknown): boolean | null {
   return null;
 }
 
+function pickPrimitiveString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && "value" in (value as Record<string, unknown>)) {
+    return pickPrimitiveString((value as Record<string, unknown>).value);
+  }
+  return "";
+}
+
 function collectPanResponseObjects(source: any): Record<string, any>[] {
   const out: Record<string, any>[] = [];
   const seen = new Set<any>();
@@ -317,8 +326,9 @@ function extractPanComprehensiveFields(result: any): { status: string | null; aa
     }
     if (statusRaw != null && aadhaarLinked !== null) break;
   }
+  const statusText = pickPrimitiveString(statusRaw).trim();
   return {
-    status: statusRaw == null || statusRaw === "" ? null : String(statusRaw),
+    status: statusText || null,
     aadhaarLinked,
   };
 }
