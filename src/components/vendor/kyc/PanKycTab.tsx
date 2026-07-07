@@ -116,18 +116,25 @@ export function PanKycTab(props: PanKycTabProps) {
         if (cr?.ok && cr.data) {
           const rawStatus = pickStr((cr.data as any).status) || null;
           const aadhaarLinked = parseAadhaarLinked(cr.data);
-          updateResult({ panStatus: rawStatus, aadhaarLinked });
+          // Skip if provider returned no definitive values — preserve prior state/DB.
+          if (rawStatus == null && aadhaarLinked == null) return;
+
+          const patch: Partial<PanTabResult> = {};
+          if (rawStatus != null) patch.panStatus = rawStatus;
+          if (aadhaarLinked != null) patch.aadhaarLinked = aadhaarLinked;
+          updateResult(patch);
           props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
 
           // Immediate persistence — don't wait for final registration save.
           if (props.vendorId) {
+            const dbPatch: Record<string, any> = {
+              pan_comprehensive_verified_at: new Date().toISOString(),
+            };
+            if (rawStatus != null) dbPatch.pan_status = rawStatus;
+            if (aadhaarLinked != null) dbPatch.pan_aadhaar_linked = aadhaarLinked;
             supabase
               .from('vendors')
-              .update({
-                pan_status: rawStatus,
-                pan_aadhaar_linked: aadhaarLinked,
-                pan_comprehensive_verified_at: new Date().toISOString(),
-              })
+              .update(dbPatch)
               .eq('id', props.vendorId)
               .then(({ error }) => {
                 if (error) console.warn('[PanKycTab] persist pan_aadhaar_linked failed', error);
