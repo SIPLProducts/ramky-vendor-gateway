@@ -287,23 +287,6 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="city">City <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="city" {...register('city')} placeholder="City" className={errors.city ? 'border-destructive' : ''} />
-              {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="state">State <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="state" {...register('state')} placeholder="State / Province" className={errors.state ? 'border-destructive' : ''} />
-              {errors.state && <p className="text-xs text-destructive">{errors.state.message}</p>}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pincode">PIN Code <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="pincode" {...register('pincode')} placeholder="Postal code" className={errors.pincode ? 'border-destructive' : ''} />
-              {errors.pincode && <p className="text-xs text-destructive">{errors.pincode.message}</p>}
-            </div>
-          </div>
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
