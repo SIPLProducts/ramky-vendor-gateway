@@ -298,9 +298,11 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
               <Label htmlFor="fax">Fax</Label>
               <Input id="fax" {...register('fax')} placeholder="Fax number" className={errors.fax ? 'border-destructive' : ''} />
               {errors.fax && <p className="text-xs text-destructive">{errors.fax.message}</p>}
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
+
 
             <div className="grid gap-1.5">
               <Label>Country (From SAP) <span className="text-destructive ml-0.5">*</span></Label>
