@@ -5,18 +5,26 @@ import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Building2, Loader2, AlertTriangle, RefreshCw, MapPin } from 'lucide-react';
 import { InternationalCompanyDetails } from '@/types/vendor';
 import { supabase } from '@/integrations/supabase/client';
 import { useSapMasterData } from '@/hooks/useSapMasterData';
+import { splitAddressIntoLines } from '@/lib/addressAutoflow';
 
 const schema = z.object({
   companyName: z.string().trim().min(2, 'Company name is required'),
-  companyAddress: z.string().trim().optional().or(z.literal('')),
-  pincode: z.string().trim().min(2, 'Pincode is required'),
+  addressLine1: z.string().trim().min(1, 'Address Line 1 is required').max(40, 'Maximum 40 characters allowed'),
+  addressLine2: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
+  addressLine3: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
+  addressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
+  city: z.string().trim().min(1, 'City is required'),
+  state: z.string().trim().min(1, 'State is required'),
+  pincode: z.string().trim().min(2, 'PIN Code is required'),
+  officePhone: z.string().regex(/^\d{10}$/, '10-digit mobile number required').or(z.literal('')),
+  fax: z.string().optional().or(z.literal('')),
+  companyAddress: z.string().optional().or(z.literal('')),
   country: z.string().trim().min(1, 'Country is required'),
   region: z.string().trim().min(1, 'Region is required'),
   contact1: z.string().regex(/^\d{6,15}$/, 'Enter a valid phone number (digits only)'),
@@ -92,11 +100,41 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
   const selectedCountry = watch('country');
 
   useEffect(() => {
-    const sub = watch((vals) => onLiveUpdate?.(vals as InternationalCompanyDetails));
+    const sub = watch((vals) => {
+      const v = vals as FormValues;
+      const joined = [v.addressLine1, v.addressLine2, v.addressLine3, v.addressLine4]
+        .filter(Boolean).join(', ');
+      onLiveUpdate?.({ ...(v as InternationalCompanyDetails), companyAddress: joined });
+    });
     return () => sub.unsubscribe();
   }, [watch, onLiveUpdate]);
 
-  // Cache fallback (same source that Company Code / Rec-Account rely on in SAP Sync)
+  // Cascade a pre-populated long Address Line 1 into Lines 2-4 on mount.
+  useEffect(() => {
+    const raw = (data as any)?.addressLine1 as string | undefined;
+    if (!raw || raw.length <= 40) return;
+    if ((data as any)?.addressLine2 || (data as any)?.addressLine3 || (data as any)?.addressLine4) return;
+    const [l1, l2, l3, l4] = splitAddressIntoLines(raw);
+    setValue('addressLine1', l1, { shouldValidate: true, shouldDirty: true });
+    setValue('addressLine2', l2, { shouldValidate: true, shouldDirty: true });
+    setValue('addressLine3', l3, { shouldValidate: true, shouldDirty: true });
+    setValue('addressLine4', l4, { shouldValidate: true, shouldDirty: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const handleAddressLine1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const [l1, l2, l3, l4] = splitAddressIntoLines(raw);
+    setValue('addressLine1', l1, { shouldValidate: true, shouldDirty: true });
+    if (raw.length > 40 || l2) {
+      setValue('addressLine2', l2, { shouldValidate: true, shouldDirty: true });
+      setValue('addressLine3', l3, { shouldValidate: true, shouldDirty: true });
+      setValue('addressLine4', l4, { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
+  const addressLine1 = watch('addressLine1');
+
   const { data: cachedCountries, isLoading: cachedCountriesLoading } = useSapMasterData('country');
   const { data: cachedRegions, isLoading: cachedRegionsLoading } = useSapMasterData('region');
 
@@ -157,15 +195,20 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
 
   const countriesFetching = (f4Fetching || cachedCountriesLoading) && !hasCountries;
   const regionsFetching = (f4Fetching || cachedRegionsLoading) && regionsForCountry.length === 0 && !!selectedCountry;
-  // Only surface the red error state when we have nothing to show at all.
   const countriesError = !hasCountries ? f4Error : null;
   const regionsError = !!selectedCountry && regionsForCountry.length === 0 && !regionsFetching ? f4Error : null;
   const retryCountries = fetchF4;
   const retryRegions = fetchF4;
   const countryDisabled = countriesFetching || !hasCountries;
 
+  const submit = (v: FormValues) => {
+    const joined = [v.addressLine1, v.addressLine2, v.addressLine3, v.addressLine4]
+      .filter(Boolean).join(', ');
+    onSubmit({ ...(v as InternationalCompanyDetails), companyAddress: joined });
+  };
+
   return (
-    <form id="step-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form id="step-form" onSubmit={handleSubmit(submit)} className="space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">
           <Building2 className="h-5 w-5 text-primary" />
@@ -195,20 +238,97 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
             <p className="text-xs text-muted-foreground">Assigned by buyer — cannot be changed.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="companyName">Company Name <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="companyName" {...register('companyName')} placeholder="Enter company name" className={errors.companyName ? 'border-destructive' : ''} />
-              {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
-            </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="companyName">Company Name <span className="text-destructive ml-0.5">*</span></Label>
+            <Input id="companyName" {...register('companyName')} placeholder="Enter company name" className={errors.companyName ? 'border-destructive' : ''} />
+            {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
+          </div>
+        </div>
+      </div>
 
+      {/* Address block — mirrors the domestic Registered Address layout */}
+      <div className="form-section">
+        <h3 className="form-section-title">
+          <MapPin className="h-5 w-5 text-primary" />
+          Address
+        </h3>
+
+        <div className="grid gap-5">
+          <div className="grid gap-1.5">
+            <Label htmlFor="addressLine1">Address Line 1 <span className="text-destructive ml-0.5">*</span></Label>
+            <Input
+              id="addressLine1"
+              value={addressLine1 || ''}
+              onChange={handleAddressLine1Change}
+              placeholder="Building name, street address (overflow auto-flows into Lines 2-4)"
+              maxLength={160}
+              className={errors.addressLine1 ? 'border-destructive' : ''}
+            />
+            <p className="text-xs text-muted-foreground">
+              Text beyond 40 characters automatically flows into Address Line 2, 3 and 4.
+            </p>
+            {errors.addressLine1 && <p className="text-xs text-destructive">{errors.addressLine1.message}</p>}
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
-              <Label htmlFor="pincode">Pincode / Postal Code <span className="text-destructive ml-0.5">*</span></Label>
+              <Label htmlFor="addressLine2">Address Line 2</Label>
+              <Input id="addressLine2" {...register('addressLine2')} placeholder="Area, locality" maxLength={40} className={errors.addressLine2 ? 'border-destructive' : ''} />
+              {errors.addressLine2 && <p className="text-xs text-destructive">{errors.addressLine2.message}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="addressLine3">Address Line 3</Label>
+              <Input id="addressLine3" {...register('addressLine3')} placeholder="Landmark" maxLength={40} className={errors.addressLine3 ? 'border-destructive' : ''} />
+              {errors.addressLine3 && <p className="text-xs text-destructive">{errors.addressLine3.message}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="addressLine4">Address Line 4</Label>
+              <Input id="addressLine4" {...register('addressLine4')} placeholder="Additional detail (optional)" maxLength={40} className={errors.addressLine4 ? 'border-destructive' : ''} />
+              {errors.addressLine4 && <p className="text-xs text-destructive">{errors.addressLine4.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="city">City <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="city" {...register('city')} placeholder="City" className={errors.city ? 'border-destructive' : ''} />
+              {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="state">State <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="state" {...register('state')} placeholder="State / Province" className={errors.state ? 'border-destructive' : ''} />
+              {errors.state && <p className="text-xs text-destructive">{errors.state.message}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pincode">PIN Code <span className="text-destructive ml-0.5">*</span></Label>
               <Input id="pincode" {...register('pincode')} placeholder="Postal code" className={errors.pincode ? 'border-destructive' : ''} />
               {errors.pincode && <p className="text-xs text-destructive">{errors.pincode.message}</p>}
             </div>
           </div>
 
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="officePhone">Office Phone</Label>
+              <Input id="officePhone" inputMode="numeric" {...register('officePhone')} placeholder="10-digit mobile number" maxLength={10} className={errors.officePhone ? 'border-destructive' : ''} />
+              {errors.officePhone && <p className="text-xs text-destructive">{errors.officePhone.message}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="fax">Fax</Label>
+              <Input id="fax" {...register('fax')} placeholder="Fax number" className={errors.fax ? 'border-destructive' : ''} />
+              {errors.fax && <p className="text-xs text-destructive">{errors.fax.message}</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SAP Country / Region + primary contacts */}
+      <div className="form-section">
+        <h3 className="form-section-title">
+          <Building2 className="h-5 w-5 text-primary" />
+          Country, Region & Contacts
+        </h3>
+
+        <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label>Country (From SAP) <span className="text-destructive ml-0.5">*</span></Label>
@@ -338,7 +458,6 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
             </div>
           </div>
 
-
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="contact1">Company Contact 1 <span className="text-destructive ml-0.5">*</span></Label>
@@ -350,12 +469,6 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
               <Input id="email1" type="email" {...register('email1')} placeholder="primary@company.com" className={errors.email1 ? 'border-destructive' : ''} />
               {errors.email1 && <p className="text-xs text-destructive">{errors.email1.message}</p>}
             </div>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="companyAddress">Company Address</Label>
-            <Textarea id="companyAddress" rows={3} {...register('companyAddress')} placeholder="Full registered address (optional)" className={errors.companyAddress ? 'border-destructive' : ''} />
-            {errors.companyAddress && <p className="text-xs text-destructive">{errors.companyAddress.message}</p>}
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
