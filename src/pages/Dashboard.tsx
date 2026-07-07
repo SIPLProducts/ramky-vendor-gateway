@@ -284,8 +284,8 @@ export default function Dashboard() {
               onClick={() => toggleFilter(c.key)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
               className={cn(
-                'cursor-pointer p-5 transition hover:shadow-md border',
-                active && 'bg-primary/15 text-primary border-primary/40'
+                'cursor-pointer p-5 transition hover:shadow-md',
+                active && 'ring-2 ring-primary border-primary'
               )}
             >
               <div className="flex items-start justify-between gap-3">
