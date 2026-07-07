@@ -656,7 +656,7 @@ function buildSectionData(d: Record<string, any>) {
         if (consumed.has(key)) continue;
         const v = d[key];
         if (v === null || v === undefined || v === '') continue;
-        entries.push([label, fmtValue(v)]);
+        entries.push([label, fmtValue(v, key)]);
         consumed.add(key);
       }
     }
@@ -668,7 +668,7 @@ function buildSectionData(d: Record<string, any>) {
       if (typeof value === 'object' && !Array.isArray(value)) {
         entries.push([humanize(key), JSON.stringify(value)]);
       } else {
-        entries.push([humanize(key), fmtValue(value)]);
+        entries.push([humanize(key), fmtValue(value, key)]);
       }
       consumed.add(key);
     }
@@ -685,7 +685,7 @@ function buildSectionData(d: Record<string, any>) {
     if (typeof value === 'object') {
       other.push([humanize(key), JSON.stringify(value)]);
     } else {
-      other.push([humanize(key), fmtValue(value)]);
+      other.push([humanize(key), fmtValue(value, key)]);
     }
   }
   if (other.length > 0) {
