@@ -137,6 +137,28 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     }
   };
 
+  const fetchWtCodesRectypes = async () => {
+    setWtcLoading(true);
+    setWtcError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-fetch-wtx-code-rectype', {
+        body: { config_name: 'Fetch_Withholding_WTX_Code_REC_Type' },
+      });
+      if (error) {
+        setWtcError(error.message || 'Failed to load WTax Code / Rec.Type');
+      } else if (data?.success) {
+        setWtcAll(Array.isArray(data.taxcodes) ? data.taxcodes : []);
+        setWtrAll(Array.isArray(data.rectypes) ? data.rectypes : []);
+      } else {
+        setWtcError(data?.message || 'Failed to load WTax Code / Rec.Type');
+      }
+    } catch (e: any) {
+      setWtcError(e?.message || 'Failed to load WTax Code / Rec.Type');
+    } finally {
+      setWtcLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
