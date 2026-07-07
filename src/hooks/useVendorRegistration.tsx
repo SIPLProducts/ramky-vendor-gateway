@@ -793,7 +793,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       },
       international: (vendor as any).international_data ? {
         documents: { registrationCopyFile: null, swiftIbanFile: null },
-        company: (vendor as any).international_data?.company || { companyName: '', companyAddress: '', pincode: '', country: '', region: '', contact1: '', contact2: '', email1: '', email2: '' },
+        company: {
+          companyName: '', addressLine1: '', addressLine2: '', addressLine3: '', addressLine4: '',
+          city: '', state: '', pincode: '', officePhone: '', fax: '',
+          companyAddress: '', country: '', region: '',
+          contact1: '', contact2: '', email1: '', email2: '',
+          ...((vendor as any).international_data?.company || {}),
+        },
         bank: (vendor as any).international_data?.bank || { accountNumber: '', swiftCode: '', companyName: '', bankName: '', bankBranch: '', ibanNumber: '' },
         classification: (vendor as any).international_data?.classification || { materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [] },
       } : undefined,
