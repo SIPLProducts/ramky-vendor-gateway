@@ -1,38 +1,21 @@
 ## Problem
 
-`Import_Doc.pdf` (25 pages, ~2.5 MB, valid PDF 1.7) still fails to open in the preview dialog even after the blob-URL fix, because Microsoft Edge is blocking its built-in PDF viewer from rendering the file inside our iframe. Depending on the tenant's Edge/SmartScreen/Group Policy, the browser's native PDF handler is unreliable — the file is fine, the viewer is the problem.
+`The API version "5.4.296" does not match the Worker version "6.1.200".`
 
-## Fix — render PDFs ourselves with pdf.js
+`react-pdf@10` bundles its own `pdfjs-dist@5.4.x`, but I also installed `pdfjs-dist@6.1.200` and pointed the worker at that version — versions must match exactly.
 
-Stop relying on the browser's PDF plugin. Render pages client-side with `pdf.js` (via `react-pdf`) inside the existing preview dialog. This works identically across Edge, Chrome, Firefox, and Safari, and does not depend on any browser policy.
+## Fix
 
-### Changes
+Load the worker from the same `pdfjs-dist` copy that `react-pdf` uses, and drop the extra top-level `pdfjs-dist` dependency.
 
-1. **Install dependency**
-   - `react-pdf` (bundles `pdfjs-dist`).
-   - Configure the pdf.js worker via a Vite-friendly `?url` import so no `public/` copy is needed.
+1. **`src/components/vendor/PdfPreview.tsx`** — change the worker import to resolve through `react-pdf`'s bundled pdfjs:
+   ```ts
+   import pdfWorker from 'react-pdf/dist/pdf.worker.min.mjs?url';
+   ```
+   (Fallback if that path isn't exported: `import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'` after aligning the version — see step 2.)
 
-2. **New component `src/components/vendor/PdfPreview.tsx`**
-   - Props: `blob: Blob` (preferred) or `url: string`.
-   - Loads the PDF with `<Document file={blob}>`, iterates pages with `<Page pageNumber={n} width={containerWidth} />`.
-   - Toolbar: page counter (`1 / 25`), prev/next, zoom −/+ (0.5x–2x), and a "Download" button (uses signed URL).
-   - Scrollable container capped at `max-h-[70vh]` matching the existing dialog.
-   - Loading spinner + error state ("Could not render PDF, try Download").
-
-3. **`src/components/vendor/VendorDocuments.tsx`**
-   - Keep the blob-first `handlePreview` from the previous fix.
-   - In the Dialog body, replace the `<iframe src={previewUrl}>` branch with `<PdfPreview blob={previewBlob} />`.
-   - Store the downloaded `Blob` in state (`previewBlob`) alongside `previewUrl` so pdf.js gets the bytes directly (no network re-fetch, no iframe).
-   - Images branch unchanged. Non-PDF/non-image fallback unchanged.
-
-4. **`src/components/vendor/PersistedFileActions.tsx`** — no change needed for this fix; "View Details" already opens the blob in a new tab. (Optional follow-up: route "View Details" through the same `PdfPreview` dialog, but out of scope here.)
-
-### Out of scope
-- No changes to upload flow, storage bucket, RLS, SAP payload, or International form.
-- No server / edge-function changes.
+2. **`package.json`** — remove the explicit `pdfjs-dist` dependency so only the version bundled with `react-pdf` is used, avoiding future drift. If step 1's `react-pdf/dist/...` path doesn't exist, keep `pdfjs-dist` but pin it to the version `react-pdf@10` requires (`^5.4.x`) instead of `6.1.x`.
 
 ## Validation
-- Open `Import_Doc.pdf` (25 pages) from the International vendor's Documents card → all pages render, page nav + zoom work.
-- Test in Edge (the browser that was blocking), Chrome, and Firefox.
-- Test a 1-page PDF and a JPG/PNG to confirm no regressions.
-- Confirm dialog cleanup: closing revokes the blob URL (no memory leaks in DevTools).
+- Reopen `Import_Doc.pdf` — all 25 pages render, page nav + zoom work.
+- No console warning about API/Worker version mismatch.
