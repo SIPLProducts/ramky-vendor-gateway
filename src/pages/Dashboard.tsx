@@ -284,13 +284,13 @@ export default function Dashboard() {
               onClick={() => toggleFilter(c.key)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
               className={cn(
-                'cursor-pointer p-5 transition hover:shadow-md',
+                'cursor-pointer p-5 transition hover:shadow-md bg-primary/5 border border-primary/30',
                 active && 'ring-2 ring-primary border-primary'
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-primary truncate">
                     {c.label}
                   </p>
                   {isLoading ? (
@@ -302,8 +302,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0',
-                  c.color
+                  'flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0 text-primary'
                 )}>
                   <c.icon className="h-5 w-5" />
                 </div>
