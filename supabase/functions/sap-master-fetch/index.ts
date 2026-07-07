@@ -412,9 +412,21 @@ serve(async (req) => {
             last_synced_at: now,
           });
         }
+        // Dedupe by code within this master_type — SAP feeds sometimes return
+        // duplicate codes (e.g. recon_account SAKNR), which makes Postgres reject
+        // the whole chunk with "ON CONFLICT DO UPDATE command cannot affect row
+        // a second time". Keep the last occurrence to preserve SAP ordering.
+        const dedupMap = new Map<string, any>();
+        for (const r of rows) dedupMap.set(r.code, r);
+        const uniqueRows = Array.from(dedupMap.values());
+        const removedDupes = rows.length - uniqueRows.length;
+        if (removedDupes > 0) {
+          skipped += removedDupes;
+          trace(reqId, SVC, "dedup", { type: mapping.type, removed: removedDupes });
+        }
         let upserted = 0;
-        for (let i = 0; i < rows.length; i += 500) {
-          const chunk = rows.slice(i, i + 500);
+        for (let i = 0; i < uniqueRows.length; i += 500) {
+          const chunk = uniqueRows.slice(i, i + 500);
           const { error: upErr } = await supabase
             .from("sap_master_data")
             .upsert(chunk, { onConflict: "master_type,code" });

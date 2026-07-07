@@ -1,53 +1,52 @@
+# Fix: SAP F4 dialog error on server — duplicate `recon_account` codes break upsert
+
 ## Root cause
 
-Local (Lovable) sends the correct `WHOLDTAX` array; the self-hosted server sends two empty rows. That difference is produced entirely by the **browser** — the edge function currently trusts whatever `sapPayload` the client posts and only re-normalizes `CLASSIFY`, never `WHOLDTAX`.
+`supabase/functions/sap-master-fetch/index.ts` builds `rows[]` from each SAP F4 array and upserts in chunks of 500 with `onConflict: "master_type,code"`.
 
-Two things combine on your server:
+The self-hosted SAP endpoint returns **duplicate `SAKNR` codes** in `Fetch_ReconAccount` (and likely other masters). Postgres rejects `INSERT ... ON CONFLICT` when the same conflict target appears more than once in a single statement:
 
-1. **Stale frontend build.** The current `src/lib/sapPayloadBuilder.ts` (lines 404–436) overwrites `row.WHOLDTAX` from `overrides.withholding` before sending. The server's built frontend predates that logic, so it emits the template's static `WHOLDTAX` (two empty rows) instead.
-2. **Legacy stored template.** `sap_payload_templates.template.WHOLDTAX` on that server still contains two hardcoded empty entries. That is why you see *exactly two* empty rows in the SAP request — it's the template shape, not user input.
+```
+ON CONFLICT DO UPDATE command cannot affect row a second time
+```
 
-Locally both are already up-to-date, so it works.
+Every affected chunk fails → recon_account is counted as `skipped` → the dialog shows *"Edge Function returned a non-2xx status code. Showing cached F4 options if available."*
+
+Local Lovable doesn't see this because its SAP feed has no duplicate recon-account codes.
 
 ## Fix
 
-Make the edge function the source of truth for `WHOLDTAX`, so it is correct even when the deployed frontend or stored template is stale. Then rebuild the frontend on the server.
+### 1. `supabase/functions/sap-master-fetch/index.ts` (~L397–414)
 
-### 1. `supabase/functions/sync-vendor-to-sap/index.ts` — client-supplied branch (~L381–440)
+Dedupe rows by `(master_type, code)` **before** chunking/upserting. Keep the last occurrence (SAP-order-stable) and count the discarded duplicates into `skipped`:
 
-After `row = clientPayload[0]`, rebuild `row.WHOLDTAX` from `overrides.withholding` using the same rules as the client builder:
+```text
+build rows[] as today
+------------------------------------------------------------
+const dedup = new Map<string, Row>();
+for (const r of rows) dedup.set(r.code, r);   // master_type is constant per loop
+const beforeDedup = rows.length;
+const uniqueRows = Array.from(dedup.values());
+skipped += (beforeDedup - uniqueRows.length);
+------------------------------------------------------------
+chunk uniqueRows and upsert as today
+```
 
-- Filter to rows where `witht` is truthy.
-- Emit one entry per row:
-  ```
-  {
-    LIFNR: "",
-    WITHT:     String(r.witht).trim(),
-    WT_WITHCD: String(r.wt_withcd || "").trim(),
-    WT_SUBJCT: r.wt_subjct ? "X" : "",
-    QSREC:     String(r.qsrec || "").trim(),
-    QLAND:     String(r.qland || vendorCountry || "IN").trim(),
-  }
-  ```
-- If `overrides.withholding` is missing/empty, set `row.WHOLDTAX = []` (never leave the template's static empties).
-- Delete any lowercase `wholdtax` key.
+Also log once per master when duplicates are collapsed, e.g. `trace(reqId, SVC, "dedup", { type: mapping.type, removed: n })`, so we can spot bad SAP feeds without a Postgres error.
 
-### 2. `supabase/functions/sync-vendors-to-sap-bulk/index.ts` — enrichment loop (~L95)
+### 2. No other files need changes
 
-Same treatment inside the `sapPayload.map` loop, using each row's `withholding` override (the bulk caller sends the shared `overrides` object; read `withholding` from it and apply per row). Ensure `WHOLDTAX` in the enriched row is always the freshly-built array (or `[]`), never the template's empties.
-
-### 3. `src/lib/sapPayloadBuilder.ts`
-
-No behavior change; add a short comment noting the server also re-normalizes `WHOLDTAX` so stale client bundles still produce a correct SAP request.
-
-### 4. Server-side follow-ups (surfaced in the reply, not code changes)
-
-- Rebuild and redeploy the **frontend** on the self-hosted server so the client also sends correct `WHOLDTAX` (belt-and-braces).
-- Optionally clean up `sap_payload_templates` on that server: remove the static `WHOLDTAX` block from the stored template so it is always constructed by code.
+The dialog message text, cache fallback path, and WHOLDTAX logic stay as-is.
 
 ## Verification
 
-- On the self-hosted server, open SAP Sync, select two withholding rows in the popup, submit.
-- Inspect the outgoing SAP request: `WHOLDTAX` should now contain the selected `WITHT / WT_WITHCD / WT_SUBJCT / QSREC / QLAND`, matching your local example.
-- With zero rows selected, `WHOLDTAX` must be `[]`, not two empty rows.
-- Local behavior unchanged.
+On the self-hosted server, after redeploying `sap-master-fetch`:
+
+1. Open **SAP Field Confirmation** dialog on any vendor → the red banner disappears, F4 dropdowns populate from live SAP.
+2. Edge function logs show `stage:"dedup"` entries instead of `bulk upsert error recon_account …`.
+3. `summary.recon_account.upserted > 0`; `sap_master_data` contains recon-account rows.
+4. Local Lovable behaviour unchanged (no duplicates → nothing to dedupe).
+
+## Deployment note
+
+Only the edge function needs to be redeployed on the self-hosted server. No frontend rebuild required for this fix.
