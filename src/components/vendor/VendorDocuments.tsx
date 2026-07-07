@@ -127,12 +127,14 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
     // block the embedded PDF iframe from a foreign Storage origin.
     const blob = await downloadBlob(doc.file_path);
     if (blob) {
+      setPreviewBlob(blob);
       setPreviewUrl(URL.createObjectURL(blob));
       setPreviewDoc(doc);
       return;
     }
     const url = await getSignedUrl(doc.file_path);
     if (url) {
+      setPreviewBlob(null);
       setPreviewUrl(url);
       setPreviewDoc(doc);
       return;
@@ -143,6 +145,7 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
       variant: 'destructive',
     });
   };
+
 
 
   const triggerBrowserDownload = (href: string, fileName: string) => {
