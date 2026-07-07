@@ -1,35 +1,38 @@
 ## Problem
 
-When previewing an uploaded PDF (e.g. `Import Doc.pdf`) from the International vendor flow, Microsoft Edge shows "This page has been blocked by Microsoft Edge" inside the preview `<iframe>`.
+`Import_Doc.pdf` (25 pages, ~2.5 MB, valid PDF 1.7) still fails to open in the preview dialog even after the blob-URL fix, because Microsoft Edge is blocking its built-in PDF viewer from rendering the file inside our iframe. Depending on the tenant's Edge/SmartScreen/Group Policy, the browser's native PDF handler is unreliable — the file is fine, the viewer is the problem.
 
-Root cause: the preview iframe (`src/components/vendor/VendorDocuments.tsx`) is pointed at the Supabase Storage **signed URL** directly. Edge's SmartScreen / tracking-prevention / cross-origin PDF policy frequently blocks third-origin PDFs rendered inside an iframe (especially against a local `http://127.0.0.1` Storage endpoint on self-hosted Lovable, which is a mixed/foreign origin relative to the app). The same file downloads fine, because the download path uses the URL as a top-level navigation, not an embedded frame.
+## Fix — render PDFs ourselves with pdf.js
 
-The same-origin `blob:` fallback that already exists in `downloadBlob` is never used for preview, because `getSignedUrl` succeeds first.
+Stop relying on the browser's PDF plugin. Render pages client-side with `pdf.js` (via `react-pdf`) inside the existing preview dialog. This works identically across Edge, Chrome, Firefox, and Safari, and does not depend on any browser policy.
 
-## Fix
+### Changes
 
-Render PDFs (and images) from a **same-origin `blob:` URL** in the preview dialog instead of the remote signed URL. Signed URLs stay in use for "Open in new tab" / download, where Edge does not block them.
+1. **Install dependency**
+   - `react-pdf` (bundles `pdfjs-dist`).
+   - Configure the pdf.js worker via a Vite-friendly `?url` import so no `public/` copy is needed.
 
-### Files to change
+2. **New component `src/components/vendor/PdfPreview.tsx`**
+   - Props: `blob: Blob` (preferred) or `url: string`.
+   - Loads the PDF with `<Document file={blob}>`, iterates pages with `<Page pageNumber={n} width={containerWidth} />`.
+   - Toolbar: page counter (`1 / 25`), prev/next, zoom −/+ (0.5x–2x), and a "Download" button (uses signed URL).
+   - Scrollable container capped at `max-h-[70vh]` matching the existing dialog.
+   - Loading spinner + error state ("Could not render PDF, try Download").
 
-1. **`src/components/vendor/VendorDocuments.tsx`**
-   - In `handlePreview`, always call `downloadBlob(doc.file_path)` first for PDFs and images, wrap in `URL.createObjectURL`, and set that as `previewUrl`. Only fall back to the signed URL if the blob download fails.
-   - Track the created object URL in state and `URL.revokeObjectURL(...)` it when the dialog closes (in the existing `onOpenChange` handler) to avoid leaks.
-   - Keep the current signed-URL path for the "Open in New Tab" button and for downloads (unchanged).
+3. **`src/components/vendor/VendorDocuments.tsx`**
+   - Keep the blob-first `handlePreview` from the previous fix.
+   - In the Dialog body, replace the `<iframe src={previewUrl}>` branch with `<PdfPreview blob={previewBlob} />`.
+   - Store the downloaded `Blob` in state (`previewBlob`) alongside `previewUrl` so pdf.js gets the bytes directly (no network re-fetch, no iframe).
+   - Images branch unchanged. Non-PDF/non-image fallback unchanged.
 
-2. **`src/components/vendor/PersistedFileActions.tsx`** (View Details button used by `FileUpload` in `IntlDocumentsStep`)
-   - `handleView` currently does `window.open(signedUrl)`. That works in a new tab but is also affected by SmartScreen for some tenants. Change it to: download the object via `supabase.storage.from(bucket).download(filePath)`, create a `blob:` URL, and `window.open(blobUrl, '_blank')`. Revoke the URL after ~30 s.
-   - Keeps behaviour identical for the user, but the opened tab is a same-origin blob that Edge will not block.
+4. **`src/components/vendor/PersistedFileActions.tsx`** — no change needed for this fix; "View Details" already opens the blob in a new tab. (Optional follow-up: route "View Details" through the same `PdfPreview` dialog, but out of scope here.)
 
 ### Out of scope
-
-- No changes to upload, storage bucket, RLS, SAP payload, or the International Company Details form.
-- No changes to `useVendorRegistration` or types.
-- Domestic flow inherits the same fix automatically because both flows share `VendorDocuments` and `PersistedFileActions`.
+- No changes to upload flow, storage bucket, RLS, SAP payload, or International form.
+- No server / edge-function changes.
 
 ## Validation
-
-- Re-upload a PDF in the International flow, open **View Details** — PDF should render inline in the dialog.
-- Click **Open in New Tab** — opens a same-origin blob tab (no Edge block page).
-- Click **Download** — still saves the original filename.
-- Repeat with a JPG/PNG upload to confirm image preview still works.
+- Open `Import_Doc.pdf` (25 pages) from the International vendor's Documents card → all pages render, page nav + zoom work.
+- Test in Edge (the browser that was blocking), Chrome, and Firefox.
+- Test a 1-page PDF and a JPG/PNG to confirm no regressions.
+- Confirm dialog cleanup: closing revokes the blob URL (no memory leaks in DevTools).
