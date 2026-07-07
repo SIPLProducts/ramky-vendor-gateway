@@ -405,6 +405,9 @@ export async function buildSapPayload(
     // If the template provides a WHOLDTAX array with a single mapping template,
     // use it to render one entry per withholding row (configurable via SAP API
     // Settings → SAP Payload Template). Otherwise fall back to the fixed shape.
+    // Note: the edge functions (sync-vendor-to-sap / sync-vendors-to-sap-bulk)
+    // also re-normalize WHOLDTAX from overrides.withholding, so stale frontend
+    // builds or legacy stored templates can never leak empty rows to SAP.
     delete (row as any).wholdtax;
     const wt = Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding : [];
     const wtRows = wt.filter((r: any) => r && String(r.witht || "").trim());
