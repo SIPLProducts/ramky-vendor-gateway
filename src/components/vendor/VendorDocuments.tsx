@@ -70,7 +70,9 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewDoc, setPreviewDoc] = useState<VendorDocument | null>(null);
+
 
   useEffect(() => {
     fetchDocuments();
