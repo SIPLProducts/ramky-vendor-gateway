@@ -1240,15 +1240,20 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
 
       // Log submission
-      await supabase.from('audit_logs').insert({
-        vendor_id: vendor.id,
-        action: 'vendor_submitted',
-        details: {
-          submitted_by: vendor.user_id || 'anonymous',
-          invitation_token: options?.invitationToken || null,
-          verification_statuses: verificationStatuses,
-        },
-      });
+      try {
+        const { error: auditError } = await supabase.from('audit_logs').insert({
+          vendor_id: vendor.id,
+          action: 'vendor_submitted',
+          details: {
+            submitted_by: vendor.user_id || 'anonymous',
+            invitation_token: options?.invitationToken || null,
+            verification_statuses: verificationStatuses,
+          },
+        });
+        if (auditError) console.warn('[Vendor] vendor_submitted audit log failed (non-blocking):', auditError);
+      } catch (auditError) {
+        console.warn('[Vendor] vendor_submitted audit log threw (non-blocking):', auditError);
+      }
 
       // Send notification email to buyer who invited this vendor
       let notifyResult: any = null;
@@ -1306,7 +1311,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       }
       toast({
         title: 'Submission Failed',
-        description: error.message,
+        description: error?.details || error?.hint || error?.message || (code ? `Database error (${code})` : 'An unexpected error occurred.'),
         variant: 'destructive',
       });
     },

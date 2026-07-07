@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { STAGE_ORDER, STAGE_LABEL, type VendorReportRow } from './loadVendorReport';
+import { formatAadhaarLinked, formatPanStatus } from '@/lib/panComprehensive';
 
 function fmt(d: string | null | undefined): string {
   if (!d) return '';
@@ -13,6 +14,12 @@ function statusLabel(s: string): string {
   if (s === 'rejected') return 'Rejected';
   if (s === 'returned') return 'Returned';
   return s;
+}
+
+function detailValue(key: string, value: any): string {
+  if (key === 'pan_aadhaar_linked') return formatAadhaarLinked(value as boolean | null | undefined);
+  if (key === 'pan_status') return formatPanStatus(value as string | null | undefined);
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
 }
 
 export function exportVendorExcel(rows: VendorReportRow[], reportType: 'vendor' | 'approval' | 'both') {
@@ -54,7 +61,7 @@ export function exportVendorExcel(rows: VendorReportRow[], reportType: 'vendor' 
     const d = rows[0].details;
     const kv = Object.entries(d)
       .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      .map(([k, v]) => ({ Field: k, Value: typeof v === 'object' ? JSON.stringify(v) : String(v) }));
+      .map(([k, v]) => ({ Field: k, Value: detailValue(k, v) }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kv), 'Vendor Details');
 
     if (rows[0].documents && rows[0].documents.length) {

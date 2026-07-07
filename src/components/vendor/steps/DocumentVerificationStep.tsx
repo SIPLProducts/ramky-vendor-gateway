@@ -261,36 +261,75 @@ function friendlyModelName(model?: string): string | undefined {
 
 function normalizeBooleanLike(value: unknown): boolean | null {
   if (value === true || value === false) return value;
+  if (value === 1) return true;
+  if (value === 0) return false;
   const s = String(value ?? "").trim().toLowerCase();
-  if (["true", "yes", "y", "linked", "aadhaar linked", "aadhaar linked with pan", "1"].includes(s)) return true;
-  if (["false", "no", "n", "not linked", "aadhaar not linked", "aadhaar not linked with pan", "0"].includes(s)) return false;
+  if (!s) return null;
+  if (
+    ["false", "no", "n", "not_linked", "notlinked", "not linked", "aadhaar not linked", "aadhaar not linked with pan", "not_seeded", "notseeded", "not seeded", "unlinked", "inactive", "invalid", "0"].includes(s) ||
+    /\bnot\b/.test(s)
+  ) return false;
+  if (["true", "yes", "y", "linked", "aadhaar linked", "aadhaar linked with pan", "seeded", "active", "valid", "verified", "1"].includes(s)) return true;
   return null;
 }
 
+function pickPrimitiveString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && "value" in (value as Record<string, unknown>)) {
+    return pickPrimitiveString((value as Record<string, unknown>).value);
+  }
+  return "";
+}
+
+function collectPanResponseObjects(source: any): Record<string, any>[] {
+  const out: Record<string, any>[] = [];
+  const seen = new Set<any>();
+  const push = (v: any) => {
+    if (!v || typeof v !== "object" || seen.has(v)) return;
+    seen.add(v);
+    out.push(v);
+    push(v.data);
+    push(v.result);
+    push(v.response);
+    push(v.response_data);
+    push(v.raw);
+  };
+  push(source);
+  return out;
+}
+
 function extractPanComprehensiveFields(result: any): { status: string | null; aadhaarLinked: boolean | null } {
-  const rawData =
-    result?.raw && typeof result.raw === "object" && result.raw.data && typeof result.raw.data === "object"
-      ? result.raw.data
-      : {};
-  const data = result?.data && typeof result.data === "object" ? result.data : {};
-  const statusRaw = data.status ?? data.pan_status ?? rawData.status ?? rawData.pan_status ?? null;
-  const linkedRaw =
-    data.aadhaar_linked ??
-    data.aadhaarLinked ??
-    data.aadhaar_linked_with_pan ??
-    data.is_aadhaar_linked ??
-    data.aadhaar_seeding_status ??
-    data.aadhaar_seeding_status_desc ??
-    rawData.aadhaar_linked ??
-    rawData.aadhaarLinked ??
-    rawData.aadhaar_linked_with_pan ??
-    rawData.is_aadhaar_linked ??
-    rawData.aadhaar_seeding_status ??
-    rawData.aadhaar_seeding_status_desc ??
-    null;
+  let statusRaw: unknown = null;
+  let aadhaarLinked: boolean | null = null;
+  for (const data of collectPanResponseObjects(result)) {
+    statusRaw ??= data.status ?? data.pan_status ?? data.panStatus ?? data.pan_status_desc ?? null;
+    const candidates = [
+      data.aadhaar_linked,
+      data.aadhaarLinked,
+      data.aadhaar_linked_with_pan,
+      data.is_aadhaar_linked,
+      data.aadhaar_link_status,
+      data.aadhaar_seeding,
+      data.aadhaar_seeding_status,
+      data.aadhaar_seeding_status_desc,
+      data.pan_aadhaar_linked,
+      data.panAadhaarLinked,
+      data.pan_aadhaar_link_status,
+    ];
+    for (const raw of candidates) {
+      const parsed = normalizeBooleanLike(raw);
+      if (parsed !== null) {
+        aadhaarLinked = parsed;
+        break;
+      }
+    }
+    if (statusRaw != null && aadhaarLinked !== null) break;
+  }
+  const statusText = pickPrimitiveString(statusRaw).trim();
   return {
-    status: statusRaw == null || statusRaw === "" ? null : String(statusRaw),
-    aadhaarLinked: normalizeBooleanLike(linkedRaw),
+    status: statusText || null,
+    aadhaarLinked,
   };
 }
 
@@ -851,11 +890,12 @@ export function DocumentVerificationStep({
         };
         if (vendorId) {
           try {
-            await supabase.from('vendors').update({
+            const panPatch: Record<string, unknown> = {
               pan_holder_name: holderName || null,
-              pan_status: comprehensive.status ?? null,
-              pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
-            }).eq('id', vendorId);
+            };
+            if (comprehensive.status != null) panPatch.pan_status = comprehensive.status;
+            if (comprehensive.aadhaarLinked != null) panPatch.pan_aadhaar_linked = comprehensive.aadhaarLinked;
+            await supabase.from('vendors').update(panPatch).eq('id', vendorId);
           } catch (e) {
             console.warn('[PAN Comprehensive] persist failed', e);
           }
@@ -881,11 +921,12 @@ export function DocumentVerificationStep({
       // Persist PAN Comprehensive result on the vendor row so approvers can see it.
       if (vendorId) {
         try {
-          await supabase.from('vendors').update({
+          const panPatch: Record<string, unknown> = {
             pan_holder_name: holderName || null,
-            pan_status: comprehensive.status ?? null,
-            pan_aadhaar_linked: comprehensive.aadhaarLinked ?? null,
-          }).eq('id', vendorId);
+          };
+          if (comprehensive.status != null) panPatch.pan_status = comprehensive.status;
+          if (comprehensive.aadhaarLinked != null) panPatch.pan_aadhaar_linked = comprehensive.aadhaarLinked;
+          await supabase.from('vendors').update(panPatch).eq('id', vendorId);
         } catch (e) {
           console.warn('[PAN Comprehensive] persist failed', e);
         }
@@ -2408,11 +2449,8 @@ export function DocumentVerificationStep({
                             />
                           )}
                           {(() => {
-                            const rawStatus = panDoc.ocrData?.status ?? panApi.status ?? null;
-                            const panStatusLabel =
-                              rawStatus && String(rawStatus).trim().toLowerCase() === "valid"
-                                ? "Valid"
-                                : "Invalid";
+                            const comprehensive = extractPanComprehensiveFields({ data: panDoc.ocrData, raw: { data: panApi } });
+                            const panStatusLabel = formatPanStatus(comprehensive.status);
                             return (
                               <EditableOcrField
                                 label="PAN Status"
@@ -2425,13 +2463,8 @@ export function DocumentVerificationStep({
                             );
                           })()}
                           {(() => {
-                            const rawLinked = normalizeBooleanLike(
-                              panDoc.ocrData?.aadhaar_linked ?? panApi.aadhaar_linked
-                            );
-                            const linkedLabel =
-                              rawLinked === true
-                                ? "Aadhaar Linked with PAN"
-                                : "Aadhaar Not Linked with PAN";
+                            const comprehensive = extractPanComprehensiveFields({ data: panDoc.ocrData, raw: { data: panApi } });
+                            const linkedLabel = formatAadhaarLinked(comprehensive.aadhaarLinked);
                             return (
                               <EditableOcrField
                                 label="Is Aadhaar Linked"
