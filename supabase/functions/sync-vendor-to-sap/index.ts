@@ -4,7 +4,8 @@ import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts"
 import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_shared/trace.ts";
 
 const SVC = "sync-vendor-to-sap";
-const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v3";
+const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v2";
+const WHOLDTAX_BINDING_MODE = "direct-overrides-withholding";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -685,6 +686,7 @@ serve(async (req) => {
       svc: SVC,
       stage: "wholdtax.final",
       version: WHOLDTAX_FINAL_NORMALIZE_VERSION,
+      bindingMode: WHOLDTAX_BINDING_MODE,
       selectedRows: Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding.length : 0,
       finalRows: finalWholdtax.length,
       rows: summarizeWholdtax(finalWholdtax),

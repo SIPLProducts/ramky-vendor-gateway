@@ -8,7 +8,8 @@ const corsHeaders = {
 };
 
 const SVC = "sync-vendors-to-sap-bulk";
-const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v3";
+const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v2";
+const WHOLDTAX_BINDING_MODE = "direct-overrides-withholding";
 
 function ok(body: any) {
   return new Response(JSON.stringify(body), {
@@ -248,6 +249,7 @@ serve(async (req) => {
       svc: SVC,
       stage: "wholdtax.final",
       version: WHOLDTAX_FINAL_NORMALIZE_VERSION,
+      bindingMode: WHOLDTAX_BINDING_MODE,
       selectedRows: Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding.length : 0,
       rowsPerVendor: finalWholdtaxRows.map((rows: any[]) => rows.length),
       rows: summarizeWholdtax(finalWholdtaxRows[0] || []),
