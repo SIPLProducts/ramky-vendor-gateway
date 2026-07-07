@@ -20,7 +20,6 @@ const schema = z.object({
   addressLine3: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
   addressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
   city: z.string().trim().min(1, 'City is required'),
-  state: z.string().trim().min(1, 'State is required'),
   pincode: z.string().trim().min(2, 'PIN Code is required'),
   officePhone: z.string().regex(/^\d{10}$/, '10-digit mobile number required').or(z.literal('')),
   fax: z.string().optional().or(z.literal('')),
