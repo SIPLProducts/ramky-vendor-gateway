@@ -16,9 +16,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 213 27% 17%;
 
-    /* Primary - Teal */
-    --primary: 174 65% 42%;
+    /* Primary - Emerald (enterprise reference) */
+    --primary: 160 70% 38%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 160 70% 33%;
 
     --secondary: 210 16% 93%;
     --secondary-foreground: 213 27% 17%;
@@ -26,14 +27,14 @@
     --muted: 210 20% 96%;
     --muted-foreground: 215 14% 45%;
 
-    /* Accent - Teal (light) */
-    --accent: 174 60% 45%;
+    /* Accent - Teal */
+    --accent: 174 60% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 69% 31%;
+    --success: 160 70% 38%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
@@ -42,11 +43,12 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    --border: 214 20% 88%;
+    --border: 214 20% 90%;
     --input: 214 20% 88%;
-    --ring: 174 65% 42%;
+    --ring: 160 70% 38%;
 
-    --radius: 0.375rem;
+    --radius: 0.625rem;
+
 
     /* Sidebar - Dark teal (#16262D) with #233A46 selected, #23C4B5 accent */
     --sidebar-background: 196 35% 13%;
@@ -69,11 +71,12 @@
 
     /* Enterprise tokens */
     --header-height: 3rem;
-    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(215 25% 15% / 0.08), 0 2px 4px -2px hsl(215 25% 15% / 0.06);
-    --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.10), 0 4px 6px -4px hsl(215 25% 15% / 0.06);
-    --shadow-card: 0 1px 3px 0 hsl(215 25% 15% / 0.08), 0 1px 2px -1px hsl(215 25% 15% / 0.06);
-    --shadow-glow: 0 0 0 4px hsl(217 91% 35% / 0.12);
+    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.04);
+    --shadow-md: 0 4px 10px -2px hsl(215 25% 15% / 0.06), 0 2px 4px -2px hsl(215 25% 15% / 0.05);
+    --shadow-lg: 0 12px 24px -6px hsl(215 25% 15% / 0.08), 0 4px 8px -4px hsl(215 25% 15% / 0.05);
+    --shadow-card: 0 1px 2px 0 hsl(215 25% 15% / 0.04), 0 1px 3px 0 hsl(215 25% 15% / 0.05);
+    --shadow-glow: 0 0 0 4px hsl(160 70% 38% / 0.15);
+
 
     /* Motion */
     --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -90,8 +93,10 @@
     --popover: 200 35% 9%;
     --popover-foreground: 180 12% 92%;
 
-    --primary: 174 65% 48%;
+    --primary: 160 70% 42%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 160 70% 36%;
+
 
     --secondary: 200 30% 14%;
     --secondary-foreground: 180 12% 92%;
