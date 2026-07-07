@@ -275,7 +275,14 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
       </Card>
 
       {/* Document Preview Dialog */}
-      <Dialog open={!!previewUrl} onOpenChange={() => { setPreviewUrl(null); setPreviewDoc(null); }}>
+      <Dialog open={!!previewUrl} onOpenChange={() => {
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          try { URL.revokeObjectURL(previewUrl); } catch { /* noop */ }
+        }
+        setPreviewUrl(null);
+        setPreviewDoc(null);
+      }}>
+
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
