@@ -168,7 +168,7 @@ export const DEFAULT_SAP_PAYLOAD_TEMPLATE: any = {
   j_1isern: "",
   legaenty: "",
   legaform: "",
-  location: "",
+  location: "{{vendor.registered_state|trunc:40}}",
   taxnumxl: "{{vendor.gstin|trunc:20}}",
   bank_acct: "{{vendor.account_number|trunc:18}}",
   bank_ctry: "IN",
