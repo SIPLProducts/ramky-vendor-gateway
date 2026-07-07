@@ -357,11 +357,12 @@ export default function Dashboard() {
                 ) : (
                   filteredVendors.map((v) => (
                     <TableRow key={v.id}>
-                      <TableCell className="font-mono text-xs">
-                        <Link to={`/vendors/${v.id}`} className="text-primary hover:underline">
+                      <TableCell className="font-mono text-[13px] font-semibold text-foreground">
+                        <Link to={`/vendors/${v.id}`} className="hover:text-primary transition-colors">
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
+
                       <TableCell>{getSapName1(v) || v.legal_name || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
