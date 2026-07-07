@@ -207,8 +207,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                 'flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 group relative',
                 collapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5',
                 isActive
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-md'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
               )}
             >
               <div className={cn(
