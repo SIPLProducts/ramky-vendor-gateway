@@ -115,14 +115,16 @@
     --input: 222 35% 16%;
     --ring: 174 65% 48%;
 
-    --sidebar-background: 200 35% 8%;
-    --sidebar-foreground: 180 12% 85%;
-    --sidebar-primary: 174 65% 48%;
+    --sidebar-background: 196 35% 10%;
+    --sidebar-foreground: 200 20% 85%;
+    --sidebar-primary: 174 70% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 200 35% 14%;
+    --sidebar-accent: 202 33% 18%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 200 30% 16%;
-    --sidebar-ring: 174 65% 48%;
+    --sidebar-border: 200 28% 16%;
+    --sidebar-ring: 174 70% 48%;
+    --sidebar-hover: 202 34% 15%;
+    --sidebar-submuted: 202 16% 65%;
   }
 
 }
