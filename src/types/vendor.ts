@@ -307,8 +307,20 @@ export interface InternationalDocuments {
 
 export interface InternationalCompanyDetails {
   companyName: string;
-  companyAddress: string;
+  // Address block (mirrors domestic Registered Address structure)
+  addressLine1: string;
+  addressLine2: string;
+  addressLine3: string;
+  addressLine4: string;
+  city: string;
+  state: string;
   pincode: string;
+  officePhone: string;
+  fax: string;
+  // Legacy single-line address kept for backward compatibility with older
+  // saved records; new code writes the joined value here and reads from
+  // addressLine1..4 first.
+  companyAddress: string;
   country: string;
   region: string;
   contact1: string;
@@ -344,7 +356,10 @@ export interface InternationalData {
 export const EMPTY_INTERNATIONAL_DATA: InternationalData = {
   documents: { registrationCopyFile: null, swiftIbanFile: null },
   company: {
-    companyName: '', companyAddress: '', pincode: '', country: '', region: '',
+    companyName: '',
+    addressLine1: '', addressLine2: '', addressLine3: '', addressLine4: '',
+    city: '', state: '', pincode: '', officePhone: '', fax: '',
+    companyAddress: '', country: '', region: '',
     contact1: '', contact2: '', email1: '', email2: '',
   },
   bank: {

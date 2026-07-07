@@ -348,11 +348,19 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     const intlLegalName = intl?.company.companyName || '';
     const intlEmail = intl?.company.email1 || '';
     const intlPhone = intl?.company.contact1 || '';
-    const intlAddr = intl?.company.companyAddress || '';
-    const intlCity = intl?.company.region || '';
-    const intlState = intl?.company.region || '';
+    const intlAddrLine1 = intl?.company.addressLine1 || '';
+    const intlAddrLine2 = intl?.company.addressLine2 || '';
+    const intlAddrLine3 = intl?.company.addressLine3 || '';
+    const intlAddrLine4 = intl?.company.addressLine4 || '';
+    const intlJoinedAddr = [intlAddrLine1, intlAddrLine2, intlAddrLine3, intlAddrLine4].filter(Boolean).join(', ');
+    const intlAddr = intlJoinedAddr || intl?.company.companyAddress || '';
+    const intlCity = intl?.company.city || '';
+    const intlState = intl?.company.state || '';
     const intlPin = intl?.company.pincode || '';
     const intlCountry = intl?.company.country || '';
+    const intlRegion = intl?.company.region || '';
+    const intlOfficePhone = intl?.company.officePhone || '';
+    const intlFax = intl?.company.fax || '';
 
     const cls = intl?.classification;
     const intlMaterial = cls?.materialGroupVendor || [];
@@ -372,7 +380,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
               registrationCopy: intl?.documents.registrationCopyFile?.name || null,
               swiftIban: intl?.documents.swiftIbanFile?.name || null,
             },
-            company: intl?.company,
+            company: {
+              ...(intl?.company || {}),
+              // Keep the legacy single-line value in sync with the new lines.
+              companyAddress: intlJoinedAddr || intl?.company.companyAddress || '',
+            },
             bank: intl?.bank,
             classification: intl?.classification,
           }
@@ -401,21 +413,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       vendor_categories: isIntl ? intlVendorCat : (Array.isArray(formData.organization.vendorCategory) ? formData.organization.vendorCategory : (formData.organization.vendorCategory ? [formData.organization.vendorCategory as unknown as string] : [])),
       vendor_locations: isIntl ? intlVendorLoc : (Array.isArray(formData.organization.vendorLocation) ? formData.organization.vendorLocation : (formData.organization.vendorLocation ? [formData.organization.vendorLocation as unknown as string] : [])),
       identification_sources: isIntl ? intlIdSrc : (Array.isArray(formData.organization.identificationSource) ? formData.organization.identificationSource : (formData.organization.identificationSource ? [formData.organization.identificationSource as unknown as string] : [])),
-      // Registered Address
-      registered_address: formData.address.registeredAddress,
-      registered_address_line2: formData.address.registeredAddressLine2 || null,
-      registered_address_line3: formData.address.registeredAddressLine3 || null,
-      registered_address_line4: formData.address.registeredAddressLine4 || null,
-      registered_city: formData.address.registeredCity,
-      registered_state: formData.address.registeredState,
-      registered_pincode: formData.address.registeredPincode,
-      registered_phone: formData.address.registeredPhone || null,
-      registered_fax: formData.address.registeredFax || null,
+      // Registered Address — for intl vendors, mirror the intl company address
+      // block onto the shared registered_* columns so downstream SAP mapping,
+      // list queries and reports work without special-casing.
+      registered_address: isIntl ? (intlAddrLine1 || intlAddr) : formData.address.registeredAddress,
+      registered_address_line2: isIntl ? (intlAddrLine2 || null) : (formData.address.registeredAddressLine2 || null),
+      registered_address_line3: isIntl ? (intlAddrLine3 || null) : (formData.address.registeredAddressLine3 || null),
+      registered_address_line4: isIntl ? (intlAddrLine4 || null) : (formData.address.registeredAddressLine4 || null),
+      registered_city: isIntl ? (intlCity || '') : formData.address.registeredCity,
+      registered_state: isIntl ? (intlRegion || intlState || '') : formData.address.registeredState,
+      registered_pincode: isIntl ? (intlPin || '') : formData.address.registeredPincode,
+      registered_phone: isIntl ? (intlOfficePhone || null) : (formData.address.registeredPhone || null),
+      registered_fax: isIntl ? (intlFax || null) : (formData.address.registeredFax || null),
       registered_website: formData.address.registeredWebsite || null,
-      registered_email: formData.address.registeredEmail || null,
-      registered_contact_1: formData.address.registeredContact1 || null,
-      registered_contact_2: formData.address.registeredContact2 || null,
-      registered_email_2: formData.address.registeredEmail2 || null,
+      registered_email: isIntl ? (intlEmail || null) : (formData.address.registeredEmail || null),
+      registered_contact_1: isIntl ? (intlPhone || null) : (formData.address.registeredContact1 || null),
+      registered_contact_2: isIntl ? (intl?.company.contact2 || null) : (formData.address.registeredContact2 || null),
+      registered_email_2: isIntl ? (intl?.company.email2 || null) : (formData.address.registeredEmail2 || null),
       same_as_registered: formData.address.sameAsRegistered,
       // Manufacturing Address
       manufacturing_address: formData.address.manufacturingAddress || null,
@@ -793,7 +807,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       },
       international: (vendor as any).international_data ? {
         documents: { registrationCopyFile: null, swiftIbanFile: null },
-        company: (vendor as any).international_data?.company || { companyName: '', companyAddress: '', pincode: '', country: '', region: '', contact1: '', contact2: '', email1: '', email2: '' },
+        company: {
+          companyName: '', addressLine1: '', addressLine2: '', addressLine3: '', addressLine4: '',
+          city: '', state: '', pincode: '', officePhone: '', fax: '',
+          companyAddress: '', country: '', region: '',
+          contact1: '', contact2: '', email1: '', email2: '',
+          ...((vendor as any).international_data?.company || {}),
+        },
         bank: (vendor as any).international_data?.bank || { accountNumber: '', swiftCode: '', companyName: '', bankName: '', bankBranch: '', ibanNumber: '' },
         classification: (vendor as any).international_data?.classification || { materialGroupVendor: [], vendorCategory: [], vendorLocation: [], identificationSource: [] },
       } : undefined,

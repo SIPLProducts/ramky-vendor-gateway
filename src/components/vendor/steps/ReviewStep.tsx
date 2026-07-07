@@ -108,8 +108,15 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
             <SectionHeader icon={Building2} title="Company Details" step={2} onEdit={onEditStep} />
             <div className="space-y-1">
               <DataRow label="Company Name" value={intl?.company?.companyName} />
-              <DataRow label="Address" value={intl?.company?.companyAddress} />
-              <DataRow label="Pincode" value={intl?.company?.pincode} />
+              <DataRow label="Address Line 1" value={intl?.company?.addressLine1 || intl?.company?.companyAddress} />
+              <DataRow label="Address Line 2" value={intl?.company?.addressLine2} />
+              <DataRow label="Address Line 3" value={intl?.company?.addressLine3} />
+              <DataRow label="Address Line 4" value={intl?.company?.addressLine4} />
+              <DataRow label="City" value={intl?.company?.city} />
+              <DataRow label="State" value={intl?.company?.state} />
+              <DataRow label="PIN Code" value={intl?.company?.pincode} />
+              <DataRow label="Office Phone" value={intl?.company?.officePhone} />
+              <DataRow label="Fax" value={intl?.company?.fax} />
               <DataRow label="Country" value={intl?.company?.country} />
               <DataRow label="Region" value={intl?.company?.region} />
               <DataRow label="Contact 1" value={intl?.company?.contact1} />

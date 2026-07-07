@@ -163,10 +163,15 @@ export function VendorSubmissionPreviewDialog({
               <div className="form-section">
                 <SectionHeader icon={MapPin} title="Address Information" />
                 <div className="space-y-1">
-                  <DataRow label="Registered Address" value={vendor.registered_address} />
+                  <DataRow label="Address Line 1" value={vendor.registered_address} />
+                  <DataRow label="Address Line 2" value={vendor.registered_address_line2} />
+                  <DataRow label="Address Line 3" value={vendor.registered_address_line3} />
+                  <DataRow label="Address Line 4" value={vendor.registered_address_line4} />
                   <DataRow label="City" value={vendor.registered_city} />
                   <DataRow label="State" value={vendor.registered_state} />
                   <DataRow label="PIN Code" value={vendor.registered_pincode} />
+                  <DataRow label="Office Phone" value={vendor.registered_phone} />
+                  <DataRow label="Fax" value={vendor.registered_fax} />
                   {vendor.communication_address && (
                     <>
                       <DataRow label="Communication Address" value={vendor.communication_address} />
