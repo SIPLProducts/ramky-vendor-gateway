@@ -357,7 +357,7 @@ export const EMPTY_INTERNATIONAL_DATA: InternationalData = {
   company: {
     companyName: '',
     addressLine1: '', addressLine2: '', addressLine3: '', addressLine4: '',
-    city: '', state: '', pincode: '', officePhone: '', fax: '',
+    city: '', pincode: '', officePhone: '', fax: '',
     companyAddress: '', country: '', region: '',
     contact1: '', contact2: '', email1: '', email2: '',
   },
