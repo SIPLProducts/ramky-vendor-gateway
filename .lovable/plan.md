@@ -1,32 +1,21 @@
-## Match reference styling — Dashboard, Buttons, Sidebar, Table
+## Sidebar selection + card polish
 
-Pure visual polish. No logic changes.
+### 1. Sidebar selected item (`src/components/layout/Sidebar.tsx`)
+Change selected item from solid emerald fill to a **tinted green pill with a green border and green text** — same treatment as a soft "chip":
+- Selected: `bg-primary/10 text-primary border border-primary/30 rounded-lg` (was `bg-primary text-primary-foreground shadow-sm`)
+- Icon inherits `text-primary`.
+- Hover on non-active stays `bg-sidebar-hover`.
+- Collapsed active indicator bar stays the same (already `bg-primary`).
 
-### 1. Dashboard title & description (`src/pages/Dashboard.tsx`)
-Match the reference "Operations Dashboard" typography:
-- Title: `text-[32px] font-bold tracking-tight text-foreground` (was `text-[26px] font-semibold`)
-- Description: `text-[15px] text-muted-foreground` with `mt-1.5`
-- Keep the two-line stacked layout on the left, actions on the right.
+### 2. Dashboard KPI cards (`src/pages/Dashboard.tsx`)
+Match the reference exactly:
+- Card container: keep `p-5 rounded-xl border bg-card shadow-card`.
+- Value color: ensure `text-foreground` bold `text-[32px]`.
+- Icon tile: `h-10 w-10 rounded-lg bg-primary/10 text-primary` (slightly larger, softer green like reference).
+- Add a subtle "vs last month" placeholder row below the value using existing status color tokens — **skipped** since we have no delta data; keep the current single-value layout as-is, only bump icon tile size.
 
-### 2. Buttons (`src/components/ui/button.tsx`)
-Reference Export button = deep emerald filled, subtle shadow, `rounded-lg`.
-- `default` variant: `bg-primary text-primary-foreground rounded-lg shadow-sm hover:bg-[hsl(var(--primary-hover))]` — swap `rounded-md` for `rounded-lg` on default+outline so both match the reference pill shape.
-- `outline`: `border border-border bg-card rounded-lg shadow-sm hover:bg-muted` (Refresh button style — white with soft border).
-- Sizes stay `h-9 px-4`.
-
-### 3. Sidebar selected item (`src/components/layout/Sidebar.tsx`)
-Reference sidebar selection uses the same emerald as the Export button, with a matching rounded-lg pill. Currently selection is `bg-primary` but with `rounded-md`. Change to:
-- Selected: `bg-primary text-primary-foreground rounded-lg shadow-sm` (was `rounded-md`)
-- Base: `rounded-lg` (was `rounded-md`) so hover/selected share the same shape.
-- Keep the `mx-1` inset so the pill sits inside the rail.
-
-### 4. Dashboard table — reference # column (`src/pages/Dashboard.tsx`)
-Reference shows DMR/reference numbers in a bold monospace-style font, dark foreground (not the muted primary link look we have). Update the body cell for `Reference #`:
-- From: `font-mono text-xs` link in `text-primary`
-- To: `font-mono text-[13px] font-semibold text-foreground hover:text-primary` — keeps clickable link behavior, matches the reference's bold DMR-NO look.
+### 3. Export button (`src/pages/Dashboard.tsx`)
+Already uses default primary variant with rounded-lg + shadow — matches the reference. No change needed unless icon spacing off; keep as-is.
 
 ### Not touched
-Vendor Registration, business logic, routes, workflows, edge functions, hooks, auth.
-
-### Verify
-Typecheck + visual check on `/dashboard`.
+Vendor Registration, business logic, routes, workflows, hooks.
