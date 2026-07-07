@@ -300,18 +300,10 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
               {errors.fax && <p className="text-xs text-destructive">{errors.fax.message}</p>}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* SAP Country / Region + primary contacts */}
-      <div className="form-section">
-        <h3 className="form-section-title">
-          <Building2 className="h-5 w-5 text-primary" />
-          Country, Region & Contacts
-        </h3>
-
-        <div className="grid gap-5">
           <div className="grid md:grid-cols-2 gap-5">
+
+
             <div className="grid gap-1.5">
               <Label>Country (From SAP) <span className="text-destructive ml-0.5">*</span></Label>
               <Controller
