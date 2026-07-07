@@ -1,65 +1,48 @@
 ## Plan
 
-1. **Update single-vendor SAP sync mapping**
-   - In `sync-vendor-to-sap`, rebuild `sapPayload[0].WHOLDTAX` directly from `overrides.withholding` at the final point before calling SAP.
-   - Ignore any existing blank/stale `sapPayload[0].WHOLDTAX` rows.
-   - Remove any legacy lowercase `wholdtax` field so only the correct `WHOLDTAX` is sent.
+1. **Fix only the payload binding logic**
+   - Update the SAP sync function so the actual outgoing payload is rebuilt from `overrides.withholding` just before the SAP/middleware call.
+   - No deploy script changes.
+   - No UI changes unless the backend request shape is proven different.
 
-2. **Apply the exact mapping requested**
-   - For every item in `overrides.withholding`, create one `WHOLDTAX` row:
+2. **Map selected override rows exactly into `WHOLDTAX`**
+   - For each item in `overrides.withholding`, create one `WHOLDTAX` row:
      - `witht` → `WITHT`
      - `wt_withcd` → `WT_WITHCD`
-     - `wt_subjct` → `WT_SUBJCT`
+     - `wt_subjct: true` → `WT_SUBJCT: "X"`
      - `qsrec` → `QSREC`
      - `qland` → `QLAND`
-     - `LIFNR` → keep existing vendor number logic, fallback to empty string before SAP assigns the vendor code.
+     - `LIFNR` → existing vendor number / payload `LIFNR` if available, otherwise `""`
 
-3. **Mirror the fix for bulk SAP sync**
-   - Apply the same final `WHOLDTAX` generation in `sync-vendors-to-sap-bulk` so both single and bulk sync behave consistently.
+3. **Prevent empty rows from overriding selected data**
+   - Delete/ignore any existing blank `WHOLDTAX` rows from `sapPayload[0]` or templates.
+   - Delete lowercase `wholdtax` before sending.
+   - Assign the generated array back to both the working row and `payload[0]` so the exact object passed to `fetch()` contains the selected values.
 
-4. **Add safe backend diagnostics**
-   - Log a small version marker and non-sensitive `WHOLDTAX` summary: selected row count and final mapped codes.
-   - This will make it clear from server logs whether the deployed server is running the fixed code.
-
-5. **Verify self-host deployment path**
-   - Ensure the deploy script copies the latest edge functions to the self-hosted server functions directory and restarts the functions container.
-   - Keep the existing marker check so deployment fails if the WHOLDTAX fix is missing.
+4. **Add a minimal safe verification log**
+   - Log selected row count and final mapped `WITHT`, `WT_WITHCD`, `WT_SUBJCT`, `QSREC`, `QLAND` values.
+   - This confirms whether the function is receiving overrides and whether the final outgoing payload is correctly bound.
 
 ## Expected Result
 
-When the request contains:
+For your override:
 
 ```json
-"overrides": {
-  "withholding": [
-    {
-      "witht": "W7",
-      "wt_withcd": "W8",
-      "wt_subjct": "X",
-      "qsrec": "CO",
-      "qland": "IN"
-    }
-  ]
-}
-```
-
-The final SAP payload will contain:
-
-```json
-"WHOLDTAX": [
-  {
-    "LIFNR": "",
-    "WITHT": "W7",
-    "WT_WITHCD": "W8",
-    "WT_SUBJCT": "X",
-    "QSREC": "CO",
-    "QLAND": "IN"
-  }
+[
+  { "witht": "W7", "wt_withcd": "W8", "wt_subjct": true, "qsrec": "CO", "qland": "IN" },
+  { "witht": "W2", "wt_withcd": "P2", "wt_subjct": true, "qsrec": "OT", "qland": "IN" }
 ]
 ```
 
-## Technical Notes
+The outgoing SAP payload will be:
 
-- The frontend selection flow does not need to change because `overrides.withholding` already contains the selected data.
-- The fix belongs at the backend final-boundary mapping step, immediately before the SAP/middleware request.
-- This prevents any SAP template, stale client payload, or server transform from overwriting selected Withholding Tax values with blanks.
+```json
+"WHOLDTAX": [
+  { "LIFNR": "", "WITHT": "W7", "WT_WITHCD": "W8", "WT_SUBJCT": "X", "QSREC": "CO", "QLAND": "IN" },
+  { "LIFNR": "", "WITHT": "W2", "WT_WITHCD": "P2", "WT_SUBJCT": "X", "QSREC": "OT", "QLAND": "IN" }
+]
+```
+
+## Scope
+
+I will not change the self-host deploy scripts. This fix is only for binding `overrides.withholding` into the final SAP payload.

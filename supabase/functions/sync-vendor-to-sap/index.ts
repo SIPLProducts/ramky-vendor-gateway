@@ -5,6 +5,7 @@ import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_s
 
 const SVC = "sync-vendor-to-sap";
 const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v2";
+const WHOLDTAX_BINDING_MODE = "direct-overrides-withholding";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -254,8 +255,43 @@ function fail(message: string, extra: Record<string, any> = {}) {
   return ok({ success: false, message, sapResponse: [], ...extra });
 }
 
+function firstArray(...values: any[]) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function normalizeOverridesFromBody(body: any) {
+  let base = body?.overrides ?? body?.override ?? body?.overide ?? body?.sapOverrides ?? {};
+  if (Array.isArray(base)) base = { withholding: base };
+  if (!base || typeof base !== "object") base = {};
+  const withholding = firstArray(
+    base?.withholding,
+    base?.witholding,
+    base?.WHOLDTAX,
+    base?.wholdtax,
+    body?.withholding,
+    body?.witholding,
+    body?.WHOLDTAX,
+    body?.wholdtax,
+    body?.overrideWithholding,
+  );
+  return withholding.length > 0 ? { ...base, withholding } : base;
+}
+
+function getWithholdingRows(overrides: any) {
+  return firstArray(
+    Array.isArray(overrides) ? overrides : null,
+    overrides?.withholding,
+    overrides?.witholding,
+    overrides?.WHOLDTAX,
+    overrides?.wholdtax,
+  );
+}
+
 function normalizeWholdtax(overrides: any, vendorCountry: string, lifnr = "") {
-  const wt = Array.isArray(overrides?.withholding) ? overrides.withholding : [];
+  const wt = getWithholdingRows(overrides);
   const resolvedLifnr = String(lifnr ?? "").trim();
   return wt
     .map((r: any) => {
@@ -312,7 +348,9 @@ serve(async (req) => {
   trace(reqId, SVC, "auth.ok", { userId: auth.userId });
 
   try {
-    const { vendorId, overrides, sapPayload: clientPayload } = await req.json();
+    const body = await req.json();
+    const { vendorId, sapPayload: clientPayload } = body;
+    const overrides = normalizeOverridesFromBody(body);
     if (!vendorId) throw new Error("vendorId is required");
     trace(reqId, SVC, "body.parsed", { vendorId, hasOverrides: Boolean(overrides), hasClientPayload: Array.isArray(clientPayload) });
     console.log(JSON.stringify({
@@ -648,6 +686,7 @@ serve(async (req) => {
       svc: SVC,
       stage: "wholdtax.final",
       version: WHOLDTAX_FINAL_NORMALIZE_VERSION,
+      bindingMode: WHOLDTAX_BINDING_MODE,
       selectedRows: Array.isArray((overrides as any)?.withholding) ? (overrides as any).withholding.length : 0,
       finalRows: finalWholdtax.length,
       rows: summarizeWholdtax(finalWholdtax),
