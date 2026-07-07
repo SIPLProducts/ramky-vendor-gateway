@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { PdfPreview } from '@/components/vendor/PdfPreview';
 
 interface VendorDocument {
   id: string;
@@ -70,7 +71,9 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewDoc, setPreviewDoc] = useState<VendorDocument | null>(null);
+
 
   useEffect(() => {
     fetchDocuments();
@@ -125,12 +128,14 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
     // block the embedded PDF iframe from a foreign Storage origin.
     const blob = await downloadBlob(doc.file_path);
     if (blob) {
+      setPreviewBlob(blob);
       setPreviewUrl(URL.createObjectURL(blob));
       setPreviewDoc(doc);
       return;
     }
     const url = await getSignedUrl(doc.file_path);
     if (url) {
+      setPreviewBlob(null);
       setPreviewUrl(url);
       setPreviewDoc(doc);
       return;
@@ -141,6 +146,7 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
       variant: 'destructive',
     });
   };
+
 
 
   const triggerBrowserDownload = (href: string, fileName: string) => {
@@ -280,6 +286,7 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
           try { URL.revokeObjectURL(previewUrl); } catch { /* noop */ }
         }
         setPreviewUrl(null);
+        setPreviewBlob(null);
         setPreviewDoc(null);
       }}>
 
@@ -298,11 +305,8 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
                 className="max-w-full max-h-[70vh] mx-auto rounded-md"
               />
             ) : previewDoc?.mime_type === 'application/pdf' ? (
-              <iframe
-                src={previewUrl || ''}
-                className="w-full h-[70vh] rounded-md"
-                title={previewDoc.file_name}
-              />
+              <PdfPreview blob={previewBlob} url={previewUrl} />
+
             ) : (
               <div className="text-center py-8">
                 <p className="text-muted-foreground mb-4">
