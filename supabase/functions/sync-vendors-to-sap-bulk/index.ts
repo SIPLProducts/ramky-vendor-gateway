@@ -65,7 +65,7 @@ serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendorIds, sapPayload } = await req.json();
+    const { vendorIds, sapPayload, overrides } = await req.json();
     if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
       return fail("vendorIds (array) is required");
     }
