@@ -43,14 +43,20 @@ export function PersistedFileActions({
     if (busy) return;
     setBusy('view');
     try {
-      const url = await getSignedUrl();
-      window.open(url, '_blank', 'noopener,noreferrer');
+      // Download to a same-origin blob: URL so Microsoft Edge / SmartScreen
+      // doesn't block the opened PDF from a foreign Storage origin.
+      const { data, error } = await supabase.storage.from(bucket).download(filePath);
+      if (error || !data) throw new Error(error?.message || 'Failed to open file');
+      const blobUrl = URL.createObjectURL(data);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch { /* noop */ } }, 30_000);
     } catch (e: any) {
       toast({ title: 'Could not open file', description: e?.message, variant: 'destructive' });
     } finally {
       setBusy(null);
     }
   };
+
 
   const handleDownload = async () => {
     if (busy) return;
