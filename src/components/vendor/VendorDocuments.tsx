@@ -285,6 +285,7 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
           try { URL.revokeObjectURL(previewUrl); } catch { /* noop */ }
         }
         setPreviewUrl(null);
+        setPreviewBlob(null);
         setPreviewDoc(null);
       }}>
 
@@ -303,11 +304,8 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
                 className="max-w-full max-h-[70vh] mx-auto rounded-md"
               />
             ) : previewDoc?.mime_type === 'application/pdf' ? (
-              <iframe
-                src={previewUrl || ''}
-                className="w-full h-[70vh] rounded-md"
-                title={previewDoc.file_name}
-              />
+              <PdfPreview blob={previewBlob} url={previewUrl} />
+
             ) : (
               <div className="text-center py-8">
                 <p className="text-muted-foreground mb-4">
