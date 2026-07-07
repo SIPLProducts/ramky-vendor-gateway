@@ -2439,11 +2439,8 @@ export function DocumentVerificationStep({
                             />
                           )}
                           {(() => {
-                            const rawStatus = panDoc.ocrData?.status ?? panApi.status ?? null;
-                            const panStatusLabel =
-                              rawStatus && String(rawStatus).trim().toLowerCase() === "valid"
-                                ? "Valid"
-                                : "Invalid";
+                            const comprehensive = extractPanComprehensiveFields({ data: panDoc.ocrData, raw: { data: panApi } });
+                            const panStatusLabel = formatPanStatus(comprehensive.status);
                             return (
                               <EditableOcrField
                                 label="PAN Status"
@@ -2456,13 +2453,8 @@ export function DocumentVerificationStep({
                             );
                           })()}
                           {(() => {
-                            const rawLinked = normalizeBooleanLike(
-                              panDoc.ocrData?.aadhaar_linked ?? panApi.aadhaar_linked
-                            );
-                            const linkedLabel =
-                              rawLinked === true
-                                ? "Aadhaar Linked with PAN"
-                                : "Aadhaar Not Linked with PAN";
+                            const comprehensive = extractPanComprehensiveFields({ data: panDoc.ocrData, raw: { data: panApi } });
+                            const linkedLabel = formatAadhaarLinked(comprehensive.aadhaarLinked);
                             return (
                               <EditableOcrField
                                 label="Is Aadhaar Linked"
