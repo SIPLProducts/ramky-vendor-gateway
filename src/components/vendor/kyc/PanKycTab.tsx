@@ -64,6 +64,46 @@ function pickStr(v: any): string {
   return '';
 }
 
+function collectPanResponseObjects(source: any): Record<string, any>[] {
+  const out: Record<string, any>[] = [];
+  const seen = new Set<any>();
+  const push = (v: any) => {
+    if (!v || typeof v !== 'object' || seen.has(v)) return;
+    seen.add(v);
+    out.push(v);
+    push(v.data);
+    push(v.result);
+    push(v.response);
+    push(v.response_data);
+    push(v.raw);
+  };
+  push(source);
+  return out;
+}
+
+function normalizeBooleanLike(value: unknown): boolean | null {
+  if (value === true || value === false) return value;
+  if (value === 1) return true;
+  if (value === 0) return false;
+  const s = String(value ?? '').trim().toLowerCase();
+  if (!s) return null;
+  if (
+    ['false', 'no', 'n', '0', 'not_linked', 'notlinked', 'not linked', 'not_seeded', 'notseeded', 'not seeded', 'unlinked', 'inactive', 'invalid'].includes(s) ||
+    /\bnot\b/.test(s)
+  ) return false;
+  if (['true', 'yes', 'y', '1', 'linked', 'seeded', 'active', 'valid', 'verified'].includes(s)) return true;
+  return null;
+}
+
+function parsePanStatus(source: any): string | null {
+  for (const data of collectPanResponseObjects(source)) {
+    const raw = data.status ?? data.pan_status ?? data.panStatus ?? data.pan_status_desc ?? null;
+    const value = pickStr(raw).trim();
+    if (value) return value;
+  }
+  return null;
+}
+
 const EMPTY_RESULT: PanTabResult = { ocrPan: '', ocrName: '', panCheck: 'idle', nameCheck: 'idle' };
 
 export function PanKycTab(props: PanKycTabProps) {
@@ -78,28 +118,25 @@ export function PanKycTab(props: PanKycTabProps) {
   };
 
 
-  const parseAadhaarLinked = (data: any): boolean | null => {
-    if (!data || typeof data !== 'object') return null;
-    // Common keys across providers (Surepass, Signzy, Karza, etc.)
-    const candidates = [
-      data.aadhaar_linked,
-      data.is_aadhaar_linked,
-      data.aadhaar_link_status,
-      data.aadhaar_seeding_status,
-      data.aadhaar_seeding_status_desc,
-      data?.pan_aadhaar_linked,
-      data?.pan_aadhaar_link_status,
-    ];
-    for (const raw of candidates) {
-      if (raw === true) return true;
-      if (raw === false) return false;
-      if (raw === 1 || raw === '1') return true;
-      if (raw === 0 || raw === '0') return false;
-      if (typeof raw === 'string') {
-        const s = raw.trim().toLowerCase();
-        if (!s) continue;
-        if (['true', 'yes', 'y', 'linked', 'seeded', 'active', 'valid', 'verified'].includes(s)) return true;
-        if (['false', 'no', 'n', 'not_linked', 'notlinked', 'not linked', 'not seeded', 'notseeded', 'inactive', 'invalid'].includes(s)) return false;
+  const parseAadhaarLinked = (source: any): boolean | null => {
+    for (const data of collectPanResponseObjects(source)) {
+      // Common keys across providers (Surepass, Signzy, Karza, etc.)
+      const candidates = [
+        data.aadhaar_linked,
+        data.aadhaarLinked,
+        data.aadhaar_linked_with_pan,
+        data.is_aadhaar_linked,
+        data.aadhaar_link_status,
+        data.aadhaar_seeding,
+        data.aadhaar_seeding_status,
+        data.aadhaar_seeding_status_desc,
+        data.pan_aadhaar_linked,
+        data.panAadhaarLinked,
+        data.pan_aadhaar_link_status,
+      ];
+      for (const raw of candidates) {
+        const parsed = normalizeBooleanLike(raw);
+        if (parsed !== null) return parsed;
       }
     }
     return null;
@@ -114,8 +151,8 @@ export function PanKycTab(props: PanKycTabProps) {
           input: { id_number: pan, pan },
         });
         if (cr?.ok && cr.data) {
-          const rawStatus = pickStr((cr.data as any).status) || null;
-          const aadhaarLinked = parseAadhaarLinked(cr.data);
+          const rawStatus = parsePanStatus(cr);
+          const aadhaarLinked = parseAadhaarLinked(cr);
           // Skip if provider returned no definitive values — preserve prior state/DB.
           if (rawStatus == null && aadhaarLinked == null) return;
 
