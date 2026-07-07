@@ -113,7 +113,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
               <DataRow label="Address Line 3" value={intl?.company?.addressLine3} />
               <DataRow label="Address Line 4" value={intl?.company?.addressLine4} />
               <DataRow label="City" value={intl?.company?.city} />
-              <DataRow label="State" value={intl?.company?.state} />
+              
               <DataRow label="PIN Code" value={intl?.company?.pincode} />
               <DataRow label="Office Phone" value={intl?.company?.officePhone} />
               <DataRow label="Fax" value={intl?.company?.fax} />

@@ -20,7 +20,6 @@ const schema = z.object({
   addressLine3: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
   addressLine4: z.string().max(40, 'Maximum 40 characters allowed').optional().or(z.literal('')),
   city: z.string().trim().min(1, 'City is required'),
-  state: z.string().trim().min(1, 'State is required'),
   pincode: z.string().trim().min(2, 'PIN Code is required'),
   officePhone: z.string().regex(/^\d{10}$/, '10-digit mobile number required').or(z.literal('')),
   fax: z.string().optional().or(z.literal('')),
@@ -288,23 +287,6 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="city">City <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="city" {...register('city')} placeholder="City" className={errors.city ? 'border-destructive' : ''} />
-              {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="state">State <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="state" {...register('state')} placeholder="State / Province" className={errors.state ? 'border-destructive' : ''} />
-              {errors.state && <p className="text-xs text-destructive">{errors.state.message}</p>}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pincode">PIN Code <span className="text-destructive ml-0.5">*</span></Label>
-              <Input id="pincode" {...register('pincode')} placeholder="Postal code" className={errors.pincode ? 'border-destructive' : ''} />
-              {errors.pincode && <p className="text-xs text-destructive">{errors.pincode.message}</p>}
-            </div>
-          </div>
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">
@@ -457,6 +439,20 @@ export function IntlCompanyDetailsStep({ data, onSubmit, onLiveUpdate, tenantId 
               )}
             </div>
           </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="city">City <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="city" {...register('city')} placeholder="City" className={errors.city ? 'border-destructive' : ''} />
+              {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pincode">PIN Code <span className="text-destructive ml-0.5">*</span></Label>
+              <Input id="pincode" {...register('pincode')} placeholder="Postal code" className={errors.pincode ? 'border-destructive' : ''} />
+              {errors.pincode && <p className="text-xs text-destructive">{errors.pincode.message}</p>}
+            </div>
+          </div>
+
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="grid gap-1.5">

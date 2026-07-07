@@ -313,7 +313,6 @@ export interface InternationalCompanyDetails {
   addressLine3: string;
   addressLine4: string;
   city: string;
-  state: string;
   pincode: string;
   officePhone: string;
   fax: string;
@@ -358,7 +357,7 @@ export const EMPTY_INTERNATIONAL_DATA: InternationalData = {
   company: {
     companyName: '',
     addressLine1: '', addressLine2: '', addressLine3: '', addressLine4: '',
-    city: '', state: '', pincode: '', officePhone: '', fax: '',
+    city: '', pincode: '', officePhone: '', fax: '',
     companyAddress: '', country: '', region: '',
     contact1: '', contact2: '', email1: '', email2: '',
   },
