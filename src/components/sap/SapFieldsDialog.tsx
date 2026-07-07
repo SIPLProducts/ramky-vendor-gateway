@@ -782,8 +782,12 @@ export function SapF4MultiSelectField({
 
 type WTaxOption = { LAND1: string; TAXTYPE: string; TEXT40: string };
 
+type WTaxCodeOption = { LAND1: string; WITHT: string; WT_WITHCD: string; TCDESC: string };
+type RecTypeOption = { LAND1: string; WITHT: string; QSREC: string; RCTXT: string };
+
 function WithholdingTaxSection({
   country, rows, onChange, options, allOptions, loading, error, onRetry,
+  taxcodesAll, rectypesAll, codeLoading, codeError, onCodeRetry,
 }: {
   country: string;
   rows: WTaxRow[];
@@ -793,13 +797,20 @@ function WithholdingTaxSection({
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  taxcodesAll: WTaxCodeOption[];
+  rectypesAll: RecTypeOption[];
+  codeLoading: boolean;
+  codeError: string | null;
+  onCodeRetry: () => void;
 }) {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [openCodeIdx, setOpenCodeIdx] = useState<number | null>(null);
+  const [openRecIdx, setOpenRecIdx] = useState<number | null>(null);
 
   const addRow = () => {
     onChange([
       ...rows,
-      { witht: '', text40: '', wt_withcd: '', wt_subjct: true, qsrec: 'OT', qland: country },
+      { witht: '', text40: '', wt_withcd: '', wt_subjct: true, qsrec: '', qland: country },
     ]);
   };
 
@@ -811,9 +822,8 @@ function WithholdingTaxSection({
     onChange(rows.filter((_, i) => i !== idx));
   };
 
-  // Popover list: prefer country-filtered rows; if none, fall back to all.
-  const filteredEmpty = options.length === 0 && allOptions.length > 0;
-  const listOptions = filteredEmpty ? allOptions : options;
+  const activeCodeRow = openCodeIdx !== null ? rows[openCodeIdx] : null;
+  const activeRecRow = openRecIdx !== null ? rows[openRecIdx] : null;
 
   return (
     <div className="space-y-3">
@@ -854,9 +864,9 @@ function WithholdingTaxSection({
             <tr className="text-left">
               <th className="px-3 py-2 font-medium w-[140px]">WTax Type</th>
               <th className="px-3 py-2 font-medium">WTax Type Description</th>
-              <th className="px-3 py-2 font-medium w-[120px]">WTax Code</th>
-              <th className="px-3 py-2 font-medium w-[80px] text-center">Subject</th>
-              <th className="px-3 py-2 font-medium w-[110px]">Rec.Type</th>
+              <th className="px-3 py-2 font-medium w-[160px]">WTax Code</th>
+              <th className="px-3 py-2 font-medium w-[70px] text-center">Subject</th>
+              <th className="px-3 py-2 font-medium w-[160px]">Rec.Type</th>
               <th className="px-3 py-2 w-[40px]"></th>
             </tr>
           </thead>
@@ -869,7 +879,7 @@ function WithholdingTaxSection({
               </tr>
             ) : (
               rows.map((r, idx) => (
-                <tr key={idx} className="border-t border-border">
+                <tr key={idx} className="border-t border-border align-top">
                   <td className="px-2 py-1.5">
                     <div className="flex gap-1">
                       <Input
@@ -898,11 +908,29 @@ function WithholdingTaxSection({
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <Input
-                      value={r.wt_withcd}
-                      onChange={(e) => updateRow(idx, { wt_withcd: e.target.value.toUpperCase() })}
-                      className="h-8 rounded-md text-xs"
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        value={r.wt_withcd}
+                        onChange={(e) => updateRow(idx, { wt_withcd: e.target.value.toUpperCase() })}
+                        className="h-8 rounded-md text-xs"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 shrink-0"
+                        onClick={() => setOpenCodeIdx(idx)}
+                        disabled={!r.witht}
+                        title={r.witht ? 'Search WTax Code' : 'Select WTax Type first'}
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {r.wt_withcd_desc && (
+                      <div className="text-[10px] text-muted-foreground mt-0.5 truncate" title={r.wt_withcd_desc}>
+                        {r.wt_withcd_desc}
+                      </div>
+                    )}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <Checkbox
@@ -911,18 +939,30 @@ function WithholdingTaxSection({
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <Select
-                      value={r.qsrec || 'OT'}
-                      onValueChange={(v) => updateRow(idx, { qsrec: v })}
-                    >
-                      <SelectTrigger className="h-8 rounded-md text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="OT">OT</SelectItem>
-                        <SelectItem value="ST">ST</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-1">
+                      <Input
+                        value={r.qsrec}
+                        onChange={(e) => updateRow(idx, { qsrec: e.target.value.toUpperCase() })}
+                        className="h-8 rounded-md text-xs"
+                        placeholder="Rec.Type"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 shrink-0"
+                        onClick={() => setOpenRecIdx(idx)}
+                        disabled={!r.witht}
+                        title={r.witht ? 'Search Rec.Type' : 'Select WTax Type first'}
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {r.qsrec_desc && (
+                      <div className="text-[10px] text-muted-foreground mt-0.5 truncate" title={r.qsrec_desc}>
+                        {r.qsrec_desc}
+                      </div>
+                    )}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <Button
@@ -964,6 +1004,44 @@ function WithholdingTaxSection({
             qland: opt.LAND1 || country,
           });
           setOpenIdx(null);
+        }}
+      />
+
+      <WithholdingTaxCodeSearchDialog
+        open={openCodeIdx !== null}
+        onOpenChange={(v) => { if (!v) setOpenCodeIdx(null); }}
+        country={country}
+        witht={activeCodeRow?.witht || ''}
+        all={taxcodesAll}
+        loading={codeLoading}
+        error={codeError}
+        onRetry={onCodeRetry}
+        onSelect={(opt) => {
+          if (openCodeIdx === null) return;
+          updateRow(openCodeIdx, {
+            wt_withcd: opt.WT_WITHCD,
+            wt_withcd_desc: opt.TCDESC,
+          });
+          setOpenCodeIdx(null);
+        }}
+      />
+
+      <RecTypeSearchDialog
+        open={openRecIdx !== null}
+        onOpenChange={(v) => { if (!v) setOpenRecIdx(null); }}
+        country={country}
+        witht={activeRecRow?.witht || ''}
+        all={rectypesAll}
+        loading={codeLoading}
+        error={codeError}
+        onRetry={onCodeRetry}
+        onSelect={(opt) => {
+          if (openRecIdx === null) return;
+          updateRow(openRecIdx, {
+            qsrec: opt.QSREC,
+            qsrec_desc: opt.RCTXT,
+          });
+          setOpenRecIdx(null);
         }}
       />
     </div>
