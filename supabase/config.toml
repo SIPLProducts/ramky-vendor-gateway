@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.sap-fetch-withholding-tax]
 verify_jwt = false
 
+[functions.sap-fetch-wtx-code-rectype]
+verify_jwt = false
+
 [functions.log-login-attempt]
 verify_jwt = false
 
