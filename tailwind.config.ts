@@ -56,6 +56,8 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+          hover: "hsl(var(--sidebar-hover))",
+          submuted: "hsl(var(--sidebar-submuted))",
         },
         success: {
           DEFAULT: "hsl(var(--success))",
