@@ -2,14 +2,11 @@
 // (fields `status` and `aadhaar_linked` from the Surepass PAN Comprehensive endpoint).
 
 export function formatPanStatus(status: string | null | undefined): string {
-  if (!status) return '-';
-  return String(status).trim().toLowerCase() === 'valid' ? 'Valid' : 'Invalid';
+  return String(status ?? '').trim().toLowerCase() === 'valid' ? 'Valid' : 'Invalid';
 }
 
 export function formatAadhaarLinked(linked: boolean | null | undefined): string {
-  if (linked === true) return 'Aadhaar Linked with PAN';
-  if (linked === false) return 'Aadhaar Not Linked with PAN';
-  return '-';
+  return linked === true ? 'Aadhaar Linked with PAN' : 'Aadhaar Not Linked with PAN';
 }
 
 /** Human label used across the app. */
