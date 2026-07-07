@@ -23,8 +23,10 @@ export type WTaxRow = {
   witht: string;
   text40: string;
   wt_withcd: string;
+  wt_withcd_desc?: string;
   wt_subjct: boolean;
   qsrec: string;
+  qsrec_desc?: string;
   qland: string;
 };
 
