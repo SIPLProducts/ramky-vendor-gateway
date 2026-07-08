@@ -251,9 +251,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
                         <Eye className="h-4 w-4 mr-1" /> View Details
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
-                        <FileText className="h-4 w-4 mr-1" /> Preview
-                      </Button>
                       <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
                         <MessageSquare className="h-4 w-4 mr-1" /> Comments
                       </Button>
@@ -344,9 +341,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
                       <Eye className="h-4 w-4 mr-1" /> View Details
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setPreviewVendorId(it.vendorId)}>
-                      <FileText className="h-4 w-4 mr-1" /> Preview
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
                       <MessageSquare className="h-4 w-4 mr-1" /> Comments

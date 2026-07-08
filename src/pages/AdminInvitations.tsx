@@ -944,7 +944,7 @@ export default function AdminInvitations() {
               </form>
               <div className="relative w-64">
                 <Input
-                  placeholder="Search by email, name or reference #..."
+                  placeholder="Search by Name, Email or Phone Number"
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
                 />

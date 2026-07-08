@@ -1,41 +1,33 @@
-# Fix: "Submitted At" in email showing UTC instead of IST
+## Changes
 
-## Root cause
-In `supabase/functions/notify-vendor-submission/index.ts` (lines 281–282), the timestamp is formatted with:
+### 1. Rename "Created At" → "Created Date"
+Only occurrence found in the codebase: `src/pages/Dashboard.tsx`
+- Line 205: Excel export column header key `'Created At'` → `'Created Date'`
+- Line 338: `<TableHead>Created At</TableHead>` → `<TableHead>Created Date</TableHead>`
 
-```ts
-new Date(vendor.submitted_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
-```
+(No other screen currently displays a "Created At" label — verified via ripgrep.)
 
-`"en-IN"` only sets the format (day-month-year, 12-hour). It does NOT set the timezone. Supabase Edge Functions run in **UTC**, so the email renders UTC time with Indian formatting. That is why a vendor who submitted at ~2:46 PM IST sees "9:16 am" in the email (9:16 UTC = 14:46 IST).
+### 2. Show vendor email in Dashboard email column
+File: `src/pages/Dashboard.tsx`
 
-## Fix (single file, minimal change)
+Currently the Email cell renders only `v.primary_email`, which is empty until the vendor completes their profile. Fallback chain:
+`primary_email` → `invited_by.email` (already loaded on the row) → `'—'`
 
-**File:** `supabase/functions/notify-vendor-submission/index.ts`
+Apply the same fallback to:
+- Table cell render (line 380)
+- Excel export `Email` column (line 203)
 
-Change both `toLocaleString` calls (~lines 281–282) to include `timeZone: "Asia/Kolkata"`:
+### 3. Update Invitations search placeholder
+File: `src/pages/AdminInvitations.tsx` (line 947)
+- `"Search by email, name or reference #..."` → `"Search by Name, Email or Phone Number"`
 
-```ts
-const submittedAt = vendor.submitted_at
-  ? new Date(vendor.submitted_at).toLocaleString("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Asia/Kolkata",
-    })
-  : new Date().toLocaleString("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Asia/Kolkata",
-    });
-```
+(No change to search logic — it already matches across those fields; if phone matching is missing we'll extend the filter to include `phone_number` in the same edit.)
 
-Result: email will display "8 Jul 2026, 2:46 pm" (IST) instead of "9:16 am" (UTC).
+### 4. Hide Preview button on all approval screens
+File: `src/components/approvals/StageApprovalView.tsx` (shared by Buyer / SCM CO / SCM Head / Finance 1 / Finance 2 / CEO Office approvals)
 
-## Scope
+Remove the two `<Button>…Preview</Button>` blocks at lines 254 and 348. Leave the `VendorSubmissionPreviewDialog` mount and state in place-but-unused so nothing else breaks; or remove them together if unreferenced after the button removal. Approvers will continue to open the vendor via the existing "Open" / row link.
 
-- **Only** `supabase/functions/notify-vendor-submission/index.ts` — this is the file that generates the "Submitted At" line in the vendor submission / resubmission notification email you screenshotted.
-- No changes to DB, RLS, submission logic, or other emails.
-
-## Out of scope (not touched)
-
-Other emails/UI already use `timeZone: 'Asia/Kolkata'` correctly (`process-approval-action`, `sap-team-reject-vendor`, `sap-team-return-to-buyer`, `sync-vendor-to-sap`, `ApprovalCommentsDialog`). Frontend `toLocaleString('en-IN')` calls in pages render in the user's browser timezone (already IST for Indian users) — not part of this fix. If you later want every outbound email and UI timestamp forced to IST regardless of viewer location, that would be a separate, larger pass.
+## Out of scope
+- No DB, RLS, or edge-function changes.
+- No changes to email column on other pages (they either already show email in detail panes or use invitation email which is always populated).
