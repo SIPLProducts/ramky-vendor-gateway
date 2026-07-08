@@ -596,7 +596,8 @@ export default function AdminInvitations() {
     const matchesSearch =
       invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (invitation.vendor?.reference_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (invitation.vendor_name ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+      (invitation.vendor_name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (invitation.phone_number ?? '').toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesStatus = true;
     if (statusFilter !== 'all') {
