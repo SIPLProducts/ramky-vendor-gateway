@@ -295,7 +295,15 @@ function collectPanResponseObjects(source: any): Record<string, any>[] {
     push(v.response_data);
     push(v.raw);
   };
-  push(source);
+  // IMPORTANT: do NOT push `source` itself — when `source` is a KycApiResult
+  // envelope it carries a top-level `status` field (HTTP 200) that would
+  // shadow the inner `data.status` ("valid") and make the PAN check fail
+  // with the upstream message_code "success". Start from the payload keys.
+  push(source?.data);
+  push(source?.raw);
+  push(source?.result);
+  push(source?.response);
+  push(source?.response_data);
   return out;
 }
 
@@ -303,7 +311,12 @@ function extractPanComprehensiveFields(result: any): { status: string | null; aa
   let statusRaw: unknown = null;
   let aadhaarLinked: boolean | null = null;
   for (const data of collectPanResponseObjects(result)) {
-    statusRaw ??= data.status ?? data.pan_status ?? data.panStatus ?? data.pan_status_desc ?? null;
+    if (statusRaw == null) {
+      const candidate = data.status ?? data.pan_status ?? data.panStatus ?? data.pan_status_desc ?? null;
+      const asStr = pickPrimitiveString(candidate).trim();
+      // Ignore numeric-looking values (e.g. HTTP 200) — real PAN status is textual.
+      if (asStr && !/^\d+$/.test(asStr)) statusRaw = candidate;
+    }
     const candidates = [
       data.aadhaar_linked,
       data.aadhaarLinked,

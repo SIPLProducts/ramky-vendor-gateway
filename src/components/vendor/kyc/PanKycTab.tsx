@@ -77,7 +77,14 @@ function collectPanResponseObjects(source: any): Record<string, any>[] {
     push(v.response_data);
     push(v.raw);
   };
-  push(source);
+  // Do NOT push `source` itself — a KycApiResult envelope has a top-level
+  // `status` field (HTTP 200) that would shadow the inner `data.status`
+  // ("valid") from the PAN Comprehensive payload.
+  push(source?.data);
+  push(source?.raw);
+  push(source?.result);
+  push(source?.response);
+  push(source?.response_data);
   return out;
 }
 
@@ -99,7 +106,8 @@ function parsePanStatus(source: any): string | null {
   for (const data of collectPanResponseObjects(source)) {
     const raw = data.status ?? data.pan_status ?? data.panStatus ?? data.pan_status_desc ?? null;
     const value = pickStr(raw).trim();
-    if (value) return value;
+    // Skip numeric-looking values (e.g. HTTP 200) — real PAN status is textual.
+    if (value && !/^\d+$/.test(value)) return value;
   }
   return null;
 }
