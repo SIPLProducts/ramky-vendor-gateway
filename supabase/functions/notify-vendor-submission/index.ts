@@ -278,8 +278,8 @@ serve(async (req) => {
       : "there";
 
     const submittedAt = vendor.submitted_at
-      ? new Date(vendor.submitted_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
-      : new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+      ? new Date(vendor.submitted_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })
+      : new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
 
     const vendorName = (invite?.vendor_name || vendor.legal_name || vendor.trade_name || "Unnamed Vendor").trim();
     const vendorEmail = (invite?.email || vendor.primary_email || "").trim();
