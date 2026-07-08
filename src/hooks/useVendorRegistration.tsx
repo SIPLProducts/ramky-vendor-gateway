@@ -965,15 +965,29 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
             .update(nextPayload)
             .eq('id', vendorId)
             .select()
-            .single()
+            .maybeSingle()
         );
 
         if (error) throw error;
 
+        // If RLS filters the RETURNING row (e.g. on-behalf flow after status
+        // transition), the update still succeeded — fall back to a fresh read
+        // or, at minimum, the id we just wrote to.
+        let resolved: any = data;
+        if (!resolved) {
+          const { data: reread } = await supabase
+            .from('vendors')
+            .select('*')
+            .eq('id', vendorId)
+            .maybeSingle();
+          resolved = reread ?? { id: vendorId };
+        }
+
         // Upload documents after vendor is saved
-        await uploadAllDocuments(formData, data.id);
-        savedVendor = data;
+        await uploadAllDocuments(formData, resolved.id);
+        savedVendor = resolved;
       } else {
+
         const { data, error } = await writeVendorWithPanFallback(
           'insert',
           vendorData,
@@ -1358,10 +1372,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           .update(nextPayload)
           .eq('id', vendorId)
           .select()
-          .single()
+          .maybeSingle()
       );
 
       if (error) throw error;
+
+      // RLS may filter the RETURNING row after a status transition; the update
+      // itself succeeded, so fall back to a fresh read (or the known id).
+      let resubmitted: any = data;
+      if (!resubmitted) {
+        const { data: reread } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('id', vendorId)
+          .maybeSingle();
+        resubmitted = reread ?? { id: vendorId };
+      }
+
 
       // Upload any new documents (existing ones are retained by the dedupe logic)
       await uploadAllDocuments(formData, vendorId);
@@ -1410,7 +1437,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       setVendorStatus(nextStatus as VendorStatus);
       await refetchVendor();
-      return { ...data, _notify: notifyResult } as typeof data & { _notify: any };
+      return { ...resubmitted, _notify: notifyResult } as typeof resubmitted & { _notify: any };
     },
     onSuccess: () => {
       // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
