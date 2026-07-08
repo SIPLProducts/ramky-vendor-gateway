@@ -887,13 +887,17 @@ export function DocumentVerificationStep({
             message: `PAN on card (${ocrPan}) does not match PAN derived from GSTIN (${panFromGst}).`,
           };
         }
-        if (ocrName && gstLegal && nameMatchPercentage(ocrName, gstLegal) < 40) {
+        // Prefer the PAN Verification API name over the OCR-extracted name for
+        // cross-checking against GST Legal Name, so OCR reading errors don't
+        // create false mismatches.
+        const panNameForMatch = apiName || ocrName;
+        if (panNameForMatch && gstLegal && nameMatchPercentage(panNameForMatch, gstLegal) < 40) {
           return {
             ok: false as const,
             message: "PAN Holder Name does not match GST Legal Name.",
           };
         }
-        const holderName = ocrName || gstLegal;
+        const holderName = panNameForMatch || gstLegal;
         const normalized: Record<string, any> = {
           pan_number: ocrPan,
           holder_name: holderName,
