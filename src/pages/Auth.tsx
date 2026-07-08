@@ -79,45 +79,6 @@ export default function Auth() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    try {
-      nameSchema.parse(signupName);
-      emailSchema.parse(signupEmail);
-      passwordSchema.parse(signupPassword);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        setError(err.errors[0].message);
-        return;
-      }
-    }
-
-    if (signupPassword !== signupConfirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setIsLoading(true);
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
-    setIsLoading(false);
-
-    if (error) {
-      if (error.message.includes('already registered')) {
-        setError('This email is already registered. Please log in instead.');
-      } else {
-        setError(error.message);
-      }
-    } else {
-      setSuccess('Account created successfully! You can now log in.');
-      setSignupName('');
-      setSignupEmail('');
-      setSignupPassword('');
-      setSignupConfirmPassword('');
-    }
-  };
 
   if (authLoading) {
     return (
