@@ -21,7 +21,7 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signIn, signUp, signOut, isVendor, userRole } = useAuth();
+  const { user, loading: authLoading, signIn, signOut, isVendor, userRole } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
