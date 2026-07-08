@@ -1372,10 +1372,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           .update(nextPayload)
           .eq('id', vendorId)
           .select()
-          .single()
+          .maybeSingle()
       );
 
       if (error) throw error;
+
+      // RLS may filter the RETURNING row after a status transition; the update
+      // itself succeeded, so fall back to a fresh read (or the known id).
+      let resubmitted: any = data;
+      if (!resubmitted) {
+        const { data: reread } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('id', vendorId)
+          .maybeSingle();
+        resubmitted = reread ?? { id: vendorId };
+      }
+
 
       // Upload any new documents (existing ones are retained by the dedupe logic)
       await uploadAllDocuments(formData, vendorId);
