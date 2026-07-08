@@ -143,7 +143,7 @@ export default function Auth() {
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-2xl">Welcome</CardTitle>
               <CardDescription>
-                Sign in to your account or create a new one
+                Sign in to your account
               </CardDescription>
             </CardHeader>
             <CardContent>
