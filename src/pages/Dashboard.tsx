@@ -200,9 +200,9 @@ export default function Dashboard() {
       'Reference #': v.reference_number ?? '',
       'Company Name': v.legal_name ?? '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
-      Email: v.primary_email ?? '',
+      Email: v.primary_email ?? v.invited_by?.email ?? '',
       Status: STATUS_LABELS[v.status]?.label ?? v.status,
-      'Created At': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
+      'Created Date': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -335,7 +335,7 @@ export default function Dashboard() {
                   <TableHead>Invited By</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created At</TableHead>
+                  <TableHead>Created Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -377,7 +377,7 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{v.primary_email ?? '—'}</TableCell>
+                      <TableCell>{v.primary_email ?? v.invited_by?.email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
                     </TableRow>
