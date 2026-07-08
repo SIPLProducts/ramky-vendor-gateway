@@ -1437,7 +1437,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       setVendorStatus(nextStatus as VendorStatus);
       await refetchVendor();
-      return { ...data, _notify: notifyResult } as typeof data & { _notify: any };
+      return { ...resubmitted, _notify: notifyResult } as typeof resubmitted & { _notify: any };
     },
     onSuccess: () => {
       // Toast suppressed — VendorRegistration.tsx shows a success dialog with buyer details.
