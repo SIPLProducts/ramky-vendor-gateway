@@ -988,9 +988,9 @@ export default function AdminInvitations() {
                       <TableHead>Email</TableHead>
 
                       <TableHead>Phone Number</TableHead>
-                      <TableHead>Created</TableHead>
+                      <TableHead>Created Date</TableHead>
                       <TableHead>Expires</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
