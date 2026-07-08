@@ -593,6 +593,9 @@ export default function AdminInvitations() {
 
   // Filter invitations
   const filteredInvitations = invitations?.filter((invitation: any) => {
+    const vendorStatus = invitation.vendor?.status as string | undefined;
+    if (invitation.vendor && vendorStatus && vendorStatus !== 'draft') return false;
+
     const matchesSearch =
       invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (invitation.vendor?.reference_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||

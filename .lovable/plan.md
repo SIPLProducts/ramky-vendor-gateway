@@ -1,34 +1,25 @@
-## Changes
+## Change
 
-### 1. Rename "Created" → "Created Date" in remaining tables
-- `src/pages/AdminInvitations.tsx` line 990: `<TableHead>Created</TableHead>` → `<TableHead>Created Date</TableHead>`
-- `src/components/admin/BuyerScmMapping.tsx` line 284: same rename
-- `src/components/admin/TenantManager.tsx` line 98: same rename
+Hide invitations from the Vendor Invitations screen once the invited vendor has submitted their application (including buyer-on-behalf submissions).
 
-(Dashboard already updated in previous turn.)
+### Where
+`src/pages/AdminInvitations.tsx` — `filteredInvitations` (lines 595–609).
 
-### 2. Invitations search: include phone number
-File: `src/pages/AdminInvitations.tsx` (filter at lines 595–599)
+### How
+Each invitation row already joins `vendor:vendors(id, reference_number, status)`. An invitation is considered "submitted" when `invitation.vendor` exists AND `invitation.vendor.status` is anything other than `'draft'` (i.e. the vendor has moved past the draft/registration-in-progress state — covers `submitted`, all `*_review`, `pending_sap_sync`, `sap_synced`, rejections, etc.). Buyer on-behalf submissions follow the same path, so they'll be filtered out too.
 
-Extend the `filteredInvitations` filter to also match on `invitation.phone_number`:
+Add this predicate at the top of the `filteredInvitations` filter so submitted vendors never appear in the list (nor in pagination / counts):
+
 ```ts
-(invitation.phone_number ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+const vendorStatus = invitation.vendor?.status as string | undefined;
+const submitted = !!invitation.vendor && vendorStatus && vendorStatus !== 'draft';
+if (submitted) return false;
 ```
-So the placeholder "Search by Name, Email or Phone Number" actually filters by phone.
 
-### 3. Rename "Actions" → "Status" column header
-File: `src/pages/AdminInvitations.tsx` line 992
-- `<TableHead className="text-right">Actions</TableHead>` → `<TableHead className="text-right">Status</TableHead>`
+No other changes:
+- Status tabs/counters continue to work off the remaining (non-submitted) rows.
+- Backend, RLS, and the vendor list screen are untouched — submitted vendors remain visible under Vendors, just not under Invitations.
 
-(Only the header label changes; the cells in that column remain unchanged — they already show status badges alongside action buttons.)
-
-### 4. Remove Sign Up from login page
-File: `src/pages/Auth.tsx`
-- Remove the `<Tabs>` wrapper and `TabsList` (lines ~222–226) so only the login form renders.
-- Remove the `<TabsContent value="signup">` block and its form (lines ~288 onward through its closing tag).
-- Remove now-unused signup state (`signupName/Email/Password/ConfirmPassword`), `handleSignup`, `nameSchema`, and the `signUp` import from `useAuth`.
-- Update the card copy: `CardDescription` "Sign in to your account or create a new one" → "Sign in to your account".
-
-## Out of scope
-- No backend, RLS, or route changes.
-- Vendor invite / vendor login flows untouched (vendors already onboard via invitation links, not this signup tab).
+### Out of scope
+- No change to what "Used" means on the badge (kept as-is per the previous clarification).
+- No schema, edge function, or query-layer changes.
