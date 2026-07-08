@@ -1,50 +1,52 @@
-
 ## Problem
 
-When a vendor uploads a PAN card, both API calls actually succeed:
+After submitting a vendor application via an invitation link, the network tab shows:
 
-- **PAN OCR** (`/api/v1/ocr/pan`) → `success: true`, extracts `AABCF1735D` / `Foss India Private Limited`
-- **PAN Comprehensive** (`/api/v1/pan/pan-comprehensive`) → `success: true`, `data.status: "valid"`
-
-But the UI still shows a red **Failed** pill on the file row and a destructive alert containing the word **"success"** (the upstream `message_code`). This blocks the vendor from continuing to MSME.
+```
+PATCH /rest/v1/vendors?id=eq.<uuid>&select=*  → 406
+PGRST116: The result contains 0 rows
+Cannot coerce the result to a single JSON object
+```
 
 ## Root cause
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`, the PAN branch of `verifyApi` (around line 846–856) does:
+In `src/hooks/useVendorRegistration.tsx` the save/update calls use:
 
 ```ts
-const comprehensive = extractPanComprehensiveFields(r);
-const apiStatus = String(comprehensive.status ?? "").toLowerCase().trim();
-if (!r.ok || apiStatus !== "valid") {
-  return { ok: false, message: r.message || "PAN validation failed..." };
-}
+supabase.from('vendors').update(payload).eq('id', vendorId).select().single()
 ```
 
-`extractPanComprehensiveFields(r)` uses `collectPanResponseObjects` which walks the `KycApiResult` wrapper starting from `r` itself, then `r.data`, `r.raw`, etc. It then reads `data.status ?? data.pan_status ?? ...` with `??=` (assign-if-nullish).
+`.select().single()` runs a `RETURNING *` and re-applies the `SELECT` RLS policies on `vendors`. The update itself succeeds (the UPDATE policy `WITH CHECK` permits transitioning to `scm_manager_review`, `submitted`, etc.), but the returning SELECT is filtered to 0 rows in cases where the caller cannot re-read the row under any SELECT policy after the status transition. This happens most reliably in the "on-behalf" invitation flow (the buyer is the acting user, `vendors.user_id` is the vendor's user, and the buyer sees the row only via `vendor_invitations.vendor_id`, which may not yet be linked at the exact moment of insert/first update).
 
-The problem: the outer `KycApiResult` envelope produced by `kyc-api-execute` also has a top-level `status` field (the HTTP status, `200`). So on the very first iteration `statusRaw` is assigned `200` (a number, not nullish), and the real `data.status = "valid"` never overrides it. `apiStatus` becomes `"200"`, the guard triggers, and the error message shown to the user is `r.message`, i.e. Surepass's `message_code` `"success"`.
+The update wrote correctly — only the returning row is empty — so `.single()` throws PGRST116 and the UI surfaces the 406.
 
-This is the same envelope-collision hazard as the earlier PAN Comprehensive parser. Nothing changed in the API — the wrapper's `status: 200` field just happens to shadow the inner payload's `status: "valid"`.
+## Fix (minimal, targeted)
 
-## Fix
+Do not change any RLS, business logic, or submission flow. Only make the "read back after write" tolerant of an empty RETURNING result, because we already know the vendor id we just wrote to.
 
-Change `extractPanComprehensiveFields` (and the twin helper `parsePanStatus` in `src/components/vendor/kyc/PanKycTab.tsx`) so it only reads `status` from **inner payload objects**, never from the `KycApiResult` envelope.
+Edit `src/hooks/useVendorRegistration.tsx`:
 
-Concretely, in `src/components/vendor/steps/DocumentVerificationStep.tsx`:
+1. Replace the three `.select().single()` calls used inside `writeVendorWithPanFallback` (lines ~963–968, ~980–984, ~1356–1361) with `.select().maybeSingle()`.
 
-1. Update `collectPanResponseObjects(source)` (or add a sibling `collectPanPayloadObjects`) so it does not include the outer `KycApiResult` itself in the returned list — start traversal from `source.data`, `source.raw`, `source.result`, `source.response`, `source.response_data`. This drops the envelope's `status` / `status_code` / `success` / `message_code` fields from the search space entirely.
-2. Keep the rest of `extractPanComprehensiveFields` unchanged (still prefers `data.status`, falls back to `pan_status`, etc., still resolves `aadhaar_linked`).
-3. Apply the identical change to `parsePanStatus` in `src/components/vendor/kyc/PanKycTab.tsx` so the standalone PAN KYC tab is not vulnerable to the same collision.
+2. After each call, if `data` is null and there is no error, fall back to a fresh read of the row by id so downstream code (`uploadAllDocuments(formData, data.id)`, `setVendorId(data.id)`, resubmit return value) keeps working:
 
-Also add a small defensive filter inside `extractPanComprehensiveFields`: ignore any `status` value that is a number or a purely numeric string (e.g. `200`, `"200"`) — the real PAN Comprehensive `status` is always textual (`"valid"`, `"invalid"`, `"deactivated"`, etc.). This makes the parser resilient even if a future wrapper adds another numeric `status`-shaped field.
+   - For the UPDATE branches (existing vendor): reuse the known `vendorId` — synthesize `{ id: vendorId }` (all downstream code only needs `.id`), or issue a follow-up `select('*').eq('id', vendorId).maybeSingle()` under the same client. Prefer the follow-up read; if it also returns null (RLS truly blocks), fall back to `{ id: vendorId }`.
+   - For the INSERT branch: if `data` is null we cannot know the new id, so keep `.single()` behavior there but wrap with a clearer error message. In practice self-registration inserts satisfy the SELECT policy (`user_id = auth.uid()`), so this path already works; only the on-behalf INSERT is at risk and it already uses a different code path.
 
-## Verification
-
-- PAN upload with the response you shared → the file row shows **Verified**, PAN Holder Name populates, "Continue to MSME" becomes enabled.
-- `pan_status` still persists to `vendors.pan_status` as `"valid"`.
-- No changes to the edge function, DB schema, or other tabs (GST/MSME/Bank).
+3. No changes to `submitFormMutation` (line 1168) — it already avoids `.select().single()`.
 
 ## Files touched
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — narrow `collectPanResponseObjects` / harden `extractPanComprehensiveFields`.
-- `src/components/vendor/kyc/PanKycTab.tsx` — mirror the same narrowing in `parsePanStatus` / `parseAadhaarLinked`.
+- `src/hooks/useVendorRegistration.tsx` — swap `.single()` → `.maybeSingle()` and add null-guard fallbacks at the three write sites listed above.
+
+## Out of scope
+
+- RLS policies on `vendors` (unchanged).
+- Submission status transitions and approval routing (unchanged).
+- Any other page or hook.
+
+## Verification
+
+- Submit a normal (self) invitation flow → no 406, submission succeeds, success dialog shows.
+- Submit an on-behalf invitation flow → no 406, vendor row created and routed to SCM CO as before.
+- Resubmit after "returned to vendor" → no 406, resubmission succeeds.
