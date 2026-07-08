@@ -95,7 +95,7 @@ export function TenantManager() {
                   <TableHead>Company Name</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Created Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

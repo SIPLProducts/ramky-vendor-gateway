@@ -1,33 +1,34 @@
 ## Changes
 
-### 1. Rename "Created At" → "Created Date"
-Only occurrence found in the codebase: `src/pages/Dashboard.tsx`
-- Line 205: Excel export column header key `'Created At'` → `'Created Date'`
-- Line 338: `<TableHead>Created At</TableHead>` → `<TableHead>Created Date</TableHead>`
+### 1. Rename "Created" → "Created Date" in remaining tables
+- `src/pages/AdminInvitations.tsx` line 990: `<TableHead>Created</TableHead>` → `<TableHead>Created Date</TableHead>`
+- `src/components/admin/BuyerScmMapping.tsx` line 284: same rename
+- `src/components/admin/TenantManager.tsx` line 98: same rename
 
-(No other screen currently displays a "Created At" label — verified via ripgrep.)
+(Dashboard already updated in previous turn.)
 
-### 2. Show vendor email in Dashboard email column
-File: `src/pages/Dashboard.tsx`
+### 2. Invitations search: include phone number
+File: `src/pages/AdminInvitations.tsx` (filter at lines 595–599)
 
-Currently the Email cell renders only `v.primary_email`, which is empty until the vendor completes their profile. Fallback chain:
-`primary_email` → `invited_by.email` (already loaded on the row) → `'—'`
+Extend the `filteredInvitations` filter to also match on `invitation.phone_number`:
+```ts
+(invitation.phone_number ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+```
+So the placeholder "Search by Name, Email or Phone Number" actually filters by phone.
 
-Apply the same fallback to:
-- Table cell render (line 380)
-- Excel export `Email` column (line 203)
+### 3. Rename "Actions" → "Status" column header
+File: `src/pages/AdminInvitations.tsx` line 992
+- `<TableHead className="text-right">Actions</TableHead>` → `<TableHead className="text-right">Status</TableHead>`
 
-### 3. Update Invitations search placeholder
-File: `src/pages/AdminInvitations.tsx` (line 947)
-- `"Search by email, name or reference #..."` → `"Search by Name, Email or Phone Number"`
+(Only the header label changes; the cells in that column remain unchanged — they already show status badges alongside action buttons.)
 
-(No change to search logic — it already matches across those fields; if phone matching is missing we'll extend the filter to include `phone_number` in the same edit.)
-
-### 4. Hide Preview button on all approval screens
-File: `src/components/approvals/StageApprovalView.tsx` (shared by Buyer / SCM CO / SCM Head / Finance 1 / Finance 2 / CEO Office approvals)
-
-Remove the two `<Button>…Preview</Button>` blocks at lines 254 and 348. Leave the `VendorSubmissionPreviewDialog` mount and state in place-but-unused so nothing else breaks; or remove them together if unreferenced after the button removal. Approvers will continue to open the vendor via the existing "Open" / row link.
+### 4. Remove Sign Up from login page
+File: `src/pages/Auth.tsx`
+- Remove the `<Tabs>` wrapper and `TabsList` (lines ~222–226) so only the login form renders.
+- Remove the `<TabsContent value="signup">` block and its form (lines ~288 onward through its closing tag).
+- Remove now-unused signup state (`signupName/Email/Password/ConfirmPassword`), `handleSignup`, `nameSchema`, and the `signUp` import from `useAuth`.
+- Update the card copy: `CardDescription` "Sign in to your account or create a new one" → "Sign in to your account".
 
 ## Out of scope
-- No DB, RLS, or edge-function changes.
-- No changes to email column on other pages (they either already show email in detail panes or use invitation email which is always populated).
+- No backend, RLS, or route changes.
+- Vendor invite / vendor login flows untouched (vendors already onboard via invitation links, not this signup tab).
