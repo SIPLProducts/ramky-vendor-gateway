@@ -1,52 +1,41 @@
-## Problem
-
-After submitting a vendor application via an invitation link, the network tab shows:
-
-```
-PATCH /rest/v1/vendors?id=eq.<uuid>&select=*  → 406
-PGRST116: The result contains 0 rows
-Cannot coerce the result to a single JSON object
-```
+# Fix: "Submitted At" in email showing UTC instead of IST
 
 ## Root cause
-
-In `src/hooks/useVendorRegistration.tsx` the save/update calls use:
+In `supabase/functions/notify-vendor-submission/index.ts` (lines 281–282), the timestamp is formatted with:
 
 ```ts
-supabase.from('vendors').update(payload).eq('id', vendorId).select().single()
+new Date(vendor.submitted_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
 ```
 
-`.select().single()` runs a `RETURNING *` and re-applies the `SELECT` RLS policies on `vendors`. The update itself succeeds (the UPDATE policy `WITH CHECK` permits transitioning to `scm_manager_review`, `submitted`, etc.), but the returning SELECT is filtered to 0 rows in cases where the caller cannot re-read the row under any SELECT policy after the status transition. This happens most reliably in the "on-behalf" invitation flow (the buyer is the acting user, `vendors.user_id` is the vendor's user, and the buyer sees the row only via `vendor_invitations.vendor_id`, which may not yet be linked at the exact moment of insert/first update).
+`"en-IN"` only sets the format (day-month-year, 12-hour). It does NOT set the timezone. Supabase Edge Functions run in **UTC**, so the email renders UTC time with Indian formatting. That is why a vendor who submitted at ~2:46 PM IST sees "9:16 am" in the email (9:16 UTC = 14:46 IST).
 
-The update wrote correctly — only the returning row is empty — so `.single()` throws PGRST116 and the UI surfaces the 406.
+## Fix (single file, minimal change)
 
-## Fix (minimal, targeted)
+**File:** `supabase/functions/notify-vendor-submission/index.ts`
 
-Do not change any RLS, business logic, or submission flow. Only make the "read back after write" tolerant of an empty RETURNING result, because we already know the vendor id we just wrote to.
+Change both `toLocaleString` calls (~lines 281–282) to include `timeZone: "Asia/Kolkata"`:
 
-Edit `src/hooks/useVendorRegistration.tsx`:
+```ts
+const submittedAt = vendor.submitted_at
+  ? new Date(vendor.submitted_at).toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    })
+  : new Date().toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    });
+```
 
-1. Replace the three `.select().single()` calls used inside `writeVendorWithPanFallback` (lines ~963–968, ~980–984, ~1356–1361) with `.select().maybeSingle()`.
+Result: email will display "8 Jul 2026, 2:46 pm" (IST) instead of "9:16 am" (UTC).
 
-2. After each call, if `data` is null and there is no error, fall back to a fresh read of the row by id so downstream code (`uploadAllDocuments(formData, data.id)`, `setVendorId(data.id)`, resubmit return value) keeps working:
+## Scope
 
-   - For the UPDATE branches (existing vendor): reuse the known `vendorId` — synthesize `{ id: vendorId }` (all downstream code only needs `.id`), or issue a follow-up `select('*').eq('id', vendorId).maybeSingle()` under the same client. Prefer the follow-up read; if it also returns null (RLS truly blocks), fall back to `{ id: vendorId }`.
-   - For the INSERT branch: if `data` is null we cannot know the new id, so keep `.single()` behavior there but wrap with a clearer error message. In practice self-registration inserts satisfy the SELECT policy (`user_id = auth.uid()`), so this path already works; only the on-behalf INSERT is at risk and it already uses a different code path.
+- **Only** `supabase/functions/notify-vendor-submission/index.ts` — this is the file that generates the "Submitted At" line in the vendor submission / resubmission notification email you screenshotted.
+- No changes to DB, RLS, submission logic, or other emails.
 
-3. No changes to `submitFormMutation` (line 1168) — it already avoids `.select().single()`.
+## Out of scope (not touched)
 
-## Files touched
-
-- `src/hooks/useVendorRegistration.tsx` — swap `.single()` → `.maybeSingle()` and add null-guard fallbacks at the three write sites listed above.
-
-## Out of scope
-
-- RLS policies on `vendors` (unchanged).
-- Submission status transitions and approval routing (unchanged).
-- Any other page or hook.
-
-## Verification
-
-- Submit a normal (self) invitation flow → no 406, submission succeeds, success dialog shows.
-- Submit an on-behalf invitation flow → no 406, vendor row created and routed to SCM CO as before.
-- Resubmit after "returned to vendor" → no 406, resubmission succeeds.
+Other emails/UI already use `timeZone: 'Asia/Kolkata'` correctly (`process-approval-action`, `sap-team-reject-vendor`, `sap-team-return-to-buyer`, `sync-vendor-to-sap`, `ApprovalCommentsDialog`). Frontend `toLocaleString('en-IN')` calls in pages render in the user's browser timezone (already IST for Indian users) — not part of this fix. If you later want every outbound email and UI timestamp forced to IST regardless of viewer location, that would be a separate, larger pass.
