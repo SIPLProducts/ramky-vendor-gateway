@@ -965,15 +965,29 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
             .update(nextPayload)
             .eq('id', vendorId)
             .select()
-            .single()
+            .maybeSingle()
         );
 
         if (error) throw error;
 
+        // If RLS filters the RETURNING row (e.g. on-behalf flow after status
+        // transition), the update still succeeded — fall back to a fresh read
+        // or, at minimum, the id we just wrote to.
+        let resolved: any = data;
+        if (!resolved) {
+          const { data: reread } = await supabase
+            .from('vendors')
+            .select('*')
+            .eq('id', vendorId)
+            .maybeSingle();
+          resolved = reread ?? { id: vendorId };
+        }
+
         // Upload documents after vendor is saved
-        await uploadAllDocuments(formData, data.id);
-        savedVendor = data;
+        await uploadAllDocuments(formData, resolved.id);
+        savedVendor = resolved;
       } else {
+
         const { data, error } = await writeVendorWithPanFallback(
           'insert',
           vendorData,
