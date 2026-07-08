@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-import { Mail, Lock, User, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 import authHeroImage from '@/assets/auth-hero.jpg';
 import ramkyLogo from '@/assets/ramky-logo.png';
