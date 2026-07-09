@@ -225,6 +225,29 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
           <div className="relative flex justify-between">
             {statusSteps.map((step, index) => {
               const stepStatus = stepOverrides[index] ?? getStepStatus(index, adjustedActiveIndex, status);
+              const isSapStep = step.id === 'sap';
+              let descriptionText: string;
+              if (isSapStep) {
+                if (stepStatus === 'completed') {
+                  descriptionText = sapVendorCode
+                    ? `Vendor Code Created · ${sapVendorCode}`
+                    : 'Vendor Code Created';
+                } else if (stepStatus === 'active') {
+                  descriptionText = 'Syncing to SAP…';
+                } else if (stepStatus === 'failed') {
+                  descriptionText = 'Action required';
+                } else {
+                  descriptionText = 'Awaiting SAP sync';
+                }
+              } else {
+                descriptionText = stepStatus === 'active'
+                  ? 'In Progress'
+                  : stepStatus === 'completed'
+                    ? 'Completed'
+                    : stepStatus === 'failed'
+                      ? 'Action required'
+                      : step.description;
+              }
               return (
                 <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / statusSteps.length}%` }}>
                   <div
@@ -247,7 +270,7 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
                       stepStatus === 'failed' && "text-destructive"
                     )}>{step.label}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 hidden md:block">
-                      {stepStatus === 'active' ? 'In Progress' : stepStatus === 'completed' ? 'Completed' : stepStatus === 'failed' ? 'Action required' : step.description}
+                      {descriptionText}
                     </p>
 
                   </div>
