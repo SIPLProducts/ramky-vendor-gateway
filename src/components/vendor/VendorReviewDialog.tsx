@@ -449,7 +449,7 @@ export function VendorReviewDialog({
                           <Shield className="h-4 w-4" />
                           Buyer Details
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1">
                             <p className="text-muted-foreground">Buyer Company</p>
                             <p className="font-medium">{routing.vendorCompany || '-'}</p>
