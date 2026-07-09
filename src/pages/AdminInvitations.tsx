@@ -137,11 +137,12 @@ export default function AdminInvitations() {
       if (seesAllInvitations) {
         let q = supabase
           .from('vendor_invitations')
-          .select('*, vendor:vendors(id, reference_number, status), tenants(id, name)')
+          .select('*, vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status), tenants(id, name)')
           .order('created_at', { ascending: false });
         if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
         const { data, error } = await q;
         if (error) throw error;
+        (data ?? []).forEach((r: any) => { r.vendor = Array.isArray(r.vendor) ? (r.vendor[0] ?? null) : r.vendor; });
         return data ?? [];
       }
 
@@ -176,13 +177,14 @@ export default function AdminInvitations() {
 
       let q = supabase
         .from('vendor_invitations')
-        .select('*, vendor:vendors(id, reference_number, status), tenants(id, name)')
+        .select('*, vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status), tenants(id, name)')
         .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
       if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
 
       const { data, error } = await q;
       if (error) throw error;
+      (data ?? []).forEach((r: any) => { r.vendor = Array.isArray(r.vendor) ? (r.vendor[0] ?? null) : r.vendor; });
       return data ?? [];
     },
     enabled: !!user?.id,
@@ -583,11 +585,11 @@ export default function AdminInvitations() {
     });
   };
 
-  type InviteStatus = 'pending' | 'used' | 'draft' | 'expired' | 'submitted';
+  type InviteStatus = 'pending' | 'used' | 'in_progress' | 'expired' | 'submitted';
   const getInvitationStatus = (invitation: any): InviteStatus => {
     const vStatus = invitation?.vendor?.status as string | undefined;
     if (vStatus && vStatus !== 'draft') return 'submitted';
-    if (vStatus === 'draft') return 'draft';
+    if (vStatus === 'draft' || invitation.created_on_behalf) return 'in_progress';
     if (invitation.used_at) return 'used';
     if (new Date(invitation.expires_at) < new Date()) return 'expired';
     return 'pending';
@@ -679,7 +681,7 @@ export default function AdminInvitations() {
       );
     }
 
-    if (status === 'draft') {
+    if (status === 'in_progress') {
       return (
         <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 text-white">
           <Clock className="h-3 w-3 mr-1" />
@@ -974,7 +976,7 @@ export default function AdminInvitations() {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="used">Used</SelectItem>
-                  <SelectItem value="draft">In Progress</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
@@ -1015,7 +1017,7 @@ export default function AdminInvitations() {
                       const isOnBehalf = !!(invitation as any).created_on_behalf;
                       const status = getInvitationStatus(invitation);
                       const canResumeOnBehalf = isOnBehalf && !invitation.used_at && status !== 'expired';
-                      const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'draft' || status === 'expired');
+                      const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'in_progress' || status === 'expired');
                       const resendLabel = status === 'pending' ? 'Send Email' : status === 'expired' ? 'Resend Invitation' : 'Resend Email';
                       const isSending = sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id;
                       const handleResend = async () => {
