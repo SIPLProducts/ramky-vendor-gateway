@@ -405,7 +405,7 @@ export function VendorReviewDialog({
     return () => { cancelled = true; };
   }, [open, vendor?.id, vendor?.gstin, gstValidation, filingFetched, filingFetching, callProvider]);
 
-  const validations = getValidationsFromVendor(vendor);
+  
   const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation, liveFilingRows) : null;
 
   const openDocument = async (filePath: string) => {
