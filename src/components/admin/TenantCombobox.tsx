@@ -12,8 +12,12 @@ export interface TenantOption {
 
 interface Props {
   tenants: TenantOption[];
-  value: string | null;                       // null = "All Tenants" when allowAll
-  onChange: (id: string | null) => void;
+  value?: string | null;                       // single-select value; null = "All Tenants" when allowAll
+  onChange?: (id: string | null) => void;
+  /** Multi-select mode. When set, `values`/`onChangeMulti` are used. */
+  multi?: boolean;
+  values?: string[] | null;                     // multi-select selection; null/empty = "All Tenants"
+  onChangeMulti?: (ids: string[] | null) => void;
   userCounts?: Record<string, number>;
   allowAll?: boolean;
   allLabel?: string;
@@ -29,6 +33,9 @@ export function TenantCombobox({
   tenants,
   value,
   onChange,
+  multi,
+  values,
+  onChangeMulti,
   userCounts,
   allowAll = false,
   allLabel = 'All Tenants',
@@ -39,19 +46,40 @@ export function TenantCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
 
-  const selected = useMemo(() => {
-    if (allowAll && (value === null || value === ALL_VALUE)) return null;
-    return tenants.find((x) => x.id === value) ?? null;
-  }, [tenants, value, allowAll]);
+  const selectedIds = useMemo<string[]>(() => {
+    if (multi) return Array.isArray(values) ? values : [];
+    return value ? [value] : [];
+  }, [multi, values, value]);
 
-  const selectedLabel = useMemo(() => {
-    if (allowAll && (value === null || value === ALL_VALUE)) return allLabel;
-    if (!selected) return placeholder;
-    const c = userCounts?.[selected.id];
-    return c != null ? `${selected.name} · ${c} user${c === 1 ? '' : 's'}` : selected.name;
-  }, [selected, value, userCounts, allowAll, allLabel, placeholder]);
+  const isAll = multi
+    ? selectedIds.length === 0
+    : (allowAll && (value === null || value === undefined || value === ALL_VALUE));
 
-  const isPlaceholder = !selected && !(allowAll && (value === null || value === ALL_VALUE));
+  const triggerLabel = useMemo(() => {
+    if (isAll) return allLabel;
+    if (multi) {
+      if (selectedIds.length === 1) {
+        const t = tenants.find((x) => x.id === selectedIds[0]);
+        return t ? t.name : placeholder;
+      }
+      return `${selectedIds.length} tenants selected`;
+    }
+    const t = tenants.find((x) => x.id === value);
+    if (!t) return placeholder;
+    const c = userCounts?.[t.id];
+    return c != null ? `${t.name} · ${c} user${c === 1 ? '' : 's'}` : t.name;
+  }, [isAll, multi, selectedIds, tenants, value, userCounts, allLabel, placeholder]);
+
+  const isPlaceholder = !isAll && selectedIds.length === 0;
+
+  const toggleMulti = (id: string) => {
+    if (!multi || !onChangeMulti) return;
+    const set = new Set(selectedIds);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    const next = Array.from(set);
+    onChangeMulti(next.length > 0 ? next : null);
+  };
 
   return (
     <div className={className}>
@@ -72,7 +100,7 @@ export function TenantCombobox({
           >
             <span className={cn('flex items-center gap-2 truncate', isPlaceholder && 'text-muted-foreground')}>
               <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{selectedLabel}</span>
+              <span className="truncate">{triggerLabel}</span>
             </span>
             <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
           </button>
@@ -86,21 +114,36 @@ export function TenantCombobox({
                 {allowAll && (
                   <CommandItem
                     value={allLabel}
-                    onSelect={() => { onChange(null); setOpen(false); }}
+                    onSelect={() => {
+                      if (multi) {
+                        onChangeMulti?.(null);
+                      } else {
+                        onChange?.(null);
+                      }
+                      setOpen(false);
+                    }}
                   >
-                    <Check className={cn('mr-2 h-4 w-4', value === null ? 'opacity-100' : 'opacity-0')} />
+                    <Check className={cn('mr-2 h-4 w-4', isAll ? 'opacity-100' : 'opacity-0')} />
                     {allLabel}
                   </CommandItem>
                 )}
                 {tenants.map((t) => {
                   const c = userCounts?.[t.id];
+                  const isSelected = selectedIds.includes(t.id);
                   return (
                     <CommandItem
                       key={t.id}
                       value={`${t.name} ${t.code ?? ''}`}
-                      onSelect={() => { onChange(t.id); setOpen(false); }}
+                      onSelect={() => {
+                        if (multi) {
+                          toggleMulti(t.id);
+                        } else {
+                          onChange?.(t.id);
+                          setOpen(false);
+                        }
+                      }}
                     >
-                      <Check className={cn('mr-2 h-4 w-4', value === t.id ? 'opacity-100' : 'opacity-0')} />
+                      <Check className={cn('mr-2 h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
                       <span className="flex-1 truncate">{t.name}</span>
                       {c != null && (
                         <span className="ml-2 text-xs text-muted-foreground shrink-0">
@@ -118,4 +161,3 @@ export function TenantCombobox({
     </div>
   );
 }
-

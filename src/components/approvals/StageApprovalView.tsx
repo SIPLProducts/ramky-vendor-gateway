@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+import { useTenantContext } from '@/hooks/useTenantContext';
 
 interface Props {
   stage: ApprovalStage;
@@ -33,8 +34,23 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { myTenantIds, activeTenantIds } = useTenantContext();
 
-  const { items, loading, refresh } = usePendingApprovalsByStage(stage);
+  const { items: rawItems, loading, refresh } = usePendingApprovalsByStage(stage);
+
+  const isBuyer = stage === 'BUYER';
+
+  // For Buyer stage: honour the header multi-select tenant filter.
+  const items = isBuyer && activeTenantIds && activeTenantIds.length > 0
+    ? rawItems.filter((i) => !i.tenantId || activeTenantIds.includes(i.tenantId))
+    : rawItems;
+
+  // Effective tenant count drives visibility of the "Buyer Company" column.
+  const effectiveTenantCount = isBuyer
+    ? ((activeTenantIds && activeTenantIds.length > 0) ? activeTenantIds.length : myTenantIds.length)
+    : 0;
+  const showBuyerCompanyColumn = !isBuyer || effectiveTenantCount > 1;
+
   const [actionItem, setActionItem] = useState<{ item: StageApprovalItem; action: 'approve' | 'reject' } | null>(null);
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -49,7 +65,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
   const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
 
-  const isBuyer = stage === 'BUYER';
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
   const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
   const rejectedItems = items.filter((i) => i.kind === 'rejected');
@@ -177,7 +192,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <TableHeader>
           <TableRow>
             <TableHead>Vendor</TableHead>
-            {!isBuyer && <TableHead>Buyer Company</TableHead>}
+            {showBuyerCompanyColumn && <TableHead>Buyer Company</TableHead>}
             {!isBuyer && <TableHead>Invited By</TableHead>}
             <TableHead>MSME</TableHead>
             <TableHead>Submitted</TableHead>
@@ -185,25 +200,31 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={isBuyer ? 4 : 6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-            ))
-          ) : rows.length === 0 ? (
-            <TableRow><TableCell colSpan={isBuyer ? 4 : 6} className="text-center text-muted-foreground py-8">
-              {variant === 'pending' ? (
-                <>
-                  <div>No vendors are pending your approval right now.</div>
-                  <div className="text-xs mt-2">
-                    Only vendors whose approval matrix lists you as an approver for this stage appear here.
-                  </div>
-                </>
-              ) : (
-                <div>No vendors are waiting for a previous approver.</div>
-              )}
-            </TableCell></TableRow>
-          ) : (
-            rows.map((it) => {
+          {(() => {
+            const baseCols = 4; // Vendor + MSME + Submitted + Actions
+            const colSpan = baseCols + (showBuyerCompanyColumn ? 1 : 0) + (!isBuyer ? 1 : 0);
+            if (loading) {
+              return Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}><TableCell colSpan={colSpan}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+              ));
+            }
+            if (rows.length === 0) {
+              return (
+                <TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground py-8">
+                  {variant === 'pending' ? (
+                    <>
+                      <div>No vendors are pending your approval right now.</div>
+                      <div className="text-xs mt-2">
+                        Only vendors whose approval matrix lists you as an approver for this stage appear here.
+                      </div>
+                    </>
+                  ) : (
+                    <div>No vendors are waiting for a previous approver.</div>
+                  )}
+                </TableCell></TableRow>
+              );
+            }
+            return rows.map((it) => {
               const blocked = variant === 'waiting';
               return (
                 <TableRow key={it.progressId ?? it.vendorId}>
@@ -223,7 +244,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       </div>
                     )}
                   </TableCell>
-                  {!isBuyer && (
+                  {showBuyerCompanyColumn && (
                     <TableCell className="text-sm">
                       <div>{it.vendorCompany ?? '—'}</div>
                       {it.companyMismatch && it.invitationCompany && (
@@ -282,8 +303,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   </TableCell>
                 </TableRow>
               );
-            })
-          )}
+            });
+          })()}
         </TableBody>
       </Table>
     </div>

@@ -248,6 +248,7 @@ Deno.serve(async (req) => {
         stage,
         blockedByPrevious,
         startedAt: p.started_at,
+        tenantId: v?.tenant_id ?? inv?.tenant_id ?? null,
         vendorCompany: vendorTenant ? `${vendorTenant.name}${vendorTenant.code ? ` (${vendorTenant.code})` : ''}` : null,
         invitationCompany: inviteTenant ? `${inviteTenant.name}${inviteTenant.code ? ` (${inviteTenant.code})` : ''}` : null,
         companyMismatch: !!(vendorTenant && inviteTenant && v?.tenant_id !== inv?.tenant_id),

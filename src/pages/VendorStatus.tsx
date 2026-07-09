@@ -23,6 +23,7 @@ interface VendorRow {
   status: string;
   created_at: string;
   last_rejection_comments: string | null;
+  sap_vendor_code: string | null;
 }
 
 
@@ -64,7 +65,7 @@ export default function VendorStatus() {
       setLoading(true);
       const { data, error } = await supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments')
+        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments, sap_vendor_code')
         .eq('id', id)
         .maybeSingle();
       if (error) {
@@ -136,6 +137,7 @@ export default function VendorStatus() {
               <RegistrationStatusTracker
                 status={vendor.status as RegistrationStatus}
                 approvalProgress={approvalChain}
+                sapVendorCode={vendor.sap_vendor_code}
               />
             </CardContent>
           </Card>

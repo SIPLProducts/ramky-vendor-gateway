@@ -14,6 +14,9 @@ interface TenantContextValue {
   myTenantIds: string[];
   activeTenantId: string | null; // null = "all"
   setActiveTenantId: (id: string | null) => void;
+  /** Multi-select selection. `null` = all tenants. Kept in sync with `activeTenantId`. */
+  activeTenantIds: string[] | null;
+  setActiveTenantIds: (ids: string[] | null) => void;
   isSuperAdmin: boolean;
   /** SAP Team — sees all tenants (needed for sync). */
   isCrossTenantReviewer: boolean;
@@ -178,16 +181,33 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     staleTime: 60 * 1000,
   });
 
-  const [activeTenantId, setActiveTenantIdState] = useState<string | null>(() => {
+  // Multi-tenant selection. `null` = all. Persists as CSV.
+  const [activeTenantIds, setActiveTenantIdsState] = useState<string[] | null>(() => {
     if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored || stored === 'null' || stored === '__all__') return null;
-    return stored;
+    if (stored.includes(',')) {
+      const arr = stored.split(',').map((s) => s.trim()).filter(Boolean);
+      return arr.length > 0 ? arr : null;
+    }
+    return [stored];
   });
-  const [explicitAll, setExplicitAll] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem(STORAGE_KEY) === '__all__';
-  });
+
+  const activeTenantId = useMemo<string | null>(
+    () => (activeTenantIds && activeTenantIds.length === 1 ? activeTenantIds[0] : null),
+    [activeTenantIds],
+  );
+
+  const persistSelection = (ids: string[] | null) => {
+    if (typeof window === 'undefined') return;
+    if (!ids || ids.length === 0) {
+      localStorage.setItem(STORAGE_KEY, '__all__');
+    } else if (ids.length === 1) {
+      localStorage.setItem(STORAGE_KEY, ids[0]);
+    } else {
+      localStorage.setItem(STORAGE_KEY, ids.join(','));
+    }
+  };
 
   const seesAllTenants = isSuperAdmin || isCrossTenantReviewer;
 
@@ -227,37 +247,54 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (isLoading || !user?.id) return;
 
     if (seesAllTenants) {
-      if (activeTenantId && !myTenantIds.includes(activeTenantId)) {
-        setActiveTenantIdState(null);
-        if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY);
+      // Drop any selections that no longer exist.
+      if (activeTenantIds) {
+        const filtered = activeTenantIds.filter((id) => myTenantIds.includes(id));
+        if (filtered.length !== activeTenantIds.length) {
+          const next = filtered.length > 0 ? filtered : null;
+          setActiveTenantIdsState(next);
+          if (typeof window !== 'undefined') {
+            if (next) persistSelection(next);
+            else localStorage.removeItem(STORAGE_KEY);
+          }
+        }
       }
       return;
     }
 
     if (myTenantIds.length === 0) {
-      setActiveTenantIdState(null);
+      if (activeTenantIds) setActiveTenantIdsState(null);
       return;
     }
-    if (!activeTenantId && !explicitAll) {
-      setActiveTenantIdState(myTenantIds[0]);
-    } else if (activeTenantId && !myTenantIds.includes(activeTenantId)) {
-      setActiveTenantIdState(myTenantIds[0]);
-      setExplicitAll(false);
+    if (!activeTenantIds) {
+      // Default to all assigned tenants when nothing is explicitly chosen.
+      // Historical single-tenant users still see just their tenant naturally.
+      return;
     }
-  }, [isLoading, user?.id, seesAllTenants, myTenantIds, activeTenantId, explicitAll]);
+    const filtered = activeTenantIds.filter((id) => myTenantIds.includes(id));
+    if (filtered.length !== activeTenantIds.length) {
+      const next = filtered.length > 0 ? filtered : null;
+      setActiveTenantIdsState(next);
+      persistSelection(next);
+    }
+  }, [isLoading, user?.id, seesAllTenants, myTenantIds, activeTenantIds]);
+
+  const setActiveTenantIds = useCallback((ids: string[] | null) => {
+    const next = ids && ids.length > 0 ? ids : null;
+    setActiveTenantIdsState(next);
+    persistSelection(next);
+  }, []);
 
   const setActiveTenantId = useCallback((id: string | null) => {
-    setActiveTenantIdState(id);
-    setExplicitAll(id === null);
-    if (typeof window !== 'undefined') {
-      if (id) localStorage.setItem(STORAGE_KEY, id);
-      else localStorage.setItem(STORAGE_KEY, '__all__');
-    }
+    const next = id ? [id] : null;
+    setActiveTenantIdsState(next);
+    persistSelection(next);
   }, []);
 
   const value = useMemo<TenantContextValue>(
     () => ({
       myTenants, myTenantIds, activeTenantId, setActiveTenantId,
+      activeTenantIds, setActiveTenantIds,
       isSuperAdmin, isCrossTenantReviewer, isScmManager, isStageApprover, isBuyerRole,
       scmManagerVendorIds: isScmManager && !isCrossTenantReviewer && !isSuperAdmin
         ? (scmManagerVendorIds ?? [])
@@ -265,8 +302,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       scopedVendorIds: needsScopedIds ? (scopedVendorIds ?? []) : null,
       isLoading,
     }),
-    [myTenants, myTenantIds, activeTenantId, setActiveTenantId, isSuperAdmin,
-     isCrossTenantReviewer, isScmManager, isStageApprover, isBuyerRole,
+    [myTenants, myTenantIds, activeTenantId, setActiveTenantId,
+     activeTenantIds, setActiveTenantIds,
+     isSuperAdmin, isCrossTenantReviewer, isScmManager, isStageApprover, isBuyerRole,
      scmManagerVendorIds, scopedVendorIds, needsScopedIds, isLoading],
   );
 
@@ -278,6 +316,7 @@ export function useTenantContext() {
   if (!ctx) {
     return {
       myTenants: [], myTenantIds: [], activeTenantId: null, setActiveTenantId: () => {},
+      activeTenantIds: null, setActiveTenantIds: () => {},
       isSuperAdmin: false, isCrossTenantReviewer: false, isScmManager: false,
       isStageApprover: false, isBuyerRole: false,
       scmManagerVendorIds: null, scopedVendorIds: null, isLoading: false,

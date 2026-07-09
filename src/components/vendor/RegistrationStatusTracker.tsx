@@ -139,6 +139,8 @@ interface RegistrationStatusTrackerProps {
    * status enum mapping when empty.
    */
   approvalProgress?: ApprovalChainEntry[];
+  /** SAP vendor code, if the vendor has been created in SAP. */
+  sapVendorCode?: string | null;
 }
 
 // Map stage -> step index in `statusSteps`
@@ -152,8 +154,9 @@ const STAGE_TO_STEP: Record<ApprovalStageKey, number> = {
 };
 
 export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, RegistrationStatusTrackerProps>(
-  function RegistrationStatusTracker({ status, className, approvalProgress }, ref) {
+  function RegistrationStatusTracker({ status, className, approvalProgress, sapVendorCode }, ref) {
     const hasChain = (approvalProgress?.length ?? 0) > 0;
+    const sapCreated = !!sapVendorCode || status === 'sap_synced' || status === 'approved';
 
     // Build per-step override map from the live chain. Each approver step is
     // computed from its corresponding `vendor_approval_progress` row.
@@ -177,15 +180,17 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
       // Once any approval row exists, Document Verification is implicitly done.
       if (stepOverrides[1] === undefined) stepOverrides[1] = 'completed';
 
-      // If all approver levels approved, SAP Sync becomes active (unless synced).
+      // SAP Sync step: only mark completed when the vendor code has actually
+      // been created in SAP. Otherwise, if all approvals are through, mark it
+      // active (in progress).
       const allApproved = sorted.length > 0 && sorted.every((r) => r.status === 'approved');
-      if (allApproved && status !== 'sap_synced' && status !== 'approved') {
+      if (sapCreated) {
+        stepOverrides[7] = 'completed';
+      } else if (allApproved) {
         stepOverrides[7] = 'active';
       }
-      if (status === 'sap_synced' || status === 'approved') {
-        stepOverrides[7] = 'completed';
-      }
     }
+
 
     const activeStepIndex = getActiveStepIndex(status);
     const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
@@ -220,6 +225,29 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
           <div className="relative flex justify-between">
             {statusSteps.map((step, index) => {
               const stepStatus = stepOverrides[index] ?? getStepStatus(index, adjustedActiveIndex, status);
+              const isSapStep = step.id === 'sap';
+              let descriptionText: string;
+              if (isSapStep) {
+                if (stepStatus === 'completed') {
+                  descriptionText = sapVendorCode
+                    ? `Vendor Code Created · ${sapVendorCode}`
+                    : 'Vendor Code Created';
+                } else if (stepStatus === 'active') {
+                  descriptionText = 'Syncing to SAP…';
+                } else if (stepStatus === 'failed') {
+                  descriptionText = 'Action required';
+                } else {
+                  descriptionText = 'Awaiting SAP sync';
+                }
+              } else {
+                descriptionText = stepStatus === 'active'
+                  ? 'In Progress'
+                  : stepStatus === 'completed'
+                    ? 'Completed'
+                    : stepStatus === 'failed'
+                      ? 'Action required'
+                      : step.description;
+              }
               return (
                 <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / statusSteps.length}%` }}>
                   <div
@@ -242,7 +270,7 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
                       stepStatus === 'failed' && "text-destructive"
                     )}>{step.label}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 hidden md:block">
-                      {stepStatus === 'active' ? 'In Progress' : stepStatus === 'completed' ? 'Completed' : stepStatus === 'failed' ? 'Action required' : step.description}
+                      {descriptionText}
                     </p>
 
                   </div>
