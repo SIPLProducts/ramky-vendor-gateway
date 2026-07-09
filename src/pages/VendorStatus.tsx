@@ -65,7 +65,7 @@ export default function VendorStatus() {
       setLoading(true);
       const { data, error } = await supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments')
+        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments, sap_vendor_code')
         .eq('id', id)
         .maybeSingle();
       if (error) {
