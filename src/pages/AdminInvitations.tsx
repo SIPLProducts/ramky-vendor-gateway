@@ -633,35 +633,6 @@ export default function AdminInvitations() {
     setCurrentPage(1);
   };
 
-  const handleTrackByReference = async () => {
-    const ref = trackRef.trim();
-    if (!ref) {
-      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
-      return;
-    }
-    setIsTracking(true);
-    try {
-      // RLS (user_can_see_vendor) enforces visibility for buyers, on-behalf,
-      // SCM CO, stage approvers, admin, and SAP team. Query directly.
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('reference_number', ref)
-        .maybeSingle();
-      if (error) throw error;
-      const vendorId = data?.id ?? null;
-
-      if (!vendorId) {
-        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
-        return;
-      }
-      navigate(`/vendor-status/${vendorId}`);
-    } catch (e: any) {
-      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
-    } finally {
-      setIsTracking(false);
-    }
-  };
 
 
 
