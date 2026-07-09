@@ -137,6 +137,7 @@ export default function VendorStatus() {
               <RegistrationStatusTracker
                 status={vendor.status as RegistrationStatus}
                 approvalProgress={approvalChain}
+                sapVendorCode={vendor.sap_vendor_code}
               />
             </CardContent>
           </Card>
