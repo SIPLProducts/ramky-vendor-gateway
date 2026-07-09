@@ -493,8 +493,12 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <Button
               onClick={submit}
               disabled={submitting || !comments.trim()}
-
-              variant={actionItem?.action === 'reject' ? 'destructive' : 'default'}
+              variant="outline"
+              className={
+                actionItem?.action === 'reject'
+                  ? 'text-destructive border-destructive'
+                  : 'text-success border-success'
+              }
             >
               {submitting
                 ? 'Submitting...'
