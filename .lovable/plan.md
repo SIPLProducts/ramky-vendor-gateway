@@ -1,26 +1,22 @@
-## Problem
-Clicking Submit shows "Organization Profile is incomplete" even after filling every visible required field. The Submit-gate in `VendorRegistration.tsx` requires `statutory.entityType`, but the current `OrganizationStep.tsx` never renders an Entity Type input, so users cannot satisfy it.
+## Plan
 
-## Fix (frontend only, minimal)
+1. **Fix the domestic submit validation mismatch**
+   - Update the final submit-gate in `VendorRegistration` so Address Information checks the actual visible fields used by `AddressStep`:
+     - `registeredEmail`
+     - `registeredContact1`
+   - Remove the stale checks for hidden/nonexistent fields:
+     - `contactEmail1`
+     - `contactPhone1`
+   - This is why you are seeing “Address Information is incomplete” even after filling mandatory fields: the submit validation is checking old field names that are not on the form anymore.
 
-**`src/pages/VendorRegistration.tsx`** — `isDomesticStepComplete`, case 2:
-Drop the `nonEmpty(s?.entityType)` check. Step 2 completeness becomes:
-```
-legalName + industryType + organizationType
-```
-This matches what the Organization Profile step actually asks the user to fill (all already required by its zod schema). It also aligns with `useFormCompleteness` (which does not require entityType) and prevents the misleading toast + forced tab-jump.
+2. **Keep international registration protected from this issue**
+   - Leave the existing international branch separate from domestic validation.
+   - Confirm the domestic-only submit gate does not run for international vendors.
 
-No changes to:
-- The Organization step zod schema, field ordering, or persisted data.
-- Statutory slice / SAP payload builder — `entityType` remains an optional field on the model.
-- Other steps' gating logic.
+3. **Remove “Powering Progress”**
+   - Remove the “Powering Progress” tagline from the sidebar header.
+   - Keep the logo and “Vendor Portal” text unchanged.
 
-## Verification
-1. Fill Organization Profile with Legal Name, Industry Type, Organization Type (already required by zod).
-2. Complete Address, Contact, Financial steps.
-3. Click Submit on Review — should proceed without the false "Organization Profile is incomplete" toast.
-4. `bunx tsgo --noEmit` clean.
-
-## Out of scope
-- Re-adding an Entity Type input to Organization Profile (can be a separate request if you want it captured in registration).
-- Any backend / SAP mapping changes.
+4. **Verify**
+   - Run a TypeScript check after the changes.
+   - Confirm the registration submit validation no longer blocks on Address Information when visible mandatory address fields are completed.

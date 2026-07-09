@@ -122,8 +122,8 @@ function isDomesticStepComplete(
         nonEmpty(a?.registeredCity) &&
         nonEmpty(a?.registeredState) &&
         pinOk(a?.registeredPincode) &&
-        emailOk((a as any)?.contactEmail1) &&
-        phoneOk((a as any)?.contactPhone1)
+        emailOk(a?.registeredEmail) &&
+        phoneOk(a?.registeredContact1)
       );
     }
     case 4: {
