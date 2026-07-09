@@ -256,7 +256,7 @@ export default function FinanceReview() {
                     <div>
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="font-bold text-lg text-foreground">
-                          {getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}
+                          {pickVendorDisplayName(vendor) || 'Unnamed Vendor'}
                         </h3>
                         {getStatusBadge(vendor.status)}
                       </div>
@@ -319,7 +319,7 @@ export default function FinanceReview() {
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Vendor Details - {selectedVendor ? (getSapName1(selectedVendor) || selectedVendor.legal_name) : ''}</DialogTitle>
+            <DialogTitle className="text-xl">Vendor Details - {selectedVendor ? (pickVendorDisplayName(selectedVendor)) : ''}</DialogTitle>
             <DialogDescription>
               Review complete vendor information, Purchase/SCM approval trail, documents, and validations
             </DialogDescription>

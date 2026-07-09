@@ -522,7 +522,7 @@ export default function GstCompliance() {
                           onCheckedChange={() => toggleVendorSelection(vendor.id)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{getSapName1(vendor) || vendor.legal_name}</TableCell>
+                      <TableCell className="font-medium">{pickVendorDisplayName(vendor)}</TableCell>
                       <TableCell className="font-mono text-sm">{vendor.gstin}</TableCell>
                       <TableCell>{getStatusBadge(compliance.status)}</TableCell>
                       <TableCell>
