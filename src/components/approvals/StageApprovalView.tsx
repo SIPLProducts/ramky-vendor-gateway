@@ -279,7 +279,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-destructive"
+                        className="text-destructive border-destructive"
                         disabled={blocked}
                         title={blocked ? 'The previous approver has not approved yet.' : undefined}
                         onClick={() => setActionItem({ item: it, action: 'reject' })}
@@ -289,6 +289,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button
                         size="sm"
                         variant="outline"
+                        className="text-success border-success"
                         disabled={blocked}
                         title={blocked ? 'The previous approver has not approved yet.' : undefined}
                         onClick={() => setActionItem({ item: it, action: 'approve' })}
@@ -366,6 +367,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     <Button
                       size="sm"
                       variant="outline"
+                      className="text-success border-success"
                       onClick={() => { setRejectedAction({ item: it, action: 'approve' }); setRejectedRemarks(''); }}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
@@ -491,8 +493,12 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <Button
               onClick={submit}
               disabled={submitting || !comments.trim()}
-
-              variant={actionItem?.action === 'reject' ? 'destructive' : 'default'}
+              variant="outline"
+              className={
+                actionItem?.action === 'reject'
+                  ? 'text-destructive border-destructive'
+                  : 'text-success border-success'
+              }
             >
               {submitting
                 ? 'Submitting...'
@@ -595,7 +601,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               No
             </Button>
             <Button
-              variant="destructive"
+              variant="outline"
+              className="text-destructive border-destructive"
               onClick={confirmForceReject}
               disabled={forceRejectSubmitting}
             >
