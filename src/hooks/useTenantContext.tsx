@@ -14,6 +14,9 @@ interface TenantContextValue {
   myTenantIds: string[];
   activeTenantId: string | null; // null = "all"
   setActiveTenantId: (id: string | null) => void;
+  /** Multi-select selection. `null` = all tenants. Kept in sync with `activeTenantId`. */
+  activeTenantIds: string[] | null;
+  setActiveTenantIds: (ids: string[] | null) => void;
   isSuperAdmin: boolean;
   /** SAP Team — sees all tenants (needed for sync). */
   isCrossTenantReviewer: boolean;
