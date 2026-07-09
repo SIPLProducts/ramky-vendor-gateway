@@ -708,8 +708,6 @@ export function VendorReviewDialog({
                     );
                   })()}
 
-                  <Separator />
-
                   {/* Financial */}
                   {(() => {
                     const [fy1, fy2, fy3] = getLastThreeCompletedIndianFyStartYears();
@@ -721,18 +719,14 @@ export function VendorReviewDialog({
                     };
                     const creditPeriod = Number(vendor.credit_period_expected);
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <CreditCard className="h-4 w-4" />
-                          Financial Information
-                        </h4>
+                      <SectionCard icon={CreditCard} title="Financial Information">
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy1)}</p><p className="font-medium">{fmt(vendor.turnover_year1)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy2)}</p><p className="font-medium">{fmt(vendor.turnover_year2)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy3)}</p><p className="font-medium">{fmt(vendor.turnover_year3)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{(vendor.credit_period_expected === 0 || vendor.credit_period_expected) && Number.isFinite(creditPeriod) && creditPeriod >= 0 ? `${vendor.credit_period_expected} days` : '-'}</p></div>
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
 
