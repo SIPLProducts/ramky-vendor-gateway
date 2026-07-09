@@ -400,7 +400,7 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference #</TableHead>
-                  <TableHead>Company</TableHead>
+                  <TableHead>Vendor Name</TableHead>
                   <TableHead>Invited By</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
