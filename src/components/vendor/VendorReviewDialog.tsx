@@ -27,8 +27,6 @@ import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/i
 import {
   Building2,
   MapPin,
-  User,
-  Phone,
   Mail,
   FileText,
   Landmark,
