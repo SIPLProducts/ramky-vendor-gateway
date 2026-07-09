@@ -109,12 +109,10 @@ function isDomesticStepComplete(
     }
     case 2: {
       const o = data.organization;
-      const s = data.statutory;
       return (
         nonEmpty(o?.legalName) &&
         nonEmpty(o?.industryType) &&
-        nonEmpty(o?.organizationType) &&
-        nonEmpty(s?.entityType)
+        nonEmpty(o?.organizationType)
       );
     }
     case 3: {
