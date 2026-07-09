@@ -1,33 +1,38 @@
 ## Problem
 
-After clicking the password reset email link, the user lands on a 404. The `/reset-password` route exists in `App.tsx`, so the underlying issue is that the current `ResetPassword` page does **not** process the auth parameters Supabase appends to the redirect URL. When the browser hits `/reset-password?code=...` (PKCE) or `/reset-password#access_token=...&type=recovery` (implicit), the component only waits passively on `onAuthStateChange`. If the redirect chain runs into an unexpected host or the code isn't exchanged, the user is dumped on a page that never becomes "ready" — and on the published custom domain (`vms.siplproducts.com`) an unhandled hash/query can be interpreted as an asset request and return 404.
+On the self-hosted server, an on-behalf vendor submission stays visible on **Admin → Invitations**, even though the same flow correctly disappears in local/cloud. On local, the row is filtered out because `getInvitationStatus()` reads `invitation.vendor.status` (`scm_manager_review`) and returns `'submitted'`, which the list filter drops.
 
-The fix keeps everything client-side: make `/reset-password` actively consume whatever Supabase hands it, then render the password form. Also make the send-side always use the currently open origin so the link matches the site the user came from.
+## Root cause
 
-## Changes
+The invitations query joins vendors through the embedded relation:
 
-### 1. `src/pages/ResetPassword.tsx`
-On mount, before deciding to show the "open this page from the email link" message:
-- Read `window.location.search` and `window.location.hash`.
-- If `?code=<uuid>` is present, call `supabase.auth.exchangeCodeForSession(code)`; on success set `ready = true` and `history.replaceState` to strip the query.
-- Else if hash contains `access_token` and `refresh_token` (with `type=recovery` or `type=signup`), call `supabase.auth.setSession({ access_token, refresh_token })`; on success set `ready = true` and clear the hash.
-- Else if hash contains `error` / `error_description`, show that message inline instead of the generic "open from email" alert (covers expired/used links).
-- Keep the existing `onAuthStateChange` + `getSession` fallback for already-authenticated recovery sessions.
-- Only after all of the above resolve should the page decide whether to render the form or the info alert.
+```
+vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status)
+```
 
-### 2. `src/components/auth/ForgotPasswordDialog.tsx`
-No logic change, but guarantee the redirect target is always the current site origin plus `/reset-password` (already the case) and trim trailing slashes so the URL Supabase stores in the link is stable across preview/custom-domain.
+This depends on `vendors.invitation_id` + a FK named `vendors_invitation_id_fkey` existing in the database. That column/FK is **not** defined in any migration under `supabase/migrations/`; it exists only on the managed cloud DB (added out-of-band). On the self-hosted Postgres the relation is missing, so PostgREST returns `vendor: null` for every row. With `vendor.status` undefined and `created_on_behalf = true`, `getInvitationStatus()` falls into the `'in_progress'` branch and the row is never filtered — it lingers on the Invitations page.
 
-### 3. `supabase/functions/send-password-reset/index.ts`
-Pass the incoming `redirectTo` through to `generateLink` unchanged (already done), and add a `console.log` of the final `action_link` host so future 404 reports can be diagnosed from edge logs. No behavioural change to link generation.
+Meanwhile `useVendorRegistration` already writes `vendor_invitations.vendor_id` on submit (both normal and on-behalf paths), and that column/FK does exist. So the reliable link is invitation → vendor via `vendor_invitations.vendor_id`, not vendor → invitation via `vendors.invitation_id`.
 
-## Technical Details
+## Fix
 
-- Supabase's `admin.generateLink({ type: 'recovery' })` returns a `.../auth/v1/verify?token=...&type=recovery&redirect_to=<redirectTo>` URL. Supabase verifies then 302-redirects to `redirectTo` — with either `?code=...` (PKCE) or `#access_token=...` (implicit) depending on the project's auth flow. The current page handles neither explicitly, which is the root cause of the "opens but 404 / blank" behaviour.
-- Using `exchangeCodeForSession` is safe on any route; if the code is invalid it returns an error we surface inline.
-- No database or edge-function schema changes. No new routes. No styling changes beyond a small inline error message.
+Stop relying on the fragile `vendors_invitation_id_fkey` relation. Resolve the linked vendor via `vendor_invitations.vendor_id` instead, which works on both cloud and self-host.
 
-## Out of Scope
+### 1. `src/pages/AdminInvitations.tsx` — invitations query
 
-- Changing the SMTP sender or email template content.
-- Auth provider configuration (site URL / redirect allow-list) — those are managed in the backend settings screen, not code.
+- Drop the embedded `vendor:vendors!vendors_invitation_id_fkey(...)` join from both the `seesAllInvitations` branch and the scoped branch. Keep the `tenants(id, name)` join.
+- After fetching invitations, collect the non-null `vendor_id`s, run a single `supabase.from('vendors').select('id, reference_number, status').in('id', ids)` query, build an `id → vendor` map, and attach `row.vendor = map.get(row.vendor_id) ?? null` before returning.
+- Remove the `r.vendor = Array.isArray(...) ? r.vendor[0] : r.vendor` normalization (no longer needed).
+- No changes to `getInvitationStatus`, filtering, or UI — once `row.vendor.status` is populated for submitted on-behalf rows, they naturally resolve to `'submitted'` and drop off the list.
+
+### 2. No other files change
+
+- `useVendorRegistration.tsx` already sets `vendor_invitations.vendor_id` and `used_at` on submit; no change needed.
+- Approval, dashboard, and status pages are unaffected.
+- No DB migration is proposed here — the self-hosted DB is out of scope for a schema fix from this app, and the code change makes the UI robust regardless of whether `vendors.invitation_id` exists.
+
+## Verification
+
+- `bunx tsgo --noEmit` clean.
+- Manual (self-host after deploy): submit an on-behalf vendor → row disappears from Invitations and shows up on Dashboard / approval queues.
+- Manual (cloud): existing behavior unchanged; used/expired/pending still render correctly.
