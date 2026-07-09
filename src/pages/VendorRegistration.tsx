@@ -131,8 +131,9 @@ function isDomesticStepComplete(
       return nonEmpty(c?.ceoName);
     }
     case 5: {
-      const f = data.financial;
-      return nonEmpty(f?.turnoverYear1) && nonEmpty(f?.creditPeriodExpected);
+      // Financial & Infrastructure step has no required fields in its schema.
+      // Any provided values are validated inline by the step itself.
+      return true;
     }
     default:
       return true;
