@@ -140,7 +140,7 @@ interface VendorReviewDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Optional extra footer button(s), e.g. "Prepare & Sync" on SAP Sync page. */
   footerExtra?: ReactNode;
-  /** Override the dialog subtitle. Defaults to "Review vendor details before syncing to SAP". */
+  /** Override the dialog subtitle. Defaults to "Review vendor details". */
   description?: string;
 }
 
@@ -191,7 +191,7 @@ export function VendorReviewDialog({
   open,
   onOpenChange,
   footerExtra,
-  description = 'Review vendor details before syncing to SAP',
+  description = 'Review vendor details',
 }: VendorReviewDialogProps) {
   const [vendor, setVendor] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -449,7 +449,7 @@ export function VendorReviewDialog({
                           <Shield className="h-4 w-4" />
                           Buyer Details
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1">
                             <p className="text-muted-foreground">Buyer Company</p>
                             <p className="font-medium">{routing.vendorCompany || '-'}</p>
@@ -475,7 +475,7 @@ export function VendorReviewDialog({
                       <Building2 className="h-4 w-4" />
                       Organization Details
                     </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">Legal Name</p><p className="font-medium">{vendor.legal_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Trade Name</p><p className="font-medium">{vendor.trade_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Industry Type</p><p className="font-medium">{vendor.industry_type || '-'}</p></div>
@@ -497,7 +497,7 @@ export function VendorReviewDialog({
                     {/* Registered / Corporate Office Address */}
                     <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
                       <p className="text-sm font-semibold text-foreground">Registered / Corporate Office Address</p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
                         <Field label="Address Line 1" value={vendor.registered_address} />
                         <Field label="Address Line 2" value={(vendor as any).registered_address_line2} />
                         <Field label="Address Line 3" value={(vendor as any).registered_address_line3} />
@@ -521,7 +521,7 @@ export function VendorReviewDialog({
                       {!vendor.communication_address || vendor.communication_address === vendor.registered_address ? (
                         <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
                           <Field label="Address" value={vendor.communication_address} />
                           <Field label="City" value={vendor.communication_city} />
                           <Field label="State" value={vendor.communication_state} />
@@ -540,7 +540,7 @@ export function VendorReviewDialog({
                       <User className="h-4 w-4" />
                       Contact Details
                     </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1">
                         <p className="text-muted-foreground">Primary Contact</p>
                         <p className="font-medium">{vendor.primary_contact_name || '-'}</p>
@@ -577,7 +577,7 @@ export function VendorReviewDialog({
                           <FileText className="h-4 w-4" />
                           Statutory Details
                         </h4>
-                        <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
                           <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
                           <div className="space-y-1"><Label text="PAN Holder Name" ok={panOk} /><p className="font-medium">{v.pan_holder_name || v.msme_enterprise_name || v.account_holder_name || v.trade_name || v.legal_name || '-'}</p></div>
