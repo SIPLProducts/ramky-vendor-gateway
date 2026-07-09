@@ -77,13 +77,13 @@ Deno.serve(async (req) => {
         .eq('stage', 'BUYER').eq('status', 'pending').in('vendor_id', buyerVendorIds);
       const { data: rejectedVendors } = await admin
         .from('vendors')
-        .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number')
+        .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number, tenant_id')
         .in('id', buyerVendorIds).eq('status', 'returned_to_buyer');
 
-      // Latest invitation per vendor (for on-behalf detection + deep-link).
+      // Latest invitation per vendor (for on-behalf detection + deep-link + tenant).
       const { data: invsForBuyer } = await admin
         .from('vendor_invitations')
-        .select('id, vendor_id, created_on_behalf, created_at')
+        .select('id, vendor_id, created_on_behalf, created_at, tenant_id')
         .in('vendor_id', buyerVendorIds)
         .order('created_at', { ascending: false });
       const invByVendor = new Map<string, any>();
@@ -93,14 +93,33 @@ Deno.serve(async (req) => {
 
       const pendingVIds = (buyerProgress ?? []).map((p: any) => p.vendor_id);
       const { data: vendors } = pendingVIds.length
-        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number').in('id', pendingVIds)
+        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number, tenant_id').in('id', pendingVIds)
         : { data: [] as any[] } as any;
       const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
+
+      // Fetch tenant display info for any vendor/invitation tenant referenced.
+      const buyerTenantIds = Array.from(new Set([
+        ...(vendors ?? []).map((v: any) => v.tenant_id).filter(Boolean),
+        ...(rejectedVendors ?? []).map((v: any) => v.tenant_id).filter(Boolean),
+        ...(invsForBuyer ?? []).map((i: any) => i.tenant_id).filter(Boolean),
+      ]));
+      const { data: buyerTenantRows } = buyerTenantIds.length
+        ? await admin.from('tenants').select('id, name, code').in('id', buyerTenantIds)
+        : { data: [] as any[] } as any;
+      const btMap = new Map((buyerTenantRows ?? []).map((t: any) => [t.id, t]));
+      const tenantLabel = (id: string | null | undefined) => {
+        if (!id) return null;
+        const t: any = btMap.get(id);
+        if (!t) return null;
+        return `${t.name}${t.code ? ` (${t.code})` : ''}`;
+      };
 
       const pendingItems = (buyerProgress ?? []).map((p: any) => {
         const v: any = vMap.get(p.vendor_id);
         const isIntl = v?.vendor_type === 'international';
         const inv = invByVendor.get(p.vendor_id);
+        const vTenantId = v?.tenant_id ?? null;
+        const iTenantId = inv?.tenant_id ?? null;
         return {
           progressId: p.id,
           vendorId: p.vendor_id,
@@ -116,6 +135,10 @@ Deno.serve(async (req) => {
           blockedByPrevious: false,
           kind: 'pending',
           startedAt: p.started_at,
+          tenantId: vTenantId ?? iTenantId ?? null,
+          vendorCompany: tenantLabel(vTenantId),
+          invitationCompany: tenantLabel(iTenantId),
+          companyMismatch: !!(vTenantId && iTenantId && vTenantId !== iTenantId),
           rejectionComments: p.rejection_comments ?? null,
           rejectionFromStage: p.rejection_from_stage ?? null,
           rejectionAt: p.rejection_at ?? null,
@@ -127,6 +150,8 @@ Deno.serve(async (req) => {
       const rejectedItems = (rejectedVendors ?? []).map((v: any) => {
         const isIntl = v?.vendor_type === 'international';
         const inv = invByVendor.get(v.id);
+        const vTenantId = v?.tenant_id ?? null;
+        const iTenantId = inv?.tenant_id ?? null;
         return {
           progressId: null, vendorId: v.id,
           referenceNumber: v?.reference_number ?? null,
@@ -136,6 +161,10 @@ Deno.serve(async (req) => {
           isInternational: isIntl,
           levelNumber: 0, levelName: 'Rejected', approvalMode: 'ANY', stage: 'BUYER',
           blockedByPrevious: false, kind: 'rejected',
+          tenantId: vTenantId ?? iTenantId ?? null,
+          vendorCompany: tenantLabel(vTenantId),
+          invitationCompany: tenantLabel(iTenantId),
+          companyMismatch: !!(vTenantId && iTenantId && vTenantId !== iTenantId),
           rejectionComments: v?.last_rejection_comments ?? null,
           rejectionFromStage: v?.last_rejection_stage ?? null,
           rejectionAt: v?.last_rejected_at ?? null,
@@ -149,6 +178,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // ─── DOWNSTREAM STAGES (via buyer_approval_flows) ─────────────────
     const userCol = STAGE_TO_FLOW_COL[stage];
