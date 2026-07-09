@@ -577,7 +577,7 @@ export function VendorReviewDialog({
                           <FileText className="h-4 w-4" />
                           Statutory Details
                         </h4>
-                        <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
                           <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
                           <div className="space-y-1"><Label text="PAN Holder Name" ok={panOk} /><p className="font-medium">{v.pan_holder_name || v.msme_enterprise_name || v.account_holder_name || v.trade_name || v.legal_name || '-'}</p></div>
