@@ -244,7 +244,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       </div>
                     )}
                   </TableCell>
-                  {!isBuyer && (
+                  {showBuyerCompanyColumn && (
                     <TableCell className="text-sm">
                       <div>{it.vendorCompany ?? '—'}</div>
                       {it.companyMismatch && it.invitationCompany && (
