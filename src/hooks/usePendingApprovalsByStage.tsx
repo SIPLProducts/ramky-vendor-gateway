@@ -18,6 +18,7 @@ export interface StageApprovalItem {
   stage: ApprovalStage;
   blockedByPrevious: boolean;
   kind?: 'pending' | 'rejected';
+  tenantId?: string | null;
   vendorCompany?: string | null;
   invitationCompany?: string | null;
   companyMismatch?: boolean;
