@@ -105,11 +105,7 @@ export default function Dashboard() {
   const [trackRef, setTrackRef] = useState('');
   const [isTracking, setIsTracking] = useState(false);
   const navigate = useNavigate();
-  const { toast } = (() => {
-    // local lazy import to avoid extra top-level change
-    const mod = require('@/hooks/use-toast');
-    return mod.useToast();
-  })();
+  const { toast } = useToast();
 
   const handleTrackByReference = async () => {
     const ref = trackRef.trim();
