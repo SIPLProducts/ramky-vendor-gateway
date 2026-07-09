@@ -143,12 +143,15 @@ export default function ResetPassword() {
         </CardHeader>
         <CardContent>
           {!ready ? (
-            <Alert>
+            <Alert variant={error ? 'destructive' : 'default'}>
               <AlertDescription className="text-sm">
-                Open this page from the password reset email link. If the link has expired, request a new one from the login page.
+                {error
+                  ? error
+                  : 'Verifying your reset link…  If nothing happens, request a new link from the login page.'}
               </AlertDescription>
             </Alert>
           ) : (
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
