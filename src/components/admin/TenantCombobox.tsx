@@ -108,6 +108,27 @@ export function TenantCombobox({
         <PopoverContent className="p-0 w-[--radix-popover-trigger-width] min-w-[260px]" align="start">
           <Command>
             <CommandInput placeholder="Search tenant…" />
+            {multi && tenants.length > 0 && (
+              <div className="flex items-center justify-between border-b px-2 py-1.5 text-xs">
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => onChangeMulti?.(tenants.map((t) => t.id))}
+                >
+                  Select all
+                </button>
+                <span className="text-muted-foreground">
+                  {selectedIds.length}/{tenants.length} selected
+                </span>
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => onChangeMulti?.(null)}
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
             <CommandList>
               <CommandEmpty>No tenant found.</CommandEmpty>
               <CommandGroup>
@@ -127,6 +148,7 @@ export function TenantCombobox({
                     {allLabel}
                   </CommandItem>
                 )}
+
                 {tenants.map((t) => {
                   const c = userCounts?.[t.id];
                   const isSelected = selectedIds.includes(t.id);
