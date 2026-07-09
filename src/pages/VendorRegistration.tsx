@@ -82,6 +82,8 @@ const initialFormData: VendorFormData = {
 // Mandatory-field completeness for domestic steps.
 // Kept in sync with each step's zod schema (mandatory subset only).
 // Shared by the resume logic and pre-submit gating so both agree.
+// Keep each case aligned with the corresponding step's zod schema.
+// Do not require fields here that the step itself treats as optional.
 function isDomesticStepComplete(
   step: number,
   data: VendorFormData,
