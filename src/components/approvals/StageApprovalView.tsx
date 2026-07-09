@@ -367,6 +367,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     <Button
                       size="sm"
                       variant="outline"
+                      className="text-success border-success"
                       onClick={() => { setRejectedAction({ item: it, action: 'approve' }); setRejectedRemarks(''); }}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
