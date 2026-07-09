@@ -50,15 +50,28 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
 
       <div className="flex items-center gap-2">
         {showSwitcher && (
-          <TenantCombobox
-            tenants={myTenants}
-            value={activeTenantId}
-            onChange={(id) => setActiveTenantId(id)}
-            allowAll
-            allLabel="All Tenants"
-            className="w-[200px]"
-            triggerClassName="h-8 text-xs"
-          />
+          isBuyerRole ? (
+            <TenantCombobox
+              tenants={myTenants}
+              multi
+              values={activeTenantIds}
+              onChangeMulti={(ids) => setActiveTenantIds(ids)}
+              allowAll
+              allLabel="All Tenants"
+              className="w-[220px]"
+              triggerClassName="h-8 text-xs"
+            />
+          ) : (
+            <TenantCombobox
+              tenants={myTenants}
+              value={activeTenantId}
+              onChange={(id) => setActiveTenantId(id)}
+              allowAll
+              allLabel="All Tenants"
+              className="w-[200px]"
+              triggerClassName="h-8 text-xs"
+            />
+          )
         )}
         {showHelp && (
           <DropdownMenu>
