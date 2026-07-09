@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 
 import { GstFilingStatusTable, normalizeFilingStatus, type FilingStatusRow } from '@/components/vendor/kyc/GstFilingStatusTable';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
