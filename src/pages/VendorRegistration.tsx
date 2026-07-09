@@ -805,11 +805,10 @@ export default function VendorRegistration() {
             const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
             setCurrentStep(isReturned ? 5 : (nextStep || 5));
           } else {
-            // Step 1 = doc verification — assume completed if we already have key fields
+            // Step 1 = doc verification — pre-seed verifiedData if we have key fields
+            let step1Seed: VerifiedDocumentData | undefined = undefined;
             if (existingFormData.statutory?.pan && existingFormData.bank?.accountNumber) {
-              filledSteps.push(1);
-              // Pre-seed verifiedData so Step 1 shows green tiles when revisited
-              setVerifiedData({
+              step1Seed = {
                 isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
                 isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
                 pan: {
@@ -877,23 +876,26 @@ export default function VendorRegistration() {
                     }
                   : undefined,
                 cancelledChequeFile2: existingFormData.bank?.secondary?.cancelledChequeFile ?? null,
-              } as any);
+              } as any;
+              setVerifiedData(step1Seed);
             }
-            if (existingFormData.organization?.legalName) filledSteps.push(2);
-            if (existingFormData.address?.registeredAddress) filledSteps.push(3);
-            if (existingFormData.contact?.ceoName) filledSteps.push(4);
-            if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
-            setCompletedSteps(filledSteps);
+            // True completeness — mandatory fields only (matches per-step zod).
+            // Presence-based checks used to skip Address/Contact when their
+            // fields were auto-seeded from GST OCR / organization data.
+            const filled = [1, 2, 3, 4, 5].filter(s =>
+              isDomesticStepComplete(s, existingFormData, step1Seed),
+            );
+            setCompletedSteps(filled);
             // For returned_to_vendor mark all completed and jump to Review
             if (isReturned) {
               setCompletedSteps([1, 2, 3, 4, 5]);
               setIsEditMode(true);
               setCurrentStep(6);
             } else {
-              const allSteps = [1, 2, 3, 4, 5, 6];
-              const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-              setCurrentStep(nextStep || 6);
+              const firstMissing = [1, 2, 3, 4, 5].find(s => !filled.includes(s));
+              setCurrentStep(firstMissing ?? 6);
             }
+
           }
         } else {
           setIsSubmitted(true);
