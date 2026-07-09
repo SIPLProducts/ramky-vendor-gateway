@@ -79,6 +79,68 @@ const initialFormData: VendorFormData = {
   declaration: { selfDeclared: false, termsAccepted: false },
 };
 
+// Mandatory-field completeness for domestic steps.
+// Kept in sync with each step's zod schema (mandatory subset only).
+// Shared by the resume logic and pre-submit gating so both agree.
+function isDomesticStepComplete(
+  step: number,
+  data: VendorFormData,
+  verified?: VerifiedDocumentData,
+): boolean {
+  const nonEmpty = (v: unknown) => typeof v === 'string' && v.trim().length > 0;
+  const emailOk = (v: unknown) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const phoneOk = (v: unknown) => typeof v === 'string' && /^\d{10}$/.test(v);
+  const pinOk = (v: unknown) => typeof v === 'string' && /^\d{6}$/.test(v);
+
+  switch (step) {
+    case 1: {
+      if (!verified) return false;
+      if (verified.step1Status?.allDone) return true;
+      const gstOk =
+        verified.isGstRegistered === true
+          ? !!verified.gst
+          : verified.isGstRegistered === false
+            ? !!verified.gstSelfDeclarationFile
+            : false;
+      const msmeOk = verified.isMsmeRegistered === false
+        ? !!verified.msmeSelfDeclarationFile
+        : !!verified.msme;
+      return gstOk && !!verified.pan && msmeOk && !!verified.bank;
+    }
+    case 2: {
+      const o = data.organization;
+      const s = data.statutory;
+      return (
+        nonEmpty(o?.legalName) &&
+        nonEmpty(o?.industryType) &&
+        nonEmpty(o?.organizationType) &&
+        nonEmpty(s?.entityType)
+      );
+    }
+    case 3: {
+      const a = data.address;
+      return (
+        typeof a?.registeredAddress === 'string' && a.registeredAddress.trim().length >= 5 &&
+        nonEmpty(a?.registeredCity) &&
+        nonEmpty(a?.registeredState) &&
+        pinOk(a?.registeredPincode) &&
+        emailOk((a as any)?.contactEmail1) &&
+        phoneOk((a as any)?.contactPhone1)
+      );
+    }
+    case 4: {
+      const c = data.contact;
+      return nonEmpty(c?.ceoName);
+    }
+    case 5: {
+      const f = data.financial;
+      return nonEmpty(f?.turnoverYear1) && nonEmpty(f?.creditPeriodExpected);
+    }
+    default:
+      return true;
+  }
+}
+
 export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
