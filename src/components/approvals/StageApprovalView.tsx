@@ -498,9 +498,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                 ? 'Submitting...'
                 : actionItem?.action === 'approve'
                   ? 'Confirm approve'
-                  : isBuyer
-                    ? 'Send Back to Vendor'
-                    : 'Confirm reject'}
+                  : 'Confirm reject'}
             </Button>
           </DialogFooter>
         </DialogContent>
