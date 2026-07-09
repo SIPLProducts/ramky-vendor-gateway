@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/hooks/useTenantContext';
 import { useToast } from '@/hooks/use-toast';
-import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 import { 
   Card, 
   CardContent, 

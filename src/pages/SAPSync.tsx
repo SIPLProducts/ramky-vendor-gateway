@@ -30,7 +30,7 @@ import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDi
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
-import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
+import { getSapVenClass, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -750,7 +750,7 @@ export default function SAPSync() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-semibold">{(rejectVendor && getSapName1(rejectVendor)) || rejectVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="font-semibold">{pickVendorDisplayName(rejectVendor) || 'Unnamed Vendor'}</p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 Ref No: {(rejectVendor as any)?.reference_number || rejectVendor?.id.slice(0, 8).toUpperCase()}
               </p>
@@ -803,7 +803,7 @@ export default function SAPSync() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-semibold">{(returnVendor && getSapName1(returnVendor)) || returnVendor?.legal_name || 'Unnamed Vendor'}</p>
+              <p className="font-semibold">{pickVendorDisplayName(returnVendor) || 'Unnamed Vendor'}</p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 Ref No: {(returnVendor as any)?.reference_number || returnVendor?.id.slice(0, 8).toUpperCase()}
               </p>

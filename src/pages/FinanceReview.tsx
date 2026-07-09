@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 import {
   GstFilingStatusTable,
   normalizeFilingStatus,
