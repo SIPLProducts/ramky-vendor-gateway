@@ -945,21 +945,6 @@ export default function AdminInvitations() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <form
-                onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
-                className="flex items-center gap-2"
-              >
-                <Input
-                  placeholder="Enter Reference Number"
-                  value={trackRef}
-                  onChange={(e) => setTrackRef(e.target.value)}
-                  className="w-56"
-                />
-                <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
-                  {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  Search
-                </Button>
-              </form>
               <div className="relative w-64">
                 <Input
                   placeholder="Search by Name, Email or Phone Number"
