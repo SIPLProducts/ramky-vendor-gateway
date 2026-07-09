@@ -859,3 +859,105 @@ function Field({ label, value }: { label: string; value?: string | null }) {
     </div>
   );
 }
+
+function SectionCard({
+  icon: Icon,
+  title,
+  children,
+  className,
+}: {
+  icon: React.ElementType;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm", className)}>
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
+      <div className="mb-4 flex items-center gap-2">
+        <Icon className="h-4 w-4 text-primary" />
+        <h4 className="font-semibold text-primary">{title}</h4>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function VisitingCard({
+  title,
+  lines,
+  cityLine,
+  pin,
+  showContacts = false,
+  sameAsRegistered = false,
+  email1,
+  email2,
+  contact1,
+  contact2,
+}: {
+  title: string;
+  lines: string[];
+  cityLine: string;
+  pin: string;
+  showContacts?: boolean;
+  sameAsRegistered?: boolean;
+  email1?: string | null;
+  email2?: string | null;
+  contact1?: string | null;
+  contact2?: string | null;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <MapPin className="h-4 w-4 text-primary" />
+      </div>
+      {sameAsRegistered ? (
+        <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
+      ) : (
+        <address className="not-italic text-sm leading-relaxed text-foreground space-y-0.5">
+          {lines.map((l, i) => (
+            <div key={i}>{l}</div>
+          ))}
+          {cityLine && <div>{cityLine}</div>}
+          {pin && <div className="font-medium">{pin}</div>}
+          {lines.length === 0 && !cityLine && !pin && (
+            <div className="text-muted-foreground">-</div>
+          )}
+        </address>
+      )}
+      {showContacts && (email1 || email2 || contact1 || contact2) && (
+        <>
+          <div className="my-4 h-px bg-border/60" />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            {contact1 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 1</span>
+                <span className="font-medium">{contact1}</span>
+              </div>
+            )}
+            {contact2 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 2</span>
+                <span className="font-medium">{contact2}</span>
+              </div>
+            )}
+            {email1 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 1</span>
+                <span className="font-medium break-all">{email1}</span>
+              </div>
+            )}
+            {email2 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 2</span>
+                <span className="font-medium break-all">{email2}</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
