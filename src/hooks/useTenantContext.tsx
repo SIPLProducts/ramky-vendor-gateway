@@ -316,6 +316,7 @@ export function useTenantContext() {
   if (!ctx) {
     return {
       myTenants: [], myTenantIds: [], activeTenantId: null, setActiveTenantId: () => {},
+      activeTenantIds: null, setActiveTenantIds: () => {},
       isSuperAdmin: false, isCrossTenantReviewer: false, isScmManager: false,
       isStageApprover: false, isBuyerRole: false,
       scmManagerVendorIds: null, scopedVendorIds: null, isLoading: false,
