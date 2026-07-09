@@ -28,12 +28,9 @@ import {
   FileText,
   Landmark,
   CreditCard,
-  Calendar,
   MessageSquare,
   FolderOpen,
   Shield,
-  Download,
-  Eye,
   Tags,
   CheckCircle2,
 } from 'lucide-react';
