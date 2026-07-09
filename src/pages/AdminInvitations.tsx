@@ -583,16 +583,22 @@ export default function AdminInvitations() {
     });
   };
 
-  const getInvitationStatus = (invitation: any): 'used' | 'expired' | 'pending' => {
-    const now = new Date();
-    const expiresAt = new Date(invitation.expires_at);
+  type InviteStatus = 'pending' | 'used' | 'draft' | 'expired' | 'submitted';
+  const getInvitationStatus = (invitation: any): InviteStatus => {
+    const vStatus = invitation?.vendor?.status as string | undefined;
+    if (vStatus && vStatus !== 'draft') return 'submitted';
+    if (vStatus === 'draft') return 'draft';
     if (invitation.used_at) return 'used';
-    if (expiresAt < now) return 'expired';
+    if (new Date(invitation.expires_at) < new Date()) return 'expired';
     return 'pending';
   };
 
   // Filter invitations
   const filteredInvitations = invitations?.filter((invitation: any) => {
+    const status = getInvitationStatus(invitation);
+    // Submitted vendors move to Dashboard / All Vendors / Approval screens
+    if (status === 'submitted') return false;
+
     const matchesSearch =
       invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (invitation.vendor?.reference_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -601,7 +607,7 @@ export default function AdminInvitations() {
 
     let matchesStatus = true;
     if (statusFilter !== 'all') {
-      matchesStatus = getInvitationStatus(invitation) === statusFilter;
+      matchesStatus = status === statusFilter;
     }
 
     return matchesSearch && matchesStatus;
@@ -666,9 +672,18 @@ export default function AdminInvitations() {
 
     if (status === 'used') {
       return (
-        <Badge variant="default" className="bg-success">
-          <CheckCircle2 className="h-3 w-3 mr-1" />
+        <Badge variant="default" className="bg-blue-600 hover:bg-blue-600 text-white">
+          <Mail className="h-3 w-3 mr-1" />
           Used
+        </Badge>
+      );
+    }
+
+    if (status === 'draft') {
+      return (
+        <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 text-white">
+          <Clock className="h-3 w-3 mr-1" />
+          In Progress
         </Badge>
       );
     }
@@ -957,9 +972,10 @@ export default function AdminInvitations() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Invitation: Pending</SelectItem>
-                  <SelectItem value="used">Invitation: Used</SelectItem>
-                  <SelectItem value="expired">Invitation: Expired</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="used">Used</SelectItem>
+                  <SelectItem value="draft">In Progress</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -990,13 +1006,33 @@ export default function AdminInvitations() {
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Created Date</TableHead>
                       <TableHead>Expires</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedInvitations.map((invitation) => {
                       const isOnBehalf = !!(invitation as any).created_on_behalf;
-                      const canResumeOnBehalf = isOnBehalf && !invitation.used_at;
+                      const status = getInvitationStatus(invitation);
+                      const canResumeOnBehalf = isOnBehalf && !invitation.used_at && status !== 'expired';
+                      const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'draft' || status === 'expired');
+                      const resendLabel = status === 'pending' ? 'Send Email' : status === 'expired' ? 'Resend Invitation' : 'Resend Email';
+                      const isSending = sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id;
+                      const handleResend = async () => {
+                        if (status === 'expired') {
+                          const newExpiry = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
+                          const { error } = await supabase
+                            .from('vendor_invitations')
+                            .update({ expires_at: newExpiry })
+                            .eq('id', invitation.id);
+                          if (error) {
+                            toast({ title: 'Could not extend invitation', description: error.message, variant: 'destructive' });
+                            return;
+                          }
+                          queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+                        }
+                        sendEmailInvitation.mutate(invitation.id);
+                      };
                       return (
                       <TableRow key={invitation.id}>
                         <TableCell>
@@ -1037,9 +1073,9 @@ export default function AdminInvitations() {
                         <TableCell className="text-muted-foreground">
                           {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
                         </TableCell>
+                        <TableCell>{getStatusBadge(invitation)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-
                             {canResumeOnBehalf && (
                               <Button
                                 variant="default"
@@ -1051,20 +1087,20 @@ export default function AdminInvitations() {
                                 Resume
                               </Button>
                             )}
-                            {!isOnBehalf && !invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+                            {showResend && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => sendEmailInvitation.mutate(invitation.id)}
-                                disabled={sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id}
+                                onClick={handleResend}
+                                disabled={isSending}
                                 className="gap-1"
                               >
-                                {sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id ? (
+                                {isSending ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <>
                                     <Send className="h-4 w-4" />
-                                    Send Email
+                                    {resendLabel}
                                   </>
                                 )}
                               </Button>

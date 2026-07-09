@@ -1,71 +1,76 @@
 ## Problem
 
-Two related gaps in the vendor registration flow (domestic path):
+The Vendor Invitations table (`src/pages/AdminInvitations.tsx`) currently only knows three states — Pending, Used, Expired — derived purely from `used_at` / `expires_at`. It doesn't distinguish "vendor opened the link but hasn't started filling" from "vendor is mid-form (draft)" from "vendor already submitted". Submitted vendors keep showing in the invitations list, and Resend Email is only offered when `!used_at`, so a buyer can't nudge a vendor who opened the link or started a draft. On-behalf rows only show Resume, never a status that matches the invitation lifecycle.
 
-1. **Resume jumps too far ahead.** When the buyer/vendor comes back to a draft, the resume logic in `src/pages/VendorRegistration.tsx` (lines ~820–833) marks a step as "filled" based on the mere presence of *any* field in that slice:
-   - Step 3 (Address) is marked filled if `address.registeredAddress` is truthy — but GST verification in Step 1 auto-populates parts of the address, so this field can already be non-empty even though the user never opened the Address tab.
-   - Step 4 (Contact) is marked filled if `contact.ceoName` is truthy — again, this can get seeded from OCR/organization data.
-   - `nextStep = min(steps not in filledSteps)` therefore skips Address/Contact and drops the user on Step 5 (Financial & Infrastructure).
+The vendor row (already joined as `vendor:vendors(id, reference_number, status)`) tells us exactly what happened after the link was opened — `status = 'draft'` means resume-able, anything else means submitted/in workflow.
 
-2. **Submit does not bounce the user back to the incomplete tab.** `handleSubmit` (line 1282) calls `submitVendor(formData)` immediately. If mandatory fields on Address / Contact / Financial / Organization are blank, the server-side error surfaces as a toast but the user is left sitting on the Review step with no indication of which tab to fix.
+## Fix (frontend-only, `src/pages/AdminInvitations.tsx`)
 
-## Fix
+### 1. Compute a richer status
 
-### 1. Trustworthy per-step completeness check
-
-Add a single helper in `VendorRegistration.tsx` that returns whether a given domestic step is *actually* complete, using the same required-field rules as each step's zod schema (mandatory-only subset, no format-only checks, no OCR gate beyond what step 1 already does):
-
-- Step 1: reuse existing `canProceedFromCurrentStep()` semantics (verifiedData.step1Status.allDone or the fallback checks).
-- Step 2: `organization.legalName`, `organization.industryType`, `organization.organizationType`, `statutory.entityType`.
-- Step 3: `address.registeredAddress` (≥5 chars), `registeredCity`, `registeredState`, `registeredPincode` (6 digits), `contactEmail1` (valid email), `contactPhone1` (10 digits).
-- Step 4: `contact.ceoName`, plus at least one valid CEO/marketing/customer-service phone+email pair matching current `ContactStep` schema.
-- Step 5: mandatory keys in `FinancialInfrastructureStep` schema (turnoverYear1, creditPeriodExpected, etc. — mirror the existing zod `schema`).
-
-Extract these as `isStepComplete(step, formData, verifiedData)` so both resume and submit use identical rules.
-
-### 2. Resume lands on the first incomplete step
-
-Replace the presence-based `filledSteps.push(...)` block (lines ~820–833) with:
+Replace `getInvitationStatus` with a five-state resolver:
 
 ```
-const filled = [1,2,3,4,5].filter(s => isStepComplete(s, existingFormData, seededVerifiedData));
-setCompletedSteps(filled);
-const firstMissing = [1,2,3,4,5].find(s => !filled.includes(s));
-setCurrentStep(isReturned ? 6 : (firstMissing ?? 6));
+type InviteStatus = 'pending' | 'used' | 'draft' | 'expired' | 'submitted';
 ```
 
-This guarantees the user re-enters at the first step with missing mandatory data — Address in the reported scenario — instead of leapfrogging to Financial.
+Rules, evaluated in order:
 
-Also tighten `handleStepClick` so a user can only jump forward to a step whose predecessors are all complete (they can always jump *backward* freely). Prevents the same skip via clicking the step indicator.
+1. If `invitation.vendor?.status` exists and is NOT `'draft'` → `submitted` (row will be filtered out of the table).
+2. If `invitation.vendor?.status === 'draft'` → `draft` (In Progress).
+3. If `used_at` is set → `used`.
+4. If `expires_at < now` → `expired`.
+5. Otherwise → `pending`.
 
-### 3. Submit routes to the first incomplete tab
+Notes:
+- On-behalf rows never get `used_at` today; step 1/2 still classifies them correctly via the linked vendor row (draft vs submitted). If neither exists yet, they fall into `pending`, which matches the "buyer created but hasn't started" state.
 
-Wrap `handleSubmit`:
+### 2. Hide submitted invitations from the table
 
-```
-const firstMissing = [1,2,3,4,5].find(s => !isStepComplete(s, formData, verifiedData));
-if (firstMissing) {
-  toast({
-    title: 'Please complete required fields',
-    description: `Step ${firstMissing} — ${registrationSteps[firstMissing-1].title} is incomplete.`,
-    variant: 'destructive',
-  });
-  setCurrentStep(firstMissing);
-  return;
-}
-// existing submitVendor / resubmitVendor flow …
-```
+In the `filteredInvitations` pipeline, drop any row where the resolved status is `submitted` BEFORE search/status/pagination filters run. Keep the row in the DB (untouched) so it still powers Dashboard / All Vendors / Approval screens.
 
-The individual step forms already surface field-level errors on mount via their zod resolvers, so once we drop the user on that tab they immediately see the red messages.
+### 3. Status column badges
 
-### 4. Scope
+Extend `getStatusBadge` to render:
 
-- Domestic flow only. International flow keeps its existing `filledSteps` presence check (its step slices don't get auto-seeded from OCR the same way).
-- No schema / DB changes. Purely client-side.
-- No changes to the actual step components — we reuse their required-field lists inline in the helper.
+| Status | Variant | Icon | Label |
+| --- | --- | --- | --- |
+| pending | secondary | Clock | Pending |
+| used | default (bg-info/blue) | Mail | Used |
+| draft | default (bg-warning/amber) | Loader2 (static) | In Progress |
+| expired | destructive | XCircle | Expired |
+
+(`submitted` never renders because it's filtered out.)
+
+### 4. Status filter dropdown
+
+Update the Filter select options to: All Status, Pending, Used, In Progress (draft), Expired. Remove nothing else.
+
+### 5. Resend Email availability
+
+Replace the current `!isOnBehalf && !invitation.used_at && expires>now` guard on the Send Email button with:
+
+- Show **Send Email** (label) when status is `pending`.
+- Show **Resend Email** when status is `used` or `draft` (same underlying mutation; button label switches).
+- Show **Resend Invitation** when status is `expired` — same `sendEmailInvitation.mutate` call. The edge function already accepts the existing invitation id; we additionally extend the row's `expires_at` before invoking:
+  - On expired resend: `await supabase.from('vendor_invitations').update({ expires_at: new Date(Date.now() + 14*24*3600*1000).toISOString() }).eq('id', invitation.id)` then invalidate and call the mutation.
+- Hide the Send/Resend button entirely for `submitted` (n/a — filtered out anyway).
+
+Keep the existing **Resume** button (for on-behalf rows with no `used_at`) as-is; also show Resume for on-behalf `draft` rows (the current `!invitation.used_at` check already covers this since on-behalf rows never set `used_at`).
+
+### 6. Scope guardrails
+
+- No DB schema change, no RLS change, no edge function change.
+- `sendEmailInvitation` mutation body stays the same; only the trigger conditions and button label change. For expired, we do a lightweight `update({ expires_at })` inline before invoking.
+- Query key and select shape unchanged (`vendor:vendors(id, reference_number, status)` is already fetched).
+- Dashboard / All Vendors / Approval screens are unaffected — they read `vendors`, not `vendor_invitations`.
 
 ## Verification
 
-- Build (`bun run build`) must pass.
-- Playwright: open a draft with only Organization filled → confirm resume lands on Step 3 (Address) not Step 5.
-- Playwright: on Review, click Submit with Address blank → confirm we get bounced to Address with a red toast and inline errors.
+- `bun run build` passes.
+- Playwright as buyer on `/admin/invitations`:
+  1. Row with no vendor + not expired → Status "Pending", button "Send Email".
+  2. Row with `used_at` set, no vendor → Status "Used", button "Resend Email".
+  3. Row where `vendor.status === 'draft'` → Status "In Progress", button "Resend Email" (and Resume for on-behalf).
+  4. Row with `expires_at < now`, no submitted vendor → Status "Expired", button "Resend Invitation" (extends expiry then sends).
+  5. Row where `vendor.status !== 'draft'` (e.g. `buyer_review`) → row is absent from the table; vendor still appears in All Vendors.
