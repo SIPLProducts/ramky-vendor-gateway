@@ -1,21 +1,25 @@
-## Scope
-- `src/components/vendor/VendorReviewDialog.tsx` — All Details tab card changes.
-- `src/components/approvals/StageApprovalView.tsx` — Buyer-stage-only table columns and tab visibility.
+## Changes to `src/components/vendor/VendorReviewDialog.tsx`
 
-## Changes
+### 1. Address Details card → visiting-card format
+Replace the current field-grid layout with a two-column visiting-card layout (Registered / Corporate Office + Communication):
+- Rounded card, subtle gradient background, thin primary accent bar on the left, MapPin icon top-right.
+- Address rendered as a formatted `<address>` block (line-by-line):
+  - Address Line 1
+  - Address Line 2 (Lines 3 & 4 also included if present)
+  - City, State
+  - PIN <pincode>
+- District / Country omitted (not stored today, per your choice).
+- Office Phone and Fax removed.
+- Email 1, Email 2, Contact 1, Contact 2 kept, shown inside the same card in a compact 2-column key/value grid below a divider.
+- Communication Address uses the same card style. When it equals the registered address it shows "Same as Registered Address" italic.
 
-### 1. Vendor Review Dialog — All Details tab
-- **Remove** the entire "Contact Details" card.
-- **Reorder** remaining cards to: Buyer Details → Organization Details → Statutory Details → Bank Details → Address Details → Classification Details → Financial Information.
+### 2. Statutory Details — clearer, more beautiful verified tick
+Replace the tiny inline `CheckCircle2` with a solid emerald pill badge:
+- 16 px round badge, `bg-emerald-500`, white check icon (stroke 3), subtle ring + shadow.
+- Sits right next to the field label (GSTIN, PAN, PAN Holder Name, PAN Status, Aadhaar Linked, MSME Number, MSME Category) whenever that verification passed.
+- `title` / `aria-label` = "Verified" for accessibility.
 
-### 2. Buyer Approval screen only (`stage === 'BUYER'`)
-In `StageApprovalView.tsx`:
-- **Hide the "Waiting for Previous Approval" tab and its content** when `isBuyer` (no prior approver exists before Buyer).
-- In the Pending Approval table, **hide the `Buyer Company`, `Invited By`, and `Stage` columns** when `isBuyer` — both header and body cells; adjust `colSpan` on skeleton/empty rows to 4.
-- Rejected tab (Buyer only) is unchanged.
-- No changes to other approval screens (SCM Manager/Head, Finance 1/2, CEO, SAP Sync).
+### 3. No other cards, order, or logic changes
+Card order stays: Buyer Details → Organization Details → Statutory Details → Bank Details → Address Details → Classification Details → Financial Information.
 
-## Technical Notes
-- `renderTable` currently uses 7 columns with `colSpan={7}`. Under `isBuyer` it will render 4 columns (Vendor, MSME, Submitted, Actions) with `colSpan={4}`, via conditional JSX inside the shared function.
-- Waiting tab removal: wrap `<TabsTrigger value="waiting">` and its `<TabsContent value="waiting">` in `{!isBuyer && (...)}`.
-- No business-logic, data-fetching, or edge-function changes.
+No schema/migration changes. No changes to other files.

@@ -492,7 +492,13 @@ export function VendorReviewDialog({
                     const panOk = v.pan_verification_status === 'passed';
                     const msmeOk = v.msme_verification_status === 'passed';
                     const Tick = () => (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 inline-block ml-1 align-text-bottom" />
+                      <span
+                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-600/30 ml-1.5 align-text-bottom"
+                        title="Verified"
+                        aria-label="Verified"
+                      >
+                        <CheckCircle2 className="h-3 w-3" strokeWidth={3} />
+                      </span>
                     );
                     const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
                       <p className="text-muted-foreground flex items-center">
@@ -541,49 +547,133 @@ export function VendorReviewDialog({
 
                   <Separator />
 
-                  {/* Address */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <MapPin className="h-4 w-4" />
-                      Address Details
-                    </h4>
+                  {/* Address — visiting-card style */}
+                  {(() => {
+                    const v: any = vendor;
+                    const joinAddr = (parts: (string | null | undefined)[]) =>
+                      parts.map((p) => (p || '').trim()).filter(Boolean);
+                    const regLines = joinAddr([
+                      v.registered_address,
+                      v.registered_address_line2,
+                      v.registered_address_line3,
+                      v.registered_address_line4,
+                    ]);
+                    const regCityLine = joinAddr([v.registered_city, v.registered_state]).join(', ');
+                    const regPin = v.registered_pincode ? `PIN ${v.registered_pincode}` : '';
 
-                    {/* Registered / Corporate Office Address */}
-                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
-                      <p className="text-sm font-semibold text-foreground">Registered / Corporate Office Address</p>
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
-                        <Field label="Address Line 1" value={vendor.registered_address} />
-                        <Field label="Address Line 2" value={(vendor as any).registered_address_line2} />
-                        <Field label="Address Line 3" value={(vendor as any).registered_address_line3} />
-                        <Field label="Address Line 4" value={(vendor as any).registered_address_line4} />
-                        <Field label="City" value={vendor.registered_city} />
-                        <Field label="State" value={vendor.registered_state} />
-                        <Field label="PIN Code" value={vendor.registered_pincode} />
-                        <Field label="Office Phone" value={(vendor as any).registered_phone} />
-                        <Field label="Fax" value={(vendor as any).registered_fax} />
-                        <Field label="Contact 1" value={(vendor as any).registered_contact_1 || vendor.primary_phone} />
-                        <Field label="Contact 2" value={(vendor as any).registered_contact_2} />
-                        <Field label="Email 1" value={(vendor as any).registered_email || vendor.primary_email} />
-                        <Field label="Email 2" value={(vendor as any).registered_email_2} />
+                    const commSame =
+                      !v.communication_address ||
+                      v.communication_address === v.registered_address;
+                    const commLines = commSame ? [] : joinAddr([v.communication_address]);
+                    const commCityLine = commSame
+                      ? ''
+                      : joinAddr([v.communication_city, v.communication_state]).join(', ');
+                    const commPin = commSame
+                      ? ''
+                      : v.communication_pincode
+                      ? `PIN ${v.communication_pincode}`
+                      : '';
 
-                      </div>
-                    </div>
+                    const email1 = v.registered_email || v.primary_email;
+                    const email2 = v.registered_email_2;
+                    const contact1 = v.registered_contact_1 || v.primary_phone;
+                    const contact2 = v.registered_contact_2;
 
-                    {/* Communication Address */}
-                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
-                      <p className="text-sm font-semibold text-foreground">Communication Address</p>
-                      {!vendor.communication_address || vendor.communication_address === vendor.registered_address ? (
-                        <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
-                          <Field label="Address" value={vendor.communication_address} />
-                          <Field label="City" value={vendor.communication_city} />
-                          <Field label="State" value={vendor.communication_state} />
-                          <Field label="PIN Code" value={(vendor as any).communication_pincode} />
+                    const VisitingCard = ({
+                      title,
+                      lines,
+                      cityLine,
+                      pin,
+                      showContacts = false,
+                      sameAsRegistered = false,
+                    }: {
+                      title: string;
+                      lines: string[];
+                      cityLine: string;
+                      pin: string;
+                      showContacts?: boolean;
+                      sameAsRegistered?: boolean;
+                    }) => (
+                      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
+                        <div className="absolute left-0 top-0 h-full w-1 bg-primary/70" />
+                        <div className="flex items-start justify-between mb-3">
+                          <p className="text-sm font-semibold text-foreground">{title}</p>
+                          <MapPin className="h-4 w-4 text-primary/70" />
                         </div>
-                      )}
-                    </div>
-                  </div>
+                        {sameAsRegistered ? (
+                          <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
+                        ) : (
+                          <address className="not-italic text-sm leading-relaxed text-foreground space-y-0.5">
+                            {lines.map((l, i) => (
+                              <div key={i}>{l}</div>
+                            ))}
+                            {cityLine && <div>{cityLine}</div>}
+                            {pin && <div className="font-medium">{pin}</div>}
+                            {lines.length === 0 && !cityLine && !pin && (
+                              <div className="text-muted-foreground">-</div>
+                            )}
+                          </address>
+                        )}
+                        {showContacts && (email1 || email2 || contact1 || contact2) && (
+                          <>
+                            <div className="my-4 h-px bg-border/60" />
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                              {contact1 && (
+                                <div className="flex items-start gap-2">
+                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 1</span>
+                                  <span className="font-medium">{contact1}</span>
+                                </div>
+                              )}
+                              {contact2 && (
+                                <div className="flex items-start gap-2">
+                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 2</span>
+                                  <span className="font-medium">{contact2}</span>
+                                </div>
+                              )}
+                              {email1 && (
+                                <div className="flex items-start gap-2">
+                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 1</span>
+                                  <span className="font-medium break-all">{email1}</span>
+                                </div>
+                              )}
+                              {email2 && (
+                                <div className="flex items-start gap-2">
+                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 2</span>
+                                  <span className="font-medium break-all">{email2}</span>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold flex items-center gap-2 text-primary">
+                          <MapPin className="h-4 w-4" />
+                          Address Details
+                        </h4>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <VisitingCard
+                            title="Registered / Corporate Office Address"
+                            lines={regLines}
+                            cityLine={regCityLine}
+                            pin={regPin}
+                            showContacts
+                          />
+                          <VisitingCard
+                            title="Communication Address"
+                            lines={commLines}
+                            cityLine={commCityLine}
+                            pin={commPin}
+                            sameAsRegistered={commSame}
+                            showContacts={!commSame}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <Separator />
 
