@@ -191,7 +191,7 @@ export function VendorReviewDialog({
   open,
   onOpenChange,
   footerExtra,
-  description = 'Review vendor details before syncing to SAP',
+  description = 'Review vendor details',
 }: VendorReviewDialogProps) {
   const [vendor, setVendor] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
