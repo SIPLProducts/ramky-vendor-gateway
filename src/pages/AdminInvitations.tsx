@@ -672,9 +672,18 @@ export default function AdminInvitations() {
 
     if (status === 'used') {
       return (
-        <Badge variant="default" className="bg-success">
-          <CheckCircle2 className="h-3 w-3 mr-1" />
+        <Badge variant="default" className="bg-blue-600 hover:bg-blue-600 text-white">
+          <Mail className="h-3 w-3 mr-1" />
           Used
+        </Badge>
+      );
+    }
+
+    if (status === 'draft') {
+      return (
+        <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 text-white">
+          <Clock className="h-3 w-3 mr-1" />
+          In Progress
         </Badge>
       );
     }
