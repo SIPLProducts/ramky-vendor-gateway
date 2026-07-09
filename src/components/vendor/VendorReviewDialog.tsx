@@ -140,7 +140,7 @@ interface VendorReviewDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Optional extra footer button(s), e.g. "Prepare & Sync" on SAP Sync page. */
   footerExtra?: ReactNode;
-  /** Override the dialog subtitle. Defaults to "Review vendor details before syncing to SAP". */
+  /** Override the dialog subtitle. Defaults to "Review vendor details". */
   description?: string;
 }
 
