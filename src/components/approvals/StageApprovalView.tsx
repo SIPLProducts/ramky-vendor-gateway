@@ -411,9 +411,11 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               <TabsTrigger value="pending">
                 Pending Approval ({pendingItems.length})
               </TabsTrigger>
-              <TabsTrigger value="waiting">
-                Waiting for Previous Approval ({waitingItems.length})
-              </TabsTrigger>
+              {!isBuyer && (
+                <TabsTrigger value="waiting">
+                  Waiting for Previous Approval ({waitingItems.length})
+                </TabsTrigger>
+              )}
               {isBuyer && (
                 <TabsTrigger value="rejected">
                   Rejected ({rejectedItems.length})
@@ -423,9 +425,11 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <TabsContent value="pending" className="mt-4">
               {renderTable(pendingItems, 'pending')}
             </TabsContent>
-            <TabsContent value="waiting" className="mt-4">
-              {renderTable(waitingItems, 'waiting')}
-            </TabsContent>
+            {!isBuyer && (
+              <TabsContent value="waiting" className="mt-4">
+                {renderTable(waitingItems, 'waiting')}
+              </TabsContent>
+            )}
             {isBuyer && (
               <TabsContent value="rejected" className="mt-4">
                 {renderRejectedTable(rejectedItems)}
