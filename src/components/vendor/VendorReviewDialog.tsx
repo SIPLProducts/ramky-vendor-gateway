@@ -521,7 +521,7 @@ export function VendorReviewDialog({
                       {!vendor.communication_address || vendor.communication_address === vendor.registered_address ? (
                         <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
                           <Field label="Address" value={vendor.communication_address} />
                           <Field label="City" value={vendor.communication_city} />
                           <Field label="State" value={vendor.communication_state} />
