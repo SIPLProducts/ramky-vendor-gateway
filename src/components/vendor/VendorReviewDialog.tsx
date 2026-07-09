@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -12,10 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import { GstFilingStatusTable, normalizeFilingStatus, type FilingStatusRow } from '@/components/vendor/kyc/GstFilingStatusTable';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
@@ -31,12 +28,9 @@ import {
   FileText,
   Landmark,
   CreditCard,
-  Calendar,
   MessageSquare,
   FolderOpen,
   Shield,
-  Download,
-  Eye,
   Tags,
   CheckCircle2,
 } from 'lucide-react';
@@ -441,38 +435,27 @@ export function VendorReviewDialog({
                 <div className="space-y-6">
                   {/* Routing / Invitation */}
                   {routing && (
-                    <>
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <Shield className="h-4 w-4" />
-                          Buyer Details
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Buyer Company</p>
-                            <p className="font-medium">{routing.vendorCompany || '-'}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Invited By (Buyer)</p>
-                            <p className="font-medium">{routing.buyerName || '-'}</p>
-                            {routing.buyerEmail && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Mail className="h-3 w-3" /> {routing.buyerEmail}
-                              </p>
-                            )}
-                          </div>
+                    <SectionCard icon={Shield} title="Buyer Details">
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Buyer Company</p>
+                          <p className="font-medium">{routing.vendorCompany || '-'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Invited By (Buyer)</p>
+                          <p className="font-medium">{routing.buyerName || '-'}</p>
+                          {routing.buyerEmail && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Mail className="h-3 w-3" /> {routing.buyerEmail}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <Separator />
-                    </>
+                    </SectionCard>
                   )}
 
                   {/* Organization */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <Building2 className="h-4 w-4" />
-                      Organization Details
-                    </h4>
+                  <SectionCard icon={Building2} title="Organization Details">
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">Legal Name</p><p className="font-medium">{vendor.legal_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Trade Name</p><p className="font-medium">{vendor.trade_name || '-'}</p></div>
@@ -481,9 +464,7 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">Ownership Type</p><p className="font-medium">{vendor.ownership_type || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Entity Type</p><p className="font-medium">{vendor.entity_type || '-'}</p></div>
                     </div>
-                  </div>
-
-                  <Separator />
+                  </SectionCard>
 
                   {/* Statutory */}
                   {(() => {
@@ -493,11 +474,11 @@ export function VendorReviewDialog({
                     const msmeOk = v.msme_verification_status === 'passed';
                     const Tick = () => (
                       <span
-                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-600/30 ml-1.5 align-text-bottom"
+                        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-emerald-600/40 ml-1.5 align-text-bottom"
                         title="Verified"
                         aria-label="Verified"
                       >
-                        <CheckCircle2 className="h-3 w-3" strokeWidth={3} />
+                        <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={3.5} />
                       </span>
                     );
                     const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
@@ -507,11 +488,7 @@ export function VendorReviewDialog({
                       </p>
                     );
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <FileText className="h-4 w-4" />
-                          Statutory Details
-                        </h4>
+                      <SectionCard icon={FileText} title="Statutory Details">
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
                           <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
@@ -523,18 +500,12 @@ export function VendorReviewDialog({
                           <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{v.firm_registration_no || '-'}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{v.iec_no || '-'}</p></div>
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
 
-                  <Separator />
-
                   {/* Bank */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <Landmark className="h-4 w-4" />
-                      Bank Details
-                    </h4>
+                  <SectionCard icon={Landmark} title="Bank Details">
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">Bank Name</p><p className="font-medium">{vendor.bank_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Branch</p><p className="font-medium">{vendor.bank_branch_name || vendor.branch_name || '-'}</p></div>
@@ -543,9 +514,7 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">IFSC Code</p><p className="font-mono font-medium">{vendor.ifsc_code || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">MICR Code</p><p className="font-mono font-medium">{vendor.micr_code || '-'}</p></div>
                     </div>
-                  </div>
-
-                  <Separator />
+                  </SectionCard>
 
                   {/* Address — visiting-card style */}
                   {(() => {
@@ -579,81 +548,8 @@ export function VendorReviewDialog({
                     const contact1 = v.registered_contact_1 || v.primary_phone;
                     const contact2 = v.registered_contact_2;
 
-                    const VisitingCard = ({
-                      title,
-                      lines,
-                      cityLine,
-                      pin,
-                      showContacts = false,
-                      sameAsRegistered = false,
-                    }: {
-                      title: string;
-                      lines: string[];
-                      cityLine: string;
-                      pin: string;
-                      showContacts?: boolean;
-                      sameAsRegistered?: boolean;
-                    }) => (
-                      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
-                        <div className="absolute left-0 top-0 h-full w-1 bg-primary/70" />
-                        <div className="flex items-start justify-between mb-3">
-                          <p className="text-sm font-semibold text-foreground">{title}</p>
-                          <MapPin className="h-4 w-4 text-primary/70" />
-                        </div>
-                        {sameAsRegistered ? (
-                          <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
-                        ) : (
-                          <address className="not-italic text-sm leading-relaxed text-foreground space-y-0.5">
-                            {lines.map((l, i) => (
-                              <div key={i}>{l}</div>
-                            ))}
-                            {cityLine && <div>{cityLine}</div>}
-                            {pin && <div className="font-medium">{pin}</div>}
-                            {lines.length === 0 && !cityLine && !pin && (
-                              <div className="text-muted-foreground">-</div>
-                            )}
-                          </address>
-                        )}
-                        {showContacts && (email1 || email2 || contact1 || contact2) && (
-                          <>
-                            <div className="my-4 h-px bg-border/60" />
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                              {contact1 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 1</span>
-                                  <span className="font-medium">{contact1}</span>
-                                </div>
-                              )}
-                              {contact2 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 2</span>
-                                  <span className="font-medium">{contact2}</span>
-                                </div>
-                              )}
-                              {email1 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 1</span>
-                                  <span className="font-medium break-all">{email1}</span>
-                                </div>
-                              )}
-                              {email2 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 2</span>
-                                  <span className="font-medium break-all">{email2}</span>
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <MapPin className="h-4 w-4" />
-                          Address Details
-                        </h4>
+                      <SectionCard icon={MapPin} title="Address Details">
                         <div className="grid gap-4 md:grid-cols-2">
                           <VisitingCard
                             title="Registered / Corporate Office Address"
@@ -661,6 +557,10 @@ export function VendorReviewDialog({
                             cityLine={regCityLine}
                             pin={regPin}
                             showContacts
+                            email1={email1}
+                            email2={email2}
+                            contact1={contact1}
+                            contact2={contact2}
                           />
                           <VisitingCard
                             title="Communication Address"
@@ -669,24 +569,22 @@ export function VendorReviewDialog({
                             pin={commPin}
                             sameAsRegistered={commSame}
                             showContacts={!commSame}
+                            email1={email1}
+                            email2={email2}
+                            contact1={contact1}
+                            contact2={contact2}
                           />
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
-
-                  <Separator />
 
                   {/* Classification Details */}
                   {(() => {
                     const v = vendor as any;
                     const fmtArr = (arr: any) => Array.isArray(arr) && arr.length ? arr.join(', ') : '-';
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <Tags className="h-4 w-4" />
-                          Classification Details
-                        </h4>
+                      <SectionCard icon={Tags} title="Classification Details">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="border border-border rounded-lg p-3 space-y-2">
                             <p className="text-xs font-semibold text-primary">Vendor_Details</p>
@@ -703,11 +601,9 @@ export function VendorReviewDialog({
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
-
-                  <Separator />
 
                   {/* Financial */}
                   {(() => {
@@ -720,56 +616,45 @@ export function VendorReviewDialog({
                     };
                     const creditPeriod = Number(vendor.credit_period_expected);
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <CreditCard className="h-4 w-4" />
-                          Financial Information
-                        </h4>
+                      <SectionCard icon={CreditCard} title="Financial Information">
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy1)}</p><p className="font-medium">{fmt(vendor.turnover_year1)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy2)}</p><p className="font-medium">{fmt(vendor.turnover_year2)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Turnover {formatIndianFy(fy3)}</p><p className="font-medium">{fmt(vendor.turnover_year3)}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">Credit Period Expected</p><p className="font-medium">{(vendor.credit_period_expected === 0 || vendor.credit_period_expected) && Number.isFinite(creditPeriod) && creditPeriod >= 0 ? `${vendor.credit_period_expected} days` : '-'}</p></div>
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
 
 
                   {(vendor.finance_comments || vendor.purchase_comments) && (
-                    <>
-                      <Separator />
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <MessageSquare className="h-4 w-4" />
-                          Review Comments
-                        </h4>
-                        <div className="grid grid-cols-1 gap-4 text-sm">
-                          {vendor.finance_comments && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
-                                {vendor.finance_reviewed_at && (
-                                  <span className="text-xs text-muted-foreground">{new Date(vendor.finance_reviewed_at).toLocaleDateString('en-IN')}</span>
-                                )}
-                              </div>
-                              <p className="text-amber-900 dark:text-amber-100">{vendor.finance_comments}</p>
+                    <SectionCard icon={MessageSquare} title="Review Comments">
+                      <div className="grid grid-cols-1 gap-4 text-sm">
+                        {vendor.finance_comments && (
+                          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
+                              {vendor.finance_reviewed_at && (
+                                <span className="text-xs text-muted-foreground">{new Date(vendor.finance_reviewed_at).toLocaleDateString('en-IN')}</span>
+                              )}
                             </div>
-                          )}
-                          {vendor.purchase_comments && (
-                            <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
-                                {vendor.purchase_reviewed_at && (
-                                  <span className="text-xs text-muted-foreground">{new Date(vendor.purchase_reviewed_at).toLocaleDateString('en-IN')}</span>
-                                )}
-                              </div>
-                              <p className="text-teal-900 dark:text-teal-100">{vendor.purchase_comments}</p>
+                            <p className="text-amber-900 dark:text-amber-100">{vendor.finance_comments}</p>
+                          </div>
+                        )}
+                        {vendor.purchase_comments && (
+                          <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
+                              {vendor.purchase_reviewed_at && (
+                                <span className="text-xs text-muted-foreground">{new Date(vendor.purchase_reviewed_at).toLocaleDateString('en-IN')}</span>
+                              )}
                             </div>
-                          )}
-                        </div>
+                            <p className="text-teal-900 dark:text-teal-100">{vendor.purchase_comments}</p>
+                          </div>
+                        )}
                       </div>
-                    </>
+                    </SectionCard>
                   )}
                 </div>
               </ScrollArea>
@@ -855,6 +740,108 @@ function Field({ label, value }: { label: string; value?: string | null }) {
     <div className="space-y-0.5">
       <p className="text-muted-foreground text-xs">{label}</p>
       <p className="font-medium break-words">{value || "-"}</p>
+    </div>
+  );
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  children,
+  className,
+}: {
+  icon: React.ElementType;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm", className)}>
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
+      <div className="mb-4 flex items-center gap-2">
+        <Icon className="h-4 w-4 text-primary" />
+        <h4 className="font-semibold text-primary">{title}</h4>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function VisitingCard({
+  title,
+  lines,
+  cityLine,
+  pin,
+  showContacts = false,
+  sameAsRegistered = false,
+  email1,
+  email2,
+  contact1,
+  contact2,
+}: {
+  title: string;
+  lines: string[];
+  cityLine: string;
+  pin: string;
+  showContacts?: boolean;
+  sameAsRegistered?: boolean;
+  email1?: string | null;
+  email2?: string | null;
+  contact1?: string | null;
+  contact2?: string | null;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <MapPin className="h-4 w-4 text-primary" />
+      </div>
+      {sameAsRegistered ? (
+        <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
+      ) : (
+        <address className="not-italic text-sm leading-relaxed text-foreground space-y-0.5">
+          {lines.map((l, i) => (
+            <div key={i}>{l}</div>
+          ))}
+          {cityLine && <div>{cityLine}</div>}
+          {pin && <div className="font-medium">{pin}</div>}
+          {lines.length === 0 && !cityLine && !pin && (
+            <div className="text-muted-foreground">-</div>
+          )}
+        </address>
+      )}
+      {showContacts && (email1 || email2 || contact1 || contact2) && (
+        <>
+          <div className="my-4 h-px bg-border/60" />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            {contact1 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 1</span>
+                <span className="font-medium">{contact1}</span>
+              </div>
+            )}
+            {contact2 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 2</span>
+                <span className="font-medium">{contact2}</span>
+              </div>
+            )}
+            {email1 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 1</span>
+                <span className="font-medium break-all">{email1}</span>
+              </div>
+            )}
+            {email2 && (
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 2</span>
+                <span className="font-medium break-all">{email2}</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
