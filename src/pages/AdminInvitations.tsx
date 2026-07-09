@@ -972,9 +972,10 @@ export default function AdminInvitations() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Invitation: Pending</SelectItem>
-                  <SelectItem value="used">Invitation: Used</SelectItem>
-                  <SelectItem value="expired">Invitation: Expired</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="used">Used</SelectItem>
+                  <SelectItem value="draft">In Progress</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
             </div>
