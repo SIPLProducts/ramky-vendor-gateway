@@ -17,7 +17,6 @@ import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
-import { formatStageLevel, parseLevelOrdinal } from '@/lib/approvalLabels';
 
 interface Props {
   stage: ApprovalStage;
@@ -180,7 +179,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <TableHead>Vendor</TableHead>
             {!isBuyer && <TableHead>Buyer Company</TableHead>}
             {!isBuyer && <TableHead>Invited By</TableHead>}
-            {!isBuyer && <TableHead>Stage</TableHead>}
             <TableHead>MSME</TableHead>
             <TableHead>Submitted</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -189,10 +187,10 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <TableBody>
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={isBuyer ? 4 : 7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+              <TableRow key={i}><TableCell colSpan={isBuyer ? 4 : 6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
             ))
           ) : rows.length === 0 ? (
-            <TableRow><TableCell colSpan={isBuyer ? 4 : 7} className="text-center text-muted-foreground py-8">
+            <TableRow><TableCell colSpan={isBuyer ? 4 : 6} className="text-center text-muted-foreground py-8">
               {variant === 'pending' ? (
                 <>
                   <div>No vendors are pending your approval right now.</div>
@@ -242,9 +240,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                         <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
                       )}
                     </TableCell>
-                  )}
-                  {!isBuyer && (
-                    <TableCell><Badge variant="outline">{(() => { const n = parseLevelOrdinal(it.levelName); return n != null ? formatStageLevel(stage, n) : it.levelName; })()}</Badge></TableCell>
                   )}
                   <TableCell>
                     {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
