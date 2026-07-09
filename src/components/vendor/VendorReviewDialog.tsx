@@ -474,11 +474,11 @@ export function VendorReviewDialog({
                     const msmeOk = v.msme_verification_status === 'passed';
                     const Tick = () => (
                       <span
-                        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-emerald-600/40 ml-1.5 align-text-bottom"
+                        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500 text-white border-[3px] border-emerald-700 ml-1.5 align-text-bottom"
                         title="Verified"
                         aria-label="Verified"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={3.5} />
+                        <CheckCircle2 className="h-4 w-4" strokeWidth={3} />
                       </span>
                     );
                     const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
