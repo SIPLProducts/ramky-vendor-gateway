@@ -162,7 +162,7 @@ export default function Dashboard() {
 
       let q = supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, status, created_at, tenant_id')
+        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
         .order('created_at', { ascending: false });
 
       if (fromIso) q = q.gte('created_at', fromIso);
@@ -178,13 +178,17 @@ export default function Dashboard() {
         const ids = rows.map((r) => r.id);
         const { data: invites } = await supabase
           .from('vendor_invitations')
-          .select('vendor_id, created_by, email, created_at')
+          .select('vendor_id, created_by, email, created_on_behalf, created_at')
           .in('vendor_id', ids)
           .order('created_at', { ascending: false });
-        const latest = new Map<string, { created_by: string | null; email: string | null }>();
+        const latest = new Map<string, { created_by: string | null; email: string | null; on_behalf: boolean }>();
         (invites ?? []).forEach((inv: any) => {
           if (inv.vendor_id && !latest.has(inv.vendor_id)) {
-            latest.set(inv.vendor_id, { created_by: inv.created_by, email: inv.email });
+            latest.set(inv.vendor_id, {
+              created_by: inv.created_by,
+              email: inv.email,
+              on_behalf: !!inv.created_on_behalf,
+            });
           }
         });
         const buyerIds = Array.from(
@@ -202,11 +206,20 @@ export default function Dashboard() {
         }
         rows.forEach((r) => {
           const inv = latest.get(r.id);
-          if (!inv) { r.invited_by = null; return; }
+          if (!inv) {
+            r.invited_by = null;
+            r.display_email = r.primary_email ?? r.registered_email ?? null;
+            return;
+          }
           const prof = inv.created_by ? profMap.get(inv.created_by) : null;
           r.invited_by = prof
             ? { name: prof.name, email: prof.email }
             : { name: null, email: inv.email };
+          // On-behalf: buyer entered vendor's contact email; show it (fallback to invite email).
+          // Self-signup: invitation email is the vendor's email (fallback to primary_email).
+          r.display_email = inv.on_behalf
+            ? (r.registered_email || inv.email || r.primary_email || null)
+            : (inv.email || r.primary_email || r.registered_email || null);
         });
       }
 
