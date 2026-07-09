@@ -1,76 +1,85 @@
-## Problem
+# Vendor Invitations — Status Column + Draft Auto-Save
 
-The Vendor Invitations table (`src/pages/AdminInvitations.tsx`) currently only knows three states — Pending, Used, Expired — derived purely from `used_at` / `expires_at`. It doesn't distinguish "vendor opened the link but hasn't started filling" from "vendor is mid-form (draft)" from "vendor already submitted". Submitted vendors keep showing in the invitations list, and Resend Email is only offered when `!used_at`, so a buyer can't nudge a vendor who opened the link or started a draft. On-behalf rows only show Resume, never a status that matches the invitation lifecycle.
+## Part A — Fix Vendor Invitations status column
 
-The vendor row (already joined as `vendor:vendors(id, reference_number, status)`) tells us exactly what happened after the link was opened — `status = 'draft'` means resume-able, anything else means submitted/in workflow.
+### Root cause
+The two rows showing "Used" are on-behalf registrations whose vendors are already at `pending_sap_sync` / `scm_manager_review` — they should be hidden. The query embed `vendor:vendors(...)` resolves the wrong direction (FK is `vendors.invitation_id → vendor_invitations.id`, one-to-many), so `invitation.vendor?.status` is `undefined` and the code falls through to "Used".
 
-## Fix (frontend-only, `src/pages/AdminInvitations.tsx`)
+### Status definitions
 
-### 1. Compute a richer status
+| Status      | Meaning                                        | Detection                                                     |
+| ----------- | ---------------------------------------------- | ------------------------------------------------------------- |
+| Pending     | Email sent, link not yet clicked               | `!used_at && !created_on_behalf && !expired`                  |
+| Used        | Link clicked, no form data yet                 | `used_at` set, no vendor row                                  |
+| In Progress | Draft — data partially filled / on-behalf draft | vendor row with `status = 'draft'`                            |
+| Expired     | Link past `expires_at`, no draft/submission    | `expires_at < now()` and not In Progress/Submitted            |
+| Submitted   | **Hidden** from this table                     | vendor row with `status != 'draft'`                           |
 
-Replace `getInvitationStatus` with a five-state resolver:
+### Changes — `src/pages/AdminInvitations.tsx`
 
-```
-type InviteStatus = 'pending' | 'used' | 'draft' | 'expired' | 'submitted';
-```
+1. **Fix join** (~lines 139 & 178):
+   ```ts
+   .select('*, vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status), tenants(id, name)')
+   // normalize
+   data.forEach((r: any) => { r.vendor = Array.isArray(r.vendor) ? r.vendor[0] ?? null : r.vendor; });
+   ```
 
-Rules, evaluated in order:
+2. **Rewrite `getInvitationStatus`**:
+   ```ts
+   type InviteStatus = 'pending' | 'used' | 'in_progress' | 'expired' | 'submitted';
+   const getInvitationStatus = (inv: any): InviteStatus => {
+     const v = inv?.vendor?.status as string | undefined;
+     if (v && v !== 'draft') return 'submitted';
+     if (v === 'draft' || inv.created_on_behalf) return 'in_progress';
+     if (inv.used_at) return 'used';
+     if (new Date(inv.expires_at) < new Date()) return 'expired';
+     return 'pending';
+   };
+   ```
+   Keep existing `if (status === 'submitted') return false;` — it will now correctly hide those rows.
 
-1. If `invitation.vendor?.status` exists and is NOT `'draft'` → `submitted` (row will be filtered out of the table).
-2. If `invitation.vendor?.status === 'draft'` → `draft` (In Progress).
-3. If `used_at` is set → `used`.
-4. If `expires_at < now` → `expired`.
-5. Otherwise → `pending`.
+3. **Badges**: Pending (grey), Used (blue), In Progress (amber), Expired (red).
 
-Notes:
-- On-behalf rows never get `used_at` today; step 1/2 still classifies them correctly via the linked vendor row (draft vs submitted). If neither exists yet, they fall into `pending`, which matches the "buyer created but hasn't started" state.
+4. **Filter dropdown**: All Status / Pending / Used / In Progress / Expired.
 
-### 2. Hide submitted invitations from the table
+5. **Action buttons**:
+   - Pending → **Send Email**
+   - Used → **Resend Email**
+   - In Progress → **Resend Email**
+   - Expired → **Resend Invitation** (existing `handleResend` extends expiry by 14 days first)
+   - On-behalf Resume button unchanged.
 
-In the `filteredInvitations` pipeline, drop any row where the resolved status is `submitted` BEFORE search/status/pagination filters run. Keep the row in the DB (untouched) so it still powers Dashboard / All Vendors / Approval screens.
+## Part B — Auto-save drafts in Vendor Registration
 
-### 3. Status column badges
+Today the vendor form saves only when the user clicks Save/Next. If they close the tab mid-step, unsaved changes are lost and the invitation stays showing "Used" instead of moving to "In Progress".
 
-Extend `getStatusBadge` to render:
+### Changes — `src/pages/VendorRegistration.tsx`
 
-| Status | Variant | Icon | Label |
-| --- | --- | --- | --- |
-| pending | secondary | Clock | Pending |
-| used | default (bg-info/blue) | Mail | Used |
-| draft | default (bg-warning/amber) | Loader2 (static) | In Progress |
-| expired | destructive | XCircle | Expired |
+1. **Debounced auto-save hook**: watch the form's data object. When it changes, wait 2 seconds of idle, then call the same upsert path that "Save Draft" already uses. Skip when nothing has changed vs the last saved snapshot.
 
-(`submitted` never renders because it's filtered out.)
+2. **Trigger on step change**: fire an immediate save when the user navigates between steps (Next/Back/tab click), so the vendor row is created as soon as any real data exists.
 
-### 4. Status filter dropdown
+3. **Save on unload**: `beforeunload` handler calls a synchronous best-effort flush (only if there are pending unsaved changes).
 
-Update the Filter select options to: All Status, Pending, Used, In Progress (draft), Expired. Remove nothing else.
+4. **First-write behaviour**: if no vendor row exists yet, the first auto-save creates it with `status = 'draft'` and `invitation_id` set — this is what flips the invitation from "Used" to "In Progress" without any user action.
 
-### 5. Resend Email availability
+5. **Silent by default**: no toast on auto-save (avoid noise). Keep the existing toast on explicit "Save Draft" click. Show a small "Saving…/Saved" indicator near the step header.
 
-Replace the current `!isOnBehalf && !invitation.used_at && expires>now` guard on the Send Email button with:
+6. **Guard rails**:
+   - Skip auto-save while a manual save is in-flight.
+   - Skip if the vendor is already past draft (submitted / in workflow) — read `status` before writing.
+   - Do not auto-save the OCR/verification transient state, only persisted form fields.
 
-- Show **Send Email** (label) when status is `pending`.
-- Show **Resend Email** when status is `used` or `draft` (same underlying mutation; button label switches).
-- Show **Resend Invitation** when status is `expired` — same `sendEmailInvitation.mutate` call. The edge function already accepts the existing invitation id; we additionally extend the row's `expires_at` before invoking:
-  - On expired resend: `await supabase.from('vendor_invitations').update({ expires_at: new Date(Date.now() + 14*24*3600*1000).toISOString() }).eq('id', invitation.id)` then invalidate and call the mutation.
-- Hide the Send/Resend button entirely for `submitted` (n/a — filtered out anyway).
+## Out of scope
 
-Keep the existing **Resume** button (for on-behalf rows with no `used_at`) as-is; also show Resume for on-behalf `draft` rows (the current `!invitation.used_at` check already covers this since on-behalf rows never set `used_at`).
-
-### 6. Scope guardrails
-
-- No DB schema change, no RLS change, no edge function change.
-- `sendEmailInvitation` mutation body stays the same; only the trigger conditions and button label change. For expired, we do a lightweight `update({ expires_at })` inline before invoking.
-- Query key and select shape unchanged (`vendor:vendors(id, reference_number, status)` is already fetched).
-- Dashboard / All Vendors / Approval screens are unaffected — they read `vendors`, not `vendor_invitations`.
+- No DB / RLS / edge-function changes.
+- No changes to `sendEmailInvitation` mutation body.
+- No changes to Dashboard, All Vendors, Approvals, or the submitted-vendor flow.
 
 ## Verification
 
-- `bun run build` passes.
-- Playwright as buyer on `/admin/invitations`:
-  1. Row with no vendor + not expired → Status "Pending", button "Send Email".
-  2. Row with `used_at` set, no vendor → Status "Used", button "Resend Email".
-  3. Row where `vendor.status === 'draft'` → Status "In Progress", button "Resend Email" (and Resume for on-behalf).
-  4. Row with `expires_at < now`, no submitted vendor → Status "Expired", button "Resend Invitation" (extends expiry then sends).
-  5. Row where `vendor.status !== 'draft'` (e.g. `buyer_review`) → row is absent from the table; vendor still appears in All Vendors.
+1. `bunx tsgo --noEmit` clean.
+2. Vendor Invitations no longer lists rows whose vendors are in `pending_sap_sync` / `scm_manager_review` / `buyer_review` / etc.
+3. On-behalf draft rows show **In Progress** with **Resend Email**.
+4. Fresh email invite → **Pending / Send Email**. After vendor opens link → **Used / Resend Email**. After vendor types into any field and 2s pass (or navigates a step) → **In Progress / Resend Email**, with no manual save required.
+5. Refresh mid-form: previously entered fields persist.
