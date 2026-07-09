@@ -28,16 +28,78 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (cancelled) return;
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setReady(true);
       }
     });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => subscription.unsubscribe();
+
+    (async () => {
+      try {
+        // 1) Error passed in the hash from Supabase verify endpoint
+        const rawHash = window.location.hash.startsWith('#')
+          ? window.location.hash.slice(1)
+          : window.location.hash;
+        const hashParams = new URLSearchParams(rawHash);
+        const search = new URLSearchParams(window.location.search);
+
+        const hashError = hashParams.get('error_description') || hashParams.get('error');
+        const queryError = search.get('error_description') || search.get('error');
+        if (hashError || queryError) {
+          const msg = decodeURIComponent((hashError || queryError || '').replace(/\+/g, ' '));
+          if (!cancelled) setError(msg || 'This reset link is invalid or has expired. Please request a new one.');
+          return;
+        }
+
+        // 2) PKCE flow: ?code=...
+        const code = search.get('code');
+        if (code) {
+          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (cancelled) return;
+          if (exchangeErr) {
+            setError(exchangeErr.message || 'Reset link is invalid or has expired. Please request a new one.');
+            return;
+          }
+          setReady(true);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        // 3) Implicit flow: #access_token=...&refresh_token=...&type=recovery
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (cancelled) return;
+          if (setErr) {
+            setError(setErr.message || 'Reset link is invalid or has expired. Please request a new one.');
+            return;
+          }
+          setReady(true);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        // 4) Fallback: already-authenticated recovery session
+        const { data } = await supabase.auth.getSession();
+        if (!cancelled && data.session) setReady(true);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? 'Unable to process reset link.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
+
 
   const validate = (): string | null => {
     const parsed = passwordSchema.safeParse(newPassword);
