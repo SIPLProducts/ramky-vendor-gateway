@@ -676,18 +676,12 @@ export function VendorReviewDialog({
                     );
                   })()}
 
-                  <Separator />
-
                   {/* Classification Details */}
                   {(() => {
                     const v = vendor as any;
                     const fmtArr = (arr: any) => Array.isArray(arr) && arr.length ? arr.join(', ') : '-';
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <Tags className="h-4 w-4" />
-                          Classification Details
-                        </h4>
+                      <SectionCard icon={Tags} title="Classification Details">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="border border-border rounded-lg p-3 space-y-2">
                             <p className="text-xs font-semibold text-primary">Vendor_Details</p>
@@ -704,7 +698,7 @@ export function VendorReviewDialog({
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
 
