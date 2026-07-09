@@ -714,9 +714,6 @@ export function VendorReviewDialog({
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
-            <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
-              <ValidationStatus validations={validations} />
-            </TabsContent>
 
             <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-[55vh] pr-4">
