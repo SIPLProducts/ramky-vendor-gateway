@@ -1,34 +1,28 @@
-## Changes
 
-### 1. Rename "Created" → "Created Date" in remaining tables
-- `src/pages/AdminInvitations.tsx` line 990: `<TableHead>Created</TableHead>` → `<TableHead>Created Date</TableHead>`
-- `src/components/admin/BuyerScmMapping.tsx` line 284: same rename
-- `src/components/admin/TenantManager.tsx` line 98: same rename
+## Changes in `src/components/vendor/VendorReviewDialog.tsx`
 
-(Dashboard already updated in previous turn.)
+### 1. Rename & trim "Routing & Invitation" → "Buyer Details"
+- Change section heading to "Buyer Details".
+- Keep only two fields in the grid (2 columns):
+  - **Buyer Company** — from `routing.vendorCompany`
+  - **Invited By (Buyer)** — from `routing.buyerName` (+ email sub-line)
+- Remove "Invitation Company" (including mismatch warning) and "Mapped SCM CO(s)".
 
-### 2. Invitations search: include phone number
-File: `src/pages/AdminInvitations.tsx` (filter at lines 595–599)
+### 2. Restructure Statutory Details card
+- Change grid from `grid-cols-3` to `grid-cols-4`.
+- Reorder fields into a single logical flow (4 per row):
+  - Row 1: GSTIN, PAN, PAN Holder Name, PAN Status
+  - Row 2: Is Aadhaar Linked, MSME Number, MSME Category, Firm Registration No
+  - Row 3: IEC No
+- Add a small green check icon (`CheckCircle2` from lucide-react, `text-emerald-600`) inline beside the label when that field's validation passed:
+  - GSTIN → `vendor.gst_verification_status === 'passed'`
+  - PAN, PAN Holder Name, PAN Status, Is Aadhaar Linked → `vendor.pan_verification_status === 'passed'`
+  - MSME Number, MSME Category → `vendor.msme_verification_status === 'passed'`
+- No separate status text — just the tick icon beside verified fields.
 
-Extend the `filteredInvitations` filter to also match on `invitation.phone_number`:
-```ts
-(invitation.phone_number ?? '').toLowerCase().includes(searchTerm.toLowerCase())
-```
-So the placeholder "Search by Name, Email or Phone Number" actually filters by phone.
+### 3. Remove the "Validations" tab
+- Change `TabsList` from `grid-cols-4` to `grid-cols-3`.
+- Delete `<TabsTrigger value="validations">` and its corresponding `<TabsContent value="validations">` block (which renders `<ValidationStatus>`).
+- Remove now-unused `ValidationStatus` import and `validations` local variable.
 
-### 3. Rename "Actions" → "Status" column header
-File: `src/pages/AdminInvitations.tsx` line 992
-- `<TableHead className="text-right">Actions</TableHead>` → `<TableHead className="text-right">Status</TableHead>`
-
-(Only the header label changes; the cells in that column remain unchanged — they already show status badges alongside action buttons.)
-
-### 4. Remove Sign Up from login page
-File: `src/pages/Auth.tsx`
-- Remove the `<Tabs>` wrapper and `TabsList` (lines ~222–226) so only the login form renders.
-- Remove the `<TabsContent value="signup">` block and its form (lines ~288 onward through its closing tag).
-- Remove now-unused signup state (`signupName/Email/Password/ConfirmPassword`), `handleSignup`, `nameSchema`, and the `signUp` import from `useAuth`.
-- Update the card copy: `CardDescription` "Sign in to your account or create a new one" → "Sign in to your account".
-
-## Out of scope
-- No backend, RLS, or route changes.
-- Vendor invite / vendor login flows untouched (vendors already onboard via invitation links, not this signup tab).
+No other files or business logic touched.

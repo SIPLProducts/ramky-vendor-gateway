@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ValidationStatus } from '@/components/vendor/ValidationStatus';
+
 import { GstFilingStatusTable, normalizeFilingStatus, type FilingStatusRow } from '@/components/vendor/kyc/GstFilingStatusTable';
 import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
@@ -40,6 +40,7 @@ import {
   Download,
   Eye,
   Tags,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface GstFilingRow {
@@ -404,7 +405,7 @@ export function VendorReviewDialog({
     return () => { cancelled = true; };
   }, [open, vendor?.id, vendor?.gstin, gstValidation, filingFetched, filingFetching, callProvider]);
 
-  const validations = getValidationsFromVendor(vendor);
+  
   const gstReport = vendor ? buildGstComplianceReport(vendor, gstValidation, liveFilingRows) : null;
 
   const openDocument = async (filePath: string) => {
@@ -427,12 +428,11 @@ export function VendorReviewDialog({
           <Skeleton className="h-64 w-full" />
         ) : vendor ? (
           <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted p-1">
+            <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
               <TabsTrigger value="details" className="rounded-lg">All Details</TabsTrigger>
               <TabsTrigger value="documents" className="rounded-lg">
                 <FolderOpen className="h-4 w-4 mr-2" />Documents
               </TabsTrigger>
-              <TabsTrigger value="validations" className="rounded-lg">Validations</TabsTrigger>
               <TabsTrigger value="gst_compliance" className="rounded-lg">
                 <Shield className="h-4 w-4 mr-2" />GST Compliance Report
               </TabsTrigger>
@@ -447,21 +447,12 @@ export function VendorReviewDialog({
                       <div className="space-y-3">
                         <h4 className="font-semibold flex items-center gap-2 text-primary">
                           <Shield className="h-4 w-4" />
-                          Routing & Invitation
+                          Buyer Details
                         </h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div className="space-y-1">
-                            <p className="text-muted-foreground">Buyer Company (on vendor)</p>
+                            <p className="text-muted-foreground">Buyer Company</p>
                             <p className="font-medium">{routing.vendorCompany || '-'}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Invitation Company</p>
-                            <p className="font-medium">{routing.invitationCompany || '-'}</p>
-                            {routing.companyMismatch && (
-                              <p className="text-xs text-amber-600">
-                                Vendor selected a different company than the invitation.
-                              </p>
-                            )}
                           </div>
                           <div className="space-y-1">
                             <p className="text-muted-foreground">Invited By (Buyer)</p>
@@ -470,23 +461,6 @@ export function VendorReviewDialog({
                               <p className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Mail className="h-3 w-3" /> {routing.buyerEmail}
                               </p>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Mapped SCM CO(s)</p>
-                            {routing.mappedScm.length === 0 ? (
-                              <p className="font-medium">-</p>
-                            ) : (
-                              routing.mappedScm.map((s, i) => (
-                                <div key={i}>
-                                  <p className="font-medium">{s.name || '-'}</p>
-                                  {s.email && (
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Mail className="h-3 w-3" /> {s.email}
-                                    </p>
-                                  )}
-                                </div>
-                              ))
                             )}
                           </div>
                         </div>
@@ -583,23 +557,40 @@ export function VendorReviewDialog({
                   <Separator />
 
                   {/* Statutory */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <FileText className="h-4 w-4" />
-                      Statutory Details
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="space-y-1"><p className="text-muted-foreground">GSTIN</p><p className="font-mono font-medium">{vendor.gstin || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">PAN</p><p className="font-mono font-medium">{vendor.pan || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">PAN Holder Name</p><p className="font-medium">{(vendor as any).pan_holder_name || (vendor as any).msme_enterprise_name || (vendor as any).account_holder_name || vendor.trade_name || vendor.legal_name || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">MSME Number</p><p className="font-mono font-medium">{vendor.msme_number || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">MSME Category</p><p className="font-medium capitalize">{vendor.msme_category || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{vendor.firm_registration_no || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{vendor.iec_no || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">{PAN_STATUS_LABEL}</p><p className="font-medium">{(vendor as any).pan_status ? formatPanStatus((vendor as any).pan_status) : (vendor.pan && (vendor as any).pan_verification_status === 'passed' ? 'Valid' : '-')}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">{AADHAAR_LINKED_LABEL}</p><p className="font-medium">{formatAadhaarLinked((vendor as any).pan_aadhaar_linked)}</p></div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const v: any = vendor;
+                    const gstOk = v.gst_verification_status === 'passed';
+                    const panOk = v.pan_verification_status === 'passed';
+                    const msmeOk = v.msme_verification_status === 'passed';
+                    const Tick = () => (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 inline-block ml-1 align-text-bottom" />
+                    );
+                    const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
+                      <p className="text-muted-foreground flex items-center">
+                        <span>{text}</span>
+                        {ok && <Tick />}
+                      </p>
+                    );
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold flex items-center gap-2 text-primary">
+                          <FileText className="h-4 w-4" />
+                          Statutory Details
+                        </h4>
+                        <div className="grid grid-cols-4 gap-4 text-sm">
+                          <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
+                          <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
+                          <div className="space-y-1"><Label text="PAN Holder Name" ok={panOk} /><p className="font-medium">{v.pan_holder_name || v.msme_enterprise_name || v.account_holder_name || v.trade_name || v.legal_name || '-'}</p></div>
+                          <div className="space-y-1"><Label text={PAN_STATUS_LABEL} ok={panOk} /><p className="font-medium">{v.pan_status ? formatPanStatus(v.pan_status) : (v.pan && panOk ? 'Valid' : '-')}</p></div>
+                          <div className="space-y-1"><Label text={AADHAAR_LINKED_LABEL} ok={panOk} /><p className="font-medium">{formatAadhaarLinked(v.pan_aadhaar_linked)}</p></div>
+                          <div className="space-y-1"><Label text="MSME Number" ok={msmeOk} /><p className="font-mono font-medium">{v.msme_number || '-'}</p></div>
+                          <div className="space-y-1"><Label text="MSME Category" ok={msmeOk} /><p className="font-medium capitalize">{v.msme_category || '-'}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{v.firm_registration_no || '-'}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{v.iec_no || '-'}</p></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <Separator />
 
@@ -723,9 +714,6 @@ export function VendorReviewDialog({
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
-            <TabsContent value="validations" className="mt-4 flex-1 overflow-auto">
-              <ValidationStatus validations={validations} />
-            </TabsContent>
 
             <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-[55vh] pr-4">
