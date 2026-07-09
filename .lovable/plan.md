@@ -1,26 +1,21 @@
 ## Scope
-File: `src/components/vendor/VendorReviewDialog.tsx` (used by SCM Manager, SCM Head, Finance 1, Finance 2, CEO, and SAP Sync review flows).
+- `src/components/vendor/VendorReviewDialog.tsx` — All Details tab card changes.
+- `src/components/approvals/StageApprovalView.tsx` — Buyer-stage-only table columns and tab visibility.
 
 ## Changes
 
-### 1. Rename dialog subtitle everywhere
-- Line 143 comment: update JSDoc default to `"Review vendor details"`.
-- Line 194: change default prop value from `'Review vendor details before syncing to SAP'` to `'Review vendor details'`.
+### 1. Vendor Review Dialog — All Details tab
+- **Remove** the entire "Contact Details" card.
+- **Reorder** remaining cards to: Buyer Details → Organization Details → Statutory Details → Bank Details → Address Details → Classification Details → Financial Information.
 
-Since every approval screen (SCM Manager, SCM Head, Finance 1/2, CEO, SAP Sync) uses this shared dialog's default `description`, one change updates all of them.
+### 2. Buyer Approval screen only (`stage === 'BUYER'`)
+In `StageApprovalView.tsx`:
+- **Hide the "Waiting for Previous Approval" tab and its content** when `isBuyer` (no prior approver exists before Buyer).
+- In the Pending Approval table, **hide the `Buyer Company`, `Invited By`, and `Stage` columns** when `isBuyer` — both header and body cells; adjust `colSpan` on skeleton/empty rows to 4.
+- Rejected tab (Buyer only) is unchanged.
+- No changes to other approval screens (SCM Manager/Head, Finance 1/2, CEO, SAP Sync).
 
-### 2. All Details tab — every card to 3 columns
-Update grid layouts inside the "Details" tab to `grid-cols-3`:
-
-- **Buyer Details** (line 452): `grid-cols-2` → `grid-cols-3`
-- **Organization Details** (line 478): `grid-cols-2` → `grid-cols-3`
-- **Address Details**
-  - Registered / Corporate Office Address (line 500): `grid-cols-2` → `grid-cols-3`
-  - Communication Address (line 524): `grid-cols-2` → `grid-cols-3`
-- **Contact Details** (line 543): `grid-cols-2` → `grid-cols-3`
-- **Statutory Details** (line 580): `grid-cols-4` → `grid-cols-3`
-- **Bank Details** (line 603): already `grid-cols-3` — leave as is
-- **Classification Details** (line 625): outer wrapper stays `md:grid-cols-2` (two labeled sub-cards side-by-side); no change needed
-- **Financial Information** (line 663): already `grid-cols-3` — leave as is
-
-No changes to business logic, data fetching, tab structure, or other files.
+## Technical Notes
+- `renderTable` currently uses 7 columns with `colSpan={7}`. Under `isBuyer` it will render 4 columns (Vendor, MSME, Submitted, Actions) with `colSpan={4}`, via conditional JSX inside the shared function.
+- Waiting tab removal: wrap `<TabsTrigger value="waiting">` and its `<TabsContent value="waiting">` in `{!isBuyer && (...)}`.
+- No business-logic, data-fetching, or edge-function changes.

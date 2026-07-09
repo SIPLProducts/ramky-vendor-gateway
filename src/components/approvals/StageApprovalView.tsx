@@ -178,9 +178,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <TableHeader>
           <TableRow>
             <TableHead>Vendor</TableHead>
-            <TableHead>Buyer Company</TableHead>
-            <TableHead>Invited By</TableHead>
-            <TableHead>Stage</TableHead>
+            {!isBuyer && <TableHead>Buyer Company</TableHead>}
+            {!isBuyer && <TableHead>Invited By</TableHead>}
+            {!isBuyer && <TableHead>Stage</TableHead>}
             <TableHead>MSME</TableHead>
             <TableHead>Submitted</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -189,10 +189,10 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <TableBody>
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+              <TableRow key={i}><TableCell colSpan={isBuyer ? 4 : 7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
             ))
           ) : rows.length === 0 ? (
-            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+            <TableRow><TableCell colSpan={isBuyer ? 4 : 7} className="text-center text-muted-foreground py-8">
               {variant === 'pending' ? (
                 <>
                   <div>No vendors are pending your approval right now.</div>
@@ -225,21 +225,27 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm">
-                    <div>{it.vendorCompany ?? '—'}</div>
-                    {it.companyMismatch && it.invitationCompany && (
-                      <div className="text-xs text-amber-600 mt-1">
-                        Invitation: {it.invitationCompany}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <div>{it.buyerName ?? '—'}</div>
-                    {it.buyerEmail && (
-                      <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
-                    )}
-                  </TableCell>
-                  <TableCell><Badge variant="outline">{(() => { const n = parseLevelOrdinal(it.levelName); return n != null ? formatStageLevel(stage, n) : it.levelName; })()}</Badge></TableCell>
+                  {!isBuyer && (
+                    <TableCell className="text-sm">
+                      <div>{it.vendorCompany ?? '—'}</div>
+                      {it.companyMismatch && it.invitationCompany && (
+                        <div className="text-xs text-amber-600 mt-1">
+                          Invitation: {it.invitationCompany}
+                        </div>
+                      )}
+                    </TableCell>
+                  )}
+                  {!isBuyer && (
+                    <TableCell className="text-sm">
+                      <div>{it.buyerName ?? '—'}</div>
+                      {it.buyerEmail && (
+                        <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
+                      )}
+                    </TableCell>
+                  )}
+                  {!isBuyer && (
+                    <TableCell><Badge variant="outline">{(() => { const n = parseLevelOrdinal(it.levelName); return n != null ? formatStageLevel(stage, n) : it.levelName; })()}</Badge></TableCell>
+                  )}
                   <TableCell>
                     {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
                   </TableCell>
@@ -405,9 +411,11 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               <TabsTrigger value="pending">
                 Pending Approval ({pendingItems.length})
               </TabsTrigger>
-              <TabsTrigger value="waiting">
-                Waiting for Previous Approval ({waitingItems.length})
-              </TabsTrigger>
+              {!isBuyer && (
+                <TabsTrigger value="waiting">
+                  Waiting for Previous Approval ({waitingItems.length})
+                </TabsTrigger>
+              )}
               {isBuyer && (
                 <TabsTrigger value="rejected">
                   Rejected ({rejectedItems.length})
@@ -417,9 +425,11 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <TabsContent value="pending" className="mt-4">
               {renderTable(pendingItems, 'pending')}
             </TabsContent>
-            <TabsContent value="waiting" className="mt-4">
-              {renderTable(waitingItems, 'waiting')}
-            </TabsContent>
+            {!isBuyer && (
+              <TabsContent value="waiting" className="mt-4">
+                {renderTable(waitingItems, 'waiting')}
+              </TabsContent>
+            )}
             {isBuyer && (
               <TabsContent value="rejected" className="mt-4">
                 {renderRejectedTable(rejectedItems)}
