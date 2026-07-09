@@ -300,6 +300,25 @@ export default function Dashboard() {
           >
             Clear
           </Button>
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
+            className="flex items-end gap-2"
+          >
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="track-ref" className="text-xs font-medium text-muted-foreground">Reference #</Label>
+              <Input
+                id="track-ref"
+                placeholder="Enter Reference Number"
+                value={trackRef}
+                onChange={(e) => setTrackRef(e.target.value)}
+                className="h-9 w-56"
+              />
+            </div>
+            <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
+              {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
+          </form>
           <Button onClick={handleExport} disabled={filteredVendors.length === 0}>
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
