@@ -494,11 +494,11 @@ export function VendorReviewDialog({
                     const msmeOk = v.msme_verification_status === 'passed';
                     const Tick = () => (
                       <span
-                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-600/30 ml-1.5 align-text-bottom"
+                        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-emerald-600/40 ml-1.5 align-text-bottom"
                         title="Verified"
                         aria-label="Verified"
                       >
-                        <CheckCircle2 className="h-3 w-3" strokeWidth={3} />
+                        <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={3.5} />
                       </span>
                     );
                     const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
@@ -508,11 +508,7 @@ export function VendorReviewDialog({
                       </p>
                     );
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <FileText className="h-4 w-4" />
-                          Statutory Details
-                        </h4>
+                      <SectionCard icon={FileText} title="Statutory Details">
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
                           <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
@@ -524,7 +520,7 @@ export function VendorReviewDialog({
                           <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{v.firm_registration_no || '-'}</p></div>
                           <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{v.iec_no || '-'}</p></div>
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
 
