@@ -177,13 +177,14 @@ export default function AdminInvitations() {
 
       let q = supabase
         .from('vendor_invitations')
-        .select('*, vendor:vendors(id, reference_number, status), tenants(id, name)')
+        .select('*, vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status), tenants(id, name)')
         .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
       if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
 
       const { data, error } = await q;
       if (error) throw error;
+      (data ?? []).forEach((r: any) => { r.vendor = Array.isArray(r.vendor) ? (r.vendor[0] ?? null) : r.vendor; });
       return data ?? [];
     },
     enabled: !!user?.id,
