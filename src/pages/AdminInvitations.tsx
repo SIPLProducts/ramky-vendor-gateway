@@ -132,16 +132,29 @@ export default function AdminInvitations() {
     queryFn: async () => {
       if (!user?.id) return [];
 
+      const attachVendors = async (rows: any[]) => {
+        const ids = Array.from(new Set(rows.map((r: any) => r.vendor_id).filter(Boolean)));
+        let vMap = new Map<string, any>();
+        if (ids.length) {
+          const { data: vRows } = await supabase
+            .from('vendors')
+            .select('id, reference_number, status')
+            .in('id', ids);
+          vMap = new Map((vRows ?? []).map((v: any) => [v.id, v]));
+        }
+        rows.forEach((r: any) => { r.vendor = r.vendor_id ? (vMap.get(r.vendor_id) ?? null) : null; });
+        return rows;
+      };
+
       if (seesAllInvitations) {
         let q = supabase
           .from('vendor_invitations')
-          .select('*, vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status), tenants(id, name)')
+          .select('*, tenants(id, name)')
           .order('created_at', { ascending: false });
         if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
         const { data, error } = await q;
         if (error) throw error;
-        (data ?? []).forEach((r: any) => { r.vendor = Array.isArray(r.vendor) ? (r.vendor[0] ?? null) : r.vendor; });
-        return data ?? [];
+        return await attachVendors(data ?? []);
       }
 
       const creatorIds = new Set<string>();
@@ -175,18 +188,18 @@ export default function AdminInvitations() {
 
       let q = supabase
         .from('vendor_invitations')
-        .select('*, vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status), tenants(id, name)')
+        .select('*, tenants(id, name)')
         .in('created_by', Array.from(creatorIds))
         .order('created_at', { ascending: false });
       if (activeTenantId) q = q.eq('tenant_id', activeTenantId);
 
       const { data, error } = await q;
       if (error) throw error;
-      (data ?? []).forEach((r: any) => { r.vendor = Array.isArray(r.vendor) ? (r.vendor[0] ?? null) : r.vendor; });
-      return data ?? [];
+      return await attachVendors(data ?? []);
     },
     enabled: !!user?.id,
   });
+
 
 
 
