@@ -583,16 +583,22 @@ export default function AdminInvitations() {
     });
   };
 
-  const getInvitationStatus = (invitation: any): 'used' | 'expired' | 'pending' => {
-    const now = new Date();
-    const expiresAt = new Date(invitation.expires_at);
+  type InviteStatus = 'pending' | 'used' | 'draft' | 'expired' | 'submitted';
+  const getInvitationStatus = (invitation: any): InviteStatus => {
+    const vStatus = invitation?.vendor?.status as string | undefined;
+    if (vStatus && vStatus !== 'draft') return 'submitted';
+    if (vStatus === 'draft') return 'draft';
     if (invitation.used_at) return 'used';
-    if (expiresAt < now) return 'expired';
+    if (new Date(invitation.expires_at) < new Date()) return 'expired';
     return 'pending';
   };
 
   // Filter invitations
   const filteredInvitations = invitations?.filter((invitation: any) => {
+    const status = getInvitationStatus(invitation);
+    // Submitted vendors move to Dashboard / All Vendors / Approval screens
+    if (status === 'submitted') return false;
+
     const matchesSearch =
       invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (invitation.vendor?.reference_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -601,7 +607,7 @@ export default function AdminInvitations() {
 
     let matchesStatus = true;
     if (statusFilter !== 'all') {
-      matchesStatus = getInvitationStatus(invitation) === statusFilter;
+      matchesStatus = status === statusFilter;
     }
 
     return matchesSearch && matchesStatus;
