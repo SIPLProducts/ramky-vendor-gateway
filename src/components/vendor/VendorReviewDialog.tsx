@@ -546,8 +546,6 @@ export function VendorReviewDialog({
                     </div>
                   </div>
 
-                  <Separator />
-
                   {/* Address — visiting-card style */}
                   {(() => {
                     const v: any = vendor;
@@ -580,81 +578,8 @@ export function VendorReviewDialog({
                     const contact1 = v.registered_contact_1 || v.primary_phone;
                     const contact2 = v.registered_contact_2;
 
-                    const VisitingCard = ({
-                      title,
-                      lines,
-                      cityLine,
-                      pin,
-                      showContacts = false,
-                      sameAsRegistered = false,
-                    }: {
-                      title: string;
-                      lines: string[];
-                      cityLine: string;
-                      pin: string;
-                      showContacts?: boolean;
-                      sameAsRegistered?: boolean;
-                    }) => (
-                      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
-                        <div className="absolute left-0 top-0 h-full w-1 bg-primary/70" />
-                        <div className="flex items-start justify-between mb-3">
-                          <p className="text-sm font-semibold text-foreground">{title}</p>
-                          <MapPin className="h-4 w-4 text-primary/70" />
-                        </div>
-                        {sameAsRegistered ? (
-                          <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
-                        ) : (
-                          <address className="not-italic text-sm leading-relaxed text-foreground space-y-0.5">
-                            {lines.map((l, i) => (
-                              <div key={i}>{l}</div>
-                            ))}
-                            {cityLine && <div>{cityLine}</div>}
-                            {pin && <div className="font-medium">{pin}</div>}
-                            {lines.length === 0 && !cityLine && !pin && (
-                              <div className="text-muted-foreground">-</div>
-                            )}
-                          </address>
-                        )}
-                        {showContacts && (email1 || email2 || contact1 || contact2) && (
-                          <>
-                            <div className="my-4 h-px bg-border/60" />
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                              {contact1 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 1</span>
-                                  <span className="font-medium">{contact1}</span>
-                                </div>
-                              )}
-                              {contact2 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 2</span>
-                                  <span className="font-medium">{contact2}</span>
-                                </div>
-                              )}
-                              {email1 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 1</span>
-                                  <span className="font-medium break-all">{email1}</span>
-                                </div>
-                              )}
-                              {email2 && (
-                                <div className="flex items-start gap-2">
-                                  <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 2</span>
-                                  <span className="font-medium break-all">{email2}</span>
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-
                     return (
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <MapPin className="h-4 w-4" />
-                          Address Details
-                        </h4>
+                      <SectionCard icon={MapPin} title="Address Details">
                         <div className="grid gap-4 md:grid-cols-2">
                           <VisitingCard
                             title="Registered / Corporate Office Address"
@@ -662,6 +587,10 @@ export function VendorReviewDialog({
                             cityLine={regCityLine}
                             pin={regPin}
                             showContacts
+                            email1={email1}
+                            email2={email2}
+                            contact1={contact1}
+                            contact2={contact2}
                           />
                           <VisitingCard
                             title="Communication Address"
@@ -670,9 +599,13 @@ export function VendorReviewDialog({
                             pin={commPin}
                             sameAsRegistered={commSame}
                             showContacts={!commSame}
+                            email1={email1}
+                            email2={email2}
+                            contact1={contact1}
+                            contact2={contact2}
                           />
                         </div>
-                      </div>
+                      </SectionCard>
                     );
                   })()}
 
