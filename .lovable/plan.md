@@ -1,28 +1,26 @@
+## Scope
+File: `src/components/vendor/VendorReviewDialog.tsx` (used by SCM Manager, SCM Head, Finance 1, Finance 2, CEO, and SAP Sync review flows).
 
-## Changes in `src/components/vendor/VendorReviewDialog.tsx`
+## Changes
 
-### 1. Rename & trim "Routing & Invitation" → "Buyer Details"
-- Change section heading to "Buyer Details".
-- Keep only two fields in the grid (2 columns):
-  - **Buyer Company** — from `routing.vendorCompany`
-  - **Invited By (Buyer)** — from `routing.buyerName` (+ email sub-line)
-- Remove "Invitation Company" (including mismatch warning) and "Mapped SCM CO(s)".
+### 1. Rename dialog subtitle everywhere
+- Line 143 comment: update JSDoc default to `"Review vendor details"`.
+- Line 194: change default prop value from `'Review vendor details before syncing to SAP'` to `'Review vendor details'`.
 
-### 2. Restructure Statutory Details card
-- Change grid from `grid-cols-3` to `grid-cols-4`.
-- Reorder fields into a single logical flow (4 per row):
-  - Row 1: GSTIN, PAN, PAN Holder Name, PAN Status
-  - Row 2: Is Aadhaar Linked, MSME Number, MSME Category, Firm Registration No
-  - Row 3: IEC No
-- Add a small green check icon (`CheckCircle2` from lucide-react, `text-emerald-600`) inline beside the label when that field's validation passed:
-  - GSTIN → `vendor.gst_verification_status === 'passed'`
-  - PAN, PAN Holder Name, PAN Status, Is Aadhaar Linked → `vendor.pan_verification_status === 'passed'`
-  - MSME Number, MSME Category → `vendor.msme_verification_status === 'passed'`
-- No separate status text — just the tick icon beside verified fields.
+Since every approval screen (SCM Manager, SCM Head, Finance 1/2, CEO, SAP Sync) uses this shared dialog's default `description`, one change updates all of them.
 
-### 3. Remove the "Validations" tab
-- Change `TabsList` from `grid-cols-4` to `grid-cols-3`.
-- Delete `<TabsTrigger value="validations">` and its corresponding `<TabsContent value="validations">` block (which renders `<ValidationStatus>`).
-- Remove now-unused `ValidationStatus` import and `validations` local variable.
+### 2. All Details tab — every card to 3 columns
+Update grid layouts inside the "Details" tab to `grid-cols-3`:
 
-No other files or business logic touched.
+- **Buyer Details** (line 452): `grid-cols-2` → `grid-cols-3`
+- **Organization Details** (line 478): `grid-cols-2` → `grid-cols-3`
+- **Address Details**
+  - Registered / Corporate Office Address (line 500): `grid-cols-2` → `grid-cols-3`
+  - Communication Address (line 524): `grid-cols-2` → `grid-cols-3`
+- **Contact Details** (line 543): `grid-cols-2` → `grid-cols-3`
+- **Statutory Details** (line 580): `grid-cols-4` → `grid-cols-3`
+- **Bank Details** (line 603): already `grid-cols-3` — leave as is
+- **Classification Details** (line 625): outer wrapper stays `md:grid-cols-2` (two labeled sub-cards side-by-side); no change needed
+- **Financial Information** (line 663): already `grid-cols-3` — leave as is
+
+No changes to business logic, data fetching, tab structure, or other files.
