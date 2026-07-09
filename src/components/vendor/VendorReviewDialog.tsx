@@ -528,14 +528,8 @@ export function VendorReviewDialog({
                     );
                   })()}
 
-                  <Separator />
-
                   {/* Bank */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <Landmark className="h-4 w-4" />
-                      Bank Details
-                    </h4>
+                  <SectionCard icon={Landmark} title="Bank Details">
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">Bank Name</p><p className="font-medium">{vendor.bank_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Branch</p><p className="font-medium">{vendor.bank_branch_name || vendor.branch_name || '-'}</p></div>
@@ -544,7 +538,7 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">IFSC Code</p><p className="font-mono font-medium">{vendor.ifsc_code || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">MICR Code</p><p className="font-mono font-medium">{vendor.micr_code || '-'}</p></div>
                     </div>
-                  </div>
+                  </SectionCard>
 
                   {/* Address — visiting-card style */}
                   {(() => {
