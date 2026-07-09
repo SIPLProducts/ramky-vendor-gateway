@@ -585,11 +585,11 @@ export default function AdminInvitations() {
     });
   };
 
-  type InviteStatus = 'pending' | 'used' | 'draft' | 'expired' | 'submitted';
+  type InviteStatus = 'pending' | 'used' | 'in_progress' | 'expired' | 'submitted';
   const getInvitationStatus = (invitation: any): InviteStatus => {
     const vStatus = invitation?.vendor?.status as string | undefined;
     if (vStatus && vStatus !== 'draft') return 'submitted';
-    if (vStatus === 'draft') return 'draft';
+    if (vStatus === 'draft' || invitation.created_on_behalf) return 'in_progress';
     if (invitation.used_at) return 'used';
     if (new Date(invitation.expires_at) < new Date()) return 'expired';
     return 'pending';
