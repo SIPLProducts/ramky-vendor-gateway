@@ -738,39 +738,32 @@ export function VendorReviewDialog({
 
 
                   {(vendor.finance_comments || vendor.purchase_comments) && (
-                    <>
-                      <Separator />
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <MessageSquare className="h-4 w-4" />
-                          Review Comments
-                        </h4>
-                        <div className="grid grid-cols-1 gap-4 text-sm">
-                          {vendor.finance_comments && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
-                                {vendor.finance_reviewed_at && (
-                                  <span className="text-xs text-muted-foreground">{new Date(vendor.finance_reviewed_at).toLocaleDateString('en-IN')}</span>
-                                )}
-                              </div>
-                              <p className="text-amber-900 dark:text-amber-100">{vendor.finance_comments}</p>
+                    <SectionCard icon={MessageSquare} title="Review Comments">
+                      <div className="grid grid-cols-1 gap-4 text-sm">
+                        {vendor.finance_comments && (
+                          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
+                              {vendor.finance_reviewed_at && (
+                                <span className="text-xs text-muted-foreground">{new Date(vendor.finance_reviewed_at).toLocaleDateString('en-IN')}</span>
+                              )}
                             </div>
-                          )}
-                          {vendor.purchase_comments && (
-                            <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
-                                {vendor.purchase_reviewed_at && (
-                                  <span className="text-xs text-muted-foreground">{new Date(vendor.purchase_reviewed_at).toLocaleDateString('en-IN')}</span>
-                                )}
-                              </div>
-                              <p className="text-teal-900 dark:text-teal-100">{vendor.purchase_comments}</p>
+                            <p className="text-amber-900 dark:text-amber-100">{vendor.finance_comments}</p>
+                          </div>
+                        )}
+                        {vendor.purchase_comments && (
+                          <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
+                              {vendor.purchase_reviewed_at && (
+                                <span className="text-xs text-muted-foreground">{new Date(vendor.purchase_reviewed_at).toLocaleDateString('en-IN')}</span>
+                              )}
                             </div>
-                          )}
-                        </div>
+                            <p className="text-teal-900 dark:text-teal-100">{vendor.purchase_comments}</p>
+                          </div>
+                        )}
                       </div>
-                    </>
+                    </SectionCard>
                   )}
                 </div>
               </ScrollArea>
