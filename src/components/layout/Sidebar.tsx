@@ -146,7 +146,6 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
           {!collapsed && (
             <div className="overflow-hidden">
               <span className="text-sm font-semibold text-sidebar-foreground block whitespace-nowrap">Vendor Portal</span>
-              <span className="text-[10px] text-sidebar-foreground/50 whitespace-nowrap">Powering Progress</span>
             </div>
           )}
         </Link>
