@@ -1013,7 +1013,26 @@ export default function AdminInvitations() {
                   <TableBody>
                     {paginatedInvitations.map((invitation) => {
                       const isOnBehalf = !!(invitation as any).created_on_behalf;
-                      const canResumeOnBehalf = isOnBehalf && !invitation.used_at;
+                      const status = getInvitationStatus(invitation);
+                      const canResumeOnBehalf = isOnBehalf && !invitation.used_at && status !== 'expired';
+                      const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'draft' || status === 'expired');
+                      const resendLabel = status === 'pending' ? 'Send Email' : status === 'expired' ? 'Resend Invitation' : 'Resend Email';
+                      const isSending = sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id;
+                      const handleResend = async () => {
+                        if (status === 'expired') {
+                          const newExpiry = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
+                          const { error } = await supabase
+                            .from('vendor_invitations')
+                            .update({ expires_at: newExpiry })
+                            .eq('id', invitation.id);
+                          if (error) {
+                            toast({ title: 'Could not extend invitation', description: error.message, variant: 'destructive' });
+                            return;
+                          }
+                          queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+                        }
+                        sendEmailInvitation.mutate(invitation.id);
+                      };
                       return (
                       <TableRow key={invitation.id}>
                         <TableCell>
@@ -1054,9 +1073,9 @@ export default function AdminInvitations() {
                         <TableCell className="text-muted-foreground">
                           {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
                         </TableCell>
+                        <TableCell>{getStatusBadge(invitation)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-
                             {canResumeOnBehalf && (
                               <Button
                                 variant="default"
@@ -1068,20 +1087,20 @@ export default function AdminInvitations() {
                                 Resume
                               </Button>
                             )}
-                            {!isOnBehalf && !invitation.used_at && new Date(invitation.expires_at) > new Date() && (
+                            {showResend && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => sendEmailInvitation.mutate(invitation.id)}
-                                disabled={sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id}
+                                onClick={handleResend}
+                                disabled={isSending}
                                 className="gap-1"
                               >
-                                {sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id ? (
+                                {isSending ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <>
                                     <Send className="h-4 w-4" />
-                                    Send Email
+                                    {resendLabel}
                                   </>
                                 )}
                               </Button>
