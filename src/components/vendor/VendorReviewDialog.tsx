@@ -469,11 +469,7 @@ export function VendorReviewDialog({
                   )}
 
                   {/* Organization */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <Building2 className="h-4 w-4" />
-                      Organization Details
-                    </h4>
+                  <SectionCard icon={Building2} title="Organization Details">
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">Legal Name</p><p className="font-medium">{vendor.legal_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Trade Name</p><p className="font-medium">{vendor.trade_name || '-'}</p></div>
@@ -482,9 +478,7 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">Ownership Type</p><p className="font-medium">{vendor.ownership_type || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Entity Type</p><p className="font-medium">{vendor.entity_type || '-'}</p></div>
                     </div>
-                  </div>
-
-                  <Separator />
+                  </SectionCard>
 
                   {/* Statutory */}
                   {(() => {
