@@ -154,8 +154,9 @@ const STAGE_TO_STEP: Record<ApprovalStageKey, number> = {
 };
 
 export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, RegistrationStatusTrackerProps>(
-  function RegistrationStatusTracker({ status, className, approvalProgress }, ref) {
+  function RegistrationStatusTracker({ status, className, approvalProgress, sapVendorCode }, ref) {
     const hasChain = (approvalProgress?.length ?? 0) > 0;
+    const sapCreated = !!sapVendorCode || status === 'sap_synced' || status === 'approved';
 
     // Build per-step override map from the live chain. Each approver step is
     // computed from its corresponding `vendor_approval_progress` row.
@@ -179,15 +180,17 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
       // Once any approval row exists, Document Verification is implicitly done.
       if (stepOverrides[1] === undefined) stepOverrides[1] = 'completed';
 
-      // If all approver levels approved, SAP Sync becomes active (unless synced).
+      // SAP Sync step: only mark completed when the vendor code has actually
+      // been created in SAP. Otherwise, if all approvals are through, mark it
+      // active (in progress).
       const allApproved = sorted.length > 0 && sorted.every((r) => r.status === 'approved');
-      if (allApproved && status !== 'sap_synced' && status !== 'approved') {
+      if (sapCreated) {
+        stepOverrides[7] = 'completed';
+      } else if (allApproved) {
         stepOverrides[7] = 'active';
       }
-      if (status === 'sap_synced' || status === 'approved') {
-        stepOverrides[7] = 'completed';
-      }
     }
+
 
     const activeStepIndex = getActiveStepIndex(status);
     const adjustedActiveIndex = status !== 'draft' ? Math.max(activeStepIndex, 0) : activeStepIndex;
