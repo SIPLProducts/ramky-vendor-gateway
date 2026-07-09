@@ -1188,7 +1188,17 @@ export default function VendorRegistration() {
   };
 
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
-  const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
+  const handleStepClick = (step: number) => {
+    // Free navigation backward; forward only if all preceding steps are complete.
+    if (step <= currentStep) { setCurrentStep(step); return; }
+    if (isInternational) {
+      if (completedSteps.includes(step)) setCurrentStep(step);
+      return;
+    }
+    const allPrevComplete = Array.from({ length: step - 1 }, (_, i) => i + 1)
+      .every((s) => isDomesticStepComplete(s, formData, verifiedData));
+    if (allPrevComplete) setCurrentStep(step);
+  };
   const [pendingDocTab, setPendingDocTab] = useState<'gst' | 'pan' | 'msme' | 'bank' | undefined>(undefined);
   const handleEditStep = (step: number, tab?: 'gst' | 'pan' | 'msme' | 'bank') => {
     if (step === 1 && tab) setPendingDocTab(tab);
