@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+import { useTenantContext } from '@/hooks/useTenantContext';
 
 interface Props {
   stage: ApprovalStage;
@@ -33,8 +34,23 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { myTenantIds, activeTenantIds } = useTenantContext();
 
-  const { items, loading, refresh } = usePendingApprovalsByStage(stage);
+  const { items: rawItems, loading, refresh } = usePendingApprovalsByStage(stage);
+
+  const isBuyer = stage === 'BUYER';
+
+  // For Buyer stage: honour the header multi-select tenant filter.
+  const items = isBuyer && activeTenantIds && activeTenantIds.length > 0
+    ? rawItems.filter((i) => !i.tenantId || activeTenantIds.includes(i.tenantId))
+    : rawItems;
+
+  // Effective tenant count drives visibility of the "Buyer Company" column.
+  const effectiveTenantCount = isBuyer
+    ? ((activeTenantIds && activeTenantIds.length > 0) ? activeTenantIds.length : myTenantIds.length)
+    : 0;
+  const showBuyerCompanyColumn = !isBuyer || effectiveTenantCount > 1;
+
   const [actionItem, setActionItem] = useState<{ item: StageApprovalItem; action: 'approve' | 'reject' } | null>(null);
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -49,7 +65,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
   const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
 
-  const isBuyer = stage === 'BUYER';
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
   const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
   const rejectedItems = items.filter((i) => i.kind === 'rejected');
