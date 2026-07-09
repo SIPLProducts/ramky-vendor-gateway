@@ -32,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
-import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 import { useToast } from '@/hooks/use-toast';
 
 type VendorRow = {
@@ -40,12 +40,15 @@ type VendorRow = {
   reference_number: string | null;
   legal_name: string | null;
   trade_name: string | null;
+  account_holder_name: string | null;
   gstin: string | null;
   primary_email: string | null;
+  registered_email: string | null;
   status: string;
   created_at: string;
   tenant_id: string | null;
   invited_by?: { name: string | null; email: string | null } | null;
+  display_email?: string | null;
 };
 
 
@@ -159,7 +162,7 @@ export default function Dashboard() {
 
       let q = supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, gstin, primary_email, status, created_at, tenant_id')
+        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
         .order('created_at', { ascending: false });
 
       if (fromIso) q = q.gte('created_at', fromIso);
@@ -175,13 +178,17 @@ export default function Dashboard() {
         const ids = rows.map((r) => r.id);
         const { data: invites } = await supabase
           .from('vendor_invitations')
-          .select('vendor_id, created_by, email, created_at')
+          .select('vendor_id, created_by, email, created_on_behalf, created_at')
           .in('vendor_id', ids)
           .order('created_at', { ascending: false });
-        const latest = new Map<string, { created_by: string | null; email: string | null }>();
+        const latest = new Map<string, { created_by: string | null; email: string | null; on_behalf: boolean }>();
         (invites ?? []).forEach((inv: any) => {
           if (inv.vendor_id && !latest.has(inv.vendor_id)) {
-            latest.set(inv.vendor_id, { created_by: inv.created_by, email: inv.email });
+            latest.set(inv.vendor_id, {
+              created_by: inv.created_by,
+              email: inv.email,
+              on_behalf: !!inv.created_on_behalf,
+            });
           }
         });
         const buyerIds = Array.from(
@@ -199,11 +206,20 @@ export default function Dashboard() {
         }
         rows.forEach((r) => {
           const inv = latest.get(r.id);
-          if (!inv) { r.invited_by = null; return; }
+          if (!inv) {
+            r.invited_by = null;
+            r.display_email = r.primary_email ?? r.registered_email ?? null;
+            return;
+          }
           const prof = inv.created_by ? profMap.get(inv.created_by) : null;
           r.invited_by = prof
             ? { name: prof.name, email: prof.email }
             : { name: null, email: inv.email };
+          // On-behalf: buyer entered vendor's contact email; show it (fallback to invite email).
+          // Self-signup: invitation email is the vendor's email (fallback to primary_email).
+          r.display_email = inv.on_behalf
+            ? (r.registered_email || inv.email || r.primary_email || null)
+            : (inv.email || r.primary_email || r.registered_email || null);
         });
       }
 
@@ -232,9 +248,9 @@ export default function Dashboard() {
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
-      'Company Name': v.legal_name ?? '',
+      'Vendor Name': pickVendorDisplayName(v) || '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
-      Email: v.primary_email ?? v.invited_by?.email ?? '',
+      Email: v.display_email ?? '',
       Status: STATUS_LABELS[v.status]?.label ?? v.status,
       'Created Date': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
     }));
@@ -384,7 +400,7 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference #</TableHead>
-                  <TableHead>Company</TableHead>
+                  <TableHead>Vendor Name</TableHead>
                   <TableHead>Invited By</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
@@ -417,7 +433,7 @@ export default function Dashboard() {
                         </Link>
                       </TableCell>
 
-                      <TableCell>{getSapName1(v) || v.legal_name || '—'}</TableCell>
+                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">
@@ -430,7 +446,7 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{v.primary_email ?? v.invited_by?.email ?? '—'}</TableCell>
+                      <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
                     </TableRow>

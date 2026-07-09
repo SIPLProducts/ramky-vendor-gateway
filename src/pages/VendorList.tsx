@@ -419,7 +419,7 @@ export default function VendorList() {
                                 <Building2 className="h-4 w-4 text-muted-foreground" />
                               </div>
                               <div>
-                                <p className="font-medium">{getSapName1(vendor) || vendor.legal_name || 'Unnamed Vendor'}</p>
+                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
                                 <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
                               </div>
                             </div>
@@ -522,7 +522,7 @@ export default function VendorList() {
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <Building2 className="h-5 w-5 text-primary" />
-              {selectedVendor ? (getSapName1(selectedVendor) || selectedVendor.legal_name) : ''}
+              {selectedVendor ? (pickVendorDisplayName(selectedVendor)) : ''}
               <span className="ml-2">{selectedVendor && getStatusBadge(selectedVendor.status as VendorStatus)}</span>
             </DialogTitle>
           </DialogHeader>
@@ -851,7 +851,7 @@ export default function VendorList() {
           {returnTarget && (
             <div className="space-y-3 text-sm">
               <div>
-                <div className="font-medium">{getSapName1(returnTarget) || returnTarget.legal_name || returnTarget.id}</div>
+                <div className="font-medium">{pickVendorDisplayName(returnTarget) || returnTarget.id}</div>
                 <div className="text-xs text-muted-foreground">
                   Last rejected at: {(returnTarget as any).last_rejection_stage ?? '—'}
                 </div>

@@ -279,25 +279,21 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button
                         size="sm"
                         variant="outline"
+                        className="text-destructive"
+                        disabled={blocked}
+                        title={blocked ? 'The previous approver has not approved yet.' : undefined}
+                        onClick={() => setActionItem({ item: it, action: 'reject' })}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" /> Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         disabled={blocked}
                         title={blocked ? 'The previous approver has not approved yet.' : undefined}
                         onClick={() => setActionItem({ item: it, action: 'approve' })}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive"
-                        disabled={blocked}
-                        title={blocked ? 'The previous approver has not approved yet.' : isBuyer ? 'Return the application to the vendor for correction.' : undefined}
-                        onClick={() => setActionItem({ item: it, action: 'reject' })}
-                      >
-                        {isBuyer ? (
-                          <><Undo2 className="h-4 w-4 mr-1" /> Send Back to Vendor</>
-                        ) : (
-                          <><XCircle className="h-4 w-4 mr-1" /> Reject</>
-                        )}
                       </Button>
                     </div>
                   </TableCell>
@@ -461,9 +457,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <DialogTitle>
               {actionItem?.action === 'approve'
                 ? `Approve — ${actionItem?.item.vendorName}`
-                : isBuyer
-                  ? `Send back to vendor — ${actionItem?.item.vendorName}`
-                  : `Reject — ${actionItem?.item.vendorName}`}
+                : `Reject — ${actionItem?.item.vendorName}`}
             </DialogTitle>
             {actionItem?.action === 'reject' && isBuyer ? (
               <DialogDescription>
@@ -504,9 +498,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                 ? 'Submitting...'
                 : actionItem?.action === 'approve'
                   ? 'Confirm approve'
-                  : isBuyer
-                    ? 'Send Back to Vendor'
-                    : 'Confirm reject'}
+                  : 'Confirm reject'}
             </Button>
           </DialogFooter>
         </DialogContent>
