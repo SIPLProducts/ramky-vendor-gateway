@@ -1017,7 +1017,7 @@ export default function AdminInvitations() {
                       const isOnBehalf = !!(invitation as any).created_on_behalf;
                       const status = getInvitationStatus(invitation);
                       const canResumeOnBehalf = isOnBehalf && !invitation.used_at && status !== 'expired';
-                      const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'draft' || status === 'expired');
+                      const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'in_progress' || status === 'expired');
                       const resendLabel = status === 'pending' ? 'Send Email' : status === 'expired' ? 'Resend Invitation' : 'Resend Email';
                       const isSending = sendEmailInvitation.isPending && sendEmailInvitation.variables === invitation.id;
                       const handleResend = async () => {
