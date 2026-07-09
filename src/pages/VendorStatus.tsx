@@ -23,6 +23,7 @@ interface VendorRow {
   status: string;
   created_at: string;
   last_rejection_comments: string | null;
+  sap_vendor_code: string | null;
 }
 
 
