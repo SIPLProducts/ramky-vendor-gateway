@@ -433,7 +433,7 @@ export default function Dashboard() {
                         </Link>
                       </TableCell>
 
-                      <TableCell>{getSapName1(v) || v.legal_name || '—'}</TableCell>
+                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">
