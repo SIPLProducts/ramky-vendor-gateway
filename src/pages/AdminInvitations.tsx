@@ -681,7 +681,7 @@ export default function AdminInvitations() {
       );
     }
 
-    if (status === 'draft') {
+    if (status === 'in_progress') {
       return (
         <Badge variant="default" className="bg-amber-500 hover:bg-amber-500 text-white">
           <Clock className="h-3 w-3 mr-1" />
