@@ -192,7 +192,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <TableHeader>
           <TableRow>
             <TableHead>Vendor</TableHead>
-            {!isBuyer && <TableHead>Buyer Company</TableHead>}
+            {showBuyerCompanyColumn && <TableHead>Buyer Company</TableHead>}
             {!isBuyer && <TableHead>Invited By</TableHead>}
             <TableHead>MSME</TableHead>
             <TableHead>Submitted</TableHead>
@@ -200,25 +200,31 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={isBuyer ? 4 : 6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-            ))
-          ) : rows.length === 0 ? (
-            <TableRow><TableCell colSpan={isBuyer ? 4 : 6} className="text-center text-muted-foreground py-8">
-              {variant === 'pending' ? (
-                <>
-                  <div>No vendors are pending your approval right now.</div>
-                  <div className="text-xs mt-2">
-                    Only vendors whose approval matrix lists you as an approver for this stage appear here.
-                  </div>
-                </>
-              ) : (
-                <div>No vendors are waiting for a previous approver.</div>
-              )}
-            </TableCell></TableRow>
-          ) : (
-            rows.map((it) => {
+          {(() => {
+            const baseCols = 4; // Vendor + MSME + Submitted + Actions
+            const colSpan = baseCols + (showBuyerCompanyColumn ? 1 : 0) + (!isBuyer ? 1 : 0);
+            if (loading) {
+              return Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}><TableCell colSpan={colSpan}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+              ));
+            }
+            if (rows.length === 0) {
+              return (
+                <TableRow><TableCell colSpan={colSpan} className="text-center text-muted-foreground py-8">
+                  {variant === 'pending' ? (
+                    <>
+                      <div>No vendors are pending your approval right now.</div>
+                      <div className="text-xs mt-2">
+                        Only vendors whose approval matrix lists you as an approver for this stage appear here.
+                      </div>
+                    </>
+                  ) : (
+                    <div>No vendors are waiting for a previous approver.</div>
+                  )}
+                </TableCell></TableRow>
+              );
+            }
+            return rows.map((it) => {
               const blocked = variant === 'waiting';
               return (
                 <TableRow key={it.progressId ?? it.vendorId}>
