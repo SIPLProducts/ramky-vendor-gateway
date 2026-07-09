@@ -1354,6 +1354,21 @@ export default function VendorRegistration() {
   };
 
   const handleSubmit = async () => {
+    // Pre-submit gating — bounce user back to the first tab with missing
+    // mandatory fields so they can see the inline errors immediately.
+    if (!isInternational) {
+      const firstMissing = [1, 2, 3, 4, 5].find(s => !isDomesticStepComplete(s, formData, verifiedData));
+      if (firstMissing) {
+        const title = registrationSteps[firstMissing - 1]?.title || `Step ${firstMissing}`;
+        toast({
+          title: 'Please complete required fields',
+          description: `${title} is incomplete. Fill the highlighted fields and try again.`,
+          variant: 'destructive',
+        });
+        setCurrentStep(firstMissing);
+        return;
+      }
+    }
     try {
       const vendor = isEditMode && vendorId
         ? await resubmitVendor(formData)
