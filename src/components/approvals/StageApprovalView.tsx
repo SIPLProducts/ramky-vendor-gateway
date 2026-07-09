@@ -303,8 +303,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   </TableCell>
                 </TableRow>
               );
-            })
-          )}
+            });
+          })()}
         </TableBody>
       </Table>
     </div>
