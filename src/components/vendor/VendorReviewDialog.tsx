@@ -557,23 +557,40 @@ export function VendorReviewDialog({
                   <Separator />
 
                   {/* Statutory */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <FileText className="h-4 w-4" />
-                      Statutory Details
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="space-y-1"><p className="text-muted-foreground">GSTIN</p><p className="font-mono font-medium">{vendor.gstin || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">PAN</p><p className="font-mono font-medium">{vendor.pan || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">PAN Holder Name</p><p className="font-medium">{(vendor as any).pan_holder_name || (vendor as any).msme_enterprise_name || (vendor as any).account_holder_name || vendor.trade_name || vendor.legal_name || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">MSME Number</p><p className="font-mono font-medium">{vendor.msme_number || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">MSME Category</p><p className="font-medium capitalize">{vendor.msme_category || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{vendor.firm_registration_no || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{vendor.iec_no || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">{PAN_STATUS_LABEL}</p><p className="font-medium">{(vendor as any).pan_status ? formatPanStatus((vendor as any).pan_status) : (vendor.pan && (vendor as any).pan_verification_status === 'passed' ? 'Valid' : '-')}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">{AADHAAR_LINKED_LABEL}</p><p className="font-medium">{formatAadhaarLinked((vendor as any).pan_aadhaar_linked)}</p></div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const v: any = vendor;
+                    const gstOk = v.gst_verification_status === 'passed';
+                    const panOk = v.pan_verification_status === 'passed';
+                    const msmeOk = v.msme_verification_status === 'passed';
+                    const Tick = () => (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 inline-block ml-1 align-text-bottom" />
+                    );
+                    const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
+                      <p className="text-muted-foreground flex items-center">
+                        <span>{text}</span>
+                        {ok && <Tick />}
+                      </p>
+                    );
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold flex items-center gap-2 text-primary">
+                          <FileText className="h-4 w-4" />
+                          Statutory Details
+                        </h4>
+                        <div className="grid grid-cols-4 gap-4 text-sm">
+                          <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
+                          <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
+                          <div className="space-y-1"><Label text="PAN Holder Name" ok={panOk} /><p className="font-medium">{v.pan_holder_name || v.msme_enterprise_name || v.account_holder_name || v.trade_name || v.legal_name || '-'}</p></div>
+                          <div className="space-y-1"><Label text={PAN_STATUS_LABEL} ok={panOk} /><p className="font-medium">{v.pan_status ? formatPanStatus(v.pan_status) : (v.pan && panOk ? 'Valid' : '-')}</p></div>
+                          <div className="space-y-1"><Label text={AADHAAR_LINKED_LABEL} ok={panOk} /><p className="font-medium">{formatAadhaarLinked(v.pan_aadhaar_linked)}</p></div>
+                          <div className="space-y-1"><Label text="MSME Number" ok={msmeOk} /><p className="font-mono font-medium">{v.msme_number || '-'}</p></div>
+                          <div className="space-y-1"><Label text="MSME Category" ok={msmeOk} /><p className="font-medium capitalize">{v.msme_category || '-'}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{v.firm_registration_no || '-'}</p></div>
+                          <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{v.iec_no || '-'}</p></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <Separator />
 
