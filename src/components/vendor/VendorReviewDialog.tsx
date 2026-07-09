@@ -474,11 +474,11 @@ export function VendorReviewDialog({
                     const msmeOk = v.msme_verification_status === 'passed';
                     const Tick = () => (
                       <span
-                        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-emerald-600/40 ml-1.5 align-text-bottom"
+                        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500 text-white border-[3px] border-emerald-700 ml-1.5 align-text-bottom"
                         title="Verified"
                         aria-label="Verified"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={3.5} />
+                        <CheckCircle2 className="h-4 w-4" strokeWidth={3} />
                       </span>
                     );
                     const Label = ({ text, ok }: { text: string; ok?: boolean }) => (
@@ -792,7 +792,7 @@ function VisitingCard({
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
-      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-emerald-500" />
       <div className="flex items-start justify-between mb-3">
         <p className="text-sm font-semibold text-foreground">{title}</p>
         <MapPin className="h-4 w-4 text-primary" />
