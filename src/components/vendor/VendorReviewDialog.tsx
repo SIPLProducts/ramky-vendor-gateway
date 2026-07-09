@@ -792,7 +792,7 @@ function VisitingCard({
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm">
-      <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-emerald-500" />
       <div className="flex items-start justify-between mb-3">
         <p className="text-sm font-semibold text-foreground">{title}</p>
         <MapPin className="h-4 w-4 text-primary" />
