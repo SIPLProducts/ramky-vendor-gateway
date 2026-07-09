@@ -17,6 +17,7 @@ interface VendorRow {
   reference_number: string | null;
   legal_name: string | null;
   trade_name: string | null;
+  account_holder_name: string | null;
   gstin: string | null;
   primary_email: string | null;
   vendor_type: string | null;
