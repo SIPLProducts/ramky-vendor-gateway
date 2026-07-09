@@ -487,75 +487,6 @@ export function VendorReviewDialog({
 
                   <Separator />
 
-                  {/* Address */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <MapPin className="h-4 w-4" />
-                      Address Details
-                    </h4>
-
-                    {/* Registered / Corporate Office Address */}
-                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
-                      <p className="text-sm font-semibold text-foreground">Registered / Corporate Office Address</p>
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
-                        <Field label="Address Line 1" value={vendor.registered_address} />
-                        <Field label="Address Line 2" value={(vendor as any).registered_address_line2} />
-                        <Field label="Address Line 3" value={(vendor as any).registered_address_line3} />
-                        <Field label="Address Line 4" value={(vendor as any).registered_address_line4} />
-                        <Field label="City" value={vendor.registered_city} />
-                        <Field label="State" value={vendor.registered_state} />
-                        <Field label="PIN Code" value={vendor.registered_pincode} />
-                        <Field label="Office Phone" value={(vendor as any).registered_phone} />
-                        <Field label="Fax" value={(vendor as any).registered_fax} />
-                        <Field label="Contact 1" value={(vendor as any).registered_contact_1 || vendor.primary_phone} />
-                        <Field label="Contact 2" value={(vendor as any).registered_contact_2} />
-                        <Field label="Email 1" value={(vendor as any).registered_email || vendor.primary_email} />
-                        <Field label="Email 2" value={(vendor as any).registered_email_2} />
-
-                      </div>
-                    </div>
-
-                    {/* Communication Address */}
-                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
-                      <p className="text-sm font-semibold text-foreground">Communication Address</p>
-                      {!vendor.communication_address || vendor.communication_address === vendor.registered_address ? (
-                        <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
-                          <Field label="Address" value={vendor.communication_address} />
-                          <Field label="City" value={vendor.communication_city} />
-                          <Field label="State" value={vendor.communication_state} />
-                          <Field label="PIN Code" value={(vendor as any).communication_pincode} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-
-                  <Separator />
-
-                  {/* Contact */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                      <User className="h-4 w-4" />
-                      Contact Details
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="space-y-1">
-                        <p className="text-muted-foreground">Primary Contact</p>
-                        <p className="font-medium">{vendor.primary_contact_name || '-'}</p>
-                        <p className="text-xs text-muted-foreground">{vendor.primary_designation}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-muted-foreground">Contact Info</p>
-                        <p className="font-medium flex items-center gap-1"><Phone className="h-3 w-3" /> {vendor.primary_phone || '-'}</p>
-                        <p className="font-medium flex items-center gap-1"><Mail className="h-3 w-3" /> {vendor.primary_email || '-'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
                   {/* Statutory */}
                   {(() => {
                     const v: any = vendor;
@@ -607,6 +538,52 @@ export function VendorReviewDialog({
                       <div className="space-y-1"><p className="text-muted-foreground">Account Number</p><p className="font-mono font-medium">{vendor.account_number || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">IFSC Code</p><p className="font-mono font-medium">{vendor.ifsc_code || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">MICR Code</p><p className="font-mono font-medium">{vendor.micr_code || '-'}</p></div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Address */}
+                  <div className="space-y-3">
+                    <h4 className="font-semibold flex items-center gap-2 text-primary">
+                      <MapPin className="h-4 w-4" />
+                      Address Details
+                    </h4>
+
+                    {/* Registered / Corporate Office Address */}
+                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
+                      <p className="text-sm font-semibold text-foreground">Registered / Corporate Office Address</p>
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
+                        <Field label="Address Line 1" value={vendor.registered_address} />
+                        <Field label="Address Line 2" value={(vendor as any).registered_address_line2} />
+                        <Field label="Address Line 3" value={(vendor as any).registered_address_line3} />
+                        <Field label="Address Line 4" value={(vendor as any).registered_address_line4} />
+                        <Field label="City" value={vendor.registered_city} />
+                        <Field label="State" value={vendor.registered_state} />
+                        <Field label="PIN Code" value={vendor.registered_pincode} />
+                        <Field label="Office Phone" value={(vendor as any).registered_phone} />
+                        <Field label="Fax" value={(vendor as any).registered_fax} />
+                        <Field label="Contact 1" value={(vendor as any).registered_contact_1 || vendor.primary_phone} />
+                        <Field label="Contact 2" value={(vendor as any).registered_contact_2} />
+                        <Field label="Email 1" value={(vendor as any).registered_email || vendor.primary_email} />
+                        <Field label="Email 2" value={(vendor as any).registered_email_2} />
+
+                      </div>
+                    </div>
+
+                    {/* Communication Address */}
+                    <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
+                      <p className="text-sm font-semibold text-foreground">Communication Address</p>
+                      {!vendor.communication_address || vendor.communication_address === vendor.registered_address ? (
+                        <p className="text-sm text-muted-foreground italic">Same as Registered Address</p>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
+                          <Field label="Address" value={vendor.communication_address} />
+                          <Field label="City" value={vendor.communication_city} />
+                          <Field label="State" value={vendor.communication_state} />
+                          <Field label="PIN Code" value={(vendor as any).communication_pincode} />
+                        </div>
+                      )}
                     </div>
                   </div>
 
