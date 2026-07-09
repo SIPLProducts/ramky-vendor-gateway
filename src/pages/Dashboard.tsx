@@ -32,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
-import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 import { useToast } from '@/hooks/use-toast';
 
 type VendorRow = {
@@ -40,12 +40,15 @@ type VendorRow = {
   reference_number: string | null;
   legal_name: string | null;
   trade_name: string | null;
+  account_holder_name: string | null;
   gstin: string | null;
   primary_email: string | null;
+  registered_email: string | null;
   status: string;
   created_at: string;
   tenant_id: string | null;
   invited_by?: { name: string | null; email: string | null } | null;
+  display_email?: string | null;
 };
 
 
