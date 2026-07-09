@@ -1,15 +1,15 @@
+## Goal
+On the Vendor Status screen, change the top-left back button from “Back to Vendor Invitations” to “Back to Dashboard” and make it navigate to the dashboard route.
+
+## File
+- `src/pages/VendorStatus.tsx`
+
 ## Change
+- Update the `Button` near the top of the page:
+  - Text: “Back to Dashboard”
+  - Navigation: `navigate('/dashboard')`
+  - Keep the existing `ArrowLeft` icon, `variant="outline"`, and layout styling.
 
-In `src/pages/AdminInvitations.tsx`, restrict Resend button to non-on-behalf rows so on-behalf rows show only the Resume button:
-
-```ts
-const showResend = !isOnBehalf && (status === 'pending' || status === 'used' || status === 'in_progress' || status === 'expired');
-```
-
-`canResumeOnBehalf` stays as-is (Resume on any on-behalf In Progress/Used row).
-
-Result:
-- On-behalf rows → Resume only
-- Direct email rows → Resend Email (or Resend Invitation if expired)
-
-No other changes.
+## Verification
+- Quick TypeScript check (`bunx tsgo --noEmit`) to confirm no type errors.
+- Visual check in the preview that the button label changed and clicks route to the dashboard.
