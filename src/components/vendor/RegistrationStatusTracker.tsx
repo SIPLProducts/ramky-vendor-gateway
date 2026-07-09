@@ -139,6 +139,8 @@ interface RegistrationStatusTrackerProps {
    * status enum mapping when empty.
    */
   approvalProgress?: ApprovalChainEntry[];
+  /** SAP vendor code, if the vendor has been created in SAP. */
+  sapVendorCode?: string | null;
 }
 
 // Map stage -> step index in `statusSteps`
