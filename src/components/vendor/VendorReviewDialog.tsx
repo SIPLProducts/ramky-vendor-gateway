@@ -447,21 +447,12 @@ export function VendorReviewDialog({
                       <div className="space-y-3">
                         <h4 className="font-semibold flex items-center gap-2 text-primary">
                           <Shield className="h-4 w-4" />
-                          Routing & Invitation
+                          Buyer Details
                         </h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div className="space-y-1">
-                            <p className="text-muted-foreground">Buyer Company (on vendor)</p>
+                            <p className="text-muted-foreground">Buyer Company</p>
                             <p className="font-medium">{routing.vendorCompany || '-'}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Invitation Company</p>
-                            <p className="font-medium">{routing.invitationCompany || '-'}</p>
-                            {routing.companyMismatch && (
-                              <p className="text-xs text-amber-600">
-                                Vendor selected a different company than the invitation.
-                              </p>
-                            )}
                           </div>
                           <div className="space-y-1">
                             <p className="text-muted-foreground">Invited By (Buyer)</p>
@@ -470,23 +461,6 @@ export function VendorReviewDialog({
                               <p className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Mail className="h-3 w-3" /> {routing.buyerEmail}
                               </p>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Mapped SCM CO(s)</p>
-                            {routing.mappedScm.length === 0 ? (
-                              <p className="font-medium">-</p>
-                            ) : (
-                              routing.mappedScm.map((s, i) => (
-                                <div key={i}>
-                                  <p className="font-medium">{s.name || '-'}</p>
-                                  {s.email && (
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Mail className="h-3 w-3" /> {s.email}
-                                    </p>
-                                  )}
-                                </div>
-                              ))
                             )}
                           </div>
                         </div>
