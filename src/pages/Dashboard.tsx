@@ -446,7 +446,7 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{v.primary_email ?? v.invited_by?.email ?? '—'}</TableCell>
+                      <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
                     </TableRow>
