@@ -10,7 +10,7 @@ import { RegistrationStatusTracker, RegistrationStatus } from '@/components/vend
 import { ApprovalTimeline } from '@/components/vendor/ApprovalTimeline';
 import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
 
-import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 
 interface VendorRow {
   id: string;
