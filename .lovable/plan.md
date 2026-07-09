@@ -1,22 +1,32 @@
-## Plan
+## Fix: "Financial & Infrastructure is incomplete" on Submit
 
-1. **Fix the domestic submit validation mismatch**
-   - Update the final submit-gate in `VendorRegistration` so Address Information checks the actual visible fields used by `AddressStep`:
-     - `registeredEmail`
-     - `registeredContact1`
-   - Remove the stale checks for hidden/nonexistent fields:
-     - `contactEmail1`
-     - `contactPhone1`
-   - This is why you are seeing “Address Information is incomplete” even after filling mandatory fields: the submit validation is checking old field names that are not on the form anymore.
+### Root cause
+`isDomesticStepComplete` (step 5) in `src/pages/VendorRegistration.tsx` requires:
+- `financial.turnoverYear1` non-empty
+- `financial.creditPeriodExpected` non-empty
 
-2. **Keep international registration protected from this issue**
-   - Leave the existing international branch separate from domestic validation.
-   - Confirm the domestic-only submit gate does not run for international vendors.
+But the Financial & Infrastructure step's own zod schema (`FinancialInfrastructureStep.tsx`) marks **all** financial fields as optional. So the user can complete the step without filling turnover/credit, get a green check, then Submit blocks them with a misleading error.
 
-3. **Remove “Powering Progress”**
-   - Remove the “Powering Progress” tagline from the sidebar header.
-   - Keep the logo and “Vendor Portal” text unchanged.
+This is the same class of bug as the earlier Address fix — the submit-gate checks stricter rules than the step itself enforces.
 
-4. **Verify**
-   - Run a TypeScript check after the changes.
-   - Confirm the registration submit validation no longer blocks on Address Information when visible mandatory address fields are completed.
+### Change
+In `src/pages/VendorRegistration.tsx`, `isDomesticStepComplete` case 5:
+
+```ts
+case 5: {
+  // Financial & Infrastructure step has no required fields in its schema.
+  // Any provided values are already validated inline by the step.
+  return true;
+}
+```
+
+### Why this is safe internationally
+`isDomesticStepComplete` runs only for domestic vendors. The international submit branch is untouched.
+
+### Guardrail (prevent recurrence)
+Add a short comment above `isDomesticStepComplete` noting: "Keep each case aligned with the corresponding step's zod schema. Do not add fields here that the step itself treats as optional."
+
+### Verification
+- `bunx tsgo --noEmit`
+- Domestic vendor with empty turnover/credit → Submit proceeds (no "Financial & Infrastructure incomplete" toast).
+- Filling turnover with negative/invalid values still blocked by inline step validation.

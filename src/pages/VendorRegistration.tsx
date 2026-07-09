@@ -82,6 +82,8 @@ const initialFormData: VendorFormData = {
 // Mandatory-field completeness for domestic steps.
 // Kept in sync with each step's zod schema (mandatory subset only).
 // Shared by the resume logic and pre-submit gating so both agree.
+// Keep each case aligned with the corresponding step's zod schema.
+// Do not require fields here that the step itself treats as optional.
 function isDomesticStepComplete(
   step: number,
   data: VendorFormData,
@@ -131,8 +133,9 @@ function isDomesticStepComplete(
       return nonEmpty(c?.ceoName);
     }
     case 5: {
-      const f = data.financial;
-      return nonEmpty(f?.turnoverYear1) && nonEmpty(f?.creditPeriodExpected);
+      // Financial & Infrastructure step has no required fields in its schema.
+      // Any provided values are validated inline by the step itself.
+      return true;
     }
     default:
       return true;
