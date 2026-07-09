@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import * as XLSX from 'xlsx';
 import {
@@ -8,6 +8,8 @@ import {
   Clock,
   Download,
   FileText,
+  Loader2,
+  Search,
   XCircle,
 } from 'lucide-react';
 
@@ -31,6 +33,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { useToast } from '@/hooks/use-toast';
 
 type VendorRow = {
   id: string;
@@ -100,6 +103,37 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
+  const [trackRef, setTrackRef] = useState('');
+  const [isTracking, setIsTracking] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleTrackByReference = async () => {
+    const ref = trackRef.trim();
+    if (!ref) {
+      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
+      return;
+    }
+    setIsTracking(true);
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('reference_number', ref)
+        .maybeSingle();
+      if (error) throw error;
+      const vendorId = data?.id ?? null;
+      if (!vendorId) {
+        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
+        return;
+      }
+      navigate(`/vendor-status/${vendorId}`);
+    } catch (e: any) {
+      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
+    } finally {
+      setIsTracking(false);
+    }
+  };
 
   const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
   const toIso = dateTo ? endOfDay(dateTo).toISOString() : null;
@@ -266,6 +300,25 @@ export default function Dashboard() {
           >
             Clear
           </Button>
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
+            className="flex items-end gap-2"
+          >
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="track-ref" className="text-xs font-medium text-muted-foreground">Reference #</Label>
+              <Input
+                id="track-ref"
+                placeholder="Enter Reference Number"
+                value={trackRef}
+                onChange={(e) => setTrackRef(e.target.value)}
+                className="h-9 w-56"
+              />
+            </div>
+            <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
+              {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
+          </form>
           <Button onClick={handleExport} disabled={filteredVendors.length === 0}>
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
