@@ -442,30 +442,23 @@ export function VendorReviewDialog({
                 <div className="space-y-6">
                   {/* Routing / Invitation */}
                   {routing && (
-                    <>
-                      <div className="space-y-3">
-                        <h4 className="font-semibold flex items-center gap-2 text-primary">
-                          <Shield className="h-4 w-4" />
-                          Buyer Details
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Buyer Company</p>
-                            <p className="font-medium">{routing.vendorCompany || '-'}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">Invited By (Buyer)</p>
-                            <p className="font-medium">{routing.buyerName || '-'}</p>
-                            {routing.buyerEmail && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Mail className="h-3 w-3" /> {routing.buyerEmail}
-                              </p>
-                            )}
-                          </div>
+                    <SectionCard icon={Shield} title="Buyer Details">
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Buyer Company</p>
+                          <p className="font-medium">{routing.vendorCompany || '-'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Invited By (Buyer)</p>
+                          <p className="font-medium">{routing.buyerName || '-'}</p>
+                          {routing.buyerEmail && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Mail className="h-3 w-3" /> {routing.buyerEmail}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <Separator />
-                    </>
+                    </SectionCard>
                   )}
 
                   {/* Organization */}
