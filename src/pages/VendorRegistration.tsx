@@ -79,6 +79,68 @@ const initialFormData: VendorFormData = {
   declaration: { selfDeclared: false, termsAccepted: false },
 };
 
+// Mandatory-field completeness for domestic steps.
+// Kept in sync with each step's zod schema (mandatory subset only).
+// Shared by the resume logic and pre-submit gating so both agree.
+function isDomesticStepComplete(
+  step: number,
+  data: VendorFormData,
+  verified?: VerifiedDocumentData,
+): boolean {
+  const nonEmpty = (v: unknown) => typeof v === 'string' && v.trim().length > 0;
+  const emailOk = (v: unknown) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const phoneOk = (v: unknown) => typeof v === 'string' && /^\d{10}$/.test(v);
+  const pinOk = (v: unknown) => typeof v === 'string' && /^\d{6}$/.test(v);
+
+  switch (step) {
+    case 1: {
+      if (!verified) return false;
+      if (verified.step1Status?.allDone) return true;
+      const gstOk =
+        verified.isGstRegistered === true
+          ? !!verified.gst
+          : verified.isGstRegistered === false
+            ? !!verified.gstSelfDeclarationFile
+            : false;
+      const msmeOk = verified.isMsmeRegistered === false
+        ? !!verified.msmeSelfDeclarationFile
+        : !!verified.msme;
+      return gstOk && !!verified.pan && msmeOk && !!verified.bank;
+    }
+    case 2: {
+      const o = data.organization;
+      const s = data.statutory;
+      return (
+        nonEmpty(o?.legalName) &&
+        nonEmpty(o?.industryType) &&
+        nonEmpty(o?.organizationType) &&
+        nonEmpty(s?.entityType)
+      );
+    }
+    case 3: {
+      const a = data.address;
+      return (
+        typeof a?.registeredAddress === 'string' && a.registeredAddress.trim().length >= 5 &&
+        nonEmpty(a?.registeredCity) &&
+        nonEmpty(a?.registeredState) &&
+        pinOk(a?.registeredPincode) &&
+        emailOk((a as any)?.contactEmail1) &&
+        phoneOk((a as any)?.contactPhone1)
+      );
+    }
+    case 4: {
+      const c = data.contact;
+      return nonEmpty(c?.ceoName);
+    }
+    case 5: {
+      const f = data.financial;
+      return nonEmpty(f?.turnoverYear1) && nonEmpty(f?.creditPeriodExpected);
+    }
+    default:
+      return true;
+  }
+}
+
 export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
@@ -743,11 +805,10 @@ export default function VendorRegistration() {
             const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
             setCurrentStep(isReturned ? 5 : (nextStep || 5));
           } else {
-            // Step 1 = doc verification — assume completed if we already have key fields
+            // Step 1 = doc verification — pre-seed verifiedData if we have key fields
+            let step1Seed: VerifiedDocumentData | undefined = undefined;
             if (existingFormData.statutory?.pan && existingFormData.bank?.accountNumber) {
-              filledSteps.push(1);
-              // Pre-seed verifiedData so Step 1 shows green tiles when revisited
-              setVerifiedData({
+              step1Seed = {
                 isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
                 isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
                 pan: {
@@ -815,23 +876,26 @@ export default function VendorRegistration() {
                     }
                   : undefined,
                 cancelledChequeFile2: existingFormData.bank?.secondary?.cancelledChequeFile ?? null,
-              } as any);
+              } as any;
+              setVerifiedData(step1Seed);
             }
-            if (existingFormData.organization?.legalName) filledSteps.push(2);
-            if (existingFormData.address?.registeredAddress) filledSteps.push(3);
-            if (existingFormData.contact?.ceoName) filledSteps.push(4);
-            if (existingFormData.financial?.creditPeriodExpected || existingFormData.infrastructure?.rawMaterialsUsed) filledSteps.push(5);
-            setCompletedSteps(filledSteps);
+            // True completeness — mandatory fields only (matches per-step zod).
+            // Presence-based checks used to skip Address/Contact when their
+            // fields were auto-seeded from GST OCR / organization data.
+            const filled = [1, 2, 3, 4, 5].filter(s =>
+              isDomesticStepComplete(s, existingFormData, step1Seed),
+            );
+            setCompletedSteps(filled);
             // For returned_to_vendor mark all completed and jump to Review
             if (isReturned) {
               setCompletedSteps([1, 2, 3, 4, 5]);
               setIsEditMode(true);
               setCurrentStep(6);
             } else {
-              const allSteps = [1, 2, 3, 4, 5, 6];
-              const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
-              setCurrentStep(nextStep || 6);
+              const firstMissing = [1, 2, 3, 4, 5].find(s => !filled.includes(s));
+              setCurrentStep(firstMissing ?? 6);
             }
+
           }
         } else {
           setIsSubmitted(true);
@@ -1124,7 +1188,17 @@ export default function VendorRegistration() {
   };
 
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
-  const handleStepClick = (step: number) => { if (completedSteps.includes(step) || step <= currentStep) setCurrentStep(step); };
+  const handleStepClick = (step: number) => {
+    // Free navigation backward; forward only if all preceding steps are complete.
+    if (step <= currentStep) { setCurrentStep(step); return; }
+    if (isInternational) {
+      if (completedSteps.includes(step)) setCurrentStep(step);
+      return;
+    }
+    const allPrevComplete = Array.from({ length: step - 1 }, (_, i) => i + 1)
+      .every((s) => isDomesticStepComplete(s, formData, verifiedData));
+    if (allPrevComplete) setCurrentStep(step);
+  };
   const [pendingDocTab, setPendingDocTab] = useState<'gst' | 'pan' | 'msme' | 'bank' | undefined>(undefined);
   const handleEditStep = (step: number, tab?: 'gst' | 'pan' | 'msme' | 'bank') => {
     if (step === 1 && tab) setPendingDocTab(tab);
@@ -1280,6 +1354,21 @@ export default function VendorRegistration() {
   };
 
   const handleSubmit = async () => {
+    // Pre-submit gating — bounce user back to the first tab with missing
+    // mandatory fields so they can see the inline errors immediately.
+    if (!isInternational) {
+      const firstMissing = [1, 2, 3, 4, 5].find(s => !isDomesticStepComplete(s, formData, verifiedData));
+      if (firstMissing) {
+        const title = registrationSteps[firstMissing - 1]?.title || `Step ${firstMissing}`;
+        toast({
+          title: 'Please complete required fields',
+          description: `${title} is incomplete. Fill the highlighted fields and try again.`,
+          variant: 'destructive',
+        });
+        setCurrentStep(firstMissing);
+        return;
+      }
+    }
     try {
       const vendor = isEditMode && vendorId
         ? await resubmitVendor(formData)
