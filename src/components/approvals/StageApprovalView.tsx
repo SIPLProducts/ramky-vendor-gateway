@@ -457,9 +457,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <DialogTitle>
               {actionItem?.action === 'approve'
                 ? `Approve — ${actionItem?.item.vendorName}`
-                : isBuyer
-                  ? `Send back to vendor — ${actionItem?.item.vendorName}`
-                  : `Reject — ${actionItem?.item.vendorName}`}
+                : `Reject — ${actionItem?.item.vendorName}`}
             </DialogTitle>
             {actionItem?.action === 'reject' && isBuyer ? (
               <DialogDescription>
