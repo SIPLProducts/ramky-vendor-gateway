@@ -601,7 +601,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               No
             </Button>
             <Button
-              variant="destructive"
+              variant="outline"
+              className="text-destructive border-destructive"
               onClick={confirmForceReject}
               disabled={forceRejectSubmitting}
             >
