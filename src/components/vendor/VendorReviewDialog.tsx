@@ -497,7 +497,7 @@ export function VendorReviewDialog({
                     {/* Registered / Corporate Office Address */}
                     <div className="rounded-lg border border-border/60 p-4 bg-muted/20 space-y-2">
                       <p className="text-sm font-semibold text-foreground">Registered / Corporate Office Address</p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
                         <Field label="Address Line 1" value={vendor.registered_address} />
                         <Field label="Address Line 2" value={(vendor as any).registered_address_line2} />
                         <Field label="Address Line 3" value={(vendor as any).registered_address_line3} />
