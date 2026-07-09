@@ -21,7 +21,8 @@ interface EnterpriseHeaderProps {
 export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
   const {
     myTenants, activeTenantId, setActiveTenantId,
-    isSuperAdmin, isCrossTenantReviewer, isScmManager, isStageApprover,
+    activeTenantIds, setActiveTenantIds,
+    isSuperAdmin, isCrossTenantReviewer, isScmManager, isStageApprover, isBuyerRole,
   } = useTenantContext();
   const hidePicker = isCrossTenantReviewer || isScmManager || isStageApprover;
   const showSwitcher = !hidePicker && (myTenants.length > 1 || (isSuperAdmin && myTenants.length > 0));
