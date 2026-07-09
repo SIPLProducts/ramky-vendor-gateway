@@ -279,7 +279,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-destructive"
+                        className="text-destructive border-destructive"
                         disabled={blocked}
                         title={blocked ? 'The previous approver has not approved yet.' : undefined}
                         onClick={() => setActionItem({ item: it, action: 'reject' })}
@@ -289,6 +289,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       <Button
                         size="sm"
                         variant="outline"
+                        className="text-success border-success"
                         disabled={blocked}
                         title={blocked ? 'The previous approver has not approved yet.' : undefined}
                         onClick={() => setActionItem({ item: it, action: 'approve' })}
