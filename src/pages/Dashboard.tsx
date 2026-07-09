@@ -248,9 +248,9 @@ export default function Dashboard() {
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
       'Reference #': v.reference_number ?? '',
-      'Company Name': v.legal_name ?? '',
+      'Vendor Name': pickVendorDisplayName(v) || '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
-      Email: v.primary_email ?? v.invited_by?.email ?? '',
+      Email: v.display_email ?? '',
       Status: STATUS_LABELS[v.status]?.label ?? v.status,
       'Created Date': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
     }));
