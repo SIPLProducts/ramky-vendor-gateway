@@ -66,10 +66,86 @@ function buildCommonDefaults(tenantDefaults: any | null): SapFieldOverrides {
 
 export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildCommonDefaults(null));
+  const [classifyMode, setClassifyMode] = useState<'details' | 'cfstmt'>('details');
   const [missing, setMissing] = useState<string[]>([]);
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
+  const [wtAll, setWtAll] = useState<Array<{ LAND1: string; TAXTYPE: string; TEXT40: string }>>([]);
+  const [wtLoading, setWtLoading] = useState(false);
+  const [wtError, setWtError] = useState<string | null>(null);
+  const [wtcAll, setWtcAll] = useState<Array<{ LAND1: string; WITHT: string; WT_WITHCD: string; TCDESC: string }>>([]);
+  const [wtrAll, setWtrAll] = useState<Array<{ LAND1: string; WITHT: string; QSREC: string; RCTXT: string }>>([]);
+  const [wtcLoading, setWtcLoading] = useState(false);
+  const [wtcError, setWtcError] = useState<string | null>(null);
   const refreshMaster = useRefreshSapMaster();
+
+  // Common country across selected vendors (blank if mixed)
+  const commonCountry = (() => {
+    const countries = new Set<string>();
+    for (const v of vendors) {
+      const anyV: any = v;
+      const isIntl = String(anyV.vendor_type || 'domestic') === 'international';
+      const c = isIntl
+        ? (anyV.international_data?.company?.country || anyV.international_data?.address?.country || anyV.country || anyV.reg_country || '')
+        : 'IN';
+      countries.add(String(c || '').trim().toUpperCase());
+    }
+    return countries.size === 1 ? [...countries][0] : '';
+  })();
+
+  const wtFiltered = commonCountry
+    ? wtAll.filter((r) => String(r.LAND1 || '').trim().toUpperCase() === commonCountry)
+    : wtAll;
+
+  const fetchWtTypes = async () => {
+    setWtLoading(true);
+    setWtError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-fetch-withholding-tax', {
+        body: { config_name: 'Fetch_Withholding_TaxType' },
+      });
+      if (error) setWtError(error.message || 'Failed to load withholding tax types');
+      else if (data?.success) {
+        const records = Array.isArray(data.records) ? data.records : Array.isArray(data.raw) ? data.raw : [];
+        const norm = records.map((r: any) => {
+          const get = (k: string) => {
+            for (const key of Object.keys(r || {})) if (key.toLowerCase() === k.toLowerCase()) return r[key];
+            return '';
+          };
+          return {
+            LAND1: String(get('LAND1') || '').trim().toUpperCase(),
+            TAXTYPE: String(get('TAXTYPE') || '').trim(),
+            TEXT40: String(get('TEXT40') || '').trim(),
+          };
+        }).filter((r: any) => r.TAXTYPE);
+        setWtAll(norm);
+      } else setWtError(data?.message || 'Failed to load withholding tax types');
+    } catch (e: any) {
+      setWtError(e?.message || 'Failed to load withholding tax types');
+    } finally {
+      setWtLoading(false);
+    }
+  };
+
+  const fetchWtCodesRectypes = async () => {
+    setWtcLoading(true);
+    setWtcError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-fetch-wtx-code-rectype', {
+        body: { config_name: 'Fetch_Withholding_WTX_Code_REC_Type' },
+      });
+      if (error) setWtcError(error.message || 'Failed to load WTax Code / Rec.Type');
+      else if (data?.success) {
+        setWtcAll(Array.isArray(data.taxcodes) ? data.taxcodes : []);
+        setWtrAll(Array.isArray(data.rectypes) ? data.rectypes : []);
+      } else setWtcError(data?.message || 'Failed to load WTax Code / Rec.Type');
+    } catch (e: any) {
+      setWtcError(e?.message || 'Failed to load WTax Code / Rec.Type');
+    } finally {
+      setWtcLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!open) return;
