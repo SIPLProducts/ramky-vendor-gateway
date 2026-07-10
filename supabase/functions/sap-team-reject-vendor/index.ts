@@ -174,6 +174,7 @@ serve(async (req) => {
               <h2 style="color:#b91c1c;margin:0 0 12px">${esc(headline)}</h2>
               <p>Dear ${esc((buyerProfile as any)?.full_name ?? "Buyer")},</p>
               <p>${intro}</p>
+              ${existingBlock}
               <table style="border-collapse:collapse;width:100%;margin:12px 0;font-size:14px">
                 ${row("Vendor Name", vendorName)}
                 ${row("Vendor Reference Number", vendorRef)}
@@ -183,7 +184,6 @@ serve(async (req) => {
                 ${row("Remarks", remarks)}
                 ${row("Closed Date & Time", rejectedAtIst)}
               </table>
-              ${existingBlock}
               <p>Vendor <b>${esc(vendorRef)}</b> has been closed because a vendor with the same details already exists in SAP. This vendor has been moved to the <b>Duplicate &amp; Closed</b> tab in the SAP Sync screen. No further action is required for this submission.</p>
               <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vendor Portal.</p>
             </div>`;
