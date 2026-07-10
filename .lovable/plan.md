@@ -1,38 +1,46 @@
-## Problem
+# Reference number: generate on SUBMIT for both flows (on-behalf & via-invitation)
 
-On the self-hosted server, an on-behalf vendor submission stays visible on **Admin → Invitations**, even though the same flow correctly disappears in local/cloud. On local, the row is filtered out because `getInvitationStatus()` reads `invitation.vendor.status` (`scm_manager_review`) and returns `'submitted'`, which the list filter drops.
+## New rule (applies to both paths)
 
-## Root cause
+- Ref number is assigned **only when the vendor is submitted** — never on draft creation.
+- Format: `YYYYMMDD` (submit date, IST) + 3-digit sequence.
+- Sequence uses **the submit date's counter** in `vendor_reference_counters`, incremented atomically. First submit of the day = `001`, next = `002`, etc.
+- Once assigned, the number is frozen — re-submit, re-open, or later status changes never re-number.
 
-The invitations query joins vendors through the embedded relation:
+Applies uniformly to:
+- **Via-invitation flow** — vendor completes the form and submits (status moves `draft → buyer_review` / next review stage).
+- **On-behalf flow** — buyer inserts the vendor directly with a submitted status.
 
-```
-vendor:vendors!vendors_invitation_id_fkey(id, reference_number, status)
-```
+## Database changes (single migration)
 
-This depends on `vendors.invitation_id` + a FK named `vendors_invitation_id_fkey` existing in the database. That column/FK is **not** defined in any migration under `supabase/migrations/`; it exists only on the managed cloud DB (added out-of-band). On the self-hosted Postgres the relation is missing, so PostgREST returns `vendor: null` for every row. With `vendor.status` undefined and `created_on_behalf = true`, `getInvitationStatus()` falls into the `'in_progress'` branch and the row is never filtered — it lingers on the Invitations page.
+1. **Modify** `public.assign_vendor_reference_number()` into an "assign if submitted" function:
+   - Keep the guard: if `NEW.reference_number` is already set, return.
+   - Only proceed when `NEW.status` is a submitted/review status:
+     `buyer_review, scm_manager_review, scm_head_review, finance_1_review, finance_2_review, ceo_office_review, pending_sap_sync, sap_synced`.
+   - Compute `v_date := (now() AT TIME ZONE 'Asia/Kolkata')::date`.
+   - Upsert `vendor_reference_counters` for `v_date` with `ON CONFLICT (date) DO UPDATE SET last_seq = c.last_seq + 1 RETURNING last_seq INTO v_seq`.
+   - Set `NEW.reference_number := to_char(v_date,'YYYYMMDD') || lpad(v_seq::text,3,'0')`.
 
-Meanwhile `useVendorRegistration` already writes `vendor_invitations.vendor_id` on submit (both normal and on-behalf paths), and that column/FK does exist. So the reliable link is invitation → vendor via `vendor_invitations.vendor_id`, not vendor → invitation via `vendors.invitation_id`.
+2. **Drop** the current `BEFORE INSERT` trigger and **create** a single `BEFORE INSERT OR UPDATE` trigger on `public.vendors` calling the updated function. This covers:
+   - Via-invitation: draft INSERT → skipped; later UPDATE to `buyer_review`/etc. → number assigned using that day's counter.
+   - On-behalf: INSERT already with `scm_manager_review` → number assigned immediately using that day's counter.
 
-## Fix
+3. **No backfill.** Existing rows with a ref number (e.g. `20260708001`) stay as-is. Draft rows without a number will get one on their next submit.
 
-Stop relying on the fragile `vendors_invitation_id_fkey` relation. Resolve the linked vendor via `vendor_invitations.vendor_id` instead, which works on both cloud and self-host.
+## Frontend
 
-### 1. `src/pages/AdminInvitations.tsx` — invitations query
-
-- Drop the embedded `vendor:vendors!vendors_invitation_id_fkey(...)` join from both the `seesAllInvitations` branch and the scoped branch. Keep the `tenants(id, name)` join.
-- After fetching invitations, collect the non-null `vendor_id`s, run a single `supabase.from('vendors').select('id, reference_number, status').in('id', ids)` query, build an `id → vendor` map, and attach `row.vendor = map.get(row.vendor_id) ?? null` before returning.
-- Remove the `r.vendor = Array.isArray(...) ? r.vendor[0] : r.vendor` normalization (no longer needed).
-- No changes to `getInvitationStatus`, filtering, or UI — once `row.vendor.status` is populated for submitted on-behalf rows, they naturally resolve to `'submitted'` and drop off the list.
-
-### 2. No other files change
-
-- `useVendorRegistration.tsx` already sets `vendor_invitations.vendor_id` and `used_at` on submit; no change needed.
-- Approval, dashboard, and status pages are unaffected.
-- No DB migration is proposed here — the self-hosted DB is out of scope for a schema fix from this app, and the code change makes the UI robust regardless of whether `vendors.invitation_id` exists.
+- No code change required. UI reads `vendor.reference_number` as it does today. Draft rows without a number display blank until submitted (same as any nullable field). Say the word if you want a placeholder like `—` or `Not submitted` for draft rows in the vendor list.
 
 ## Verification
 
 - `bunx tsgo --noEmit` clean.
-- Manual (self-host after deploy): submit an on-behalf vendor → row disappears from Invitations and shows up on Dashboard / approval queues.
-- Manual (cloud): existing behavior unchanged; used/expired/pending still render correctly.
+- SQL checks:
+  - Insert a draft vendor → `reference_number IS NULL`, no counter row created.
+  - Update that vendor to `buyer_review` today → number = `YYYYMMDD001` (or next seq for today).
+  - Insert an on-behalf vendor today with `scm_manager_review` → number uses same day's counter, increments correctly.
+  - Two submits on the same day → sequence goes `...001`, `...002`.
+  - Change status again on an already-numbered vendor → number unchanged.
+
+## Ready to build
+
+Reply **"go"** and I'll switch to build mode and run the migration.
