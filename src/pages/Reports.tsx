@@ -247,49 +247,56 @@ export default function Reports() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-xs">From</Label>
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    value={toInputValue(dateFrom)}
-                    max={toInputValue(dateTo)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val) { setDateFrom(null); return; }
-                      const d = startOfDay(new Date(val));
-                      setDateFrom(d);
-                      if (dateTo && d > dateTo) setDateTo(endOfDay(d));
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">To</Label>
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    value={toInputValue(dateTo)}
-                    min={toInputValue(dateFrom)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val) { setDateTo(null); return; }
-                      const d = endOfDay(new Date(val));
-                      setDateTo(d);
-                      if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Vendor Status</Label>
-                  <div className="mt-1">
-                    <MultiSelect
-                      options={STATUS_OPTIONS}
-                      selected={statuses}
-                      onChange={setStatuses}
-                      placeholder="All statuses"
+                {cfg.filter_from_date && (
+                  <div>
+                    <Label className="text-xs">From</Label>
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={toInputValue(dateFrom)}
+                      max={toInputValue(dateTo)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) { setDateFrom(null); return; }
+                        const d = startOfDay(new Date(val));
+                        setDateFrom(d);
+                        if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+                      }}
                     />
                   </div>
-                </div>
+                )}
+                {cfg.filter_to_date && (
+                  <div>
+                    <Label className="text-xs">To</Label>
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={toInputValue(dateTo)}
+                      min={toInputValue(dateFrom)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) { setDateTo(null); return; }
+                        const d = endOfDay(new Date(val));
+                        setDateTo(d);
+                        if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+                      }}
+                    />
+                  </div>
+                )}
+                {cfg.filter_vendor_status && (
+                  <div>
+                    <Label className="text-xs">Vendor Status</Label>
+                    <div className="mt-1">
+                      <MultiSelect
+                        options={STATUS_OPTIONS}
+                        selected={statuses}
+                        onChange={setStatuses}
+                        placeholder="All statuses"
+                      />
+                    </div>
+                  </div>
+                )}
+
               </div>
 
             )}
