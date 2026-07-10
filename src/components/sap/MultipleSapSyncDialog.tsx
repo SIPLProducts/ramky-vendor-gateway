@@ -152,7 +152,13 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
     let cancelled = false;
     setMissing([]);
     setForm(buildCommonDefaults(null));
+    setClassifyMode('details');
     setLiveF4(null);
+    setWtAll([]);
+    setWtcAll([]);
+    setWtrAll([]);
+    fetchWtTypes();
+    fetchWtCodesRectypes();
 
     const tenantId = (vendors[0] as any)?.tenant_id;
     if (tenantId) {
