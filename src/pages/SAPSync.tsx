@@ -334,7 +334,7 @@ export default function SAPSync() {
       for (const r of results) {
         const vid = r?.vendorId || r?.vendor_id;
         const dup = isPanDuplicateResponse(r?.sapResponse || r);
-        if (vid && dup.matched) dupIds.push({ id: vid, msg: dup.message });
+        if (vid && dup.matched) dupIds.push({ id: vid, msg: dup.message, msgText: dup.msgText });
       }
       if (dupIds.length === 0) {
         const dup = isPanDuplicateResponse(result);
