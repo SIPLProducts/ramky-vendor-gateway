@@ -218,14 +218,19 @@ export default function Reports() {
                   onValueChange={(v) => setMode(v as any)}
                   className="flex flex-wrap gap-4 mt-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="single" id="m-single" />
-                    <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="all" id="m-all" />
-                    <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
-                  </div>
+                  {cfg.scope_single && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="single" id="m-single" />
+                      <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
+                    </div>
+                  )}
+                  {cfg.scope_all && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="all" id="m-all" />
+                      <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
+                    </div>
+                  )}
+
                 </RadioGroup>
               </div>
             </div>
