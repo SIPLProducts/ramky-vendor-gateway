@@ -302,20 +302,29 @@ export default function Reports() {
             )}
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={() => run()} disabled={loading}>
-                <Search className="h-4 w-4 mr-2" />
-                {loading ? 'Running…' : 'Run Report'}
-              </Button>
-              <Button variant="outline" onClick={reset} disabled={loading}>
-                <RefreshCw className="h-4 w-4 mr-2" /> Reset
-              </Button>
-              <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-              </Button>
-              <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
-                <FileText className="h-4 w-4 mr-2" /> PDF
-              </Button>
+              {cfg.action_run && (
+                <Button onClick={() => run()} disabled={loading}>
+                  <Search className="h-4 w-4 mr-2" />
+                  {loading ? 'Running…' : 'Run Report'}
+                </Button>
+              )}
+              {cfg.action_reset && (
+                <Button variant="outline" onClick={reset} disabled={loading}>
+                  <RefreshCw className="h-4 w-4 mr-2" /> Reset
+                </Button>
+              )}
+              {cfg.action_excel && (
+                <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                </Button>
+              )}
+              {cfg.action_pdf && (
+                <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
+                  <FileText className="h-4 w-4 mr-2" /> PDF
+                </Button>
+              )}
             </div>
+
           </CardContent>
 
         </Card>
