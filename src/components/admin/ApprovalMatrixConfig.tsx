@@ -298,6 +298,13 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
     return u ? (u.full_name || u.email) : id.slice(0, 8);
   };
 
+  const resolveApprover = (id: string | null | undefined): string | null => {
+    if (!id) return null;
+    const u = profileById.get(id);
+    if (!u) return null;
+    return u.full_name || u.email;
+  };
+
   const tenantLabelForUser = (uid: string) => {
     const ids = Array.from(userTenants.get(uid) ?? []);
     if (ids.length === 0) return '—';
@@ -359,13 +366,14 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                   {STAGE_DEFS.map((def) => {
                     const uid = flow[def.userKey] as string | null;
                     const skipped = def.skipKey ? (flow[def.skipKey] as boolean) : false;
-                    const inactive = !uid || skipped;
+                    const name = resolveApprover(uid);
+                    const isSkipped = skipped || !name;
                     return (
                       <span key={def.stage} className="flex items-center gap-2">
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        <Badge variant={inactive ? 'outline' : 'default'} className={inactive ? 'opacity-60' : ''}>
+                        <Badge variant={isSkipped ? 'outline' : 'default'} className={isSkipped ? 'opacity-60' : ''}>
                           {def.label}
-                          {skipped ? ' · skipped' : uid ? ` · ${buyerLabel(uid)}` : ' · not set'}
+                          {isSkipped ? ' · Skipped' : ` · ${name}`}
                         </Badge>
                       </span>
                     );
@@ -447,10 +455,12 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
               </TableHeader>
               <TableBody>
                 {visibleFlows.map((f) => {
-                  const cell = (uid: string | null, skipped: boolean) =>
-                    skipped ? <span className="text-xs text-muted-foreground">skipped</span>
-                      : uid ? buyerLabel(uid)
-                      : <span className="text-xs text-muted-foreground">—</span>;
+                  const skippedCell = <span className="text-xs text-muted-foreground">Skipped</span>;
+                  const cell = (uid: string | null, skipped: boolean) => {
+                    if (skipped) return skippedCell;
+                    const name = resolveApprover(uid);
+                    return name ? name : skippedCell;
+                  };
                   return (
                     <TableRow key={f.id} className="cursor-pointer" onClick={() => setBuyerId(f.buyer_user_id)}>
                       <TableCell className="font-medium">{buyerLabel(f.buyer_user_id)}</TableCell>
