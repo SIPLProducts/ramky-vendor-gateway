@@ -345,7 +345,7 @@ export default function SAPSync() {
       for (const d of dupIds) {
         try {
           await supabase.functions.invoke('sap-team-reject-vendor', {
-            body: { vendorId: d.id, remarks: d.msg || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
+            body: { vendorId: d.id, remarks: d.msg || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true, existingVendorText: d.msgText || '' },
           });
         } catch (e) {
           console.warn('[SAPSync] bulk auto duplicate-close failed', d.id, e);
