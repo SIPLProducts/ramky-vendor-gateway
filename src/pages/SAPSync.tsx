@@ -312,7 +312,7 @@ export default function SAPSync() {
       setShowSapResultDialog(true);
       const dup = isPanDuplicateResponse(failResp);
       if (dup.matched) {
-        await autoRejectAsDuplicate(vendor.id, dup.message);
+        await autoRejectAsDuplicate(vendor.id, dup.message, dup.msgText);
       }
     } finally {
       setSyncingVendorId(null);
