@@ -190,18 +190,25 @@ export default function Reports() {
                   onValueChange={(v) => setReportType(v as ReportType)}
                   className="flex flex-wrap gap-4 mt-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="vendor" id="rt-vendor" />
-                    <Label htmlFor="rt-vendor" className="cursor-pointer">Vendor Report</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="approval" id="rt-approval" />
-                    <Label htmlFor="rt-approval" className="cursor-pointer">Approval Flow Report</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="both" id="rt-both" />
-                    <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
-                  </div>
+                  {cfg.report_type_vendor && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="vendor" id="rt-vendor" />
+                      <Label htmlFor="rt-vendor" className="cursor-pointer">Vendor Report</Label>
+                    </div>
+                  )}
+                  {cfg.report_type_approval && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="approval" id="rt-approval" />
+                      <Label htmlFor="rt-approval" className="cursor-pointer">Approval Flow Report</Label>
+                    </div>
+                  )}
+                  {cfg.report_type_both && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="both" id="rt-both" />
+                      <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
+                    </div>
+                  )}
+
                 </RadioGroup>
               </div>
               <div>
