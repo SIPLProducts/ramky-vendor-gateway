@@ -89,38 +89,34 @@ export function ReportsScreenConfigCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {GROUPS.map((g) => {
-          const isGreen = g.title === 'Report Type' || g.title === 'Scope';
-          return (
-            <div
-              key={g.title}
-              className={`space-y-3 rounded-lg border p-4 ${
-                isGreen ? 'border-l-4 border-l-green-500' : ''
-              }`}
-            >
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                {g.title}
-              </h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                {g.rows.map((r) => (
-                  <div
-                    key={r.key}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <Label htmlFor={r.key} className="font-medium cursor-pointer">
-                      {r.label}
-                    </Label>
-                    <Switch
-                      id={r.key}
-                      checked={cfg[r.key]}
-                      onCheckedChange={(v) => toggle(r.key, v)}
-                    />
-                  </div>
-                ))}
-              </div>
+        {GROUPS.map((g) => (
+          <div
+            key={g.title}
+            className="space-y-3 rounded-lg border p-4 border-l-4 border-l-green-500"
+          >
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              {g.title}
+            </h3>
+            <div className="grid gap-3 md:grid-cols-3">
+              {g.rows.map((r) => (
+                <div
+                  key={r.key}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
+                  <Label htmlFor={r.key} className="font-medium cursor-pointer">
+                    {r.label}
+                  </Label>
+                  <Switch
+                    id={r.key}
+                    checked={cfg[r.key]}
+                    onCheckedChange={(v) => toggle(r.key, v)}
+                  />
+                </div>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        ))}
+
 
       </CardContent>
     </Card>
