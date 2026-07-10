@@ -290,7 +290,7 @@ export default function SAPSync() {
       setSelectedSapIds(new Set());
       const dup = isPanDuplicateResponse(result.sapResponse);
       if (dup.matched) {
-        await autoRejectAsDuplicate(vendor.id, dup.message);
+        await autoRejectAsDuplicate(vendor.id, dup.message, dup.msgText);
       } else {
         toast.success('SAP sync complete');
       }
