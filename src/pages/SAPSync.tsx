@@ -239,24 +239,30 @@ export default function SAPSync() {
     setShowSapFieldsDialog(true);
   };
 
-  const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string } => {
-    if (!resp) return { matched: false, message: '' };
+  const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string; msgText: string } => {
+    if (!resp) return { matched: false, message: '', msgText: '' };
     const rows = Array.isArray(resp.ACC_RES) ? resp.ACC_RES : [];
     const texts: string[] = [
       resp.message || '',
       ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
     ];
     const re = /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i;
-    for (const t of texts) {
-      if (t && re.test(t)) return { matched: true, message: String(t).trim() };
+    // Try to find MSG_TEXT with existing vendor details: "SAPCODE - NAME - PAN - GSTIN"
+    let msgText = '';
+    for (const r of rows) {
+      const t = String(r?.MSG_TEXT || r?.MSGTEXT || r?.MSG_LONG_TEXT || '').trim();
+      if (t) { msgText = t; break; }
     }
-    return { matched: false, message: '' };
+    for (const t of texts) {
+      if (t && re.test(t)) return { matched: true, message: String(t).trim(), msgText };
+    }
+    return { matched: false, message: '', msgText };
   };
 
-  const autoRejectAsDuplicate = async (vendorId: string, remarks: string) => {
+  const autoRejectAsDuplicate = async (vendorId: string, remarks: string, existingVendorText?: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('sap-team-reject-vendor', {
-        body: { vendorId, remarks: remarks || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
+        body: { vendorId, remarks: remarks || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true, existingVendorText: existingVendorText || '' },
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
@@ -284,7 +290,7 @@ export default function SAPSync() {
       setSelectedSapIds(new Set());
       const dup = isPanDuplicateResponse(result.sapResponse);
       if (dup.matched) {
-        await autoRejectAsDuplicate(vendor.id, dup.message);
+        await autoRejectAsDuplicate(vendor.id, dup.message, dup.msgText);
       } else {
         toast.success('SAP sync complete');
       }
@@ -306,7 +312,7 @@ export default function SAPSync() {
       setShowSapResultDialog(true);
       const dup = isPanDuplicateResponse(failResp);
       if (dup.matched) {
-        await autoRejectAsDuplicate(vendor.id, dup.message);
+        await autoRejectAsDuplicate(vendor.id, dup.message, dup.msgText);
       }
     } finally {
       setSyncingVendorId(null);
@@ -324,22 +330,22 @@ export default function SAPSync() {
       setSelectedSapIds(new Set());
       // Auto-move PAN-duplicate failures
       const results: any[] = Array.isArray(result?.results) ? result.results : [];
-      const dupIds: { id: string; msg: string }[] = [];
+      const dupIds: { id: string; msg: string; msgText: string }[] = [];
       for (const r of results) {
         const vid = r?.vendorId || r?.vendor_id;
         const dup = isPanDuplicateResponse(r?.sapResponse || r);
-        if (vid && dup.matched) dupIds.push({ id: vid, msg: dup.message });
+        if (vid && dup.matched) dupIds.push({ id: vid, msg: dup.message, msgText: dup.msgText });
       }
       if (dupIds.length === 0) {
         const dup = isPanDuplicateResponse(result);
         if (dup.matched) {
-          for (const vid of vendorIds) dupIds.push({ id: vid, msg: dup.message });
+          for (const vid of vendorIds) dupIds.push({ id: vid, msg: dup.message, msgText: dup.msgText });
         }
       }
       for (const d of dupIds) {
         try {
           await supabase.functions.invoke('sap-team-reject-vendor', {
-            body: { vendorId: d.id, remarks: d.msg || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true },
+            body: { vendorId: d.id, remarks: d.msg || 'Duplicate detected in SAP (PAN or PAN+GST combination already exists)', autoTriggered: true, existingVendorText: d.msgText || '' },
           });
         } catch (e) {
           console.warn('[SAPSync] bulk auto duplicate-close failed', d.id, e);

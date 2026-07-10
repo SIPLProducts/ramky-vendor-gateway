@@ -1,23 +1,27 @@
-## Problem
+## Goal
+When SAP responds with a duplicate error (`MSGTYP: E` + PAN / PAN+GST duplicate message), the "Vendor Closed — Duplicate detected in SAP" email must include an **Existing Vendor Details** section parsed from the SAP `MSG_TEXT` field (format: `SAPCODE - NAME - PAN - GSTIN`). Non-duplicate flows are unchanged.
 
-In **User Management → Approval Matrix → Configured Buyers**, cells like `dfd020d9`, `fdef7d40`, `2b0d11f8` appear. These aren't stored numbers — they're the first 8 chars of an approver UUID that the client can't resolve to a profile, produced by `buyerLabel`'s fallback `id.slice(0, 8)`.
+## Changes
 
-Also confirmed: any approver stage that was **not selected** must display **"Skipped"** — same treatment as an explicitly skipped stage.
+### 1. `src/pages/SAPSync.tsx` — extract existing-vendor info and forward it
+- Extend `isPanDuplicateResponse(resp)` to also return `msgText` — scan `ACC_RES` rows for `MSG_TEXT` (fallback: any row field matching the `code - name - PAN - GSTIN` shape).
+- Update `autoRejectAsDuplicate(vendorId, remarks, msgText?)` to pass `existingVendorText: msgText` in the invoke body.
+- Update both call sites (single `handleConfirmSync`, bulk `handleMultipleSync`) to forward `dup.msgText`.
 
-## Fix (display only, in `src/components/admin/ApprovalMatrixConfig.tsx`)
+### 2. `supabase/functions/sap-team-reject-vendor/index.ts` — render the section
+- Accept optional `existingVendorText` in the request body.
+- Add a small parser: split by ` - ` (or `-` with surrounding spaces), trim to 4 parts → `{ sapCode, vendorName, pan, gstin }`. Skip empty parts gracefully.
+- When `autoTriggered === true` **and** parsed values exist, insert an **Existing Vendor Details** block immediately after the Reason row (or after the main table), containing:
+  - SAP Vendor Code
+  - Vendor Name
+  - PAN Number
+  - GSTIN
+- Use the existing `row(k,v)` / `esc(...)` helpers and matching table style. If parsing fails, fall back to showing the raw `existingVendorText` as a single row so nothing is lost.
+- Manual rejections (no `existingVendorText`) render exactly the current email.
 
-1. Add a `resolveApprover(uid)` helper returning the profile name/email if found in `profileById`, else `null`.
-2. Rewrite the Configured Buyers table `cell(uid, skipped)`:
-   - `skipped === true` → **Skipped**
-   - `uid` is null/empty (not selected) → **Skipped**
-   - `resolveApprover(uid)` returns null (user missing/deleted) → **Skipped**
-   - otherwise → resolved name
-   - Apply to all 5 columns: SCM Mgr, SCM Head, Finance 1, Finance 2, CEO Office (CEO Office currently shows "—" when unset — switch to **Skipped**).
-3. Apply the same rule to the chain preview badges shown while editing a buyer, so unresolved/unset stages show **Skipped** instead of a UUID fragment or "not set".
-4. Leave the Buyer column alone (row key; keep existing name/email fallback — never show "Skipped" for the buyer themselves).
-5. Do **not** change the save payload, database schema, RLS, edge functions, or approval workflow. This is a pure rendering fix; stored approver IDs remain untouched.
+## Out of scope
+No changes to DB, RLS, workflow, edge-function auth, or the sync-to-SAP function itself. Purely additive email content driven by a new optional payload field.
 
 ## Verification
-
-- `bunx tsgo --noEmit`.
-- Reload `/admin/users` → Approval Matrix → Configured Buyers and confirm previously hex-looking cells now read **Skipped**, while correctly-assigned approvers still show their names.
+- `bunx tsgo --noEmit`
+- Trigger a duplicate SAP sync in preview → confirm the closure email shows the new "Existing Vendor Details" section with parsed values; trigger a manual (non-duplicate) close → confirm the email is unchanged.
