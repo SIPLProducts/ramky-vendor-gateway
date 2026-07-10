@@ -177,12 +177,12 @@ export default function Reports() {
       </div>
 
       {!single && (
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="pb-3 border-b border-gray-200">
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(cfg.report_type_vendor || cfg.report_type_approval || cfg.report_type_both) && (
               <div>
                 <Label className="text-xs">Report Type</Label>
                 <RadioGroup
@@ -208,9 +208,11 @@ export default function Reports() {
                       <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
                     </div>
                   )}
-
                 </RadioGroup>
               </div>
+            )}
+
+            {(cfg.scope_single || cfg.scope_all) && (
               <div>
                 <Label className="text-xs">Scope</Label>
                 <RadioGroup
@@ -230,10 +232,10 @@ export default function Reports() {
                       <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
                     </div>
                   )}
-
                 </RadioGroup>
               </div>
-            </div>
+            )}
+
 
             {mode === 'single' ? (
               <div className="max-w-sm">
@@ -246,84 +248,93 @@ export default function Reports() {
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {cfg.filter_from_date && (
-                  <div>
-                    <Label className="text-xs">From</Label>
-                    <Input
-                      type="date"
-                      className="mt-1"
-                      value={toInputValue(dateFrom)}
-                      max={toInputValue(dateTo)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) { setDateFrom(null); return; }
-                        const d = startOfDay(new Date(val));
-                        setDateFrom(d);
-                        if (dateTo && d > dateTo) setDateTo(endOfDay(d));
-                      }}
-                    />
+              (cfg.filter_from_date || cfg.filter_to_date || cfg.filter_vendor_status) && (
+                <div>
+                  <Label className="text-xs">Filters</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    {cfg.filter_from_date && (
+                      <div>
+                        <Label className="text-xs">From</Label>
+                        <Input
+                          type="date"
+                          className="mt-1"
+                          value={toInputValue(dateFrom)}
+                          max={toInputValue(dateTo)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) { setDateFrom(null); return; }
+                            const d = startOfDay(new Date(val));
+                            setDateFrom(d);
+                            if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+                          }}
+                        />
+                      </div>
+                    )}
+                    {cfg.filter_to_date && (
+                      <div>
+                        <Label className="text-xs">To</Label>
+                        <Input
+                          type="date"
+                          className="mt-1"
+                          value={toInputValue(dateTo)}
+                          min={toInputValue(dateFrom)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) { setDateTo(null); return; }
+                            const d = endOfDay(new Date(val));
+                            setDateTo(d);
+                            if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+                          }}
+                        />
+                      </div>
+                    )}
+                    {cfg.filter_vendor_status && (
+                      <div>
+                        <Label className="text-xs">Vendor Status</Label>
+                        <div className="mt-1">
+                          <MultiSelect
+                            options={STATUS_OPTIONS}
+                            selected={statuses}
+                            onChange={setStatuses}
+                            placeholder="All statuses"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                {cfg.filter_to_date && (
-                  <div>
-                    <Label className="text-xs">To</Label>
-                    <Input
-                      type="date"
-                      className="mt-1"
-                      value={toInputValue(dateTo)}
-                      min={toInputValue(dateFrom)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) { setDateTo(null); return; }
-                        const d = endOfDay(new Date(val));
-                        setDateTo(d);
-                        if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
-                      }}
-                    />
-                  </div>
-                )}
-                {cfg.filter_vendor_status && (
-                  <div>
-                    <Label className="text-xs">Vendor Status</Label>
-                    <div className="mt-1">
-                      <MultiSelect
-                        options={STATUS_OPTIONS}
-                        selected={statuses}
-                        onChange={setStatuses}
-                        placeholder="All statuses"
-                      />
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
+                </div>
+              )
             )}
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              {cfg.action_run && (
-                <Button onClick={() => run()} disabled={loading}>
-                  <Search className="h-4 w-4 mr-2" />
-                  {loading ? 'Running…' : 'Run Report'}
-                </Button>
-              )}
-              {cfg.action_reset && (
-                <Button variant="outline" onClick={reset} disabled={loading}>
-                  <RefreshCw className="h-4 w-4 mr-2" /> Reset
-                </Button>
-              )}
-              {cfg.action_excel && (
-                <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
-                  <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-                </Button>
-              )}
-              {cfg.action_pdf && (
-                <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
-                  <FileText className="h-4 w-4 mr-2" /> PDF
-                </Button>
-              )}
-            </div>
+            {(cfg.action_run || cfg.action_reset || cfg.action_excel || cfg.action_pdf) && (
+              <div>
+                <Label className="text-xs">Action Buttons</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {cfg.action_run && (
+                    <Button onClick={() => run()} disabled={loading}>
+                      <Search className="h-4 w-4 mr-2" />
+                      {loading ? 'Running…' : 'Run Report'}
+                    </Button>
+                  )}
+                  {cfg.action_reset && (
+                    <Button variant="outline" onClick={reset} disabled={loading}>
+                      <RefreshCw className="h-4 w-4 mr-2" /> Reset
+                    </Button>
+                  )}
+                  {cfg.action_excel && (
+                    <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                    </Button>
+                  )}
+                  {cfg.action_pdf && (
+                    <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
+                      <FileText className="h-4 w-4 mr-2" /> PDF
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
 
           </CardContent>
 

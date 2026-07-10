@@ -413,13 +413,33 @@ export default function UserManagement() {
 
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
-          <TabsTrigger value="custom-roles"><ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles</TabsTrigger>
-          <TabsTrigger value="role-permissions"><Settings className="h-4 w-4 mr-2" /> Role Permissions</TabsTrigger>
-          <TabsTrigger value="approval-matrix"><GitBranch className="h-4 w-4 mr-2" /> Approval Matrix</TabsTrigger>
-          
+        <TabsList className="border-b-0">
+          <TabsTrigger
+            value="users"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <Users className="h-4 w-4 mr-2" /> Users
+          </TabsTrigger>
+          <TabsTrigger
+            value="custom-roles"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles
+          </TabsTrigger>
+          <TabsTrigger
+            value="role-permissions"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <Settings className="h-4 w-4 mr-2" /> Role Permissions
+          </TabsTrigger>
+          <TabsTrigger
+            value="approval-matrix"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <GitBranch className="h-4 w-4 mr-2" /> Approval Matrix
+          </TabsTrigger>
         </TabsList>
+
 
         {/* USERS TAB */}
         <TabsContent value="users" className="space-y-6">
@@ -451,7 +471,7 @@ export default function UserManagement() {
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Users</CardTitle></CardHeader>
+            <CardHeader className="border-b-2 border-green-500 pb-3"><CardTitle className="text-base">Users</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
@@ -602,8 +622,9 @@ export default function UserManagement() {
           </Card>
 
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex-row items-center justify-between space-y-0 border-b-2 border-green-500 pb-3">
               <CardTitle className="text-base">Inactive User Login Attempts</CardTitle>
+
               <Button variant="ghost" size="sm" onClick={loadLoginAttempts} disabled={attemptsLoading}>
                 {attemptsLoading ? 'Refreshing…' : 'Refresh'}
               </Button>
@@ -669,11 +690,12 @@ export default function UserManagement() {
             </Button>
           </div>
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Custom Roles
-              </CardTitle>
-            </CardHeader>
+          <CardHeader className="border-b-2 border-green-500 pb-3">
+            <CardTitle className="text-base">
+              Custom Roles
+            </CardTitle>
+          </CardHeader>
+
             <CardContent>
               <div className="border rounded-md">
                 <Table>
