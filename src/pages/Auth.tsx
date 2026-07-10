@@ -109,8 +109,6 @@ export default function Auth() {
             Join our network of trusted vendors and partners. Streamline your onboarding 
             process with our secure, efficient portal.
           </p>
-          
-          <div className="mt-12" />
         </div>
       </div>
 
