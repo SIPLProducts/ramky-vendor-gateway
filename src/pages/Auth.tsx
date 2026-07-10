@@ -110,20 +110,7 @@ export default function Auth() {
             process with our secure, efficient portal.
           </p>
           
-          <div className="mt-12 grid grid-cols-3 gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold">500+</p>
-              <p className="text-sm text-white/80">Active Vendors</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold">₹2000Cr+</p>
-              <p className="text-sm text-white/80">Annual Procurement</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold">15+</p>
-              <p className="text-sm text-white/80">States Covered</p>
-            </div>
-          </div>
+          <div className="mt-12" />
         </div>
       </div>
 
@@ -242,6 +229,12 @@ export default function Auth() {
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             © 2026 Sharvi Infotech Private Limited. All rights reserved.
+          </p>
+          <p className="text-center text-sm text-muted-foreground mt-2">
+            For any queries or support, please contact:{" "}
+            <a href="mailto:vendxsupport@ramky.com" className="text-primary hover:underline">
+              vendxsupport@ramky.com
+            </a>
           </p>
         </div>
       </div>
