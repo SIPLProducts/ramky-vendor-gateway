@@ -135,6 +135,30 @@ export default function Reports() {
   const showVendor = reportType === 'vendor' || reportType === 'both';
   const showApproval = reportType === 'approval' || reportType === 'both';
 
+  const { data: screenCfg } = useReportsScreenConfig();
+  const cfg = screenCfg ?? DEFAULT_REPORTS_SCREEN_CONFIG;
+
+  // If the current Report Type is hidden by config, fall back to the first visible one.
+  useEffect(() => {
+    const map: Record<ReportType, boolean> = {
+      vendor: cfg.report_type_vendor,
+      approval: cfg.report_type_approval,
+      both: cfg.report_type_both,
+    };
+    if (!map[reportType]) {
+      const fallback = (['both', 'vendor', 'approval'] as ReportType[]).find((t) => map[t]);
+      if (fallback) setReportType(fallback);
+    }
+  }, [cfg.report_type_vendor, cfg.report_type_approval, cfg.report_type_both, reportType]);
+
+  // If the current Scope is hidden, fall back.
+  useEffect(() => {
+    if (mode === 'single' && !cfg.scope_single && cfg.scope_all) setMode('all');
+    else if (mode === 'all' && !cfg.scope_all && cfg.scope_single) setMode('single');
+  }, [cfg.scope_single, cfg.scope_all, mode]);
+
+
+
 
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
