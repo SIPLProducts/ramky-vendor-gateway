@@ -146,6 +146,29 @@ serve(async (req) => {
             ? `The vendor application below was <b>automatically closed</b> during SAP Sync because SAP reported a duplicate (PAN or PAN+GST combination already registered for an existing vendor).`
             : `The vendor application below has been <b>closed by the SAP Team</b> because a duplicate vendor already exists in SAP.`;
 
+          // Parse existing vendor details from SAP MSG_TEXT (format: "SAPCODE - NAME - PAN - GSTIN")
+          let existingBlock = "";
+          if (existingVendorText) {
+            const parts = existingVendorText.split(/\s+-\s+|\s+–\s+/).map(s => s.trim()).filter(Boolean);
+            if (parts.length >= 2) {
+              const [sapCode, vName, pan, gstin] = [parts[0] || "", parts[1] || "", parts[2] || "", parts[3] || ""];
+              existingBlock = `
+              <h3 style="margin:20px 0 8px;color:#111;font-size:15px">Existing Vendor Details</h3>
+              <table style="border-collapse:collapse;width:100%;margin:0 0 12px;font-size:14px">
+                ${sapCode ? row("SAP Vendor Code", sapCode) : ""}
+                ${vName ? row("Vendor Name", vName) : ""}
+                ${pan ? row("PAN Number", pan) : ""}
+                ${gstin ? row("GSTIN", gstin) : ""}
+              </table>`;
+            } else {
+              existingBlock = `
+              <h3 style="margin:20px 0 8px;color:#111;font-size:15px">Existing Vendor Details</h3>
+              <table style="border-collapse:collapse;width:100%;margin:0 0 12px;font-size:14px">
+                ${row("Details", existingVendorText)}
+              </table>`;
+            }
+          }
+
           const html = `
             <div style="font-family:Arial,sans-serif;color:#111;max-width:640px;margin:auto">
               <h2 style="color:#b91c1c;margin:0 0 12px">${esc(headline)}</h2>
@@ -160,6 +183,7 @@ serve(async (req) => {
                 ${row("Remarks", remarks)}
                 ${row("Closed Date & Time", rejectedAtIst)}
               </table>
+              ${existingBlock}
               <p>Vendor <b>${esc(vendorRef)}</b> has been closed because a vendor with the same details already exists in SAP. This vendor has been moved to the <b>Duplicate &amp; Closed</b> tab in the SAP Sync screen. No further action is required for this submission.</p>
               <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vendor Portal.</p>
             </div>`;
