@@ -366,13 +366,14 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                   {STAGE_DEFS.map((def) => {
                     const uid = flow[def.userKey] as string | null;
                     const skipped = def.skipKey ? (flow[def.skipKey] as boolean) : false;
-                    const inactive = !uid || skipped;
+                    const name = resolveApprover(uid);
+                    const isSkipped = skipped || !name;
                     return (
                       <span key={def.stage} className="flex items-center gap-2">
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        <Badge variant={inactive ? 'outline' : 'default'} className={inactive ? 'opacity-60' : ''}>
+                        <Badge variant={isSkipped ? 'outline' : 'default'} className={isSkipped ? 'opacity-60' : ''}>
                           {def.label}
-                          {skipped ? ' · skipped' : uid ? ` · ${buyerLabel(uid)}` : ' · not set'}
+                          {isSkipped ? ' · Skipped' : ` · ${name}`}
                         </Badge>
                       </span>
                     );
