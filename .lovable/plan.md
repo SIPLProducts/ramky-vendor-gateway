@@ -1,46 +1,56 @@
-## Fix "Vendor's Registered State (empty)" error in Multiple SAP Sync
+## Fix: Existing Vendor Details missing in duplicate email (bulk sync)
 
 ### Root cause
-`MultipleSapSyncDialog` sends a common-fields object where every per-vendor key (`reg_state`, `reg_city`, `reg_pincode`, `reg_addr1..4`, `reg_contact1/2`, `reg_email1/2`, `reg_is_msme`, `reg_msme_*`, `msme`, `idtype`, `idnum`) is present as an empty string.
 
-`src/lib/sapPayloadBuilder.ts` uses `hasOwnProperty` to decide whether to overwrite the vendor's DB value:
+For bulk SAP sync, the front-end iterates `result.results[]` (from `sync-vendors-to-sap-bulk`). Each item shape is:
+
 ```
-if (hasKey('reg_state')) vendorForPayload.registered_state = ov.reg_state ?? '';
+{ vendorId, refNo, sapVendorCode, success, message /* LONGMSG */, raw /* the ACC_RES row incl. MSG_TEXT */ }
 ```
-Because the key exists (as `''`), each vendor's real `registered_state` is wiped → `resolveRegion('')` fails → guard throws `Vendor's Registered State "(empty)" is not mapped to an SAP region code for IN.`
 
-The single-vendor `SapFieldsDialog` doesn't hit this because it pre-fills those fields from the vendor.
-
-### Fix (single file: `src/components/sap/MultipleSapSyncDialog.tsx`)
-
-The bulk dialog is documented as "common header fields only — vendor-specific data is derived per vendor automatically." So in the confirm handler, delete the per-vendor keys from the payload before calling `onConfirm`, so `hasKey(...)` returns false and vendor DB values are preserved.
-
-Keys stripped only in bulk dialog:
-- `reg_addr1/2/3/4`, `reg_city`, `reg_state`, `reg_pincode`
-- `reg_contact1/2`, `reg_email1/2`
-- `reg_is_msme`, `reg_msme_no`, `reg_msme_cat`, `reg_msme_act`
-- `msme`, `idtype`, `idnum`
+In `src/pages/SAPSync.tsx` (`handleMultipleSync`, line ~336):
 
 ```ts
-const stripKeys = [
-  'reg_addr1','reg_addr2','reg_addr3','reg_addr4',
-  'reg_city','reg_state','reg_pincode',
-  'reg_contact1','reg_contact2','reg_email1','reg_email2',
-  'reg_is_msme','reg_msme_no','reg_msme_cat','reg_msme_act',
-  'msme','idtype','idnum',
-];
-const cleaned: any = { ...form, classify: finalClassify };
-for (const k of stripKeys) delete cleaned[k];
-onConfirm(cleaned);
+const dup = isPanDuplicateResponse(r?.sapResponse || r);
 ```
 
-### Preserved (unchanged)
-- Single-vendor `SapFieldsDialog` flow (still sends `reg_*` for that vendor).
-- All common header fields from bulk dialog (partn_grp, bukrs, akont, fdgrv, vkorg, waers, title, taxtype, kalsk, webre, lebre, cdi, ven_class).
-- New Withholding Tax + Classification cards still flow through.
-- `sapPayloadBuilder.ts`, edge functions, DB, and RLS untouched.
+`r.sapResponse` is undefined, so `isPanDuplicateResponse` receives `r` itself. Inside `isPanDuplicateResponse` it looks for `resp.ACC_RES` (array) to pull `MSG_TEXT`. `r` has no `ACC_RES`, so `msgText` stays `''` even though `r.raw.MSG_TEXT` holds the SAP text like `"4023080 - SHARDA GENPOWER PVT.LTD. - AAPCS1562H - 20AAPCS1562H1ZG"`.
+
+Empty `existingVendorText` is then sent to `sap-team-reject-vendor`, which skips the "Existing Vendor Details" block — matching the screenshot the user shared.
+
+Single-sync path is fine: `result.sapResponse` there is the full body `{ ACC_RES: [...], ... }`, so `MSG_TEXT` is extracted correctly.
+
+Mixed bulk responses (some success, some duplicate, some bank/key errors) already behave correctly at the status level — only rows whose `LONGMSG` matches the duplicate regex are auto-closed; other failures are just shown in the result dialog. This fix keeps that unchanged.
+
+### Fix (single file: `src/pages/SAPSync.tsx`)
+
+Extend `isPanDuplicateResponse` so it also finds `MSG_TEXT` when the caller passes a single per-vendor bulk row. No other logic changes.
+
+1. Inside the function, when building `msgText`, also inspect:
+   - `resp.raw` (bulk per-vendor row)
+   - `resp.MSG_TEXT` / `resp.MSGTEXT` / `resp.MSG_LONG_TEXT` (row passed directly)
+
+   Prefer values found via `ACC_RES` first (single-sync path unchanged), fall back to the row-level fields.
+
+2. Keep the regex/matching logic and all callers exactly as they are.
+
+Resulting helper (conceptual):
+
+```ts
+const readMsgText = (o: any) =>
+  String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || '').trim();
+
+// after existing ACC_RES loop:
+if (!msgText) msgText = readMsgText(resp?.raw) || readMsgText(resp);
+```
+
+### What stays untouched
+- `sap-team-reject-vendor` edge function (already parses `"SAPCODE - NAME - PAN - GSTIN"` correctly).
+- Single-vendor sync flow.
+- Bulk sync mixed-response handling: success rows sync normally, non-duplicate failures continue to surface in the result dialog with their SAP message (bank key errors, missing fields, etc.), only true PAN/PAN+GST duplicates auto-move to Duplicate & Closed and trigger the email.
+- All other email content, subject, styling.
 
 ### Verification
-- Select ≥2 vendors with valid states → Multiple Sync → succeeds with correct region code per vendor.
-- Single-vendor sync path unchanged.
+- Bulk sync 3 vendors: 1 success, 1 duplicate (`PAN & GST combination is Duplicated`), 1 bank-key error → success syncs, duplicate moves to Duplicate & Closed and the buyer email now includes the "Existing Vendor Details" table populated from `MSG_TEXT`, bank-key error stays visible in the result dialog without closing the vendor.
+- Single-vendor duplicate sync: email still shows the "Existing Vendor Details" block (unchanged).
 - `bunx tsgo --noEmit` clean.
