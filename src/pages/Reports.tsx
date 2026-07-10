@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import {
   FileSpreadsheet, FileText, Search, RefreshCw,
@@ -24,6 +24,8 @@ import {
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
 import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
+import { useReportsScreenConfig, DEFAULT_REPORTS_SCREEN_CONFIG } from '@/hooks/useScreenConfig';
+
 
 
 type ReportType = 'vendor' | 'approval' | 'both';
@@ -133,6 +135,30 @@ export default function Reports() {
   const showVendor = reportType === 'vendor' || reportType === 'both';
   const showApproval = reportType === 'approval' || reportType === 'both';
 
+  const { data: screenCfg } = useReportsScreenConfig();
+  const cfg = screenCfg ?? DEFAULT_REPORTS_SCREEN_CONFIG;
+
+  // If the current Report Type is hidden by config, fall back to the first visible one.
+  useEffect(() => {
+    const map: Record<ReportType, boolean> = {
+      vendor: cfg.report_type_vendor,
+      approval: cfg.report_type_approval,
+      both: cfg.report_type_both,
+    };
+    if (!map[reportType]) {
+      const fallback = (['both', 'vendor', 'approval'] as ReportType[]).find((t) => map[t]);
+      if (fallback) setReportType(fallback);
+    }
+  }, [cfg.report_type_vendor, cfg.report_type_approval, cfg.report_type_both, reportType]);
+
+  // If the current Scope is hidden, fall back.
+  useEffect(() => {
+    if (mode === 'single' && !cfg.scope_single && cfg.scope_all) setMode('all');
+    else if (mode === 'all' && !cfg.scope_all && cfg.scope_single) setMode('single');
+  }, [cfg.scope_single, cfg.scope_all, mode]);
+
+
+
 
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
@@ -164,18 +190,25 @@ export default function Reports() {
                   onValueChange={(v) => setReportType(v as ReportType)}
                   className="flex flex-wrap gap-4 mt-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="vendor" id="rt-vendor" />
-                    <Label htmlFor="rt-vendor" className="cursor-pointer">Vendor Report</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="approval" id="rt-approval" />
-                    <Label htmlFor="rt-approval" className="cursor-pointer">Approval Flow Report</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="both" id="rt-both" />
-                    <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
-                  </div>
+                  {cfg.report_type_vendor && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="vendor" id="rt-vendor" />
+                      <Label htmlFor="rt-vendor" className="cursor-pointer">Vendor Report</Label>
+                    </div>
+                  )}
+                  {cfg.report_type_approval && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="approval" id="rt-approval" />
+                      <Label htmlFor="rt-approval" className="cursor-pointer">Approval Flow Report</Label>
+                    </div>
+                  )}
+                  {cfg.report_type_both && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="both" id="rt-both" />
+                      <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
+                    </div>
+                  )}
+
                 </RadioGroup>
               </div>
               <div>
@@ -185,14 +218,19 @@ export default function Reports() {
                   onValueChange={(v) => setMode(v as any)}
                   className="flex flex-wrap gap-4 mt-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="single" id="m-single" />
-                    <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="all" id="m-all" />
-                    <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
-                  </div>
+                  {cfg.scope_single && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="single" id="m-single" />
+                      <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
+                    </div>
+                  )}
+                  {cfg.scope_all && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="all" id="m-all" />
+                      <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
+                    </div>
+                  )}
+
                 </RadioGroup>
               </div>
             </div>
@@ -209,68 +247,84 @@ export default function Reports() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-xs">From</Label>
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    value={toInputValue(dateFrom)}
-                    max={toInputValue(dateTo)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val) { setDateFrom(null); return; }
-                      const d = startOfDay(new Date(val));
-                      setDateFrom(d);
-                      if (dateTo && d > dateTo) setDateTo(endOfDay(d));
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">To</Label>
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    value={toInputValue(dateTo)}
-                    min={toInputValue(dateFrom)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val) { setDateTo(null); return; }
-                      const d = endOfDay(new Date(val));
-                      setDateTo(d);
-                      if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Vendor Status</Label>
-                  <div className="mt-1">
-                    <MultiSelect
-                      options={STATUS_OPTIONS}
-                      selected={statuses}
-                      onChange={setStatuses}
-                      placeholder="All statuses"
+                {cfg.filter_from_date && (
+                  <div>
+                    <Label className="text-xs">From</Label>
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={toInputValue(dateFrom)}
+                      max={toInputValue(dateTo)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) { setDateFrom(null); return; }
+                        const d = startOfDay(new Date(val));
+                        setDateFrom(d);
+                        if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+                      }}
                     />
                   </div>
-                </div>
+                )}
+                {cfg.filter_to_date && (
+                  <div>
+                    <Label className="text-xs">To</Label>
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={toInputValue(dateTo)}
+                      min={toInputValue(dateFrom)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) { setDateTo(null); return; }
+                        const d = endOfDay(new Date(val));
+                        setDateTo(d);
+                        if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+                      }}
+                    />
+                  </div>
+                )}
+                {cfg.filter_vendor_status && (
+                  <div>
+                    <Label className="text-xs">Vendor Status</Label>
+                    <div className="mt-1">
+                      <MultiSelect
+                        options={STATUS_OPTIONS}
+                        selected={statuses}
+                        onChange={setStatuses}
+                        placeholder="All statuses"
+                      />
+                    </div>
+                  </div>
+                )}
+
               </div>
 
             )}
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={() => run()} disabled={loading}>
-                <Search className="h-4 w-4 mr-2" />
-                {loading ? 'Running…' : 'Run Report'}
-              </Button>
-              <Button variant="outline" onClick={reset} disabled={loading}>
-                <RefreshCw className="h-4 w-4 mr-2" /> Reset
-              </Button>
-              <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-              </Button>
-              <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
-                <FileText className="h-4 w-4 mr-2" /> PDF
-              </Button>
+              {cfg.action_run && (
+                <Button onClick={() => run()} disabled={loading}>
+                  <Search className="h-4 w-4 mr-2" />
+                  {loading ? 'Running…' : 'Run Report'}
+                </Button>
+              )}
+              {cfg.action_reset && (
+                <Button variant="outline" onClick={reset} disabled={loading}>
+                  <RefreshCw className="h-4 w-4 mr-2" /> Reset
+                </Button>
+              )}
+              {cfg.action_excel && (
+                <Button variant="outline" onClick={() => exportVendorExcel(rows, reportType)} disabled={rows.length === 0}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                </Button>
+              )}
+              {cfg.action_pdf && (
+                <Button variant="outline" onClick={() => exportVendorPdf(rows, reportType)} disabled={rows.length === 0}>
+                  <FileText className="h-4 w-4 mr-2" /> PDF
+                </Button>
+              )}
             </div>
+
           </CardContent>
 
         </Card>
@@ -284,16 +338,23 @@ export default function Reports() {
 
       {!loading && single && (
         <>
-          <Card>
-            <CardContent className="flex flex-wrap gap-2 py-3">
-              <Button variant="outline" size="sm" onClick={() => exportVendorExcel([single], reportType)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportVendorPdf([single], reportType)}>
-                <FileText className="h-4 w-4 mr-2" /> PDF
-              </Button>
-            </CardContent>
-          </Card>
+          {(cfg.action_excel || cfg.action_pdf) && (
+            <Card>
+              <CardContent className="flex flex-wrap gap-2 py-3">
+                {cfg.action_excel && (
+                  <Button variant="outline" size="sm" onClick={() => exportVendorExcel([single], reportType)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                  </Button>
+                )}
+                {cfg.action_pdf && (
+                  <Button variant="outline" size="sm" onClick={() => exportVendorPdf([single], reportType)}>
+                    <FileText className="h-4 w-4 mr-2" /> PDF
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {showVendor && <SingleVendorView row={single} />}
           {showApproval && <ApprovalFlowTimeline row={single} />}
         </>

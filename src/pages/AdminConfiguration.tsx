@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ValidationConfigManager } from '@/components/admin/ValidationConfigManager';
 import { ValidationApiLogs } from '@/components/admin/ValidationApiLogs';
+import { ReportsScreenConfigCard } from '@/components/admin/ReportsScreenConfigCard';
+
 import {
   Settings,
   Clock,
@@ -240,7 +242,7 @@ export default function AdminConfiguration() {
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general" className="gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">General</span>
@@ -257,11 +259,16 @@ export default function AdminConfiguration() {
             <Bell className="h-4 w-4" />
             <span className="hidden sm:inline">Notifications</span>
           </TabsTrigger>
+          <TabsTrigger value="screen" className="gap-2">
+            <Eye className="h-4 w-4" />
+            <span className="hidden sm:inline">Screen Config</span>
+          </TabsTrigger>
           <TabsTrigger value="logs" className="gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Logs</span>
           </TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="general">
           <div className="grid gap-6 md:grid-cols-2">
@@ -487,9 +494,14 @@ export default function AdminConfiguration() {
           </div>
         </TabsContent>
 
+        <TabsContent value="screen">
+          <ReportsScreenConfigCard />
+        </TabsContent>
+
         <TabsContent value="logs">
           <ValidationApiLogs />
         </TabsContent>
+
       </Tabs>
     </div>
   );
