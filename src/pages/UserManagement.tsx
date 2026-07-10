@@ -631,7 +631,8 @@ export default function UserManagement() {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-md">
+              <div className="border rounded-md mt-[5px]">
+
                 <Table>
                   <TableHeader>
                     <TableRow>
