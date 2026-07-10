@@ -383,7 +383,17 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
                 const finalClassify = classifyMode === 'details'
                   ? { ...form.classify, CASH: [], TIER: [] }
                   : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
-                onConfirm({ ...form, classify: finalClassify });
+                // Strip per-vendor keys so payload builder falls back to each vendor's own DB values
+                const stripKeys = [
+                  'reg_addr1','reg_addr2','reg_addr3','reg_addr4',
+                  'reg_city','reg_state','reg_pincode',
+                  'reg_contact1','reg_contact2','reg_email1','reg_email2',
+                  'reg_is_msme','reg_msme_no','reg_msme_cat','reg_msme_act',
+                  'msme','idtype','idnum',
+                ];
+                const cleaned: any = { ...form, classify: finalClassify };
+                for (const k of stripKeys) delete cleaned[k];
+                onConfirm(cleaned);
               }
             }}
             disabled={isSubmitting || f4Status.state === 'loading'}
