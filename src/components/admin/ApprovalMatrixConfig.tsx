@@ -454,10 +454,12 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
               </TableHeader>
               <TableBody>
                 {visibleFlows.map((f) => {
-                  const cell = (uid: string | null, skipped: boolean) =>
-                    skipped ? <span className="text-xs text-muted-foreground">skipped</span>
-                      : uid ? buyerLabel(uid)
-                      : <span className="text-xs text-muted-foreground">—</span>;
+                  const skippedCell = <span className="text-xs text-muted-foreground">Skipped</span>;
+                  const cell = (uid: string | null, skipped: boolean) => {
+                    if (skipped) return skippedCell;
+                    const name = resolveApprover(uid);
+                    return name ? name : skippedCell;
+                  };
                   return (
                     <TableRow key={f.id} className="cursor-pointer" onClick={() => setBuyerId(f.buyer_user_id)}>
                       <TableCell className="font-medium">{buyerLabel(f.buyer_user_id)}</TableCell>
