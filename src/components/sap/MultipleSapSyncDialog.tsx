@@ -379,7 +379,12 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
             onClick={() => {
               const miss = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
               setMissing(miss as string[]);
-              if (miss.length === 0) onConfirm(form);
+              if (miss.length === 0) {
+                const finalClassify = classifyMode === 'details'
+                  ? { ...form.classify, CASH: [], TIER: [] }
+                  : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
+                onConfirm({ ...form, classify: finalClassify });
+              }
             }}
             disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
