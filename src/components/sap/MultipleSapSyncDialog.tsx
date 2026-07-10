@@ -9,12 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertCircle, CheckCircle2, Tags } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
-import { SapF4SelectField, type SapFieldOverrides } from './SapFieldsDialog';
+import { SapF4SelectField, SapF4MultiSelectField, WithholdingTaxSection, type SapFieldOverrides } from './SapFieldsDialog';
 
 interface Props {
   open: boolean;
