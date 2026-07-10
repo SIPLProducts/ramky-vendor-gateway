@@ -330,7 +330,7 @@ export default function SAPSync() {
       setSelectedSapIds(new Set());
       // Auto-move PAN-duplicate failures
       const results: any[] = Array.isArray(result?.results) ? result.results : [];
-      const dupIds: { id: string; msg: string }[] = [];
+      const dupIds: { id: string; msg: string; msgText: string }[] = [];
       for (const r of results) {
         const vid = r?.vendorId || r?.vendor_id;
         const dup = isPanDuplicateResponse(r?.sapResponse || r);
