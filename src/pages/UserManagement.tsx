@@ -413,13 +413,33 @@ export default function UserManagement() {
 
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
-          <TabsTrigger value="custom-roles"><ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles</TabsTrigger>
-          <TabsTrigger value="role-permissions"><Settings className="h-4 w-4 mr-2" /> Role Permissions</TabsTrigger>
-          <TabsTrigger value="approval-matrix"><GitBranch className="h-4 w-4 mr-2" /> Approval Matrix</TabsTrigger>
-          
+        <TabsList className="border-b-0">
+          <TabsTrigger
+            value="users"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <Users className="h-4 w-4 mr-2" /> Users
+          </TabsTrigger>
+          <TabsTrigger
+            value="custom-roles"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles
+          </TabsTrigger>
+          <TabsTrigger
+            value="role-permissions"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <Settings className="h-4 w-4 mr-2" /> Role Permissions
+          </TabsTrigger>
+          <TabsTrigger
+            value="approval-matrix"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+          >
+            <GitBranch className="h-4 w-4 mr-2" /> Approval Matrix
+          </TabsTrigger>
         </TabsList>
+
 
         {/* USERS TAB */}
         <TabsContent value="users" className="space-y-6">
