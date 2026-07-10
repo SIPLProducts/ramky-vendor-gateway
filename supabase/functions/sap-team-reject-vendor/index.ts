@@ -45,6 +45,7 @@ serve(async (req) => {
     const vendorId: string | undefined = body.vendorId;
     const remarks: string = (body.remarks || "").toString().trim();
     const autoTriggered: boolean = !!body.autoTriggered;
+    const existingVendorText: string = (body.existingVendorText || "").toString().trim();
 
     if (!vendorId || typeof vendorId !== "string") {
       return new Response(JSON.stringify({ error: "vendorId is required" }), {
