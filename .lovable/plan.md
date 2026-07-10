@@ -1,7 +1,7 @@
-1. **Reports screen: hide empty group labels** — In `src/pages/Reports.tsx`, conditionally render the Report Type, Scope, Filters, and Action Buttons group labels/sections only when at least one item in that group is visible. If all items are hidden via Screen Configuration, the label disappears too.
+1. **Reports Filters card** — Remove the extra "Filters" group label inside the card body (keep the card header title and the individual From/To/Status labels).
 
-2. **Reports Filters card styling** — Add a green left accent border (`border-l-4 border-l-green-500`) to the Reports Filters card, and add a light gray bottom border to the Filters card header.
+2. **User Management Users card** — Add a small top margin (5px equivalent) to the search/filter row inside the Users card body.
 
-3. **User Management tab selected state** — Make the selected `TabsTrigger` in `src/pages/UserManagement.tsx` clearly highlighted (e.g., green bottom border, green text, and/or subtle background).
+3. **Inactive User Login Attempts card** — Add the same small top margin to its content/table row inside the card body.
 
-4. **User Management card header bottom border** — Add a green 1–2px bottom border to card headers on the User Management screen (e.g., the Users card, Custom Roles card, and Inactive Login Attempts card headers).
+4. **User Management tab visibility** — Add a light background color to the selected tab so the active state is clearly visible (e.g., `data-[state=active]:bg-white/60` or theme light surface).

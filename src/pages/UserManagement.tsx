@@ -416,29 +416,30 @@ export default function UserManagement() {
         <TabsList className="border-b-0">
           <TabsTrigger
             value="users"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <Users className="h-4 w-4 mr-2" /> Users
           </TabsTrigger>
           <TabsTrigger
             value="custom-roles"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles
           </TabsTrigger>
           <TabsTrigger
             value="role-permissions"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <Settings className="h-4 w-4 mr-2" /> Role Permissions
           </TabsTrigger>
           <TabsTrigger
             value="approval-matrix"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <GitBranch className="h-4 w-4 mr-2" /> Approval Matrix
           </TabsTrigger>
         </TabsList>
+
 
 
         {/* USERS TAB */}
@@ -473,7 +474,7 @@ export default function UserManagement() {
           <Card>
             <CardHeader className="border-b-2 border-green-500 pb-3"><CardTitle className="text-base">Users</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 mt-[5px]">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Search by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
@@ -630,7 +631,8 @@ export default function UserManagement() {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-md">
+              <div className="border rounded-md mt-[5px]">
+
                 <Table>
                   <TableHeader>
                     <TableRow>
