@@ -416,29 +416,30 @@ export default function UserManagement() {
         <TabsList className="border-b-0">
           <TabsTrigger
             value="users"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <Users className="h-4 w-4 mr-2" /> Users
           </TabsTrigger>
           <TabsTrigger
             value="custom-roles"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <ShieldCheck className="h-4 w-4 mr-2" /> Custom Roles
           </TabsTrigger>
           <TabsTrigger
             value="role-permissions"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <Settings className="h-4 w-4 mr-2" /> Role Permissions
           </TabsTrigger>
           <TabsTrigger
             value="approval-matrix"
-            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:font-semibold data-[state=active]:bg-white/80"
           >
             <GitBranch className="h-4 w-4 mr-2" /> Approval Matrix
           </TabsTrigger>
         </TabsList>
+
 
 
         {/* USERS TAB */}
