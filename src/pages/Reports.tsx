@@ -177,12 +177,12 @@ export default function Reports() {
       </div>
 
       {!single && (
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="pb-3 border-b border-gray-200">
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(cfg.report_type_vendor || cfg.report_type_approval || cfg.report_type_both) && (
               <div>
                 <Label className="text-xs">Report Type</Label>
                 <RadioGroup
@@ -208,9 +208,11 @@ export default function Reports() {
                       <Label htmlFor="rt-both" className="cursor-pointer">Both</Label>
                     </div>
                   )}
-
                 </RadioGroup>
               </div>
+            )}
+
+            {(cfg.scope_single || cfg.scope_all) && (
               <div>
                 <Label className="text-xs">Scope</Label>
                 <RadioGroup
@@ -230,10 +232,10 @@ export default function Reports() {
                       <Label htmlFor="m-all" className="cursor-pointer">All Vendors</Label>
                     </div>
                   )}
-
                 </RadioGroup>
               </div>
-            </div>
+            )}
+
 
             {mode === 'single' ? (
               <div className="max-w-sm">
