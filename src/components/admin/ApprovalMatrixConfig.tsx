@@ -298,6 +298,13 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
     return u ? (u.full_name || u.email) : id.slice(0, 8);
   };
 
+  const resolveApprover = (id: string | null | undefined): string | null => {
+    if (!id) return null;
+    const u = profileById.get(id);
+    if (!u) return null;
+    return u.full_name || u.email;
+  };
+
   const tenantLabelForUser = (uid: string) => {
     const ids = Array.from(userTenants.get(uid) ?? []);
     if (ids.length === 0) return '—';
