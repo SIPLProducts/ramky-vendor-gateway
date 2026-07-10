@@ -1,46 +1,46 @@
-## Add Withholding Tax & Classification cards to "Multiple SAP Sync — Common Fields"
+## Fix "Vendor's Registered State (empty)" error in Multiple SAP Sync
 
-The single-vendor `SapFieldsDialog` already renders two sections that are missing from `MultipleSapSyncDialog`:
-1. **Withholding Tax** (`WithholdingTaxSection`) — vendor-country-filtered tax type rows with codes/rec-types.
-2. **Classification** — radio between `Vendor_Details` (MGV, CATV) and `Vendor_CFSTMT` (CASH, TIER) with F4 multi-selects.
+### Root cause
+`MultipleSapSyncDialog` sends a common-fields object where every per-vendor key (`reg_state`, `reg_city`, `reg_pincode`, `reg_addr1..4`, `reg_contact1/2`, `reg_email1/2`, `reg_is_msme`, `reg_msme_*`, `msme`, `idtype`, `idnum`) is present as an empty string.
 
-Both must be added to the multiple-sync dialog so bulk syncs carry the same common header data.
+`src/lib/sapPayloadBuilder.ts` uses `hasOwnProperty` to decide whether to overwrite the vendor's DB value:
+```
+if (hasKey('reg_state')) vendorForPayload.registered_state = ov.reg_state ?? '';
+```
+Because the key exists (as `''`), each vendor's real `registered_state` is wiped → `resolveRegion('')` fails → guard throws `Vendor's Registered State "(empty)" is not mapped to an SAP region code for IN.`
 
-### Changes (single file: `src/components/sap/MultipleSapSyncDialog.tsx`)
+The single-vendor `SapFieldsDialog` doesn't hit this because it pre-fills those fields from the vendor.
 
-1. **State**
-   - Add `classifyMode` state (`'details' | 'cfstmt'`, default `'details'`).
-   - Reuse existing `form.classify` and `form.withholding` in `SapFieldOverrides`.
+### Fix (single file: `src/components/sap/MultipleSapSyncDialog.tsx`)
 
-2. **Withholding Tax data fetch** (mirror `SapFieldsDialog`)
-   - Add state: `wtAll`, `wtLoading`, `wtError`, `wtcAll`, `wtrAll`, `wtcLoading`, `wtcError`.
-   - Add `fetchWtTypes()` invoking `sap-fetch-withholding-tax` (config `Fetch_Withholding_TaxType`).
-   - Add `fetchWtCodesRectypes()` invoking `sap-fetch-wtx-code-rectype` (config `Fetch_Withholding_WTX_Code_REC_Type`).
-   - Trigger both on dialog open (same effect that already fires F4 refresh).
-   - Country filter: for bulk, no single vendor country — pass `undefined` (or the shared country if all vendors match); `wtFiltered = wtAll` when no country.
+The bulk dialog is documented as "common header fields only — vendor-specific data is derived per vendor automatically." So in the confirm handler, delete the per-vendor keys from the payload before calling `onConfirm`, so `hasKey(...)` returns false and vendor DB values are preserved.
 
-3. **Render sections** (after the existing Invoice Verification section, before footer)
-   - `<Separator />` then reuse `WithholdingTaxSection` exported from `SapFieldsDialog.tsx` (export it if not already exported) with the same props.
-   - `<Separator />` then a Classification block copied structurally from `SapFieldsDialog` (RadioGroup + two bordered panels with `SapF4MultiSelectField` for MGV/CATV and CASH/TIER). Reuse `handleClassifyModeChange` logic: switching modes clears the other group's arrays in state.
+Keys stripped only in bulk dialog:
+- `reg_addr1/2/3/4`, `reg_city`, `reg_state`, `reg_pincode`
+- `reg_contact1/2`, `reg_email1/2`
+- `reg_is_msme`, `reg_msme_no`, `reg_msme_cat`, `reg_msme_act`
+- `msme`, `idtype`, `idnum`
 
-4. **Confirm handler**
-   - Before calling `onConfirm(form)`, apply the same `finalClassify` derivation used in `SapFieldsDialog`:
-     ```
-     const finalClassify = classifyMode === 'details'
-       ? { ...form.classify, CASH: [], TIER: [] }
-       : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
-     onConfirm({ ...form, classify: finalClassify });
-     ```
-   - Withholding rows flow through untouched (already in `form.withholding`).
+```ts
+const stripKeys = [
+  'reg_addr1','reg_addr2','reg_addr3','reg_addr4',
+  'reg_city','reg_state','reg_pincode',
+  'reg_contact1','reg_contact2','reg_email1','reg_email2',
+  'reg_is_msme','reg_msme_no','reg_msme_cat','reg_msme_act',
+  'msme','idtype','idnum',
+];
+const cleaned: any = { ...form, classify: finalClassify };
+for (const k of stripKeys) delete cleaned[k];
+onConfirm(cleaned);
+```
 
-5. **Exports**
-   - In `src/components/sap/SapFieldsDialog.tsx`, add `export` to `WithholdingTaxSection` (and any small helper it needs that isn't already exported) so `MultipleSapSyncDialog` can import it — no behavior change to single-sync dialog.
-
-### Out of scope
-- No changes to payload builder, edge functions, DB, or the single-vendor `SapFieldsDialog` UI (only an `export` keyword added).
-- No changes to required-field validation set.
+### Preserved (unchanged)
+- Single-vendor `SapFieldsDialog` flow (still sends `reg_*` for that vendor).
+- All common header fields from bulk dialog (partn_grp, bukrs, akont, fdgrv, vkorg, waers, title, taxtype, kalsk, webre, lebre, cdi, ven_class).
+- New Withholding Tax + Classification cards still flow through.
+- `sapPayloadBuilder.ts`, edge functions, DB, and RLS untouched.
 
 ### Verification
-- Open a bulk selection → click "Multiple SAP Sync" → confirm Withholding Tax and Classification cards render with the same UX as single sync.
-- Submit and confirm the bulk sync payload includes `classify` and `withholding` per vendor.
+- Select ≥2 vendors with valid states → Multiple Sync → succeeds with correct region code per vendor.
+- Single-vendor sync path unchanged.
 - `bunx tsgo --noEmit` clean.
