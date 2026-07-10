@@ -247,17 +247,27 @@ export default function SAPSync() {
       ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
     ];
     const re = /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i;
+    const readMsgText = (o: any) =>
+      String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || '').trim();
     // Try to find MSG_TEXT with existing vendor details: "SAPCODE - NAME - PAN - GSTIN"
     let msgText = '';
     for (const r of rows) {
-      const t = String(r?.MSG_TEXT || r?.MSGTEXT || r?.MSG_LONG_TEXT || '').trim();
+      const t = readMsgText(r);
       if (t) { msgText = t; break; }
     }
-    for (const t of texts) {
+    // Fallbacks: bulk per-vendor row shape { raw: {...}, message, ... } or a bare ACC_RES row
+    if (!msgText) msgText = readMsgText(resp?.raw) || readMsgText(resp);
+    // Also include row-level LONGMSG/MSG from raw/self when regex-testing
+    const extraTexts = [
+      `${resp?.raw?.LONGMSG || ''} ${resp?.raw?.MSG || ''}`,
+      `${resp?.LONGMSG || ''} ${resp?.MSG || ''}`,
+    ];
+    for (const t of [...texts, ...extraTexts]) {
       if (t && re.test(t)) return { matched: true, message: String(t).trim(), msgText };
     }
     return { matched: false, message: '', msgText };
   };
+
 
   const autoRejectAsDuplicate = async (vendorId: string, remarks: string, existingVendorText?: string) => {
     try {
