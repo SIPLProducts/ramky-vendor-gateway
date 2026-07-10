@@ -474,7 +474,7 @@ export default function UserManagement() {
           <Card>
             <CardHeader className="border-b-2 border-green-500 pb-3"><CardTitle className="text-base">Users</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 mt-[5px]">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Search by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
