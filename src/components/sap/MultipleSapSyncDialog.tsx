@@ -279,9 +279,91 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
               <CheckboxField label="Service-Based Invoice Verification" checked={form.lebre === 'X'} onChange={v => set('lebre', v ? 'X' : '')} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'} onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
+
+            <Separator />
+
+            <WithholdingTaxSection
+              country={commonCountry}
+              rows={form.withholding}
+              onChange={(rows) => set('withholding', rows)}
+              options={wtFiltered}
+              allOptions={wtAll}
+              loading={wtLoading}
+              error={wtError}
+              onRetry={fetchWtTypes}
+              taxcodesAll={wtcAll}
+              rectypesAll={wtrAll}
+              codeLoading={wtcLoading}
+              codeError={wtcError}
+              onCodeRetry={fetchWtCodesRectypes}
+            />
+
+            <Separator />
+
+            <div className="space-y-3">
+              <h4 className="font-semibold flex items-center gap-2 text-primary">
+                <Tags className="h-4 w-4" />Classification
+              </h4>
+              <RadioGroup
+                value={classifyMode}
+                onValueChange={(v) => setClassifyMode(v as 'details' | 'cfstmt')}
+                className="flex flex-wrap gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="mclassify-details" value="details" />
+                  <Label htmlFor="mclassify-details" className="text-sm cursor-pointer">Vendor_Details</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="mclassify-cfstmt" value="cfstmt" />
+                  <Label htmlFor="mclassify-cfstmt" className="text-sm cursor-pointer">Vendor_CFSTMT</Label>
+                </div>
+              </RadioGroup>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'details' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <h5 className="text-sm font-medium text-primary">Vendor_Details</h5>
+                  <SapF4MultiSelectField
+                    label="Material Group for Vendors"
+                    masterType="material_group_vendor"
+                    value={form.classify.MGV || []}
+                    onChange={(v) => setClassify('MGV', v)}
+                    placeholder="Select material groups"
+                  />
+                  <SapF4MultiSelectField
+                    label="Vendor Category"
+                    masterType="vendor_category"
+                    value={form.classify.CATV || []}
+                    onChange={(v) => setClassify('CATV', v)}
+                    placeholder="Select vendor categories"
+                  />
+                </div>
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'cfstmt' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <h5 className="text-sm font-medium text-primary">Vendor_CFSTMT</h5>
+                  <SapF4MultiSelectField
+                    label="Vendor Cash Flow"
+                    masterType="vendor_cashflow"
+                    value={form.classify.CASH || []}
+                    onChange={(v) => setClassify('CASH', v)}
+                    liveItems={liveF4?.CFSTMT}
+                    placeholder="Select cash flow"
+                  />
+                  <SapF4MultiSelectField
+                    label="Tier Category"
+                    masterType="tier_category"
+                    value={form.classify.TIER || []}
+                    onChange={(v) => setClassify('TIER', v)}
+                    liveItems={liveF4?.CP_TIER}
+                    placeholder="Select tier category"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Only the selected group is sent to SAP; the other group is sent as empty. Your selections in the other group are preserved.
+              </p>
+            </div>
           </div>
           )}
         </div>
+
 
         {missing.length > 0 && (
           <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
