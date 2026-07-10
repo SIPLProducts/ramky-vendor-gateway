@@ -9,12 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Server, Loader2, Building2, Briefcase, ShoppingCart, FileCheck2, AlertCircle, CheckCircle2, Tags } from 'lucide-react';
 import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
-import { SapF4SelectField, type SapFieldOverrides } from './SapFieldsDialog';
+import { SapF4SelectField, SapF4MultiSelectField, WithholdingTaxSection, type SapFieldOverrides } from './SapFieldsDialog';
 
 interface Props {
   open: boolean;
@@ -65,17 +66,99 @@ function buildCommonDefaults(tenantDefaults: any | null): SapFieldOverrides {
 
 export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, isSubmitting }: Props) {
   const [form, setForm] = useState<SapFieldOverrides>(() => buildCommonDefaults(null));
+  const [classifyMode, setClassifyMode] = useState<'details' | 'cfstmt'>('details');
   const [missing, setMissing] = useState<string[]>([]);
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
+  const [wtAll, setWtAll] = useState<Array<{ LAND1: string; TAXTYPE: string; TEXT40: string }>>([]);
+  const [wtLoading, setWtLoading] = useState(false);
+  const [wtError, setWtError] = useState<string | null>(null);
+  const [wtcAll, setWtcAll] = useState<Array<{ LAND1: string; WITHT: string; WT_WITHCD: string; TCDESC: string }>>([]);
+  const [wtrAll, setWtrAll] = useState<Array<{ LAND1: string; WITHT: string; QSREC: string; RCTXT: string }>>([]);
+  const [wtcLoading, setWtcLoading] = useState(false);
+  const [wtcError, setWtcError] = useState<string | null>(null);
   const refreshMaster = useRefreshSapMaster();
+
+  // Common country across selected vendors (blank if mixed)
+  const commonCountry = (() => {
+    const countries = new Set<string>();
+    for (const v of vendors) {
+      const anyV: any = v;
+      const isIntl = String(anyV.vendor_type || 'domestic') === 'international';
+      const c = isIntl
+        ? (anyV.international_data?.company?.country || anyV.international_data?.address?.country || anyV.country || anyV.reg_country || '')
+        : 'IN';
+      countries.add(String(c || '').trim().toUpperCase());
+    }
+    return countries.size === 1 ? [...countries][0] : '';
+  })();
+
+  const wtFiltered = commonCountry
+    ? wtAll.filter((r) => String(r.LAND1 || '').trim().toUpperCase() === commonCountry)
+    : wtAll;
+
+  const fetchWtTypes = async () => {
+    setWtLoading(true);
+    setWtError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-fetch-withholding-tax', {
+        body: { config_name: 'Fetch_Withholding_TaxType' },
+      });
+      if (error) setWtError(error.message || 'Failed to load withholding tax types');
+      else if (data?.success) {
+        const records = Array.isArray(data.records) ? data.records : Array.isArray(data.raw) ? data.raw : [];
+        const norm = records.map((r: any) => {
+          const get = (k: string) => {
+            for (const key of Object.keys(r || {})) if (key.toLowerCase() === k.toLowerCase()) return r[key];
+            return '';
+          };
+          return {
+            LAND1: String(get('LAND1') || '').trim().toUpperCase(),
+            TAXTYPE: String(get('TAXTYPE') || '').trim(),
+            TEXT40: String(get('TEXT40') || '').trim(),
+          };
+        }).filter((r: any) => r.TAXTYPE);
+        setWtAll(norm);
+      } else setWtError(data?.message || 'Failed to load withholding tax types');
+    } catch (e: any) {
+      setWtError(e?.message || 'Failed to load withholding tax types');
+    } finally {
+      setWtLoading(false);
+    }
+  };
+
+  const fetchWtCodesRectypes = async () => {
+    setWtcLoading(true);
+    setWtcError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sap-fetch-wtx-code-rectype', {
+        body: { config_name: 'Fetch_Withholding_WTX_Code_REC_Type' },
+      });
+      if (error) setWtcError(error.message || 'Failed to load WTax Code / Rec.Type');
+      else if (data?.success) {
+        setWtcAll(Array.isArray(data.taxcodes) ? data.taxcodes : []);
+        setWtrAll(Array.isArray(data.rectypes) ? data.rectypes : []);
+      } else setWtcError(data?.message || 'Failed to load WTax Code / Rec.Type');
+    } catch (e: any) {
+      setWtcError(e?.message || 'Failed to load WTax Code / Rec.Type');
+    } finally {
+      setWtcLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     setMissing([]);
     setForm(buildCommonDefaults(null));
+    setClassifyMode('details');
     setLiveF4(null);
+    setWtAll([]);
+    setWtcAll([]);
+    setWtrAll([]);
+    fetchWtTypes();
+    fetchWtCodesRectypes();
 
     const tenantId = (vendors[0] as any)?.tenant_id;
     if (tenantId) {
@@ -123,6 +206,9 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
     setForm(prev => ({ ...prev, [k]: v }));
+
+  const setClassify = (k: keyof SapFieldOverrides['classify'], v: string[]) =>
+    setForm(prev => ({ ...prev, classify: { ...prev.classify, [k]: v } }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -193,9 +279,91 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
               <CheckboxField label="Service-Based Invoice Verification" checked={form.lebre === 'X'} onChange={v => set('lebre', v ? 'X' : '')} />
               <CheckboxField label="Check Duplicate Invoice" checked={form.cdi === 'X'} onChange={v => set('cdi', v ? 'X' : '')} />
             </Section>
+
+            <Separator />
+
+            <WithholdingTaxSection
+              country={commonCountry}
+              rows={form.withholding}
+              onChange={(rows) => set('withholding', rows)}
+              options={wtFiltered}
+              allOptions={wtAll}
+              loading={wtLoading}
+              error={wtError}
+              onRetry={fetchWtTypes}
+              taxcodesAll={wtcAll}
+              rectypesAll={wtrAll}
+              codeLoading={wtcLoading}
+              codeError={wtcError}
+              onCodeRetry={fetchWtCodesRectypes}
+            />
+
+            <Separator />
+
+            <div className="space-y-3">
+              <h4 className="font-semibold flex items-center gap-2 text-primary">
+                <Tags className="h-4 w-4" />Classification
+              </h4>
+              <RadioGroup
+                value={classifyMode}
+                onValueChange={(v) => setClassifyMode(v as 'details' | 'cfstmt')}
+                className="flex flex-wrap gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="mclassify-details" value="details" />
+                  <Label htmlFor="mclassify-details" className="text-sm cursor-pointer">Vendor_Details</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="mclassify-cfstmt" value="cfstmt" />
+                  <Label htmlFor="mclassify-cfstmt" className="text-sm cursor-pointer">Vendor_CFSTMT</Label>
+                </div>
+              </RadioGroup>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'details' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <h5 className="text-sm font-medium text-primary">Vendor_Details</h5>
+                  <SapF4MultiSelectField
+                    label="Material Group for Vendors"
+                    masterType="material_group_vendor"
+                    value={form.classify.MGV || []}
+                    onChange={(v) => setClassify('MGV', v)}
+                    placeholder="Select material groups"
+                  />
+                  <SapF4MultiSelectField
+                    label="Vendor Category"
+                    masterType="vendor_category"
+                    value={form.classify.CATV || []}
+                    onChange={(v) => setClassify('CATV', v)}
+                    placeholder="Select vendor categories"
+                  />
+                </div>
+                <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'cfstmt' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <h5 className="text-sm font-medium text-primary">Vendor_CFSTMT</h5>
+                  <SapF4MultiSelectField
+                    label="Vendor Cash Flow"
+                    masterType="vendor_cashflow"
+                    value={form.classify.CASH || []}
+                    onChange={(v) => setClassify('CASH', v)}
+                    liveItems={liveF4?.CFSTMT}
+                    placeholder="Select cash flow"
+                  />
+                  <SapF4MultiSelectField
+                    label="Tier Category"
+                    masterType="tier_category"
+                    value={form.classify.TIER || []}
+                    onChange={(v) => setClassify('TIER', v)}
+                    liveItems={liveF4?.CP_TIER}
+                    placeholder="Select tier category"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Only the selected group is sent to SAP; the other group is sent as empty. Your selections in the other group are preserved.
+              </p>
+            </div>
           </div>
           )}
         </div>
+
 
         {missing.length > 0 && (
           <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
@@ -211,7 +379,12 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
             onClick={() => {
               const miss = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
               setMissing(miss as string[]);
-              if (miss.length === 0) onConfirm(form);
+              if (miss.length === 0) {
+                const finalClassify = classifyMode === 'details'
+                  ? { ...form.classify, CASH: [], TIER: [] }
+                  : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
+                onConfirm({ ...form, classify: finalClassify });
+              }
             }}
             disabled={isSubmitting || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"

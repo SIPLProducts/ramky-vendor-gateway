@@ -1,27 +1,46 @@
-## Goal
-When SAP responds with a duplicate error (`MSGTYP: E` + PAN / PAN+GST duplicate message), the "Vendor Closed — Duplicate detected in SAP" email must include an **Existing Vendor Details** section parsed from the SAP `MSG_TEXT` field (format: `SAPCODE - NAME - PAN - GSTIN`). Non-duplicate flows are unchanged.
+## Add Withholding Tax & Classification cards to "Multiple SAP Sync — Common Fields"
 
-## Changes
+The single-vendor `SapFieldsDialog` already renders two sections that are missing from `MultipleSapSyncDialog`:
+1. **Withholding Tax** (`WithholdingTaxSection`) — vendor-country-filtered tax type rows with codes/rec-types.
+2. **Classification** — radio between `Vendor_Details` (MGV, CATV) and `Vendor_CFSTMT` (CASH, TIER) with F4 multi-selects.
 
-### 1. `src/pages/SAPSync.tsx` — extract existing-vendor info and forward it
-- Extend `isPanDuplicateResponse(resp)` to also return `msgText` — scan `ACC_RES` rows for `MSG_TEXT` (fallback: any row field matching the `code - name - PAN - GSTIN` shape).
-- Update `autoRejectAsDuplicate(vendorId, remarks, msgText?)` to pass `existingVendorText: msgText` in the invoke body.
-- Update both call sites (single `handleConfirmSync`, bulk `handleMultipleSync`) to forward `dup.msgText`.
+Both must be added to the multiple-sync dialog so bulk syncs carry the same common header data.
 
-### 2. `supabase/functions/sap-team-reject-vendor/index.ts` — render the section
-- Accept optional `existingVendorText` in the request body.
-- Add a small parser: split by ` - ` (or `-` with surrounding spaces), trim to 4 parts → `{ sapCode, vendorName, pan, gstin }`. Skip empty parts gracefully.
-- When `autoTriggered === true` **and** parsed values exist, insert an **Existing Vendor Details** block immediately after the Reason row (or after the main table), containing:
-  - SAP Vendor Code
-  - Vendor Name
-  - PAN Number
-  - GSTIN
-- Use the existing `row(k,v)` / `esc(...)` helpers and matching table style. If parsing fails, fall back to showing the raw `existingVendorText` as a single row so nothing is lost.
-- Manual rejections (no `existingVendorText`) render exactly the current email.
+### Changes (single file: `src/components/sap/MultipleSapSyncDialog.tsx`)
 
-## Out of scope
-No changes to DB, RLS, workflow, edge-function auth, or the sync-to-SAP function itself. Purely additive email content driven by a new optional payload field.
+1. **State**
+   - Add `classifyMode` state (`'details' | 'cfstmt'`, default `'details'`).
+   - Reuse existing `form.classify` and `form.withholding` in `SapFieldOverrides`.
 
-## Verification
-- `bunx tsgo --noEmit`
-- Trigger a duplicate SAP sync in preview → confirm the closure email shows the new "Existing Vendor Details" section with parsed values; trigger a manual (non-duplicate) close → confirm the email is unchanged.
+2. **Withholding Tax data fetch** (mirror `SapFieldsDialog`)
+   - Add state: `wtAll`, `wtLoading`, `wtError`, `wtcAll`, `wtrAll`, `wtcLoading`, `wtcError`.
+   - Add `fetchWtTypes()` invoking `sap-fetch-withholding-tax` (config `Fetch_Withholding_TaxType`).
+   - Add `fetchWtCodesRectypes()` invoking `sap-fetch-wtx-code-rectype` (config `Fetch_Withholding_WTX_Code_REC_Type`).
+   - Trigger both on dialog open (same effect that already fires F4 refresh).
+   - Country filter: for bulk, no single vendor country — pass `undefined` (or the shared country if all vendors match); `wtFiltered = wtAll` when no country.
+
+3. **Render sections** (after the existing Invoice Verification section, before footer)
+   - `<Separator />` then reuse `WithholdingTaxSection` exported from `SapFieldsDialog.tsx` (export it if not already exported) with the same props.
+   - `<Separator />` then a Classification block copied structurally from `SapFieldsDialog` (RadioGroup + two bordered panels with `SapF4MultiSelectField` for MGV/CATV and CASH/TIER). Reuse `handleClassifyModeChange` logic: switching modes clears the other group's arrays in state.
+
+4. **Confirm handler**
+   - Before calling `onConfirm(form)`, apply the same `finalClassify` derivation used in `SapFieldsDialog`:
+     ```
+     const finalClassify = classifyMode === 'details'
+       ? { ...form.classify, CASH: [], TIER: [] }
+       : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
+     onConfirm({ ...form, classify: finalClassify });
+     ```
+   - Withholding rows flow through untouched (already in `form.withholding`).
+
+5. **Exports**
+   - In `src/components/sap/SapFieldsDialog.tsx`, add `export` to `WithholdingTaxSection` (and any small helper it needs that isn't already exported) so `MultipleSapSyncDialog` can import it — no behavior change to single-sync dialog.
+
+### Out of scope
+- No changes to payload builder, edge functions, DB, or the single-vendor `SapFieldsDialog` UI (only an `export` keyword added).
+- No changes to required-field validation set.
+
+### Verification
+- Open a bulk selection → click "Multiple SAP Sync" → confirm Withholding Tax and Classification cards render with the same UX as single sync.
+- Submit and confirm the bulk sync payload includes `classify` and `withholding` per vendor.
+- `bunx tsgo --noEmit` clean.

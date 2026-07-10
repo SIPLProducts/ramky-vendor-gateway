@@ -785,7 +785,7 @@ type WTaxOption = { LAND1: string; TAXTYPE: string; TEXT40: string };
 type WTaxCodeOption = { LAND1: string; WITHT: string; WT_WITHCD: string; TCDESC: string };
 type RecTypeOption = { LAND1: string; WITHT: string; QSREC: string; RCTXT: string };
 
-function WithholdingTaxSection({
+export function WithholdingTaxSection({
   country, rows, onChange, options, allOptions, loading, error, onRetry,
   taxcodesAll, rectypesAll, codeLoading, codeError, onCodeRetry,
 }: {
