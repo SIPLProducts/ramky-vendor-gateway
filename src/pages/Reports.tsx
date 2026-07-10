@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import {
   FileSpreadsheet, FileText, Search, RefreshCw,
@@ -24,6 +24,8 @@ import {
 import { exportVendorExcel } from '@/lib/reports/exportExcel';
 import { exportVendorPdf } from '@/lib/reports/exportPdf';
 import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
+import { useReportsScreenConfig, DEFAULT_REPORTS_SCREEN_CONFIG } from '@/hooks/useScreenConfig';
+
 
 
 type ReportType = 'vendor' | 'approval' | 'both';
