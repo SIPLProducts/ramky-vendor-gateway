@@ -100,6 +100,23 @@ function summarizeWholdtax(rows: any[]) {
   }));
 }
 
+function responseRef(row: any): string {
+  return String(row?.REFER_NUM || row?.refer_num || row?.idnum || row?.IDNUM || "").trim().toUpperCase();
+}
+
+function readArrayByKey(source: any, key: string): any[] {
+  if (!source) return [];
+  if (Array.isArray(source)) {
+    return source.flatMap((item) => readArrayByKey(item, key));
+  }
+  if (typeof source === "object" && Array.isArray(source[key])) return source[key];
+  return [];
+}
+
+function rowMessage(row: any): string {
+  return String(row?.LONGMSG || row?.LONG_MSG || row?.MSG_TEXT || row?.MSGTEXT || row?.MSG_LONG_TEXT || row?.MSG || "").trim();
+}
+
 function parseHostRewrites(): { from: string; to: string }[] {
   return (Deno.env.get("SAP_MIDDLEWARE_HOST_REWRITES") || "")
     .split(",").map((s) => s.trim()).filter(Boolean)
@@ -288,6 +305,7 @@ serve(async (req) => {
     }
 
     let accRes: any[] = [];
+    let totRes: any[] = [];
     let httpStatus = 0;
     let networkError: string | null = null;
 
@@ -324,9 +342,14 @@ serve(async (req) => {
         const parsed = JSON.parse(text);
         const inner = useMiddleware && parsed && typeof parsed === "object" && "sapResponse" in parsed
           ? parsed.sapResponse : parsed;
-        // The SAP response shape can be { ACC_RES: [...] } OR a flat array of items.
-        if (inner && typeof inner === "object" && Array.isArray((inner as any).ACC_RES)) {
-          accRes = (inner as any).ACC_RES;
+        // SAP can return { ACC_RES: [...], TOT_RES: [...] }, an array of such wrappers,
+        // or the older flat ACC_RES array. Keep both blocks so REFER_NUM can map each
+        // mixed response row back to the correct vendor.
+        const extractedAcc = readArrayByKey(inner, "ACC_RES");
+        const extractedTot = readArrayByKey(inner, "TOT_RES");
+        totRes = extractedTot;
+        if (extractedAcc.length > 0) {
+          accRes = extractedAcc;
         } else if (Array.isArray(inner)) {
           accRes = inner;
         } else if (inner) {
@@ -341,17 +364,18 @@ serve(async (req) => {
 
     if (networkError) return fail(networkError);
 
-    // Match ACC_RES rows back to vendors. Use idnum if present; otherwise positional fallback.
-    const results: Array<{ vendorId: string; refNo: string; sapVendorCode: string | null; success: boolean; message: string; raw: any }> = [];
+    // Match response rows back to vendors. Prefer SAP's REFER_NUM, then idnum, then positional fallback.
+    const results: Array<{ vendorId: string; refNo: string; sapVendorCode: string | null; success: boolean; message: string; raw: any; totRaw?: any }> = [];
 
     for (let i = 0; i < vendorIds.length; i++) {
       const vid = vendorIds[i];
       const vendor = (vendors || []).find((v: any) => v.id === vid);
       const refNo = String(vendor?.reference_number || vid || "").toUpperCase();
-      // Try match by idnum first
-      let match = accRes.find((r: any) => String(r?.idnum || "").toUpperCase() === refNo);
-      // Fallback: positional
-      if (!match && accRes[i]) match = accRes[i];
+      const exactAccMatch = accRes.find((r: any) => responseRef(r) === refNo);
+      const exactTotMatch = totRes.find((r: any) => responseRef(r) === refNo);
+      const accMatch = exactAccMatch || (!exactTotMatch ? accRes[i] : null);
+      const totMatch = exactTotMatch || (!exactAccMatch ? totRes[i] : null);
+      const match = exactAccMatch || exactTotMatch || accMatch || totMatch || null;
 
       const sapVendorCode = match?.VENDOR || match?.BP_LIFNR || null;
       const success = match?.MSGTYP === "S" && !!sapVendorCode;
@@ -361,9 +385,18 @@ serve(async (req) => {
         match.VENDOR = sapVendorCode || "";
         match.BP_LIFNR = sapVendorCode || "";
       }
-      const message = match?.LONGMSG || match?.MSG || (success ? "Vendor created" : "No response from SAP for this vendor");
+      const message = rowMessage(match) || rowMessage(totMatch) || (success ? "Vendor created" : "No response from SAP for this vendor");
+      const raw = match
+        ? {
+          ...(totMatch || {}),
+          ...(match || {}),
+          REFER_NUM: responseRef(match) || responseRef(totMatch) || refNo,
+          MSG_TEXT: match?.MSG_TEXT || match?.MSGTEXT || match?.MSG_LONG_TEXT || match?.LONG_MSG || totMatch?.MSG_TEXT || totMatch?.LONG_MSG || "",
+          LONG_MSG: match?.LONG_MSG || totMatch?.LONG_MSG || match?.MSG_TEXT || "",
+        }
+        : null;
 
-      results.push({ vendorId: vid, refNo, sapVendorCode, success, message, raw: match || null });
+      results.push({ vendorId: vid, refNo, sapVendorCode, success, message, raw, totRaw: totMatch || undefined });
 
       if (success && sapVendorCode) {
         await supabase.from("vendors").update({
@@ -385,12 +418,15 @@ serve(async (req) => {
     const successCount = results.filter(r => r.success).length;
     const normalizedAccRes = (accRes || []).map((r: any) => {
       const vendorVal = r?.VENDOR || r?.BP_LIFNR || "";
-      return { ...r, VENDOR: vendorVal, BP_LIFNR_ORIG: r?.BP_LIFNR_ORIG ?? r?.BP_LIFNR ?? "", BP_LIFNR: vendorVal };
+      const ref = responseRef(r);
+      const tot = ref ? totRes.find((t: any) => responseRef(t) === ref) : null;
+      return { ...tot, ...r, VENDOR: vendorVal, BP_LIFNR_ORIG: r?.BP_LIFNR_ORIG ?? r?.BP_LIFNR ?? "", BP_LIFNR: vendorVal, REFER_NUM: ref || responseRef(tot) };
     });
     return ok({
       success: successCount > 0,
       message: `${successCount}/${vendorIds.length} vendor(s) created in SAP`,
       ACC_RES: normalizedAccRes,
+      TOT_RES: totRes,
       results,
     });
   } catch (error: any) {

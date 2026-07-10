@@ -1,56 +1,54 @@
-## Fix: Existing Vendor Details missing in duplicate email (bulk sync)
+## Plan: Fix SAP response correlation, duplicate email details, and idnum ref no
 
-### Root cause
+### Issue
+Bulk SAP responses now identify each row using `REFER_NUM`, not `idnum`:
 
-For bulk SAP sync, the front-end iterates `result.results[]` (from `sync-vendors-to-sap-bulk`). Each item shape is:
+- Duplicate/error rows may appear in `ACC_RES` with `REFER_NUM` and `MSG_TEXT`.
+- Detailed messages may also appear in `TOT_RES` with `REFER_NUM` and `LONG_MSG`.
+- Current bulk sync mainly matches rows by `idnum`, then falls back to array position. That can attach a duplicate/bank-key/success result to the wrong vendor when mixed responses come back.
+- The client payload builder still uses an 8-character vendor ID fallback for `idnum` in one path, while SAP expects the vendor reference number.
 
-```
-{ vendorId, refNo, sapVendorCode, success, message /* LONGMSG */, raw /* the ACC_RES row incl. MSG_TEXT */ }
-```
+### Fix
+1. **Always send vendor reference number as `idnum`**
+   - Update client-side SAP payload generation so `row.idnum` uses `vendor.reference_number` first, falling back to vendor ID only if missing.
+   - Keep server-side single and bulk sync final-normalization as the source of truth, also forcing `idnum = reference_number` before sending to SAP.
 
-In `src/pages/SAPSync.tsx` (`handleMultipleSync`, line ~336):
+2. **Support new SAP response shape in bulk sync**
+   - In `sync-vendors-to-sap-bulk`, parse both `ACC_RES` and `TOT_RES` from SAP responses.
+   - Match each vendor response by `REFER_NUM` first, then `idnum`, then existing positional fallback.
+   - Merge the matching `ACC_RES` and `TOT_RES` row details so each `results[]` item carries the correct raw SAP row for that specific reference number.
 
-```ts
-const dup = isPanDuplicateResponse(r?.sapResponse || r);
-```
+3. **Preserve mixed bulk behavior**
+   - Success rows continue to update the vendor and move to DMS pending.
+   - Duplicate rows only move that matching vendor to Duplicate & Closed and send the buyer email.
+   - Bank key or other non-duplicate errors stay visible in the Multiple SAP Sync result dialog and do not close the vendor.
 
-`r.sapResponse` is undefined, so `isPanDuplicateResponse` receives `r` itself. Inside `isPanDuplicateResponse` it looks for `resp.ACC_RES` (array) to pull `MSG_TEXT`. `r` has no `ACC_RES`, so `msgText` stays `''` even though `r.raw.MSG_TEXT` holds the SAP text like `"4023080 - SHARDA GENPOWER PVT.LTD. - AAPCS1562H - 20AAPCS1562H1ZG"`.
+4. **Populate duplicate email details from both old and new fields**
+   - Extend duplicate detection to read existing vendor details from:
+     - `MSG_TEXT`
+     - `MSGTEXT`
+     - `MSG_LONG_TEXT`
+     - `LONG_MSG`
+     - `raw.MSG_TEXT`
+     - `raw.LONG_MSG`
+     - `totRaw.LONG_MSG`
+   - This preserves the existing email parser and only improves the input text passed to it.
 
-Empty `existingVendorText` is then sent to `sap-team-reject-vendor`, which skips the "Existing Vendor Details" block — matching the screenshot the user shared.
+5. **Improve Multiple SAP Sync result display**
+   - Show reference number from `REFER_NUM`, `idnum`, or the mapped result `refNo`.
+   - Show the correct message from `LONGMSG`, `LONG_MSG`, `MSG_TEXT`, or `MSG`.
+   - Prefer `results[]` for display when available so each card corresponds to one selected vendor and its correct SAP outcome.
 
-Single-sync path is fine: `result.sapResponse` there is the full body `{ ACC_RES: [...], ... }`, so `MSG_TEXT` is extracted correctly.
+### Files to change
+- `src/lib/sapPayloadBuilder.ts`
+- `supabase/functions/sync-vendors-to-sap-bulk/index.ts`
+- `src/pages/SAPSync.tsx`
 
-Mixed bulk responses (some success, some duplicate, some bank/key errors) already behave correctly at the status level — only rows whose `LONGMSG` matches the duplicate regex are auto-closed; other failures are just shown in the result dialog. This fix keeps that unchanged.
-
-### Fix (single file: `src/pages/SAPSync.tsx`)
-
-Extend `isPanDuplicateResponse` so it also finds `MSG_TEXT` when the caller passes a single per-vendor bulk row. No other logic changes.
-
-1. Inside the function, when building `msgText`, also inspect:
-   - `resp.raw` (bulk per-vendor row)
-   - `resp.MSG_TEXT` / `resp.MSGTEXT` / `resp.MSG_LONG_TEXT` (row passed directly)
-
-   Prefer values found via `ACC_RES` first (single-sync path unchanged), fall back to the row-level fields.
-
-2. Keep the regex/matching logic and all callers exactly as they are.
-
-Resulting helper (conceptual):
-
-```ts
-const readMsgText = (o: any) =>
-  String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || '').trim();
-
-// after existing ACC_RES loop:
-if (!msgText) msgText = readMsgText(resp?.raw) || readMsgText(resp);
-```
-
-### What stays untouched
-- `sap-team-reject-vendor` edge function (already parses `"SAPCODE - NAME - PAN - GSTIN"` correctly).
-- Single-vendor sync flow.
-- Bulk sync mixed-response handling: success rows sync normally, non-duplicate failures continue to surface in the result dialog with their SAP message (bank key errors, missing fields, etc.), only true PAN/PAN+GST duplicates auto-move to Duplicate & Closed and trigger the email.
-- All other email content, subject, styling.
-
-### Verification
-- Bulk sync 3 vendors: 1 success, 1 duplicate (`PAN & GST combination is Duplicated`), 1 bank-key error → success syncs, duplicate moves to Duplicate & Closed and the buyer email now includes the "Existing Vendor Details" table populated from `MSG_TEXT`, bank-key error stays visible in the result dialog without closing the vendor.
-- Single-vendor duplicate sync: email still shows the "Existing Vendor Details" block (unchanged).
-- `bunx tsgo --noEmit` clean.
+### Validation
+- Run TypeScript check.
+- Verify a mixed bulk response with one success, one duplicate using `REFER_NUM`, and one bank key error maps each message to the correct vendor.
+- Confirm duplicate email includes:
+  - SAP Vendor Code
+  - Vendor Name
+  - PAN Number
+  - GSTIN

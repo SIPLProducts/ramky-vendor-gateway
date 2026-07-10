@@ -133,7 +133,7 @@ function resolveExpr(expr: string, ctx: ResolverCtx): any {
   } else if (head === "vendor.registered_address_line3_or_2") {
     value = ctx.vendor?.registered_address_line3 || ctx.vendor?.registered_address_line2 || "";
   } else if (head === "vendor.reference_no") {
-    value = String(ctx.vendor?.id || "").slice(0, 8).toUpperCase();
+    value = String(ctx.vendor?.reference_number || ctx.vendor?.reference_no || ctx.vendor?.id || "").toUpperCase();
   } else if (head === "vendor.primary_email_or_fallback") {
     const v: any = ctx.vendor || {};
     value = v.registered_email || v.primary_email || v.registered_email_2 || v.branch_email || v.manufacturing_email || "";
@@ -424,7 +424,7 @@ export async function buildSapPayload(
     });
     row.UPLOAD = [];
     row.idtype = "SOLMN1";
-    row.idnum = String((vendor as any).id || "").slice(0, 8).toUpperCase();
+    row.idnum = String((vendor as any).reference_number || (vendor as any).id || "").toUpperCase();
     row.idtype2 = "ZMSMEN";
     row.idnum2 = vendorForPayload.msme_number ? String(vendorForPayload.msme_number).slice(0, 20) : "";
     row.IDCATG = vendorForPayload.msme_major_activity ? String(vendorForPayload.msme_major_activity) : "";

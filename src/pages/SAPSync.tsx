@@ -239,28 +239,41 @@ export default function SAPSync() {
     setShowSapFieldsDialog(true);
   };
 
+  const getSapRowMessage = (r: any) => String(r?.LONGMSG || r?.LONG_MSG || r?.MSG_TEXT || r?.MSGTEXT || r?.MSG_LONG_TEXT || r?.MSG || r?.message || '').trim();
+  const getSapRowRef = (r: any) => String(r?.REFER_NUM || r?.refer_num || r?.idnum || r?.IDNUM || r?.refNo || '').trim().toUpperCase();
+
   const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string; msgText: string } => {
     if (!resp) return { matched: false, message: '', msgText: '' };
-    const rows = Array.isArray(resp.ACC_RES) ? resp.ACC_RES : [];
+    const wrapped = Array.isArray(resp.sapResponse) ? resp.sapResponse : [];
+    const rows = [
+      ...(Array.isArray(resp.ACC_RES) ? resp.ACC_RES : []),
+      ...wrapped.flatMap((w: any) => Array.isArray(w?.ACC_RES) ? w.ACC_RES : []),
+    ];
+    const totRows = [
+      ...(Array.isArray(resp.TOT_RES) ? resp.TOT_RES : []),
+      ...wrapped.flatMap((w: any) => Array.isArray(w?.TOT_RES) ? w.TOT_RES : []),
+    ];
     const texts: string[] = [
       resp.message || '',
-      ...rows.map((r: any) => `${r?.LONGMSG || ''} ${r?.MSG || ''}`),
+      ...rows.map((r: any) => getSapRowMessage(r)),
+      ...totRows.map((r: any) => getSapRowMessage(r)),
     ];
     const re = /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i;
     const readMsgText = (o: any) =>
-      String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || '').trim();
+      String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || o?.LONG_MSG || '').trim();
     // Try to find MSG_TEXT with existing vendor details: "SAPCODE - NAME - PAN - GSTIN"
     let msgText = '';
-    for (const r of rows) {
+    for (const r of [...rows, ...totRows]) {
       const t = readMsgText(r);
       if (t) { msgText = t; break; }
     }
-    // Fallbacks: bulk per-vendor row shape { raw: {...}, message, ... } or a bare ACC_RES row
-    if (!msgText) msgText = readMsgText(resp?.raw) || readMsgText(resp);
+    // Fallbacks: bulk per-vendor row shape { raw/totRaw: {...}, message, ... } or a bare ACC_RES/TOT_RES row
+    if (!msgText) msgText = readMsgText(resp?.raw) || readMsgText(resp?.totRaw) || readMsgText(resp);
     // Also include row-level LONGMSG/MSG from raw/self when regex-testing
     const extraTexts = [
-      `${resp?.raw?.LONGMSG || ''} ${resp?.raw?.MSG || ''}`,
-      `${resp?.LONGMSG || ''} ${resp?.MSG || ''}`,
+      getSapRowMessage(resp?.raw),
+      getSapRowMessage(resp?.totRaw),
+      getSapRowMessage(resp),
     ];
     for (const t of [...texts, ...extraTexts]) {
       if (t && re.test(t)) return { matched: true, message: String(t).trim(), msgText };
@@ -946,23 +959,28 @@ export default function SAPSync() {
           </DialogHeader>
           <ScrollArea className="flex-1 max-h-[65vh] pr-4">
             <div className="space-y-3 py-4">
-              {(bulkResult?.ACC_RES || []).length === 0 && (
+              {((bulkResult?.results || bulkResult?.ACC_RES || [])).length === 0 && (
                 <p className="text-sm text-muted-foreground">No ACC_RES rows returned from SAP.</p>
               )}
-              {(bulkResult?.ACC_RES || []).map((r: any, i: number) => (
+              {(bulkResult?.results || bulkResult?.ACC_RES || []).map((item: any, i: number) => {
+                const r = item?.raw || item;
+                const success = item?.success ?? (r?.MSGTYP === 'S');
+                const ref = item?.refNo || getSapRowRef(r) || getSapRowRef(item?.totRaw);
+                const message = item?.message || getSapRowMessage(r) || getSapRowMessage(item?.totRaw) || 'No message returned from SAP';
+                return (
                 <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">{r.LONGMSG || r.MSG}</span>
-                    <Badge variant={r.MSGTYP === 'S' ? 'default' : 'destructive'}>
-                      {r.MSGTYP === 'S' ? 'Success' : 'Error'}
+                    <span className="font-medium">{message}</span>
+                    <Badge variant={success ? 'default' : 'destructive'}>
+                      {success ? 'Success' : 'Error'}
                     </Badge>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
-                    {r.idnum && <p>Ref No (idnum): <span className="font-mono">{r.idnum}</span></p>}
+                    {ref && <p>Ref No: <span className="font-mono">{ref}</span></p>}
                     {(r.VENDOR || r.BP_LIFNR) && <p>SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR ?? r.BP_LIFNR}</span></p>}
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           </ScrollArea>
           <DialogFooter>
