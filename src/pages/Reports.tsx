@@ -338,16 +338,23 @@ export default function Reports() {
 
       {!loading && single && (
         <>
-          <Card>
-            <CardContent className="flex flex-wrap gap-2 py-3">
-              <Button variant="outline" size="sm" onClick={() => exportVendorExcel([single], reportType)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportVendorPdf([single], reportType)}>
-                <FileText className="h-4 w-4 mr-2" /> PDF
-              </Button>
-            </CardContent>
-          </Card>
+          {(cfg.action_excel || cfg.action_pdf) && (
+            <Card>
+              <CardContent className="flex flex-wrap gap-2 py-3">
+                {cfg.action_excel && (
+                  <Button variant="outline" size="sm" onClick={() => exportVendorExcel([single], reportType)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                  </Button>
+                )}
+                {cfg.action_pdf && (
+                  <Button variant="outline" size="sm" onClick={() => exportVendorPdf([single], reportType)}>
+                    <FileText className="h-4 w-4 mr-2" /> PDF
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {showVendor && <SingleVendorView row={single} />}
           {showApproval && <ApprovalFlowTimeline row={single} />}
         </>
