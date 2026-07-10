@@ -207,6 +207,9 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
   const set = <K extends keyof SapFieldOverrides>(k: K, v: SapFieldOverrides[K]) =>
     setForm(prev => ({ ...prev, [k]: v }));
 
+  const setClassify = (k: keyof SapFieldOverrides['classify'], v: string[]) =>
+    setForm(prev => ({ ...prev, classify: { ...prev.classify, [k]: v } }));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
