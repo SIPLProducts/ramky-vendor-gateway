@@ -471,7 +471,7 @@ export default function UserManagement() {
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Users</CardTitle></CardHeader>
+            <CardHeader className="border-b-2 border-green-500 pb-3"><CardTitle className="text-base">Users</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
@@ -622,8 +622,9 @@ export default function UserManagement() {
           </Card>
 
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex-row items-center justify-between space-y-0 border-b-2 border-green-500 pb-3">
               <CardTitle className="text-base">Inactive User Login Attempts</CardTitle>
+
               <Button variant="ghost" size="sm" onClick={loadLoginAttempts} disabled={attemptsLoading}>
                 {attemptsLoading ? 'Refreshing…' : 'Refresh'}
               </Button>
@@ -689,11 +690,12 @@ export default function UserManagement() {
             </Button>
           </div>
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Custom Roles
-              </CardTitle>
-            </CardHeader>
+          <CardHeader className="border-b-2 border-green-500 pb-3">
+            <CardTitle className="text-base">
+              Custom Roles
+            </CardTitle>
+          </CardHeader>
+
             <CardContent>
               <div className="border rounded-md">
                 <Table>
