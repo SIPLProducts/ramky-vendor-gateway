@@ -244,8 +244,15 @@ export default function SAPSync() {
 
   const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string; msgText: string } => {
     if (!resp) return { matched: false, message: '', msgText: '' };
-    const rows = Array.isArray(resp.ACC_RES) ? resp.ACC_RES : [];
-    const totRows = Array.isArray(resp.TOT_RES) ? resp.TOT_RES : [];
+    const wrapped = Array.isArray(resp.sapResponse) ? resp.sapResponse : [];
+    const rows = [
+      ...(Array.isArray(resp.ACC_RES) ? resp.ACC_RES : []),
+      ...wrapped.flatMap((w: any) => Array.isArray(w?.ACC_RES) ? w.ACC_RES : []),
+    ];
+    const totRows = [
+      ...(Array.isArray(resp.TOT_RES) ? resp.TOT_RES : []),
+      ...wrapped.flatMap((w: any) => Array.isArray(w?.TOT_RES) ? w.TOT_RES : []),
+    ];
     const texts: string[] = [
       resp.message || '',
       ...rows.map((r: any) => getSapRowMessage(r)),

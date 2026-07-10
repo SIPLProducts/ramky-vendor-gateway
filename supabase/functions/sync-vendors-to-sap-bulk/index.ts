@@ -371,11 +371,11 @@ serve(async (req) => {
       const vid = vendorIds[i];
       const vendor = (vendors || []).find((v: any) => v.id === vid);
       const refNo = String(vendor?.reference_number || vid || "").toUpperCase();
-      let accMatch = accRes.find((r: any) => responseRef(r) === refNo);
-      let totMatch = totRes.find((r: any) => responseRef(r) === refNo);
-      if (!accMatch && accRes[i]) accMatch = accRes[i];
-      if (!totMatch && totRes[i]) totMatch = totRes[i];
-      const match = accMatch || totMatch || null;
+      const exactAccMatch = accRes.find((r: any) => responseRef(r) === refNo);
+      const exactTotMatch = totRes.find((r: any) => responseRef(r) === refNo);
+      const accMatch = exactAccMatch || (!exactTotMatch ? accRes[i] : null);
+      const totMatch = exactTotMatch || (!exactAccMatch ? totRes[i] : null);
+      const match = exactAccMatch || exactTotMatch || accMatch || totMatch || null;
 
       const sapVendorCode = match?.VENDOR || match?.BP_LIFNR || null;
       const success = match?.MSGTYP === "S" && !!sapVendorCode;
