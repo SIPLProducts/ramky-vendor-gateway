@@ -258,6 +258,8 @@ export function DesignSettingsPanel() {
         <TextInputField label="Font Size"        value={draft.buttons.fontSize}     onChange={(v) => update('buttons','fontSize',v)} placeholder="14px" />
         <ColorInput label="Hover Color"          value={draft.buttons.hover}        onChange={(v) => update('buttons','hover',v)} />
         <ColorInput label="Disabled State Color" value={draft.buttons.disabled}     onChange={(v) => update('buttons','disabled',v)} />
+        <TextInputField label="Letter Spacing"   value={draft.buttons.letterSpacing} onChange={(v) => update('buttons','letterSpacing',v)} placeholder="0.02em" />
+
       </SectionCard>
 
       <SectionCard title="Forms" icon={FormInput}>
