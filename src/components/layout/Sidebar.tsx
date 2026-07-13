@@ -222,7 +222,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               </div>
               {/* Active indicator for collapsed state */}
               {collapsed && isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r-full" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full bg-[color:var(--sidebar-selected-border,hsl(var(--sidebar-primary)))]" />
               )}
             </Link>
           );
