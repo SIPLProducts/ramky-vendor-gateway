@@ -1376,6 +1376,8 @@ export default function VendorRegistration() {
         ? await resubmitVendor(formData)
         : await submitVendor(formData);
 
+      setSubmittedReferenceNumber((vendor as any)?.reference_number ?? null);
+
       // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
       if (invitationToken) {
         const { error: claimErr } = await supabase.rpc('claim_invitation', {
