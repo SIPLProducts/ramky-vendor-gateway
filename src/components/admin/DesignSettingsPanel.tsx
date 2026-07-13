@@ -3,17 +3,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useDesignSettings } from '@/hooks/useDesignSettings';
 import { DEFAULT_DESIGN_SETTINGS, DesignSettings } from '@/lib/designTokens';
+import { ensureFontLoaded } from '@/lib/googleFonts';
 import {
   Palette, Type, PanelLeft, MousePointer2, FormInput, Table2, LayoutGrid,
   Save, RotateCcw, AlertCircle,
 } from 'lucide-react';
 
-const FONT_FAMILIES = ['Inter', 'Roboto', 'Poppins', 'Open Sans', 'Lato', 'Nunito', 'System'];
+const FONT_GROUPS: { label: string; fonts: string[] }[] = [
+  {
+    label: 'System',
+    fonts: ['System', 'Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI'],
+  },
+  {
+    label: 'Serif',
+    fonts: [
+      'Times New Roman', 'Georgia', 'Cambria', 'Garamond', 'Palatino', 'Book Antiqua', 'Baskerville',
+      'Merriweather', 'Playfair Display', 'Lora', 'PT Serif', 'Source Serif Pro', 'Cormorant Garamond',
+      'Crimson Text', 'Libre Baskerville', 'EB Garamond', 'Bitter', 'Noto Serif',
+    ],
+  },
+  {
+    label: 'Sans-serif',
+    fonts: [
+      'Inter', 'Roboto', 'Open Sans', 'Poppins', 'Lato', 'Nunito', 'Montserrat', 'Raleway',
+      'Ubuntu', 'Work Sans', 'Rubik', 'Mulish', 'Manrope', 'DM Sans', 'Karla', 'Barlow',
+      'IBM Plex Sans', 'Source Sans Pro', 'PT Sans', 'Fira Sans', 'Noto Sans', 'Quicksand',
+      'Cabin', 'Titillium Web', 'Hind', 'Oxygen', 'Heebo', 'Assistant', 'Public Sans',
+    ],
+  },
+  {
+    label: 'Display',
+    fonts: ['Oswald', 'Bebas Neue', 'Anton', 'Righteous', 'Pacifico', 'Lobster', 'Comfortaa', 'Archivo Black'],
+  },
+  {
+    label: 'Monospace',
+    fonts: ['Courier New', 'Consolas', 'Monaco', 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'IBM Plex Mono', 'Roboto Mono', 'Space Mono'],
+  },
+];
 
 function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
