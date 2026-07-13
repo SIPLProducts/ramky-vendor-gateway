@@ -6,6 +6,8 @@ import {
   applyDesignSettings,
   resetAppliedDesign,
 } from '@/lib/designTokens';
+import { startActionButtonTagger, stopActionButtonTagger } from '@/lib/actionButton';
+
 
 const CONFIG_KEY = 'ui_design_settings';
 
