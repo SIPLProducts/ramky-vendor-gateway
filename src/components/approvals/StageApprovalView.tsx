@@ -257,9 +257,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   {!isBuyer && (
                     <TableCell className="text-sm">
                       <div>{it.buyerName ?? '—'}</div>
-                      {it.buyerEmail && (
-                        <div className="text-xs text-muted-foreground">{it.buyerEmail}</div>
-                      )}
                     </TableCell>
                   )}
                   <TableCell>

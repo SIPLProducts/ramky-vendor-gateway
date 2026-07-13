@@ -444,11 +444,6 @@ export function VendorReviewDialog({
                         <div className="space-y-1">
                           <p className="text-muted-foreground">Invited By (Buyer)</p>
                           <p className="font-medium">{routing.buyerName || '-'}</p>
-                          {routing.buyerEmail && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Mail className="h-3 w-3" /> {routing.buyerEmail}
-                            </p>
-                          )}
                         </div>
                       </div>
                     </SectionCard>
