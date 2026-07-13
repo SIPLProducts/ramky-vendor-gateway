@@ -236,6 +236,9 @@ export function DesignSettingsPanel() {
         <SelectField label="Screen Name Weight"    value={draft.typography.screenNameFontWeight} onChange={(v) => update('typography','screenNameFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
         <ColorInput label="Font Color"             value={draft.typography.fontColor} onChange={(v) => update('typography','fontColor',v)} />
         <TextInputField label="Line Height"        value={draft.typography.lineHeight} onChange={(v) => update('typography','lineHeight',v)} placeholder="1.5" />
+        <TextInputField label="Letter Spacing"     value={draft.typography.letterSpacing} onChange={(v) => update('typography','letterSpacing',v)} placeholder="0.01em, normal, 0.5px" />
+        <TextInputField label="Heading Letter Spacing" value={draft.typography.headingLetterSpacing} onChange={(v) => update('typography','headingLetterSpacing',v)} placeholder="-0.01em" />
+
       </SectionCard>
 
       <SectionCard title="Sidebar" icon={PanelLeft}>
@@ -255,6 +258,8 @@ export function DesignSettingsPanel() {
         <TextInputField label="Font Size"        value={draft.buttons.fontSize}     onChange={(v) => update('buttons','fontSize',v)} placeholder="14px" />
         <ColorInput label="Hover Color"          value={draft.buttons.hover}        onChange={(v) => update('buttons','hover',v)} />
         <ColorInput label="Disabled State Color" value={draft.buttons.disabled}     onChange={(v) => update('buttons','disabled',v)} />
+        <TextInputField label="Letter Spacing"   value={draft.buttons.letterSpacing} onChange={(v) => update('buttons','letterSpacing',v)} placeholder="0.02em" />
+
       </SectionCard>
 
       <SectionCard title="Forms" icon={FormInput}>
@@ -266,6 +271,9 @@ export function DesignSettingsPanel() {
         <ColorInput label="Focus Border Color"    value={draft.forms.focusBorderColor} onChange={(v) => update('forms','focusBorderColor',v)} />
         <TextInputField label="Label Font Size"   value={draft.forms.labelFontSize}    onChange={(v) => update('forms','labelFontSize',v)} placeholder="13px" />
         <ColorInput label="Label Color"           value={draft.forms.labelColor}       onChange={(v) => update('forms','labelColor',v)} />
+        <TextInputField label="Input Letter Spacing" value={draft.forms.inputLetterSpacing} onChange={(v) => update('forms','inputLetterSpacing',v)} placeholder="0.01em" />
+        <TextInputField label="Label Letter Spacing" value={draft.forms.labelLetterSpacing} onChange={(v) => update('forms','labelLetterSpacing',v)} placeholder="0.02em" />
+
       </SectionCard>
 
       <SectionCard title="Tables" icon={Table2}>
@@ -275,6 +283,8 @@ export function DesignSettingsPanel() {
         <ColorInput label="Alternate Row Color"  value={draft.tables.altRow}      onChange={(v) => update('tables','altRow',v)} />
         <ColorInput label="Border Color"         value={draft.tables.borderColor} onChange={(v) => update('tables','borderColor',v)} />
         <TextInputField label="Font Size"        value={draft.tables.fontSize}    onChange={(v) => update('tables','fontSize',v)} placeholder="14px" />
+        <TextInputField label="Letter Spacing"   value={draft.tables.letterSpacing} onChange={(v) => update('tables','letterSpacing',v)} placeholder="0.01em" />
+
       </SectionCard>
 
       <SectionCard title="Cards" icon={LayoutGrid}>

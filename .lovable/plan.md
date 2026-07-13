@@ -1,79 +1,50 @@
-## Problem
+# Improve Typography Clarity — Add Letter Spacing Controls
 
-Two issues in UI Design Settings:
+Times New Roman is loading, but at the current sizing the text feels tight/cramped. Add explicit letter-spacing (tracking) controls to the Design Settings so admins can loosen the text globally and per-surface, plus a couple of readability defaults that make serif fonts look cleaner.
 
-1. **Times New Roman missing** from the Font Family dropdown.
-2. **Table card border color (and other Table / Card tokens) not reflecting** — the settings write CSS variables (`--table-border`, `--table-header-bg`, `--card-shadow`, etc.) but the shadcn `Table` and `Card` components use hardcoded classes (`bg-muted/40`, `border-border/60`, `text-muted-foreground`), so the tokens are never consumed.
+## Changes
 
-## Fix
+### 1. `src/lib/designTokens.ts`
+Extend `DesignSettings` with new fields (all optional-safe via defaults):
+- `typography.letterSpacing` (e.g. `normal`, `0.01em`, `0.02em`, `0.5px`) → `--letter-spacing`
+- `typography.headingLetterSpacing` → `--heading-letter-spacing`
+- `tables.letterSpacing` → `--table-letter-spacing`
+- `buttons.letterSpacing` → `--btn-letter-spacing`
+- `forms.inputLetterSpacing` → `--input-letter-spacing`
+- `forms.labelLetterSpacing` → `--label-letter-spacing`
 
-### 1. `src/components/admin/DesignSettingsPanel.tsx`
-Extend the fonts list (already planned to be ~70+ items) to include the full serif set explicitly, with **Times New Roman**, Georgia, Cambria, Garamond, Palatino, Book Antiqua, Baskerville, Courier New, Consolas, Trebuchet MS, Verdana, Tahoma, Arial, Helvetica, etc. under the System / Serif / Monospace groups. Each item previews itself in its own font.
+Defaults tuned for readability:
+- body `0.01em`, headings `-0.01em`, buttons `0.02em`, labels `0.02em`, tables `0.01em`, inputs `0.01em`.
 
-### 2. `src/lib/googleFonts.ts` (new, from prior plan)
-`ensureFontLoaded(family)` skips system fonts (Times New Roman, Georgia, Arial, Courier New, Consolas, Verdana, Tahoma, Trebuchet MS, Helvetica, System, etc.) and only injects a Google Fonts `<link>` for web fonts. Called from `applyDesignSettings` for both `theme.fontFamily` and `typography.fontFamily`, and from the Select's on-change for instant preview.
+Apply each via `document.documentElement.style.setProperty(...)` in `applyDesignSettings`.
 
-### 3. `src/index.css` — bridge tokens to real components (root fix for "not reflecting")
-Add global rules so the tokens set by `applyDesignSettings` actually paint the UI. No component files edited; behaviour unchanged. Approx:
-
+### 2. `src/index.css`
+Bridge the new CSS variables to real elements:
 ```css
-/* Tables */
-table thead tr, table thead th {
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-}
-table, table th, table td, table tr {
-  font-size: var(--table-font-size);
-  border-color: var(--table-border);
-}
-table tbody tr { color: var(--table-row-text); border-bottom: 1px solid var(--table-border); }
-table tbody tr:nth-child(even) { background: var(--table-alt-row); }
-
-/* Cards — border, radius, shadow, header color */
-[class*="rounded-lg"][class*="border"][class*="bg-card"] {
-  border-color: hsl(var(--border));
-  border-radius: var(--radius);
-  box-shadow: var(--card-shadow);
-}
-[class*="rounded-lg"][class*="border"][class*="bg-card"] :is(h1,h2,h3,[class*="CardTitle"]) {
-  color: var(--card-header-color);
-}
-
-/* Buttons — bridge --btn-* onto default button variant */
-button[class*="bg-primary"] {
-  background: var(--btn-bg);
-  color: var(--btn-text);
-  border-color: var(--btn-border);
-  border-radius: var(--btn-radius);
-  font-size: var(--btn-font-size);
-}
-button[class*="bg-primary"]:hover { background: var(--btn-hover); }
-button[class*="bg-primary"]:disabled { background: var(--btn-disabled); }
-
-/* Forms */
-input, textarea, select, [role="combobox"] {
-  font-size: var(--input-font-size);
-  color: var(--input-text);
-  border-radius: var(--input-radius);
-}
-input::placeholder, textarea::placeholder { color: var(--input-placeholder); }
-input:focus, textarea:focus, select:focus, [role="combobox"]:focus {
-  border-color: var(--input-focus);
-  outline-color: var(--input-focus);
-}
-label { font-size: var(--label-font-size); color: var(--label-color); }
-
-/* Font family everywhere — dropdowns, tables, dialogs, popovers */
-html, body, button, input, select, textarea, table, [role="menu"], [role="listbox"], [role="dialog"] {
-  font-family: var(--font-sans);
-}
+html, body { letter-spacing: var(--letter-spacing, normal); }
+h1,h2,h3,h4,h5,h6 { letter-spacing: var(--heading-letter-spacing, normal); }
+button, [role="button"], .btn { letter-spacing: var(--btn-letter-spacing, normal); }
+input, textarea, select { letter-spacing: var(--input-letter-spacing, normal); }
+label { letter-spacing: var(--label-letter-spacing, normal); }
+table, th, td { letter-spacing: var(--table-letter-spacing, normal); }
 ```
-
-### 4. `tailwind.config.ts`
-```ts
-fontFamily: { sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'] }
+Also add a global body rule:
+```css
+body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 ```
-So every `font-sans` (which is Tailwind's default) resolves through the token.
+so serif fonts (Times New Roman, Georgia) render crisply.
+
+### 3. `src/components/admin/DesignSettingsPanel.tsx`
+Add new inputs (using existing `TextInputField`):
+- **Typography** section: `Letter Spacing`, `Heading Letter Spacing` (placeholder `0.01em`, `normal`, `0.5px`).
+- **Buttons** section: `Letter Spacing`.
+- **Forms** section: `Input Letter Spacing`, `Label Letter Spacing`.
+- **Tables** section: `Letter Spacing`.
+
+Each accepts any valid CSS value (`normal`, `em`, `px`, `rem`). Helper text under Typography: "Use `0.01em`–`0.03em` to make serif fonts like Times New Roman easier to read."
+
+### 4. Migration safety
+`mergeDeep` in `useDesignSettings.tsx` already merges new keys from defaults, so existing saved configs pick up the new letter-spacing defaults without a DB migration.
 
 ## Out of scope
-No changes to storage shape, business logic, or per-page components. Only `DesignSettingsPanel.tsx`, `googleFonts.ts` (new), `designTokens.ts`, `index.css`, `tailwind.config.ts`.
+No changes to backend, storage schema, business logic, or page-level components. Purely presentation tokens in the Design Settings tab.

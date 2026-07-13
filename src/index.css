@@ -181,13 +181,32 @@
     font-size: var(--font-base-size, 14px);
     font-weight: var(--font-weight-base, 400);
     line-height: var(--line-height-base, 1.5);
+    letter-spacing: var(--letter-spacing, normal);
     font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Enterprise Typography */
   h1, h2, h3, h4, h5, h6 {
-    @apply tracking-tight;
+    letter-spacing: var(--heading-letter-spacing, -0.01em);
   }
+
+  /* Runtime letter-spacing bridges */
+  button, [role="button"], .btn {
+    letter-spacing: var(--btn-letter-spacing, normal);
+  }
+  input, textarea, select {
+    letter-spacing: var(--input-letter-spacing, normal);
+  }
+  label {
+    letter-spacing: var(--label-letter-spacing, normal);
+  }
+  table, th, td {
+    letter-spacing: var(--table-letter-spacing, normal);
+  }
+
 
   /* Enterprise Form Section */
   .form-section {

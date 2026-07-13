@@ -21,7 +21,10 @@ export interface DesignSettings {
     screenNameFontWeight: string; // e.g. "600"
     fontColor: string;         // hex
     lineHeight: string;        // e.g. "1.5"
+    letterSpacing: string;         // e.g. "normal", "0.01em"
+    headingLetterSpacing: string;  // e.g. "-0.01em"
   };
+
   sidebar: {
     background: string;
     text: string;
@@ -38,6 +41,7 @@ export interface DesignSettings {
     fontSize: string;
     hover: string;
     disabled: string;
+    letterSpacing: string;
   };
   forms: {
     inputFontSize: string;
@@ -48,6 +52,8 @@ export interface DesignSettings {
     focusBorderColor: string;
     labelFontSize: string;
     labelColor: string;
+    inputLetterSpacing: string;
+    labelLetterSpacing: string;
   };
   tables: {
     headerBg: string;
@@ -56,7 +62,10 @@ export interface DesignSettings {
     altRow: string;
     borderColor: string;
     fontSize: string;
+    letterSpacing: string;
   };
+
+
   cards: {
     background: string;
     header: string;
@@ -85,6 +94,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     screenNameFontWeight: '600',
     fontColor: '#1f2a37',
     lineHeight: '1.5',
+    letterSpacing: '0.01em',
+    headingLetterSpacing: '-0.01em',
   },
   sidebar: {
     background: '#16262d',
@@ -102,6 +113,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     fontSize: '14px',
     hover: '#178857',
     disabled: '#9ca3af',
+    letterSpacing: '0.02em',
   },
   forms: {
     inputFontSize: '14px',
@@ -112,6 +124,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     focusBorderColor: '#1f9d6a',
     labelFontSize: '13px',
     labelColor: '#374151',
+    inputLetterSpacing: '0.01em',
+    labelLetterSpacing: '0.02em',
   },
   tables: {
     headerBg: '#f3f6f8',
@@ -120,7 +134,9 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     altRow: '#f9fafb',
     borderColor: '#e5e7eb',
     fontSize: '14px',
+    letterSpacing: '0.01em',
   },
+
   cards: {
     background: '#ffffff',
     header: '#111827',
@@ -187,6 +203,9 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--screen-name-weight', s.typography.screenNameFontWeight);
   r.setProperty('--foreground', hexToHslTriplet(s.typography.fontColor));
   r.setProperty('--line-height-base', s.typography.lineHeight);
+  r.setProperty('--letter-spacing', s.typography.letterSpacing || 'normal');
+  r.setProperty('--heading-letter-spacing', s.typography.headingLetterSpacing || 'normal');
+
 
   // Sidebar
   r.setProperty('--sidebar-background', hexToHslTriplet(s.sidebar.background));
@@ -204,6 +223,8 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--btn-font-size', s.buttons.fontSize);
   r.setProperty('--btn-hover', s.buttons.hover);
   r.setProperty('--btn-disabled', s.buttons.disabled);
+  r.setProperty('--btn-letter-spacing', s.buttons.letterSpacing || 'normal');
+
 
   // Forms
   r.setProperty('--input-font-size', s.forms.inputFontSize);
@@ -214,6 +235,9 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--input-focus', s.forms.focusBorderColor);
   r.setProperty('--label-font-size', s.forms.labelFontSize);
   r.setProperty('--label-color', s.forms.labelColor);
+  r.setProperty('--input-letter-spacing', s.forms.inputLetterSpacing || 'normal');
+  r.setProperty('--label-letter-spacing', s.forms.labelLetterSpacing || 'normal');
+
 
   // Tables
   r.setProperty('--table-header-bg', s.tables.headerBg);
@@ -222,6 +246,8 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--table-alt-row', s.tables.altRow);
   r.setProperty('--table-border', s.tables.borderColor);
   r.setProperty('--table-font-size', s.tables.fontSize);
+  r.setProperty('--table-letter-spacing', s.tables.letterSpacing || 'normal');
+
 
   // Cards
   r.setProperty('--card', hexToHslTriplet(s.cards.background));
@@ -236,12 +262,13 @@ export function resetAppliedDesign() {
   const props = [
     '--primary','--ring','--secondary','--success','--warning','--destructive','--background',
     '--font-sans','--font-base-size','--heading-size','--screen-name-size','--font-weight-base',
-    '--screen-name-weight','--foreground','--line-height-base',
+    '--screen-name-weight','--foreground','--line-height-base','--letter-spacing','--heading-letter-spacing',
     '--sidebar-background','--sidebar-foreground','--sidebar-accent','--sidebar-hover','--sidebar-primary','--sidebar-width',
-    '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-disabled',
-    '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color',
-    '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size',
+    '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-disabled','--btn-letter-spacing',
+    '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color','--input-letter-spacing','--label-letter-spacing',
+    '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size','--table-letter-spacing',
     '--card','--card-header-color','--border','--radius','--card-shadow',
+
   ];
   const s = document.documentElement.style;
   props.forEach((p) => s.removeProperty(p));
