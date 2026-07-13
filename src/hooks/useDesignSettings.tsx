@@ -48,6 +48,7 @@ export function DesignSettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     load();
+    startActionButtonTagger();
     const channel = supabase
       .channel('portal_config_design')
       .on(
@@ -58,8 +59,10 @@ export function DesignSettingsProvider({ children }: { children: ReactNode }) {
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
+      stopActionButtonTagger();
     };
   }, [load]);
+
 
   const preview = useCallback((s: DesignSettings) => {
     applyDesignSettings(s);
