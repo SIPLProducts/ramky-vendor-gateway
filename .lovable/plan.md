@@ -1,54 +1,78 @@
-## Goal
-Reference number must equal the actual submit date in IST (`YYYYMMDDNNN`), regardless of when the draft was created. Once a real submit has happened, the number is frozen forever (resubmits/edits/approvals never change it).
 
-## Why today's submission still shows 20260707009
-- The vendor row was drafted on 07-Jul and a reference number was assigned back then.
-- Current `assign_vendor_reference_number` trigger has an early `RETURN NEW` whenever `reference_number` is already set, so today's submit cannot overwrite it.
-- Also, the trigger only treats `buyer_review` as a submit transition, but the app submits into `scm_manager_review` — so even for fresh rows, the stamp path is not hit consistently.
+# UI Design Settings Tab
 
-## Fix
+Add a new **UI Design Settings** tab in Admin Configuration that lets admins control the app's visual design at runtime. Settings persist in the `portal_config` table and apply instantly by writing CSS variables to `:root`, so no code changes are needed to re-theme the app. No business logic touched.
 
-### 1) Backend migration — reference number
-Rewrite `public.assign_vendor_reference_number()` so:
+## Scope
 
-- Track "already submitted" via a new column `public.vendors.submit_ref_locked_at timestamptz`.
-- Trigger fires `BEFORE INSERT OR UPDATE` on `vendors`.
-- Detect real submit transition (INSERT with review status, or UPDATE from a pre-submit status into any review status): 
-  pre-submit = `draft, validation_pending, validation_failed, returned_to_vendor, returned_to_buyer`
-  review = `buyer_review, scm_manager_review, scm_head_review, finance_1_review, finance_2_review, ceo_office_review`
-- Behavior:
-  - If `submit_ref_locked_at IS NOT NULL` → never touch `reference_number` (freeze after first real submit).
-  - Else if this update is a real submit transition → stamp `reference_number = YYYYMMDD(IST today) + NNN` from `vendor_reference_counters`, set `submit_ref_locked_at = now()`, and also set `submitted_at = COALESCE(NEW.submitted_at, now())`. This overwrites any stale draft-era number.
-  - Else → leave `reference_number` alone (drafts may or may not have one; we won't create a pre-submit one from this trigger).
-- Drop duplicate trigger `trg_vendors_assign_reference_number` and keep a single `vendors_assign_reference_number` BEFORE INSERT OR UPDATE trigger.
+Purely visual/styling. Green left-border card style matching the rest of Admin Configuration. Existing functionality unchanged.
 
-### 2) Backend migration — on-behalf seeding
-In `public.seed_vendor_approval_progress`:
-- Remove the block that stamps a reference number based on `created_on_behalf` alone. Reference-number stamping is now solely owned by the trigger, driven by the real submit status transition (which the seeding path already produces). This avoids double logic and stale-date stamping.
+## Where it lives
 
-### 3) One-time data backfill
-For existing rows that already have a `reference_number` but never really submitted (still in `draft`/`validation_*`/`returned_*` and `submitted_at IS NULL`):
-- Clear `reference_number` and leave `submit_ref_locked_at` NULL, so their next real submit stamps today's date.
-For rows that have `submitted_at IS NOT NULL`:
-- Set `submit_ref_locked_at = submitted_at` to preserve their historical reference numbers.
+- New tab in `src/pages/AdminConfiguration.tsx` beside "General / Validations / Email / Notifications / Screen / Logs", labeled **UI Design** (icon: `Palette`).
+- Tab content is a new component `src/components/admin/DesignSettingsPanel.tsx`.
 
-### 4) Frontend
-`src/hooks/useVendorRegistration.tsx`:
-- After the submit `UPDATE ... status = 'scm_manager_review'`, re-select the vendor row (`select reference_number, status, submitted_at`) and return that in the mutation result.
-- Ensures both the success popup and the Success/Progress screen render the freshly stamped number.
+## Groups & fields
 
-`src/pages/VendorRegistration.tsx`:
-- Keep the existing `submittedReferenceNumber` state; populate it from the re-selected row so Success screen and popup match.
+Each group is a green-left-border card with the fields listed:
 
-## Expected outcomes
+1. **Global Theme** — Primary, Secondary, Success, Warning, Error, Background color, Page font family.
+2. **Typography** — Font family, base font size, heading font size, screen-name font size, base font weight, screen-name font weight, font color, line height.
+3. **Sidebar** — Background, text, active menu, hover, icon color, width (px).
+4. **Buttons** — Background, text, border, border-radius, font size, hover, disabled color.
+5. **Forms** — Input font size, input text color, placeholder color, border color, border-radius, focus border color, label font size, label color.
+6. **Tables** — Header bg, header text, row text, alternate row, border color, font size.
+7. **Cards** — Background, header color, border color, border-radius, shadow (preset: none / sm / md / lg).
 
-- Draft created 2026-07-07, submitted today 2026-07-13 → `20260713NNN`.
-- Same application resubmitted after rejection → same `20260713NNN` (frozen).
-- Approvals moving through SCM/Finance/CEO → number never changes.
-- New buyer-invited or on-behalf submissions today → `20260713NNN`.
-- Historic already-submitted rows keep their existing numbers.
+All colors use a color picker + hex input. Sizes use number inputs with `px` / `rem` where appropriate. Font family uses a select (Inter, Roboto, Poppins, Open Sans, System) + custom text.
 
-## Validation
-- Query active triggers on `vendors` to confirm only one reference trigger remains.
-- Insert a synthetic draft dated 07-Jul, transition to `scm_manager_review`, confirm reference is `20260713NNN`.
-- Update same row to `finance_1_review` and back to `returned_to_vendor` then `scm_manager_review` — confirm number does not change.
+## Actions
+
+- **Preview** — writes CSS vars live to `:root` while editing (no save).
+- **Save Changes** — persists to `portal_config` under key `ui_design_settings`.
+- **Reset to Defaults** — restores built-in tokens (removes overrides).
+
+## Runtime application
+
+- New hook `src/hooks/useDesignSettings.tsx`:
+  - Loads `portal_config.ui_design_settings` on app mount.
+  - Applies values by setting CSS custom properties on `document.documentElement`:
+    - Colors converted to HSL triplets to fit existing tokens (`--primary`, `--secondary`, `--background`, `--foreground`, `--destructive`, `--sidebar-*`, `--border`, `--input`, `--ring`, `--radius`, plus new `--btn-*`, `--table-*`, `--card-header`, `--card-shadow`, `--font-sans`, `--font-base-size`, `--heading-size`, `--screen-name-size`, `--font-weight-base`, `--screen-name-weight`, `--line-height-base`, `--sidebar-width`).
+  - Realtime subscription on `portal_config` so a Save from any admin propagates to open sessions.
+- Provider mounted in `src/main.tsx` next to `ThemeColorProvider` (order: DesignSettingsProvider inside ThemeColorProvider so brand palette still initializes first, design overrides applied after).
+- `src/index.css` gains a few new CSS variables (`--btn-*`, `--table-*`, `--card-header`, `--card-shadow`, `--font-sans`, `--font-base-size`, `--heading-size`, `--screen-name-size`, `--line-height-base`, `--sidebar-width`) with sensible defaults, and body/heading/sidebar rules read from them. Existing hardcoded values remain as fallback so nothing breaks if the design row is empty.
+
+## Persistence
+
+- Uses existing `portal_config` table (no schema change needed): one row with `config_key = 'ui_design_settings'`, `config_value = jsonb` matching the settings shape. RLS already covers admin write.
+
+## Sidebar / component wiring
+
+- `src/components/layout/Sidebar.tsx`: width driven by `var(--sidebar-width, 16rem)`, colors already use `--sidebar-*` tokens.
+- Buttons/forms/tables/cards: extend the shadcn variants to reference the new vars via Tailwind arbitrary values in the base component classes only (no per-page changes).
+
+## Files to add / edit
+
+Add:
+- `src/components/admin/DesignSettingsPanel.tsx` (UI + save/reset).
+- `src/hooks/useDesignSettings.tsx` (load, apply, subscribe, context).
+- `src/lib/designTokens.ts` (defaults, hex↔HSL helpers, CSS var mapping).
+
+Edit:
+- `src/pages/AdminConfiguration.tsx` — add tab trigger + content.
+- `src/main.tsx` — wrap App with `DesignSettingsProvider`.
+- `src/index.css` — declare new CSS variables with fallback defaults.
+- `src/components/layout/Sidebar.tsx` — use `--sidebar-width` var.
+- `tailwind.config.ts` — expose new vars where needed for `text-[hsl(var(...))]` usage.
+
+## Out of scope
+
+No changes to auth, vendor flows, approvals, SAP sync, or any business logic. No changes to existing tabs.
+
+## Acceptance
+
+- New tab visible in Admin Configuration for admins.
+- Changing any control updates the preview immediately.
+- Save Changes persists and all open browser tabs reflect the change on next load (or immediately via realtime).
+- Reset restores defaults everywhere.
+- No regression in existing screens.
