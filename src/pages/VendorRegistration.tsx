@@ -151,6 +151,7 @@ export default function VendorRegistration() {
   const [verifiedData, setVerifiedData] = useState<VerifiedDocumentData | undefined>(undefined);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
+  const [submittedReferenceNumber, setSubmittedReferenceNumber] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     open: boolean;
@@ -1375,6 +1376,8 @@ export default function VendorRegistration() {
         ? await resubmitVendor(formData)
         : await submitVendor(formData);
 
+      setSubmittedReferenceNumber((vendor as any)?.reference_number ?? null);
+
       // Mark invitation as used via SECURITY DEFINER RPC (RLS-safe)
       if (invitationToken) {
         const { error: claimErr } = await supabase.rpc('claim_invitation', {
@@ -1544,7 +1547,7 @@ export default function VendorRegistration() {
         <SuccessScreen
           status={vendorStatusState}
           vendorId={vendorId || undefined}
-          referenceNumber={(existingVendor as any)?.reference_number ?? undefined}
+          referenceNumber={submittedReferenceNumber ?? (existingVendor as any)?.reference_number ?? undefined}
           financeComments={existingVendor?.finance_comments}
           purchaseComments={existingVendor?.purchase_comments}
           onEdit={isTokenMode ? undefined : handleStartEdit}
