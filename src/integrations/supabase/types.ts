@@ -2054,6 +2054,7 @@ export type Database = {
           state: string | null
           status: Database["public"]["Enums"]["vendor_status"]
           store_capacity: string | null
+          submit_ref_locked_at: string | null
           submitted_at: string | null
           supply_capacity: string | null
           swift_iban_code: string | null
@@ -2254,6 +2255,7 @@ export type Database = {
           state?: string | null
           status?: Database["public"]["Enums"]["vendor_status"]
           store_capacity?: string | null
+          submit_ref_locked_at?: string | null
           submitted_at?: string | null
           supply_capacity?: string | null
           swift_iban_code?: string | null
@@ -2454,6 +2456,7 @@ export type Database = {
           state?: string | null
           status?: Database["public"]["Enums"]["vendor_status"]
           store_capacity?: string | null
+          submit_ref_locked_at?: string | null
           submitted_at?: string | null
           supply_capacity?: string | null
           swift_iban_code?: string | null

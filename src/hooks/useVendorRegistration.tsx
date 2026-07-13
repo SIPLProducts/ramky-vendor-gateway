@@ -1186,6 +1186,24 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
       if (updateError) throw updateError;
 
+      // Re-fetch the row so the freshly stamped reference_number (assigned by
+      // the DB trigger during the status transition) is reflected in the
+      // success popup and success screen.
+      try {
+        const { data: fresh } = await supabase
+          .from('vendors')
+          .select('reference_number, status, submitted_at')
+          .eq('id', vendor.id)
+          .maybeSingle();
+        if (fresh) {
+          (vendor as any).reference_number = (fresh as any).reference_number ?? (vendor as any).reference_number;
+          (vendor as any).status = (fresh as any).status ?? (vendor as any).status;
+          (vendor as any).submitted_at = (fresh as any).submitted_at ?? (vendor as any).submitted_at;
+        }
+      } catch (e) {
+        console.warn('[submitVendor] post-submit reference refetch failed (non-blocking):', e);
+      }
+
       // Mark invitation as used BEFORE notifying so the notification function
       // can resolve the inviter reliably.
       if (options?.onBehalfInvitationId) {
