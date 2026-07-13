@@ -224,11 +224,11 @@ export function DesignSettingsPanel() {
         <ColorInput label="Warning Color"    value={draft.theme.warning}    onChange={(v) => update('theme','warning',v)} />
         <ColorInput label="Error Color"      value={draft.theme.error}      onChange={(v) => update('theme','error',v)} />
         <ColorInput label="Background Color" value={draft.theme.background} onChange={(v) => update('theme','background',v)} />
-        <SelectField label="Page Font"       value={draft.theme.fontFamily} onChange={(v) => update('theme','fontFamily',v)} options={fontOptions} />
+        <FontSelectField label="Page Font"       value={draft.theme.fontFamily} onChange={(v) => update('theme','fontFamily',v)} />
       </SectionCard>
 
       <SectionCard title="Typography" icon={Type}>
-        <SelectField label="Font Family"           value={draft.typography.fontFamily} onChange={(v) => update('typography','fontFamily',v)} options={fontOptions} />
+        <FontSelectField label="Font Family"           value={draft.typography.fontFamily} onChange={(v) => update('typography','fontFamily',v)} />
         <TextInputField label="Base Font Size"     value={draft.typography.baseFontSize} onChange={(v) => update('typography','baseFontSize',v)} placeholder="14px" />
         <TextInputField label="Heading Font Size"  value={draft.typography.headingFontSize} onChange={(v) => update('typography','headingFontSize',v)} placeholder="24px" />
         <TextInputField label="Screen Name Size"   value={draft.typography.screenNameFontSize} onChange={(v) => update('typography','screenNameFontSize',v)} placeholder="18px" />
