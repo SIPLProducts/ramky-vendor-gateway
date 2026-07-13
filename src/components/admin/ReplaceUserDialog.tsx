@@ -31,6 +31,11 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
   const [counts, setCounts] = useState<Counts | null>(null);
   const [replacementId, setReplacementId] = useState<string>('');
 
+  // SAP tenants for the selected replacement user
+  const [sapTenants, setSapTenants] = useState<SapTenant[]>([]);
+  const [fetchingSap, setFetchingSap] = useState(false);
+  const [sapError, setSapError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open || !inactiveUser) return;
     setReplacementId('');
