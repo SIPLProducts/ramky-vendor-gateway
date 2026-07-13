@@ -855,6 +855,13 @@ export default function UserManagement() {
         onSave={handleSaveEditUser}
       />
 
+      <ReplaceUserDialog
+        open={!!replaceCtx}
+        onOpenChange={(o) => { if (!o) setReplaceCtx(null); }}
+        inactiveUser={replaceCtx?.inactiveUser ?? null}
+        onConfirmed={handleReplacementConfirmed}
+      />
+
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
