@@ -1,5 +1,6 @@
 // Design tokens for runtime UI configuration.
 // Stored as JSON in portal_config.ui_design_settings and applied to :root as CSS variables.
+import { ensureFontLoaded } from './googleFonts';
 
 export interface DesignSettings {
   theme: {
@@ -175,7 +176,9 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--destructive', hexToHslTriplet(s.theme.error));
   r.setProperty('--background', hexToHslTriplet(s.theme.background));
 
-  // Typography
+  // Typography — load web fonts on demand
+  ensureFontLoaded(s.typography.fontFamily);
+  ensureFontLoaded(s.theme.fontFamily);
   r.setProperty('--font-sans', `"${s.typography.fontFamily}", "Inter", system-ui, sans-serif`);
   r.setProperty('--font-base-size', s.typography.baseFontSize);
   r.setProperty('--heading-size', s.typography.headingFontSize);
