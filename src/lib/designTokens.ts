@@ -65,24 +65,7 @@ export interface DesignSettings {
     letterSpacing: string;
   };
 
-  forms: {
-    inputFontSize: string;
-    inputTextColor: string;
-    placeholderColor: string;
-    borderColor: string;
-    borderRadius: string;
-    focusBorderColor: string;
-    labelFontSize: string;
-    labelColor: string;
-  };
-  tables: {
-    headerBg: string;
-    headerText: string;
-    rowText: string;
-    altRow: string;
-    borderColor: string;
-    fontSize: string;
-  };
+
   cards: {
     background: string;
     header: string;
