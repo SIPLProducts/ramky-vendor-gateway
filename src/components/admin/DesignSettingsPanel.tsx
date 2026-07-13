@@ -92,6 +92,39 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   );
 }
 
+function FontSelectField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Select
+        value={value}
+        onValueChange={(v) => { ensureFontLoaded(v); onChange(v); }}
+      >
+        <SelectTrigger className="h-9" style={{ fontFamily: `"${value}", system-ui, sans-serif` }}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="max-h-80">
+          {FONT_GROUPS.map((g) => (
+            <SelectGroup key={g.label}>
+              <SelectLabel>{g.label}</SelectLabel>
+              {g.fonts.map((f) => (
+                <SelectItem
+                  key={f}
+                  value={f}
+                  style={{ fontFamily: `"${f}", system-ui, sans-serif` }}
+                  onMouseEnter={() => ensureFontLoaded(f)}
+                >
+                  {f}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
   return (
     <Card className="border-l-4 border-l-success">
