@@ -1547,7 +1547,7 @@ export default function VendorRegistration() {
         <SuccessScreen
           status={vendorStatusState}
           vendorId={vendorId || undefined}
-          referenceNumber={(existingVendor as any)?.reference_number ?? undefined}
+          referenceNumber={submittedReferenceNumber ?? (existingVendor as any)?.reference_number ?? undefined}
           financeComments={existingVendor?.finance_comments}
           purchaseComments={existingVendor?.purchase_comments}
           onEdit={isTokenMode ? undefined : handleStartEdit}
