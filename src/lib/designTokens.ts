@@ -246,6 +246,8 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--table-alt-row', s.tables.altRow);
   r.setProperty('--table-border', s.tables.borderColor);
   r.setProperty('--table-font-size', s.tables.fontSize);
+  r.setProperty('--table-letter-spacing', s.tables.letterSpacing || 'normal');
+
 
   // Cards
   r.setProperty('--card', hexToHslTriplet(s.cards.background));
