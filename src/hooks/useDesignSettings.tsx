@@ -6,6 +6,8 @@ import {
   applyDesignSettings,
   resetAppliedDesign,
 } from '@/lib/designTokens';
+import { startActionButtonTagger, stopActionButtonTagger } from '@/lib/actionButton';
+
 
 const CONFIG_KEY = 'ui_design_settings';
 
@@ -46,6 +48,7 @@ export function DesignSettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     load();
+    startActionButtonTagger();
     const channel = supabase
       .channel('portal_config_design')
       .on(
@@ -56,8 +59,10 @@ export function DesignSettingsProvider({ children }: { children: ReactNode }) {
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
+      stopActionButtonTagger();
     };
   }, [load]);
+
 
   const preview = useCallback((s: DesignSettings) => {
     applyDesignSettings(s);

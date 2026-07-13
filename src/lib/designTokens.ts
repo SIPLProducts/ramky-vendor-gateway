@@ -1,6 +1,16 @@
 // Design tokens for runtime UI configuration.
 // Stored as JSON in portal_config.ui_design_settings and applied to :root as CSS variables.
 import { ensureFontLoaded } from './googleFonts';
+import { ACTION_KEYS, type ActionKey } from './actionButton';
+
+export interface ActionButtonStyle {
+  background: string;
+  text: string;
+  border: string;
+  borderRadius: string;
+  fontSize: string;
+  hover: string;
+}
 
 export interface DesignSettings {
   theme: {
@@ -14,35 +24,38 @@ export interface DesignSettings {
   };
   typography: {
     fontFamily: string;
-    baseFontSize: string;      // e.g. "14px"
-    headingFontSize: string;   // e.g. "24px"
-    screenNameFontSize: string;// e.g. "18px"
-    fontWeight: string;        // e.g. "400"
-    screenNameFontWeight: string; // e.g. "600"
-    fontColor: string;         // hex
-    lineHeight: string;        // e.g. "1.5"
-    letterSpacing: string;         // e.g. "normal", "0.01em"
-    headingLetterSpacing: string;  // e.g. "-0.01em"
+    baseFontSize: string;
+    headingFontSize: string;
+    screenNameFontSize: string;
+    fontWeight: string;
+    screenNameFontWeight: string;
+    fontColor: string;
+    lineHeight: string;
+    letterSpacing: string;
+    headingLetterSpacing: string;
   };
 
   sidebar: {
     background: string;
     text: string;
-    active: string;
+    active: string;         // selected menu background
+    selectedBorder: string; // selected menu left border
+    selectedText: string;   // selected menu text color
     hover: string;
     icon: string;
-    width: string;             // e.g. "256px"
+    width: string;
   };
   buttons: {
     background: string;
     text: string;
     border: string;
-    borderRadius: string;      // e.g. "8px"
+    borderRadius: string;
     fontSize: string;
     hover: string;
     disabled: string;
     letterSpacing: string;
   };
+  actionButtons: Record<ActionKey, ActionButtonStyle>;
   forms: {
     inputFontSize: string;
     inputTextColor: string;
@@ -75,6 +88,53 @@ export interface DesignSettings {
   };
 }
 
+// Palette used for action-button defaults — mirrors current app colors.
+const PRIMARY = '#1f9d6a';
+const PRIMARY_HOVER = '#178857';
+const DESTRUCTIVE = '#dc2626';
+const DESTRUCTIVE_HOVER = '#b91c1c';
+const INFO = '#2f80ed';
+const INFO_HOVER = '#1e6fd9';
+const NEUTRAL = '#6b7280';
+const NEUTRAL_HOVER = '#4b5563';
+const ACCENT = '#0ea5e9';
+const ACCENT_HOVER = '#0284c7';
+const WHITE = '#ffffff';
+
+const filled = (bg: string, hover: string): ActionButtonStyle => ({
+  background: bg, text: WHITE, border: bg,
+  borderRadius: '8px', fontSize: '14px', hover,
+});
+const outline = (color: string, hover: string): ActionButtonStyle => ({
+  background: WHITE, text: color, border: color,
+  borderRadius: '8px', fontSize: '14px', hover,
+});
+
+const DEFAULT_ACTION_BUTTONS: Record<ActionKey, ActionButtonStyle> = {
+  approve:            filled(PRIMARY, PRIMARY_HOVER),
+  'approve-forward':  filled(PRIMARY, PRIMARY_HOVER),
+  reject:             filled(DESTRUCTIVE, DESTRUCTIVE_HOVER),
+  preview:            outline(INFO, '#eff6ff'),
+  'view-details':     outline(INFO, '#eff6ff'),
+  'add-config':       filled(PRIMARY, PRIMARY_HOVER),
+  save:               filled(PRIMARY, PRIMARY_HOVER),
+  update:             filled(PRIMARY, PRIMARY_HOVER),
+  create:             filled(PRIMARY, PRIMARY_HOVER),
+  search:             filled(INFO, INFO_HOVER),
+  reset:              outline(NEUTRAL, '#f3f4f6'),
+  'export-excel':     outline('#217346', '#e7f3ec'),
+  'export-pdf':       outline('#c1272d', '#fdecec'),
+  'export-csv':       outline(INFO, '#eff6ff'),
+  cancel:             outline(NEUTRAL, '#f3f4f6'),
+  clear:              outline(DESTRUCTIVE, '#fef2f2'),
+  sync:               filled(INFO, INFO_HOVER),
+  'duplicate-close':  filled(NEUTRAL, NEUTRAL_HOVER),
+  'send-vendor':      filled(ACCENT, ACCENT_HOVER),
+  submit:             filled(PRIMARY, PRIMARY_HOVER),
+  delete:             filled(DESTRUCTIVE, DESTRUCTIVE_HOVER),
+  invite:             filled(ACCENT, ACCENT_HOVER),
+};
+
 export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   theme: {
     primary: '#1f9d6a',
@@ -101,6 +161,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     background: '#16262d',
     text: '#d1dbde',
     active: '#233a46',
+    selectedBorder: '#23c4b5',
+    selectedText: '#ffffff',
     hover: '#1c2f38',
     icon: '#23c4b5',
     width: '256px',
@@ -115,6 +177,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     disabled: '#9ca3af',
     letterSpacing: '0.02em',
   },
+  actionButtons: DEFAULT_ACTION_BUTTONS,
   forms: {
     inputFontSize: '14px',
     inputTextColor: '#1f2a37',
@@ -183,7 +246,6 @@ export function applyDesignSettings(s: DesignSettings) {
   if (typeof document === 'undefined') return;
   const r = document.documentElement.style;
 
-  // Global theme → semantic tokens (HSL triplets to align with index.css)
   r.setProperty('--primary', hexToHslTriplet(s.theme.primary));
   r.setProperty('--ring', hexToHslTriplet(s.theme.primary));
   r.setProperty('--secondary', hexToHslTriplet(s.theme.secondary));
@@ -192,7 +254,6 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--destructive', hexToHslTriplet(s.theme.error));
   r.setProperty('--background', hexToHslTriplet(s.theme.background));
 
-  // Typography — load web fonts on demand
   ensureFontLoaded(s.typography.fontFamily);
   ensureFontLoaded(s.theme.fontFamily);
   r.setProperty('--font-sans', `"${s.typography.fontFamily}", "Inter", system-ui, sans-serif`);
@@ -211,11 +272,13 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--sidebar-background', hexToHslTriplet(s.sidebar.background));
   r.setProperty('--sidebar-foreground', hexToHslTriplet(s.sidebar.text));
   r.setProperty('--sidebar-accent', hexToHslTriplet(s.sidebar.active));
+  r.setProperty('--sidebar-accent-foreground', hexToHslTriplet(s.sidebar.selectedText));
+  r.setProperty('--sidebar-selected-border', s.sidebar.selectedBorder);
   r.setProperty('--sidebar-hover', hexToHslTriplet(s.sidebar.hover));
   r.setProperty('--sidebar-primary', hexToHslTriplet(s.sidebar.icon));
   r.setProperty('--sidebar-width', s.sidebar.width);
 
-  // Buttons
+  // Buttons (global fallback)
   r.setProperty('--btn-bg', s.buttons.background);
   r.setProperty('--btn-text', s.buttons.text);
   r.setProperty('--btn-border', s.buttons.border);
@@ -224,6 +287,18 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--btn-hover', s.buttons.hover);
   r.setProperty('--btn-disabled', s.buttons.disabled);
   r.setProperty('--btn-letter-spacing', s.buttons.letterSpacing || 'normal');
+
+  // Per-action buttons
+  for (const key of ACTION_KEYS) {
+    const a = s.actionButtons?.[key] ?? DEFAULT_ACTION_BUTTONS[key];
+    if (!a) continue;
+    r.setProperty(`--btn-${key}-bg`, a.background);
+    r.setProperty(`--btn-${key}-text`, a.text);
+    r.setProperty(`--btn-${key}-border`, a.border);
+    r.setProperty(`--btn-${key}-radius`, a.borderRadius);
+    r.setProperty(`--btn-${key}-font-size`, a.fontSize);
+    r.setProperty(`--btn-${key}-hover`, a.hover);
+  }
 
 
   // Forms
@@ -259,17 +334,23 @@ export function applyDesignSettings(s: DesignSettings) {
 
 export function resetAppliedDesign() {
   if (typeof document === 'undefined') return;
-  const props = [
+  const base = [
     '--primary','--ring','--secondary','--success','--warning','--destructive','--background',
     '--font-sans','--font-base-size','--heading-size','--screen-name-size','--font-weight-base',
     '--screen-name-weight','--foreground','--line-height-base','--letter-spacing','--heading-letter-spacing',
-    '--sidebar-background','--sidebar-foreground','--sidebar-accent','--sidebar-hover','--sidebar-primary','--sidebar-width',
+    '--sidebar-background','--sidebar-foreground','--sidebar-accent','--sidebar-accent-foreground','--sidebar-selected-border','--sidebar-hover','--sidebar-primary','--sidebar-width',
     '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-disabled','--btn-letter-spacing',
     '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color','--input-letter-spacing','--label-letter-spacing',
     '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size','--table-letter-spacing',
     '--card','--card-header-color','--border','--radius','--card-shadow',
-
   ];
+  const perAction: string[] = [];
+  for (const k of ACTION_KEYS) {
+    perAction.push(
+      `--btn-${k}-bg`, `--btn-${k}-text`, `--btn-${k}-border`,
+      `--btn-${k}-radius`, `--btn-${k}-font-size`, `--btn-${k}-hover`,
+    );
+  }
   const s = document.documentElement.style;
-  props.forEach((p) => s.removeProperty(p));
+  [...base, ...perAction].forEach((p) => s.removeProperty(p));
 }

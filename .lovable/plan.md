@@ -1,50 +1,113 @@
-# Improve Typography Clarity — Add Letter Spacing Controls
+## UI Design Settings — Sidebar & Per-Action Button Configuration
 
-Times New Roman is loading, but at the current sizing the text feels tight/cramped. Add explicit letter-spacing (tracking) controls to the Design Settings so admins can loosen the text globally and per-surface, plus a couple of readability defaults that make serif fonts look cleaner.
+Extend the existing Design Settings tab with (1) full sidebar theming including selected-menu styling, and (2) per-action button styling that flows to every module. No business logic touched — presentation tokens only.
 
-## Changes
+### 1. Sidebar card additions
 
-### 1. `src/lib/designTokens.ts`
-Extend `DesignSettings` with new fields (all optional-safe via defaults):
-- `typography.letterSpacing` (e.g. `normal`, `0.01em`, `0.02em`, `0.5px`) → `--letter-spacing`
-- `typography.headingLetterSpacing` → `--heading-letter-spacing`
-- `tables.letterSpacing` → `--table-letter-spacing`
-- `buttons.letterSpacing` → `--btn-letter-spacing`
-- `forms.inputLetterSpacing` → `--input-letter-spacing`
-- `forms.labelLetterSpacing` → `--label-letter-spacing`
+Add missing controls to `sidebar` in `DesignSettings`:
 
-Defaults tuned for readability:
-- body `0.01em`, headings `-0.01em`, buttons `0.02em`, labels `0.02em`, tables `0.01em`, inputs `0.01em`.
+- Selected Menu Background Color (already covered by `active` — relabel to "Selected Menu Background")
+- **Selected Menu Border Color** (new — `selectedBorder`)
+- **Selected Menu Text Color** (new — `selectedText`)
+- Existing kept: Background, Text, Icon, Hover, Width
 
-Apply each via `document.documentElement.style.setProperty(...)` in `applyDesignSettings`.
+New CSS variables written from `applyDesignSettings`:
+- `--sidebar-selected-border`, `--sidebar-selected-foreground`
 
-### 2. `src/index.css`
-Bridge the new CSS variables to real elements:
+Bridges in `src/index.css` target the shadcn sidebar active state:
 ```css
-html, body { letter-spacing: var(--letter-spacing, normal); }
-h1,h2,h3,h4,h5,h6 { letter-spacing: var(--heading-letter-spacing, normal); }
-button, [role="button"], .btn { letter-spacing: var(--btn-letter-spacing, normal); }
-input, textarea, select { letter-spacing: var(--input-letter-spacing, normal); }
-label { letter-spacing: var(--label-letter-spacing, normal); }
-table, th, td { letter-spacing: var(--table-letter-spacing, normal); }
+[data-sidebar="menu-button"][data-active="true"] {
+  background: hsl(var(--sidebar-accent));
+  color: var(--sidebar-selected-foreground, hsl(var(--sidebar-accent-foreground)));
+  border-left: 3px solid var(--sidebar-selected-border, transparent);
+}
 ```
-Also add a global body rule:
+
+### 2. Buttons card — per-action styling
+
+Replace the single "Buttons" block with:
+
+- **Global Buttons** (default fallback — the current fields stay as the baseline)
+- **Action Buttons** — a repeatable grid of accordion rows, one per action:
+
+  Approve, Reject, Preview, View Details, Add Config, Save, Update, Create, Search, Reset, Export Excel, Export PDF, Export CSV, Cancel, Clear, Sync, Duplicate & Close, Send to Vendor, Submit, Delete, Invite, Approve & Forward.
+
+  Each row exposes: Background, Border, Text, Border Radius, Font Size, Hover.
+
+Data shape added to `DesignSettings`:
+```ts
+actionButtons: Record<ActionKey, {
+  background: string; text: string; border: string;
+  borderRadius: string; fontSize: string; hover: string;
+}>
+```
+
+`applyDesignSettings` emits scoped CSS variables per action:
+```
+--btn-approve-bg, --btn-approve-text, --btn-approve-border,
+--btn-approve-radius, --btn-approve-font-size, --btn-approve-hover
+… (same for every action key)
+```
+
+`src/index.css` adds one selector per action, matched by a `data-action` attribute:
 ```css
-body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+[data-action="approve"] {
+  background: var(--btn-approve-bg) !important;
+  color: var(--btn-approve-text) !important;
+  border: 1px solid var(--btn-approve-border) !important;
+  border-radius: var(--btn-approve-radius) !important;
+  font-size: var(--btn-approve-font-size) !important;
+}
+[data-action="approve"]:hover { background: var(--btn-approve-hover) !important; }
 ```
-so serif fonts (Times New Roman, Georgia) render crisply.
 
-### 3. `src/components/admin/DesignSettingsPanel.tsx`
-Add new inputs (using existing `TextInputField`):
-- **Typography** section: `Letter Spacing`, `Heading Letter Spacing` (placeholder `0.01em`, `normal`, `0.5px`).
-- **Buttons** section: `Letter Spacing`.
-- **Forms** section: `Input Letter Spacing`, `Label Letter Spacing`.
-- **Tables** section: `Letter Spacing`.
+### 3. Applying action styles across modules
 
-Each accepts any valid CSS value (`normal`, `em`, `px`, `rem`). Helper text under Typography: "Use `0.01em`–`0.03em` to make serif fonts like Times New Roman easier to read."
+To reach User Management, Vendor Invitations, Buyer Approval, All Vendors, Reports, Admin Configuration, KYC/SAP API Settings, Email Configuration, Dashboard, and approval screens without touching business logic, add a tiny presentation helper:
 
-### 4. Migration safety
-`mergeDeep` in `useDesignSettings.tsx` already merges new keys from defaults, so existing saved configs pick up the new letter-spacing defaults without a DB migration.
+`src/lib/actionButton.ts`
+```ts
+export const actionProps = (action: ActionKey) => ({ 'data-action': action });
+```
 
-## Out of scope
-No changes to backend, storage schema, business logic, or page-level components. Purely presentation tokens in the Design Settings tab.
+Then in each page's existing `<Button>` usages, add `{...actionProps('approve')}` (or the matching key). This is a pure prop addition — no handlers, state, or logic change. The change is mechanical and confined to JSX attributes on already-existing buttons.
+
+Scope of files that receive the `data-action` prop (buttons already present, just tagged):
+```text
+src/pages/UserManagement.tsx
+src/pages/AdminInvitations.tsx
+src/pages/VendorList.tsx
+src/pages/Reports.tsx
+src/pages/AdminConfiguration.tsx
+src/pages/KycApiSettings.tsx
+src/pages/SapApiSettings.tsx
+src/pages/EmailConfiguration.tsx
+src/pages/Dashboard.tsx
+src/pages/approvals/*.tsx
+src/components/admin/*.tsx  (Save / Create / Update / Cancel / Reset / Add Config buttons)
+src/components/vendor/VendorReviewDialog.tsx (Approve / Reject / Send to Vendor)
+src/components/sap/*.tsx (Sync / Duplicate & Close / Preview)
+```
+
+### 4. Defaults from the current UI
+
+`DEFAULT_DESIGN_SETTINGS.actionButtons` is seeded with the colors currently used in the app:
+- Approve / Save / Create / Update / Submit → primary green `#1f9d6a`
+- Reject / Delete / Clear → destructive `#dc2626`
+- Preview / View Details / Sync / Export → info `#2f80ed` outline style
+- Cancel / Reset → neutral outline `#6b7280`
+- Send to Vendor / Invite → accent `#0ea5e9`
+
+`useDesignSettings.mergeDeep` already backfills missing keys from defaults, so existing tenants pick these up automatically on first load — the panel shows the live current colors as editable defaults.
+
+### 5. Files changed
+
+- `src/lib/designTokens.ts` — extend `DesignSettings` (sidebar selected fields, `actionButtons` map, `ActionKey` union), extend `DEFAULT_DESIGN_SETTINGS`, extend `applyDesignSettings`, extend reset list.
+- `src/components/admin/DesignSettingsPanel.tsx` — new sidebar fields, new "Action Buttons" accordion section with per-action rows.
+- `src/index.css` — sidebar selected bridges + per-action `[data-action="…"]` bridges.
+- `src/lib/actionButton.ts` — new tiny helper exporting `actionProps` and `ActionKey`.
+- Mechanical prop-only edits across the page/component files listed above.
+
+### Out of scope
+
+No changes to auth, RLS, edge functions, DB schema, vendor workflow, validations, or any handler code. Purely visual tokens and JSX attribute tagging.

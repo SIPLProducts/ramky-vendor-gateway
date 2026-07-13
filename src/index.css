@@ -444,3 +444,54 @@
     font-size: var(--heading-size, inherit);
   }
 }
+
+/* ================================================================
+ * Sidebar — selected menu styling bridges
+ * ================================================================ */
+@layer base {
+  [data-sidebar="menu-button"][data-active="true"] {
+    color: hsl(var(--sidebar-accent-foreground)) !important;
+    border-left: 3px solid var(--sidebar-selected-border, transparent) !important;
+  }
+}
+
+/* ================================================================
+ * Per-action button styling
+ * Reads --btn-<action>-* variables set by applyDesignSettings.
+ * Elements are tagged with data-action="<key>" by src/lib/actionButton.ts.
+ * ================================================================ */
+button[data-action] {
+  background: var(--btn-action-bg) !important;
+  color: var(--btn-action-text) !important;
+  border: 1px solid var(--btn-action-border) !important;
+  border-radius: var(--btn-action-radius) !important;
+  font-size: var(--btn-action-font-size) !important;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+button[data-action]:hover:not(:disabled) {
+  background: var(--btn-action-hover) !important;
+}
+
+button[data-action="approve"]           { --btn-action-bg: var(--btn-approve-bg); --btn-action-text: var(--btn-approve-text); --btn-action-border: var(--btn-approve-border); --btn-action-radius: var(--btn-approve-radius); --btn-action-font-size: var(--btn-approve-font-size); --btn-action-hover: var(--btn-approve-hover); }
+button[data-action="approve-forward"]   { --btn-action-bg: var(--btn-approve-forward-bg); --btn-action-text: var(--btn-approve-forward-text); --btn-action-border: var(--btn-approve-forward-border); --btn-action-radius: var(--btn-approve-forward-radius); --btn-action-font-size: var(--btn-approve-forward-font-size); --btn-action-hover: var(--btn-approve-forward-hover); }
+button[data-action="reject"]            { --btn-action-bg: var(--btn-reject-bg); --btn-action-text: var(--btn-reject-text); --btn-action-border: var(--btn-reject-border); --btn-action-radius: var(--btn-reject-radius); --btn-action-font-size: var(--btn-reject-font-size); --btn-action-hover: var(--btn-reject-hover); }
+button[data-action="preview"]           { --btn-action-bg: var(--btn-preview-bg); --btn-action-text: var(--btn-preview-text); --btn-action-border: var(--btn-preview-border); --btn-action-radius: var(--btn-preview-radius); --btn-action-font-size: var(--btn-preview-font-size); --btn-action-hover: var(--btn-preview-hover); }
+button[data-action="view-details"]      { --btn-action-bg: var(--btn-view-details-bg); --btn-action-text: var(--btn-view-details-text); --btn-action-border: var(--btn-view-details-border); --btn-action-radius: var(--btn-view-details-radius); --btn-action-font-size: var(--btn-view-details-font-size); --btn-action-hover: var(--btn-view-details-hover); }
+button[data-action="add-config"]        { --btn-action-bg: var(--btn-add-config-bg); --btn-action-text: var(--btn-add-config-text); --btn-action-border: var(--btn-add-config-border); --btn-action-radius: var(--btn-add-config-radius); --btn-action-font-size: var(--btn-add-config-font-size); --btn-action-hover: var(--btn-add-config-hover); }
+button[data-action="save"]              { --btn-action-bg: var(--btn-save-bg); --btn-action-text: var(--btn-save-text); --btn-action-border: var(--btn-save-border); --btn-action-radius: var(--btn-save-radius); --btn-action-font-size: var(--btn-save-font-size); --btn-action-hover: var(--btn-save-hover); }
+button[data-action="update"]            { --btn-action-bg: var(--btn-update-bg); --btn-action-text: var(--btn-update-text); --btn-action-border: var(--btn-update-border); --btn-action-radius: var(--btn-update-radius); --btn-action-font-size: var(--btn-update-font-size); --btn-action-hover: var(--btn-update-hover); }
+button[data-action="create"]            { --btn-action-bg: var(--btn-create-bg); --btn-action-text: var(--btn-create-text); --btn-action-border: var(--btn-create-border); --btn-action-radius: var(--btn-create-radius); --btn-action-font-size: var(--btn-create-font-size); --btn-action-hover: var(--btn-create-hover); }
+button[data-action="search"]            { --btn-action-bg: var(--btn-search-bg); --btn-action-text: var(--btn-search-text); --btn-action-border: var(--btn-search-border); --btn-action-radius: var(--btn-search-radius); --btn-action-font-size: var(--btn-search-font-size); --btn-action-hover: var(--btn-search-hover); }
+button[data-action="reset"]             { --btn-action-bg: var(--btn-reset-bg); --btn-action-text: var(--btn-reset-text); --btn-action-border: var(--btn-reset-border); --btn-action-radius: var(--btn-reset-radius); --btn-action-font-size: var(--btn-reset-font-size); --btn-action-hover: var(--btn-reset-hover); }
+button[data-action="export-excel"]      { --btn-action-bg: var(--btn-export-excel-bg); --btn-action-text: var(--btn-export-excel-text); --btn-action-border: var(--btn-export-excel-border); --btn-action-radius: var(--btn-export-excel-radius); --btn-action-font-size: var(--btn-export-excel-font-size); --btn-action-hover: var(--btn-export-excel-hover); }
+button[data-action="export-pdf"]        { --btn-action-bg: var(--btn-export-pdf-bg); --btn-action-text: var(--btn-export-pdf-text); --btn-action-border: var(--btn-export-pdf-border); --btn-action-radius: var(--btn-export-pdf-radius); --btn-action-font-size: var(--btn-export-pdf-font-size); --btn-action-hover: var(--btn-export-pdf-hover); }
+button[data-action="export-csv"]        { --btn-action-bg: var(--btn-export-csv-bg); --btn-action-text: var(--btn-export-csv-text); --btn-action-border: var(--btn-export-csv-border); --btn-action-radius: var(--btn-export-csv-radius); --btn-action-font-size: var(--btn-export-csv-font-size); --btn-action-hover: var(--btn-export-csv-hover); }
+button[data-action="cancel"]            { --btn-action-bg: var(--btn-cancel-bg); --btn-action-text: var(--btn-cancel-text); --btn-action-border: var(--btn-cancel-border); --btn-action-radius: var(--btn-cancel-radius); --btn-action-font-size: var(--btn-cancel-font-size); --btn-action-hover: var(--btn-cancel-hover); }
+button[data-action="clear"]             { --btn-action-bg: var(--btn-clear-bg); --btn-action-text: var(--btn-clear-text); --btn-action-border: var(--btn-clear-border); --btn-action-radius: var(--btn-clear-radius); --btn-action-font-size: var(--btn-clear-font-size); --btn-action-hover: var(--btn-clear-hover); }
+button[data-action="sync"]              { --btn-action-bg: var(--btn-sync-bg); --btn-action-text: var(--btn-sync-text); --btn-action-border: var(--btn-sync-border); --btn-action-radius: var(--btn-sync-radius); --btn-action-font-size: var(--btn-sync-font-size); --btn-action-hover: var(--btn-sync-hover); }
+button[data-action="duplicate-close"]   { --btn-action-bg: var(--btn-duplicate-close-bg); --btn-action-text: var(--btn-duplicate-close-text); --btn-action-border: var(--btn-duplicate-close-border); --btn-action-radius: var(--btn-duplicate-close-radius); --btn-action-font-size: var(--btn-duplicate-close-font-size); --btn-action-hover: var(--btn-duplicate-close-hover); }
+button[data-action="send-vendor"]       { --btn-action-bg: var(--btn-send-vendor-bg); --btn-action-text: var(--btn-send-vendor-text); --btn-action-border: var(--btn-send-vendor-border); --btn-action-radius: var(--btn-send-vendor-radius); --btn-action-font-size: var(--btn-send-vendor-font-size); --btn-action-hover: var(--btn-send-vendor-hover); }
+button[data-action="submit"]            { --btn-action-bg: var(--btn-submit-bg); --btn-action-text: var(--btn-submit-text); --btn-action-border: var(--btn-submit-border); --btn-action-radius: var(--btn-submit-radius); --btn-action-font-size: var(--btn-submit-font-size); --btn-action-hover: var(--btn-submit-hover); }
+button[data-action="delete"]            { --btn-action-bg: var(--btn-delete-bg); --btn-action-text: var(--btn-delete-text); --btn-action-border: var(--btn-delete-border); --btn-action-radius: var(--btn-delete-radius); --btn-action-font-size: var(--btn-delete-font-size); --btn-action-hover: var(--btn-delete-hover); }
+button[data-action="invite"]            { --btn-action-bg: var(--btn-invite-bg); --btn-action-text: var(--btn-invite-text); --btn-action-border: var(--btn-invite-border); --btn-action-radius: var(--btn-invite-radius); --btn-action-font-size: var(--btn-invite-font-size); --btn-action-hover: var(--btn-invite-hover); }
+

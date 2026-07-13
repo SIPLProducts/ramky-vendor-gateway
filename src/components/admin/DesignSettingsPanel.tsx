@@ -7,12 +7,40 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useDesignSettings } from '@/hooks/useDesignSettings';
-import { DEFAULT_DESIGN_SETTINGS, DesignSettings } from '@/lib/designTokens';
+import { DEFAULT_DESIGN_SETTINGS, DesignSettings, ActionButtonStyle } from '@/lib/designTokens';
 import { ensureFontLoaded } from '@/lib/googleFonts';
+import { ACTION_KEYS, type ActionKey } from '@/lib/actionButton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Palette, Type, PanelLeft, MousePointer2, FormInput, Table2, LayoutGrid,
   Save, RotateCcw, AlertCircle,
 } from 'lucide-react';
+
+const ACTION_LABELS: Record<ActionKey, string> = {
+  approve: 'Approve',
+  'approve-forward': 'Approve & Forward',
+  reject: 'Reject',
+  preview: 'Preview',
+  'view-details': 'View Details',
+  'add-config': 'Add Config',
+  save: 'Save',
+  update: 'Update',
+  create: 'Create',
+  search: 'Search',
+  reset: 'Reset',
+  'export-excel': 'Export Excel',
+  'export-pdf': 'Export PDF',
+  'export-csv': 'Export CSV',
+  cancel: 'Cancel',
+  clear: 'Clear',
+  sync: 'Sync',
+  'duplicate-close': 'Duplicate & Close',
+  'send-vendor': 'Send to Vendor',
+  submit: 'Submit',
+  delete: 'Delete',
+  invite: 'Invite',
+};
+
 
 const FONT_GROUPS: { label: string; fonts: string[] }[] = [
   {
@@ -242,15 +270,17 @@ export function DesignSettingsPanel() {
       </SectionCard>
 
       <SectionCard title="Sidebar" icon={PanelLeft}>
-        <ColorInput label="Background Color"  value={draft.sidebar.background} onChange={(v) => update('sidebar','background',v)} />
-        <ColorInput label="Text Color"        value={draft.sidebar.text}       onChange={(v) => update('sidebar','text',v)} />
-        <ColorInput label="Active Menu Color" value={draft.sidebar.active}     onChange={(v) => update('sidebar','active',v)} />
-        <ColorInput label="Hover Color"       value={draft.sidebar.hover}      onChange={(v) => update('sidebar','hover',v)} />
-        <ColorInput label="Icon Color"        value={draft.sidebar.icon}       onChange={(v) => update('sidebar','icon',v)} />
-        <TextInputField label="Sidebar Width" value={draft.sidebar.width}      onChange={(v) => update('sidebar','width',v)} placeholder="256px" />
+        <ColorInput label="Sidebar Background Color"     value={draft.sidebar.background}     onChange={(v) => update('sidebar','background',v)} />
+        <ColorInput label="Sidebar Text Color"           value={draft.sidebar.text}           onChange={(v) => update('sidebar','text',v)} />
+        <ColorInput label="Sidebar Icon Color"           value={draft.sidebar.icon}           onChange={(v) => update('sidebar','icon',v)} />
+        <ColorInput label="Sidebar Hover Color"          value={draft.sidebar.hover}          onChange={(v) => update('sidebar','hover',v)} />
+        <ColorInput label="Selected Menu Background"     value={draft.sidebar.active}         onChange={(v) => update('sidebar','active',v)} />
+        <ColorInput label="Selected Menu Border Color"   value={draft.sidebar.selectedBorder} onChange={(v) => update('sidebar','selectedBorder',v)} />
+        <ColorInput label="Selected Menu Text Color"     value={draft.sidebar.selectedText}   onChange={(v) => update('sidebar','selectedText',v)} />
+        <TextInputField label="Sidebar Width"            value={draft.sidebar.width}          onChange={(v) => update('sidebar','width',v)} placeholder="256px" />
       </SectionCard>
 
-      <SectionCard title="Buttons" icon={MousePointer2}>
+      <SectionCard title="Buttons (Global Defaults)" icon={MousePointer2}>
         <ColorInput label="Background Color"     value={draft.buttons.background}   onChange={(v) => update('buttons','background',v)} />
         <ColorInput label="Text Color"           value={draft.buttons.text}         onChange={(v) => update('buttons','text',v)} />
         <ColorInput label="Border Color"         value={draft.buttons.border}       onChange={(v) => update('buttons','border',v)} />
@@ -261,6 +291,61 @@ export function DesignSettingsPanel() {
         <TextInputField label="Letter Spacing"   value={draft.buttons.letterSpacing} onChange={(v) => update('buttons','letterSpacing',v)} placeholder="0.02em" />
 
       </SectionCard>
+
+      <Card className="border-l-4 border-l-success">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MousePointer2 className="h-4 w-4 text-success" />
+            Action Buttons
+          </CardTitle>
+          <p className="text-xs text-muted-foreground pt-1">
+            Style specific action buttons (Approve, Reject, Save, Export, etc.). These styles apply across all modules automatically.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Accordion type="multiple" className="w-full">
+            {ACTION_KEYS.map((key) => {
+              const style = draft.actionButtons?.[key] ?? DEFAULT_DESIGN_SETTINGS.actionButtons[key];
+              const setField = <K extends keyof ActionButtonStyle>(field: K, value: ActionButtonStyle[K]) => {
+                const next: DesignSettings = {
+                  ...draft,
+                  actionButtons: {
+                    ...draft.actionButtons,
+                    [key]: { ...style, [field]: value },
+                  },
+                };
+                setDraft(next);
+                preview(next);
+              };
+              return (
+                <AccordionItem key={key} value={key}>
+                  <AccordionTrigger className="text-sm hover:no-underline">
+                    <span className="flex items-center gap-3">
+                      <span
+                        className="inline-block h-5 w-10 rounded border"
+                        style={{ background: style.background, borderColor: style.border }}
+                        aria-hidden
+                      />
+                      <span className="font-medium">{ACTION_LABELS[key]}</span>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-2">
+                      <ColorInput label="Background Color" value={style.background} onChange={(v) => setField('background', v)} />
+                      <ColorInput label="Text Color"       value={style.text}       onChange={(v) => setField('text', v)} />
+                      <ColorInput label="Border Color"     value={style.border}     onChange={(v) => setField('border', v)} />
+                      <ColorInput label="Hover Color"      value={style.hover}      onChange={(v) => setField('hover', v)} />
+                      <TextInputField label="Border Radius" value={style.borderRadius} onChange={(v) => setField('borderRadius', v)} placeholder="8px" />
+                      <TextInputField label="Font Size"     value={style.fontSize}     onChange={(v) => setField('fontSize', v)} placeholder="14px" />
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </CardContent>
+      </Card>
+
 
       <SectionCard title="Forms" icon={FormInput}>
         <TextInputField label="Input Font Size"   value={draft.forms.inputFontSize}    onChange={(v) => update('forms','inputFontSize',v)} placeholder="14px" />
