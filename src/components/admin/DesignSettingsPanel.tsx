@@ -176,6 +176,8 @@ export function DesignSettingsPanel() {
   const { toast } = useToast();
   const [draft, setDraft] = useState<DesignSettings>(settings);
   const [saving, setSaving] = useState(false);
+  const [openAction, setOpenAction] = useState<ActionKey | null>(null);
+
 
   useEffect(() => { setDraft(settings); }, [settings]);
 
