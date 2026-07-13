@@ -94,6 +94,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     screenNameFontWeight: '600',
     fontColor: '#1f2a37',
     lineHeight: '1.5',
+    letterSpacing: '0.01em',
+    headingLetterSpacing: '-0.01em',
   },
   sidebar: {
     background: '#16262d',
@@ -111,6 +113,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     fontSize: '14px',
     hover: '#178857',
     disabled: '#9ca3af',
+    letterSpacing: '0.02em',
   },
   forms: {
     inputFontSize: '14px',
@@ -121,6 +124,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     focusBorderColor: '#1f9d6a',
     labelFontSize: '13px',
     labelColor: '#374151',
+    inputLetterSpacing: '0.01em',
+    labelLetterSpacing: '0.02em',
   },
   tables: {
     headerBg: '#f3f6f8',
@@ -129,7 +134,9 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     altRow: '#f9fafb',
     borderColor: '#e5e7eb',
     fontSize: '14px',
+    letterSpacing: '0.01em',
   },
+
   cards: {
     background: '#ffffff',
     header: '#111827',
