@@ -41,7 +41,30 @@ export interface DesignSettings {
     fontSize: string;
     hover: string;
     disabled: string;
+    letterSpacing: string;
   };
+  forms: {
+    inputFontSize: string;
+    inputTextColor: string;
+    placeholderColor: string;
+    borderColor: string;
+    borderRadius: string;
+    focusBorderColor: string;
+    labelFontSize: string;
+    labelColor: string;
+    inputLetterSpacing: string;
+    labelLetterSpacing: string;
+  };
+  tables: {
+    headerBg: string;
+    headerText: string;
+    rowText: string;
+    altRow: string;
+    borderColor: string;
+    fontSize: string;
+    letterSpacing: string;
+  };
+
   forms: {
     inputFontSize: string;
     inputTextColor: string;
