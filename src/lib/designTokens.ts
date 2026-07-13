@@ -223,6 +223,8 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--btn-font-size', s.buttons.fontSize);
   r.setProperty('--btn-hover', s.buttons.hover);
   r.setProperty('--btn-disabled', s.buttons.disabled);
+  r.setProperty('--btn-letter-spacing', s.buttons.letterSpacing || 'normal');
+
 
   // Forms
   r.setProperty('--input-font-size', s.forms.inputFontSize);
