@@ -280,6 +280,8 @@ export function DesignSettingsPanel() {
         <ColorInput label="Selected Menu Border Color"   value={draft.sidebar.selectedBorder} onChange={(v) => update('sidebar','selectedBorder',v)} />
         <ColorInput label="Selected Menu Text Color"     value={draft.sidebar.selectedText}   onChange={(v) => update('sidebar','selectedText',v)} />
         <TextInputField label="Sidebar Width"            value={draft.sidebar.width}          onChange={(v) => update('sidebar','width',v)} placeholder="256px" />
+        <TextInputField label="Menu Font Size"           value={draft.sidebar.fontSize}       onChange={(v) => update('sidebar','fontSize',v)} placeholder="14px" />
+        <SelectField label="Menu Font Weight"            value={draft.sidebar.fontWeight}     onChange={(v) => update('sidebar','fontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
       </SectionCard>
 
       <SectionCard title="Buttons (Global Defaults)" icon={MousePointer2}>
@@ -288,11 +290,14 @@ export function DesignSettingsPanel() {
         <ColorInput label="Border Color"         value={draft.buttons.border}       onChange={(v) => update('buttons','border',v)} />
         <TextInputField label="Border Radius"    value={draft.buttons.borderRadius} onChange={(v) => update('buttons','borderRadius',v)} placeholder="8px" />
         <TextInputField label="Font Size"        value={draft.buttons.fontSize}     onChange={(v) => update('buttons','fontSize',v)} placeholder="14px" />
-        <ColorInput label="Hover Color"          value={draft.buttons.hover}        onChange={(v) => update('buttons','hover',v)} />
+        <ColorInput label="Hover Background"     value={draft.buttons.hover}        onChange={(v) => update('buttons','hover',v)} />
+        <ColorInput label="Hover Text Color"     value={draft.buttons.hoverText}    onChange={(v) => update('buttons','hoverText',v)} />
+        <ColorInput label="Hover Border Color"   value={draft.buttons.hoverBorder}  onChange={(v) => update('buttons','hoverBorder',v)} />
         <ColorInput label="Disabled State Color" value={draft.buttons.disabled}     onChange={(v) => update('buttons','disabled',v)} />
         <TextInputField label="Letter Spacing"   value={draft.buttons.letterSpacing} onChange={(v) => update('buttons','letterSpacing',v)} placeholder="0.02em" />
 
       </SectionCard>
+
 
       <Card className="border-l-4 border-l-success">
         <CardHeader className="pb-3">
@@ -353,10 +358,13 @@ export function DesignSettingsPanel() {
                       <ColorInput label="Background Color" value={style.background} onChange={(v) => setField('background', v)} />
                       <ColorInput label="Text Color"       value={style.text}       onChange={(v) => setField('text', v)} />
                       <ColorInput label="Border Color"     value={style.border}     onChange={(v) => setField('border', v)} />
-                      <ColorInput label="Hover Color"      value={style.hover}      onChange={(v) => setField('hover', v)} />
+                      <ColorInput label="Hover Background" value={style.hover}      onChange={(v) => setField('hover', v)} />
+                      <ColorInput label="Hover Text Color" value={style.hoverText ?? style.text}     onChange={(v) => setField('hoverText', v)} />
+                      <ColorInput label="Hover Border Color" value={style.hoverBorder ?? style.hover} onChange={(v) => setField('hoverBorder', v)} />
                       <TextInputField label="Border Radius" value={style.borderRadius} onChange={(v) => setField('borderRadius', v)} placeholder="8px" />
                       <TextInputField label="Font Size"     value={style.fontSize}     onChange={(v) => setField('fontSize', v)} placeholder="14px" />
                     </div>
+
                     <div className="flex justify-end pt-2">
                       <Button data-action-skip variant="outline" onClick={() => setOpenAction(null)}>Done</Button>
                     </div>
@@ -390,9 +398,12 @@ export function DesignSettingsPanel() {
         <ColorInput label="Row Text Color"       value={draft.tables.rowText}     onChange={(v) => update('tables','rowText',v)} />
         <ColorInput label="Alternate Row Color"  value={draft.tables.altRow}      onChange={(v) => update('tables','altRow',v)} />
         <ColorInput label="Border Color"         value={draft.tables.borderColor} onChange={(v) => update('tables','borderColor',v)} />
-        <TextInputField label="Font Size"        value={draft.tables.fontSize}    onChange={(v) => update('tables','fontSize',v)} placeholder="14px" />
+        <TextInputField label="Base Font Size"   value={draft.tables.fontSize}    onChange={(v) => update('tables','fontSize',v)} placeholder="14px" />
         <TextInputField label="Letter Spacing"   value={draft.tables.letterSpacing} onChange={(v) => update('tables','letterSpacing',v)} placeholder="0.01em" />
-
+        <TextInputField label="Header Font Size"   value={draft.tables.headerFontSize}   onChange={(v) => update('tables','headerFontSize',v)} placeholder="13px" />
+        <SelectField label="Header Font Weight"    value={draft.tables.headerFontWeight} onChange={(v) => update('tables','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
+        <TextInputField label="Body Font Size"     value={draft.tables.bodyFontSize}     onChange={(v) => update('tables','bodyFontSize',v)} placeholder="14px" />
+        <SelectField label="Body Font Weight"      value={draft.tables.bodyFontWeight}   onChange={(v) => update('tables','bodyFontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
       </SectionCard>
 
       <SectionCard title="Cards" icon={LayoutGrid}>
@@ -401,7 +412,12 @@ export function DesignSettingsPanel() {
         <ColorInput label="Border Color"         value={draft.cards.border}       onChange={(v) => update('cards','border',v)} />
         <TextInputField label="Border Radius"    value={draft.cards.borderRadius} onChange={(v) => update('cards','borderRadius',v)} placeholder="12px" />
         <SelectField label="Shadow"              value={draft.cards.shadow}       onChange={(v) => update('cards','shadow', v as any)} options={shadowOptions} />
+        <TextInputField label="Header Font Size"   value={draft.cards.headerFontSize}   onChange={(v) => update('cards','headerFontSize',v)} placeholder="16px" />
+        <SelectField label="Header Font Weight"    value={draft.cards.headerFontWeight} onChange={(v) => update('cards','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
+        <TextInputField label="Body Font Size"     value={draft.cards.bodyFontSize}     onChange={(v) => update('cards','bodyFontSize',v)} placeholder="14px" />
+        <SelectField label="Body Font Weight"      value={draft.cards.bodyFontWeight}   onChange={(v) => update('cards','bodyFontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
       </SectionCard>
+
     </div>
   );
 }

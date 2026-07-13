@@ -1,42 +1,58 @@
-## Fix: Sidebar selected state + Action Buttons layout
 
-### 1. Sidebar selected color leaking from Global Theme
+## Goal
+Extend the UI Design Settings so admins can control (1) hover text + border color for buttons, and (2) font size + font weight for each distinct surface — with clear separation between Buttons (global defaults) and Action Buttons (per-label overrides).
 
-`src/components/layout/Sidebar.tsx` uses `bg-primary/15 text-primary border-primary/40` (line ~209) and `bg-primary` on the left rail (~224) for the active menu item. Those classes read `--primary` — the Global Theme color — which is why the Sidebar card's Selected Menu Background / Border / Text controls have no effect.
+## Buttons vs Actions (clarified)
+- **Buttons card** = global default styling applied to every button in the app.
+- **Action Buttons card** = per-action overrides (Approve, Reject, Save, Export, …). When an action override is set, it wins over the global default; otherwise the button inherits the global Buttons style.
 
-Rebind active/hover classes to sidebar tokens (already set from the Sidebar card via `applyDesignSettings`):
+## 1. Hover — add text + border color
+Add two new fields to both the global Buttons style and every per-Action Button style:
+- `hoverText` (color)
+- `hoverBorder` (color)
 
-- Active item background → `bg-sidebar-accent`
-- Active item text → `text-sidebar-accent-foreground`
-- Active item left rail → `bg-[color:var(--sidebar-selected-border)]` (was `bg-primary`)
-- Active item border → `border-[color:var(--sidebar-selected-border)]`
-- Hover keeps existing `hover:bg-sidebar-hover hover:text-sidebar-accent-foreground`
+Behavior: on `:hover`, background, text color, and border color all switch to the configured hover values. Defaults: `hoverText` = current text color, `hoverBorder` = current hover background (keeps today's look).
 
-Also add a strengthened rule in `src/index.css` so any other place that marks itself active with `[data-active="true"]` inside `[data-sidebar]` picks up `background: hsl(var(--sidebar-accent))` and the selected-border variable, with `!important` to beat any residual `--primary`-based utility class.
+Wiring:
+- `designTokens.ts` — add `hoverText`, `hoverBorder` to `ActionButtonStyle` and to `buttons` block. Emit CSS vars `--btn-hover-text`, `--btn-hover-border`, and per-action `--btn-{key}-hover-text`, `--btn-{key}-hover-border`.
+- `index.css` — update global button hover and per-action `[data-action="…"]:hover` rules to apply the new vars.
+- `DesignSettingsPanel.tsx` — add two ColorInput fields in the global Buttons card and in the per-action Dialog.
 
-Result: Sidebar card controls fully own selected-menu appearance; Global Theme primary no longer bleeds in.
+## 2. Typography — per-section size + weight
+Add independent Font Size + Font Weight controls (and keep existing color/letter-spacing where present) for:
 
-### 2. Action Buttons — grid layout with dialog editor
+| Section | New controls | CSS vars |
+|---|---|---|
+| Sidebar menu text | size, weight | `--sidebar-font-size`, `--sidebar-font-weight` |
+| Screen name (page title) | size, weight | already have `--screen-name-size`, `--screen-name-weight` — surface both in a dedicated "Screen Name" sub-card |
+| Card header | size, weight | `--card-header-size`, `--card-header-weight` |
+| Card body | size, weight | `--card-body-size`, `--card-body-weight` |
+| Table header | size, weight | `--table-header-size`, `--table-header-weight` |
+| Table body | size, weight | `--table-body-size`, `--table-body-weight` (replaces single `--table-font-size`) |
 
-In `src/components/admin/DesignSettingsPanel.tsx`, replace the current full-width Accordion with a responsive tile grid:
+Panel reorganization inside the Design Settings tab:
+- **Typography** card keeps only base body defaults (family, base size, weight, color, line-height, letter-spacing).
+- **Screen Name** section (inside Typography or as its own small card) exposes screen-name size + weight + letter-spacing.
+- **Sidebar** card gains size + weight rows.
+- **Cards** card splits into "Header" and "Body" rows, each with size + weight (plus existing background/border/radius/shadow).
+- **Tables** card splits into "Header" and "Body" rows, each with size + weight (plus existing colors/border).
 
-```
-grid  grid-cols-2  md:grid-cols-3  lg:grid-cols-4  xl:grid-cols-6  gap-4
-```
+## 3. Apply to the app
+- `Sidebar.tsx` — sidebar menu items use `text-[length:var(--sidebar-font-size)] font-[var(--sidebar-font-weight)]`.
+- `PageHeader.tsx` / `EnterpriseHeader.tsx` — screen name uses the screen-name vars (already partially wired; confirm).
+- `ui/card.tsx` — CardTitle uses `--card-header-size/weight`; CardContent uses `--card-body-size/weight`.
+- `ui/table.tsx` — TableHead uses `--table-header-size/weight`; TableCell uses `--table-body-size/weight`.
 
-Each tile shows:
-- A rounded color swatch preview of the button (using its own bg/text/border)
-- The action label (e.g. "Approve", "Export PDF")
-- Small "Edit" affordance on hover
+No business-logic files touched. No route or DB schema changes. Existing `portal_config.ui_design_settings` JSON schema gains new optional keys; defaults preserve today's appearance so nothing regresses on first load.
 
-Clicking a tile opens a shadcn `<Dialog>` with the same 6 fields already implemented (Background, Text, Border, Hover, Border Radius, Font Size). Changes still call `preview(next)` for live update. Dialog closes on Save/Cancel — no persistence change; the outer "Save Changes" button still writes to the DB.
+## Files to edit
+- `src/lib/designTokens.ts` — extend `DesignSettings` type, defaults, and `applyDesignSettings` var emission.
+- `src/index.css` — new var-consuming rules for hover text/border and per-section typography.
+- `src/components/admin/DesignSettingsPanel.tsx` — new controls, panel reorg, per-action Dialog gains hover text/border.
+- `src/components/layout/Sidebar.tsx` — consume sidebar font vars.
+- `src/components/ui/card.tsx` — consume card header/body font vars.
+- `src/components/ui/table.tsx` — consume table header/body font vars.
+- (verify) `src/components/layout/PageHeader.tsx` uses screen-name vars.
 
-Benefit: all 22 actions visible at a glance, clear spacing, no long vertical scroll.
-
-### Files changed
-
-- `src/components/layout/Sidebar.tsx` — swap `*-primary*` active classes for sidebar tokens (presentation only, no route/logic change).
-- `src/index.css` — add stronger `[data-sidebar] [data-active="true"]` fallback rule using sidebar variables.
-- `src/components/admin/DesignSettingsPanel.tsx` — replace Accordion with tile grid + Dialog editor for action buttons.
-
-No backend, no schema, no button behavior changes.
+## Out of scope
+Any change to button click handlers, approval flow, data fetching, RLS, or backend config.
