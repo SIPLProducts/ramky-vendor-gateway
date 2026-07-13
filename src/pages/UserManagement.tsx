@@ -208,14 +208,17 @@ export default function UserManagement() {
     }
   };
 
-  const handleSaveEditUser = async (patch: {
-    full_name: string;
-    status: 'active' | 'inactive';
-    role: AppRole;
-    tenantIds: string[];
-    customRoleIds: string[];
-  }) => {
-    if (!editUser) return;
+  const applyEditPatch = async (
+    target: EditUserData,
+    patch: {
+      full_name: string;
+      status: 'active' | 'inactive';
+      role: AppRole;
+      tenantIds: string[];
+      customRoleIds: string[];
+    },
+  ) => {
+    const editUser = target;
     const isSelf = editUser.id === user?.id;
     try {
       // 1. profile: name + status
