@@ -4,8 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+interface SapTenant { code: string; name: string; }
 
 interface EligibleUser { id: string; email: string; full_name: string | null; }
 interface Counts {
@@ -29,11 +31,19 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
   const [counts, setCounts] = useState<Counts | null>(null);
   const [replacementId, setReplacementId] = useState<string>('');
 
+  // SAP tenants for the selected replacement user
+  const [sapTenants, setSapTenants] = useState<SapTenant[]>([]);
+  const [fetchingSap, setFetchingSap] = useState(false);
+  const [sapError, setSapError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open || !inactiveUser) return;
     setReplacementId('');
     setEligible([]);
     setCounts(null);
+    setSapTenants([]);
+    setSapError(null);
+    setFetchingSap(false);
     (async () => {
       setLoading(true);
       try {
@@ -51,6 +61,37 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
       }
     })();
   }, [open, inactiveUser, toast]);
+
+  // When a replacement user is selected, fetch their tenants live from SAP.
+  useEffect(() => {
+    if (!replacementId) {
+      setSapTenants([]); setSapError(null); setFetchingSap(false);
+      return;
+    }
+    const target = eligible.find((u) => u.id === replacementId);
+    if (!target?.email) return;
+    let cancelled = false;
+    (async () => {
+      setFetchingSap(true); setSapError(null); setSapTenants([]);
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-tenants-from-sap', {
+          body: { email: target.email },
+        });
+        if (error) throw error;
+        if (!(data as any)?.success) throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+        const list: SapTenant[] = ((data as any).tenants ?? []).map((t: any) => ({
+          code: String(t.code),
+          name: String(t.name || t.code),
+        }));
+        if (!cancelled) setSapTenants(list);
+      } catch (err: any) {
+        if (!cancelled) setSapError(err.message ?? String(err));
+      } finally {
+        if (!cancelled) setFetchingSap(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [replacementId, eligible]);
 
   const handleConfirm = async () => {
     if (!inactiveUser || !replacementId) return;
@@ -97,10 +138,6 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
             <div><span className="text-muted-foreground">User:</span> <strong>{inactiveUser.full_name || inactiveUser.email}</strong></div>
             <div><span className="text-muted-foreground">Email:</span> {inactiveUser.email}</div>
             <div><span className="text-muted-foreground">Role:</span> {inactiveUser.roleLabel}</div>
-            <div>
-              <span className="text-muted-foreground">Tenants:</span>{' '}
-              {inactiveUser.tenantNames.length > 0 ? inactiveUser.tenantNames.join(', ') : '—'}
-            </div>
           </div>
         )}
 
@@ -136,6 +173,35 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
                 Only active users with the same role and overlapping tenant access are shown.
               </p>
             </div>
+
+            {replacementId && (
+              <div className="space-y-1.5">
+                <Label>Companies / Tenants for replacement <span className="text-xs text-muted-foreground font-normal">(from SAP)</span></Label>
+                {sapError ? (
+                  <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>{sapError}</div>
+                  </div>
+                ) : fetchingSap ? (
+                  <div className="border rounded-md p-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Fetching tenants from SAP…
+                  </div>
+                ) : sapTenants.length > 0 ? (
+                  <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-1 bg-muted/20">
+                    {sapTenants.map((t) => (
+                      <div key={t.code} className="text-sm">
+                        <span className="font-mono text-xs text-muted-foreground mr-2">{t.code}</span>
+                        {t.name}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border rounded-md p-3 text-sm text-muted-foreground">
+                    No tenants returned by SAP for this user.
+                  </div>
+                )}
+              </div>
+            )}
 
             {eligible.length === 0 && hasWork && (
               <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">

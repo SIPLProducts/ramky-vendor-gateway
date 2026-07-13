@@ -132,7 +132,7 @@ export default function UserManagement() {
         supabase.from('profiles').select('id, email, full_name, created_at, status, last_login_attempt_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
         fetchAll<{ user_id: string; tenant_id: string }>('user_tenants', 'user_id, tenant_id'),
-        supabase.from('tenants').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('tenants').select('id, name, code').eq('is_active', true).order('name'),
         supabase.from('custom_roles').select('*').order('created_at', { ascending: false }),
         fetchAll<{ user_id: string; custom_role_id: string }>('user_custom_roles', 'user_id, custom_role_id'),
       ]);
