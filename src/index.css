@@ -177,7 +177,10 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans, "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+    font-size: var(--font-base-size, 14px);
+    font-weight: var(--font-weight-base, 400);
+    line-height: var(--line-height-base, 1.5);
     font-feature-settings: "cv11", "ss01";
   }
 
