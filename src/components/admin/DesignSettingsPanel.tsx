@@ -358,10 +358,13 @@ export function DesignSettingsPanel() {
                       <ColorInput label="Background Color" value={style.background} onChange={(v) => setField('background', v)} />
                       <ColorInput label="Text Color"       value={style.text}       onChange={(v) => setField('text', v)} />
                       <ColorInput label="Border Color"     value={style.border}     onChange={(v) => setField('border', v)} />
-                      <ColorInput label="Hover Color"      value={style.hover}      onChange={(v) => setField('hover', v)} />
+                      <ColorInput label="Hover Background" value={style.hover}      onChange={(v) => setField('hover', v)} />
+                      <ColorInput label="Hover Text Color" value={style.hoverText ?? style.text}     onChange={(v) => setField('hoverText', v)} />
+                      <ColorInput label="Hover Border Color" value={style.hoverBorder ?? style.hover} onChange={(v) => setField('hoverBorder', v)} />
                       <TextInputField label="Border Radius" value={style.borderRadius} onChange={(v) => setField('borderRadius', v)} placeholder="8px" />
                       <TextInputField label="Font Size"     value={style.fontSize}     onChange={(v) => setField('fontSize', v)} placeholder="14px" />
                     </div>
+
                     <div className="flex justify-end pt-2">
                       <Button data-action-skip variant="outline" onClick={() => setOpenAction(null)}>Done</Button>
                     </div>
