@@ -504,6 +504,10 @@ export default function AdminConfiguration() {
           <ReportsScreenConfigCard />
         </TabsContent>
 
+        <TabsContent value="design">
+          <DesignSettingsPanel />
+        </TabsContent>
+
         <TabsContent value="logs">
           <ValidationApiLogs />
         </TabsContent>
