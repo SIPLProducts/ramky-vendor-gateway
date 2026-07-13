@@ -174,6 +174,35 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
               </p>
             </div>
 
+            {replacementId && (
+              <div className="space-y-1.5">
+                <Label>Companies / Tenants for replacement <span className="text-xs text-muted-foreground font-normal">(from SAP)</span></Label>
+                {sapError ? (
+                  <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>{sapError}</div>
+                  </div>
+                ) : fetchingSap ? (
+                  <div className="border rounded-md p-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Fetching tenants from SAP…
+                  </div>
+                ) : sapTenants.length > 0 ? (
+                  <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-1 bg-muted/20">
+                    {sapTenants.map((t) => (
+                      <div key={t.code} className="text-sm">
+                        <span className="font-mono text-xs text-muted-foreground mr-2">{t.code}</span>
+                        {t.name}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border rounded-md p-3 text-sm text-muted-foreground">
+                    No tenants returned by SAP for this user.
+                  </div>
+                )}
+              </div>
+            )}
+
             {eligible.length === 0 && hasWork && (
               <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
