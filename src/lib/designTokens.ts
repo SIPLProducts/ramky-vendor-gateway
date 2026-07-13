@@ -235,6 +235,9 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--input-focus', s.forms.focusBorderColor);
   r.setProperty('--label-font-size', s.forms.labelFontSize);
   r.setProperty('--label-color', s.forms.labelColor);
+  r.setProperty('--input-letter-spacing', s.forms.inputLetterSpacing || 'normal');
+  r.setProperty('--label-letter-spacing', s.forms.labelLetterSpacing || 'normal');
+
 
   // Tables
   r.setProperty('--table-header-bg', s.tables.headerBg);
