@@ -41,6 +41,9 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
     setReplacementId('');
     setEligible([]);
     setCounts(null);
+    setSapTenants([]);
+    setSapError(null);
+    setFetchingSap(false);
     (async () => {
       setLoading(true);
       try {
@@ -58,6 +61,37 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
       }
     })();
   }, [open, inactiveUser, toast]);
+
+  // When a replacement user is selected, fetch their tenants live from SAP.
+  useEffect(() => {
+    if (!replacementId) {
+      setSapTenants([]); setSapError(null); setFetchingSap(false);
+      return;
+    }
+    const target = eligible.find((u) => u.id === replacementId);
+    if (!target?.email) return;
+    let cancelled = false;
+    (async () => {
+      setFetchingSap(true); setSapError(null); setSapTenants([]);
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-tenants-from-sap', {
+          body: { email: target.email },
+        });
+        if (error) throw error;
+        if (!(data as any)?.success) throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+        const list: SapTenant[] = ((data as any).tenants ?? []).map((t: any) => ({
+          code: String(t.code),
+          name: String(t.name || t.code),
+        }));
+        if (!cancelled) setSapTenants(list);
+      } catch (err: any) {
+        if (!cancelled) setSapError(err.message ?? String(err));
+      } finally {
+        if (!cancelled) setFetchingSap(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [replacementId, eligible]);
 
   const handleConfirm = async () => {
     if (!inactiveUser || !replacementId) return;
