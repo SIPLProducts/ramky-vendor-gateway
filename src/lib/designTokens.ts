@@ -203,6 +203,9 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--screen-name-weight', s.typography.screenNameFontWeight);
   r.setProperty('--foreground', hexToHslTriplet(s.typography.fontColor));
   r.setProperty('--line-height-base', s.typography.lineHeight);
+  r.setProperty('--letter-spacing', s.typography.letterSpacing || 'normal');
+  r.setProperty('--heading-letter-spacing', s.typography.headingLetterSpacing || 'normal');
+
 
   // Sidebar
   r.setProperty('--sidebar-background', hexToHslTriplet(s.sidebar.background));
