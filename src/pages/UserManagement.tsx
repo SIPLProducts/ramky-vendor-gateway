@@ -330,9 +330,9 @@ export default function UserManagement() {
         },
         pendingPatch: patch,
       });
-      // Do NOT close EditUserDialog yet; ReplaceUserDialog handles the rest.
-      // Throw so EditUserDialog doesn't auto-close on success.
-      throw new Error('__await_replacement__');
+      // Close EditUserDialog and let ReplaceUserDialog drive the rest.
+      return;
+
     }
 
     await applyEditPatch(editUser, patch);
