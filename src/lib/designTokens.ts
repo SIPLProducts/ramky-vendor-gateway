@@ -21,7 +21,10 @@ export interface DesignSettings {
     screenNameFontWeight: string; // e.g. "600"
     fontColor: string;         // hex
     lineHeight: string;        // e.g. "1.5"
+    letterSpacing: string;         // e.g. "normal", "0.01em"
+    headingLetterSpacing: string;  // e.g. "-0.01em"
   };
+
   sidebar: {
     background: string;
     text: string;
