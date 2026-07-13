@@ -283,6 +283,8 @@ export function DesignSettingsPanel() {
         <ColorInput label="Alternate Row Color"  value={draft.tables.altRow}      onChange={(v) => update('tables','altRow',v)} />
         <ColorInput label="Border Color"         value={draft.tables.borderColor} onChange={(v) => update('tables','borderColor',v)} />
         <TextInputField label="Font Size"        value={draft.tables.fontSize}    onChange={(v) => update('tables','fontSize',v)} placeholder="14px" />
+        <TextInputField label="Letter Spacing"   value={draft.tables.letterSpacing} onChange={(v) => update('tables','letterSpacing',v)} placeholder="0.01em" />
+
       </SectionCard>
 
       <SectionCard title="Cards" icon={LayoutGrid}>
