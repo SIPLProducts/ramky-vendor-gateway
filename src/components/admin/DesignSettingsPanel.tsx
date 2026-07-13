@@ -280,6 +280,8 @@ export function DesignSettingsPanel() {
         <ColorInput label="Selected Menu Border Color"   value={draft.sidebar.selectedBorder} onChange={(v) => update('sidebar','selectedBorder',v)} />
         <ColorInput label="Selected Menu Text Color"     value={draft.sidebar.selectedText}   onChange={(v) => update('sidebar','selectedText',v)} />
         <TextInputField label="Sidebar Width"            value={draft.sidebar.width}          onChange={(v) => update('sidebar','width',v)} placeholder="256px" />
+        <TextInputField label="Menu Font Size"           value={draft.sidebar.fontSize}       onChange={(v) => update('sidebar','fontSize',v)} placeholder="14px" />
+        <SelectField label="Menu Font Weight"            value={draft.sidebar.fontWeight}     onChange={(v) => update('sidebar','fontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
       </SectionCard>
 
       <SectionCard title="Buttons (Global Defaults)" icon={MousePointer2}>
@@ -288,11 +290,14 @@ export function DesignSettingsPanel() {
         <ColorInput label="Border Color"         value={draft.buttons.border}       onChange={(v) => update('buttons','border',v)} />
         <TextInputField label="Border Radius"    value={draft.buttons.borderRadius} onChange={(v) => update('buttons','borderRadius',v)} placeholder="8px" />
         <TextInputField label="Font Size"        value={draft.buttons.fontSize}     onChange={(v) => update('buttons','fontSize',v)} placeholder="14px" />
-        <ColorInput label="Hover Color"          value={draft.buttons.hover}        onChange={(v) => update('buttons','hover',v)} />
+        <ColorInput label="Hover Background"     value={draft.buttons.hover}        onChange={(v) => update('buttons','hover',v)} />
+        <ColorInput label="Hover Text Color"     value={draft.buttons.hoverText}    onChange={(v) => update('buttons','hoverText',v)} />
+        <ColorInput label="Hover Border Color"   value={draft.buttons.hoverBorder}  onChange={(v) => update('buttons','hoverBorder',v)} />
         <ColorInput label="Disabled State Color" value={draft.buttons.disabled}     onChange={(v) => update('buttons','disabled',v)} />
         <TextInputField label="Letter Spacing"   value={draft.buttons.letterSpacing} onChange={(v) => update('buttons','letterSpacing',v)} placeholder="0.02em" />
 
       </SectionCard>
+
 
       <Card className="border-l-4 border-l-success">
         <CardHeader className="pb-3">
