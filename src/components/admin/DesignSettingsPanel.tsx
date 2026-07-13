@@ -10,7 +10,7 @@ import { useDesignSettings } from '@/hooks/useDesignSettings';
 import { DEFAULT_DESIGN_SETTINGS, DesignSettings, ActionButtonStyle } from '@/lib/designTokens';
 import { ensureFontLoaded } from '@/lib/googleFonts';
 import { ACTION_KEYS, type ActionKey } from '@/lib/actionButton';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   Palette, Type, PanelLeft, MousePointer2, FormInput, Table2, LayoutGrid,
   Save, RotateCcw, AlertCircle,
