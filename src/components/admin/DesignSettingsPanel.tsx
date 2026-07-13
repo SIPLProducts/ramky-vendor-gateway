@@ -398,9 +398,12 @@ export function DesignSettingsPanel() {
         <ColorInput label="Row Text Color"       value={draft.tables.rowText}     onChange={(v) => update('tables','rowText',v)} />
         <ColorInput label="Alternate Row Color"  value={draft.tables.altRow}      onChange={(v) => update('tables','altRow',v)} />
         <ColorInput label="Border Color"         value={draft.tables.borderColor} onChange={(v) => update('tables','borderColor',v)} />
-        <TextInputField label="Font Size"        value={draft.tables.fontSize}    onChange={(v) => update('tables','fontSize',v)} placeholder="14px" />
+        <TextInputField label="Base Font Size"   value={draft.tables.fontSize}    onChange={(v) => update('tables','fontSize',v)} placeholder="14px" />
         <TextInputField label="Letter Spacing"   value={draft.tables.letterSpacing} onChange={(v) => update('tables','letterSpacing',v)} placeholder="0.01em" />
-
+        <TextInputField label="Header Font Size"   value={draft.tables.headerFontSize}   onChange={(v) => update('tables','headerFontSize',v)} placeholder="13px" />
+        <SelectField label="Header Font Weight"    value={draft.tables.headerFontWeight} onChange={(v) => update('tables','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
+        <TextInputField label="Body Font Size"     value={draft.tables.bodyFontSize}     onChange={(v) => update('tables','bodyFontSize',v)} placeholder="14px" />
+        <SelectField label="Body Font Weight"      value={draft.tables.bodyFontWeight}   onChange={(v) => update('tables','bodyFontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
       </SectionCard>
 
       <SectionCard title="Cards" icon={LayoutGrid}>
@@ -409,7 +412,12 @@ export function DesignSettingsPanel() {
         <ColorInput label="Border Color"         value={draft.cards.border}       onChange={(v) => update('cards','border',v)} />
         <TextInputField label="Border Radius"    value={draft.cards.borderRadius} onChange={(v) => update('cards','borderRadius',v)} placeholder="12px" />
         <SelectField label="Shadow"              value={draft.cards.shadow}       onChange={(v) => update('cards','shadow', v as any)} options={shadowOptions} />
+        <TextInputField label="Header Font Size"   value={draft.cards.headerFontSize}   onChange={(v) => update('cards','headerFontSize',v)} placeholder="16px" />
+        <SelectField label="Header Font Weight"    value={draft.cards.headerFontWeight} onChange={(v) => update('cards','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
+        <TextInputField label="Body Font Size"     value={draft.cards.bodyFontSize}     onChange={(v) => update('cards','bodyFontSize',v)} placeholder="14px" />
+        <SelectField label="Body Font Weight"      value={draft.cards.bodyFontWeight}   onChange={(v) => update('cards','bodyFontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
       </SectionCard>
+
     </div>
   );
 }
