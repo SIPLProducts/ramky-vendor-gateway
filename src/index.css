@@ -338,3 +338,90 @@
     display: none;
   }
 }
+
+/* ================================================================
+ * Design Settings runtime bridge
+ * Maps runtime CSS variables set by /settings → UI Design Settings
+ * onto real shadcn components so Save Changes reflects everywhere.
+ * ================================================================ */
+@layer base {
+  /* Font family across the whole app */
+  html, body, button, input, select, textarea, table,
+  [role="menu"], [role="listbox"], [role="dialog"], [role="combobox"],
+  [data-radix-popper-content-wrapper] * {
+    font-family: var(--font-sans, "Inter", system-ui, sans-serif);
+  }
+
+  /* Tables — header bg/text, row text, alt row, borders, font size */
+  table thead tr,
+  table thead th {
+    background: var(--table-header-bg, transparent);
+    color: var(--table-header-text, inherit);
+  }
+  table {
+    font-size: var(--table-font-size, inherit);
+  }
+  table th,
+  table td {
+    border-color: var(--table-border, hsl(var(--border)));
+  }
+  table tbody tr {
+    color: var(--table-row-text, inherit);
+    border-bottom: 1px solid var(--table-border, hsl(var(--border)));
+  }
+  table tbody tr:nth-child(even) {
+    background: var(--table-alt-row, transparent);
+  }
+
+  /* Cards — border color, radius, shadow, header title color */
+  .bg-card,
+  [class*="bg-card"] {
+    border-color: hsl(var(--border));
+    box-shadow: var(--card-shadow, var(--shadow-card));
+  }
+  .bg-card > :first-child :is(h1, h2, h3, h4, h5, h6),
+  [class*="bg-card"] > :first-child :is(h1, h2, h3, h4, h5, h6) {
+    color: var(--card-header-color, inherit);
+  }
+
+  /* Buttons — primary variant reads --btn-* */
+  button.bg-primary,
+  [class*="bg-primary"][class*="text-primary-foreground"] {
+    background: var(--btn-bg, hsl(var(--primary)));
+    color: var(--btn-text, hsl(var(--primary-foreground)));
+    border-color: var(--btn-border, transparent);
+    border-radius: var(--btn-radius, var(--radius));
+    font-size: var(--btn-font-size, inherit);
+  }
+  button.bg-primary:hover,
+  [class*="bg-primary"][class*="text-primary-foreground"]:hover {
+    background: var(--btn-hover, hsl(var(--primary-hover)));
+  }
+  button:disabled[class*="bg-primary"] {
+    background: var(--btn-disabled, hsl(var(--muted)));
+  }
+
+  /* Forms — inputs, textareas, selects, labels */
+  input, textarea, select, [role="combobox"] {
+    font-size: var(--input-font-size, inherit);
+    color: var(--input-text, inherit);
+    border-radius: var(--input-radius, var(--radius));
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--input-placeholder, hsl(var(--muted-foreground)));
+  }
+  input:focus, textarea:focus, select:focus, [role="combobox"]:focus {
+    border-color: var(--input-focus, hsl(var(--ring)));
+    outline-color: var(--input-focus, hsl(var(--ring)));
+  }
+  label {
+    font-size: var(--label-font-size, inherit);
+    color: var(--label-color, inherit);
+  }
+
+  /* Heading / screen name sizes when tokens are defined */
+  h1, h2 {
+    font-size: var(--heading-size, inherit);
+  }
+}
