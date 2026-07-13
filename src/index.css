@@ -376,6 +376,8 @@
   table thead th {
     background: var(--table-header-bg, transparent);
     color: var(--table-header-text, inherit);
+    font-size: var(--table-header-size, var(--table-font-size, inherit));
+    font-weight: var(--table-header-weight, 600);
   }
   table {
     font-size: var(--table-font-size, inherit);
@@ -391,16 +393,24 @@
   table tbody tr:nth-child(even) {
     background: var(--table-alt-row, transparent);
   }
+  table tbody td {
+    font-size: var(--table-body-size, var(--table-font-size, inherit));
+    font-weight: var(--table-body-weight, 400);
+  }
 
-  /* Cards — border color, radius, shadow, header title color */
+  /* Cards — border color, radius, shadow, header title color + size/weight */
   .bg-card,
   [class*="bg-card"] {
     border-color: hsl(var(--border));
     box-shadow: var(--card-shadow, var(--shadow-card));
+    font-size: var(--card-body-size, inherit);
+    font-weight: var(--card-body-weight, inherit);
   }
   .bg-card > :first-child :is(h1, h2, h3, h4, h5, h6),
   [class*="bg-card"] > :first-child :is(h1, h2, h3, h4, h5, h6) {
     color: var(--card-header-color, inherit);
+    font-size: var(--card-header-size, inherit);
+    font-weight: var(--card-header-weight, 600);
   }
 
   /* Buttons — primary variant reads --btn-* */
@@ -415,10 +425,13 @@
   button.bg-primary:hover,
   [class*="bg-primary"][class*="text-primary-foreground"]:hover {
     background: var(--btn-hover, hsl(var(--primary-hover)));
+    color: var(--btn-hover-text, var(--btn-text));
+    border-color: var(--btn-hover-border, var(--btn-hover));
   }
   button:disabled[class*="bg-primary"] {
     background: var(--btn-disabled, hsl(var(--muted)));
   }
+
 
   /* Forms — inputs, textareas, selects, labels */
   input, textarea, select, [role="combobox"] {
