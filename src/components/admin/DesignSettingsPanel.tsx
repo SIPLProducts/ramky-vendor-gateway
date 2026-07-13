@@ -10,7 +10,7 @@ import { useDesignSettings } from '@/hooks/useDesignSettings';
 import { DEFAULT_DESIGN_SETTINGS, DesignSettings, ActionButtonStyle } from '@/lib/designTokens';
 import { ensureFontLoaded } from '@/lib/googleFonts';
 import { ACTION_KEYS, type ActionKey } from '@/lib/actionButton';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   Palette, Type, PanelLeft, MousePointer2, FormInput, Table2, LayoutGrid,
   Save, RotateCcw, AlertCircle,
@@ -176,6 +176,8 @@ export function DesignSettingsPanel() {
   const { toast } = useToast();
   const [draft, setDraft] = useState<DesignSettings>(settings);
   const [saving, setSaving] = useState(false);
+  const [openAction, setOpenAction] = useState<ActionKey | null>(null);
+
 
   useEffect(() => { setDraft(settings); }, [settings]);
 
@@ -303,9 +305,10 @@ export function DesignSettingsPanel() {
           </p>
         </CardHeader>
         <CardContent>
-          <Accordion type="multiple" className="w-full">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {ACTION_KEYS.map((key) => {
               const style = draft.actionButtons?.[key] ?? DEFAULT_DESIGN_SETTINGS.actionButtons[key];
+              const isOpen = openAction === key;
               const setField = <K extends keyof ActionButtonStyle>(field: K, value: ActionButtonStyle[K]) => {
                 const next: DesignSettings = {
                   ...draft,
@@ -318,19 +321,35 @@ export function DesignSettingsPanel() {
                 preview(next);
               };
               return (
-                <AccordionItem key={key} value={key}>
-                  <AccordionTrigger className="text-sm hover:no-underline">
-                    <span className="flex items-center gap-3">
+                <Dialog key={key} open={isOpen} onOpenChange={(o) => setOpenAction(o ? key : null)}>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      data-action-skip
+                      className="group flex flex-col items-center gap-2 rounded-lg border border-border bg-card p-3 text-center transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
                       <span
-                        className="inline-block h-5 w-10 rounded border"
-                        style={{ background: style.background, borderColor: style.border }}
-                        aria-hidden
-                      />
-                      <span className="font-medium">{ACTION_LABELS[key]}</span>
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-2">
+                        className="inline-flex h-8 w-full items-center justify-center rounded-md text-[11px] font-medium"
+                        style={{
+                          background: style.background,
+                          color: style.text,
+                          border: `1px solid ${style.border}`,
+                          borderRadius: style.borderRadius,
+                        }}
+                      >
+                        {ACTION_LABELS[key]}
+                      </span>
+                      <span className="text-xs font-medium text-foreground">{ACTION_LABELS[key]}</span>
+                      <span className="text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                        Click to edit
+                      </span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Edit "{ACTION_LABELS[key]}" Button</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 md:grid-cols-2 pt-2">
                       <ColorInput label="Background Color" value={style.background} onChange={(v) => setField('background', v)} />
                       <ColorInput label="Text Color"       value={style.text}       onChange={(v) => setField('text', v)} />
                       <ColorInput label="Border Color"     value={style.border}     onChange={(v) => setField('border', v)} />
@@ -338,13 +357,17 @@ export function DesignSettingsPanel() {
                       <TextInputField label="Border Radius" value={style.borderRadius} onChange={(v) => setField('borderRadius', v)} placeholder="8px" />
                       <TextInputField label="Font Size"     value={style.fontSize}     onChange={(v) => setField('fontSize', v)} placeholder="14px" />
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
+                    <div className="flex justify-end pt-2">
+                      <Button data-action-skip variant="outline" onClick={() => setOpenAction(null)}>Done</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               );
             })}
-          </Accordion>
+          </div>
         </CardContent>
       </Card>
+
 
 
       <SectionCard title="Forms" icon={FormInput}>

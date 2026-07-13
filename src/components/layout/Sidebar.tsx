@@ -206,8 +206,9 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                 'flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 group relative border',
                 collapsed ? 'justify-center p-2.5 mx-0' : 'justify-between px-3 py-2 mx-1',
                 isActive
-                  ? 'bg-primary/15 text-primary border-primary/40'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground border-[color:var(--sidebar-selected-border,transparent)]'
                   : 'border-transparent text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+
               )}
 
 
@@ -221,7 +222,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
               </div>
               {/* Active indicator for collapsed state */}
               {collapsed && isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r-full" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full bg-[color:var(--sidebar-selected-border,hsl(var(--sidebar-primary)))]" />
               )}
             </Link>
           );
