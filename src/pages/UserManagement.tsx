@@ -79,6 +79,10 @@ export default function UserManagement() {
   const [editUser, setEditUser] = useState<EditUserData | null>(null);
   const [loginAttempts, setLoginAttempts] = useState<LoginAttemptRow[]>([]);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [replaceCtx, setReplaceCtx] = useState<null | {
+    inactiveUser: { id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[] };
+    pendingPatch: { full_name: string; status: 'active' | 'inactive'; role: AppRole; tenantIds: string[]; customRoleIds: string[] };
+  }>(null);
 
   const handleDeleteUser = async () => {
     if (!deleteUser) return;
