@@ -138,10 +138,6 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
             <div><span className="text-muted-foreground">User:</span> <strong>{inactiveUser.full_name || inactiveUser.email}</strong></div>
             <div><span className="text-muted-foreground">Email:</span> {inactiveUser.email}</div>
             <div><span className="text-muted-foreground">Role:</span> {inactiveUser.roleLabel}</div>
-            <div>
-              <span className="text-muted-foreground">Tenants:</span>{' '}
-              {inactiveUser.tenantNames.length > 0 ? inactiveUser.tenantNames.join(', ') : '—'}
-            </div>
           </div>
         )}
 
