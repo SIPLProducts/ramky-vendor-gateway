@@ -7,12 +7,40 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useDesignSettings } from '@/hooks/useDesignSettings';
-import { DEFAULT_DESIGN_SETTINGS, DesignSettings } from '@/lib/designTokens';
+import { DEFAULT_DESIGN_SETTINGS, DesignSettings, ActionButtonStyle } from '@/lib/designTokens';
 import { ensureFontLoaded } from '@/lib/googleFonts';
+import { ACTION_KEYS, type ActionKey } from '@/lib/actionButton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Palette, Type, PanelLeft, MousePointer2, FormInput, Table2, LayoutGrid,
   Save, RotateCcw, AlertCircle,
 } from 'lucide-react';
+
+const ACTION_LABELS: Record<ActionKey, string> = {
+  approve: 'Approve',
+  'approve-forward': 'Approve & Forward',
+  reject: 'Reject',
+  preview: 'Preview',
+  'view-details': 'View Details',
+  'add-config': 'Add Config',
+  save: 'Save',
+  update: 'Update',
+  create: 'Create',
+  search: 'Search',
+  reset: 'Reset',
+  'export-excel': 'Export Excel',
+  'export-pdf': 'Export PDF',
+  'export-csv': 'Export CSV',
+  cancel: 'Cancel',
+  clear: 'Clear',
+  sync: 'Sync',
+  'duplicate-close': 'Duplicate & Close',
+  'send-vendor': 'Send to Vendor',
+  submit: 'Submit',
+  delete: 'Delete',
+  invite: 'Invite',
+};
+
 
 const FONT_GROUPS: { label: string; fonts: string[] }[] = [
   {
