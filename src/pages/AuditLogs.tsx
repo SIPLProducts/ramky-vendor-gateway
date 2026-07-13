@@ -58,6 +58,9 @@ export default function AuditLogs() {
   };
 
   const getActionBadge = (action: string) => {
+    if (action === 'user_inactivated_reassigned') {
+      return <Badge className="bg-amber-500/10 text-amber-700">User Reassigned</Badge>;
+    }
     if (action.includes('approve')) {
       return <Badge className="bg-success/10 text-success">Approved</Badge>;
     }

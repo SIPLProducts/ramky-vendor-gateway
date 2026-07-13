@@ -18,6 +18,7 @@ import type { AppRole } from '@/components/admin/ChangeRoleDialog';
 
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
+import { ReplaceUserDialog } from '@/components/admin/ReplaceUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
 import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
@@ -78,6 +79,10 @@ export default function UserManagement() {
   const [editUser, setEditUser] = useState<EditUserData | null>(null);
   const [loginAttempts, setLoginAttempts] = useState<LoginAttemptRow[]>([]);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [replaceCtx, setReplaceCtx] = useState<null | {
+    inactiveUser: { id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[] };
+    pendingPatch: { full_name: string; status: 'active' | 'inactive'; role: AppRole; tenantIds: string[]; customRoleIds: string[] };
+  }>(null);
 
   const handleDeleteUser = async () => {
     if (!deleteUser) return;
@@ -203,14 +208,17 @@ export default function UserManagement() {
     }
   };
 
-  const handleSaveEditUser = async (patch: {
-    full_name: string;
-    status: 'active' | 'inactive';
-    role: AppRole;
-    tenantIds: string[];
-    customRoleIds: string[];
-  }) => {
-    if (!editUser) return;
+  const applyEditPatch = async (
+    target: EditUserData,
+    patch: {
+      full_name: string;
+      status: 'active' | 'inactive';
+      role: AppRole;
+      tenantIds: string[];
+      customRoleIds: string[];
+    },
+  ) => {
+    const editUser = target;
     const isSelf = editUser.id === user?.id;
     try {
       // 1. profile: name + status
@@ -287,6 +295,68 @@ export default function UserManagement() {
     } catch (err: any) {
       toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
       throw err;
+    }
+  };
+
+  const handleSaveEditUser = async (patch: {
+    full_name: string;
+    status: 'active' | 'inactive';
+    role: AppRole;
+    tenantIds: string[];
+    customRoleIds: string[];
+  }) => {
+    if (!editUser) return;
+    // Intercept transition active -> inactive: require replacement first
+    const isTransitionToInactive =
+      editUser.status === 'active' &&
+      patch.status === 'inactive' &&
+      editUser.id !== user?.id;
+
+    if (isTransitionToInactive) {
+      const tenantNames = editUser.tenantIds
+        .map((id) => tenants.find((t) => t.id === id)?.name)
+        .filter((n): n is string => !!n);
+      const customName = editUser.customRoleIds
+        .map((id) => customRoles.find((c) => c.id === id)?.name)
+        .filter((n): n is string => !!n)[0];
+      const roleLabel = customName ?? (editUser.role ?? 'unknown');
+      setReplaceCtx({
+        inactiveUser: {
+          id: editUser.id,
+          email: editUser.email,
+          full_name: editUser.full_name,
+          roleLabel,
+          tenantNames,
+        },
+        pendingPatch: patch,
+      });
+      // Close EditUserDialog and let ReplaceUserDialog drive the rest.
+      return;
+
+    }
+
+    await applyEditPatch(editUser, patch);
+  };
+
+  const handleReplacementConfirmed = async () => {
+    if (!replaceCtx) return;
+    try {
+      await applyEditPatch(
+        {
+          id: replaceCtx.inactiveUser.id,
+          email: replaceCtx.inactiveUser.email,
+          full_name: replaceCtx.inactiveUser.full_name,
+          status: 'active',
+          role: replaceCtx.pendingPatch.role,
+          tenantIds: replaceCtx.pendingPatch.tenantIds,
+          customRoleIds: replaceCtx.pendingPatch.customRoleIds,
+        },
+        replaceCtx.pendingPatch,
+      );
+      setReplaceCtx(null);
+      setEditUser(null);
+    } catch {
+      // toast shown in applyEditPatch
     }
   };
 
@@ -783,6 +853,13 @@ export default function UserManagement() {
         customRoles={scopedCustomRoles}
         disableRoleAndAccess={editUser?.id === user?.id}
         onSave={handleSaveEditUser}
+      />
+
+      <ReplaceUserDialog
+        open={!!replaceCtx}
+        onOpenChange={(o) => { if (!o) setReplaceCtx(null); }}
+        inactiveUser={replaceCtx?.inactiveUser ?? null}
+        onConfirmed={handleReplacementConfirmed}
       />
 
       <CreateUserDialog

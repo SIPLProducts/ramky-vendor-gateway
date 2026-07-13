@@ -26,10 +26,14 @@ export function ApproverPicker({ selectedUserIds, onChange, tenantId }: Props) {
         const { data } = await supabase.from('user_tenants').select('user_id').eq('tenant_id', tenantId);
         userIds = (data ?? []).map((u) => u.user_id);
       }
-      let q = supabase.from('profiles').select('id, full_name, email').order('full_name');
+      let q = supabase
+        .from('profiles')
+        .select('id, full_name, email, status')
+        .eq('status', 'active')
+        .order('full_name');
       if (userIds && userIds.length > 0) q = q.in('id', userIds);
       const { data } = await q;
-      setProfiles(data ?? []);
+      setProfiles((data ?? []) as Profile[]);
     })();
   }, [tenantId]);
 
