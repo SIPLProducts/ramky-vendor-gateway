@@ -67,11 +67,11 @@ export function DesignSettingsProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase
       .from('portal_config')
       .upsert(
-        {
+        [{
           config_key: CONFIG_KEY,
-          config_value: s as unknown as Record<string, unknown>,
+          config_value: s as unknown as any,
           description: 'Runtime UI design settings',
-        },
+        }],
         { onConflict: 'config_key' },
       );
     if (error) throw error;
