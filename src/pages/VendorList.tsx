@@ -430,10 +430,7 @@ export default function VendorList() {
                           <TableCell>
                             {vendor.invited_by ? (
                               <div className="text-sm">
-                                <div className="font-medium">{vendor.invited_by.name ?? vendor.invited_by.email ?? '—'}</div>
-                                {vendor.invited_by.name && vendor.invited_by.email && (
-                                  <div className="text-xs text-muted-foreground">{vendor.invited_by.email}</div>
-                                )}
+                                <div className="font-medium">{vendor.invited_by.name ?? '—'}</div>
                               </div>
                             ) : (
                               <span className="text-sm text-muted-foreground">—</span>

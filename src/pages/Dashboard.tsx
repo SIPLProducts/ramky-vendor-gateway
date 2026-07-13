@@ -437,10 +437,7 @@ export default function Dashboard() {
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">
-                            <div className="font-medium">{v.invited_by.name ?? v.invited_by.email ?? '—'}</div>
-                            {v.invited_by.name && v.invited_by.email && (
-                              <div className="text-xs text-muted-foreground">{v.invited_by.email}</div>
-                            )}
+                            <div className="font-medium">{v.invited_by.name ?? '—'}</div>
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
