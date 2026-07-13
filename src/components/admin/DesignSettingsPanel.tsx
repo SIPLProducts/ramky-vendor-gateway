@@ -188,7 +188,6 @@ export function DesignSettingsPanel() {
 
   if (loading) return <div className="text-sm text-muted-foreground">Loading design settings…</div>;
 
-  const fontOptions = FONT_FAMILIES.map((f) => ({ value: f, label: f }));
   const shadowOptions = [
     { value: 'none', label: 'None' }, { value: 'sm', label: 'Small' },
     { value: 'md', label: 'Medium' }, { value: 'lg', label: 'Large' },
