@@ -298,6 +298,68 @@ export default function UserManagement() {
     }
   };
 
+  const handleSaveEditUser = async (patch: {
+    full_name: string;
+    status: 'active' | 'inactive';
+    role: AppRole;
+    tenantIds: string[];
+    customRoleIds: string[];
+  }) => {
+    if (!editUser) return;
+    // Intercept transition active -> inactive: require replacement first
+    const isTransitionToInactive =
+      editUser.status === 'active' &&
+      patch.status === 'inactive' &&
+      editUser.id !== user?.id;
+
+    if (isTransitionToInactive) {
+      const tenantNames = editUser.tenantIds
+        .map((id) => tenants.find((t) => t.id === id)?.name)
+        .filter((n): n is string => !!n);
+      const customName = editUser.customRoleIds
+        .map((id) => customRoles.find((c) => c.id === id)?.name)
+        .filter((n): n is string => !!n)[0];
+      const roleLabel = customName ?? (editUser.role ?? 'unknown');
+      setReplaceCtx({
+        inactiveUser: {
+          id: editUser.id,
+          email: editUser.email,
+          full_name: editUser.full_name,
+          roleLabel,
+          tenantNames,
+        },
+        pendingPatch: patch,
+      });
+      // Do NOT close EditUserDialog yet; ReplaceUserDialog handles the rest.
+      // Throw so EditUserDialog doesn't auto-close on success.
+      throw new Error('__await_replacement__');
+    }
+
+    await applyEditPatch(editUser, patch);
+  };
+
+  const handleReplacementConfirmed = async () => {
+    if (!replaceCtx) return;
+    try {
+      await applyEditPatch(
+        {
+          id: replaceCtx.inactiveUser.id,
+          email: replaceCtx.inactiveUser.email,
+          full_name: replaceCtx.inactiveUser.full_name,
+          status: 'active',
+          role: replaceCtx.pendingPatch.role,
+          tenantIds: replaceCtx.pendingPatch.tenantIds,
+          customRoleIds: replaceCtx.pendingPatch.customRoleIds,
+        },
+        replaceCtx.pendingPatch,
+      );
+      setReplaceCtx(null);
+      setEditUser(null);
+    } catch {
+      // toast shown in applyEditPatch
+    }
+  };
+
 
   useEffect(() => { loadData(); loadLoginAttempts(); }, []);
 
