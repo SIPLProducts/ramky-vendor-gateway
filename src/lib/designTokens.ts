@@ -262,12 +262,13 @@ export function resetAppliedDesign() {
   const props = [
     '--primary','--ring','--secondary','--success','--warning','--destructive','--background',
     '--font-sans','--font-base-size','--heading-size','--screen-name-size','--font-weight-base',
-    '--screen-name-weight','--foreground','--line-height-base',
+    '--screen-name-weight','--foreground','--line-height-base','--letter-spacing','--heading-letter-spacing',
     '--sidebar-background','--sidebar-foreground','--sidebar-accent','--sidebar-hover','--sidebar-primary','--sidebar-width',
-    '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-disabled',
-    '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color',
-    '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size',
+    '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-disabled','--btn-letter-spacing',
+    '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color','--input-letter-spacing','--label-letter-spacing',
+    '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size','--table-letter-spacing',
     '--card','--card-header-color','--border','--radius','--card-shadow',
+
   ];
   const s = document.documentElement.style;
   props.forEach((p) => s.removeProperty(p));
