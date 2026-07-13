@@ -271,6 +271,9 @@ export function DesignSettingsPanel() {
         <ColorInput label="Focus Border Color"    value={draft.forms.focusBorderColor} onChange={(v) => update('forms','focusBorderColor',v)} />
         <TextInputField label="Label Font Size"   value={draft.forms.labelFontSize}    onChange={(v) => update('forms','labelFontSize',v)} placeholder="13px" />
         <ColorInput label="Label Color"           value={draft.forms.labelColor}       onChange={(v) => update('forms','labelColor',v)} />
+        <TextInputField label="Input Letter Spacing" value={draft.forms.inputLetterSpacing} onChange={(v) => update('forms','inputLetterSpacing',v)} placeholder="0.01em" />
+        <TextInputField label="Label Letter Spacing" value={draft.forms.labelLetterSpacing} onChange={(v) => update('forms','labelLetterSpacing',v)} placeholder="0.02em" />
+
       </SectionCard>
 
       <SectionCard title="Tables" icon={Table2}>
