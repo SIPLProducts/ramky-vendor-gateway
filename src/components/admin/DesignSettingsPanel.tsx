@@ -236,6 +236,9 @@ export function DesignSettingsPanel() {
         <SelectField label="Screen Name Weight"    value={draft.typography.screenNameFontWeight} onChange={(v) => update('typography','screenNameFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
         <ColorInput label="Font Color"             value={draft.typography.fontColor} onChange={(v) => update('typography','fontColor',v)} />
         <TextInputField label="Line Height"        value={draft.typography.lineHeight} onChange={(v) => update('typography','lineHeight',v)} placeholder="1.5" />
+        <TextInputField label="Letter Spacing"     value={draft.typography.letterSpacing} onChange={(v) => update('typography','letterSpacing',v)} placeholder="0.01em, normal, 0.5px" />
+        <TextInputField label="Heading Letter Spacing" value={draft.typography.headingLetterSpacing} onChange={(v) => update('typography','headingLetterSpacing',v)} placeholder="-0.01em" />
+
       </SectionCard>
 
       <SectionCard title="Sidebar" icon={PanelLeft}>
