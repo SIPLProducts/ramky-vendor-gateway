@@ -10,6 +10,8 @@ export interface ActionButtonStyle {
   borderRadius: string;
   fontSize: string;
   hover: string;
+  hoverText: string;
+  hoverBorder: string;
 }
 
 export interface DesignSettings {
@@ -44,6 +46,8 @@ export interface DesignSettings {
     hover: string;
     icon: string;
     width: string;
+    fontSize: string;
+    fontWeight: string;
   };
   buttons: {
     background: string;
@@ -52,6 +56,8 @@ export interface DesignSettings {
     borderRadius: string;
     fontSize: string;
     hover: string;
+    hoverText: string;
+    hoverBorder: string;
     disabled: string;
     letterSpacing: string;
   };
@@ -76,6 +82,10 @@ export interface DesignSettings {
     borderColor: string;
     fontSize: string;
     letterSpacing: string;
+    headerFontSize: string;
+    headerFontWeight: string;
+    bodyFontSize: string;
+    bodyFontWeight: string;
   };
 
 
@@ -85,6 +95,10 @@ export interface DesignSettings {
     border: string;
     borderRadius: string;
     shadow: 'none' | 'sm' | 'md' | 'lg';
+    headerFontSize: string;
+    headerFontWeight: string;
+    bodyFontSize: string;
+    bodyFontWeight: string;
   };
 }
 
@@ -104,10 +118,12 @@ const WHITE = '#ffffff';
 const filled = (bg: string, hover: string): ActionButtonStyle => ({
   background: bg, text: WHITE, border: bg,
   borderRadius: '8px', fontSize: '14px', hover,
+  hoverText: WHITE, hoverBorder: hover,
 });
 const outline = (color: string, hover: string): ActionButtonStyle => ({
   background: WHITE, text: color, border: color,
   borderRadius: '8px', fontSize: '14px', hover,
+  hoverText: color, hoverBorder: color,
 });
 
 const DEFAULT_ACTION_BUTTONS: Record<ActionKey, ActionButtonStyle> = {
@@ -166,6 +182,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     hover: '#1c2f38',
     icon: '#23c4b5',
     width: '256px',
+    fontSize: '14px',
+    fontWeight: '500',
   },
   buttons: {
     background: '#1f9d6a',
@@ -174,6 +192,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     borderRadius: '8px',
     fontSize: '14px',
     hover: '#178857',
+    hoverText: '#ffffff',
+    hoverBorder: '#178857',
     disabled: '#9ca3af',
     letterSpacing: '0.02em',
   },
@@ -198,6 +218,10 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     borderColor: '#e5e7eb',
     fontSize: '14px',
     letterSpacing: '0.01em',
+    headerFontSize: '13px',
+    headerFontWeight: '600',
+    bodyFontSize: '14px',
+    bodyFontWeight: '400',
   },
 
   cards: {
@@ -206,6 +230,10 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     border: '#e5e7eb',
     borderRadius: '12px',
     shadow: 'sm',
+    headerFontSize: '16px',
+    headerFontWeight: '600',
+    bodyFontSize: '14px',
+    bodyFontWeight: '400',
   },
 };
 
@@ -277,6 +305,8 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--sidebar-hover', hexToHslTriplet(s.sidebar.hover));
   r.setProperty('--sidebar-primary', hexToHslTriplet(s.sidebar.icon));
   r.setProperty('--sidebar-width', s.sidebar.width);
+  r.setProperty('--sidebar-font-size', s.sidebar.fontSize || '14px');
+  r.setProperty('--sidebar-font-weight', s.sidebar.fontWeight || '500');
 
   // Buttons (global fallback)
   r.setProperty('--btn-bg', s.buttons.background);
@@ -285,6 +315,8 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--btn-radius', s.buttons.borderRadius);
   r.setProperty('--btn-font-size', s.buttons.fontSize);
   r.setProperty('--btn-hover', s.buttons.hover);
+  r.setProperty('--btn-hover-text', s.buttons.hoverText || s.buttons.text);
+  r.setProperty('--btn-hover-border', s.buttons.hoverBorder || s.buttons.hover);
   r.setProperty('--btn-disabled', s.buttons.disabled);
   r.setProperty('--btn-letter-spacing', s.buttons.letterSpacing || 'normal');
 
@@ -298,6 +330,8 @@ export function applyDesignSettings(s: DesignSettings) {
     r.setProperty(`--btn-${key}-radius`, a.borderRadius);
     r.setProperty(`--btn-${key}-font-size`, a.fontSize);
     r.setProperty(`--btn-${key}-hover`, a.hover);
+    r.setProperty(`--btn-${key}-hover-text`, a.hoverText || a.text);
+    r.setProperty(`--btn-${key}-hover-border`, a.hoverBorder || a.hover);
   }
 
 
@@ -322,6 +356,10 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--table-border', s.tables.borderColor);
   r.setProperty('--table-font-size', s.tables.fontSize);
   r.setProperty('--table-letter-spacing', s.tables.letterSpacing || 'normal');
+  r.setProperty('--table-header-size', s.tables.headerFontSize || s.tables.fontSize);
+  r.setProperty('--table-header-weight', s.tables.headerFontWeight || '600');
+  r.setProperty('--table-body-size', s.tables.bodyFontSize || s.tables.fontSize);
+  r.setProperty('--table-body-weight', s.tables.bodyFontWeight || '400');
 
 
   // Cards
@@ -330,6 +368,10 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--border', hexToHslTriplet(s.cards.border));
   r.setProperty('--radius', s.cards.borderRadius);
   r.setProperty('--card-shadow', SHADOWS[s.cards.shadow]);
+  r.setProperty('--card-header-size', s.cards.headerFontSize || '16px');
+  r.setProperty('--card-header-weight', s.cards.headerFontWeight || '600');
+  r.setProperty('--card-body-size', s.cards.bodyFontSize || '14px');
+  r.setProperty('--card-body-weight', s.cards.bodyFontWeight || '400');
 }
 
 export function resetAppliedDesign() {
@@ -338,17 +380,18 @@ export function resetAppliedDesign() {
     '--primary','--ring','--secondary','--success','--warning','--destructive','--background',
     '--font-sans','--font-base-size','--heading-size','--screen-name-size','--font-weight-base',
     '--screen-name-weight','--foreground','--line-height-base','--letter-spacing','--heading-letter-spacing',
-    '--sidebar-background','--sidebar-foreground','--sidebar-accent','--sidebar-accent-foreground','--sidebar-selected-border','--sidebar-hover','--sidebar-primary','--sidebar-width',
-    '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-disabled','--btn-letter-spacing',
+    '--sidebar-background','--sidebar-foreground','--sidebar-accent','--sidebar-accent-foreground','--sidebar-selected-border','--sidebar-hover','--sidebar-primary','--sidebar-width','--sidebar-font-size','--sidebar-font-weight',
+    '--btn-bg','--btn-text','--btn-border','--btn-radius','--btn-font-size','--btn-hover','--btn-hover-text','--btn-hover-border','--btn-disabled','--btn-letter-spacing',
     '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color','--input-letter-spacing','--label-letter-spacing',
-    '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size','--table-letter-spacing',
-    '--card','--card-header-color','--border','--radius','--card-shadow',
+    '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size','--table-letter-spacing','--table-header-size','--table-header-weight','--table-body-size','--table-body-weight',
+    '--card','--card-header-color','--border','--radius','--card-shadow','--card-header-size','--card-header-weight','--card-body-size','--card-body-weight',
   ];
   const perAction: string[] = [];
   for (const k of ACTION_KEYS) {
     perAction.push(
       `--btn-${k}-bg`, `--btn-${k}-text`, `--btn-${k}-border`,
       `--btn-${k}-radius`, `--btn-${k}-font-size`, `--btn-${k}-hover`,
+      `--btn-${k}-hover-text`, `--btn-${k}-hover-border`,
     );
   }
   const s = document.documentElement.style;
