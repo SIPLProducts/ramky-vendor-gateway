@@ -108,10 +108,9 @@ Deno.serve(async (req) => {
 
     let eligible: Array<{ id: string; email: string; full_name: string | null }> = [];
     if (candIds.length > 0) {
-      const [candRolesRes, candCustomRes, candTenantsRes] = await Promise.all([
+      const [candRolesRes, candCustomRes] = await Promise.all([
         admin.from('user_roles').select('user_id, role').in('user_id', candIds),
         admin.from('user_custom_roles').select('user_id, custom_role_id, custom_roles(name, is_active)').in('user_id', candIds),
-        admin.from('user_tenants').select('user_id, tenant_id').in('user_id', candIds),
       ]);
       const roleByUser = new Map<string, string[]>();
       (candRolesRes.data ?? []).forEach((r: any) => {
@@ -127,17 +126,10 @@ Deno.serve(async (req) => {
         arr.push(String(cr.name || '').toLowerCase());
         customByUser.set(r.user_id, arr);
       });
-      const tenantsByUser = new Map<string, string[]>();
-      (candTenantsRes.data ?? []).forEach((r: any) => {
-        const arr = tenantsByUser.get(r.user_id) ?? [];
-        arr.push(r.tenant_id);
-        tenantsByUser.set(r.user_id, arr);
-      });
 
       eligible = (candProfiles ?? []).filter((p: any) => {
         const roles = roleByUser.get(p.id) ?? [];
         const customs = customByUser.get(p.id) ?? [];
-        const tenants = tenantsByUser.get(p.id) ?? [];
         // Same custom role match: if inactive has any custom role, replacement must share at least one
         if (inactiveCustomNames.length > 0) {
           const sharedCustom = inactiveCustomNames.some((n) => customs.includes(n));
@@ -147,14 +139,10 @@ Deno.serve(async (req) => {
           const sharedRole = inactiveRoles.some((r) => roles.includes(r));
           if (!sharedRole) return false;
         }
-        // Tenant overlap (skip if inactive had no tenants — global user)
-        if (inactiveTenantIds.length > 0) {
-          const overlap = inactiveTenantIds.some((t) => tenants.includes(t));
-          if (!overlap) return false;
-        }
         return true;
       }).map((p: any) => ({ id: p.id, email: p.email, full_name: p.full_name }));
     }
+
 
     if (mode === 'preview') {
       return json({ ok: true, counts, eligible, inactive: { id: inactive_user_id, email: inactiveEmail } });
