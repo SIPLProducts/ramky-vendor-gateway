@@ -151,6 +151,7 @@ export default function VendorRegistration() {
   const [verifiedData, setVerifiedData] = useState<VerifiedDocumentData | undefined>(undefined);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [vendorStatusState, setVendorStatusState] = useState<RegistrationStatus>('draft');
+  const [submittedReferenceNumber, setSubmittedReferenceNumber] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     open: boolean;
