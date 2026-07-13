@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ValidationConfigManager } from '@/components/admin/ValidationConfigManager';
 import { ValidationApiLogs } from '@/components/admin/ValidationApiLogs';
 import { ReportsScreenConfigCard } from '@/components/admin/ReportsScreenConfigCard';
+import { DesignSettingsPanel } from '@/components/admin/DesignSettingsPanel';
 
 import {
   Settings,
@@ -30,6 +31,7 @@ import {
   Mail,
   Eye,
   EyeOff,
+  Palette,
 } from 'lucide-react';
 import { NotificationSettings } from '@/components/pwa/NotificationSettings';
 
@@ -242,7 +244,7 @@ export default function AdminConfiguration() {
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="general" className="gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">General</span>
@@ -262,6 +264,10 @@ export default function AdminConfiguration() {
           <TabsTrigger value="screen" className="gap-2">
             <Eye className="h-4 w-4" />
             <span className="hidden sm:inline">Screen Config</span>
+          </TabsTrigger>
+          <TabsTrigger value="design" className="gap-2">
+            <Palette className="h-4 w-4" />
+            <span className="hidden sm:inline">UI Design</span>
           </TabsTrigger>
           <TabsTrigger value="logs" className="gap-2">
             <FileText className="h-4 w-4" />

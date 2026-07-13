@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import { ThemeColorProvider } from "./hooks/useThemeColor";
+import { DesignSettingsProvider } from "./hooks/useDesignSettings";
 import "./index.css";
 
 const isInIframe = (() => {
@@ -50,7 +51,9 @@ function mount() {
   createRoot(document.getElementById("root")!).render(
     <HelmetProvider>
       <ThemeColorProvider>
-        <App />
+        <DesignSettingsProvider>
+          <App />
+        </DesignSettingsProvider>
       </ThemeColorProvider>
     </HelmetProvider>
   );
