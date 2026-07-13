@@ -3,17 +3,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useDesignSettings } from '@/hooks/useDesignSettings';
 import { DEFAULT_DESIGN_SETTINGS, DesignSettings } from '@/lib/designTokens';
+import { ensureFontLoaded } from '@/lib/googleFonts';
 import {
   Palette, Type, PanelLeft, MousePointer2, FormInput, Table2, LayoutGrid,
   Save, RotateCcw, AlertCircle,
 } from 'lucide-react';
 
-const FONT_FAMILIES = ['Inter', 'Roboto', 'Poppins', 'Open Sans', 'Lato', 'Nunito', 'System'];
+const FONT_GROUPS: { label: string; fonts: string[] }[] = [
+  {
+    label: 'System',
+    fonts: ['System', 'Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI'],
+  },
+  {
+    label: 'Serif',
+    fonts: [
+      'Times New Roman', 'Georgia', 'Cambria', 'Garamond', 'Palatino', 'Book Antiqua', 'Baskerville',
+      'Merriweather', 'Playfair Display', 'Lora', 'PT Serif', 'Source Serif Pro', 'Cormorant Garamond',
+      'Crimson Text', 'Libre Baskerville', 'EB Garamond', 'Bitter', 'Noto Serif',
+    ],
+  },
+  {
+    label: 'Sans-serif',
+    fonts: [
+      'Inter', 'Roboto', 'Open Sans', 'Poppins', 'Lato', 'Nunito', 'Montserrat', 'Raleway',
+      'Ubuntu', 'Work Sans', 'Rubik', 'Mulish', 'Manrope', 'DM Sans', 'Karla', 'Barlow',
+      'IBM Plex Sans', 'Source Sans Pro', 'PT Sans', 'Fira Sans', 'Noto Sans', 'Quicksand',
+      'Cabin', 'Titillium Web', 'Hind', 'Oxygen', 'Heebo', 'Assistant', 'Public Sans',
+    ],
+  },
+  {
+    label: 'Display',
+    fonts: ['Oswald', 'Bebas Neue', 'Anton', 'Righteous', 'Pacifico', 'Lobster', 'Comfortaa', 'Archivo Black'],
+  },
+  {
+    label: 'Monospace',
+    fonts: ['Courier New', 'Consolas', 'Monaco', 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'IBM Plex Mono', 'Roboto Mono', 'Space Mono'],
+  },
+];
 
 function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -55,6 +86,39 @@ function SelectField({ label, value, onChange, options }: { label: string; value
         <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
         <SelectContent>
           {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function FontSelectField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Select
+        value={value}
+        onValueChange={(v) => { ensureFontLoaded(v); onChange(v); }}
+      >
+        <SelectTrigger className="h-9" style={{ fontFamily: `"${value}", system-ui, sans-serif` }}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="max-h-80">
+          {FONT_GROUPS.map((g) => (
+            <SelectGroup key={g.label}>
+              <SelectLabel>{g.label}</SelectLabel>
+              {g.fonts.map((f) => (
+                <SelectItem
+                  key={f}
+                  value={f}
+                  style={{ fontFamily: `"${f}", system-ui, sans-serif` }}
+                  onMouseEnter={() => ensureFontLoaded(f)}
+                >
+                  {f}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
         </SelectContent>
       </Select>
     </div>
@@ -124,7 +188,6 @@ export function DesignSettingsPanel() {
 
   if (loading) return <div className="text-sm text-muted-foreground">Loading design settings…</div>;
 
-  const fontOptions = FONT_FAMILIES.map((f) => ({ value: f, label: f }));
   const shadowOptions = [
     { value: 'none', label: 'None' }, { value: 'sm', label: 'Small' },
     { value: 'md', label: 'Medium' }, { value: 'lg', label: 'Large' },
@@ -161,11 +224,11 @@ export function DesignSettingsPanel() {
         <ColorInput label="Warning Color"    value={draft.theme.warning}    onChange={(v) => update('theme','warning',v)} />
         <ColorInput label="Error Color"      value={draft.theme.error}      onChange={(v) => update('theme','error',v)} />
         <ColorInput label="Background Color" value={draft.theme.background} onChange={(v) => update('theme','background',v)} />
-        <SelectField label="Page Font"       value={draft.theme.fontFamily} onChange={(v) => update('theme','fontFamily',v)} options={fontOptions} />
+        <FontSelectField label="Page Font"       value={draft.theme.fontFamily} onChange={(v) => update('theme','fontFamily',v)} />
       </SectionCard>
 
       <SectionCard title="Typography" icon={Type}>
-        <SelectField label="Font Family"           value={draft.typography.fontFamily} onChange={(v) => update('typography','fontFamily',v)} options={fontOptions} />
+        <FontSelectField label="Font Family"           value={draft.typography.fontFamily} onChange={(v) => update('typography','fontFamily',v)} />
         <TextInputField label="Base Font Size"     value={draft.typography.baseFontSize} onChange={(v) => update('typography','baseFontSize',v)} placeholder="14px" />
         <TextInputField label="Heading Font Size"  value={draft.typography.headingFontSize} onChange={(v) => update('typography','headingFontSize',v)} placeholder="24px" />
         <TextInputField label="Screen Name Size"   value={draft.typography.screenNameFontSize} onChange={(v) => update('typography','screenNameFontSize',v)} placeholder="18px" />
