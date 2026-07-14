@@ -224,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
       : "");
 
     const trySend = async () => {
-      await transporter.sendMail({
+      const info: any = await transporter.sendMail({
         from,
         to: toArr,
         cc: ccArr,
@@ -234,10 +234,18 @@ const handler = async (req: Request): Promise<Response> => {
         text: plainText,
         html: body.html,
       });
+      console.log(
+        `[send-smtp-email] sendMail result messageId=${info?.messageId ?? "n/a"} ` +
+          `accepted=${JSON.stringify(info?.accepted ?? [])} ` +
+          `rejected=${JSON.stringify(info?.rejected ?? [])} ` +
+          `response=${JSON.stringify(info?.response ?? null)}`,
+      );
+      return info;
     };
 
+    let sendInfo: any;
     try {
-      await withTimeout(trySend(), 25000, "SMTP send");
+      sendInfo = await withTimeout(trySend(), 25000, "SMTP send");
     } catch (sendErr: any) {
       const msg = String(sendErr?.message ?? sendErr);
       // If the SMTP server still rejects something Reply-To related, retry once
@@ -246,13 +254,26 @@ const handler = async (req: Request): Promise<Response> => {
         console.warn(`[send-smtp-email] Retrying without Reply-To/extra Cc due to: ${msg}`);
         replyTo = "";
         ccArr = baseCc.length ? baseCc.map(String) : undefined;
-        await withTimeout(trySend(), 25000, "SMTP send");
+        sendInfo = await withTimeout(trySend(), 25000, "SMTP send");
       } else {
         throw sendErr;
       }
     }
 
     try { transporter.close(); } catch { /* ignore */ }
+
+    const accepted: string[] = Array.isArray(sendInfo?.accepted) ? sendInfo.accepted : [];
+    const rejected: string[] = Array.isArray(sendInfo?.rejected) ? sendInfo.rejected : [];
+    if (accepted.length === 0 || rejected.length > 0) {
+      const errMsg =
+        `SMTP server did not accept the message. accepted=${JSON.stringify(accepted)} ` +
+        `rejected=${JSON.stringify(rejected)} response=${JSON.stringify(sendInfo?.response ?? null)}`;
+      console.error(`[send-smtp-email] ${errMsg}`);
+      return new Response(
+        JSON.stringify({ success: false, error: errMsg }),
+        { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
 
     // Audit log (best-effort)
     try {
@@ -265,6 +286,8 @@ const handler = async (req: Request): Promise<Response> => {
           port,
           encryption,
           from,
+          messageId: sendInfo?.messageId,
+          accepted,
         },
       });
     } catch (e) {
@@ -272,7 +295,12 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully" }),
+      JSON.stringify({
+        success: true,
+        message: "Email sent successfully",
+        messageId: sendInfo?.messageId,
+        accepted,
+      }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
