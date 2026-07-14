@@ -22,7 +22,7 @@ import { useTenantContext } from '@/hooks/useTenantContext';
 interface Props {
   stage: ApprovalStage;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   Icon: LucideIcon;
   /** Optional extra panel rendered inside the action dialog, e.g. MSME/GST checks for Finance 2. */
   extraPanel?: (item: StageApprovalItem) => ReactNode;
@@ -409,7 +409,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Icon className="h-6 w-6" /> {title}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+        {subtitle ? <p className="text-sm text-muted-foreground mt-1">{subtitle}</p> : null}
       </div>
 
       <Card>

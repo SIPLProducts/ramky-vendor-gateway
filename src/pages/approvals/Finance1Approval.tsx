@@ -6,7 +6,7 @@ export default function Finance1Approval() {
     <StageApprovalView
       stage="FINANCE_1"
       title="Finance 1 Approval"
-      subtitle="First level finance review of vendor onboarding."
+      
       Icon={IndianRupee}
     />
   );
