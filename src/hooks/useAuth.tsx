@@ -87,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadRoles = async (userId: string) => {
+    let hadError = false;
     try {
       const [roleRes, customRes] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
@@ -98,9 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (roleRes.error) {
         console.error('Error fetching user role:', roleRes.error);
-        setUserRole('vendor');
+        hadError = true;
+        setUserRole(null);
+      } else if (roleRes.data?.role) {
+        setUserRole(roleRes.data.role as AppRole);
       } else {
-        setUserRole((roleRes.data?.role as AppRole) || 'vendor');
+        // No row found → treat as vendor default (matches handle_new_user fallback)
+        setUserRole('vendor');
       }
 
       if (customRes.error) {
@@ -114,9 +119,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error loading roles:', err);
-      setUserRole('vendor');
+      hadError = true;
+      setUserRole(null);
       setCustomRoles([]);
     } finally {
+      setRolesError(hadError);
+      setRolesLoading(false);
       setLoading(false);
     }
   };
