@@ -502,7 +502,7 @@ const HIDDEN_KEYS = new Set<string>([
 
 const SECTIONS: SectionDef[] = [
   {
-    title: 'Organization Details',
+    title: 'Vendor Details',
     icon: Building2,
     knownLabels: {
       legal_name: 'Legal Name',

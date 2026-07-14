@@ -7,7 +7,7 @@ export default function Finance2Approval() {
     <StageApprovalView
       stage="FINANCE_2"
       title="Finance 2 Approval"
-      subtitle="Validate MSME status, GST compliance and (optional) declaration before final finance sign-off."
+      
       Icon={IndianRupee}
       extraPanel={(item) => (
         <div className="space-y-2 text-sm">

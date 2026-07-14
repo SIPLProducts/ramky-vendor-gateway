@@ -6,7 +6,7 @@ export default function CeoApproval() {
     <StageApprovalView
       stage="CEO_OFFICE"
       title="CEO Office Approval"
-      subtitle="Final approval for MSME-registered vendors before they are pushed to SAP."
+      
       Icon={Crown}
     />
   );

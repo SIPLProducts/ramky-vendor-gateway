@@ -450,7 +450,7 @@ export function VendorReviewDialog({
                   )}
 
                   {/* Organization */}
-                  <SectionCard icon={Building2} title="Organization Details">
+                  <SectionCard icon={Building2} title="Vendor Details">
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="space-y-1"><p className="text-muted-foreground">Legal Name</p><p className="font-medium">{vendor.legal_name || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Trade Name</p><p className="font-medium">{vendor.trade_name || '-'}</p></div>

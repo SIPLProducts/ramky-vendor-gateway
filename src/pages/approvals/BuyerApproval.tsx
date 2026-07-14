@@ -6,7 +6,7 @@ export default function BuyerApproval() {
     <StageApprovalView
       stage="BUYER"
       title="Buyer Approval"
-      subtitle="Vendors you invited that are waiting for your verification before moving to SCM CO."
+      subtitle="Review and verify vendor applications before they are forwarded to SCM CO."
       Icon={UserCheck}
     />
   );
