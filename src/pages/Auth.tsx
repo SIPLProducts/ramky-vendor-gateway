@@ -21,7 +21,7 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signIn, signOut, isVendor, userRole } = useAuth();
+  const { user, loading: authLoading, rolesLoading, signIn, signOut, isVendor, userRole } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function Auth() {
   
 
   useEffect(() => {
-    if (!user || authLoading || !userRole) return;
+    if (!user || authLoading || rolesLoading || !userRole) return;
     if (isVendor) {
       // Vendors are not allowed to sign in via the generic /auth screen.
       void signOut();
@@ -42,7 +42,7 @@ export default function Auth() {
       return;
     }
     navigate('/dashboard');
-  }, [user, authLoading, userRole, isVendor, navigate, signOut]);
+  }, [user, authLoading, rolesLoading, userRole, isVendor, navigate, signOut]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
