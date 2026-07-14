@@ -46,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [customRoles, setCustomRoles] = useState<CustomRoleRef[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -53,10 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          setRolesLoading(true);
+          setRolesError(false);
+          setUserRole(null);
+          setCustomRoles([]);
           setTimeout(() => { loadRoles(session.user.id); }, 0);
         } else {
           setUserRole(null);
           setCustomRoles([]);
+          setRolesLoading(false);
+          setRolesError(false);
           setLoading(false);
         }
       }
@@ -66,8 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        setRolesLoading(true);
+        setRolesError(false);
         loadRoles(session.user.id);
       } else {
+        setRolesLoading(false);
         setLoading(false);
       }
     });
