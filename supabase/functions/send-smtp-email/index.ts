@@ -143,6 +143,16 @@ const handler = async (req: Request): Promise<Response> => {
     const effectivePort = port;
     const useImplicitTls = encryption === "ssl";
 
+    // Warn on From/auth domain mismatch (common cause of Gmail silently dropping mail)
+    const userDomain = username.split("@")[1]?.toLowerCase();
+    const fromDomain = fromEmail.split("@")[1]?.toLowerCase();
+    if (userDomain && fromDomain && userDomain !== fromDomain) {
+      console.warn(
+        `[send-smtp-email] From/auth domain mismatch: username=${username} fromEmail=${fromEmail}. ` +
+          `Many providers (Gmail/Google Workspace) reject or silently drop mail when From does not match the authenticated mailbox.`,
+      );
+    }
+
     console.log(
       `[send-smtp-email] Connecting host=${host} port=${effectivePort} encryption=${encryption} implicitTLS=${useImplicitTls}`
     );
