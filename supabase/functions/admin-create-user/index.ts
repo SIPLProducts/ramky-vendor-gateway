@@ -89,7 +89,17 @@ Deno.serve(async (req) => {
       user_metadata: { full_name: full_name ?? null },
     });
     if (createErr || !created.user) {
-      return new Response(JSON.stringify({ error: createErr?.message ?? 'Failed to create user' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const msg = createErr?.message ?? 'Failed to create user';
+      const isDup = /already been registered|already exists|email_exists/i.test(msg) || (createErr as any)?.code === 'email_exists';
+      return new Response(
+        JSON.stringify({
+          error: isDup
+            ? 'A user with this email already exists. Please use a different email or edit the existing user.'
+            : msg,
+          code: isDup ? 'email_exists' : undefined,
+        }),
+        { status: isDup ? 409 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
     const newUserId = created.user.id;
 
