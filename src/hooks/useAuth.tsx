@@ -19,6 +19,8 @@ interface AuthContextType {
   hasCustomRole: boolean;
   isVendor: boolean;
   loading: boolean;
+  rolesLoading: boolean;
+  rolesError: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -44,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [customRoles, setCustomRoles] = useState<CustomRoleRef[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -51,10 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          setRolesLoading(true);
+          setRolesError(false);
+          setUserRole(null);
+          setCustomRoles([]);
           setTimeout(() => { loadRoles(session.user.id); }, 0);
         } else {
           setUserRole(null);
           setCustomRoles([]);
+          setRolesLoading(false);
+          setRolesError(false);
           setLoading(false);
         }
       }
@@ -64,8 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        setRolesLoading(true);
+        setRolesError(false);
         loadRoles(session.user.id);
       } else {
+        setRolesLoading(false);
         setLoading(false);
       }
     });
@@ -74,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadRoles = async (userId: string) => {
+    let hadError = false;
     try {
       const [roleRes, customRes] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
@@ -85,9 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (roleRes.error) {
         console.error('Error fetching user role:', roleRes.error);
-        setUserRole('vendor');
+        hadError = true;
+        setUserRole(null);
+      } else if (roleRes.data?.role) {
+        setUserRole(roleRes.data.role as AppRole);
       } else {
-        setUserRole((roleRes.data?.role as AppRole) || 'vendor');
+        // No row found → treat as vendor default (matches handle_new_user fallback)
+        setUserRole('vendor');
       }
 
       if (customRes.error) {
@@ -101,9 +119,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error loading roles:', err);
-      setUserRole('vendor');
+      hadError = true;
+      setUserRole(null);
       setCustomRoles([]);
     } finally {
+      setRolesError(hadError);
+      setRolesLoading(false);
       setLoading(false);
     }
   };
@@ -171,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user, session, userRole, customRoles, hasCustomRole, isVendor,
-        loading, signIn, signUp, signOut,
+        loading, rolesLoading, rolesError, signIn, signUp, signOut,
       }}
     >
       {children}

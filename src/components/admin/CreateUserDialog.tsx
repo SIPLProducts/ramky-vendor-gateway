@@ -137,8 +137,36 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
           custom_role_ids: customRoleId ? [customRoleId] : [],
         },
       });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
+
+      // Try to read the server's JSON body — supabase-js throws a generic
+      // FunctionsHttpError for non-2xx and hides the real message otherwise.
+      let serverBody: any = data;
+      if (error && (error as any).context) {
+        try {
+          const ctx = (error as any).context;
+          if (typeof ctx.json === 'function') {
+            serverBody = await ctx.json();
+          } else if (typeof ctx.text === 'function') {
+            const txt = await ctx.text();
+            try { serverBody = JSON.parse(txt); } catch { serverBody = { error: txt }; }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+
+      const serverError = serverBody?.error;
+      const serverCode = serverBody?.code;
+
+      if (error || serverError) {
+        const isDup =
+          serverCode === 'email_exists' ||
+          /already been registered|already exists|email_exists/i.test(String(serverError || error?.message || ''));
+        const message = isDup
+          ? 'A user with this email already exists. Please edit the existing user or use a different email.'
+          : (typeof serverError === 'string' ? serverError : error?.message ?? 'Failed to create user');
+        toast({ title: 'Create failed', description: message, variant: 'destructive' });
+        return;
+      }
+
       toast({ title: 'User created', description: `${email} added` });
       reset();
       onOpenChange(false);

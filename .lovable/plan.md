@@ -1,58 +1,44 @@
+# Fix login validation + user creation errors
 
-## Goal
-Extend the UI Design Settings so admins can control (1) hover text + border color for buttons, and (2) font size + font weight for each distinct surface — with clear separation between Buttons (global defaults) and Action Buttons (per-label overrides).
+## Issue 1 — Non-vendor login shows "Vendor accounts must use invitation link"
 
-## Buttons vs Actions (clarified)
-- **Buttons card** = global default styling applied to every button in the app.
-- **Action Buttons card** = per-action overrides (Approve, Reject, Save, Export, …). When an action override is set, it wins over the global default; otherwise the button inherits the global Buttons style.
+**Root cause:** In `src/hooks/useAuth.tsx`, `loadRoles()` falls back to `setUserRole('vendor')` whenever the `user_roles` query returns an error OR when `maybeSingle()` returns null. On a slow/transient response the auth state briefly reads `userRole = 'vendor'` + `hasCustomRole = false`, so `isVendor` becomes `true`. `Auth.tsx`'s effect then signs the user out and shows the vendor-only error, even though the account is `sharvi_admin`.
 
-## 1. Hover — add text + border color
-Add two new fields to both the global Buttons style and every per-Action Button style:
-- `hoverText` (color)
-- `hoverBorder` (color)
+Contributing factor: `loading` in `useAuth` is initialized `true` but only set back to `false` inside `loadRoles()`'s `finally` (or the "no session" branch). After a fresh sign‑in, `authLoading` can already be `false` from the initial `getSession()`, so `Auth.tsx`'s guard `if (!user || authLoading || !userRole) return;` no longer waits for roles to reload — it races.
 
-Behavior: on `:hover`, background, text color, and border color all switch to the configured hover values. Defaults: `hoverText` = current text color, `hoverBorder` = current hover background (keeps today's look).
+**Fix (frontend only):**
+1. `src/hooks/useAuth.tsx`
+   - Add a dedicated `rolesLoading` boolean (true while `loadRoles` is in flight, including after a new sign-in).
+   - Do NOT default `userRole` to `'vendor'` on error. Keep it `null` and surface a flag `rolesError`. Only set a real role when the query succeeds.
+   - Set `rolesLoading = true` when `onAuthStateChange` sees a new user, reset to `false` in `loadRoles` finally.
+   - Export `rolesLoading` from the context.
 
-Wiring:
-- `designTokens.ts` — add `hoverText`, `hoverBorder` to `ActionButtonStyle` and to `buttons` block. Emit CSS vars `--btn-hover-text`, `--btn-hover-border`, and per-action `--btn-{key}-hover-text`, `--btn-{key}-hover-border`.
-- `index.css` — update global button hover and per-action `[data-action="…"]:hover` rules to apply the new vars.
-- `DesignSettingsPanel.tsx` — add two ColorInput fields in the global Buttons card and in the per-action Dialog.
+2. `src/pages/Auth.tsx`
+   - Change the redirect guard to `if (!user || authLoading || rolesLoading || !userRole) return;` so the vendor check never runs against a null/default role.
+   - Keep the existing `isVendor` branch unchanged.
 
-## 2. Typography — per-section size + weight
-Add independent Font Size + Font Weight controls (and keep existing color/letter-spacing where present) for:
+3. `src/components/auth/ProtectedRoute.tsx`
+   - Also wait on `rolesLoading` before evaluating `isVendor`, so the same race can't bounce a non-vendor to the vendor screen.
 
-| Section | New controls | CSS vars |
-|---|---|---|
-| Sidebar menu text | size, weight | `--sidebar-font-size`, `--sidebar-font-weight` |
-| Screen name (page title) | size, weight | already have `--screen-name-size`, `--screen-name-weight` — surface both in a dedicated "Screen Name" sub-card |
-| Card header | size, weight | `--card-header-size`, `--card-header-weight` |
-| Card body | size, weight | `--card-body-size`, `--card-body-weight` |
-| Table header | size, weight | `--table-header-size`, `--table-header-weight` |
-| Table body | size, weight | `--table-body-size`, `--table-body-weight` (replaces single `--table-font-size`) |
+No DB, RLS, or edge-function changes.
 
-Panel reorganization inside the Design Settings tab:
-- **Typography** card keeps only base body defaults (family, base size, weight, color, line-height, letter-spacing).
-- **Screen Name** section (inside Typography or as its own small card) exposes screen-name size + weight + letter-spacing.
-- **Sidebar** card gains size + weight rows.
-- **Cards** card splits into "Header" and "Body" rows, each with size + weight (plus existing background/border/radius/shadow).
-- **Tables** card splits into "Header" and "Body" rows, each with size + weight (plus existing colors/border).
+## Issue 2 — Create User shows "Edge Function returned a non-2xx status code"
 
-## 3. Apply to the app
-- `Sidebar.tsx` — sidebar menu items use `text-[length:var(--sidebar-font-size)] font-[var(--sidebar-font-weight)]`.
-- `PageHeader.tsx` / `EnterpriseHeader.tsx` — screen name uses the screen-name vars (already partially wired; confirm).
-- `ui/card.tsx` — CardTitle uses `--card-header-size/weight`; CardContent uses `--card-body-size/weight`.
-- `ui/table.tsx` — TableHead uses `--table-header-size/weight`; TableCell uses `--table-body-size/weight`.
+**Root cause:** `admin-create-user` now returns HTTP 409 with a friendly JSON body when the email already exists (recent change). But `supabase.functions.invoke()` throws a generic `FunctionsHttpError` for any non-2xx response, and `CreateUserDialog.handleSubmit` does `if (error) throw error;` — so the toast shows the generic SDK message instead of the server's message.
 
-No business-logic files touched. No route or DB schema changes. Existing `portal_config.ui_design_settings` JSON schema gains new optional keys; defaults preserve today's appearance so nothing regresses on first load.
+**Fix (frontend only):** In `src/components/admin/CreateUserDialog.tsx` `handleSubmit`:
+- When `error` is present, attempt `await error.context?.json?.()` (or `.text()` fallback) to read the server's `{ error, code }` body and show that message in the toast.
+- Special‑case `code === 'email_exists'` (or a message match) with: "A user with this email already exists. Edit the existing user or use a different email." and keep the dialog open.
+- Leave the successful path untouched.
 
-## Files to edit
-- `src/lib/designTokens.ts` — extend `DesignSettings` type, defaults, and `applyDesignSettings` var emission.
-- `src/index.css` — new var-consuming rules for hover text/border and per-section typography.
-- `src/components/admin/DesignSettingsPanel.tsx` — new controls, panel reorg, per-action Dialog gains hover text/border.
-- `src/components/layout/Sidebar.tsx` — consume sidebar font vars.
-- `src/components/ui/card.tsx` — consume card header/body font vars.
-- `src/components/ui/table.tsx` — consume table header/body font vars.
-- (verify) `src/components/layout/PageHeader.tsx` uses screen-name vars.
+No backend change needed — the edge function already returns the right payload.
 
 ## Out of scope
-Any change to button click handlers, approval flow, data fetching, RLS, or backend config.
+- No changes to auth signup flow, RLS, tenants, SAP fetch, or approval workflows.
+- No visual/design changes.
+
+## Files touched
+- `src/hooks/useAuth.tsx`
+- `src/pages/Auth.tsx`
+- `src/components/auth/ProtectedRoute.tsx`
+- `src/components/admin/CreateUserDialog.tsx`
