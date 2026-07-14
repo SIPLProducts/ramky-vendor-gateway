@@ -1,18 +1,20 @@
-## Text/Subtitle updates
+## Plan: Fix "Forgot Password" email delivery using the No-Reply SMTP config
 
-**1. Approval stage page subtitles** (`src/pages/approvals/*.tsx`)
+**Issue:** UI shows "Password reset email sent successfully" but no email arrives. `send-smtp-email` logs the SMTP connect but never logs the delivery outcome, so a silently-dropped send (e.g. Gmail rewriting/rejecting a mismatched From) reports success.
 
-- `BuyerApproval.tsx` — change subtitle to: *"Review and verify vendor applications before they are forwarded to SCM CO."*
-- `ScmManagerApproval.tsx` — remove subtitle (pass `subtitle=""` or drop prop)
-- `ScmHeadApproval.tsx` — remove subtitle
-- `Finance1Approval.tsx` — remove subtitle
-- `Finance2Approval.tsx` — remove subtitle
-- `CeoApproval.tsx` — remove subtitle
+**Fix scope:** Backend edge functions only. No UI changes.
 
-I'll first check `StageApprovalView` to confirm `subtitle` is optional; if required, I'll make it optional so the empty ones render cleanly.
+### 1. `supabase/functions/send-smtp-email/index.ts`
+- Capture `sendMail` result (`messageId`, `accepted`, `rejected`, `response`) and `console.log` it.
+- If `accepted.length === 0` or `rejected.length > 0`, return `{ success:false, error }` with HTTP 502 so the caller can surface the real failure.
+- On startup of each request, `console.warn` when the domain of `from_email` doesn't match the domain of the SMTP `username` (the common cause of silent Gmail drops).
 
-**2. "Organization Details" → "Vendor Details"**
+### 2. `supabase/functions/send-password-reset/index.ts`
+- Explicitly load the **No-Reply SMTP config** from `portal_config` (`smtp_host`, `smtp_port`, `smtp_encryption`, `smtp_username`, `smtp_password`, `smtp_from_email`, `smtp_from_name`) and pass it inline as the `smtp` override in the `send-smtp-email` invocation. This guarantees the reset email is sent using the No-Reply mailbox as From, regardless of any other per-user SMTP defaults.
+- Propagate `sendData.success === false` (with its error) back to the client so the toast becomes an error instead of a false "sent successfully".
 
-Global rename across all occurrences in the codebase (view details dialogs/pages, section headers, labels). I'll ripgrep for `Organization Details` and replace each match with `Vendor Details`.
+### 3. Verification
+- Deploy both functions.
+- Trigger "Forgot password" for a known user; read `send-smtp-email` logs for `accepted:[...]` + `messageId`. If accepted, the email is truly on its way (ask user to check Spam/All Mail). If not, the returned SMTP error will now be visible.
 
-No logic, routing, or backend changes.
+No schema changes, no new secrets, no UI changes.
