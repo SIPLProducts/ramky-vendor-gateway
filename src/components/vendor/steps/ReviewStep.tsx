@@ -151,7 +151,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       ) : (
       <>
       <div className="form-section">
-        <SectionHeader icon={Building2} title="Organization Details" step={2} onEdit={onEditStep} />
+        <SectionHeader icon={Building2} title="Vendor Details" step={2} onEdit={onEditStep} />
         <div className="space-y-1">
           <DataRow label="Legal Name" value={data.organization?.legalName} />
           <DataRow label="Trade Name" value={data.organization?.tradeName} />

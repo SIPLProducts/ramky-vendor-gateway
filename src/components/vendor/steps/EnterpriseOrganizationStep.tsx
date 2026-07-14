@@ -191,7 +191,7 @@ export function EnterpriseOrganizationStep({
         <div className="form-section">
           <h3 className="form-section-title">
             <Building2 className="h-5 w-5 text-primary" />
-            Organization Details
+            Vendor Details
           </h3>
 
           <div className="grid gap-5">

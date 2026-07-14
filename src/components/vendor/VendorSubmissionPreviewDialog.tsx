@@ -138,7 +138,7 @@ export function VendorSubmissionPreviewDialog({
             <div className="space-y-6 py-2">
               {/* Organization */}
               <div className="form-section">
-                <SectionHeader icon={Building2} title="Organization Details" />
+                <SectionHeader icon={Building2} title="Vendor Details" />
                 <div className="space-y-1">
                   <DataRow label="SAP Name (NAME1)" value={getSapName1(vendor)} />
                   <DataRow label="Legal Name" value={vendor.legal_name} />
