@@ -127,7 +127,7 @@ export default function VendorStatus() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Field label="Reference Number" value={vendor.reference_number ?? '—'} mono />
                 <Field label="Company Name" value={pickVendorDisplayName(vendor) || '—'} />
-                <Field label="Email" value={vendor.primary_email ?? '—'} />
+                <Field label="Email" value={vendor.primary_email || vendor.primary_email_2 || inviteEmail || '—'} />
 
                 <Field label="Vendor Type" value={vendor.vendor_type ?? '—'} />
                 <Field label="Submitted On" value={format(new Date(vendor.created_at), 'dd MMM yyyy, HH:mm')} />
