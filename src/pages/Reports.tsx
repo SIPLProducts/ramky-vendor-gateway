@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useState } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import {
@@ -59,7 +60,7 @@ function statusLabel(s: string): string {
 
 function fmt(d: string | null | undefined): string {
   if (!d) return '—';
-  try { return new Date(d).toLocaleString(); } catch { return d; }
+  try { return formatDateTime(d); } catch { return d; }
 }
 
 function fmtValue(v: any, key?: string): string {

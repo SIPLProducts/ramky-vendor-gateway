@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -538,7 +539,7 @@ export default function GstCompliance() {
                       <TableCell>{getRiskBadge(compliance.riskLevel)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {compliance.lastChecked 
-                          ? format(new Date(compliance.lastChecked), 'dd MMM yyyy HH:mm')
+                          ? formatDateTime(compliance.lastChecked)
                           : 'Never'}
                       </TableCell>
                       <TableCell className="text-right">

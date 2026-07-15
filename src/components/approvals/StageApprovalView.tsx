@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare } from 'lucide-react';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
+import { formatDateTime } from '@/lib/dateFormat';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
@@ -191,9 +192,10 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Vendor</TableHead>
             {showBuyerCompanyColumn && <TableHead>Buyer Company</TableHead>}
-            {!isBuyer && <TableHead>Invited By</TableHead>}
+            {!isBuyer && <TableHead>Buyer Invited Email</TableHead>}
+            <TableHead>Vendor Name</TableHead>
+            <TableHead>Vendor Email</TableHead>
             <TableHead>MSME</TableHead>
             <TableHead>Submitted</TableHead>
             <TableHead className="text-center">Actions</TableHead>
@@ -201,7 +203,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         </TableHeader>
         <TableBody>
           {(() => {
-            const baseCols = 4; // Vendor + MSME + Submitted + Actions
+            const baseCols = 5; // Vendor Name + Vendor Email + MSME + Submitted + Actions
             const colSpan = baseCols + (showBuyerCompanyColumn ? 1 : 0) + (!isBuyer ? 1 : 0);
             if (loading) {
               return Array.from({ length: 3 }).map((_, i) => (
@@ -228,6 +230,24 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               const blocked = variant === 'waiting';
               return (
                 <TableRow key={it.progressId ?? it.vendorId}>
+                  {showBuyerCompanyColumn && (
+                    <TableCell className="text-sm">
+                      <div>{it.vendorCompany ?? '—'}</div>
+                      {it.companyMismatch && it.invitationCompany && (
+                        <div className="text-xs text-amber-600 mt-1">
+                          Invitation: {it.invitationCompany}
+                        </div>
+                      )}
+                    </TableCell>
+                  )}
+                  {!isBuyer && (
+                    <TableCell className="text-sm">
+                      <div>{it.buyerEmail ?? '—'}</div>
+                      {it.buyerName && (
+                        <div className="text-xs text-muted-foreground">{it.buyerName}</div>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     <div>{it.vendorName}</div>
                     <div className="text-xs text-muted-foreground font-mono mt-0.5">Ref No: {it.referenceNumber || it.vendorId.slice(0, 8).toUpperCase()}</div>
@@ -244,26 +264,12 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       </div>
                     )}
                   </TableCell>
-                  {showBuyerCompanyColumn && (
-                    <TableCell className="text-sm">
-                      <div>{it.vendorCompany ?? '—'}</div>
-                      {it.companyMismatch && it.invitationCompany && (
-                        <div className="text-xs text-amber-600 mt-1">
-                          Invitation: {it.invitationCompany}
-                        </div>
-                      )}
-                    </TableCell>
-                  )}
-                  {!isBuyer && (
-                    <TableCell className="text-sm">
-                      <div>{it.buyerName ?? '—'}</div>
-                    </TableCell>
-                  )}
+                  <TableCell className="text-sm">{it.vendorEmail ?? '—'}</TableCell>
                   <TableCell>
                     {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {it.submittedAt ? new Date(it.submittedAt).toLocaleString() : '—'}
+                    {formatDateTime(it.submittedAt, '—')}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -303,6 +309,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       </Table>
     </div>
   );
+
 
   const renderRejectedTable = (rows: StageApprovalItem[]) => (
     <div className="border rounded-md">
@@ -351,7 +358,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {it.rejectionAt ? new Date(it.rejectionAt).toLocaleString() : '—'}
+                  {formatDateTime(it.rejectionAt, '—')}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">

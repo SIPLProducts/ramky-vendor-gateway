@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -330,7 +331,7 @@ export default function ScheduledChecks() {
                     <div>
                       <p className="font-medium capitalize">{check.validation_type.replace(/_/g, ' ')}</p>
                       <p className="text-sm text-muted-foreground">
-                        Next: {format(new Date(check.next_run_at), 'dd MMM yyyy HH:mm')}
+                        Next: {formatDateTime(check.next_run_at)}
                       </p>
                     </div>
                     <Badge variant={check.is_active ? 'default' : 'secondary'}>
@@ -395,7 +396,7 @@ export default function ScheduledChecks() {
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {format(new Date(log.created_at), 'dd MMM yyyy HH:mm')}
+                        {formatDateTime(log.created_at)}
                       </TableCell>
                       <TableCell>
                         <Badge variant="default">

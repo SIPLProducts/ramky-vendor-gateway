@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
         .eq('stage', 'BUYER').eq('status', 'pending').in('vendor_id', buyerVendorIds);
       const { data: rejectedVendors } = await admin
         .from('vendors')
-        .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number, tenant_id')
+        .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, status, last_rejection_comments, last_rejection_stage, last_rejected_at, reference_number, tenant_id, primary_email, registered_email')
         .in('id', buyerVendorIds).eq('status', 'returned_to_buyer');
 
       // Latest invitation per vendor (for on-behalf detection + deep-link + tenant).
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
       const pendingVIds = (buyerProgress ?? []).map((p: any) => p.vendor_id);
       const { data: vendors } = pendingVIds.length
-        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number, tenant_id').in('id', pendingVIds)
+        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number, tenant_id, primary_email, registered_email').in('id', pendingVIds)
         : { data: [] as any[] } as any;
       const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
           rejectionAt: p.rejection_at ?? null,
           isOnBehalf: !!inv?.created_on_behalf,
           invitationId: inv?.id ?? null,
+          vendorEmail: v?.primary_email ?? v?.registered_email ?? null,
         };
       });
 
@@ -170,6 +171,7 @@ Deno.serve(async (req) => {
           rejectionAt: v?.last_rejected_at ?? null,
           isOnBehalf: !!inv?.created_on_behalf,
           invitationId: inv?.id ?? null,
+          vendorEmail: v?.primary_email ?? v?.registered_email ?? null,
         };
       });
 
@@ -231,7 +233,7 @@ Deno.serve(async (req) => {
 
     const { data: vendors } = await admin
       .from('vendors')
-      .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, tenant_id, reference_number')
+      .select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, tenant_id, reference_number, primary_email, registered_email')
       .in('id', progressVendorIds);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
@@ -288,6 +290,7 @@ Deno.serve(async (req) => {
         rejectionComments: p.rejection_comments ?? null,
         rejectionFromStage: p.rejection_from_stage ?? null,
         rejectionAt: p.rejection_at ?? null,
+        vendorEmail: v?.primary_email ?? v?.registered_email ?? null,
       };
     });
 

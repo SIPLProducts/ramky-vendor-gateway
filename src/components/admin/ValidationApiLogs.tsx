@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { forwardRef } from 'react';
 import { useValidationApiLogs, ValidationApiLog } from '@/hooks/useValidationOrchestrator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,7 +80,7 @@ export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsPro
               {logs?.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell className="font-mono text-xs">
-                    {format(new Date(log.created_at), 'MMM dd, HH:mm:ss')}
+                    {formatDateTime(log.created_at)}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">
@@ -146,7 +147,7 @@ function LogDetailDialog({ log }: { log: ValidationApiLog }) {
             API Call Details
           </DialogTitle>
           <DialogDescription>
-            {format(new Date(log.created_at), 'MMMM dd, yyyy HH:mm:ss')}
+            {formatDateTime(log.created_at)}
           </DialogDescription>
         </DialogHeader>
 

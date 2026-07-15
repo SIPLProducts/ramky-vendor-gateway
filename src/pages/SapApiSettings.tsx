@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -186,7 +187,7 @@ export default function SapApiSettings() {
                         <TableCell><Badge variant="secondary">{c.http_method}</Badge></TableCell>
                         <TableCell className="text-sm text-muted-foreground">{c.auth_type}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {c.last_synced_at ? new Date(c.last_synced_at).toLocaleString() : "—"}
+                          {formatDateTime(c.last_synced_at, '—')}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <Button size="sm" variant="ghost" onClick={() => handleTest(c.id)} disabled={test.isPending}>

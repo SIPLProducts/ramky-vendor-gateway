@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -233,7 +234,7 @@ export default function EmailConfiguration() {
       "From Name": c.from_name ?? "",
       "Reply-To": c.reply_to ?? "",
       Active: c.is_active ? "Yes" : "No",
-      "Last Updated": new Date(c.updated_at).toLocaleString(),
+      "Last Updated": formatDateTime(c.updated_at),
     }));
   }
 
@@ -249,7 +250,7 @@ export default function EmailConfiguration() {
     doc.setFontSize(14);
     doc.text("Sharvi Vendor Portal — Email Configuration", 14, 15);
     doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+    doc.text(`Generated: ${formatDateTime(new Date())}`, 14, 22);
     const rows = rowsForExport();
     autoTable(doc, {
       startY: 28,
@@ -549,7 +550,7 @@ export default function EmailConfiguration() {
                         {c.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{new Date(c.updated_at).toLocaleString()}</TableCell>
+                    <TableCell>{formatDateTime(c.updated_at)}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button size="sm" variant="ghost" onClick={() => handleRowTest(c)} disabled={test.isPending}>
                         <Send className="h-4 w-4" />

@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,7 +109,7 @@ export function ApprovalTimeline({ vendorId }: Props) {
                   </div>
                   {r.acted_by_name && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      by {r.acted_by_name} · {r.acted_at ? new Date(r.acted_at).toLocaleString() : ''}
+                      by {r.acted_by_name} · {formatDateTime(r.acted_at)}
                     </p>
                   )}
                   {r.status === 'rejected' && r.comments && (

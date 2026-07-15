@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { STAGE_ORDER, STAGE_LABEL, type VendorReportRow } from './loadVendorReport';
@@ -5,7 +6,7 @@ import { formatAadhaarLinked, formatPanStatus } from '@/lib/panComprehensive';
 
 function fmt(d: string | null | undefined): string {
   if (!d) return '';
-  try { return new Date(d).toLocaleString(); } catch { return String(d); }
+  try { return formatDateTime(d); } catch { return String(d); }
 }
 
 function statusLabel(s: string): string {
@@ -28,7 +29,7 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
   doc.setFontSize(14);
   doc.text(reportType === 'approval' ? 'Approval Flow Report' : 'Vendor Report', 40, 40);
   doc.setFontSize(9);
-  doc.text(`Generated: ${new Date().toLocaleString()}  •  ${rows.length} vendor(s)`, 40, 56);
+  doc.text(`Generated: ${formatDateTime(new Date())}  •  ${rows.length} vendor(s)`, 40, 56);
 
   const isSingle = rows.length === 1 && !!rows[0].details;
 

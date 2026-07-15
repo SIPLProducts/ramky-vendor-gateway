@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -182,7 +183,7 @@ export default function AuditLogs() {
                       )}
                       <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {new Date(log.created_at).toLocaleString('en-IN')}
+                        {formatDateTime(log.created_at)}
                         {log.vendor_id && (
                           <span className="ml-2">Vendor ID: {log.vendor_id.slice(0, 8)}...</span>
                         )}

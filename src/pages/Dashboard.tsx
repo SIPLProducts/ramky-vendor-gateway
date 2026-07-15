@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { formatDateTime } from '@/lib/dateFormat';
 import * as XLSX from 'xlsx';
 import {
   CheckCircle,
@@ -248,11 +249,11 @@ export default function Dashboard() {
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
       'Reference Number': v.reference_number ?? '',
-      'Vendor Name': pickVendorDisplayName(v) || '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
-      Email: v.display_email ?? '',
-      Status: STATUS_LABELS[v.status]?.label ?? v.status,
-      'Created Date': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
+      'Vendor Name': pickVendorDisplayName(v) || '',
+      'Vendor Email': v.display_email ?? '',
+      'Status': STATUS_LABELS[v.status]?.label ?? v.status,
+      'Created Date': formatDateTime(v.created_at),
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -400,9 +401,9 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference Number</TableHead>
-                  <TableHead>Vendor Name</TableHead>
                   <TableHead>Invited By</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Vendor Name</TableHead>
+                  <TableHead>Vendor Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created Date</TableHead>
                 </TableRow>
@@ -432,8 +433,6 @@ export default function Dashboard() {
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
-
-                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">
@@ -443,12 +442,12 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
+                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
                       <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
-                      <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
+                      <TableCell>{formatDateTime(v.created_at)}</TableCell>
                     </TableRow>
                   ))
-
                 )}
               </TableBody>
             </Table>
