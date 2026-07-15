@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       // Latest invitation per vendor (for on-behalf detection + deep-link + tenant).
       const { data: invsForBuyer } = await admin
         .from('vendor_invitations')
-        .select('id, vendor_id, created_on_behalf, created_at, tenant_id')
+        .select('id, vendor_id, created_on_behalf, created_at, tenant_id, email')
         .in('vendor_id', buyerVendorIds)
         .order('created_at', { ascending: false });
       const invByVendor = new Map<string, any>();
