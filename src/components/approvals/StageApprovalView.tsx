@@ -264,7 +264,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm">{it.vendorEmail ?? '—'}</TableCell>
+                  <TableCell className="text-sm">{it.vendorEmail || '—'}</TableCell>
                   <TableCell>
                     {it.isMsme ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>}
                   </TableCell>
