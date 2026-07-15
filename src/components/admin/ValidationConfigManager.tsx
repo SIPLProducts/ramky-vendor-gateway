@@ -207,7 +207,7 @@ export const ValidationConfigManager = forwardRef<HTMLDivElement, object>(
                 <TableHead>Execution Stage</TableHead>
                 <TableHead>Threshold</TableHead>
                 <TableHead>Retry / Timeout</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

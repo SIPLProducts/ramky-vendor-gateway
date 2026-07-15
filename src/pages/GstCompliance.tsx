@@ -508,7 +508,7 @@ export default function GstCompliance() {
                   <TableHead>Compliance Score</TableHead>
                   <TableHead>Risk Level</TableHead>
                   <TableHead>Last Checked</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

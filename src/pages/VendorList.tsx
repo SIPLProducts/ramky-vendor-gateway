@@ -387,7 +387,7 @@ export default function VendorList() {
                       <TableHead>Location</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>SAP Code</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
 
                   </TableHeader>

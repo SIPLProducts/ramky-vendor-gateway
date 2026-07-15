@@ -134,7 +134,7 @@ export default function CustomRoles() {
                   <TableHead>Description</TableHead>
                   <TableHead>Users</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -196,7 +196,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             {!isBuyer && <TableHead>Invited By</TableHead>}
             <TableHead>MSME</TableHead>
             <TableHead>Submitted</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -313,7 +313,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <TableHead>Rejected From</TableHead>
             <TableHead>Remarks</TableHead>
             <TableHead>Rejected At</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
