@@ -35,20 +35,8 @@ export function StickyActionBar({
   const isLastStep = currentStep === totalSteps;
   const isFirstStep = currentStep === 1;
 
-  const ContinueButton = (
-    <Button
-      type="submit"
-      form={currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
-      disabled={!canProceed}
-      className={cn(
-        "min-w-[120px]",
-        !canProceed && "opacity-50 cursor-not-allowed"
-      )}
-    >
-      Continue
-      <ChevronRight className="h-4 w-4 ml-1" />
-    </Button>
-  );
+
+
 
   return (
     <div className="sticky-footer">
