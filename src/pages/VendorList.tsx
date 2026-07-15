@@ -33,6 +33,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getSapName1, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
+import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
