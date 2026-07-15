@@ -401,9 +401,9 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference Number</TableHead>
-                  <TableHead>Vendor Name</TableHead>
                   <TableHead>Invited By</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Vendor Name</TableHead>
+                  <TableHead>Vendor Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created Date</TableHead>
                 </TableRow>
@@ -433,8 +433,6 @@ export default function Dashboard() {
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
                       </TableCell>
-
-                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
                       <TableCell>
                         {v.invited_by ? (
                           <div className="text-sm">
@@ -444,12 +442,12 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
+                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
                       <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
-                      <TableCell>{format(new Date(v.created_at), 'dd MMM yyyy, HH:mm')}</TableCell>
+                      <TableCell>{formatDateTime(v.created_at)}</TableCell>
                     </TableRow>
                   ))
-
                 )}
               </TableBody>
             </Table>
