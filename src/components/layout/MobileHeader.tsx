@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Bell, LogOut, Settings, User, X, Building2, KeyRound } from 'lucide-react';
+import {
+  Menu, Bell, LogOut, Settings, User, X, Building2, KeyRound,
+  LayoutDashboard, FileText, CheckCircle, ClipboardCheck, Users,
+  History, Mail, HelpCircle, Wrench, RefreshCw, IndianRupee, ShoppingCart,
+  UserCog, ShieldCheck, Layers, Crown, UserCheck, BarChart3,
+} from 'lucide-react';
 import { ChangePasswordDialog } from '@/components/account/ChangePasswordDialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -24,6 +29,7 @@ import { cn } from '@/lib/utils';
 import ramkyLogo from '@/assets/ramky-logo.png';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useTenantContext } from '@/hooks/useTenantContext';
+import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 
 interface MobileHeaderProps {
   userName: string;
@@ -41,11 +47,39 @@ const roleLabels: Record<string, string> = {
   approver: 'Approver',
 };
 
+const drawerNavItems = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, screenKey: 'dashboard' },
+  { label: 'Sharvi Admin Console', href: '/sharvi-admin', icon: Wrench, screenKey: 'sharvi_admin_console' },
+  { label: 'Form Builder', href: '/admin/form-builder', icon: Layers, screenKey: 'form_builder' },
+  { label: 'Vendor Invitations', href: '/admin/invitations', icon: Mail, screenKey: 'vendor_invitations' },
+  { label: 'User Management', href: '/admin/users', icon: UserCog, screenKey: 'user_management' },
+  { label: 'Buyer Approval', href: '/approvals/buyer', icon: UserCheck, screenKey: 'buyer_approval' },
+  { label: 'SCM Approval', href: '/approvals/scm-manager', icon: ShoppingCart, screenKey: 'scm_manager_approval' },
+  { label: 'SCM Head Approval', href: '/approvals/scm-head', icon: ShieldCheck, screenKey: 'scm_head_approval' },
+  { label: 'Finance 1 Approval', href: '/approvals/finance-1', icon: IndianRupee, screenKey: 'finance1_approval' },
+  { label: 'Finance 2 Approval', href: '/approvals/finance-2', icon: IndianRupee, screenKey: 'finance2_approval' },
+  { label: 'CEO Office Approval', href: '/approvals/ceo', icon: Crown, screenKey: 'ceo_approval' },
+  { label: 'SAP Sync', href: '/sap/sync', icon: RefreshCw, screenKey: 'sap_sync' },
+  { label: 'SAP API Settings', href: '/sap/api-settings', icon: Settings, screenKey: 'sap_api_settings' },
+  { label: 'KYC API Settings', href: '/admin/kyc-api-settings', icon: ShieldCheck, screenKey: 'kyc_api_settings' },
+  { label: 'All Vendors', href: '/vendors', icon: Users, screenKey: 'vendors' },
+  { label: 'GST Compliance', href: '/compliance/gst', icon: CheckCircle, screenKey: 'gst_compliance' },
+  { label: 'Scheduled Checks', href: '/compliance/scheduled', icon: ClipboardCheck, screenKey: 'scheduled_checks' },
+  { label: 'Audit Logs', href: '/audit-logs', icon: History, screenKey: 'audit_logs' },
+  { label: 'Reports', href: '/reports', icon: BarChart3, screenKey: 'reports' },
+  { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
+  { label: 'Email Configuration', href: '/admin/email-config', icon: Mail, screenKey: 'email_configuration' },
+  { label: 'Help & Support', href: '/support', icon: HelpCircle, screenKey: 'support' },
+];
+
 export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProps) {
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const { isSubscribed, subscribe, permission } = usePushNotifications();
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { can, loading: permsLoading } = useScreenPermissions();
+  const visibleNavItems = permsLoading ? [] : drawerNavItems.filter((i) => can(i.screenKey));
   const {
     myTenants, activeTenantId, setActiveTenantId,
     isSuperAdmin, isCrossTenantReviewer, isScmManager,
@@ -64,6 +98,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
       setNotificationLoading(false);
     }
   };
+
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border h-14 px-4 flex items-center justify-between safe-area-top">
