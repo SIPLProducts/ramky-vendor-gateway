@@ -44,6 +44,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { formatDate } from '@/lib/dateFormat';
 import {
   Mail,
   Plus,
