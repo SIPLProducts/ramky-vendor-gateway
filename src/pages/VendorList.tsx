@@ -428,17 +428,6 @@ export default function VendorList() {
                       paginatedVendors.map((vendor) => (
                         <TableRow key={vendor.id}>
                           <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded bg-muted flex items-center justify-center">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
-                                <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
                             <span className="text-sm">{getBuyerCompanyName(vendor.tenant_id)}</span>
                           </TableCell>
                           <TableCell>
@@ -450,7 +439,17 @@ export default function VendorList() {
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
                           </TableCell>
-
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded bg-muted flex items-center justify-center">
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
+                                <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="font-mono text-sm">
                             {vendor.gstin || '-'}
                           </TableCell>
@@ -458,6 +457,9 @@ export default function VendorList() {
                             {vendor.registered_city && vendor.registered_state
                               ? `${vendor.registered_city}, ${vendor.registered_state}`
                               : '-'}
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {vendor.sap_vendor_code || '-'}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(vendor.status as VendorStatus)}
@@ -468,29 +470,18 @@ export default function VendorList() {
                               </div>
                             )}
                           </TableCell>
-
-                          <TableCell className="font-mono">
-                            {vendor.sap_vendor_code || '-'}
-                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                title="View"
                                 onClick={() => {
                                   setSelectedVendor(vendor);
                                   setShowDetails(true);
                                 }}
                               >
                                 <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title="Preview"
-                                onClick={() => setPreviewVendorId(vendor.id)}
-                              >
-                                <FileText className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -506,6 +497,7 @@ export default function VendorList() {
                               </Button>
                             </div>
                           </TableCell>
+
 
                         </TableRow>
                       ))
