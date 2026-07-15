@@ -52,34 +52,46 @@ export function StickyActionBar({
 
   return (
     <div className="sticky-footer">
-      <div className="max-w-[1280px] mx-auto flex items-center justify-between">
-        {/* Left side - Cancel */}
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onCancel}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-4 w-4 mr-2" />
-          Cancel
-        </Button>
-
-        {/* Center - Validation Message */}
+      <div className="max-w-[1280px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        {/* Mobile-only inline validation message (desktop shows a centered pill) */}
         {!canProceed && validationMessage && (
-          <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-warning/10 text-warning-foreground rounded-lg border border-warning/30">
-            <ShieldAlert className="h-4 w-4 text-warning" />
-            <span className="text-sm font-medium">{validationMessage}</span>
+          <div className="md:hidden flex items-center gap-2 px-3 py-1.5 bg-warning/10 text-warning-foreground rounded-md border border-warning/30 text-xs">
+            <ShieldAlert className="h-3.5 w-3.5 text-warning shrink-0" />
+            <span className="font-medium">{validationMessage}</span>
           </div>
         )}
 
+        <div className="flex items-center justify-between md:justify-start gap-2 md:gap-3 w-full md:w-auto">
+          {/* Left side - Cancel */}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            size="sm"
+            className="text-muted-foreground hover:text-foreground md:size-default"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+
+          {/* Center - Validation Message (desktop only) */}
+          {!canProceed && validationMessage && (
+            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-warning/10 text-warning-foreground rounded-lg border border-warning/30">
+              <ShieldAlert className="h-4 w-4 text-warning" />
+              <span className="text-sm font-medium">{validationMessage}</span>
+            </div>
+          )}
+        </div>
+
         {/* Right side - Navigation and Actions */}
-        <div className="flex items-center gap-3">
+        <div className="grid grid-cols-2 md:flex md:items-center gap-2 md:gap-3 w-full md:w-auto">
           {/* Save as Draft */}
           <Button
             type="button"
             variant="outline"
             onClick={onSaveDraft}
             disabled={isSaving}
+            className="w-full md:w-auto"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -95,6 +107,7 @@ export function StickyActionBar({
               type="button"
               variant="outline"
               onClick={onBack}
+              className="w-full md:w-auto"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Previous
@@ -107,7 +120,7 @@ export function StickyActionBar({
               type="button"
               onClick={onSubmit}
               disabled={isSubmitting || !canSubmit}
-              className="min-w-[160px]"
+              className="col-span-2 md:col-span-1 md:min-w-[160px] w-full md:w-auto"
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -120,8 +133,19 @@ export function StickyActionBar({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span tabIndex={!canProceed ? 0 : undefined}>
-                    {ContinueButton}
+                  <span tabIndex={!canProceed ? 0 : undefined} className={cn(!isFirstStep ? '' : 'col-span-1', 'w-full md:w-auto')}>
+                    <Button
+                      type="submit"
+                      form={currentStep === 1 ? "step-form-1" : currentStep === 2 ? "step-form-2" : "step-form"}
+                      disabled={!canProceed}
+                      className={cn(
+                        "w-full md:min-w-[120px]",
+                        !canProceed && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      Continue
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
                   </span>
                 </TooltipTrigger>
                 {!canProceed && validationMessage && (
