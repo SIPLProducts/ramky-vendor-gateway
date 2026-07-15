@@ -84,24 +84,27 @@ export function KycTabs({ active, onActiveChange, statuses, gst, pan, msme, bank
       </div>
 
       <Tabs value={active} onValueChange={(v) => onActiveChange(v as any)} className="space-y-4">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 h-auto">
-          <TabsTrigger value="gst" className="flex items-center justify-center py-2.5">
-            <FileText className="h-4 w-4 mr-1.5" />
-            GST <StatusPill status={statuses.gst} />
-          </TabsTrigger>
-          <TabsTrigger value="pan" className="flex items-center justify-center py-2.5">
-            <CreditCard className="h-4 w-4 mr-1.5" />
-            PAN <StatusPill status={statuses.pan} />
-          </TabsTrigger>
-          <TabsTrigger value="msme" className="flex items-center justify-center py-2.5">
-            <Award className="h-4 w-4 mr-1.5" />
-            MSME <StatusPill status={statuses.msme} />
-          </TabsTrigger>
-          <TabsTrigger value="bank" className="flex items-center justify-center py-2.5">
-            <Landmark className="h-4 w-4 mr-1.5" />
-            Bank <StatusPill status={statuses.bank} />
-          </TabsTrigger>
-        </TabsList>
+        <div className="-mx-1 overflow-x-auto">
+          <TabsList className="inline-flex md:grid md:grid-cols-4 w-full min-w-full h-auto">
+            <TabsTrigger value="gst" className="flex items-center justify-center py-2.5 whitespace-nowrap">
+              <FileText className="h-4 w-4 mr-1.5" />
+              GST <StatusPill status={statuses.gst} />
+            </TabsTrigger>
+            <TabsTrigger value="pan" className="flex items-center justify-center py-2.5 whitespace-nowrap">
+              <CreditCard className="h-4 w-4 mr-1.5" />
+              PAN <StatusPill status={statuses.pan} />
+            </TabsTrigger>
+            <TabsTrigger value="msme" className="flex items-center justify-center py-2.5 whitespace-nowrap">
+              <Award className="h-4 w-4 mr-1.5" />
+              MSME <StatusPill status={statuses.msme} />
+            </TabsTrigger>
+            <TabsTrigger value="bank" className="flex items-center justify-center py-2.5 whitespace-nowrap">
+              <Landmark className="h-4 w-4 mr-1.5" />
+              Bank <StatusPill status={statuses.bank} />
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
 
         <TabsContent value="gst" className="mt-4">{gst}</TabsContent>
         <TabsContent value="pan" className="mt-4">{pan}</TabsContent>

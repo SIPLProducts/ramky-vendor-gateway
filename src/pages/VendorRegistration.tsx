@@ -130,12 +130,17 @@ function isDomesticStepComplete(
     }
     case 4: {
       const c = data.contact;
-      return nonEmpty(c?.ceoName);
+      return nonEmpty(c?.ceoName) && (emailOk(c?.ceoEmail) || phoneOk(c?.ceoPhone));
     }
     case 5: {
-      // Financial & Infrastructure step has no required fields in its schema.
-      // Any provided values are validated inline by the step itself.
-      return true;
+      // Financial & Infrastructure step has no schema-required fields, but for
+      // the visual "completed" tick we require the user to have entered at
+      // least one meaningful value; otherwise a fresh draft would show a tick.
+      const f = data.financial;
+      const i = data.infrastructure;
+      const anyFinancial = nonEmpty(f?.turnoverYear1) || nonEmpty(f?.turnoverYear2) || nonEmpty(f?.turnoverYear3) || nonEmpty(f?.creditPeriodExpected);
+      const anyInfra = nonEmpty(i?.rawMaterialsUsed) || nonEmpty(i?.machineryAvailability) || nonEmpty(i?.powerSupply) || nonEmpty(i?.manpower) || nonEmpty(i?.productionCapacity) || (i?.productTypes?.length ?? 0) > 0;
+      return anyFinancial || anyInfra;
     }
     default:
       return true;
@@ -884,9 +889,13 @@ export default function VendorRegistration() {
             // True completeness — mandatory fields only (matches per-step zod).
             // Presence-based checks used to skip Address/Contact when their
             // fields were auto-seeded from GST OCR / organization data.
-            const filled = [1, 2, 3, 4, 5].filter(s =>
-              isDomesticStepComplete(s, existingFormData, step1Seed),
-            );
+            // Only mark a step complete if every previous step is also complete —
+            // prevents e.g. step 5 showing a tick while step 2/3/4 are still blank.
+            const filled: number[] = [];
+            for (const s of [1, 2, 3, 4, 5]) {
+              if (!isDomesticStepComplete(s, existingFormData, step1Seed)) break;
+              filled.push(s);
+            }
             setCompletedSteps(filled);
             // For returned_to_vendor mark all completed and jump to Review
             if (isReturned) {
