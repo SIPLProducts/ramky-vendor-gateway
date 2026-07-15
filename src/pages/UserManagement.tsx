@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -650,11 +651,11 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {u.last_login_attempt_at
-                              ? new Date(u.last_login_attempt_at).toLocaleString()
+                              ? formatDateTime(u.last_login_attempt_at)
                               : '—'}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {new Date(u.created_at).toLocaleDateString()}
+                            {formatDate(u.created_at)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
@@ -731,13 +732,13 @@ export default function UserManagement() {
                           <TableRow key={a.id}>
                             <TableCell className="font-medium">{u?.full_name ?? '—'}</TableCell>
                             <TableCell>{a.email}</TableCell>
-                            <TableCell className="text-sm">{new Date(a.attempted_at).toLocaleString()}</TableCell>
+                            <TableCell className="text-sm">{formatDateTime(a.attempted_at)}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="border-destructive text-destructive">Inactive User</Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {u?.last_login_attempt_at
-                                ? new Date(u.last_login_attempt_at).toLocaleString()
+                                ? formatDateTime(u.last_login_attempt_at)
                                 : '—'}
                             </TableCell>
                           </TableRow>

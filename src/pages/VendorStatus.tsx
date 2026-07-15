@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatDateTime } from '@/lib/dateFormat';
 import { RegistrationStatusTracker, RegistrationStatus } from '@/components/vendor/RegistrationStatusTracker';
 import { ApprovalTimeline } from '@/components/vendor/ApprovalTimeline';
 import { useVendorApprovalChain } from '@/hooks/useVendorApprovalChain';
@@ -130,7 +131,7 @@ export default function VendorStatus() {
                 <Field label="Email" value={vendor.primary_email || vendor.primary_email_2 || inviteEmail || '—'} />
 
                 <Field label="Vendor Type" value={vendor.vendor_type ?? '—'} />
-                <Field label="Submitted On" value={format(new Date(vendor.created_at), 'dd MMM yyyy, HH:mm')} />
+                <Field label="Submitted On" value={formatDateTime(vendor.created_at)} />
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Current Status</p>
                   {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}

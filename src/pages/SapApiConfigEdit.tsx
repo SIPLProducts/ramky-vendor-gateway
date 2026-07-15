@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -225,8 +226,8 @@ export default function SapApiConfigEdit() {
               <Button size="sm" variant="outline" onClick={() => set("schedule_cron", "0 0 * * *")}>Daily</Button>
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><span className="text-muted-foreground">Last sync: </span>{form.last_synced_at ? new Date(form.last_synced_at).toLocaleString() : "—"}</div>
-              <div><span className="text-muted-foreground">Next sync: </span>{form.next_sync_at ? new Date(form.next_sync_at).toLocaleString() : "—"}</div>
+              <div><span className="text-muted-foreground">Last sync: </span>{formatDateTime(form.last_synced_at, '—')}</div>
+              <div><span className="text-muted-foreground">Next sync: </span>{formatDateTime(form.next_sync_at, '—')}</div>
             </div>
             <div className="flex justify-end"><Button onClick={saveDetails} disabled={update.isPending}><Save className="h-4 w-4 mr-2" />Save Scheduler</Button></div>
           </CardContent></Card>

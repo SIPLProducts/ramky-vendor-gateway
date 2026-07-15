@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -302,7 +303,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(m.created_at).toLocaleDateString()}
+                      {formatDate(m.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(m.id)}>

@@ -1,10 +1,11 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import * as XLSX from 'xlsx';
 import { STAGE_ORDER, STAGE_LABEL, type VendorReportRow } from './loadVendorReport';
 import { formatAadhaarLinked, formatPanStatus } from '@/lib/panComprehensive';
 
 function fmt(d: string | null | undefined): string {
   if (!d) return '';
-  try { return new Date(d).toLocaleString(); } catch { return String(d); }
+  try { return formatDateTime(d); } catch { return String(d); }
 }
 
 function statusLabel(s: string): string {

@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/dateFormat';
 import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -740,7 +741,7 @@ export default function SAPSync() {
                             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                               <span className="font-mono bg-muted px-2 py-0.5 rounded">Ref No: {refNo}</span>
                               <span>GSTIN: {vendor.gstin || 'N/A'}</span>
-                              {rejectedAt && <span>Closed: {new Date(rejectedAt).toLocaleString()}</span>}
+                              {rejectedAt && <span>Closed: {formatDateTime(rejectedAt)}</span>}
                             </div>
                             {remarks && (
                               <div className="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
