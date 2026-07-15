@@ -59,6 +59,7 @@ export default function VendorStatus() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [vendor, setVendor] = useState<VendorRow | null>(null);
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { rows: approvalChain } = useVendorApprovalChain(id);
@@ -69,7 +70,7 @@ export default function VendorStatus() {
       setLoading(true);
       const { data, error } = await supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments, sap_vendor_code')
+        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, primary_email_2, vendor_type, status, created_at, last_rejection_comments, sap_vendor_code')
         .eq('id', id)
         .maybeSingle();
       if (error) {
@@ -78,6 +79,16 @@ export default function VendorStatus() {
         setError('Vendor not found or you do not have access.');
       } else {
         setVendor(data as unknown as VendorRow);
+        if (!data.primary_email && !data.primary_email_2) {
+          const { data: inv } = await supabase
+            .from('vendor_invitations')
+            .select('email')
+            .eq('vendor_id', id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (inv?.email) setInviteEmail(inv.email);
+        }
       }
 
       setLoading(false);
