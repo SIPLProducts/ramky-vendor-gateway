@@ -291,16 +291,16 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
         setPreviewDoc(null);
       }}>
 
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {previewDoc && getFileIcon(previewDoc.mime_type)}
-              {previewDoc?.file_name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {previewDoc && previewUrl ? (
-              previewDoc.mime_type?.startsWith('image/') ? (
+        {previewDoc && previewUrl ? (
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {getFileIcon(previewDoc.mime_type)}
+                {previewDoc.file_name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden">
+              {previewDoc.mime_type?.startsWith('image/') ? (
                 <img
                   src={previewUrl}
                   alt={previewDoc.file_name}
@@ -318,10 +318,11 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
                     Open in New Tab
                   </Button>
                 </div>
-              )
-            ) : null}
-          </div>
-        </DialogContent>
+              )}
+            </div>
+          </DialogContent>
+        ) : null}
+
       </Dialog>
 
     </>
