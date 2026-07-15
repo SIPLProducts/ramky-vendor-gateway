@@ -1,19 +1,25 @@
-In `src/components/vendor/VendorReviewDialog.tsx`, update the Address Details contacts block so each cell shows the label first and the value below it:
+Update the Statutory Details layout in the View Details dialog so the rows are explicitly structured instead of relying on auto-flow grid placement.
 
-- Row 1: Email 1 | Contact 1
-- Row 2: Email 2 | Contact 2
+Implementation plan:
 
-Each cell format:
+1. Keep row 1 exactly as:
+
+```text
+GSTIN                  PAN                   PAN Holder Name
 ```
-<span className="text-muted-foreground text-xs">Email 1</span>
-<span className="font-medium break-all">{email1 || '-'}</span>
+
+2. Keep row 2 exactly as:
+
+```text
+PAN Status             Is Aadhaar Linked
 ```
 
-Keep the same `grid-cols-[1fr_140px]` layout so email takes the flexible space and contact stays fixed width for 10 digits.
+3. Move all MSME fields into row 3 exactly as:
 
-The Statutory Details card already matches the approved row layout:
-- Row 1: GSTIN, PAN, PAN Holder Name
-- Row 2: PAN Status, Is Aadhaar Linked
-- Row 3: MSME Number, MSME Category, MSME Major Activity
+```text
+MSME Number            MSME Category         MSME Major Activity
+```
 
-No other files changed.
+4. Ensure `MSME Major Activity` continues to display from `v.msme_major_activity`.
+
+5. Do not change the Address Details section or any other fields in this fix.
