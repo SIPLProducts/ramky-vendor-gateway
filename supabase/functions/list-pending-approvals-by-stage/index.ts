@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
       const pendingVIds = (buyerProgress ?? []).map((p: any) => p.vendor_id);
       const { data: vendors } = pendingVIds.length
-        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number, tenant_id').in('id', pendingVIds)
+        ? await admin.from('vendors').select('id, legal_name, trade_name, account_holder_name, gstin, submitted_at, is_msme_registered, vendor_type, reference_number, tenant_id, primary_email, registered_email').in('id', pendingVIds)
         : { data: [] as any[] } as any;
       const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
 
