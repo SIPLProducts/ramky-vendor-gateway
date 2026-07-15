@@ -930,7 +930,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                     <TableHead>File Name</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Uploaded</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
