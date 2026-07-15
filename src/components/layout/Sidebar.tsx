@@ -44,7 +44,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import ramkyLogo from '@/assets/ramky-logo.png';
+
 import { Shield } from 'lucide-react';
 import { useScreenPermissions } from '@/hooks/useScreenPermissions';
 import { useAuth } from '@/hooks/useAuth';
