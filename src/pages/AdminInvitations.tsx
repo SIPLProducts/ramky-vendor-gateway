@@ -969,10 +969,9 @@ export default function AdminInvitations() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Vendor Name</TableHead>
                       <TableHead>Buyer Company</TableHead>
-                      <TableHead>Email</TableHead>
-
+                      <TableHead>Vendor Name</TableHead>
+                      <TableHead>Vendor Email</TableHead>
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Created Date</TableHead>
                       <TableHead>Expires</TableHead>
@@ -1005,6 +1004,9 @@ export default function AdminInvitations() {
                       };
                       return (
                       <TableRow key={invitation.id}>
+                        <TableCell className="text-muted-foreground">
+                          {(invitation as any).tenants?.name ?? '—'}
+                        </TableCell>
                         <TableCell>
                           {(invitation as any).vendor_name ? (
                             <div className="flex items-center gap-2">
@@ -1023,9 +1025,6 @@ export default function AdminInvitations() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {(invitation as any).tenants?.name ?? '—'}
-                        </TableCell>
                         <TableCell className="font-medium">{invitation.email}</TableCell>
                         <TableCell>
                           {(invitation as any).phone_number ? (
@@ -1038,10 +1037,10 @@ export default function AdminInvitations() {
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {format(new Date(invitation.created_at), 'dd MMM yyyy')}
+                          {formatDate(invitation.created_at)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {format(new Date(invitation.expires_at), 'dd MMM yyyy')}
+                          {formatDate(invitation.expires_at)}
                         </TableCell>
                         <TableCell>{getStatusBadge(invitation)}</TableCell>
                         <TableCell className="text-right">
