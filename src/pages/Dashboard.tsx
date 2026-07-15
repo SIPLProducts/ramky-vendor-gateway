@@ -248,11 +248,11 @@ export default function Dashboard() {
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
       'Reference Number': v.reference_number ?? '',
-      'Vendor Name': pickVendorDisplayName(v) || '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
-      Email: v.display_email ?? '',
-      Status: STATUS_LABELS[v.status]?.label ?? v.status,
-      'Created Date': format(new Date(v.created_at), 'yyyy-MM-dd HH:mm'),
+      'Vendor Name': pickVendorDisplayName(v) || '',
+      'Vendor Email': v.display_email ?? '',
+      'Status': STATUS_LABELS[v.status]?.label ?? v.status,
+      'Created Date': formatDateTime(v.created_at),
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
