@@ -810,20 +810,20 @@ function VisitingCard({
           <div className="my-4 h-px bg-border/60" />
           <div className="grid grid-cols-[1fr_140px] gap-x-4 gap-y-3 text-sm">
             <div className="flex flex-col">
+              <span className="text-muted-foreground text-xs">Email 1</span>
               <span className="font-medium break-all">{email1 || '-'}</span>
-              <span className="text-muted-foreground text-xs mt-0.5">Email 1</span>
             </div>
             <div className="flex flex-col">
+              <span className="text-muted-foreground text-xs">Contact 1</span>
               <span className="font-medium">{contact1 || '-'}</span>
-              <span className="text-muted-foreground text-xs mt-0.5">Contact 1</span>
             </div>
             <div className="flex flex-col">
+              <span className="text-muted-foreground text-xs">Email 2</span>
               <span className="font-medium break-all">{email2 || '-'}</span>
-              <span className="text-muted-foreground text-xs mt-0.5">Email 2</span>
             </div>
             <div className="flex flex-col">
+              <span className="text-muted-foreground text-xs">Contact 2</span>
               <span className="font-medium">{contact2 || '-'}</span>
-              <span className="text-muted-foreground text-xs mt-0.5">Contact 2</span>
             </div>
           </div>
         </>
