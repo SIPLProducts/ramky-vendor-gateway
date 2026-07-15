@@ -318,7 +318,7 @@ export default function VendorList() {
           </Button>
           <Button onClick={handleExport} variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            Export Excel
           </Button>
         </div>
       </div>
