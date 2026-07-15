@@ -468,9 +468,9 @@ export default function SAPSync() {
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList className="grid w-full max-w-2xl grid-cols-3">
-          <TabsTrigger value="sap" className="gap-2"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
-          <TabsTrigger value="dms" className="gap-2"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
-          <TabsTrigger value="rejected" className="gap-2"><Ban className="h-4 w-4" />Duplicate &amp; Closed{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
+          <TabsTrigger value="sap" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
+          <TabsTrigger value="dms" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"><Ban className="h-4 w-4" />Duplicate &amp; Closed{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
         </TabsList>
 
         {/* SAP Sync tab */}
@@ -482,6 +482,7 @@ export default function SAPSync() {
                 <Checkbox
                   checked={selectedSapIds.size > 0 && selectedSapIds.size === filteredSap.length}
                   onCheckedChange={toggleAllSap}
+                  className="bg-white border-black data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
                 <span className="text-sm text-muted-foreground">
                   {selectedSapIds.size > 0 ? `${selectedSapIds.size} selected` : 'Select vendors to enable bulk actions'}
@@ -525,7 +526,7 @@ export default function SAPSync() {
                         <Checkbox
                           checked={selectedSapIds.has(vendor.id)}
                           onCheckedChange={() => toggleSap(vendor.id)}
-                          className="mt-2"
+                          className="mt-2 bg-white border-black data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                         <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/5 flex items-center justify-center">
                           <Building2 className="h-7 w-7 text-blue-600" />
@@ -544,9 +545,6 @@ export default function SAPSync() {
                       <div className="flex items-center gap-2">
                         <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
                           <Eye className="h-4 w-4 mr-2" />View Details
-                        </Button>
-                        <Button variant="outline" className="rounded-xl" onClick={() => setPreviewVendorId(vendor.id)}>
-                          <FileText className="h-4 w-4 mr-2" />Preview
                         </Button>
                         <Button
                           className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
@@ -657,6 +655,7 @@ export default function SAPSync() {
                                 <Checkbox
                                   checked={selectedDmsIds.has(v.id)}
                                   onCheckedChange={() => toggleDms(v.id)}
+                                  className="bg-white border-black data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                 />
                               )}
                             </TableCell>
