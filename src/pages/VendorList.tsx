@@ -145,10 +145,19 @@ export default function VendorList() {
   });
 
   const filteredVendors = vendors?.filter((vendor) => {
-    const matchesSearch =
-      (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase().trim();
+    const buyerName = getBuyerCompanyName(vendor.tenant_id);
+    const location = [vendor.registered_city, vendor.registered_state].filter(Boolean).join(', ');
+    const haystack = [
+      pickVendorDisplayName(vendor) || '',
+      vendor.legal_name || '',
+      vendor.gstin || '',
+      buyerName,
+      vendor.invited_by?.name || '',
+      location,
+      vendor.sap_vendor_code || '',
+    ].join(' ').toLowerCase();
+    const matchesSearch = !q || haystack.includes(q);
 
     const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
     const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
