@@ -132,8 +132,8 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
       {/* Header */}
       {!collapsed && (
         <div className="border-b border-sidebar-border p-4">
-          <Link to="/dashboard" className="block">
-            <span className="text-sm font-semibold text-sidebar-foreground whitespace-nowrap">Vendor Portal</span>
+          <Link to="/dashboard" className="flex items-center justify-center">
+            <span className="text-sm font-semibold text-sidebar-foreground whitespace-nowrap text-center">Vendor Portal</span>
           </Link>
         </div>
       )}
