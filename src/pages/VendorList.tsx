@@ -146,7 +146,8 @@ export default function VendorList() {
 
   const filteredVendors = vendors?.filter((vendor) => {
     const q = searchTerm.toLowerCase().trim();
-    const buyerName = getBuyerCompanyName(vendor.tenant_id);
+    const bc = vendor.tenant_id && buyerCompanies ? buyerCompanies.find(c => c.id === vendor.tenant_id) : null;
+    const buyerName = bc ? `${bc.name} ${bc.code}` : '';
     const location = [vendor.registered_city, vendor.registered_state].filter(Boolean).join(', ');
     const haystack = [
       pickVendorDisplayName(vendor) || '',
