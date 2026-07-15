@@ -394,13 +394,13 @@ export default function VendorList() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Vendor</TableHead>
                       <TableHead>Buyer Company</TableHead>
                       <TableHead>Invited By</TableHead>
+                      <TableHead>Vendor</TableHead>
                       <TableHead>GSTIN</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead>SAP Code</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
 
