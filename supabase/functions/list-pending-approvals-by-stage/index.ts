@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     // 2. Vendors invited by those buyers
     const { data: invites } = await admin
       .from('vendor_invitations')
-      .select('vendor_id, created_by, tenant_id, created_at')
+      .select('vendor_id, created_by, tenant_id, created_at, email, created_on_behalf')
       .in('created_by', buyerIds)
       .order('created_at', { ascending: false });
     const vendorIds = Array.from(new Set((invites ?? []).map((i: any) => i.vendor_id).filter(Boolean)));
