@@ -492,8 +492,7 @@ export function VendorReviewDialog({
                           <div className="space-y-1"><Label text={AADHAAR_LINKED_LABEL} ok={panOk} /><p className="font-medium">{formatAadhaarLinked(v.pan_aadhaar_linked)}</p></div>
                           <div className="space-y-1"><Label text="MSME Number" ok={msmeOk} /><p className="font-mono font-medium">{v.msme_number || '-'}</p></div>
                           <div className="space-y-1"><Label text="MSME Category" ok={msmeOk} /><p className="font-medium capitalize">{v.msme_category || '-'}</p></div>
-                          <div className="space-y-1"><p className="text-muted-foreground">Firm Registration No</p><p className="font-medium">{v.firm_registration_no || '-'}</p></div>
-                          <div className="space-y-1"><p className="text-muted-foreground">IEC No</p><p className="font-medium">{v.iec_no || '-'}</p></div>
+                          <div className="space-y-1"><Label text="MSME Major Activity" ok={msmeOk} /><p className="font-medium capitalize">{v.msme_major_activity || '-'}</p></div>
                         </div>
                       </SectionCard>
                     );
@@ -806,34 +805,26 @@ function VisitingCard({
           )}
         </address>
       )}
-      {showContacts && (email1 || email2 || contact1 || contact2) && (
+      {showContacts && (
         <>
           <div className="my-4 h-px bg-border/60" />
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            {contact1 && (
-              <div className="flex items-start gap-2">
-                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 1</span>
-                <span className="font-medium">{contact1}</span>
-              </div>
-            )}
-            {contact2 && (
-              <div className="flex items-start gap-2">
-                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Contact 2</span>
-                <span className="font-medium">{contact2}</span>
-              </div>
-            )}
-            {email1 && (
-              <div className="flex items-start gap-2">
-                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 1</span>
-                <span className="font-medium break-all">{email1}</span>
-              </div>
-            )}
-            {email2 && (
-              <div className="flex items-start gap-2">
-                <span className="text-muted-foreground text-xs mt-0.5 min-w-[70px]">Email 2</span>
-                <span className="font-medium break-all">{email2}</span>
-              </div>
-            )}
+          <div className="grid grid-cols-[1fr_140px] gap-x-4 gap-y-3 text-sm">
+            <div className="flex flex-col">
+              <span className="font-medium break-all">{email1 || '-'}</span>
+              <span className="text-muted-foreground text-xs mt-0.5">Email 1</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-medium">{contact1 || '-'}</span>
+              <span className="text-muted-foreground text-xs mt-0.5">Contact 1</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-medium break-all">{email2 || '-'}</span>
+              <span className="text-muted-foreground text-xs mt-0.5">Email 2</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-medium">{contact2 || '-'}</span>
+              <span className="text-muted-foreground text-xs mt-0.5">Contact 2</span>
+            </div>
           </div>
         </>
       )}
