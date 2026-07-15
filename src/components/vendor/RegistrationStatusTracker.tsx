@@ -159,7 +159,7 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
   function RegistrationStatusTracker({ status, className, approvalProgress, sapVendorCode }, ref) {
     const hasChain = (approvalProgress?.length ?? 0) > 0;
     const sapCodePresent = !!sapVendorCode;
-    const sapSynced = status === 'sap_synced' || status === 'approved' || (sapCodePresent && status !== 'pending_sap_sync');
+    const sapSynced = status === 'sap_synced' || status === 'dms_synced' || status === 'approved' || (sapCodePresent && status !== 'pending_sap_sync' && status !== 'dms_sync_pending');
 
     let renderSteps: RenderStep[] = [];
 
