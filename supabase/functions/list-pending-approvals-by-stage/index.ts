@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       // Latest invitation per vendor (for on-behalf detection + deep-link + tenant).
       const { data: invsForBuyer } = await admin
         .from('vendor_invitations')
-        .select('id, vendor_id, created_on_behalf, created_at, tenant_id')
+        .select('id, vendor_id, created_on_behalf, created_at, tenant_id, email')
         .in('vendor_id', buyerVendorIds)
         .order('created_at', { ascending: false });
       const invByVendor = new Map<string, any>();
@@ -144,7 +144,14 @@ Deno.serve(async (req) => {
           rejectionAt: p.rejection_at ?? null,
           isOnBehalf: !!inv?.created_on_behalf,
           invitationId: inv?.id ?? null,
-          vendorEmail: (v?.primary_email && String(v.primary_email).trim()) || (v?.registered_email && String(v.registered_email).trim()) || null,
+          vendorEmail: (() => {
+            const invEmail = (inv?.email && String(inv.email).trim()) || null;
+            const primary = (v?.primary_email && String(v.primary_email).trim()) || null;
+            const registered = (v?.registered_email && String(v.registered_email).trim()) || null;
+            return inv?.created_on_behalf
+              ? (registered || invEmail || primary || null)
+              : (invEmail || primary || registered || null);
+          })(),
         };
       });
 
@@ -171,7 +178,14 @@ Deno.serve(async (req) => {
           rejectionAt: v?.last_rejected_at ?? null,
           isOnBehalf: !!inv?.created_on_behalf,
           invitationId: inv?.id ?? null,
-          vendorEmail: (v?.primary_email && String(v.primary_email).trim()) || (v?.registered_email && String(v.registered_email).trim()) || null,
+          vendorEmail: (() => {
+            const invEmail = (inv?.email && String(inv.email).trim()) || null;
+            const primary = (v?.primary_email && String(v.primary_email).trim()) || null;
+            const registered = (v?.registered_email && String(v.registered_email).trim()) || null;
+            return inv?.created_on_behalf
+              ? (registered || invEmail || primary || null)
+              : (invEmail || primary || registered || null);
+          })(),
         };
       });
 
@@ -201,7 +215,7 @@ Deno.serve(async (req) => {
     // 2. Vendors invited by those buyers
     const { data: invites } = await admin
       .from('vendor_invitations')
-      .select('vendor_id, created_by, tenant_id, created_at')
+      .select('vendor_id, created_by, tenant_id, created_at, email, created_on_behalf')
       .in('created_by', buyerIds)
       .order('created_at', { ascending: false });
     const vendorIds = Array.from(new Set((invites ?? []).map((i: any) => i.vendor_id).filter(Boolean)));
@@ -290,7 +304,14 @@ Deno.serve(async (req) => {
         rejectionComments: p.rejection_comments ?? null,
         rejectionFromStage: p.rejection_from_stage ?? null,
         rejectionAt: p.rejection_at ?? null,
-        vendorEmail: (v?.primary_email && String(v.primary_email).trim()) || (v?.registered_email && String(v.registered_email).trim()) || null,
+        vendorEmail: (() => {
+          const invEmail = (inv?.email && String(inv.email).trim()) || null;
+          const primary = (v?.primary_email && String(v.primary_email).trim()) || null;
+          const registered = (v?.registered_email && String(v.registered_email).trim()) || null;
+          return inv?.created_on_behalf
+            ? (registered || invEmail || primary || null)
+            : (invEmail || primary || registered || null);
+        })(),
       };
     });
 
