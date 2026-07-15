@@ -26,7 +26,7 @@ export function exportVendorExcel(rows: VendorReportRow[], reportType: 'vendor' 
   const wb = XLSX.utils.book_new();
 
   const vendorSheet = rows.map((r) => ({
-    'Reference #': r.reference_number,
+    'Reference Number': r.reference_number,
     'Vendor Name': r.vendor_name,
     'Type': r.vendor_type,
     'Invited Email': r.invited_email,
@@ -44,7 +44,7 @@ export function exportVendorExcel(rows: VendorReportRow[], reportType: 'vendor' 
     STAGE_ORDER.forEach((s) => {
       const info = r.stages[s];
       flow.push({
-        'Reference #': r.reference_number,
+        'Reference Number': r.reference_number,
         'Vendor Name': r.vendor_name,
         'Stage': STAGE_LABEL[s],
         'Approver': info.status === 'skipped' ? '—' : info.approver_name,

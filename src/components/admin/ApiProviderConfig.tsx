@@ -218,7 +218,7 @@ export function ApiProviderConfig({ tenantId, tenantName }: ApiProviderConfigPro
                 <TableHead>Auth</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Mandatory</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

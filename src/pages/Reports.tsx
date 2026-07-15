@@ -223,7 +223,7 @@ export default function Reports() {
                   {cfg.scope_single && (
                     <div className="flex items-center gap-2">
                       <RadioGroupItem value="single" id="m-single" />
-                      <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference #)</Label>
+                      <Label htmlFor="m-single" className="cursor-pointer">Single Vendor (Reference Number)</Label>
                     </div>
                   )}
                   {cfg.scope_all && (
@@ -396,7 +396,7 @@ function AllVendorsTable({ rows, onView }: { rows: VendorReportRow[]; onView: (r
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Ref #</TableHead>
+              <TableHead>Reference Number</TableHead>
               <TableHead>Vendor</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Invited</TableHead>
@@ -445,7 +445,7 @@ function AllVendorsApprovalMatrix({ rows }: { rows: VendorReportRow[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 bg-background z-10">Ref #</TableHead>
+              <TableHead className="sticky left-0 bg-background z-10">Reference Number</TableHead>
               <TableHead className="sticky left-[100px] bg-background z-10">Vendor</TableHead>
               {STAGE_ORDER.map((s) => <TableHead key={s}>{STAGE_LABEL[s]}</TableHead>)}
               <TableHead>Current Stage</TableHead>

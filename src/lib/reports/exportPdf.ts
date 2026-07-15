@@ -40,7 +40,7 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
       startY: 70,
       head: [['Field', 'Value']],
       body: [
-        ['Reference #', r.reference_number],
+        ['Reference Number', r.reference_number],
         ['Vendor Name', r.vendor_name],
         ['Vendor Type', r.vendor_type],
         ['Invited Email', r.invited_email],
@@ -119,7 +119,7 @@ export function exportVendorPdf(rows: VendorReportRow[], reportType: 'vendor' | 
   } else if (reportType === 'vendor' || reportType === 'both') {
     autoTable(doc, {
       startY: 70,
-      head: [['Ref #', 'Vendor', 'Type', 'Invited', 'Submitted', 'Current', 'Status']],
+      head: [['Reference No', 'Vendor', 'Type', 'Invited', 'Submitted', 'Current', 'Status']],
       body: rows.map((r) => [
         r.reference_number, r.vendor_name, r.vendor_type,
         fmt(r.invited_at), fmt(r.submitted_at), r.current_stage, r.final_status,

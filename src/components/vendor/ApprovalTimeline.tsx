@@ -96,7 +96,6 @@ export function ApprovalTimeline({ vendorId }: Props) {
                 <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${color}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline">L{r.level_number}</Badge>
                     <span className="font-medium text-sm">{formatStageLevel(r.stage as ApprovalStage, r.level_number)}</span>
                     <Badge variant={r.status === 'approved' ? 'secondary' : r.status === 'rejected' ? 'destructive' : 'outline'}>
                       {r.status}

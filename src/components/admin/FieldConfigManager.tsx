@@ -75,7 +75,7 @@ export function FieldConfigManager({ tenantId, tenantName }: FieldConfigManagerP
                       <TableHead className="text-center">Visible</TableHead>
                       <TableHead className="text-center">Mandatory</TableHead>
                       <TableHead className="text-center">Editable</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

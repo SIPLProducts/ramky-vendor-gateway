@@ -450,7 +450,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                   <TableHead>Finance 1</TableHead>
                   <TableHead>Finance 2</TableHead>
                   <TableHead>CEO Office</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

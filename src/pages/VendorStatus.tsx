@@ -111,7 +111,7 @@ export default function VendorStatus() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Field label="Reference #" value={vendor.reference_number ?? '—'} mono />
+                <Field label="Reference Number" value={vendor.reference_number ?? '—'} mono />
                 <Field label="Company Name" value={pickVendorDisplayName(vendor) || '—'} />
                 <Field label="Email" value={vendor.primary_email ?? '—'} />
 

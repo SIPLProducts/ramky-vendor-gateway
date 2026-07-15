@@ -27,7 +27,7 @@ export function useVendorApprovalChain(vendorId: string | null | undefined) {
     setLoading(true);
     const { data, error } = await supabase
       .from('vendor_approval_progress')
-      .select('id, level_number, status, approval_matrix_levels!inner(stage)')
+      .select('id, level_number, status, stage, approval_matrix_levels(stage)')
       .eq('vendor_id', vendorId)
       .order('level_number', { ascending: true });
 
@@ -40,7 +40,7 @@ export function useVendorApprovalChain(vendorId: string | null | undefined) {
           id: r.id,
           level_number: r.level_number,
           status: r.status,
-          stage: r.approval_matrix_levels?.stage as ApprovalStage,
+          stage: (r.stage ?? r.approval_matrix_levels?.stage) as ApprovalStage,
         })),
       );
     }

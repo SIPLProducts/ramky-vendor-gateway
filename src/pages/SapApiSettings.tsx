@@ -164,7 +164,7 @@ export default function SapApiSettings() {
                       <TableHead>Method</TableHead>
                       <TableHead>Auth</TableHead>
                       <TableHead>Last Sync</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

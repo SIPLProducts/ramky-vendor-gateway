@@ -569,7 +569,7 @@ export default function UserManagement() {
                       <TableHead>Status</TableHead>
                       <TableHead>Last Login Attempt</TableHead>
                       <TableHead>Joined</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -778,7 +778,7 @@ export default function UserManagement() {
                       <TableHead>Description</TableHead>
                       <TableHead>Users</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

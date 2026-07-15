@@ -89,7 +89,7 @@ export function SapMasterDataTab() {
                   <TableHead>Description</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Last synced</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

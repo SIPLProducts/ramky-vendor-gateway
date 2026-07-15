@@ -230,8 +230,8 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
               if (isSapStep) {
                 if (stepStatus === 'completed') {
                   descriptionText = sapVendorCode
-                    ? `Vendor Code Created · ${sapVendorCode}`
-                    : 'Vendor Code Created';
+                    ? `SAP Sync Completed · ${sapVendorCode}`
+                    : 'SAP Sync Completed';
                 } else if (stepStatus === 'active') {
                   descriptionText = 'Syncing to SAP…';
                 } else if (stepStatus === 'failed') {

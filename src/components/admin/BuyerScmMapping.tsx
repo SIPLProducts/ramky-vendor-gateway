@@ -282,7 +282,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                   <TableHead className="w-56">Include SCM in flow</TableHead>
                   
                   <TableHead>Created Date</TableHead>
-                  <TableHead className="w-20 text-right">Actions</TableHead>
+                  <TableHead className="w-20 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
