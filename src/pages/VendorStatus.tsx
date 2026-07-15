@@ -20,6 +20,7 @@ interface VendorRow {
   account_holder_name: string | null;
   gstin: string | null;
   primary_email: string | null;
+  primary_email_2: string | null;
   vendor_type: string | null;
   status: string;
   created_at: string;
