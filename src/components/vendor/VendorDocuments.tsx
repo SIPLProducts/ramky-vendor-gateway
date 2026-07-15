@@ -281,7 +281,8 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
       </Card>
 
       {/* Document Preview Dialog */}
-      <Dialog open={!!previewUrl} onOpenChange={() => {
+      <Dialog open={!!previewUrl} onOpenChange={(open) => {
+        if (open) return;
         if (previewUrl && previewUrl.startsWith('blob:')) {
           try { URL.revokeObjectURL(previewUrl); } catch { /* noop */ }
         }
@@ -298,29 +299,31 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
-            {previewDoc?.mime_type?.startsWith('image/') ? (
-              <img
-                src={previewUrl || ''}
-                alt={previewDoc.file_name}
-                className="max-w-full max-h-[70vh] mx-auto rounded-md"
-              />
-            ) : previewDoc?.mime_type === 'application/pdf' ? (
-              <PdfPreview blob={previewBlob} url={previewUrl} />
-
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  Preview not available for this file type
-                </p>
-                <Button onClick={() => previewUrl && window.open(previewUrl, '_blank')}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open in New Tab
-                </Button>
-              </div>
-            )}
+            {previewDoc && previewUrl ? (
+              previewDoc.mime_type?.startsWith('image/') ? (
+                <img
+                  src={previewUrl}
+                  alt={previewDoc.file_name}
+                  className="max-w-full max-h-[70vh] mx-auto rounded-md"
+                />
+              ) : previewDoc.mime_type === 'application/pdf' ? (
+                <PdfPreview blob={previewBlob} url={previewUrl} />
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    Preview not available for this file type
+                  </p>
+                  <Button onClick={() => window.open(previewUrl, '_blank')}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open in New Tab
+                  </Button>
+                </div>
+              )
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
+
     </>
   );
 }
