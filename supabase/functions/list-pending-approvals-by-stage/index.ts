@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
           rejectionAt: p.rejection_at ?? null,
           isOnBehalf: !!inv?.created_on_behalf,
           invitationId: inv?.id ?? null,
-          vendorEmail: v?.primary_email ?? v?.registered_email ?? null,
+          vendorEmail: (v?.primary_email && String(v.primary_email).trim()) || (v?.registered_email && String(v.registered_email).trim()) || null,
         };
       });
 
