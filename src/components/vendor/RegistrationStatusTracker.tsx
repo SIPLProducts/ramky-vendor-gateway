@@ -210,7 +210,7 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
       let sapDescription: string;
       if (status === 'sap_team_rejected' || status === 'sap_team_closed') {
         sapStatus = 'failed';
-        sapDescription = 'Action required';
+        sapDescription = 'Duplicate & Closed';
       } else if (sapSynced) {
         sapStatus = 'completed';
         sapDescription = sapVendorCode ? `SAP Synced · ${sapVendorCode}` : 'SAP Synced';

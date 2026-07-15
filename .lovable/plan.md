@@ -1,52 +1,40 @@
-# Vendor Status page — SAP sub-status + SCM CO label
+# SAP diagram label + vendor email display
 
-Scope: `/vendor-status/:id` presentation only. No backend/schema/logic changes.
+## 1. Diagram SAP step: show sub-status text (matches badge)
 
-## 1. Approval Progress list: "SCM CO2" → "SCM CO"
+File: `src/components/vendor/RegistrationStatusTracker.tsx` — SAP-step description mapping only.
 
-File: `src/components/vendor/ApprovalTimeline.tsx`
+Update the small line under the SAP icon so it mirrors the "SAP Sync Status" badge in Vendor Details:
 
-- Replace the `formatStageLevel` import/call with `formatStageLevelHistory` (already exported from `src/lib/approvalLabels.ts`).
-- Effect: every `SCM_MANAGER` row renders as plain `SCM CO` regardless of level number. All other stages (`Buyer`, `SCM Head`, `Finance 1`, `Finance 2`, `CEO Office`) render exactly as today.
-- No other component using `formatStageLevel` is touched (dashboards, approval queues keep numbered labels).
+| Vendor state | Diagram SAP step description | Step visual |
+|---|---|---|
+| `sap_team_rejected` / `sap_team_closed` | `Duplicate & Closed` | failed (red) |
+| `sap_synced` / `dms_synced` | `SAP Synced · <code>` (or `SAP Synced` if no code) | completed |
+| `dms_sync_pending` | `DMS Pending · <code>` | active |
+| `pending_sap_sync` + `sap_vendor_code` | `DMS Pending · <code>` | active |
+| `pending_sap_sync`, no code | `SAP Sync Pending` | active |
+| all approvals done, no SAP state yet | `SAP Sync Pending` | active |
+| otherwise | `Awaiting SAP sync` | pending |
 
-## 2. Surface the current SAP sync sub-status
+Only the failed-branch label changes from generic "Action required" to explicit "Duplicate & Closed". Icon/color stay as-is.
 
-The full set of terminal / SAP-stage statuses already exist in `vendor_status`:
-`pending_sap_sync`, `dms_sync_pending`, `sap_synced`, `dms_synced`, `sap_team_rejected`, `sap_team_closed`.
-
-### 2a. Vendor Details card — new "SAP Sync Status" field
+## 2. Vendor Email not showing in Vendor Details card
 
 File: `src/pages/VendorStatus.tsx`
 
-Add a new grid field (visible only once the vendor has reached the SAP stage — i.e. status is one of the six above OR `sap_vendor_code` is set). Renders as a labelled badge:
+The Email field currently reads only `vendor.primary_email`, which is null for older / buyer-invited vendors that store the address in another column. Fix by:
 
-| Vendor state | Badge text | Variant |
-|---|---|---|
-| `sap_synced` or `dms_synced` | `SAP Synced · <sap_vendor_code>` | default (green/primary) |
-| `dms_sync_pending` | `DMS Pending · <sap_vendor_code>` | outline |
-| `pending_sap_sync` with code | `DMS Pending · <sap_vendor_code>` | outline |
-| `pending_sap_sync` without code | `SAP Sync Pending` | outline |
-| `sap_team_rejected` / `sap_team_closed` | `Duplicate & Closed` | destructive |
+- Extending the vendor `select` to also fetch `contact_email` and pulling the invitation email as a final fallback.
+- Rendering the first non-empty of: `primary_email` → `contact_email` → `vendor_invitations.email` (for this vendor, most recent) → `—`.
 
-The top-level "Current Status" badge stays untouched; this is an additional SAP-specific line so users don't have to interpret the tracker.
+Implementation:
 
-### 2b. Application Progress diagram — align SAP step with the same sub-statuses
+1. Add `contact_email` to the `.select(...)` on `vendors`.
+2. Add a second query after the vendor loads: `supabase.from('vendor_invitations').select('email').eq('vendor_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()` and keep the result in a `inviteEmail` state.
+3. Update the Email `<Field>` to display `vendor.primary_email || vendor.contact_email || inviteEmail || '—'`.
 
-File: `src/components/vendor/RegistrationStatusTracker.tsx`
-
-Extend the existing SAP-step description logic to recognise the two DMS values (currently only `pending_sap_sync` / `sap_synced` / rejected are handled):
-
-- Add `'dms_sync_pending'` to the `RegistrationStatus` union.
-- SAP-step description mapping:
-  - `sap_synced` or `dms_synced` → `SAP Synced · <code>` (completed, green check)
-  - `dms_sync_pending` → `DMS Pending · <code>` (active)
-  - `pending_sap_sync` + `sap_vendor_code` → `DMS Pending · <code>` (active) [existing behaviour]
-  - `pending_sap_sync` no code → `SAP Sync Pending` (active) [existing]
-  - `sap_team_rejected` / `sap_team_closed` → `Action required` (failed) [existing]
-- Also add `'dms_synced'` handling in `VendorStatus.tsx`'s `STATUS_LABELS` (label `Approved (DMS Synced)`, variant `default`) so the top badge doesn't fall back to raw enum text.
+No changes to schema, RLS, or other pages. Only the Vendor Details Email cell and the SAP diagram label are affected.
 
 ## Out of scope
 
-- No backend, RLS, edge function, migration, workflow, or approval-logic changes.
-- No changes to Dashboard, VendorList, Reports, SAPSync, or approval queue pages.
+Backend, workflow, approval logic, and other pages remain untouched.

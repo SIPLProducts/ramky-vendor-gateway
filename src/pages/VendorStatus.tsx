@@ -20,6 +20,7 @@ interface VendorRow {
   account_holder_name: string | null;
   gstin: string | null;
   primary_email: string | null;
+  primary_email_2: string | null;
   vendor_type: string | null;
   status: string;
   created_at: string;
@@ -58,6 +59,7 @@ export default function VendorStatus() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [vendor, setVendor] = useState<VendorRow | null>(null);
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { rows: approvalChain } = useVendorApprovalChain(id);
@@ -68,7 +70,7 @@ export default function VendorStatus() {
       setLoading(true);
       const { data, error } = await supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, vendor_type, status, created_at, last_rejection_comments, sap_vendor_code')
+        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, primary_email_2, vendor_type, status, created_at, last_rejection_comments, sap_vendor_code')
         .eq('id', id)
         .maybeSingle();
       if (error) {
@@ -77,6 +79,16 @@ export default function VendorStatus() {
         setError('Vendor not found or you do not have access.');
       } else {
         setVendor(data as unknown as VendorRow);
+        if (!data.primary_email && !data.primary_email_2) {
+          const { data: inv } = await supabase
+            .from('vendor_invitations')
+            .select('email')
+            .eq('vendor_id', id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (inv?.email) setInviteEmail(inv.email);
+        }
       }
 
       setLoading(false);
@@ -115,7 +127,7 @@ export default function VendorStatus() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Field label="Reference Number" value={vendor.reference_number ?? '—'} mono />
                 <Field label="Company Name" value={pickVendorDisplayName(vendor) || '—'} />
-                <Field label="Email" value={vendor.primary_email ?? '—'} />
+                <Field label="Email" value={vendor.primary_email || vendor.primary_email_2 || inviteEmail || '—'} />
 
                 <Field label="Vendor Type" value={vendor.vendor_type ?? '—'} />
                 <Field label="Submitted On" value={format(new Date(vendor.created_at), 'dd MMM yyyy, HH:mm')} />
