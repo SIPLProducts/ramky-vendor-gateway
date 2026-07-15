@@ -24,6 +24,7 @@ export interface StageApprovalItem {
   companyMismatch?: boolean;
   buyerName?: string | null;
   buyerEmail?: string | null;
+  vendorEmail?: string | null;
   mappedScmManagers?: Array<{ name: string | null; email: string | null }>;
   rejectionComments?: string | null;
   rejectionFromStage?: string | null;
