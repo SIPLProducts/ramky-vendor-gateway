@@ -247,7 +247,7 @@ export default function Dashboard() {
 
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
-      'Reference #': v.reference_number ?? '',
+      'Reference Number': v.reference_number ?? '',
       'Vendor Name': pickVendorDisplayName(v) || '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
       Email: v.display_email ?? '',
@@ -321,7 +321,7 @@ export default function Dashboard() {
             className="flex items-end gap-2"
           >
             <div className="flex flex-col gap-1">
-              <Label htmlFor="track-ref" className="text-xs font-medium text-muted-foreground">Reference #</Label>
+              <Label htmlFor="track-ref" className="text-xs font-medium text-muted-foreground">Reference Number</Label>
               <Input
                 id="track-ref"
                 placeholder="Enter Reference Number"
@@ -399,7 +399,7 @@ export default function Dashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Reference #</TableHead>
+                  <TableHead>Reference Number</TableHead>
                   <TableHead>Vendor Name</TableHead>
                   <TableHead>Invited By</TableHead>
                   <TableHead>Email</TableHead>

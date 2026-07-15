@@ -129,27 +129,14 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
         collapsed ? "w-[68px]" : "w-64"
       )}
     >
-      {/* Logo Header */}
-      <div className={cn(
-        "border-b border-sidebar-border transition-all duration-300",
-        collapsed ? "p-3" : "p-4"
-      )}>
-        <Link to="/dashboard" className="flex items-center gap-3">
-          <img
-            src={ramkyLogo}
-            alt="Ramky"
-            className={cn(
-              "transition-all duration-300",
-              collapsed ? "h-8 w-8 object-contain" : "h-10 w-auto"
-            )}
-          />
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <span className="text-sm font-semibold text-sidebar-foreground block whitespace-nowrap">Vendor Portal</span>
-            </div>
-          )}
-        </Link>
-      </div>
+      {/* Header */}
+      {!collapsed && (
+        <div className="border-b border-sidebar-border p-4">
+          <Link to="/dashboard" className="block">
+            <span className="text-sm font-semibold text-sidebar-foreground whitespace-nowrap">Vendor Portal</span>
+          </Link>
+        </div>
+      )}
 
       {/* Collapse Toggle */}
       <div className={cn(

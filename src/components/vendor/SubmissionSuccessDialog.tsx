@@ -65,7 +65,7 @@ export function SubmissionSuccessDialog({
             <>
               <p>
                 Your application was saved
-                {vendorIdentity?.vendorRef ? ` (Ref #${vendorIdentity.vendorRef})` : ""}
+                {vendorIdentity?.vendorRef ? ` (Ref ${vendorIdentity.vendorRef})` : ""}
                 , but we could not send the confirmation email to the buyer.
                 Our team has been notified. Please contact{" "}
                 <a
