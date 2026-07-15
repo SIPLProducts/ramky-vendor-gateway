@@ -99,6 +99,34 @@ export interface DesignSettings {
     headerFontWeight: string;
     bodyFontSize: string;
     bodyFontWeight: string;
+    headerBackground: string;
+    bodyTextColor: string;
+    paddingTop: string;
+    paddingRight: string;
+    paddingBottom: string;
+    paddingLeft: string;
+    headerPaddingTop: string;
+    headerPaddingRight: string;
+    headerPaddingBottom: string;
+    headerPaddingLeft: string;
+    marginTop: string;
+    marginRight: string;
+    marginBottom: string;
+    marginLeft: string;
+  };
+  screen: {
+    paddingTop: string;
+    paddingRight: string;
+    paddingBottom: string;
+    paddingLeft: string;
+    marginTop: string;
+    marginRight: string;
+    marginBottom: string;
+    marginLeft: string;
+    headerFontSize: string;
+    headerFontWeight: string;
+    headerColor: string;
+    headerMarginBottom: string;
   };
 }
 
