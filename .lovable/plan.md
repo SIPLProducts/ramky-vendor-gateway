@@ -1,20 +1,33 @@
-## Plan: Fix "Forgot Password" email delivery using the No-Reply SMTP config
+## Scope: UI-only changes
 
-**Issue:** UI shows "Password reset email sent successfully" but no email arrives. `send-smtp-email` logs the SMTP connect but never logs the delivery outcome, so a silently-dropped send (e.g. Gmail rewriting/rejecting a mismatched From) reports success.
+### 1. Sidebar logo removal
+- File: `src/components/layout/Sidebar.tsx`
+- Remove the logo `<img>`/brand block at the top of the sidebar. Keep the app name text if present, or collapse the header spacing cleanly so nav items sit at the top.
 
-**Fix scope:** Backend edge functions only. No UI changes.
+### 2. Table adjustments (global)
+Apply across all list/table screens (VendorList, AuditLogs, AdminInvitations, UserManagement, approval queues, SAPSync, KycApiSettings, SapApiSettings, Reports, etc.) and the shared `src/components/ui/table.tsx` if needed.
 
-### 1. `supabase/functions/send-smtp-email/index.ts`
-- Capture `sendMail` result (`messageId`, `accepted`, `rejected`, `response`) and `console.log` it.
-- If `accepted.length === 0` or `rejected.length > 0`, return `{ success:false, error }` with HTTP 502 so the caller can surface the real failure.
-- On startup of each request, `console.warn` when the domain of `from_email` doesn't match the domain of the SMTP `username` (the common cause of silent Gmail drops).
+- **a) Single-line headers**: add `whitespace-nowrap` to `<TableHead>` (either globally in `ui/table.tsx` `TableHead` default classes, or per-table). Preferred: update default `TableHead` className to include `whitespace-nowrap`.
+- **b) Remove `#` symbol**:
+  - Strip `#` from any column header label (e.g., `Reference #` → `Reference Number`, `Sr #` → `Sr No`).
+  - Strip `#` anywhere it appears next to reference numbers in cell content, page titles, detail views (e.g., `VendorStatus.tsx` "Reference #" label).
+  - Search targets: `rg "#"` in `src/pages/**` and `src/components/**` for header/label occurrences.
+- **c) Actions column header center-aligned**: add `text-center` to the Actions `<TableHead>` in every table that has one. Cell contents remain as-is (unless user later asks).
 
-### 2. `supabase/functions/send-password-reset/index.ts`
-- Explicitly load the **No-Reply SMTP config** from `portal_config` (`smtp_host`, `smtp_port`, `smtp_encryption`, `smtp_username`, `smtp_password`, `smtp_from_email`, `smtp_from_name`) and pass it inline as the `smtp` override in the `send-smtp-email` invocation. This guarantees the reset email is sent using the No-Reply mailbox as From, regardless of any other per-user SMTP defaults.
-- Propagate `sendData.success === false` (with its error) back to the client so the toast becomes an error instead of a false "sent successfully".
+### 3. Dashboard progress diagram fixes
+- File: `src/components/vendor/RegistrationStatusTracker.tsx` (and Dashboard usage).
+- **Correct status display**: ensure completed stages (including SAP Sync) render as ticked/completed when vendor status is `sap_synced`. Bug likely in step-status computation not marking all prior steps + SAP step as done when `sap_synced`.
+- **SAP Sync label**: when SAP sync is complete, show "SAP Sync Completed" with the SAP vendor code beneath (pull `sap_vendor_code` from vendor record).
+- **Remove L1–L5 labels** from the approval-flow progress diagram (the stage chips/badges showing `L1`, `L2`, …). Keep stage names and everything else unchanged.
+  - File: `src/components/vendor/ApprovalTimeline.tsx` — remove the `<Badge>L{level_number}</Badge>` element (used in Dashboard reference-number progress view).
+  - Verify `RegistrationStatusTracker` doesn't also render L-labels; if it does, remove there too.
 
-### 3. Verification
-- Deploy both functions.
-- Trigger "Forgot password" for a known user; read `send-smtp-email` logs for `accepted:[...]` + `messageId`. If accepted, the email is truly on its way (ask user to check Spam/All Mail). If not, the returned SMTP error will now be visible.
+### Out of scope
+- No backend, schema, workflow, or business-logic changes.
+- Row content alignment untouched (only the Actions header).
 
-No schema changes, no new secrets, no UI changes.
+### Verification
+- Load Dashboard for a `sap_synced` vendor → all steps ticked, SAP step shows "SAP Sync Completed · <sap_code>".
+- Open a few tables → headers on one line, no `#`, Actions header centered.
+- Sidebar shows no logo.
+- Approval Progress card shows stage names without `L1/L2/...` prefix.
