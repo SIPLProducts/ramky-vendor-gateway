@@ -546,9 +546,6 @@ export default function SAPSync() {
                         <Button variant="outline" className="rounded-xl" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
                           <Eye className="h-4 w-4 mr-2" />View Details
                         </Button>
-                        <Button variant="outline" className="rounded-xl" onClick={() => setPreviewVendorId(vendor.id)}>
-                          <FileText className="h-4 w-4 mr-2" />Preview
-                        </Button>
                         <Button
                           className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
                           onClick={() => openSapFieldsDialog(vendor)}
