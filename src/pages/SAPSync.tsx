@@ -655,7 +655,7 @@ export default function SAPSync() {
                                 <Checkbox
                                   checked={selectedDmsIds.has(v.id)}
                                   onCheckedChange={() => toggleDms(v.id)}
-                                  className="bg-white border-black data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                  className="!bg-white !border-2 !border-black data-[state=checked]:!bg-white data-[state=checked]:!text-black"
                                 />
                               )}
                             </TableCell>
