@@ -101,12 +101,49 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
 
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border h-14 px-4 flex items-center justify-between safe-area-top">
-      {/* Logo */}
-      <Link to="/dashboard" className="flex items-center gap-2">
-        <img src={ramkyLogo} alt="Ramky" className="h-8 w-8 object-contain" />
-        <span className="font-semibold text-sm">Ramky VMS</span>
-      </Link>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border h-14 px-3 flex items-center justify-between safe-area-top gap-2">
+      {/* Left: Hamburger + Logo */}
+      <div className="flex items-center gap-2 min-w-0">
+        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Open navigation">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[85vw] max-w-[320px] p-0 flex flex-col">
+            <SheetHeader className="px-4 py-3 border-b">
+              <SheetTitle className="text-center text-base">Vendor Portal</SheetTitle>
+            </SheetHeader>
+            <nav className="flex-1 overflow-y-auto py-2">
+              {visibleNavItems.length === 0 && !permsLoading && (
+                <p className="px-4 py-6 text-sm text-muted-foreground text-center">No screens available.</p>
+              )}
+              {visibleNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="border-t px-4 py-3 text-[10px] text-muted-foreground text-center">
+              © 2026 Sharvi Infotech Private Limited
+            </div>
+          </SheetContent>
+        </Sheet>
+        <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
+          <img src={ramkyLogo} alt="Ramky" className="h-7 w-7 object-contain shrink-0" />
+          <span className="font-semibold text-sm truncate">Ramky VMS</span>
+        </Link>
+      </div>
+
 
       {/* Right Actions */}
       <div className="flex items-center gap-1">
