@@ -45,7 +45,9 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   ceo_office_review: { label: 'CEO Office Review', variant: 'outline' },
   ceo_office_rejected: { label: 'CEO Office Rejected', variant: 'destructive' },
   pending_sap_sync: { label: 'Pending SAP Sync', variant: 'default' },
+  dms_sync_pending: { label: 'DMS Sync Pending', variant: 'default' },
   sap_synced: { label: 'SAP Synced', variant: 'default' },
+  dms_synced: { label: 'Approved (DMS Synced)', variant: 'default' },
   returned_to_buyer: { label: 'Returned to Buyer', variant: 'destructive' },
   returned_to_vendor: { label: 'Returned to Vendor', variant: 'destructive' },
   sap_team_rejected: { label: 'Duplicate & Closed', variant: 'destructive' },
@@ -121,6 +123,34 @@ export default function VendorStatus() {
                   <p className="text-xs text-muted-foreground mb-1">Current Status</p>
                   {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
                 </div>
+                {(() => {
+                  const s = vendor.status;
+                  const code = vendor.sap_vendor_code;
+                  const inSap = !!code || ['pending_sap_sync','dms_sync_pending','sap_synced','dms_synced','sap_team_rejected','sap_team_closed'].includes(s);
+                  if (!inSap) return null;
+                  let text = 'SAP Sync Pending';
+                  let variant: 'default' | 'outline' | 'destructive' = 'outline';
+                  if (s === 'sap_synced' || s === 'dms_synced') {
+                    text = code ? `SAP Synced · ${code}` : 'SAP Synced';
+                    variant = 'default';
+                  } else if (s === 'dms_sync_pending') {
+                    text = code ? `DMS Pending · ${code}` : 'DMS Pending';
+                  } else if (s === 'pending_sap_sync') {
+                    text = code ? `DMS Pending · ${code}` : 'SAP Sync Pending';
+                  } else if (s === 'sap_team_rejected' || s === 'sap_team_closed') {
+                    text = 'Duplicate & Closed';
+                    variant = 'destructive';
+                  } else if (code) {
+                    text = `SAP Synced · ${code}`;
+                    variant = 'default';
+                  }
+                  return (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">SAP Sync Status</p>
+                      <Badge variant={variant}>{text}</Badge>
+                    </div>
+                  );
+                })()}
               </div>
               {vendor.last_rejection_comments && (
                 <div className="mt-4 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-900">

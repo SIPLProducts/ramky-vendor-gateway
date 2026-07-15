@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, Clock, Circle } from 'lucide-react';
-import { formatStageLevel, type ApprovalStage } from '@/lib/approvalLabels';
+import { formatStageLevelHistory, type ApprovalStage } from '@/lib/approvalLabels';
 
 interface Props { vendorId: string; }
 
@@ -96,7 +96,7 @@ export function ApprovalTimeline({ vendorId }: Props) {
                 <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${color}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{formatStageLevel(r.stage as ApprovalStage, r.level_number)}</span>
+                    <span className="font-medium text-sm">{formatStageLevelHistory(r.stage as ApprovalStage, r.level_number)}</span>
                     <Badge variant={r.status === 'approved' ? 'secondary' : r.status === 'rejected' ? 'destructive' : 'outline'}>
                       {r.status}
                     </Badge>

@@ -20,8 +20,11 @@ export type RegistrationStatus =
   | 'ceo_office_review'
   | 'ceo_office_rejected'
   | 'pending_sap_sync'
+  | 'dms_sync_pending'
+  | 'dms_synced'
   | 'sap_synced'
   | 'sap_team_rejected'
+  | 'sap_team_closed'
   | 'sap_team_closed'
   | 'returned_to_buyer'
   | 'returned_to_vendor'
@@ -156,7 +159,7 @@ export const RegistrationStatusTracker = React.forwardRef<HTMLDivElement, Regist
   function RegistrationStatusTracker({ status, className, approvalProgress, sapVendorCode }, ref) {
     const hasChain = (approvalProgress?.length ?? 0) > 0;
     const sapCodePresent = !!sapVendorCode;
-    const sapSynced = status === 'sap_synced' || status === 'approved' || (sapCodePresent && status !== 'pending_sap_sync');
+    const sapSynced = status === 'sap_synced' || status === 'dms_synced' || status === 'approved' || (sapCodePresent && status !== 'pending_sap_sync' && status !== 'dms_sync_pending');
 
     let renderSteps: RenderStep[] = [];
 
