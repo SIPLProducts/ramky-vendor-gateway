@@ -482,6 +482,7 @@ export default function SAPSync() {
                 <Checkbox
                   checked={selectedSapIds.size > 0 && selectedSapIds.size === filteredSap.length}
                   onCheckedChange={toggleAllSap}
+                  className="bg-white border-black data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
                 <span className="text-sm text-muted-foreground">
                   {selectedSapIds.size > 0 ? `${selectedSapIds.size} selected` : 'Select vendors to enable bulk actions'}
