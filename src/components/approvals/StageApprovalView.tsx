@@ -358,7 +358,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {it.rejectionAt ? new Date(it.rejectionAt).toLocaleString() : '—'}
+                  {formatDateTime(it.rejectionAt, '—')}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
