@@ -1,71 +1,52 @@
-# Vendor-Specific Application Progress Diagram + SAP Status Detail
+# Vendor Status page — SAP sub-status + SCM CO label
 
-## Problem
+Scope: `/vendor-status/:id` presentation only. No backend/schema/logic changes.
 
-The **Application Progress** tracker currently renders a fixed set of 8 steps for every vendor, regardless of the vendor's actual approval matrix, and the SAP Sync step doesn't reflect the real sync sub-status.
+## 1. Approval Progress list: "SCM CO2" → "SCM CO"
 
-Observed in the screenshots:
-1. Vendors whose matrix includes **CEO Office** don't see it in the diagram (screenshot 2).
-2. Vendors whose matrix does **not** include SCM Head / Finance 2 still see them greyed out.
-3. SCM CO stage should always render as **"SCM CO"** in the diagram (no `SCM CO2` level suffix).
-4. SAP step must show the actual sync sub-status (SAP Sync Pending / DMS Pending / SAP Synced) plus the SAP vendor code when available.
+File: `src/components/vendor/ApprovalTimeline.tsx`
 
-## Solution (frontend only)
+- Replace the `formatStageLevel` import/call with `formatStageLevelHistory` (already exported from `src/lib/approvalLabels.ts`).
+- Effect: every `SCM_MANAGER` row renders as plain `SCM CO` regardless of level number. All other stages (`Buyer`, `SCM Head`, `Finance 1`, `Finance 2`, `CEO Office`) render exactly as today.
+- No other component using `formatStageLevel` is touched (dashboards, approval queues keep numbered labels).
 
-Rewrite `src/components/vendor/RegistrationStatusTracker.tsx` so the middle approver steps are **derived from `approvalProgress`** and the SAP step description reflects the vendor's live sync state.
+## 2. Surface the current SAP sync sub-status
 
-```text
-Submitted → Document Verification → [dynamic stages from matrix] → SAP Sync
-```
+The full set of terminal / SAP-stage statuses already exist in `vendor_status`:
+`pending_sap_sync`, `dms_sync_pending`, `sap_synced`, `dms_synced`, `sap_team_rejected`, `sap_team_closed`.
 
-### Stage derivation
+### 2a. Vendor Details card — new "SAP Sync Status" field
 
-- Sort `approvalProgress` by `level_number` and map each row to a stage step:
-  - `BUYER` → "Buyer Approval"
-  - `SCM_MANAGER` → **"SCM CO"** (always; collapse multiple SCM_MANAGER rows into one step whose status aggregates: completed only when all approved, active when the first pending row in the whole chain is here, failed when any rejected)
-  - `SCM_HEAD` → "SCM Head Approval"
-  - `FINANCE_1` → "Finance 1 Approval"
-  - `FINANCE_2` → "Finance 2 Approval"
-  - `CEO_OFFICE` → "CEO Office Approval"
-- Stages not present in `approvalProgress` do not appear.
-- Recompute the connector line fill from the new dynamic step count.
-- Fallback: if `approvalProgress` is empty, keep the current fixed 8-step layout so nothing regresses.
+File: `src/pages/VendorStatus.tsx`
 
-### Per-step status
+Add a new grid field (visible only once the vendor has reached the SAP stage — i.e. status is one of the six above OR `sap_vendor_code` is set). Renders as a labelled badge:
 
-- `completed` — all rows for that stage are `approved`
-- `failed` — any row `rejected`
-- `active` — contains the first pending row across the whole chain
-- `pending` — otherwise
+| Vendor state | Badge text | Variant |
+|---|---|---|
+| `sap_synced` or `dms_synced` | `SAP Synced · <sap_vendor_code>` | default (green/primary) |
+| `dms_sync_pending` | `DMS Pending · <sap_vendor_code>` | outline |
+| `pending_sap_sync` with code | `DMS Pending · <sap_vendor_code>` | outline |
+| `pending_sap_sync` without code | `SAP Sync Pending` | outline |
+| `sap_team_rejected` / `sap_team_closed` | `Duplicate & Closed` | destructive |
 
-Document Verification stays `completed` once any approval row exists (unchanged).
+The top-level "Current Status" badge stays untouched; this is an additional SAP-specific line so users don't have to interpret the tracker.
 
-### SAP Sync step
+### 2b. Application Progress diagram — align SAP step with the same sub-statuses
 
-Extend the tracker props with an optional `sapSyncStatus` (already available on the vendor row / status enum) and render the description accordingly:
+File: `src/components/vendor/RegistrationStatusTracker.tsx`
 
-| Condition | Label |
-|---|---|
-| `sap_vendor_code` present OR status `sap_synced` / `approved` | **"SAP Synced · <sap_vendor_code>"** (step = completed) |
-| Status `pending_sap_sync` and no SAP code yet | **"SAP Sync Pending"** (step = active) |
-| DMS document sync still in progress (SAP code present but DMS not yet complete — detected via `sap_dms_status` field on the vendor when available) | **"DMS Pending"** (step = active) |
-| All approvals done, awaiting SAP push | **"SAP Sync Pending"** (step = active) |
-| Nothing yet | **"Awaiting SAP sync"** (step = pending) |
-| `sap_team_rejected` / `sap_team_closed` | **"Action required"** (step = failed) |
+Extend the existing SAP-step description logic to recognise the two DMS values (currently only `pending_sap_sync` / `sap_synced` / rejected are handled):
 
-`VendorStatus.tsx` (the caller) will be updated to pass through `sapVendorCode` and, if present on the vendor row, the DMS status field. No new columns are added.
+- Add `'dms_sync_pending'` to the `RegistrationStatus` union.
+- SAP-step description mapping:
+  - `sap_synced` or `dms_synced` → `SAP Synced · <code>` (completed, green check)
+  - `dms_sync_pending` → `DMS Pending · <code>` (active)
+  - `pending_sap_sync` + `sap_vendor_code` → `DMS Pending · <code>` (active) [existing behaviour]
+  - `pending_sap_sync` no code → `SAP Sync Pending` (active) [existing]
+  - `sap_team_rejected` / `sap_team_closed` → `Action required` (failed) [existing]
+- Also add `'dms_synced'` handling in `VendorStatus.tsx`'s `STATUS_LABELS` (label `Approved (DMS Synced)`, variant `default`) so the top badge doesn't fall back to raw enum text.
 
-## Files to change
+## Out of scope
 
-- `src/components/vendor/RegistrationStatusTracker.tsx` — dynamic step construction, new SAP description logic, new optional prop for DMS status.
-- `src/pages/VendorStatus.tsx` — pass `sapVendorCode` and the DMS status field to the tracker (already passes `approvalProgress`; verify and extend).
-
-No backend, schema, workflow, RLS, or approval-logic changes. `ApprovalTimeline` (the lower list) stays as-is and continues to show `SCM CO1`, `SCM CO2` per level.
-
-## Verification
-
-- Vendor with matrix Buyer + SCM CO + Finance 1 + CEO Office + SAP → diagram shows exactly those 6 steps between Submitted and SAP Sync; CEO Office visible; no SCM Head / Finance 2.
-- Vendor with two SCM CO approvers → single "SCM CO" step, completed only after both approve.
-- SAP-synced vendor → SAP step ticked with "SAP Synced · <code>".
-- Approved but not yet pushed → "SAP Sync Pending".
-- SAP code created, DMS still syncing → "DMS Pending".
+- No backend, RLS, edge function, migration, workflow, or approval-logic changes.
+- No changes to Dashboard, VendorList, Reports, SAPSync, or approval queue pages.

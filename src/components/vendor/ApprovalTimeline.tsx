@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, Clock, Circle } from 'lucide-react';
-import { formatStageLevel, type ApprovalStage } from '@/lib/approvalLabels';
+import { formatStageLevelHistory, type ApprovalStage } from '@/lib/approvalLabels';
 
 interface Props { vendorId: string; }
 
