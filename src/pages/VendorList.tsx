@@ -329,7 +329,7 @@ export default function VendorList() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, GSTIN, or ID..."
+                placeholder="Search by Buyer Company, Invited By, Vendor, GSTIN, Location, SAP Code"
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10"
