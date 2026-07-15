@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +31,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { getSapName1, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
-import { VendorSubmissionPreviewDialog } from '@/components/vendor/VendorSubmissionPreviewDialog';
+
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -110,7 +112,7 @@ export default function VendorList() {
   const [returnTarget, setReturnTarget] = useState<VendorRow | null>(null);
   const [returnRemarks, setReturnRemarks] = useState('');
   const [returnSubmitting, setReturnSubmitting] = useState(false);
-  const [previewVendorId, setPreviewVendorId] = useState<string | null>(null);
+  
   const [commentsVendor, setCommentsVendor] = useState<{ id: string; name: string; ref: string } | null>(null);
 
 
@@ -143,10 +145,20 @@ export default function VendorList() {
   });
 
   const filteredVendors = vendors?.filter((vendor) => {
-    const matchesSearch =
-      (vendor.legal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (vendor.gstin || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase().trim();
+    const bc = vendor.tenant_id && buyerCompanies ? buyerCompanies.find(c => c.id === vendor.tenant_id) : null;
+    const buyerName = bc ? `${bc.name} ${bc.code}` : '';
+    const location = [vendor.registered_city, vendor.registered_state].filter(Boolean).join(', ');
+    const haystack = [
+      pickVendorDisplayName(vendor) || '',
+      vendor.legal_name || '',
+      vendor.gstin || '',
+      buyerName,
+      vendor.invited_by?.name || '',
+      location,
+      vendor.sap_vendor_code || '',
+    ].join(' ').toLowerCase();
+    const matchesSearch = !q || haystack.includes(q);
 
     const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
     const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
@@ -223,22 +235,24 @@ export default function VendorList() {
   };
 
   const handleExport = () => {
-    const csvData = filteredVendors.map((v) => ({
-      Reference: (v as any).reference_number || v.id,
-      Name: v.legal_name,
-      GSTIN: v.gstin,
-      PAN: v.pan,
+    const rows = filteredVendors.map((v) => ({
+      'Buyer Company': getBuyerCompanyName(v.tenant_id),
+      'Invited By': v.invited_by?.name || '-',
+      'Vendor': pickVendorDisplayName(v) || v.legal_name || '-',
+      'Reference Number': (v as any).reference_number || '-',
+      'GSTIN': v.gstin || '-',
+      'PAN': v.pan || '-',
       'PAN Holder Name': (v as any).pan_holder_name || '-',
       'PAN Status': formatPanStatus((v as any).pan_status),
       'Is Aadhaar Linked': formatAadhaarLinked((v as any).pan_aadhaar_linked),
-      City: v.registered_city,
-      State: v.registered_state,
-      Status: v.status,
-      SAP_Code: v.sap_vendor_code || '-',
+      'Location': [v.registered_city, v.registered_state].filter(Boolean).join(', ') || '-',
+      'SAP Code': v.sap_vendor_code || '-',
+      'Status': v.status,
     }));
-
-    console.log('Exporting:', csvData);
-    alert('Export functionality - CSV data logged to console');
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+    XLSX.writeFile(wb, `vendors_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
   };
 
   // Helper function to map vendor verification status columns to ValidationResult format
@@ -304,7 +318,7 @@ export default function VendorList() {
           </Button>
           <Button onClick={handleExport} variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            Export Excel
           </Button>
         </div>
       </div>
@@ -315,7 +329,7 @@ export default function VendorList() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, GSTIN, or ID..."
+                placeholder="Search by Buyer Company, Invited By, Vendor, GSTIN, Location, SAP Code"
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10"
@@ -380,13 +394,13 @@ export default function VendorList() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Vendor</TableHead>
                       <TableHead>Buyer Company</TableHead>
                       <TableHead>Invited By</TableHead>
+                      <TableHead>Vendor</TableHead>
                       <TableHead>GSTIN</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead>SAP Code</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
 
@@ -414,17 +428,6 @@ export default function VendorList() {
                       paginatedVendors.map((vendor) => (
                         <TableRow key={vendor.id}>
                           <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded bg-muted flex items-center justify-center">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
-                                <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
                             <span className="text-sm">{getBuyerCompanyName(vendor.tenant_id)}</span>
                           </TableCell>
                           <TableCell>
@@ -436,7 +439,17 @@ export default function VendorList() {
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
                           </TableCell>
-
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded bg-muted flex items-center justify-center">
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
+                                <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="font-mono text-sm">
                             {vendor.gstin || '-'}
                           </TableCell>
@@ -444,6 +457,9 @@ export default function VendorList() {
                             {vendor.registered_city && vendor.registered_state
                               ? `${vendor.registered_city}, ${vendor.registered_state}`
                               : '-'}
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {vendor.sap_vendor_code || '-'}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(vendor.status as VendorStatus)}
@@ -454,29 +470,18 @@ export default function VendorList() {
                               </div>
                             )}
                           </TableCell>
-
-                          <TableCell className="font-mono">
-                            {vendor.sap_vendor_code || '-'}
-                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                title="View"
                                 onClick={() => {
                                   setSelectedVendor(vendor);
                                   setShowDetails(true);
                                 }}
                               >
                                 <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title="Preview"
-                                onClick={() => setPreviewVendorId(vendor.id)}
-                              >
-                                <FileText className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -492,6 +497,7 @@ export default function VendorList() {
                               </Button>
                             </div>
                           </TableCell>
+
 
                         </TableRow>
                       ))
@@ -898,11 +904,6 @@ export default function VendorList() {
         </DialogContent>
       </Dialog>
 
-      <VendorSubmissionPreviewDialog
-        vendorId={previewVendorId}
-        open={!!previewVendorId}
-        onOpenChange={(o) => { if (!o) setPreviewVendorId(null); }}
-      />
       <ApprovalCommentsDialog
         open={!!commentsVendor}
         onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
