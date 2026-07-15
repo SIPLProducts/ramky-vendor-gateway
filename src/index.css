@@ -408,10 +408,56 @@
   }
   .bg-card > :first-child :is(h1, h2, h3, h4, h5, h6),
   [class*="bg-card"] > :first-child :is(h1, h2, h3, h4, h5, h6) {
-    color: var(--card-header-color, inherit);
-    font-size: var(--card-header-size, inherit);
-    font-weight: var(--card-header-weight, 600);
+    color: var(--card-header-color, inherit) !important;
+    font-size: var(--card-header-size, inherit) !important;
+    font-weight: var(--card-header-weight, 600) !important;
   }
+  /* Token-driven card padding/margin/colors — win over local Tailwind utilities */
+  [data-slot="card"].app-card {
+    margin-top: var(--card-mar-t, 0px);
+    margin-right: var(--card-mar-r, 0px);
+    margin-bottom: var(--card-mar-b, 16px);
+    margin-left: var(--card-mar-l, 0px);
+    color: var(--card-body-color, inherit);
+  }
+  [data-slot="card-header"].app-card-header {
+    padding-top: var(--card-header-pad-t, 20px) !important;
+    padding-right: var(--card-header-pad-r, 24px) !important;
+    padding-bottom: var(--card-header-pad-b, 12px) !important;
+    padding-left: var(--card-header-pad-l, 24px) !important;
+    background: var(--card-header-bg, transparent);
+  }
+  [data-slot="card-content"].app-card-content {
+    padding-top: var(--card-pad-t, 24px) !important;
+    padding-right: var(--card-pad-r, 24px) !important;
+    padding-bottom: var(--card-pad-b, 24px) !important;
+    padding-left: var(--card-pad-l, 24px) !important;
+  }
+  /* When a card has a header, keep content top padding tight by default */
+  [data-slot="card-header"].app-card-header + [data-slot="card-content"].app-card-content {
+    padding-top: 0 !important;
+  }
+
+  /* App screen container — page-level padding/margin */
+  .app-screen {
+    padding-top: var(--screen-pad-t, 20px);
+    padding-right: var(--screen-pad-r, 24px);
+    padding-bottom: var(--screen-pad-b, 20px);
+    padding-left: var(--screen-pad-l, 24px);
+    margin-top: var(--screen-mar-t, 0px);
+    margin-right: var(--screen-mar-r, 0px);
+    margin-bottom: var(--screen-mar-b, 0px);
+    margin-left: var(--screen-mar-l, 0px);
+  }
+  .screen-title {
+    font-size: var(--screen-title-size, 20px);
+    font-weight: var(--screen-title-weight, 600);
+    color: var(--screen-title-color, inherit);
+    letter-spacing: var(--heading-letter-spacing, normal);
+    margin-bottom: var(--screen-title-mb, 16px);
+    line-height: 1.2;
+  }
+
 
   /* Buttons — primary variant reads --btn-* */
   button.bg-primary,

@@ -99,6 +99,34 @@ export interface DesignSettings {
     headerFontWeight: string;
     bodyFontSize: string;
     bodyFontWeight: string;
+    headerBackground: string;
+    bodyTextColor: string;
+    paddingTop: string;
+    paddingRight: string;
+    paddingBottom: string;
+    paddingLeft: string;
+    headerPaddingTop: string;
+    headerPaddingRight: string;
+    headerPaddingBottom: string;
+    headerPaddingLeft: string;
+    marginTop: string;
+    marginRight: string;
+    marginBottom: string;
+    marginLeft: string;
+  };
+  screen: {
+    paddingTop: string;
+    paddingRight: string;
+    paddingBottom: string;
+    paddingLeft: string;
+    marginTop: string;
+    marginRight: string;
+    marginBottom: string;
+    marginLeft: string;
+    headerFontSize: string;
+    headerFontWeight: string;
+    headerColor: string;
+    headerMarginBottom: string;
   };
 }
 
@@ -234,6 +262,34 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     headerFontWeight: '600',
     bodyFontSize: '14px',
     bodyFontWeight: '400',
+    headerBackground: 'transparent',
+    bodyTextColor: '#1f2a37',
+    paddingTop: '24px',
+    paddingRight: '24px',
+    paddingBottom: '24px',
+    paddingLeft: '24px',
+    headerPaddingTop: '20px',
+    headerPaddingRight: '24px',
+    headerPaddingBottom: '12px',
+    headerPaddingLeft: '24px',
+    marginTop: '0px',
+    marginRight: '0px',
+    marginBottom: '16px',
+    marginLeft: '0px',
+  },
+  screen: {
+    paddingTop: '20px',
+    paddingRight: '24px',
+    paddingBottom: '20px',
+    paddingLeft: '24px',
+    marginTop: '0px',
+    marginRight: '0px',
+    marginBottom: '0px',
+    marginLeft: '0px',
+    headerFontSize: '20px',
+    headerFontWeight: '600',
+    headerColor: '#111827',
+    headerMarginBottom: '16px',
   },
 };
 
@@ -372,6 +428,34 @@ export function applyDesignSettings(s: DesignSettings) {
   r.setProperty('--card-header-weight', s.cards.headerFontWeight || '600');
   r.setProperty('--card-body-size', s.cards.bodyFontSize || '14px');
   r.setProperty('--card-body-weight', s.cards.bodyFontWeight || '400');
+  r.setProperty('--card-header-bg', s.cards.headerBackground || 'transparent');
+  r.setProperty('--card-body-color', s.cards.bodyTextColor || 'inherit');
+  r.setProperty('--card-pad-t', s.cards.paddingTop || '24px');
+  r.setProperty('--card-pad-r', s.cards.paddingRight || '24px');
+  r.setProperty('--card-pad-b', s.cards.paddingBottom || '24px');
+  r.setProperty('--card-pad-l', s.cards.paddingLeft || '24px');
+  r.setProperty('--card-header-pad-t', s.cards.headerPaddingTop || '20px');
+  r.setProperty('--card-header-pad-r', s.cards.headerPaddingRight || '24px');
+  r.setProperty('--card-header-pad-b', s.cards.headerPaddingBottom || '12px');
+  r.setProperty('--card-header-pad-l', s.cards.headerPaddingLeft || '24px');
+  r.setProperty('--card-mar-t', s.cards.marginTop || '0px');
+  r.setProperty('--card-mar-r', s.cards.marginRight || '0px');
+  r.setProperty('--card-mar-b', s.cards.marginBottom || '16px');
+  r.setProperty('--card-mar-l', s.cards.marginLeft || '0px');
+
+  // Screen (page container)
+  r.setProperty('--screen-pad-t', s.screen?.paddingTop || '20px');
+  r.setProperty('--screen-pad-r', s.screen?.paddingRight || '24px');
+  r.setProperty('--screen-pad-b', s.screen?.paddingBottom || '20px');
+  r.setProperty('--screen-pad-l', s.screen?.paddingLeft || '24px');
+  r.setProperty('--screen-mar-t', s.screen?.marginTop || '0px');
+  r.setProperty('--screen-mar-r', s.screen?.marginRight || '0px');
+  r.setProperty('--screen-mar-b', s.screen?.marginBottom || '0px');
+  r.setProperty('--screen-mar-l', s.screen?.marginLeft || '0px');
+  r.setProperty('--screen-title-size', s.screen?.headerFontSize || '20px');
+  r.setProperty('--screen-title-weight', s.screen?.headerFontWeight || '600');
+  r.setProperty('--screen-title-color', s.screen?.headerColor || '#111827');
+  r.setProperty('--screen-title-mb', s.screen?.headerMarginBottom || '16px');
 }
 
 export function resetAppliedDesign() {
@@ -385,6 +469,8 @@ export function resetAppliedDesign() {
     '--input-font-size','--input-text','--input-placeholder','--input','--input-radius','--input-focus','--label-font-size','--label-color','--input-letter-spacing','--label-letter-spacing',
     '--table-header-bg','--table-header-text','--table-row-text','--table-alt-row','--table-border','--table-font-size','--table-letter-spacing','--table-header-size','--table-header-weight','--table-body-size','--table-body-weight',
     '--card','--card-header-color','--border','--radius','--card-shadow','--card-header-size','--card-header-weight','--card-body-size','--card-body-weight',
+    '--card-header-bg','--card-body-color','--card-pad-t','--card-pad-r','--card-pad-b','--card-pad-l','--card-header-pad-t','--card-header-pad-r','--card-header-pad-b','--card-header-pad-l','--card-mar-t','--card-mar-r','--card-mar-b','--card-mar-l',
+    '--screen-pad-t','--screen-pad-r','--screen-pad-b','--screen-pad-l','--screen-mar-t','--screen-mar-r','--screen-mar-b','--screen-mar-l','--screen-title-size','--screen-title-weight','--screen-title-color','--screen-title-mb',
   ];
   const perAction: string[] = [];
   for (const k of ACTION_KEYS) {

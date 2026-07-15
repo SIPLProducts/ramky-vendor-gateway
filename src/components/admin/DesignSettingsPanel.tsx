@@ -257,7 +257,7 @@ export function DesignSettingsPanel() {
         <FontSelectField label="Page Font"       value={draft.theme.fontFamily} onChange={(v) => update('theme','fontFamily',v)} />
       </SectionCard>
 
-      <SectionCard title="Typography" icon={Type}>
+      <SectionCard title="Typography (Global)" icon={Type}>
         <FontSelectField label="Font Family"           value={draft.typography.fontFamily} onChange={(v) => update('typography','fontFamily',v)} />
         <TextInputField label="Base Font Size"     value={draft.typography.baseFontSize} onChange={(v) => update('typography','baseFontSize',v)} placeholder="14px" />
         <TextInputField label="Heading Font Size"  value={draft.typography.headingFontSize} onChange={(v) => update('typography','headingFontSize',v)} placeholder="24px" />
@@ -268,7 +268,21 @@ export function DesignSettingsPanel() {
         <TextInputField label="Line Height"        value={draft.typography.lineHeight} onChange={(v) => update('typography','lineHeight',v)} placeholder="1.5" />
         <TextInputField label="Letter Spacing"     value={draft.typography.letterSpacing} onChange={(v) => update('typography','letterSpacing',v)} placeholder="0.01em, normal, 0.5px" />
         <TextInputField label="Heading Letter Spacing" value={draft.typography.headingLetterSpacing} onChange={(v) => update('typography','headingLetterSpacing',v)} placeholder="-0.01em" />
+      </SectionCard>
 
+      <SectionCard title="Screen (Page Container)" icon={LayoutGrid}>
+        <TextInputField label="Screen Padding Top"    value={draft.screen.paddingTop}    onChange={(v) => update('screen','paddingTop',v)} placeholder="20px" />
+        <TextInputField label="Screen Padding Right"  value={draft.screen.paddingRight}  onChange={(v) => update('screen','paddingRight',v)} placeholder="24px" />
+        <TextInputField label="Screen Padding Bottom" value={draft.screen.paddingBottom} onChange={(v) => update('screen','paddingBottom',v)} placeholder="20px" />
+        <TextInputField label="Screen Padding Left"   value={draft.screen.paddingLeft}   onChange={(v) => update('screen','paddingLeft',v)} placeholder="24px" />
+        <TextInputField label="Screen Margin Top"     value={draft.screen.marginTop}     onChange={(v) => update('screen','marginTop',v)} placeholder="0px" />
+        <TextInputField label="Screen Margin Right"   value={draft.screen.marginRight}   onChange={(v) => update('screen','marginRight',v)} placeholder="0px" />
+        <TextInputField label="Screen Margin Bottom"  value={draft.screen.marginBottom}  onChange={(v) => update('screen','marginBottom',v)} placeholder="0px" />
+        <TextInputField label="Screen Margin Left"    value={draft.screen.marginLeft}    onChange={(v) => update('screen','marginLeft',v)} placeholder="0px" />
+        <TextInputField label="Screen Header Size"    value={draft.screen.headerFontSize} onChange={(v) => update('screen','headerFontSize',v)} placeholder="20px" />
+        <SelectField    label="Screen Header Weight"  value={draft.screen.headerFontWeight} onChange={(v) => update('screen','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
+        <ColorInput     label="Screen Header Color"   value={draft.screen.headerColor}   onChange={(v) => update('screen','headerColor',v)} />
+        <TextInputField label="Screen Header Margin Bottom" value={draft.screen.headerMarginBottom} onChange={(v) => update('screen','headerMarginBottom',v)} placeholder="16px" />
       </SectionCard>
 
       <SectionCard title="Sidebar" icon={PanelLeft}>
@@ -407,15 +421,29 @@ export function DesignSettingsPanel() {
       </SectionCard>
 
       <SectionCard title="Cards" icon={LayoutGrid}>
-        <ColorInput label="Background Color"     value={draft.cards.background}   onChange={(v) => update('cards','background',v)} />
-        <ColorInput label="Header Color"         value={draft.cards.header}       onChange={(v) => update('cards','header',v)} />
-        <ColorInput label="Border Color"         value={draft.cards.border}       onChange={(v) => update('cards','border',v)} />
-        <TextInputField label="Border Radius"    value={draft.cards.borderRadius} onChange={(v) => update('cards','borderRadius',v)} placeholder="12px" />
-        <SelectField label="Shadow"              value={draft.cards.shadow}       onChange={(v) => update('cards','shadow', v as any)} options={shadowOptions} />
-        <TextInputField label="Header Font Size"   value={draft.cards.headerFontSize}   onChange={(v) => update('cards','headerFontSize',v)} placeholder="16px" />
-        <SelectField label="Header Font Weight"    value={draft.cards.headerFontWeight} onChange={(v) => update('cards','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
-        <TextInputField label="Body Font Size"     value={draft.cards.bodyFontSize}     onChange={(v) => update('cards','bodyFontSize',v)} placeholder="14px" />
-        <SelectField label="Body Font Weight"      value={draft.cards.bodyFontWeight}   onChange={(v) => update('cards','bodyFontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
+        <ColorInput label="Card Background"       value={draft.cards.background}       onChange={(v) => update('cards','background',v)} />
+        <ColorInput label="Header Text Color"     value={draft.cards.header}           onChange={(v) => update('cards','header',v)} />
+        <ColorInput label="Header Background"     value={draft.cards.headerBackground} onChange={(v) => update('cards','headerBackground',v)} />
+        <ColorInput label="Body Text Color"       value={draft.cards.bodyTextColor}    onChange={(v) => update('cards','bodyTextColor',v)} />
+        <ColorInput label="Card Border Color"     value={draft.cards.border}           onChange={(v) => update('cards','border',v)} />
+        <TextInputField label="Border Radius"     value={draft.cards.borderRadius}     onChange={(v) => update('cards','borderRadius',v)} placeholder="12px" />
+        <SelectField label="Shadow"               value={draft.cards.shadow}           onChange={(v) => update('cards','shadow', v as any)} options={shadowOptions} />
+        <TextInputField label="Header Font Size"  value={draft.cards.headerFontSize}   onChange={(v) => update('cards','headerFontSize',v)} placeholder="16px" />
+        <SelectField label="Header Font Weight"   value={draft.cards.headerFontWeight} onChange={(v) => update('cards','headerFontWeight',v)} options={['400','500','600','700','800'].map(v => ({ value: v, label: v }))} />
+        <TextInputField label="Body Font Size"    value={draft.cards.bodyFontSize}     onChange={(v) => update('cards','bodyFontSize',v)} placeholder="14px" />
+        <SelectField label="Body Font Weight"     value={draft.cards.bodyFontWeight}   onChange={(v) => update('cards','bodyFontWeight',v)} options={['300','400','500','600','700'].map(v => ({ value: v, label: v }))} />
+        <TextInputField label="Header Padding Top"    value={draft.cards.headerPaddingTop}    onChange={(v) => update('cards','headerPaddingTop',v)} placeholder="20px" />
+        <TextInputField label="Header Padding Right"  value={draft.cards.headerPaddingRight}  onChange={(v) => update('cards','headerPaddingRight',v)} placeholder="24px" />
+        <TextInputField label="Header Padding Bottom" value={draft.cards.headerPaddingBottom} onChange={(v) => update('cards','headerPaddingBottom',v)} placeholder="12px" />
+        <TextInputField label="Header Padding Left"   value={draft.cards.headerPaddingLeft}   onChange={(v) => update('cards','headerPaddingLeft',v)} placeholder="24px" />
+        <TextInputField label="Body Padding Top"      value={draft.cards.paddingTop}    onChange={(v) => update('cards','paddingTop',v)} placeholder="24px" />
+        <TextInputField label="Body Padding Right"    value={draft.cards.paddingRight}  onChange={(v) => update('cards','paddingRight',v)} placeholder="24px" />
+        <TextInputField label="Body Padding Bottom"   value={draft.cards.paddingBottom} onChange={(v) => update('cards','paddingBottom',v)} placeholder="24px" />
+        <TextInputField label="Body Padding Left"     value={draft.cards.paddingLeft}   onChange={(v) => update('cards','paddingLeft',v)} placeholder="24px" />
+        <TextInputField label="Card Margin Top"       value={draft.cards.marginTop}    onChange={(v) => update('cards','marginTop',v)} placeholder="0px" />
+        <TextInputField label="Card Margin Right"     value={draft.cards.marginRight}  onChange={(v) => update('cards','marginRight',v)} placeholder="0px" />
+        <TextInputField label="Card Margin Bottom"    value={draft.cards.marginBottom} onChange={(v) => update('cards','marginBottom',v)} placeholder="16px" />
+        <TextInputField label="Card Margin Left"      value={draft.cards.marginLeft}   onChange={(v) => update('cards','marginLeft',v)} placeholder="0px" />
       </SectionCard>
 
     </div>

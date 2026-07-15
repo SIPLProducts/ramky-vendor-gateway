@@ -1,37 +1,82 @@
-## Root cause
+## Goal
 
-Vendor `FOSS INDIA PRIVATE LIMITED` (Ref `20260709001`) has:
-- `primary_email = ""`
-- `registered_email = "foss@gmail.com"`
-- Invitation email = `sunilkumar@sharviinfotech.com`
+Extend UI Design Settings so an admin can globally control:
 
-Dashboard uses a smarter rule (see `src/pages/Dashboard.tsx` lines 219–223):
-- **Self-signup invite** (`on_behalf = false`): show `invitation.email → primary_email → registered_email`.
-- **On-behalf** (buyer filled the form for the vendor): show `registered_email → invitation.email → primary_email`.
+1. **Typography** (global fallback for everything text-related)
+2. **Screen container** (page-level padding + margin, screen header size/weight)
+3. **Cards** (header + body + spacing + border), everywhere `<Card>` is used
 
-That's why Dashboard shows `sunilkumar@sharviinfotech.com` (the invited vendor contact) while the Approval screen shows `foss@gmail.com` (the value entered inside the registration form). The approval edge function currently only looks at `vendors.primary_email / registered_email`, ignoring the invitation email.
+All controls live in `Settings → UI Design` and apply instantly on save via CSS variables — no per-page code changes.
 
-## Fix
+---
 
-Align the Approval screen's Vendor Email with the Dashboard rule by computing `vendorEmail` in `supabase/functions/list-pending-approvals-by-stage/index.ts` the same way:
+## New / expanded config groups
 
-1. Fetch invitation `email` (and use existing `created_on_behalf`) for each vendor.
-   - BUYER branch: `invsForBuyer` already loaded — extend the select to include `email, created_on_behalf` (already has `created_on_behalf`); add `email`.
-   - Downstream branch: `invites` already loaded — extend the select to include `email, created_on_behalf` (already has `created_on_behalf`); add `email`.
-2. Replace the current `vendorEmail` assignment (3 places) with:
-   ```ts
-   const invEmail = (inv?.email && String(inv.email).trim()) || null;
-   const primary  = (v?.primary_email && String(v.primary_email).trim()) || null;
-   const registered = (v?.registered_email && String(v.registered_email).trim()) || null;
-   const onBehalf = !!inv?.created_on_behalf;
-   const vendorEmail = onBehalf
-     ? (registered || invEmail || primary || null)
-     : (invEmail || primary || registered || null);
-   ```
-3. No frontend changes needed — `StageApprovalView.tsx` already renders `it.vendorEmail || '—'`.
+### 1. Typography (global)
+Already has font family / weight / letter spacing / screen name size + weight. Nothing new needed here — it's already the global fallback. We'll just re-label the section as **"Typography (Global)"** so its scope is obvious.
 
-## Scope
+### 2. Screen (new group)
+New `screen` block in `DesignSettings`:
 
-- Edit only `supabase/functions/list-pending-approvals-by-stage/index.ts`.
-- No schema, no other screens.
-- Deploy the edge function after the edit and verify Ref `20260709001` now shows `sunilkumar@sharviinfotech.com` in Buyer Approval.
+- `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft`  (default `24px`)
+- `marginTop`, `marginRight`, `marginBottom`, `marginLeft`  (default `0`)
+- `headerFontSize` (mirrors `typography.screenNameFontSize` but scoped to page `<h1>`)
+- `headerFontWeight`
+- `headerColor`
+- `headerMarginBottom` (default `16px`)
+
+Applied by:
+- CSS vars: `--screen-pad-t/r/b/l`, `--screen-mar-t/r/b/l`, `--screen-title-*`.
+- A `.app-screen` wrapper class on the main content area in `AppLayout.tsx` reads padding/margin from those vars.
+- The `.screen-title` utility (already planned) reads the header vars.
+
+### 3. Cards (extended)
+Existing `cards` group gains:
+
+- `headerBackground` (default `transparent`)
+- `headerTextColor` (renames current `header`; keep back-compat)
+- `bodyTextColor`
+- `borderColor` (already exists as `border`, rename label to "Card Border Color")
+- `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft` (body padding, default `24px`)
+- `headerPaddingTop`, `headerPaddingRight`, `headerPaddingBottom`, `headerPaddingLeft` (default `24px 24px 0`)
+- `marginTop`, `marginRight`, `marginBottom`, `marginLeft` (default `0 0 16px 0`)
+
+Applied by extending `applyDesignSettings` to write:
+- `--card-header-bg`, `--card-header-color`, `--card-body-color`
+- `--card-pad-t/r/b/l`, `--card-header-pad-t/r/b/l`, `--card-mar-t/r/b/l`
+
+And by patching `src/components/ui/card.tsx` (shadcn wrapper) so `<Card>`, `<CardHeader>`, `<CardContent>` read those vars (padding/margin/colors) with `!important` where the token must win over local Tailwind overrides like `pb-3` or `text-base`.
+
+---
+
+## Files to touch
+
+1. `src/lib/designTokens.ts`
+   - Extend `DesignSettings` interface with `screen` group and new `cards` fields.
+   - Extend `DEFAULT_DESIGN_SETTINGS` with sane defaults.
+   - Extend `applyDesignSettings` to emit all new CSS vars.
+   - Extend `resetAppliedDesign` cleanup list.
+
+2. `src/index.css`
+   - Add `.app-screen` utility reading `--screen-pad-*` / `--screen-mar-*`.
+   - Add `.screen-title` utility reading `--screen-title-*`.
+   - Add card overrides that force `--card-*` vars onto `[data-slot=card]`, `CardHeader`, `CardContent` with `!important`.
+
+3. `src/components/ui/card.tsx`
+   - Add inline style bridges so padding/margin/colors from tokens win over any local classNames.
+
+4. `src/components/layout/AppLayout.tsx`
+   - Add `app-screen` class to the main content wrapper so screen padding/margin tokens apply.
+
+5. `src/components/admin/DesignSettingsPanel.tsx`
+   - Rename "Typography" section to "Typography (Global)".
+   - Add new **"Screen (Page Container)"** SectionCard with icon `LayoutGrid`: 4 padding inputs, 4 margin inputs, header size/weight/color/margin-bottom.
+   - Extend **Cards** SectionCard with: header background color, body text color, 4 header-padding inputs, 4 body-padding inputs, 4 margin inputs.
+
+No schema changes — `portal_config.ui_design_settings` already stores this as JSON, so existing rows keep working (missing keys fall back to defaults).
+
+## Out of scope
+
+- No sweep of page-level `<h1>` tags in this pass (kept separate); the new screen tokens still apply via `.app-screen` wrapper globally.
+- No changes to per-action buttons, forms, tables, sidebar.
+- No DB migrations.
