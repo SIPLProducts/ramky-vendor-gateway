@@ -235,22 +235,24 @@ export default function VendorList() {
   };
 
   const handleExport = () => {
-    const csvData = filteredVendors.map((v) => ({
-      Reference: (v as any).reference_number || v.id,
-      Name: v.legal_name,
-      GSTIN: v.gstin,
-      PAN: v.pan,
+    const rows = filteredVendors.map((v) => ({
+      'Buyer Company': getBuyerCompanyName(v.tenant_id),
+      'Invited By': v.invited_by?.name || '-',
+      'Vendor': pickVendorDisplayName(v) || v.legal_name || '-',
+      'Reference Number': (v as any).reference_number || '-',
+      'GSTIN': v.gstin || '-',
+      'PAN': v.pan || '-',
       'PAN Holder Name': (v as any).pan_holder_name || '-',
       'PAN Status': formatPanStatus((v as any).pan_status),
       'Is Aadhaar Linked': formatAadhaarLinked((v as any).pan_aadhaar_linked),
-      City: v.registered_city,
-      State: v.registered_state,
-      Status: v.status,
-      SAP_Code: v.sap_vendor_code || '-',
+      'Location': [v.registered_city, v.registered_state].filter(Boolean).join(', ') || '-',
+      'SAP Code': v.sap_vendor_code || '-',
+      'Status': v.status,
     }));
-
-    console.log('Exporting:', csvData);
-    alert('Export functionality - CSV data logged to console');
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
+    XLSX.writeFile(wb, `vendors_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
   };
 
   // Helper function to map vendor verification status columns to ValidationResult format
