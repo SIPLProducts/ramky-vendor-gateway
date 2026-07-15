@@ -526,7 +526,7 @@ export default function SAPSync() {
                         <Checkbox
                           checked={selectedSapIds.has(vendor.id)}
                           onCheckedChange={() => toggleSap(vendor.id)}
-                          className="mt-2"
+                          className="mt-2 bg-white border-black data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                         <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/5 flex items-center justify-center">
                           <Building2 className="h-7 w-7 text-blue-600" />
