@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare } from 'lucide-react';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
+import { formatDateTime } from '@/lib/dateFormat';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
