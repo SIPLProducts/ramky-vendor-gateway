@@ -467,10 +467,10 @@ export default function SAPSync() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
-          <TabsTrigger value="sap" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
-          <TabsTrigger value="dms" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
-          <TabsTrigger value="rejected" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"><Ban className="h-4 w-4" />Duplicate &amp; Closed{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
+        <TabsList className="grid w-full max-w-2xl grid-cols-3 bg-slate-100 border border-slate-200">
+          <TabsTrigger value="sap" className="gap-2 data-[state=active]:!bg-blue-600 data-[state=active]:!text-white data-[state=active]:!shadow-md"><Server className="h-4 w-4" />SAP Sync</TabsTrigger>
+          <TabsTrigger value="dms" className="gap-2 data-[state=active]:!bg-blue-600 data-[state=active]:!text-white data-[state=active]:!shadow-md"><FolderUp className="h-4 w-4" />DMS Sync</TabsTrigger>
+          <TabsTrigger value="rejected" className="gap-2 data-[state=active]:!bg-blue-600 data-[state=active]:!text-white data-[state=active]:!shadow-md"><Ban className="h-4 w-4" />Duplicate &amp; Closed{filteredRejected.length > 0 && <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">{filteredRejected.length}</span>}</TabsTrigger>
         </TabsList>
 
         {/* SAP Sync tab */}
