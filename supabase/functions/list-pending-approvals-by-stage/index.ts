@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
           rejectionAt: v?.last_rejected_at ?? null,
           isOnBehalf: !!inv?.created_on_behalf,
           invitationId: inv?.id ?? null,
+          vendorEmail: v?.primary_email ?? v?.registered_email ?? null,
         };
       });
 
