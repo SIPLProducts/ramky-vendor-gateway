@@ -47,13 +47,14 @@ const STORAGE_KEY = 'lovable.activeTenantId';
 // approvers (SCM Head, Finance 1/2, Finance Approval, CEO Office) are now scoped to vendors
 // routed to them via buyer_approval_flows.
 const CROSS_TENANT_ROLE_NAMES = new Set(['sap team']);
+const ADMIN_CUSTOM_ROLE_NAMES = new Set(['admin', 'sharvi admin', 'customer admin']);
 const STAGE_APPROVER_ROLE_NAMES = new Set(
   ['scm head', 'finance 1', 'finance 2', 'finance approval', 'ceo office'],
 );
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { user, userRole } = useAuth();
-  const isSuperAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
+  const isBuiltInAdmin = userRole === 'sharvi_admin' || userRole === 'admin';
 
   // Load custom-role names assigned to the user.
   const { data: customRoleNames = [] } = useQuery({
