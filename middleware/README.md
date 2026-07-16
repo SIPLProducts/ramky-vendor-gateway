@@ -128,7 +128,7 @@ Redeploy the current middleware build:
    The response should include `"middlewareVersion": "dms-sequential-upload-v5"` and `"bodyLimit": "unbounded"` unless you intentionally configured `MIDDLEWARE_BODY_LIMIT`.
 6. Re-run the DMS upload from the portal.
 
-Optional: set `MIDDLEWARE_BODY_LIMIT=1gb` in `.env` only if you intentionally want a parser cap. Leaving it unset keeps the middleware parser unbounded; nginx and SAP can still enforce their own limits.
+Optional: set `MIDDLEWARE_BODY_LIMIT` in `.env` only if you intentionally want a parser cap. Leaving it unset keeps the middleware parser unbounded; nginx and SAP can still enforce their own limits.
 
 
 ## Repeated 413 "request entity too large" fix
