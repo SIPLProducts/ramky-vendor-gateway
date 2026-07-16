@@ -677,34 +677,28 @@ export function useDMSSync() {
 
   return useMutation({
     mutationFn: async ({ vendorIds }: { vendorIds: string[] }) => {
-      // For each vendor, first build the exact SAP DMS payload, then post that
-      // payload directly so browser DevTools shows { BP_LIFNR, FILE_UPLOAD }.
-      const results: any[] = [];
-      for (const vendorId of vendorIds) {
-        try {
-          const prep = await supabase.functions.invoke('prepare-dms-payload', {
-            body: { vendorId },
-          });
-          if (prep.error) throw new Error(prep.error.message);
-          const payload = (prep.data as any)?.payload;
-          if (!payload || !payload.BP_LIFNR) {
-            throw new Error((prep.data as any)?.error || 'Failed to prepare DMS payload');
-          }
+      // Send only vendor IDs. The Edge Function downloads documents server-side
+      // and uploads them sequentially, so large base64 payloads do not travel
+      // through the browser-to-function request path.
+      const { data, error } = await supabase.functions.invoke('sync-vendor-to-dms', {
+        body: { vendorIds },
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('No response from DMS sync function');
 
-          const upload = await supabase.functions.invoke('sync-vendor-to-dms', {
-            body: payload,
-          });
-          if (upload.error) throw new Error(upload.error.message);
-          const r = (upload.data as any)?.results?.[0];
-          results.push(r || { BP_LIFNR: payload.BP_LIFNR, success: false, message: 'No result' });
-        } catch (e: any) {
-          results.push({ BP_LIFNR: '', success: false, message: e?.message || 'Failed' });
-        }
+      const results = Array.isArray((data as any).results) ? (data as any).results : [];
+      if (results.length === 0) {
+        return {
+          success: false,
+          message: (data as any).message || 'No DMS sync results returned',
+          results,
+        };
       }
+
       const successCount = results.filter((r) => r.success).length;
       return {
-        success: successCount > 0,
-        message: `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
+        success: Boolean((data as any).success) || successCount > 0,
+        message: (data as any).message || `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
         results,
       };
     },
