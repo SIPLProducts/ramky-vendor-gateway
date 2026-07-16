@@ -22,7 +22,7 @@ if [[ ! -f "$MW_ENV" ]]; then
 PORT=${MIDDLEWARE_PORT}
 # Optional JSON parser cap. Leave unset for unbounded middleware parser behavior;
 # nginx/SAP may still enforce their own request-size limits.
-# MIDDLEWARE_BODY_LIMIT=1gb
+# MIDDLEWARE_BODY_LIMIT=<size-if-you-intentionally-want-a-cap>
 MIDDLEWARE_SHARED_SECRET=${MIDDLEWARE_SHARED_SECRET}
 
 # --- SAP endpoints (EDIT THESE) ---
