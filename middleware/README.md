@@ -42,8 +42,8 @@ PORT=3002
 MIDDLEWARE_SHARED_SECRET=<long-random-string>      # must match SAP_MIDDLEWARE_KEY in Lovable Cloud
 SAP_BP_API_URL=http://10.200.1.2:8000/vendor/bp/create?sap-client=300
 SAP_DMS_API_URL=http://10.200.1.2:8000/vendor/bp/create?sap-client=300
-SAP_BP_USERNAME=22000208
-SAP_BP_PASSWORD=Nani@1432
+SAP_BP_USERNAME=<sap-username>
+SAP_BP_PASSWORD=<sap-password>
 SAP_REQUEST_TIMEOUT_MS=30000
 CORS_ORIGINS=*
 ALLOW_INSECURE_TLS=0    # set to 1 only if SAP uses a self-signed cert
