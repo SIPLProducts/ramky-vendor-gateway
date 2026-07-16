@@ -346,7 +346,7 @@ serve(async (req) => {
             if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
             const bodyStr = JSON.stringify(payload);
 
-            // Try each candidate path until one responds with non-404. Stick to the first working one for subsequent batches.
+            // Try each candidate path until one responds with non-404. Stick to the first working one for subsequent documents.
             const urlsToTry = workingDmsUrl ? [workingDmsUrl] : [...dmsCandidateUrls];
             let res: Response | null = null;
             let text = "";
@@ -418,7 +418,7 @@ serve(async (req) => {
             const firstErr = rows.find((r: any) => r?.MSGTYP && r.MSGTYP !== "S");
 
             if (batchOk) {
-              uploadedCount += rows.filter((r: any) => r?.MSGTYP === "S").length;
+              uploadedCount += 1;
             } else {
               documentErrors++;
               if (res.ok && firstErr?.MSG) {
