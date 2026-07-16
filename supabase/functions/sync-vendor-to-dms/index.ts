@@ -388,6 +388,7 @@ serve(async (req) => {
             }
 
             let inner: any = null;
+            let middlewareEnvelope: any = null;
             try {
               const parsed = JSON.parse(text);
               if (parsed && typeof parsed === "object" && parsed.code === "PAYLOAD_TOO_LARGE") {
@@ -396,6 +397,9 @@ serve(async (req) => {
                 failedDocuments.push({ fileName, filePath, status: res.status, url: workingDmsUrl || undefined, message: lastErrorMessage });
                 continue;
               }
+              middlewareEnvelope = parsed && typeof parsed === "object" && "sapResponse" in parsed
+                ? parsed
+                : null;
               inner = parsed && typeof parsed === "object" && "sapResponse" in parsed
                 ? parsed.sapResponse
                 : parsed;
@@ -408,7 +412,9 @@ serve(async (req) => {
               : (inner && typeof inner === "object" ? [inner] : []);
             allSapRows.push(...rows);
 
-            const batchOk = res.ok && rows.length > 0 && rows.every((r: any) => r?.MSGTYP === "S");
+            const upstreamOk = middlewareEnvelope ? middlewareEnvelope.ok !== false : res.ok;
+            const effectiveStatus = middlewareEnvelope?.sapStatus || res.status;
+            const batchOk = res.ok && upstreamOk && rows.length > 0 && rows.every((r: any) => r?.MSGTYP === "S");
             const firstErr = rows.find((r: any) => r?.MSGTYP && r.MSGTYP !== "S");
 
             if (batchOk) {
@@ -417,12 +423,13 @@ serve(async (req) => {
               documentErrors++;
               if (res.ok && firstErr?.MSG) {
                 lastErrorMessage = `SAP DMS error for ${fileName}: ${firstErr.MSG}`;
-              } else if (!res.ok) {
-                lastErrorMessage = `DMS upload failed (HTTP ${res.status}) for ${fileName}: ${text.slice(0, 200)}`;
+              } else if (!res.ok || !upstreamOk) {
+                const preview = typeof inner === "string" ? inner.slice(0, 200) : text.slice(0, 200);
+                lastErrorMessage = `DMS upload failed (HTTP ${effectiveStatus}) for ${fileName}: ${preview}`;
               } else {
                 lastErrorMessage = `SAP DMS returned no success rows for ${fileName}`;
               }
-              failedDocuments.push({ fileName, filePath, status: res.status, url: workingDmsUrl || undefined, message: lastErrorMessage });
+              failedDocuments.push({ fileName, filePath, status: effectiveStatus, url: workingDmsUrl || undefined, message: lastErrorMessage });
             }
           } catch (e: any) {
             documentErrors++;
