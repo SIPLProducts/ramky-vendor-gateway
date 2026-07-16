@@ -57,10 +57,11 @@ if (!SHARED_SECRET) {
   console.warn("[WARN] MIDDLEWARE_SHARED_SECRET is not set — refusing all authenticated requests.");
 }
 
-const MIDDLEWARE_VERSION = "dms-large-upload-v4";
+const MIDDLEWARE_VERSION = "dms-sequential-upload-v5";
 const app = express();
 app.use(helmet());
-const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || "500mb";
+const BODY_LIMIT = process.env.MIDDLEWARE_BODY_LIMIT || Infinity;
+const BODY_LIMIT_LABEL = Number.isFinite(BODY_LIMIT) ? `${BODY_LIMIT}` : (process.env.MIDDLEWARE_BODY_LIMIT || "unbounded");
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
 
@@ -68,13 +69,12 @@ app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
 // Registered as a 4-arg error handler AFTER body parsers so Express routes it here.
 app.use((err, _req, res, next) => {
   if (err && (err.type === "entity.too.large" || err.status === 413 || err.statusCode === 413 || err.name === "PayloadTooLargeError")) {
-    console.error(`[413] Payload exceeded ${BODY_LIMIT}. Raise MIDDLEWARE_BODY_LIMIT and restart.`);
+    console.error(`[413] Payload exceeded configured middleware body limit (${BODY_LIMIT_LABEL}).`);
     return res.status(413).json({
       ok: false,
-      error: `Payload too large. Current middleware body limit is ${BODY_LIMIT}. ` +
-             `Increase MIDDLEWARE_BODY_LIMIT in middleware .env (e.g. 1gb) and restart, ` +
-             `or reduce the size/number of documents in a single upload.`,
-      bodyLimit: BODY_LIMIT,
+      error: `Payload too large at middleware parser. Current middleware body limit is ${BODY_LIMIT_LABEL}. ` +
+             `If this value is unbounded, the 413 is from nginx or the upstream SAP endpoint instead.`,
+      bodyLimit: BODY_LIMIT_LABEL,
       middlewareVersion: MIDDLEWARE_VERSION,
       code: "PAYLOAD_TOO_LARGE",
     });
@@ -310,7 +310,7 @@ app.get("/health", (_req, res) => {
     service: "sharvi-sap-middleware",
     sapTarget: SAP_BP_API_URL ? new URL(SAP_BP_API_URL).host : null,
     middlewareVersion: MIDDLEWARE_VERSION,
-    bodyLimit: BODY_LIMIT,
+    bodyLimit: BODY_LIMIT_LABEL,
     dmsEndpoint: "/sap/dms/upload",
     availableEndpoints: [
       "GET /health",
@@ -509,7 +509,7 @@ app.use((req, res) => {
     ok: false,
     error: `No route for ${req.method} ${req.originalUrl}`,
     middlewareVersion: MIDDLEWARE_VERSION,
-    bodyLimit: BODY_LIMIT,
+    bodyLimit: BODY_LIMIT_LABEL,
     availableEndpoints: [
       "GET /health",
       "POST /sap/bp/create",
@@ -526,7 +526,7 @@ app.listen(PORT, () => {
   console.log(`========================================`);
   console.log(`Sharvi SAP middleware listening on :${PORT}`);
   console.log(`Middleware build: ${MIDDLEWARE_VERSION}`);
-  console.log(`Body limit: ${BODY_LIMIT} (override with MIDDLEWARE_BODY_LIMIT in .env)`);
+  console.log(`Body limit: ${BODY_LIMIT_LABEL} (set MIDDLEWARE_BODY_LIMIT only if you intentionally want a parser cap)`);
   console.log(`========================================`);
   console.log(`SAP target: ${SAP_BP_API_URL || "(not configured)"}`);
   console.log(`CORS origins: ${CORS_ORIGINS.join(", ")}`);
