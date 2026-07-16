@@ -79,6 +79,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     () => customRoleNames.some((n) => CROSS_TENANT_ROLE_NAMES.has(n)),
     [customRoleNames],
   );
+  const isCustomAdmin = useMemo(
+    () => customRoleNames.some((n) => ADMIN_CUSTOM_ROLE_NAMES.has(n)),
+    [customRoleNames],
+  );
+  const isSuperAdmin = isBuiltInAdmin || isCustomAdmin;
   const isScmManager = useMemo(
     () => customRoleNames.some((n) => n === 'scm co'),
     [customRoleNames],
