@@ -26,36 +26,25 @@ function ok(body: any) {
   });
 }
 
-const DOC_NAME_MAP: Record<string, string> = {
-  pan_card: "pan",
-  gst_certificate: "gst",
-  gst_self_declaration: "gst_self_declaration",
-  msme_certificate: "msme",
-  cancelled_cheque: "bank_cheque1",
-  cancelled_cheque_2: "bank_cheque2",
-  financial_docs: "financials",
-  dealership_certificate: "dealership",
-  iec_certificate: "iec",
-  swift_iban_proof: "swift_iban",
-  incorporation_certificate: "incorporation",
-  other: "other",
-};
+const DMS_CANDIDATE_PATHS = ["/sap/dms/upload", "/sap/bp/create"];
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const DMS_BATCH_MAX_BYTES = 1 * 1024 * 1024; // Keep each middleware request safely below common proxy/parser limits.
-// DMS payload is routed through the existing working middleware route.
-// The middleware forwards whatever JSON body it receives to the SAP target,
-// and SAP behavior is determined by the payload shape (BP_LIFNR + FILE_UPLOAD),
-// not by the middleware path. /sap/dms/upload is kept only as an optional
-// compatibility path for newer middleware builds that expose it.
-const DMS_CANDIDATE_PATHS = ["/sap/bp/create", "/sap/dms/upload"];
+type DocumentFailure = {
+  fileName?: string | null;
+  filePath?: string | null;
+  status?: number;
+  url?: string;
+  message: string;
+};
 
 type DmsResult = {
   BP_LIFNR: string;
   success: boolean;
   message: string;
+  attemptedCount: number;
   uploadedCount: number;
+  failedCount: number;
   skipped: string[];
+  failedDocuments: DocumentFailure[];
   sap?: any;
   sapRows?: any[];
 };
@@ -116,22 +105,6 @@ function estimateUploadBytes(upload: any): number {
 
 function formatMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
-function parseSizeToBytes(value: unknown): number | null {
-  if (typeof value !== "string") return null;
-  const match = value.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/);
-  if (!match) return null;
-  const n = Number(match[1]);
-  const unit = match[2] || "b";
-  const factors: Record<string, number> = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 };
-  return Math.floor(n * factors[unit]);
-}
-
-function middlewareMajorVersion(version: unknown): number | null {
-  if (typeof version !== "string") return null;
-  const match = version.match(/dms-large-upload-v(\d+)/i);
-  return match ? Number(match[1]) : null;
 }
 
 async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health: any; error?: string }> {
