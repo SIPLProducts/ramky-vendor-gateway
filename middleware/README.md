@@ -150,10 +150,7 @@ If the middleware returns `Cannot POST /sap/dms/upload` (HTML 404), the running 
    cd "D:\middleware (2)\middleware"
    ```
 3. Copy the new `server.js` here (overwrite the existing one).
-4. (Optional) In `.env`, set a higher limit if you upload very large bundles:
-   ```
-   MIDDLEWARE_BODY_LIMIT=1gb
-   ```
+4. Remove `MIDDLEWARE_BODY_LIMIT` from `.env` unless you intentionally want the middleware parser to enforce a cap.
 5. Start fresh:
    ```powershell
    node server.js
