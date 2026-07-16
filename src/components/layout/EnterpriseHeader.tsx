@@ -37,10 +37,10 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
     <header className="h-14 border-b bg-card/80 backdrop-blur-md px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 shadow-enterprise-sm">
       <div className="flex items-center gap-4">
         <Link to="/" className="flex items-center gap-3">
-          <img 
-            src={ramkyLogo} 
-            alt="Ramky" 
-            className="h-8 w-auto"
+          <img
+            src={ramkyLogo}
+            alt="Ramky"
+            className="h-10 w-auto object-contain"
           />
           <div className="hidden sm:block">
             <span className="text-sm font-semibold text-foreground">Vendor Portal</span>
