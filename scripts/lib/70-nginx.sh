@@ -33,7 +33,10 @@ server {
     root ${FRONTEND_DIR}/dist;
     index index.html;
 
-    client_max_body_size 500M;
+    # Do not cap request body size in nginx; DMS uploads are processed
+    # document-by-document by the application, while upstream systems may
+    # still enforce their own physical limits.
+    client_max_body_size 0;
 
     access_log ${LOGS_DIR}/access.log;
     error_log  ${LOGS_DIR}/error.log;
@@ -51,7 +54,9 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 120s;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_connect_timeout 120s;
     }
 
     # ---- Supabase Kong gateway (REST, Auth, Storage, Realtime, Functions) ----
@@ -64,7 +69,9 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 120s;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_connect_timeout 120s;
     }
 
     # ---- Supabase Studio (admin UI, basic-auth protected) ----

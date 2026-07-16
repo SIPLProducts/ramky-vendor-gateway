@@ -24,6 +24,7 @@ SAP credentials never leave your network.
 |--------|-------------------|-------------------------------------------------------------------------|
 | GET    | `/health`         | Liveness probe. No auth required.                                       |
 | POST   | `/sap/bp/create`  | Forwards the JSON array to SAP Business Partner Create. Returns verbatim.|
+| POST   | `/sap/dms/upload` | Forwards one SAP DMS document upload payload. Returns SAP response.      |
 | POST   | `/sap/proxy`      | Generic forwarder for future SAP endpoints. Body: `{ url, method, headers, body, useBasicAuth }`. Target host must match the configured SAP host. |
 
 All non-health endpoints require header:
@@ -40,8 +41,9 @@ Copy `.env.example` to `.env` and fill in:
 PORT=3002
 MIDDLEWARE_SHARED_SECRET=<long-random-string>      # must match SAP_MIDDLEWARE_KEY in Lovable Cloud
 SAP_BP_API_URL=http://10.200.1.2:8000/vendor/bp/create?sap-client=300
-SAP_BP_USERNAME=22000208
-SAP_BP_PASSWORD=Nani@1432
+SAP_DMS_API_URL=http://10.200.1.2:8000/vendor/bp/create?sap-client=300
+SAP_BP_USERNAME=<sap-username>
+SAP_BP_PASSWORD=<sap-password>
 SAP_REQUEST_TIMEOUT_MS=30000
 CORS_ORIGINS=*
 ALLOW_INSECURE_TLS=0    # set to 1 only if SAP uses a self-signed cert
@@ -104,9 +106,16 @@ curl -s -X POST http://localhost:3002/sap/bp/create \
 - **TLS errors against SAP** → set `ALLOW_INSECURE_TLS=1` (only if SAP uses a self-signed cert).
 - **403 from `/sap/proxy`** → target URL host doesn't match `SAP_BP_API_URL` host.
 
-## Redeploy after body-limit / DMS changes
+## Redeploy after DMS upload-path changes
 
-If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running middleware is using an older body limit. The current default is **500 MB**. Redeploy:
+The portal sends only vendor IDs to `sync-vendor-to-dms`; the function downloads documents server-side and forwards each document to this middleware sequentially. This avoids browser-to-function giant base64 payloads and removes any app-level total upload cap.
+
+If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, first identify which hop returned it:
+- middleware JSON response with `middlewareVersion` → middleware parser received a payload larger than a configured `MIDDLEWARE_BODY_LIMIT`.
+- nginx HTML response → nginx rejected the request before middleware/SAP handled it.
+- SAP response/body → SAP-side proxy or SAP rejected the individual document upload.
+
+Redeploy the current middleware build:
 
 1. Stop the Windows service (or the `node server.js` process).
 2. Replace `server.js` (and `package.json` if changed) with the latest from this repo in `D:\middleware (2)\middleware`.
@@ -116,17 +125,17 @@ If you see `HTTP 413 PayloadTooLargeError` from `/sap/dms/upload`, the running m
    ```
    curl http://localhost:3002/health
    ```
-   The response should include `"bodyLimit": "500mb"` and `"middlewareVersion": "dms-large-upload-v4"`.
+   The response should include `"middlewareVersion": "dms-sequential-upload-v5"` and `"bodyLimit": "unbounded"` unless you intentionally configured `MIDDLEWARE_BODY_LIMIT`.
 6. Re-run the DMS upload from the portal.
 
-Optional: override with `MIDDLEWARE_BODY_LIMIT=1gb` in `.env` for very large document batches. The cloud DMS sync also splits documents into ~8 MB batches automatically, so single requests should rarely hit the limit.
+Optional: set `MIDDLEWARE_BODY_LIMIT` in `.env` only if you intentionally want a parser cap. Leaving it unset keeps the middleware parser unbounded; nginx and SAP can still enforce their own limits.
 
 
 ## Repeated 413 "request entity too large" fix
 
 If you keep seeing `PayloadTooLargeError: request entity too large` on Windows, it means an **old `server.js` is still running**. The new build prints a version banner on startup — if you don't see it, you're running the old file.
 
-The browser DevTools payload for `sync-vendor-to-dms` shows the exact SAP DMS shape: `{ "BP_LIFNR": "...", "FILE_UPLOAD": [{ "FILE": "<base64>", "FILE_PATH": "..." }] }`. Lovable Cloud forwards that payload to this middleware on `POST /sap/dms/upload`, which calls SAP and returns SAP's response verbatim under `sapResponse`.
+The browser DevTools payload for `sync-vendor-to-dms` should now show only `{ "vendorIds": [...] }`. If it still shows `{ "BP_LIFNR": "...", "FILE_UPLOAD": [...] }`, the frontend is stale and must be redeployed. The Edge Function forwards each document to this middleware on `POST /sap/dms/upload`, which calls SAP and returns SAP's response verbatim under `sapResponse`.
 
 If the middleware returns `Cannot POST /sap/dms/upload` (HTML 404), the running `server.js` is OLD. Restart with the latest file — the new build returns a JSON 404 listing `availableEndpoints` and includes `middlewareVersion` in the response, and `/health` lists `POST /sap/dms/upload` under `availableEndpoints`.
 
@@ -141,24 +150,21 @@ If the middleware returns `Cannot POST /sap/dms/upload` (HTML 404), the running 
    cd "D:\middleware (2)\middleware"
    ```
 3. Copy the new `server.js` here (overwrite the existing one).
-4. (Optional) In `.env`, set a higher limit if you upload very large bundles:
-   ```
-   MIDDLEWARE_BODY_LIMIT=1gb
-   ```
+4. Remove `MIDDLEWARE_BODY_LIMIT` from `.env` unless you intentionally want the middleware parser to enforce a cap.
 5. Start fresh:
    ```powershell
    node server.js
    ```
    You **must** see:
    ```
-   Middleware build: dms-large-upload-v4
-   Body limit: 500mb (override with MIDDLEWARE_BODY_LIMIT in .env)
+   Middleware build: dms-sequential-upload-v5
+   Body limit: unbounded (set MIDDLEWARE_BODY_LIMIT only if you intentionally want a parser cap)
    ```
 6. Verify from another terminal:
    ```powershell
    curl http://localhost:3002/health
    ```
-   The JSON response must include `"middlewareVersion": "dms-large-upload-v4"` and `"bodyLimit": "500mb"` (or your override).
+   The JSON response must include `"middlewareVersion": "dms-sequential-upload-v5"` and `"bodyLimit": "unbounded"` (or your intentional override).
 7. Confirm the DMS endpoint accepts the SAP payload shape:
    ```powershell
    curl -Method POST http://localhost:3002/sap/dms/upload `

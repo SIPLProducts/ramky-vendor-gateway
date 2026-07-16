@@ -20,7 +20,9 @@ if [[ ! -f "$MW_ENV" ]]; then
   MIDDLEWARE_SHARED_SECRET="$(openssl rand -hex 32)"
   cat > "$MW_ENV" <<EOF
 PORT=${MIDDLEWARE_PORT}
-MIDDLEWARE_BODY_LIMIT=500mb
+# Optional JSON parser cap. Leave unset for unbounded middleware parser behavior;
+# nginx/SAP may still enforce their own request-size limits.
+# MIDDLEWARE_BODY_LIMIT=<size-if-you-intentionally-want-a-cap>
 MIDDLEWARE_SHARED_SECRET=${MIDDLEWARE_SHARED_SECRET}
 
 # --- SAP endpoints (EDIT THESE) ---
