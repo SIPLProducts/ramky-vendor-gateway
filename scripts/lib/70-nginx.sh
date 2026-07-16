@@ -74,6 +74,45 @@ server {
         proxy_connect_timeout 120s;
     }
 
+    # ---- GoTrue auth passthrough (needed for password reset / verify links
+    #      generated with the bare site URL, e.g. /auth/v1/verify?token=...) ----
+    location /auth/ {
+        proxy_pass http://127.0.0.1:${KONG_HTTP_PORT}/auth/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_connect_timeout 120s;
+    }
+
+    # ---- PostgREST + Storage passthrough (for parity with hosted paths) ----
+    location /rest/ {
+        proxy_pass http://127.0.0.1:${KONG_HTTP_PORT}/rest/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_connect_timeout 120s;
+    }
+
+    location /storage/ {
+        proxy_pass http://127.0.0.1:${KONG_HTTP_PORT}/storage/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_connect_timeout 120s;
+    }
+
     # ---- Supabase Studio (admin UI, basic-auth protected) ----
     location /studio/ {
         auth_basic           "Supabase Studio";
