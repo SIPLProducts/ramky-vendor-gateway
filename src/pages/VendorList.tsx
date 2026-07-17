@@ -363,24 +363,18 @@ export default function VendorList() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="validation_pending">Validation Pending</SelectItem>
-                <SelectItem value="validation_failed">Validation Failed</SelectItem>
                 <SelectItem value="buyer_review">Buyer Review</SelectItem>
-                <SelectItem value="scm_manager_review">SCM CO</SelectItem>
-                <SelectItem value="scm_head_review">SCM Head Review</SelectItem>
-                <SelectItem value="finance_1_review">Finance 1 Review</SelectItem>
-                <SelectItem value="finance_2_review">Finance 2 Review</SelectItem>
-                <SelectItem value="ceo_office_review">CEO Office Review</SelectItem>
-                <SelectItem value="pending_sap_sync">Pending SAP Sync</SelectItem>
+                <SelectItem value="scm_co">SCM CO</SelectItem>
+                <SelectItem value="scm_head">SCM Head</SelectItem>
+                <SelectItem value="finance_1">Finance 1</SelectItem>
+                <SelectItem value="finance_2">Finance 2</SelectItem>
+                <SelectItem value="ceo_office">CEO Office</SelectItem>
+                <SelectItem value="sap_team">SAP Team</SelectItem>
+                <SelectItem value="sap_sync_pending">SAP Sync Pending</SelectItem>
+                <SelectItem value="dms_pending">DMS Pending</SelectItem>
                 <SelectItem value="sap_synced">SAP Synced</SelectItem>
-                <SelectItem value="returned_to_buyer">Returned to Buyer</SelectItem>
+                <SelectItem value="duplicate_closed">Duplicate & Closed</SelectItem>
                 <SelectItem value="returned_to_vendor">Returned to Vendor</SelectItem>
-                <SelectItem value="scm_manager_rejected">SCM CO</SelectItem>
-                <SelectItem value="scm_head_rejected">SCM Head Rejected</SelectItem>
-                <SelectItem value="finance_1_rejected">Finance 1 Rejected</SelectItem>
-                <SelectItem value="finance_2_rejected">Finance 2 Rejected</SelectItem>
-
               </SelectContent>
             </Select>
             <TenantCombobox
