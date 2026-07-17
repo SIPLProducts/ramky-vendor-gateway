@@ -99,6 +99,24 @@ type VendorStatus =
   | 'purchase_approved'
   | 'purchase_rejected';
 
+const STATUS_FILTER_GROUPS: Record<string, string[]> = {
+  draft: ['draft'],
+  buyer_review: ['submitted', 'validation_pending', 'validation_failed', 'buyer_review', 'returned_to_buyer'],
+  scm_co: ['scm_manager_review', 'scm_manager_rejected'],
+  scm_head: ['scm_head_review', 'scm_head_rejected'],
+  finance_1: ['finance_1_review', 'finance_1_rejected'],
+  finance_2: ['finance_2_review', 'finance_2_rejected'],
+  ceo_office: ['ceo_office_review', 'ceo_office_rejected'],
+  sap_team: ['pending_sap_sync'],
+  sap_sync_pending: ['pending_sap_sync'],
+  dms_pending: ['sap_synced'],
+  sap_synced: ['sap_synced', 'dms_synced'],
+  duplicate_closed: ['sap_team_rejected', 'sap_team_closed'],
+  returned_to_vendor: ['returned_to_vendor'],
+};
+
+
+
 
 export default function VendorList() {
   const { toast } = useToast();
