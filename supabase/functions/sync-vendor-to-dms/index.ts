@@ -101,13 +101,8 @@ function normalizeMiddlewareBase(raw: string): string {
   return rewriteContainerHost(v.replace(/\/+$/, ""));
 }
 
-function estimateUploadBytes(upload: any): number {
-  return (upload?.FILE?.length || 0) + (upload?.FILE_PATH?.length || 0) + 96;
-}
 
-function formatMb(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
+
 
 async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health: any; error?: string }> {
   const healthUrl = `${middlewareUrl}/health`;
