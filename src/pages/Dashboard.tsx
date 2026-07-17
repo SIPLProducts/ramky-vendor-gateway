@@ -64,6 +64,7 @@ const PENDING_STATUSES = new Set([
   'finance_2_review',
   'ceo_office_review',
   'pending_sap_sync',
+  'dms_sync_pending',
   'returned_to_vendor',
   'returned_to_buyer',
 ]);
@@ -164,7 +165,8 @@ export default function Dashboard() {
       let q = supabase
         .from('vendors')
         .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .neq('status', 'draft');
 
       if (fromIso) q = q.gte('created_at', fromIso);
       if (toIso) q = q.lte('created_at', toIso);
