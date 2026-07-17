@@ -677,29 +677,143 @@ export function useDMSSync() {
 
   return useMutation({
     mutationFn: async ({ vendorIds }: { vendorIds: string[] }) => {
-      // Send only vendor IDs. The Edge Function downloads documents server-side
-      // and uploads them sequentially, so large base64 payloads do not travel
-      // through the browser-to-function request path.
-      const { data, error } = await supabase.functions.invoke('sync-vendor-to-dms', {
-        body: { vendorIds },
-      });
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error('No response from DMS sync function');
+      // Build the full SAP DMS payload in the browser so the exact
+      // { BP_LIFNR, FILE_UPLOAD: [{ FILE, FILE_PATH, FILE_NAME }, ...] }
+      // is visible under Network → sync-vendor-to-dms → Payload.
+      const { toDmsPath, blobToBase64 } = await import('@/lib/dmsPath');
 
-      const results = Array.isArray((data as any).results) ? (data as any).results : [];
-      if (results.length === 0) {
-        return {
-          success: false,
-          message: (data as any).message || 'No DMS sync results returned',
-          results,
-        };
+      const aggregated: any[] = [];
+      let anySuccess = false;
+
+      for (const vendorId of vendorIds) {
+        const { data: vendor, error: vErr } = await supabase
+          .from('vendors')
+          .select('id, sap_vendor_code')
+          .eq('id', vendorId)
+          .maybeSingle();
+
+        if (vErr || !vendor) {
+          aggregated.push({
+            BP_LIFNR: '',
+            success: false,
+            message: vErr?.message || 'Vendor not found',
+            attemptedCount: 0,
+            uploadedCount: 0,
+            failedCount: 0,
+            skipped: [],
+            failedDocuments: [],
+          });
+          continue;
+        }
+
+        if (!vendor.sap_vendor_code) {
+          aggregated.push({
+            BP_LIFNR: '',
+            success: false,
+            message: 'Vendor not yet synced to SAP (missing BP_LIFNR)',
+            attemptedCount: 0,
+            uploadedCount: 0,
+            failedCount: 0,
+            skipped: [],
+            failedDocuments: [],
+          });
+          continue;
+        }
+
+        const { data: docs, error: dErr } = await supabase
+          .from('vendor_documents')
+          .select('file_name, file_path')
+          .eq('vendor_id', vendorId);
+
+        if (dErr) {
+          aggregated.push({
+            BP_LIFNR: vendor.sap_vendor_code,
+            success: false,
+            message: `Failed to load documents: ${dErr.message}`,
+            attemptedCount: 0,
+            uploadedCount: 0,
+            failedCount: 0,
+            skipped: [],
+            failedDocuments: [],
+          });
+          continue;
+        }
+
+        const fileUpload: { FILE: string; FILE_PATH: string; FILE_NAME: string }[] = [];
+        const failedDocuments: any[] = [];
+        const skipped: string[] = [];
+
+        for (const d of docs || []) {
+          const fileName = d.file_name || 'document';
+          if (!d.file_path) {
+            skipped.push(`${fileName} (missing file path)`);
+            continue;
+          }
+          try {
+            const { data: blob, error: dlErr } = await supabase.storage
+              .from('vendor-documents')
+              .download(d.file_path);
+            if (dlErr || !blob) {
+              failedDocuments.push({
+                fileName,
+                filePath: toDmsPath(d.file_path),
+                message: `Download failed: ${dlErr?.message || 'unknown error'}`,
+              });
+              continue;
+            }
+            const b64 = await blobToBase64(blob);
+            fileUpload.push({
+              FILE: b64,
+              FILE_PATH: toDmsPath(d.file_path),
+              FILE_NAME: fileName,
+            });
+          } catch (e: any) {
+            failedDocuments.push({
+              fileName,
+              filePath: toDmsPath(d.file_path),
+              message: e?.message || 'Download error',
+            });
+          }
+        }
+
+        const payload = { BP_LIFNR: vendor.sap_vendor_code, FILE_UPLOAD: fileUpload };
+
+        const { data, error } = await supabase.functions.invoke('sync-vendor-to-dms', {
+          body: { vendorId, payload },
+        });
+
+        if (error) {
+          aggregated.push({
+            BP_LIFNR: vendor.sap_vendor_code,
+            success: false,
+            message: error.message,
+            attemptedCount: fileUpload.length,
+            uploadedCount: 0,
+            failedCount: fileUpload.length,
+            skipped,
+            failedDocuments,
+            dmsPayload: payload,
+          });
+          continue;
+        }
+
+        const results = Array.isArray((data as any)?.results) ? (data as any).results : [];
+        const first = results[0] || {};
+        if (first.success) anySuccess = true;
+        aggregated.push({
+          ...first,
+          BP_LIFNR: first.BP_LIFNR || vendor.sap_vendor_code,
+          skipped: [...(first.skipped || []), ...skipped],
+          failedDocuments: [...(first.failedDocuments || []), ...failedDocuments],
+          dmsPayload: first.dmsPayload || payload,
+        });
       }
 
-      const successCount = results.filter((r) => r.success).length;
+      const successCount = aggregated.filter((r) => r.success).length;
       return {
-        success: Boolean((data as any).success) || successCount > 0,
-        message: (data as any).message || `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
-        results,
+        success: anySuccess || successCount > 0,
+        message: `${successCount}/${vendorIds.length} vendor(s) uploaded to DMS`,
+        results: aggregated,
       };
     },
     onSuccess: (result: any) => {
