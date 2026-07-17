@@ -135,14 +135,10 @@ function isDomesticStepComplete(
       return true;
     }
     case 5: {
-      // Financial & Infrastructure step has no schema-required fields, but for
-      // the visual "completed" tick we require the user to have entered at
-      // least one meaningful value; otherwise a fresh draft would show a tick.
-      const f = data.financial;
-      const i = data.infrastructure;
-      const anyFinancial = nonEmpty(f?.turnoverYear1) || nonEmpty(f?.turnoverYear2) || nonEmpty(f?.turnoverYear3) || nonEmpty(f?.creditPeriodExpected);
-      const anyInfra = nonEmpty(i?.rawMaterialsUsed) || nonEmpty(i?.machineryAvailability) || nonEmpty(i?.powerSupply) || nonEmpty(i?.manpower) || nonEmpty(i?.productionCapacity) || (i?.productTypes?.length ?? 0) > 0;
-      return anyFinancial || anyInfra;
+      // Financial & Infrastructure has no mandatory fields. Its own tab
+      // handles format validation on Continue, so blank values must not block
+      // final submit.
+      return true;
     }
     default:
       return true;
