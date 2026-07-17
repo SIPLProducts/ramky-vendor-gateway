@@ -405,34 +405,70 @@ serve(async (req) => {
           const upstreamOk = middlewareEnvelope ? middlewareEnvelope.ok !== false : res.ok;
           const effectiveStatus = middlewareEnvelope?.sapStatus || res.status;
 
-          // Pair each response row with its file by index; success = MSGTYP === "S".
-          for (let idx = 0; idx < fileMeta.length; idx++) {
-            const m = fileMeta[idx];
-            const row = rows[idx];
-            if (row && row.MSGTYP === "S") {
-              uploadedCount += 1;
-            } else if (row) {
-              failedDocuments.push({
-                fileName: m.fileName,
-                filePath: m.filePath,
-                status: effectiveStatus,
-                url: workingDmsUrl || undefined,
-                message: `SAP DMS error for ${m.fileName}: ${row?.MSG || row?.LONG_MSG || "unknown error"}`,
-              });
+          const httpFailure = !res.ok || !upstreamOk;
+          const allSuccess = rows.length > 0 && rows.every((r) => r?.MSGTYP === "S");
+          sapRow = rows.find((r) => r?.MSGTYP === "S") || rows[0] || null;
+
+          if (rows.length === 0) {
+            // No rows returned. Trust HTTP status.
+            if (!httpFailure) {
+              uploadedCount = attemptedCount;
             } else {
-              failedDocuments.push({
-                fileName: m.fileName,
-                filePath: m.filePath,
-                status: effectiveStatus,
-                url: workingDmsUrl || undefined,
-                message: !res.ok || !upstreamOk
-                  ? `DMS upload failed (HTTP ${effectiveStatus}) for ${m.fileName}: ${text.slice(0, 200)}`
-                  : `SAP DMS returned no row for ${m.fileName}`,
-              });
+              for (const m of fileMeta) {
+                failedDocuments.push({
+                  fileName: m.fileName,
+                  filePath: m.filePath,
+                  status: effectiveStatus,
+                  url: workingDmsUrl || undefined,
+                  message: `DMS upload failed (HTTP ${effectiveStatus}): ${text.slice(0, 200)}`,
+                });
+              }
+            }
+          } else if (rows.length < fileMeta.length) {
+            // Aggregate response: one row for the whole batch.
+            if (allSuccess && !httpFailure) {
+              uploadedCount = attemptedCount;
+            } else {
+              const failRow = rows.find((r) => r?.MSGTYP !== "S") || rows[0];
+              const failMsg = failRow?.MSG || failRow?.LONG_MSG || `HTTP ${effectiveStatus}`;
+              for (const m of fileMeta) {
+                failedDocuments.push({
+                  fileName: m.fileName,
+                  filePath: m.filePath,
+                  status: effectiveStatus,
+                  url: workingDmsUrl || undefined,
+                  message: `SAP DMS error for ${m.fileName}: ${failMsg}`,
+                });
+              }
+            }
+          } else {
+            // Per-file rows (rows.length >= fileMeta.length): pair by index.
+            for (let idx = 0; idx < fileMeta.length; idx++) {
+              const m = fileMeta[idx];
+              const row = rows[idx];
+              if (row && row.MSGTYP === "S") {
+                uploadedCount += 1;
+              } else if (row) {
+                failedDocuments.push({
+                  fileName: m.fileName,
+                  filePath: m.filePath,
+                  status: effectiveStatus,
+                  url: workingDmsUrl || undefined,
+                  message: `SAP DMS error for ${m.fileName}: ${row?.MSG || row?.LONG_MSG || "unknown error"}`,
+                });
+              } else {
+                failedDocuments.push({
+                  fileName: m.fileName,
+                  filePath: m.filePath,
+                  status: effectiveStatus,
+                  url: workingDmsUrl || undefined,
+                  message: httpFailure
+                    ? `DMS upload failed (HTTP ${effectiveStatus}) for ${m.fileName}: ${text.slice(0, 200)}`
+                    : `SAP DMS returned no row for ${m.fileName}`,
+                });
+              }
             }
           }
-
-          sapRow = rows.find((r) => r?.MSGTYP === "S") || rows[0] || null;
 
           if (failedDocuments.length === 0 && uploadedCount === attemptedCount) {
             success = true;
@@ -441,6 +477,7 @@ serve(async (req) => {
             success = false;
             message = `${uploadedCount}/${attemptedCount} document(s) uploaded to DMS`;
           }
+
         }
       }
 
