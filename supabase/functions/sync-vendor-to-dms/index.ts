@@ -47,7 +47,9 @@ type DmsResult = {
   failedDocuments: DocumentFailure[];
   sap?: any;
   sapRows?: any[];
+  dmsPayload?: { BP_LIFNR: string; FILE_UPLOAD: any[] } | null;
 };
+
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = new Uint8Array(await blob.arrayBuffer());
