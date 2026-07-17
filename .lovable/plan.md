@@ -1,7 +1,17 @@
-## Changes in `src/pages/Dashboard.tsx`
+## Fix "DMS Pending" filter in All Vendors screen
 
-1. **Pending count fix** — Add `'dms_sync_pending'` to `PENDING_STATUSES` so vendors in that state are counted under Pending Applications and appear when the Pending card is selected.
+**File:** `src/pages/VendorList.tsx`
 
-2. **Show only submitted vendors** — Add `.neq('status', 'draft')` to the vendors query so Draft (not-yet-submitted) records are excluded for every role. Only submitted vendors appear in the table, the four count cards, and the Excel export.
+**Problem:** Selecting the "DMS Pending" status filter shows nothing even though rows with `dms_sync_pending` exist in the table. The filter group currently maps `dms_pending` to `['sap_synced']` only.
+
+**Change (line 112):**
+
+```ts
+dms_pending: ['dms_sync_pending', 'sap_synced'],
+```
+
+Include both statuses so:
+- New rows using `dms_sync_pending` (awaiting DMS sync after SAP sync) are matched.
+- Legacy rows still stored as `sap_synced` (SAP done, DMS pending) remain visible.
 
 No other files change.
