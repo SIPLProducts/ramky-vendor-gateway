@@ -109,7 +109,7 @@ const STATUS_FILTER_GROUPS: Record<string, string[]> = {
   ceo_office: ['ceo_office_review', 'ceo_office_rejected'],
   sap_team: ['pending_sap_sync'],
   sap_sync_pending: ['pending_sap_sync'],
-  dms_pending: ['sap_synced'],
+  dms_pending: ['dms_sync_pending', 'sap_synced'],
   sap_synced: ['sap_synced', 'dms_synced'],
   duplicate_closed: ['sap_team_rejected', 'sap_team_closed'],
   returned_to_vendor: ['returned_to_vendor'],
