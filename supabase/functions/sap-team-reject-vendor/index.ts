@@ -74,6 +74,7 @@ serve(async (req) => {
         last_rejected_at: nowIso,
         last_rejection_comments: remarks,
         last_rejection_stage: "SAP_TEAM",
+        sap_duplicate_details: existingVendorText || null,
       } as any)
       .eq("id", vendorId);
 
