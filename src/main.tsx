@@ -41,11 +41,16 @@ async function clearServiceWorkers() {
 function notifyNewVersion() {
   import("sonner").then(({ toast }) => {
     toast.info("A new version is available", {
-      description: "Refreshing in 3 seconds to load the latest update…",
-      duration: 3000,
+      description: "Click Refresh to load the latest update.",
+      duration: Infinity,
+      action: {
+        label: "Refresh",
+        onClick: () => window.location.reload(),
+      },
     });
   });
 }
+
 
 function mount() {
   createRoot(document.getElementById("root")!).render(
