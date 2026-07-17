@@ -63,6 +63,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { z } from 'zod';
+import Swal from 'sweetalert2';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 
@@ -1081,32 +1082,53 @@ export default function AdminInvitations() {
                                 className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
                                 title="Delete on-behalf draft"
                                 onClick={async () => {
-                                  const ok = window.confirm(
-                                    'Delete this on-behalf draft? This removes the invitation and its draft vendor. This action cannot be undone.'
-                                  );
-                                  if (!ok) return;
+                                  const confirmRes = await Swal.fire({
+                                    title: 'Are you sure?',
+                                    text: 'This will permanently delete this on-behalf draft and its vendor record.',
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonText: 'Yes, delete',
+                                    cancelButtonText: 'Cancel',
+                                    confirmButtonColor: '#dc2626',
+                                    reverseButtons: true,
+                                  });
+                                  if (!confirmRes.isConfirmed) return;
                                   try {
                                     const vId = (invitation as any).vendor_id as string | null;
-                                    if (vId) {
-                                      const { error: vErr } = await supabase
-                                        .from('vendors')
-                                        .delete()
-                                        .eq('id', vId)
-                                        .eq('status', 'draft');
-                                      if (vErr) throw vErr;
-                                    }
+                                    // 1) Delete any draft vendor referencing this invitation
+                                    const orFilter = vId
+                                      ? `invitation_id.eq.${invitation.id},id.eq.${vId}`
+                                      : `invitation_id.eq.${invitation.id}`;
+                                    const { error: vDelErr } = await supabase
+                                      .from('vendors')
+                                      .delete()
+                                      .eq('status', 'draft')
+                                      .or(orFilter);
+                                    if (vDelErr) throw vDelErr;
+                                    // 2) Null out any leftover references from non-draft vendors
+                                    const { error: vNullErr } = await supabase
+                                      .from('vendors')
+                                      .update({ invitation_id: null } as any)
+                                      .eq('invitation_id', invitation.id);
+                                    if (vNullErr) throw vNullErr;
+                                    // 3) Delete the invitation
                                     const { error: iErr } = await supabase
                                       .from('vendor_invitations')
                                       .delete()
                                       .eq('id', invitation.id);
                                     if (iErr) throw iErr;
-                                    toast({ title: 'On-behalf draft deleted' });
                                     queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+                                    await Swal.fire({
+                                      icon: 'success',
+                                      title: 'Deleted',
+                                      timer: 1500,
+                                      showConfirmButton: false,
+                                    });
                                   } catch (e: any) {
-                                    toast({
+                                    await Swal.fire({
+                                      icon: 'error',
                                       title: 'Could not delete',
-                                      description: e?.message ?? String(e),
-                                      variant: 'destructive',
+                                      text: e?.message ?? String(e),
                                     });
                                   }
                                 }}
