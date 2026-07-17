@@ -64,6 +64,7 @@ const PENDING_STATUSES = new Set([
   'finance_2_review',
   'ceo_office_review',
   'pending_sap_sync',
+  'dms_sync_pending',
   'returned_to_vendor',
   'returned_to_buyer',
 ]);
