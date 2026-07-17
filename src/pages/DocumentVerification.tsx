@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '@/lib/dateFormat';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/hooks/useTenantContext';
@@ -633,7 +634,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                         </div>
                         {vendor.submitted_at && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Submitted: {new Date(vendor.submitted_at).toLocaleDateString('en-IN')}
+                            Submitted: {formatDate(vendor.submitted_at)}
                           </p>
                         )}
                       </div>
@@ -947,7 +948,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                         {doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {new Date(doc.uploaded_at).toLocaleDateString('en-IN')}
+                        {formatDate(doc.uploaded_at)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

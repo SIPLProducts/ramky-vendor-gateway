@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatDate } from '@/lib/dateFormat';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -252,7 +253,7 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
                       </Badge>
                       <span>{formatFileSize(doc.file_size)}</span>
                       <span>•</span>
-                      <span>{new Date(doc.uploaded_at).toLocaleDateString('en-IN')}</span>
+                      <span>{formatDate(doc.uploaded_at)}</span>
                     </div>
                   </div>
                 </div>
