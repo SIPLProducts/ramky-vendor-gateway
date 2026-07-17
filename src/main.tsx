@@ -41,11 +41,16 @@ async function clearServiceWorkers() {
 function notifyNewVersion() {
   import("sonner").then(({ toast }) => {
     toast.info("A new version is available", {
-      description: "Refreshing in 3 seconds to load the latest update…",
-      duration: 3000,
+      description: "Click Refresh to load the latest update.",
+      duration: Infinity,
+      action: {
+        label: "Refresh",
+        onClick: () => window.location.reload(),
+      },
     });
   });
 }
+
 
 function mount() {
   createRoot(document.getElementById("root")!).render(
@@ -83,17 +88,11 @@ if (shouldDisableSW) {
       });
     });
 
-    window.addEventListener("focus", () => {
-      navigator.serviceWorker
-        .getRegistrations()
-        .then((regs) => regs.forEach((r) => r.update()));
-    });
-
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      refreshing = true;
-      setTimeout(() => window.location.reload(), 800);
-    });
+    // Intentionally NOT re-checking SW on window focus and NOT auto-reloading
+    // on controllerchange. Auto-reload was causing the whole app to refresh
+    // when users switched tabs / minimized the browser, closing open modals
+    // and dropping unsaved form state. Users get a persistent toast (see
+    // notifyNewVersion) and refresh explicitly when they're ready.
   }
 }
+

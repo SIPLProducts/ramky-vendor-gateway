@@ -47,7 +47,9 @@ type DmsResult = {
   failedDocuments: DocumentFailure[];
   sap?: any;
   sapRows?: any[];
+  dmsPayload?: { BP_LIFNR: string; FILE_UPLOAD: any[] } | null;
 };
+
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = new Uint8Array(await blob.arrayBuffer());
@@ -99,13 +101,8 @@ function normalizeMiddlewareBase(raw: string): string {
   return rewriteContainerHost(v.replace(/\/+$/, ""));
 }
 
-function estimateUploadBytes(upload: any): number {
-  return (upload?.FILE?.length || 0) + (upload?.FILE_PATH?.length || 0) + 96;
-}
 
-function formatMb(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
+
 
 async function probeDmsMiddlewareHealth(middlewareUrl: string): Promise<{ health: any; error?: string }> {
   const healthUrl = `${middlewareUrl}/health`;
@@ -287,167 +284,166 @@ serve(async (req) => {
       const allSapRows: any[] = [];
       let attemptedCount = documents.length;
       let uploadedCount = 0;
+      let dmsPayloadForResponse: { BP_LIFNR: string; FILE_UPLOAD: any[] } | null = null;
+
+      // Materialize base64 for every document up-front so we can send one batched request.
+      const fileUpload: any[] = [];
+      const fileMeta: { fileName: string; filePath: string }[] = [];
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+        let fileBase64 = doc.fileBase64 as string | undefined;
+        const filePath = toDmsPath(doc.filePath || doc.storagePath || "");
+        const fileName = doc.fileName || filePath || `document-${i + 1}`;
+
+        if (!fileBase64 && doc.storagePath) {
+          try {
+            const { data: blob, error: dlErr } = await supabase.storage
+              .from("vendor-documents")
+              .download(doc.storagePath);
+            if (dlErr || !blob) {
+              const failure = `${fileName} (download failed${dlErr?.message ? `: ${dlErr.message}` : ""})`;
+              skipped.push(failure);
+              failedDocuments.push({ fileName, filePath, message: failure });
+              continue;
+            }
+            fileBase64 = await blobToBase64(blob);
+          } catch (e: any) {
+            const failure = `${fileName} (${e?.message || "download error"})`;
+            skipped.push(failure);
+            failedDocuments.push({ fileName, filePath, message: failure });
+            continue;
+          }
+        }
+
+        if (!fileBase64 || !filePath) {
+          const failure = `${fileName} (missing file content or path)`;
+          skipped.push(failure);
+          failedDocuments.push({ fileName, filePath, message: failure });
+          continue;
+        }
+
+        fileUpload.push({ FILE: fileBase64, FILE_PATH: filePath, FILE_NAME: fileName });
+        fileMeta.push({ fileName, filePath });
+      }
+
+      const batchPayload = { BP_LIFNR: vendor.sap_vendor_code, FILE_UPLOAD: fileUpload };
+      dmsPayloadForResponse = batchPayload;
+      attemptedCount = fileUpload.length;
 
       if (!dmsUrl) {
-        success = true;
+        success = attemptedCount > 0;
         uploadedCount = attemptedCount;
         message = `Simulated DMS upload (${attemptedCount} document${attemptedCount === 1 ? '' : 's'})`;
       } else if (attemptedCount === 0) {
         success = false;
         message = "No uploadable documents found for this vendor";
       } else {
-        let documentErrors = 0;
-        let lastErrorMessage = "";
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
+        const bodyStr = JSON.stringify(batchPayload);
+        console.log(`DMS batched payload BP_LIFNR=${batchPayload.BP_LIFNR} files=${attemptedCount} approxBytes=${bodyStr.length}`);
+
+        // Try each candidate endpoint in order until one responds with non-404.
+        let res: Response | null = null;
+        let text = "";
         let workingDmsUrl: string | null = null;
-
-        for (let i = 0; i < documents.length; i++) {
-          const doc = documents[i];
-          let fileBase64 = doc.fileBase64 as string | undefined;
-          const filePath = toDmsPath(doc.filePath || doc.storagePath || "");
-          const fileName = doc.fileName || filePath || `document-${i + 1}`;
-
-          if (!fileBase64 && doc.storagePath) {
-            try {
-              const { data: blob, error: dlErr } = await supabase.storage
-                .from("vendor-documents")
-                .download(doc.storagePath);
-              if (dlErr || !blob) {
-                const failure = `${fileName} (download failed${dlErr?.message ? `: ${dlErr.message}` : ""})`;
-                skipped.push(failure);
-                failedDocuments.push({ fileName, filePath, message: failure });
-                documentErrors++;
-                continue;
-              }
-              fileBase64 = await blobToBase64(blob);
-            } catch (e: any) {
-              const failure = `${fileName} (${e?.message || "download error"})`;
-              skipped.push(failure);
-              failedDocuments.push({ fileName, filePath, message: failure });
-              documentErrors++;
-              continue;
-            }
-          }
-
-          if (!fileBase64 || !filePath) {
-            const failure = `${fileName} (missing file content or path)`;
-            skipped.push(failure);
-            failedDocuments.push({ fileName, filePath, message: failure });
-            documentErrors++;
-            continue;
-          }
-
-          const upload = { FILE: fileBase64, FILE_PATH: filePath };
-          const payload = { BP_LIFNR: vendor.sap_vendor_code, FILE_UPLOAD: [upload] };
-          const payloadBytes = estimateUploadBytes(upload);
-          console.log(`DMS SAP payload document ${i + 1}/${documents.length}: BP_LIFNR=${payload.BP_LIFNR} file=${fileName} approx=${formatMb(payloadBytes)} path=${filePath}`);
-
+        const triedDetails: string[] = [];
+        for (const url of dmsCandidateUrls) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 600000);
           try {
-            const headers: Record<string, string> = { "Content-Type": "application/json" };
-            if (middlewareKey) headers["x-middleware-key"] = middlewareKey;
-            const bodyStr = JSON.stringify(payload);
-
-            // Try each candidate path until one responds with non-404. Stick to the first working one for subsequent documents.
-            const urlsToTry = workingDmsUrl ? [workingDmsUrl] : [...dmsCandidateUrls];
-            let res: Response | null = null;
-            let text = "";
-            const triedDetails: string[] = [];
-            for (const url of urlsToTry) {
-              const controller = new AbortController();
-              const timer = setTimeout(() => controller.abort(), 180000);
-              try {
-                const r = await traceFetch(reqId, SVC, url, {
-                  method: "POST",
-                  headers,
-                  body: bodyStr,
-                  signal: controller.signal,
-                }, { label: `dms-document-${i + 1}` });
-                clearTimeout(timer);
-                const t = await r.text();
-                trace(reqId, SVC, "dms-document.body", { document: i + 1, fileName, filePath, url, status: r.status, bytes: t.length, preview: safePreview(t) });
-                console.log(`DMS document ${i + 1}/${documents.length} url=${url} status=${r.status} body=${t.slice(0, 200)}`);
-                if (r.status === 404 && !workingDmsUrl) {
-                  triedDetails.push(`${url}->404`);
-                  continue;
-                }
-                res = r;
-                text = t;
-                workingDmsUrl = url;
-                break;
-              } catch (e: any) {
-                clearTimeout(timer);
-                trace(reqId, SVC, "dms-document.error", { document: i + 1, fileName, filePath, url, ...summarizeError(e) });
-                triedDetails.push(`${url}->${e?.message || "network error"}`);
-              }
-            }
-
-            if (!res) {
-              documentErrors++;
-              lastErrorMessage = `Could not reach a working DMS endpoint for ${fileName}. Tried: ${triedDetails.join("; ")}`;
-              failedDocuments.push({ fileName, filePath, message: lastErrorMessage });
+            const r = await traceFetch(reqId, SVC, url, {
+              method: "POST",
+              headers,
+              body: bodyStr,
+              signal: controller.signal,
+            }, { label: "dms-batch" });
+            clearTimeout(timer);
+            const t = await r.text();
+            trace(reqId, SVC, "dms-batch.body", { url, status: r.status, bytes: t.length, preview: safePreview(t) });
+            console.log(`DMS batch url=${url} status=${r.status} body=${t.slice(0, 300)}`);
+            if (r.status === 404) {
+              triedDetails.push(`${url}->404`);
               continue;
             }
-
-            let inner: any = null;
-            let middlewareEnvelope: any = null;
-            try {
-              const parsed = JSON.parse(text);
-              if (parsed && typeof parsed === "object" && parsed.code === "PAYLOAD_TOO_LARGE") {
-                documentErrors++;
-                lastErrorMessage = `Middleware rejected ${fileName}: ${parsed.error || "payload too large"}`;
-                failedDocuments.push({ fileName, filePath, status: res.status, url: workingDmsUrl || undefined, message: lastErrorMessage });
-                continue;
-              }
-              middlewareEnvelope = parsed && typeof parsed === "object" && "sapResponse" in parsed
-                ? parsed
-                : null;
-              inner = parsed && typeof parsed === "object" && "sapResponse" in parsed
-                ? parsed.sapResponse
-                : parsed;
-            } catch {
-              inner = null;
-            }
-
-            const rows: any[] = Array.isArray(inner)
-              ? inner
-              : (inner && typeof inner === "object" ? [inner] : []);
-            allSapRows.push(...rows);
-
-            const upstreamOk = middlewareEnvelope ? middlewareEnvelope.ok !== false : res.ok;
-            const effectiveStatus = middlewareEnvelope?.sapStatus || res.status;
-            const batchOk = res.ok && upstreamOk && rows.length > 0 && rows.every((r: any) => r?.MSGTYP === "S");
-            const firstErr = rows.find((r: any) => r?.MSGTYP && r.MSGTYP !== "S");
-
-            if (batchOk) {
-              uploadedCount += 1;
-            } else {
-              documentErrors++;
-              if (res.ok && firstErr?.MSG) {
-                lastErrorMessage = `SAP DMS error for ${fileName}: ${firstErr.MSG}`;
-              } else if (!res.ok || !upstreamOk) {
-                const preview = typeof inner === "string" ? inner.slice(0, 200) : text.slice(0, 200);
-                lastErrorMessage = `DMS upload failed (HTTP ${effectiveStatus}) for ${fileName}: ${preview}`;
-              } else {
-                lastErrorMessage = `SAP DMS returned no success rows for ${fileName}`;
-              }
-              failedDocuments.push({ fileName, filePath, status: effectiveStatus, url: workingDmsUrl || undefined, message: lastErrorMessage });
-            }
+            res = r;
+            text = t;
+            workingDmsUrl = url;
+            break;
           } catch (e: any) {
-            documentErrors++;
-            lastErrorMessage = `Could not reach DMS endpoint for ${fileName}: ${e?.message || "network error"}`;
-            failedDocuments.push({ fileName, filePath, message: lastErrorMessage });
+            clearTimeout(timer);
+            trace(reqId, SVC, "dms-batch.error", { url, ...summarizeError(e) });
+            triedDetails.push(`${url}->${e?.message || "network error"}`);
           }
         }
 
-        sapRow = allSapRows.find((r) => r?.MSGTYP === "S") || allSapRows[0] || null;
-
-        if (documentErrors === 0) {
-          success = true;
-          message = sapRow?.MSG || `File(s) Uploaded Successfully (${uploadedCount} document${uploadedCount === 1 ? '' : 's'})`;
-        } else {
+        if (!res) {
+          const errMsg = `Could not reach a working DMS endpoint. Tried: ${triedDetails.join("; ")}`;
+          for (const m of fileMeta) {
+            failedDocuments.push({ fileName: m.fileName, filePath: m.filePath, message: errMsg });
+          }
           success = false;
-          message = `${uploadedCount}/${attemptedCount} document(s) uploaded to DMS${lastErrorMessage ? `: ${lastErrorMessage}` : ""}`;
+          message = errMsg;
+        } else {
+          let inner: any = null;
+          let middlewareEnvelope: any = null;
+          try {
+            const parsed = JSON.parse(text);
+            middlewareEnvelope = parsed && typeof parsed === "object" && "sapResponse" in parsed
+              ? parsed
+              : null;
+            inner = middlewareEnvelope ? middlewareEnvelope.sapResponse : parsed;
+          } catch {
+            inner = null;
+          }
+
+          const rows: any[] = Array.isArray(inner)
+            ? inner
+            : (inner && typeof inner === "object" ? [inner] : []);
+          allSapRows.push(...rows);
+
+          const upstreamOk = middlewareEnvelope ? middlewareEnvelope.ok !== false : res.ok;
+          const effectiveStatus = middlewareEnvelope?.sapStatus || res.status;
+
+          // Pair each response row with its file by index; success = MSGTYP === "S".
+          for (let idx = 0; idx < fileMeta.length; idx++) {
+            const m = fileMeta[idx];
+            const row = rows[idx];
+            if (row && row.MSGTYP === "S") {
+              uploadedCount += 1;
+            } else if (row) {
+              failedDocuments.push({
+                fileName: m.fileName,
+                filePath: m.filePath,
+                status: effectiveStatus,
+                url: workingDmsUrl || undefined,
+                message: `SAP DMS error for ${m.fileName}: ${row?.MSG || row?.LONG_MSG || "unknown error"}`,
+              });
+            } else {
+              failedDocuments.push({
+                fileName: m.fileName,
+                filePath: m.filePath,
+                status: effectiveStatus,
+                url: workingDmsUrl || undefined,
+                message: !res.ok || !upstreamOk
+                  ? `DMS upload failed (HTTP ${effectiveStatus}) for ${m.fileName}: ${text.slice(0, 200)}`
+                  : `SAP DMS returned no row for ${m.fileName}`,
+              });
+            }
+          }
+
+          sapRow = rows.find((r) => r?.MSGTYP === "S") || rows[0] || null;
+
+          if (failedDocuments.length === 0 && uploadedCount === attemptedCount) {
+            success = true;
+            message = sapRow?.MSG || `File(s) Uploaded Successfully (${uploadedCount} document${uploadedCount === 1 ? '' : 's'})`;
+          } else {
+            success = false;
+            message = `${uploadedCount}/${attemptedCount} document(s) uploaded to DMS`;
+          }
         }
       }
+
 
       if (success) {
         await supabase.from("vendors").update({
@@ -484,7 +480,9 @@ serve(async (req) => {
         failedDocuments,
         sap: sapRow,
         sapRows: allSapRows,
+        dmsPayload: dmsPayloadForResponse,
       });
+
     }
 
 
