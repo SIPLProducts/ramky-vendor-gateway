@@ -1,60 +1,32 @@
-## Part A — Move DMS payload construction to the browser
+## Problem
 
-Goal: the exact `{ BP_LIFNR, FILE_UPLOAD: [{ FILE, FILE_PATH, FILE_NAME }, …] }` sent to SAP DMS is visible under **Network → sync-vendor-to-dms → Payload** in the browser.
+SAP DMS returns **one aggregate row per vendor** (e.g. `[{ MSGTYP:"S", MSG:"400016988 Document Created" }]`) regardless of how many files were in the batch. Our edge function `sync-vendor-to-dms` currently pairs SAP rows to files by index, so with 6 files and 1 SAP row we mark file[0] as uploaded and files[1..5] as `"SAP DMS returned no row for X"` — showing `1/6 uploaded` and a red Failed popup even though SAP saved all 6 files.
 
-### Client changes — `src/hooks/useVendors.tsx` (`useDMSSync`)
+## Fix
 
-For each `vendorId` passed in:
+In `supabase/functions/sync-vendor-to-dms/index.ts`, replace the per-index row/file pairing with aggregate-response handling:
 
-1. Load the vendor (needed for `sap_vendor_code` → `BP_LIFNR`) and its `vendor_documents` rows (`file_name`, `file_path`) via the Supabase JS client.
-2. For every document, download the file from the `vendor-documents` storage bucket using `supabase.storage.from('vendor-documents').download(path)`, then base64-encode the blob in the browser (chunked `FileReader`/`Uint8Array` loop to avoid stack overflow on large files).
-3. Rewrite `FILE_PATH` to the Windows DMS prefix (`C:/Users/ADMIN/OneDrive/Desktop/…`) — same rule the edge function uses today, moved to a shared helper `src/lib/dmsPath.ts`.
-4. Build one payload per vendor:
-   ```
-   { vendorId, payload: { BP_LIFNR, FILE_UPLOAD: [{ FILE, FILE_PATH, FILE_NAME }, …] } }
-   ```
-5. Invoke `sync-vendor-to-dms` **once per vendor** with that body. Because the payload now sits in the invoke body, DevTools shows it in the request panel exactly as requested.
-6. Aggregate the per-vendor responses into the same `{ success, message, results }` shape the callers already consume — no UI changes.
+- If `rows.length === 0`:
+  - If HTTP was OK, treat as success for all files (fallback to `res.ok`).
+  - Otherwise mark all files failed with the HTTP status/body.
+- If `rows.length < fileMeta.length` (typical SAP DMS: one aggregate row):
+  - If **every** returned row has `MSGTYP === "S"` → success for all attempted files. `uploadedCount = attemptedCount`, `failedDocuments = []`, `message = firstRow.MSG || "File(s) Uploaded Successfully (N documents)"`.
+  - Otherwise → all files failed with the first non-success row's `MSG`/`LONG_MSG`.
+- If `rows.length === fileMeta.length` → keep current per-index pairing (future-proof if SAP ever returns one row per file).
+- If `rows.length > fileMeta.length` → per-index pairing for the first N; ignore extras.
 
-Skip/failure surface: if a document row has no `file_path` or download fails, push a `failedDocuments` entry in the client result and still send the remaining files (matches current behavior).
+Aggregate success/failure fields (`success`, `message`, `sap`, `sapRows`, audit log entry) keep the same shape so the UI popup and status update logic stay unchanged.
 
-No changes to `MultipleSapSyncDialog` or other callers — the mutation signature `{ vendorIds: string[] }` stays the same.
+## Files
 
-### Edge function changes — `supabase/functions/sync-vendor-to-dms/index.ts`
+- `supabase/functions/sync-vendor-to-dms/index.ts` — only the block that iterates `fileMeta` and builds `failedDocuments`/`uploadedCount`. No other functions, no frontend changes.
 
-The function already accepts `{ vendorId, payload: { BP_LIFNR, FILE_UPLOAD } }` and `{ BP_LIFNR, FILE_UPLOAD }` shapes. Keep that intact and:
+## Result
 
-- Continue to POST the batched `FILE_UPLOAD` to `/sap/dms/upload` unchanged (no size cap, no per-file fallback).
-- Keep `results[].dmsPayload` in the response for parity, but the browser will already have the source of truth.
-- Legacy `{ vendorIds: [...] }` requests still work (server downloads + base64), so nothing else calling the function breaks.
-
-No DB, RLS, storage, or config changes needed — `vendor-documents` is already reachable with the user's session for the roles that can trigger DMS sync.
-
-## Part B — Stop the "page refreshes when I switch tabs" issue
-
-Root cause: `src/hooks/useAuth.tsx` unconditionally clears `userRole`/`customRoles` and sets `rolesLoading = true` on **every** `onAuthStateChange` event, including `TOKEN_REFRESHED` and `USER_UPDATED` which Supabase fires when the tab regains focus or on the periodic refresh interval. `ProtectedRoute` then renders a full-page loader (`if (loading || (user && rolesLoading))`), unmounting `VendorList`, `VendorReviewDialog`, and any other open popup — which looks exactly like a page refresh and drops form/dialog state.
-
-### Fix — `src/hooks/useAuth.tsx`
-
-- Keep a ref of the last-loaded `user.id`.
-- On the auth listener:
-  - `SIGNED_OUT` → clear session/user/roles as today.
-  - `SIGNED_IN` / `INITIAL_SESSION` → update session/user; **only** reset roles + call `loadRoles()` when the user id actually changed from the ref (first sign-in or account switch). Otherwise leave `userRole`, `customRoles`, and `rolesLoading` untouched.
-  - `TOKEN_REFRESHED` / `USER_UPDATED` / any other event → just refresh `session` and `user`; do NOT touch role state.
-
-This keeps `ProtectedRoute` mounted across tab switches, so open dialogs and unsaved form state survive.
-
-No changes to `ProtectedRoute`, `AppLayout`, `useIdleLogout`, react-query config, or `src/main.tsx` (SW reload path is already gone).
-
-## Files touched
-
-- `src/hooks/useVendors.tsx` — rewrite `useDMSSync` mutationFn to build payload in-browser.
-- `src/lib/dmsPath.ts` — new small helper for `toDmsPath()` and base64 chunking.
-- `src/hooks/useAuth.tsx` — gate role reloads by event type + user-id change.
-- `supabase/functions/sync-vendor-to-dms/index.ts` — no functional change required; just keep the `{ vendorId, payload }` branch working.
+- 6 files + 1 SAP success row → popup shows **"6/6 documents uploaded to DMS"**, green Success, vendor status → `dms_synced`.
+- Genuine SAP failure (single row with `MSGTYP !== "S"`) → all files marked failed with that SAP `MSG`.
+- No changes to `MultipleSapSyncDialog`, `useVendors`, browser payload construction, middleware, nginx, or SAP endpoint.
 
 ## Out of scope
 
-- No changes to react-query `refetchOnWindowFocus` (background refetches don't unmount the tree; the auth gate was the real cause).
-- No changes to the middleware, nginx, or SAP DMS endpoint itself.
-- No new storage buckets, DB tables, or RLS policies.
+Multi-vendor batching (user confirmed DMS sync is one vendor at a time).
