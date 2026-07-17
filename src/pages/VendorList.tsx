@@ -361,7 +361,7 @@ export default function VendorList() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="buyer_review">Buyer Review</SelectItem>
                 <SelectItem value="scm_co">SCM CO</SelectItem>
