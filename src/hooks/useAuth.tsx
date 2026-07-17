@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useIdleLogout } from './useIdleLogout';
@@ -49,23 +49,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState(false);
 
+  const loadedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        if (session?.user) {
-          setRolesLoading(true);
-          setRolesError(false);
-          setUserRole(null);
-          setCustomRoles([]);
-          setTimeout(() => { loadRoles(session.user.id); }, 0);
-        } else {
+
+        if (event === 'SIGNED_OUT' || !session?.user) {
+          loadedUserIdRef.current = null;
           setUserRole(null);
           setCustomRoles([]);
           setRolesLoading(false);
           setRolesError(false);
           setLoading(false);
+          return;
+        }
+
+        // Only (re)load roles on real sign-in / account change. TOKEN_REFRESHED
+        // and USER_UPDATED fire on every tab-focus and would otherwise unmount
+        // the whole app tree via ProtectedRoute, killing open dialogs.
+        const isSignInEvent = event === 'SIGNED_IN' || event === 'INITIAL_SESSION';
+        const userChanged = loadedUserIdRef.current !== session.user.id;
+        if (isSignInEvent && userChanged) {
+          loadedUserIdRef.current = session.user.id;
+          setRolesLoading(true);
+          setRolesError(false);
+          setUserRole(null);
+          setCustomRoles([]);
+          setTimeout(() => { loadRoles(session.user.id); }, 0);
         }
       }
     );
@@ -74,9 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        setRolesLoading(true);
-        setRolesError(false);
-        loadRoles(session.user.id);
+        if (loadedUserIdRef.current !== session.user.id) {
+          loadedUserIdRef.current = session.user.id;
+          setRolesLoading(true);
+          setRolesError(false);
+          loadRoles(session.user.id);
+        }
       } else {
         setRolesLoading(false);
         setLoading(false);
