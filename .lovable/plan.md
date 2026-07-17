@@ -1,32 +1,57 @@
-## Problem
+## Clarification
+The email template in `sap-team-reject-vendor/index.ts` **already renders the "Existing Vendor Details" table** and it stays exactly as-is. I will not touch the email HTML. The gap is only on the **UI** — the SAP Sync → Duplicate & Closed tab doesn't show that block because we never persisted `existingVendorText` to the vendor row. This plan only adds persistence + UI display.
 
-SAP DMS returns **one aggregate row per vendor** (e.g. `[{ MSGTYP:"S", MSG:"400016988 Document Created" }]`) regardless of how many files were in the batch. Our edge function `sync-vendor-to-dms` currently pairs SAP rows to files by index, so with 6 files and 1 SAP row we mark file[0] as uploaded and files[1..5] as `"SAP DMS returned no row for X"` — showing `1/6 uploaded` and a red Failed popup even though SAP saved all 6 files.
+---
 
-## Fix
+## 1. Delete icon for "On behalf" invitations
 
-In `supabase/functions/sync-vendor-to-dms/index.ts`, replace the per-index row/file pairing with aggregate-response handling:
+**File:** `src/pages/AdminInvitations.tsx` (Actions cell, ~lines 1046–1077)
 
-- If `rows.length === 0`:
-  - If HTTP was OK, treat as success for all files (fallback to `res.ok`).
-  - Otherwise mark all files failed with the HTTP status/body.
-- If `rows.length < fileMeta.length` (typical SAP DMS: one aggregate row):
-  - If **every** returned row has `MSGTYP === "S"` → success for all attempted files. `uploadedCount = attemptedCount`, `failedDocuments = []`, `message = firstRow.MSG || "File(s) Uploaded Successfully (N documents)"`.
-  - Otherwise → all files failed with the first non-success row's `MSG`/`LONG_MSG`.
-- If `rows.length === fileMeta.length` → keep current per-index pairing (future-proof if SAP ever returns one row per file).
-- If `rows.length > fileMeta.length` → per-index pairing for the first N; ignore extras.
+- For rows where `invitation.created_on_behalf === true`, render a red `Trash2` icon button next to "Resume".
+- Click → confirm dialog ("Delete this on-behalf draft? This removes the invitation and its draft vendor.").
+- On confirm:
+  1. If `invitation.vendor_id` set → delete `vendors` where `id = vendor_id` AND `status = 'draft'` (never touch submitted vendors).
+  2. Delete `vendor_invitations` by `id`.
+  3. Toast success + `queryClient.invalidateQueries(['vendor-invitations'])`.
+- Only on-behalf rows get the delete icon. Non-on-behalf rows keep the current Resend button unchanged.
 
-Aggregate success/failure fields (`success`, `message`, `sap`, `sapRows`, audit log entry) keep the same shape so the UI popup and status update logic stay unchanged.
+## 2. Show "Existing Vendor Details" table in Duplicate & Closed tab
 
-## Files
+### Backend (persist only — email untouched)
 
-- `supabase/functions/sync-vendor-to-dms/index.ts` — only the block that iterates `fileMeta` and builds `failedDocuments`/`uploadedCount`. No other functions, no frontend changes.
+**Migration:** add nullable column `vendors.sap_duplicate_details text`.
 
-## Result
+**`supabase/functions/sap-team-reject-vendor/index.ts`** — one small change only:
+- In the vendor UPDATE block (~lines 69–78), also set `sap_duplicate_details: existingVendorText || null`.
+- The entire email HTML (headline, `existingBlock`, closed-details table, etc.) stays exactly as it is today.
 
-- 6 files + 1 SAP success row → popup shows **"6/6 documents uploaded to DMS"**, green Success, vendor status → `dms_synced`.
-- Genuine SAP failure (single row with `MSGTYP !== "S"`) → all files marked failed with that SAP `MSG`.
-- No changes to `MultipleSapSyncDialog`, `useVendors`, browser payload construction, middleware, nginx, or SAP endpoint.
+### Frontend
 
-## Out of scope
+**`src/pages/SAPSync.tsx`** — Duplicate & Closed cards (~lines 722–762):
+- Read `vendor.sap_duplicate_details`.
+- Parse with the same splitter used in the edge function: split on `" - "` / `" – "` → `[SAP Code, Name, PAN, GSTIN]`.
+- Render a new panel **above** the existing "Duplicate & Close Remarks" block:
 
-Multi-vendor batching (user confirmed DMS sync is one vendor at a time).
+  ```
+  Existing Vendor Details (from SAP)
+  ┌──────────────────┬─────────────────────┐
+  │ SAP Vendor Code  │ 1007529             │
+  │ Vendor Name      │ Foss India Pvt.Ltd. │
+  │ PAN Number       │ AABCF1735D          │
+  │ GSTIN            │ 27AABCF1735D1Z2     │
+  └──────────────────┴─────────────────────┘
+  ```
+
+  Uses existing card styling (muted headers, mono for codes). If fewer than 4 parts parse, show a single "Details" row with the raw string. If `sap_duplicate_details` is empty (older records), hide the block.
+- The current block (name, ref no, GSTIN, closed date, remarks) stays **below**, unchanged.
+
+## Explicitly NOT changing
+- Email HTML in `sap-team-reject-vendor` (already correct).
+- DMS sync, bulk sync, middleware, invitations schema.
+- Any non-on-behalf invitation row behavior.
+
+## Files touched
+- `src/pages/AdminInvitations.tsx`
+- `src/pages/SAPSync.tsx`
+- `supabase/functions/sap-team-reject-vendor/index.ts` (one-line addition in UPDATE payload)
+- New migration: add `vendors.sap_duplicate_details`

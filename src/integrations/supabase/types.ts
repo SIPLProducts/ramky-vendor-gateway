@@ -2043,6 +2043,7 @@ export type Database = {
           relative_name: string | null
           safety_issues: string | null
           same_as_registered: boolean | null
+          sap_duplicate_details: string | null
           sap_reference_no: string | null
           sap_synced_at: string | null
           sap_vendor_code: string | null
@@ -2244,6 +2245,7 @@ export type Database = {
           relative_name?: string | null
           safety_issues?: string | null
           same_as_registered?: boolean | null
+          sap_duplicate_details?: string | null
           sap_reference_no?: string | null
           sap_synced_at?: string | null
           sap_vendor_code?: string | null
@@ -2445,6 +2447,7 @@ export type Database = {
           relative_name?: string | null
           safety_issues?: string | null
           same_as_registered?: boolean | null
+          sap_duplicate_details?: string | null
           sap_reference_no?: string | null
           sap_synced_at?: string | null
           sap_vendor_code?: string | null

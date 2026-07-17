@@ -723,6 +723,13 @@ export default function SAPSync() {
                 const remarks = (vendor as any).last_rejection_comments as string | null;
                 const rejectedAt = (vendor as any).last_rejected_at as string | null;
                 const refNo = (vendor as any).reference_number || vendor.id.slice(0, 8).toUpperCase();
+                const dupRaw = ((vendor as any).sap_duplicate_details || '').toString().trim();
+                const dupParts = dupRaw
+                  ? dupRaw.split(/\s+-\s+|\s+–\s+/).map((s: string) => s.trim()).filter(Boolean)
+                  : [];
+                const [dupSapCode, dupName, dupPan, dupGstin] = [
+                  dupParts[0] || '', dupParts[1] || '', dupParts[2] || '', dupParts[3] || ''
+                ];
                 return (
                   <Card key={vendor.id} className="border-0 shadow-md border-l-4 border-l-red-500">
                     <CardContent className="p-6">
@@ -737,7 +744,51 @@ export default function SAPSync() {
                               <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate &amp; Closed</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
-                            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            {dupRaw && (
+                              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
+                                <div className="px-3 py-2 bg-amber-100 border-b border-amber-200">
+                                  <p className="text-xs font-semibold text-amber-900">Existing Vendor Details (from SAP)</p>
+                                </div>
+                                <table className="w-full text-sm">
+                                  <tbody>
+                                    {dupParts.length >= 2 ? (
+                                      <>
+                                        {dupSapCode && (
+                                          <tr className="border-b border-amber-100">
+                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50 w-1/3">SAP Vendor Code</td>
+                                            <td className="px-3 py-2 font-mono text-amber-950">{dupSapCode}</td>
+                                          </tr>
+                                        )}
+                                        {dupName && (
+                                          <tr className="border-b border-amber-100">
+                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">Vendor Name</td>
+                                            <td className="px-3 py-2 text-amber-950">{dupName}</td>
+                                          </tr>
+                                        )}
+                                        {dupPan && (
+                                          <tr className="border-b border-amber-100">
+                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">PAN Number</td>
+                                            <td className="px-3 py-2 font-mono text-amber-950">{dupPan}</td>
+                                          </tr>
+                                        )}
+                                        {dupGstin && (
+                                          <tr>
+                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">GSTIN</td>
+                                            <td className="px-3 py-2 font-mono text-amber-950">{dupGstin}</td>
+                                          </tr>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <tr>
+                                        <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50 w-1/3">Details</td>
+                                        <td className="px-3 py-2 text-amber-950 whitespace-pre-wrap">{dupRaw}</td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted-foreground">
                               <span className="font-mono bg-muted px-2 py-0.5 rounded">Ref No: {refNo}</span>
                               <span>GSTIN: {vendor.gstin || 'N/A'}</span>
                               {rejectedAt && <span>Closed: {formatDateTime(rejectedAt)}</span>}
