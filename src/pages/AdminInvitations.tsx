@@ -60,7 +60,7 @@ import {
   Phone,
   UserPlus,
   ExternalLink,
-  
+  Trash2,
 } from 'lucide-react';
 import { z } from 'zod';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
@@ -1072,6 +1072,46 @@ export default function AdminInvitations() {
                                     {resendLabel}
                                   </>
                                 )}
+                              </Button>
+                            )}
+                            {isOnBehalf && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Delete on-behalf draft"
+                                onClick={async () => {
+                                  const ok = window.confirm(
+                                    'Delete this on-behalf draft? This removes the invitation and its draft vendor. This action cannot be undone.'
+                                  );
+                                  if (!ok) return;
+                                  try {
+                                    const vId = (invitation as any).vendor_id as string | null;
+                                    if (vId) {
+                                      const { error: vErr } = await supabase
+                                        .from('vendors')
+                                        .delete()
+                                        .eq('id', vId)
+                                        .eq('status', 'draft');
+                                      if (vErr) throw vErr;
+                                    }
+                                    const { error: iErr } = await supabase
+                                      .from('vendor_invitations')
+                                      .delete()
+                                      .eq('id', invitation.id);
+                                    if (iErr) throw iErr;
+                                    toast({ title: 'On-behalf draft deleted' });
+                                    queryClient.invalidateQueries({ queryKey: ['vendor-invitations'] });
+                                  } catch (e: any) {
+                                    toast({
+                                      title: 'Could not delete',
+                                      description: e?.message ?? String(e),
+                                      variant: 'destructive',
+                                    });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
