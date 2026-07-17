@@ -129,8 +129,10 @@ function isDomesticStepComplete(
       );
     }
     case 4: {
-      const c = data.contact;
-      return nonEmpty(c?.ceoName) && (emailOk(c?.ceoEmail) || phoneOk(c?.ceoPhone));
+      // ContactStep treats CEO/MD contact fields as optional and performs
+      // format validation when the user clicks Continue on that tab. Do not
+      // add stricter mandatory checks again at final submit.
+      return true;
     }
     case 5: {
       // Financial & Infrastructure step has no schema-required fields, but for
