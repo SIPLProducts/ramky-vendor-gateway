@@ -179,7 +179,8 @@ export default function VendorList() {
     ].join(' ').toLowerCase();
     const matchesSearch = !q || haystack.includes(q);
 
-    const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
+    const group = STATUS_FILTER_GROUPS[statusFilter];
+    const matchesStatus = statusFilter === 'all' || (group ? group.includes(vendor.status) : vendor.status === statusFilter);
     const matchesBuyerCompany = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
 
     return matchesSearch && matchesStatus && matchesBuyerCompany;
