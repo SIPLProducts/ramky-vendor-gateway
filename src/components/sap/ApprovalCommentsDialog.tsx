@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { formatStageLevelHistory, type ApprovalStage } from '@/lib/approvalLabels';
+import { formatDateTime } from '@/lib/dateFormat';
 
 interface Props {
   open: boolean;
@@ -24,15 +25,6 @@ interface Row {
   rejection_from_stage: string | null;
   acted_at: string | null;
   acted_by_name: string | null;
-}
-
-function formatIst(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }) + ' IST';
 }
 
 export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorName, referenceNumber }: Props) {
