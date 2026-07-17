@@ -485,7 +485,9 @@ serve(async (req) => {
         failedDocuments,
         sap: sapRow,
         sapRows: allSapRows,
+        dmsPayload: dmsPayloadForResponse,
       });
+
     }
 
 
