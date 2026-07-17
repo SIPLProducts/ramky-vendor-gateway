@@ -115,7 +115,7 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
                       </TableCell>
                       <TableCell className="whitespace-pre-wrap text-sm">{comment ?? '—'}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatIst(r.acted_at)}
+                        {formatDateTime(r.acted_at, '—')}
                       </TableCell>
                     </TableRow>
                   );

@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
+import { formatDate } from '@/lib/dateFormat';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -636,7 +637,7 @@ export function VendorReviewDialog({
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">💰 Finance Team</span>
                               {vendor.finance_reviewed_at && (
-                                <span className="text-xs text-muted-foreground">{new Date(vendor.finance_reviewed_at).toLocaleDateString('en-IN')}</span>
+                                <span className="text-xs text-muted-foreground">{formatDate(vendor.finance_reviewed_at)}</span>
                               )}
                             </div>
                             <p className="text-amber-900 dark:text-amber-100">{vendor.finance_comments}</p>
@@ -647,7 +648,7 @@ export function VendorReviewDialog({
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">🛒 Purchase Team</span>
                               {vendor.purchase_reviewed_at && (
-                                <span className="text-xs text-muted-foreground">{new Date(vendor.purchase_reviewed_at).toLocaleDateString('en-IN')}</span>
+                                <span className="text-xs text-muted-foreground">{formatDate(vendor.purchase_reviewed_at)}</span>
                               )}
                             </div>
                             <p className="text-teal-900 dark:text-teal-100">{vendor.purchase_comments}</p>
@@ -676,7 +677,7 @@ export function VendorReviewDialog({
                       </div>
                       <div>
                         <p className="text-muted-foreground">Registration Date</p>
-                        <p className="font-medium">{gstReport.registrationDate}</p>
+                        <p className="font-medium">{formatDate(gstReport.registrationDate, gstReport.registrationDate)}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Filing Status</p>

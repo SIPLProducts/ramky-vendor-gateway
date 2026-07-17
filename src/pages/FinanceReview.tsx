@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { supabase } from '@/integrations/supabase/client';
 import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
 import {
@@ -266,7 +267,7 @@ export default function FinanceReview() {
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
                         <span className="font-mono bg-muted px-2 py-0.5 rounded">ID: {vendor.id.slice(0, 8)}...</span>
                         <span>GSTIN: {vendor.gstin || 'N/A'}</span>
-                        <span>Submitted: {vendor.submitted_at ? new Date(vendor.submitted_at).toLocaleDateString('en-IN') : '-'}</span>
+                        <span>Submitted: {formatDate(vendor.submitted_at, '-')}</span>
                       </div>
                     </div>
                   </div>
@@ -480,7 +481,7 @@ export default function FinanceReview() {
                                 {row.approver_name || row.approver_email ? (
                                   <p className="text-xs text-muted-foreground">
                                     by {row.approver_name || row.approver_email}
-                                    {row.acted_at ? ` · ${new Date(row.acted_at).toLocaleString('en-IN')}` : ''}
+                                    {row.acted_at ? ` · ${formatDateTime(row.acted_at)}` : ''}
                                   </p>
                                 ) : (
                                   <p className="text-xs text-muted-foreground">Awaiting action</p>

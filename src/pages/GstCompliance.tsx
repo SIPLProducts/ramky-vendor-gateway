@@ -209,9 +209,9 @@ export default function GstCompliance() {
         lastFiledReturn: format(new Date(), 'MMM yyyy'),
         filingStatus: data.valid ? 'Regular' : 'Delayed',
         returnsFiled: [
-          { period: format(new Date(), 'MMM yyyy'), type: 'GSTR-3B', filedOn: format(new Date(), 'dd/MM/yyyy'), status: 'Filed' },
-          { period: format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'MMM yyyy'), type: 'GSTR-3B', filedOn: format(new Date(Date.now() - 25 * 24 * 60 * 60 * 1000), 'dd/MM/yyyy'), status: 'Filed' },
-          { period: format(new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), 'MMM yyyy'), type: 'GSTR-3B', filedOn: format(new Date(Date.now() - 50 * 24 * 60 * 60 * 1000), 'dd/MM/yyyy'), status: data.valid ? 'Filed' : 'Late' },
+          { period: format(new Date(), 'MMM yyyy'), type: 'GSTR-3B', filedOn: format(new Date(), 'dd-MM-yyyy'), status: 'Filed' },
+          { period: format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'MMM yyyy'), type: 'GSTR-3B', filedOn: format(new Date(Date.now() - 25 * 24 * 60 * 60 * 1000), 'dd-MM-yyyy'), status: 'Filed' },
+          { period: format(new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), 'MMM yyyy'), type: 'GSTR-3B', filedOn: format(new Date(Date.now() - 50 * 24 * 60 * 60 * 1000), 'dd-MM-yyyy'), status: data.valid ? 'Filed' : 'Late' },
         ],
         complianceScore: data.valid ? Math.floor(Math.random() * 15) + 85 : Math.floor(Math.random() * 30) + 40,
         riskLevel: data.valid ? 'Low' : 'Medium',
