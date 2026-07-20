@@ -1192,7 +1192,11 @@ export default function VendorRegistration() {
     setCurrentStep(6);
   };
 
-  const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
+  const handleBack = () => setCurrentStep((prev) => {
+    // Legacy Contact Details tab (step 4) is hidden — jump from 5 back to 3.
+    if (!isInternational && prev === 5) return 3;
+    return Math.max(1, prev - 1);
+  });
   const handleStepClick = (step: number) => {
     // Free navigation backward; forward only if all preceding steps are complete.
     if (step <= currentStep) { setCurrentStep(step); return; }
