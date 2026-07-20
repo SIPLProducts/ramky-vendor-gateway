@@ -1,17 +1,16 @@
-## Fix "DMS Pending" filter in All Vendors screen
+Make the requested wording changes in the vendor invitation flow.
 
-**File:** `src/pages/VendorList.tsx`
+## 1. "Create Vendor Invitation" popup (`src/pages/AdminInvitations.tsx`)
 
-**Problem:** Selecting the "DMS Pending" status filter shows nothing even though rows with `dms_sync_pending` exist in the table. The filter group currently maps `dms_pending` to `['sap_synced']` only.
+- In the `DialogDescription`, remove only the sentence: "They will use this link to create their account and submit their details." Keep the opening sentence so the description reads: "Send a registration link to a new vendor."
+- Change the phone field label from "Phone Number" to "Contact Number" (popup only, line ~761).
 
-**Change (line 112):**
+## 2. Vendor registration invitation email (`supabase/functions/send-vendor-invitation/index.ts`)
 
-```ts
-dms_pending: ['dms_sync_pending', 'sap_synced'],
-```
+- Remove the "Respectfully," line in the email signature block.
+- Replace "Access Registration Portal" with "Access Registration Portal Using Below Link" in the registration process steps.
 
-Include both statuses so:
-- New rows using `dms_sync_pending` (awaiting DMS sync after SAP sync) are matched.
-- Legacy rows still stored as `sap_synced` (SAP done, DMS pending) remain visible.
+## Deploy step
+- Deploy the `send-vendor-invitation` edge function so the email template changes take effect on the server.
 
-No other files change.
+No other UI or logic changes.
