@@ -45,9 +45,8 @@ const builtInSteps = [
   { id: 1, title: 'Document Verification', description: '' },
   { id: 2, title: 'Organization Profile', description: '' },
   { id: 3, title: 'Contact Details', description: '' },
-  // Step 4 (legacy Contact Details tab) hidden — its fields are not required.
-  { id: 5, title: 'Financial & Infrastructure', description: '' },
-  // Custom tabs slot in here at runtime (ids 6..N)
+  { id: 4, title: 'Financial & Infrastructure', description: '' },
+  // Custom tabs slot in here at runtime (ids 5..N-1)
   // Review is always the last step
 ];
 const REVIEW_TITLE = 'Review & Submit';
@@ -129,12 +128,6 @@ function isDomesticStepComplete(
       );
     }
     case 4: {
-      // ContactStep treats CEO/MD contact fields as optional and performs
-      // format validation when the user clicks Continue on that tab. Do not
-      // add stricter mandatory checks again at final submit.
-      return true;
-    }
-    case 5: {
       // Financial & Infrastructure has no mandatory fields. Its own tab
       // handles format validation on Continue, so blank values must not block
       // final submit.
@@ -351,9 +344,9 @@ export default function VendorRegistration() {
     }
     const list: Array<{ id: number; title: string; description: string; stepKey?: string }> = builtInSteps.map((s) => ({ ...s }));
     customSteps.forEach((cs, i) => {
-      list.push({ id: 6 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
+      list.push({ id: 5 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
     });
-    list.push({ id: 6 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
+    list.push({ id: 5 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
     return list;
   }, [customSteps, isInternational]);
 
@@ -774,7 +767,7 @@ export default function VendorRegistration() {
   };
 
   const isFirstStep = currentStep === 1;
-  const lastStepId = registrationSteps[registrationSteps.length - 1]?.id ?? 6;
+  const lastStepId = registrationSteps[registrationSteps.length - 1]?.id ?? 5;
   const isLastStep = currentStep === lastStepId;
 
   useEffect(() => {
@@ -885,19 +878,20 @@ export default function VendorRegistration() {
             // Only mark a step complete if every previous step is also complete —
             // prevents e.g. step 5 showing a tick while step 2/3/4 are still blank.
             const filled: number[] = [];
-            for (const s of [1, 2, 3, 5]) {
+            for (const s of [1, 2, 3, 4]) {
               if (!isDomesticStepComplete(s, existingFormData, step1Seed)) break;
               filled.push(s);
             }
             setCompletedSteps(filled);
+            const reviewId = 5 + customSteps.length;
             // For returned_to_vendor mark all completed and jump to Review
             if (isReturned) {
-              setCompletedSteps([1, 2, 3, 5]);
+              setCompletedSteps([1, 2, 3, 4]);
               setIsEditMode(true);
-              setCurrentStep(6);
+              setCurrentStep(reviewId);
             } else {
-              const firstMissing = [1, 2, 3, 5].find(s => !filled.includes(s));
-              setCurrentStep(firstMissing ?? 6);
+              const firstMissing = [1, 2, 3, 4].find(s => !filled.includes(s));
+              setCurrentStep(firstMissing ?? reviewId);
             }
 
 
@@ -1185,14 +1179,11 @@ export default function VendorRegistration() {
     // step is the new step number; map to form key
     const stepKeys: Record<number, keyof VendorFormData> = {
       3: 'address',
-      4: 'contact',
     };
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
-    // Legacy Contact Details tab (step 4) is hidden — skip straight to step 5.
-    const next = step === 3 && !isInternational ? 5 : step + 1;
-    setCurrentStep(next);
+    setCurrentStep(step + 1);
   };
 
   // Step 2 emits both organization + statutory (statutory & memberships moved here)
@@ -1209,15 +1200,11 @@ export default function VendorRegistration() {
       infrastructure: data.infrastructure,
       qhse: data.qhse,
     }));
-    if (!completedSteps.includes(5)) setCompletedSteps((prev) => [...prev, 5]);
-    setCurrentStep(6);
+    if (!completedSteps.includes(4)) setCompletedSteps((prev) => [...prev, 4]);
+    setCurrentStep(5);
   };
 
-  const handleBack = () => setCurrentStep((prev) => {
-    // Legacy Contact Details tab (step 4) is hidden — jump from 5 back to 3.
-    if (!isInternational && prev === 5) return 3;
-    return Math.max(1, prev - 1);
-  });
+  const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
   const handleStepClick = (step: number) => {
     // Free navigation backward; forward only if all preceding steps are complete.
     if (step <= currentStep) { setCurrentStep(step); return; }
@@ -1387,7 +1374,7 @@ export default function VendorRegistration() {
     // Pre-submit gating — bounce user back to the first tab with missing
     // mandatory fields so they can see the inline errors immediately.
     if (!isInternational) {
-      const firstMissing = [1, 2, 3, 5].find(s => !isDomesticStepComplete(s, formData, verifiedData));
+      const firstMissing = [1, 2, 3, 4].find(s => !isDomesticStepComplete(s, formData, verifiedData));
       if (firstMissing) {
         const title = registrationSteps.find(s => s.id === firstMissing)?.title || `Step ${firstMissing}`;
         toast({
@@ -1483,7 +1470,7 @@ export default function VendorRegistration() {
       }
       return null;
     }
-    // Built-in domestic steps 1..5
+    // Built-in domestic steps 1..4
     switch (currentStep) {
       case 1:
         return null; // rendered persistently outside renderStep
@@ -1492,9 +1479,6 @@ export default function VendorRegistration() {
       case 3:
         return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
-        return null; // Legacy Contact Details tab hidden
-
-      case 5:
         return (
           <FinancialInfrastructureStep
             tenantId={tenantId}
@@ -1516,8 +1500,8 @@ export default function VendorRegistration() {
     if (currentStep === lastStepId) {
       return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
     }
-    // Anything in between is an admin-defined custom tab (ids 6..N-1)
-    const customIdx = currentStep - 6;
+    // Anything in between is an admin-defined custom tab (ids 5..N-1)
+    const customIdx = currentStep - 5;
     const customStep = customSteps[customIdx];
     if (customStep) {
       const fields = fieldsByStep[customStep.step_key] || [];

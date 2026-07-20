@@ -2628,13 +2628,12 @@ export function DocumentVerificationStep({
                                   onChange={(v) => setOcrField(setMsmeDoc, "enterprise_name", v)}
                                   verifiedValue={m.enterprise_name}
                                   verifiedLabel="Enterprise Name matches registry"
+                                  trailingInfo={
+                                    msmeDoc.apiData?.enterpriseNameMessage
+                                      ? { message: msmeDoc.apiData.enterpriseNameMessage, ok: true }
+                                      : null
+                                  }
                                 />
-                                {msmeDoc.apiData?.enterpriseNameMessage && (
-                                  <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
-                                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                                    <span>{msmeDoc.apiData.enterpriseNameMessage}</span>
-                                  </p>
-                                )}
                               </div>
                               <EditableOcrField
                                 label="Enterprise Type"
