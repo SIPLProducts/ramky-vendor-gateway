@@ -353,7 +353,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.industryType ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.industryType ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select industry type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -376,7 +376,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.organizationType ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.organizationType ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select organization type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -399,7 +399,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.ownershipType ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.ownershipType ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select ownership type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -422,7 +422,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value} disabled={isGstStateLocked}>
-                  <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.state ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
