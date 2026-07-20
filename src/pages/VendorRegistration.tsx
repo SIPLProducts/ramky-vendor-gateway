@@ -44,8 +44,8 @@ import { safeUUID } from '@/lib/uuid';
 const builtInSteps = [
   { id: 1, title: 'Document Verification', description: '' },
   { id: 2, title: 'Organization Profile', description: '' },
-  { id: 3, title: 'Address Information', description: '' },
-  { id: 4, title: 'Contact Details', description: '' },
+  { id: 3, title: 'Contact Details', description: '' },
+  // Step 4 (legacy Contact Details tab) hidden — its fields are not required.
   { id: 5, title: 'Financial & Infrastructure', description: '' },
   // Custom tabs slot in here at runtime (ids 6..N)
   // Review is always the last step
