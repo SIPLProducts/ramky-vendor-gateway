@@ -3661,6 +3661,36 @@ function FormField({
   );
 }
 
+function NameMatchInfo({ message, ok = true }: { message: string; ok?: boolean }) {
+  if (!message) return null;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Match details"
+          className={cn(
+            "inline-flex h-6 w-6 items-center justify-center rounded-full border transition-colors hover:opacity-90",
+            ok
+              ? "border-success/40 bg-success/10 text-success"
+              : "border-destructive/40 bg-destructive/10 text-destructive",
+          )}
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="max-w-sm text-xs leading-relaxed">
+        <div className="flex items-start gap-2">
+          {ok
+            ? <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+            : <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
+          <span className="whitespace-pre-wrap break-words">{message}</span>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function CrossCheckStrip({ ok, text, className }: { ok: boolean; text: string; className?: string }) {
   return (
     <div className={cn("flex justify-end", className)}>
