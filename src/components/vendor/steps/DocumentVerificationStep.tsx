@@ -2254,7 +2254,16 @@ export function DocumentVerificationStep({
                           onChangeField={(k, v) => setOcrField(setGstDoc, k, v)}
                           editablePrincipalPlace={editablePrincipalPlace}
                           onChangePrincipalPlace={setEditablePrincipalPlace}
+                          legalNameInfo={
+                            gstDoc.status === "verified" && typeof gstDoc.nameMatchScore === "number"
+                              ? {
+                                  message: `Name match score: ${gstDoc.nameMatchScore}%`,
+                                  ok: gstDoc.nameMatchScore >= 80,
+                                }
+                              : null
+                          }
                         />
+
                       }
                     />
 
