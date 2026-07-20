@@ -344,9 +344,9 @@ export default function VendorRegistration() {
     }
     const list: Array<{ id: number; title: string; description: string; stepKey?: string }> = builtInSteps.map((s) => ({ ...s }));
     customSteps.forEach((cs, i) => {
-      list.push({ id: 6 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
+      list.push({ id: 5 + i, title: cs.step_label, description: cs.step_description || '', stepKey: cs.step_key });
     });
-    list.push({ id: 6 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
+    list.push({ id: 5 + customSteps.length, title: REVIEW_TITLE, description: REVIEW_DESCRIPTION });
     return list;
   }, [customSteps, isInternational]);
 
