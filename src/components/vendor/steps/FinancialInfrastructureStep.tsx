@@ -232,7 +232,7 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
         (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    })} className="space-y-6">
+    })} className="vendor-styled-form space-y-6">
 
       {/* Financial Details */}
       <div className="form-section">
