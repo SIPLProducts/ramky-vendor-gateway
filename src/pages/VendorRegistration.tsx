@@ -885,20 +885,21 @@ export default function VendorRegistration() {
             // Only mark a step complete if every previous step is also complete —
             // prevents e.g. step 5 showing a tick while step 2/3/4 are still blank.
             const filled: number[] = [];
-            for (const s of [1, 2, 3, 4, 5]) {
+            for (const s of [1, 2, 3, 5]) {
               if (!isDomesticStepComplete(s, existingFormData, step1Seed)) break;
               filled.push(s);
             }
             setCompletedSteps(filled);
             // For returned_to_vendor mark all completed and jump to Review
             if (isReturned) {
-              setCompletedSteps([1, 2, 3, 4, 5]);
+              setCompletedSteps([1, 2, 3, 5]);
               setIsEditMode(true);
               setCurrentStep(6);
             } else {
-              const firstMissing = [1, 2, 3, 4, 5].find(s => !filled.includes(s));
+              const firstMissing = [1, 2, 3, 5].find(s => !filled.includes(s));
               setCurrentStep(firstMissing ?? 6);
             }
+
 
           }
         } else {
