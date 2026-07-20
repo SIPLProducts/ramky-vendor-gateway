@@ -1,20 +1,32 @@
-## Plan: Hide Udyam certificate upload until MSME validation succeeds
+## Change
 
-1. **Fix the active MSME section in Document Verification**
-   - The visible upload area is coming from the MSME tab inside `DocumentVerificationStep`, not only from `MsmeKycTab`.
-   - Move the `Upload Udyam Certificate *` block inside the existing `msmeDoc.status === "verified"` condition.
-   - Result: after clicking **Yes**, only the **Udyam Number** input and **Validate** button show.
+The verified inputs already show a green `BadgeCheck` tick inside the input (right adornment). The message below the input (e.g. "PAN is verified", "Legal Name is verified", "IFSC is verified") currently repeats a small `CheckCircle2` tick before the text, which is redundant.
 
-2. **Show upload only after successful validation**
-   - Once the MSME/Udyam number validates successfully and `msmeDoc.status` becomes `verified`, show:
-     - verified MSME details
-     - re-validate button
-     - `Upload Udyam Certificate *`
+## Edit
 
-3. **Keep validation behavior unchanged**
-   - The certificate remains required only after MSME is verified.
-   - No database or backend changes.
+**File:** `src/components/vendor/steps/DocumentVerificationStep.tsx` (around lines 3864–3869)
 
-4. **Quick verification**
-   - Check that selecting **Are you MSME registered? → Yes** does not show the upload section before validation.
-   - Check that after validation succeeds, the upload section appears.
+Remove the leading `CheckCircle2` icon from the verified-message line, keeping just the green text label.
+
+Before:
+```tsx
+{matchesApi && verifiedLabel && (
+  <p className="mt-1 flex items-center gap-1 text-[11px] text-success">
+    <CheckCircle2 className="h-3 w-3" />
+    <span>{verifiedLabel}</span>
+  </p>
+)}
+```
+
+After:
+```tsx
+{matchesApi && verifiedLabel && (
+  <p className="mt-1 text-[11px] text-success">
+    <span>{verifiedLabel}</span>
+  </p>
+)}
+```
+
+This covers every field using `EditableOcrField` (PAN, DOB, Legal Name, Trade Name, GSTIN, Udyam Number, Account Number, IFSC, Bank Name, Branch, etc.), so the tick disappears from all "…is verified" messages while the in-input tick remains.
+
+No other logic or styling changes.
