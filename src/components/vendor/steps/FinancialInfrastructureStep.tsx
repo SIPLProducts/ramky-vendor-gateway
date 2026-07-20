@@ -270,11 +270,13 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
               {amountErrors.turnoverYear3 && <p className="text-xs text-destructive">{amountErrors.turnoverYear3}</p>}
             </div>
           </div>
+          {false && (
           <div className="grid gap-1.5">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
             <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
             {amountErrors.creditPeriodExpected && <p className="text-xs text-destructive">{CREDIT_PERIOD_NEGATIVE_MSG}</p>}
           </div>
+          )}
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
         </div>
       </div>
