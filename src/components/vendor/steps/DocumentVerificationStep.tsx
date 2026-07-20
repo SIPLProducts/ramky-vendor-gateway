@@ -2257,12 +2257,8 @@ export function DocumentVerificationStep({
                         />
                       }
                     />
-                    {gstDoc.status === "verified" && typeof gstDoc.nameMatchScore === "number" && (
-                      <CrossCheckStrip
-                        ok={gstDoc.nameMatchScore >= 80}
-                        text={`Name match score: ${gstDoc.nameMatchScore}%`}
-                      />
-                    )}
+
+
 
                     {/* GST Filing Status — runs after GSTIN Validation */}
                     {gstDoc.status === "verified" && (
