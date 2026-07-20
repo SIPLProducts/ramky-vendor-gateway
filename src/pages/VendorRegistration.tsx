@@ -1709,10 +1709,10 @@ export default function VendorRegistration() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="inline-flex items-center justify-center h-6 px-2 rounded-full bg-primary/10 text-primary text-[11px] font-semibold shrink-0">
-                  Step {currentStep} of {registrationSteps.length}
+                  Step {Math.max(1, registrationSteps.findIndex(s => s.id === currentStep) + 1)} of {registrationSteps.length}
                 </span>
                 <span className="text-xs font-medium text-foreground truncate">
-                  {registrationSteps[currentStep - 1]?.title}
+                  {registrationSteps.find(s => s.id === currentStep)?.title}
                 </span>
               </div>
             </div>
