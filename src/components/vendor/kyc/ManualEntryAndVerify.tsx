@@ -33,6 +33,7 @@ export function ManualEntryAndVerify({
   canVerify = true,
 }: ManualEntryAndVerifyProps) {
   const isLocked = state.status === 'passed';
+  const hasValue = (value ?? '').trim().length > 0;
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -44,7 +45,11 @@ export function ManualEntryAndVerify({
           placeholder={placeholder}
           maxLength={maxLength}
           disabled={isLocked}
-          className={cn('flex-1', uppercase && 'uppercase font-mono', isLocked && 'bg-success/5 border-success/30')}
+          className={cn(
+            'flex-1',
+            uppercase && 'uppercase font-mono',
+            isLocked ? 'bg-success/5 border-success/30' : hasValue && 'bg-muted/40',
+          )}
         />
         <VerifyButton onClick={onVerify} state={state} disabled={!canVerify || isLocked} />
       </div>

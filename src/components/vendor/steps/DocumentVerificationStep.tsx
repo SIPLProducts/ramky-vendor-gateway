@@ -3826,6 +3826,7 @@ function EditableOcrField({
           className={cn(
             "mt-1 border-0 border-b rounded-none bg-transparent border-border/60 px-0 focus-visible:ring-0 focus-visible:ring-offset-0",
             mono && "font-mono text-sm tracking-wide",
+            current.trim().length > 0 && "bg-muted/40 px-2",
             isEdited && "border-b-2 border-b-warning",
             matchesApi && "border-b-2 border-b-success",
             mismatchApi && "border-b-2 border-b-warning",

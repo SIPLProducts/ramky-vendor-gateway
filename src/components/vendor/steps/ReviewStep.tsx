@@ -204,16 +204,6 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       </div>
 
 
-      <div className="form-section">
-        <SectionHeader icon={Users} title="Contact Information" step={4} onEdit={onEditStep} />
-        <div className="space-y-1">
-          <DataRow label="CEO/MD Name" value={data.contact?.ceoName} />
-          <DataRow label="CEO/MD Email 1" value={data.contact?.ceoEmail} />
-          <DataRow label="CEO/MD Phone 1" value={data.contact?.ceoPhone} />
-          {data.contact?.ceoEmail2 && <DataRow label="CEO/MD Email 2" value={data.contact.ceoEmail2} />}
-          {data.contact?.ceoPhone2 && <DataRow label="CEO/MD Phone 2" value={data.contact.ceoPhone2} />}
-        </div>
-      </div>
 
       <div className="form-section">
         <SectionHeader icon={FileCheck} title="PAN" step={1} tab="pan" onEdit={onEditStep} />
@@ -298,10 +288,6 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
           <DataRow label={`Turnover ${formatIndianFy(fy1Start)}`} value={formatTurnover(data.financial?.turnoverYear1)} />
           <DataRow label={`Turnover ${formatIndianFy(fy2Start)}`} value={formatTurnover(data.financial?.turnoverYear2)} />
           <DataRow label={`Turnover ${formatIndianFy(fy3Start)}`} value={formatTurnover(data.financial?.turnoverYear3)} />
-          <DataRow label="Expected Credit Period" value={formatCreditPeriod(data.financial?.creditPeriodExpected)} />
-          <DataRow label="Major Customer 1" value={data.financial?.majorCustomer1} />
-          <DataRow label="Major Customer 2" value={data.financial?.majorCustomer2} />
-          <DataRow label="Major Customer 3" value={data.financial?.majorCustomer3} />
         </div>
       </div>
       </>
