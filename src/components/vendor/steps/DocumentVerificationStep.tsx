@@ -3448,6 +3448,7 @@ function GstVerifiedDetails({
   onChangeField,
   editablePrincipalPlace,
   onChangePrincipalPlace,
+  legalNameInfo,
 }: {
   ocr?: Record<string, any>;
   original?: Record<string, any>;
@@ -3456,7 +3457,9 @@ function GstVerifiedDetails({
   onChangeField: (key: string, value: any) => void;
   editablePrincipalPlace: string;
   onChangePrincipalPlace: (v: string) => void;
+  legalNameInfo?: { message: string; ok: boolean } | null;
 }) {
+
   if (!ocr) return null;
   const businessNature: string[] = Array.isArray(ocr.business_nature) ? ocr.business_nature : [];
   const additionalPlaces: string[] = Array.isArray(ocr.additional_places) ? ocr.additional_places : [];
