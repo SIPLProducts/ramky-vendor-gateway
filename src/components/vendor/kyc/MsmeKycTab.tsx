@@ -214,7 +214,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
       </div>
 
       {props.isMsmeRegistered && (
-        <div className="grid md:grid-cols-2 gap-5 items-start">
+        <div className="space-y-5">
           <div className="space-y-3">
             <ManualEntryAndVerify
               id="msmeNumber"
@@ -233,7 +233,7 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
           </div>
 
           {/* Certificate upload only appears after Udyam number is successfully validated */}
-          {manualApiResult?.ok ? (
+          {manualApiResult?.ok && (
             <div className="space-y-3">
               <OcrUploadAndVerify
                 documentType="msme"
@@ -251,10 +251,6 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
                   Udyam Certificate is required.
                 </p>
               )}
-            </div>
-          ) : (
-            <div className="rounded-md border border-dashed border-muted p-4 text-xs text-muted-foreground">
-              Verify the Udyam number first — the certificate upload will appear once verification succeeds.
             </div>
           )}
         </div>

@@ -350,7 +350,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="registeredPhone">Office Phone</Label>
               <Input
@@ -373,7 +373,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="registeredWebsite">Website</Label>
               <Input
@@ -397,7 +397,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="registeredContact1">Contact 1 *</Label>
               <Input
@@ -424,7 +424,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="registeredEmail2">Email 2</Label>
               <Input
@@ -618,7 +618,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
         </h3>
 
         <div className="grid gap-5">
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchName">Branch Name</Label>
               <Input
@@ -707,7 +707,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             </div>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-5">
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchCity">City</Label>
               <Input
@@ -749,7 +749,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
 
           <div className="border-t pt-4 mt-2">
             <p className="text-sm font-medium text-foreground mb-4">Branch Contact Person</p>
-            <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="branchContactName">Name</Label>
                 <Input

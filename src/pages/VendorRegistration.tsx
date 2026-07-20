@@ -319,7 +319,7 @@ export default function VendorRegistration() {
     );
   }, [onBehalfInvitation]);
 
-  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
+  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, isAuthReady, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
     onBehalfInvitationId: onBehalfInvitationId || undefined,
     isOnBehalfMode,
@@ -968,6 +968,25 @@ export default function VendorRegistration() {
     };
   }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor, existingFormData]);
 
+  // Warn on refresh / tab-close if there are unsaved changes.
+  // Compares the current formData hash to the last auto-saved hash — silent
+  // when everything is saved, when the form is submitted, or when the user
+  // is still on the Vendor Type selector.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isSubmitted || !vendorTypeChosen) return;
+      const currentHash = JSON.stringify(formData);
+      const dirty =
+        autoSaveState === 'saving' ||
+        (lastSavedHashRef.current !== '' && lastSavedHashRef.current !== currentHash);
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [formData, autoSaveState, isSubmitted, vendorTypeChosen]);
+
 
 
   const handleStartEdit = () => { setIsEditMode(true); setIsSubmitted(false); setCurrentStep(1); setCompletedSteps([1, 2, 3, 4, 5]); };
@@ -1515,7 +1534,7 @@ export default function VendorRegistration() {
   };
 
 
-  if (isLoadingVendor || isValidatingToken || isBootstrappingOnBehalf) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
+  if (!isAuthReady || isLoadingVendor || isValidatingToken || isBootstrappingOnBehalf) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
 
 
 
