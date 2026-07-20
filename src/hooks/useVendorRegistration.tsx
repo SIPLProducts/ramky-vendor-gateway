@@ -153,10 +153,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Fetch existing vendor data for the current user
   const { data: existingVendor, isLoading: isLoadingVendor, refetch: refetchVendor } = useQuery({
-    queryKey: ['existing-vendor', options?.onBehalfInvitationId || (options?.isOnBehalfMode ? 'on-behalf-pending' : 'self')],
+    queryKey: ['existing-vendor', authUserId, options?.onBehalfInvitationId || (options?.isOnBehalfMode ? 'on-behalf-pending' : 'self')],
+    enabled: !!authUserId || !!options?.onBehalfInvitationId,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const userId = authUserId || (await supabase.auth.getUser()).data.user?.id || null;
+      if (!userId && !options?.onBehalfInvitationId) return null;
+
 
       // On-behalf mode without a resolved invitation id yet: do NOT load the
       // buyer's previous "self" draft — that would reuse an old vendor row and
