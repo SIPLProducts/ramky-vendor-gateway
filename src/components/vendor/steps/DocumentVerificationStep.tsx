@@ -3610,7 +3610,7 @@ function GstVerifiedDetails({
       {hasJurisdiction && (
         <div className="space-y-2">
           <SectionHeading>Jurisdiction</SectionHeading>
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid md:grid-cols-4 gap-3">
             {ocr.jurisdiction_centre && (
               <EditableOcrField
                 label="Centre Jurisdiction"
