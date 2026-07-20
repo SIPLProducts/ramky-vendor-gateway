@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -102,8 +102,23 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const { toast } = useToast();
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<VendorStatus | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
-  // Fetch portal configuration
+  // Track auth user id so the existing-vendor query only fires (and re-fires)
+  // once Supabase auth is hydrated. Without this, a hard refresh can race the
+  // query with auth hydration, return null, and the saved draft never loads —
+  // which drops the user back onto the Vendor Type selector.
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setAuthUserId(data.user?.id ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setAuthUserId(session?.user?.id ?? null);
+    });
+    return () => { mounted = false; sub.subscription.unsubscribe(); };
+  }, []);
+
   const { data: portalConfig } = useQuery({
     queryKey: ['portal-config'],
     queryFn: async () => {
