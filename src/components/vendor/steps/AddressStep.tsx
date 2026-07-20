@@ -771,9 +771,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   placeholder="Designation"
                 />
               </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5 mt-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="branchContactEmail">Email</Label>
                 <Input
@@ -783,6 +780,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   placeholder="email@example.com"
                 />
               </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-5 mt-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="branchContactPhone">Phone</Label>
                 <Input
@@ -803,6 +803,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   placeholder="Fax number"
                 />
               </div>
+              <div />
             </div>
           </div>
         </div>
