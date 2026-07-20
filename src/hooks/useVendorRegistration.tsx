@@ -103,6 +103,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<VendorStatus | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
 
   // Track auth user id so the existing-vendor query only fires (and re-fires)
   // once Supabase auth is hydrated. Without this, a hard refresh can race the
@@ -111,10 +112,16 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   useEffect(() => {
     let mounted = true;
     supabase.auth.getUser().then(({ data }) => {
-      if (mounted) setAuthUserId(data.user?.id ?? null);
+      if (mounted) {
+        setAuthUserId(data.user?.id ?? null);
+        setIsAuthReady(true);
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) setAuthUserId(session?.user?.id ?? null);
+      if (mounted) {
+        setAuthUserId(session?.user?.id ?? null);
+        setIsAuthReady(true);
+      }
     });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
