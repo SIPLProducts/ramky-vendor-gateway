@@ -78,7 +78,7 @@ export const IDENTIFICATION_SOURCES = [
   'OTHER',
 ] as const;
 
-// Step 2: Address Information
+// Step 2: Contact Details (Address Information renamed)
 export interface AddressDetails {
   registeredAddress: string;
   registeredAddressLine2: string;

@@ -163,7 +163,7 @@ export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: 
       </div>
 
       <div className="form-section">
-        <SectionHeader icon={MapPin} title="Address Information" step={3} onEdit={onEditStep} />
+        <SectionHeader icon={MapPin} title="Contact Details" step={3} onEdit={onEditStep} />
         <div className="space-y-5">
           <div className="rounded-lg border border-border/60 p-4 bg-muted/20">
             <h4 className="text-sm font-semibold text-foreground mb-2">Registered / Corporate Office Address</h4>

@@ -1881,7 +1881,7 @@ export default function VendorRegistration() {
                       ) : (
                         <Send className="h-4 w-4 mr-2" />
                       )}
-                      Submit Application
+                      Submit
                     </Button>
                   ) : (
                     isInternational && currentStep === 1 ? (
