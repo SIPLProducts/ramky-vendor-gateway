@@ -1515,7 +1515,7 @@ export default function VendorRegistration() {
   };
 
 
-  if (isLoadingVendor || isValidatingToken || isBootstrappingOnBehalf) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
+  if (!isAuthReady || isLoadingVendor || isValidatingToken || isBootstrappingOnBehalf) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>;
 
 
 
