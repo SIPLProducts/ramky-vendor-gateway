@@ -2254,15 +2254,20 @@ export function DocumentVerificationStep({
                           onChangeField={(k, v) => setOcrField(setGstDoc, k, v)}
                           editablePrincipalPlace={editablePrincipalPlace}
                           onChangePrincipalPlace={setEditablePrincipalPlace}
+                          legalNameInfo={
+                            gstDoc.status === "verified" && typeof gstDoc.nameMatchScore === "number"
+                              ? {
+                                  message: `Name match score: ${gstDoc.nameMatchScore}%`,
+                                  ok: gstDoc.nameMatchScore >= 80,
+                                }
+                              : null
+                          }
                         />
+
                       }
                     />
-                    {gstDoc.status === "verified" && typeof gstDoc.nameMatchScore === "number" && (
-                      <CrossCheckStrip
-                        ok={gstDoc.nameMatchScore >= 80}
-                        text={`Name match score: ${gstDoc.nameMatchScore}%`}
-                      />
-                    )}
+
+
 
                     {/* GST Filing Status — runs after GSTIN Validation */}
                     {gstDoc.status === "verified" && (
@@ -2416,14 +2421,35 @@ export function DocumentVerificationStep({
                             verifiedValue={panApi.pan_number}
                             verifiedLabel="PAN is verified"
                           />
-                          <EditableOcrField
-                            label="Holder Name"
-                            value={panDoc.ocrData?.holder_name}
-                            originalValue={panDoc.originalOcrData?.holder_name}
-                            onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
-                            verifiedValue={panApi.holder_name || panApi.full_name}
-                            verifiedLabel="Name matches PAN registry"
-                          />
+                          {(() => {
+                            const msgs: string[] = [];
+                            if (panCrossCheckError) msgs.push(panCrossCheckError);
+                            if (panDoc.status === "verified" && !panCrossCheckError) {
+                              if (panDoc.apiData?.panMatchMessage) msgs.push(panDoc.apiData.panMatchMessage);
+                              if (panDoc.apiData?.nameMatchMessage) msgs.push(panDoc.apiData.nameMatchMessage);
+                              if (!panDoc.apiData?.panMatchMessage && isGstRegistered === true) {
+                                msgs.push("PAN Number verified with GST PAN Number.");
+                              }
+                              if (typeof panDoc.nameMatchScore === "number") {
+                                msgs.push(`Name match vs Legal Name: ${panDoc.nameMatchScore}%`);
+                              }
+                            }
+                            const trailingInfo = msgs.length
+                              ? { message: msgs.join("\n"), ok: !panCrossCheckError }
+                              : null;
+                            return (
+                              <EditableOcrField
+                                label="Holder Name"
+                                value={panDoc.ocrData?.holder_name}
+                                originalValue={panDoc.originalOcrData?.holder_name}
+                                onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
+                                verifiedValue={panApi.holder_name || panApi.full_name}
+                                verifiedLabel="Name matches PAN registry"
+                                trailingInfo={trailingInfo}
+                              />
+                            );
+                          })()}
+
                           {panApi.dob && (
                             <EditableOcrField
                               label="Date of Birth"
@@ -2479,25 +2505,8 @@ export function DocumentVerificationStep({
                   })()
                 }
               />
-              {panCrossCheckError && (
-                <CrossCheckStrip ok={false} text={panCrossCheckError} className="mt-3" />
-              )}
-              {panDoc.status === "verified" && !panCrossCheckError && panDoc.apiData?.panMatchMessage && (
-                <CrossCheckStrip ok={true} text={panDoc.apiData.panMatchMessage} className="mt-3" />
-              )}
-              {panDoc.status === "verified" && !panCrossCheckError && panDoc.apiData?.nameMatchMessage && (
-                <CrossCheckStrip ok={true} text={panDoc.apiData.nameMatchMessage} className="mt-2" />
-              )}
-              {panDoc.status === "verified" && !panCrossCheckError && !panDoc.apiData?.panMatchMessage && isGstRegistered === true && (
-                <CrossCheckStrip ok={true} text="PAN Number verified with GST PAN Number." className="mt-3" />
-              )}
-              {panDoc.status === "verified" && typeof panDoc.nameMatchScore === "number" && (
-                <CrossCheckStrip
-                  ok={panDoc.nameMatchScore >= 80}
-                  text={`Name match vs Legal Name: ${panDoc.nameMatchScore}%`}
-                  className="mt-2"
-                />
-              )}
+
+
             </StageShell>
 
             <div className="mt-4 flex justify-end">
@@ -2837,31 +2846,23 @@ export function DocumentVerificationStep({
                           verifiedLabel="Branch is verified"
                           onChange={(v) => { setOcrField(setBankDoc, "branch_name", v); setBankBranchAutoFilled(false); }}
                         />
-                        {bankBranchAutoFilled && bankDoc.ocrData?.branch_name && (
-                          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
-                          </p>
-                        )}
                       </div>
                       <div className="md:col-span-2">
-                        <div className="flex items-start gap-1.5">
-                          <div className="flex-1 min-w-0">
-                            <EditableOcrField
-                              label="Account Holder Name"
-                              value={bankDoc.ocrData?.account_holder_name}
-                              originalValue={bankDoc.originalOcrData?.account_holder_name}
-                              verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
-                              verifiedLabel="Name matches bank record"
-                              onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
-                            />
-                          </div>
-                          {bankDoc.apiData?.holderNameMessage && (
-                            <div className="pt-6">
-                              <NameMatchInfo message={bankDoc.apiData.holderNameMessage} ok />
-                            </div>
-                          )}
-                        </div>
+                        <EditableOcrField
+                          label="Account Holder Name"
+                          value={bankDoc.ocrData?.account_holder_name}
+                          originalValue={bankDoc.originalOcrData?.account_holder_name}
+                          verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
+                          verifiedLabel="Name matches bank record"
+                          onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
+                          trailingInfo={
+                            bankDoc.apiData?.holderNameMessage
+                              ? { message: bankDoc.apiData.holderNameMessage, ok: true }
+                              : null
+                          }
+                        />
                       </div>
+
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
                         <select
@@ -2976,31 +2977,23 @@ export function DocumentVerificationStep({
                                 verifiedLabel="Branch is verified"
                                 onChange={(v) => { setOcrField(setBankDoc2, "branch_name", v); setBankBranchAutoFilled2(false); }}
                               />
-                              {bankBranchAutoFilled2 && bankDoc2.ocrData?.branch_name && (
-                                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                                  <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
-                                </p>
-                              )}
                             </div>
                             <div className="md:col-span-2">
-                              <div className="flex items-start gap-1.5">
-                                <div className="flex-1 min-w-0">
-                                  <EditableOcrField
-                                    label="Account Holder Name"
-                                    value={bankDoc2.ocrData?.account_holder_name}
-                                    originalValue={bankDoc2.originalOcrData?.account_holder_name}
-                                    verifiedValue={bankDoc2.apiData?.normalized?.account_holder_name}
-                                    verifiedLabel="Name matches bank record"
-                                    onChange={(v) => setOcrField(setBankDoc2, "account_holder_name", v)}
-                                  />
-                                </div>
-                                {bankDoc2.apiData?.holderNameMessage && (
-                                  <div className="pt-6">
-                                    <NameMatchInfo message={bankDoc2.apiData.holderNameMessage} ok />
-                                  </div>
-                                )}
-                              </div>
+                              <EditableOcrField
+                                label="Account Holder Name"
+                                value={bankDoc2.ocrData?.account_holder_name}
+                                originalValue={bankDoc2.originalOcrData?.account_holder_name}
+                                verifiedValue={bankDoc2.apiData?.normalized?.account_holder_name}
+                                verifiedLabel="Name matches bank record"
+                                onChange={(v) => setOcrField(setBankDoc2, "account_holder_name", v)}
+                                trailingInfo={
+                                  bankDoc2.apiData?.holderNameMessage
+                                    ? { message: bankDoc2.apiData.holderNameMessage, ok: true }
+                                    : null
+                                }
+                              />
                             </div>
+
                             <div>
                               <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
                               <select
@@ -3455,6 +3448,7 @@ function GstVerifiedDetails({
   onChangeField,
   editablePrincipalPlace,
   onChangePrincipalPlace,
+  legalNameInfo,
 }: {
   ocr?: Record<string, any>;
   original?: Record<string, any>;
@@ -3463,7 +3457,9 @@ function GstVerifiedDetails({
   onChangeField: (key: string, value: any) => void;
   editablePrincipalPlace: string;
   onChangePrincipalPlace: (v: string) => void;
+  legalNameInfo?: { message: string; ok: boolean } | null;
 }) {
+
   if (!ocr) return null;
   const businessNature: string[] = Array.isArray(ocr.business_nature) ? ocr.business_nature : [];
   const additionalPlaces: string[] = Array.isArray(ocr.additional_places) ? ocr.additional_places : [];
@@ -3490,7 +3486,9 @@ function GstVerifiedDetails({
             verifiedValue={api.legal_name}
             verifiedLabel="Legal Name is verified"
             onChange={(v) => onChangeField("legal_name", v)}
+            trailingInfo={legalNameInfo ?? null}
           />
+
           <EditableOcrField
             label="Trade Name"
             value={ocr.trade_name}
@@ -3617,7 +3615,7 @@ function GstVerifiedDetails({
       {hasJurisdiction && (
         <div className="space-y-2">
           <SectionHeading>Jurisdiction</SectionHeading>
-          <div className="grid md:grid-cols-4 gap-3">
+          <div className="grid md:grid-cols-2 gap-3">
             {ocr.jurisdiction_centre && (
               <EditableOcrField
                 label="Centre Jurisdiction"
@@ -3777,6 +3775,7 @@ function EditableOcrField({
   verifiedValue,
   verifiedLabel,
   readOnly = true,
+  trailingInfo,
 }: {
   label: string;
   value?: string;
@@ -3786,10 +3785,12 @@ function EditableOcrField({
   placeholder?: string;
   /** Value returned by the validation API for this field (registry/penny-drop). */
   verifiedValue?: string;
-  /** Label shown next to the green tick when the value matches the API. */
+  /** Tooltip label shown on the trailing green tick when the value matches the API. */
   verifiedLabel?: string;
   /** When true, disables editing and hides Edited/Reset/Use registry affordances. */
   readOnly?: boolean;
+  /** Optional cross-check message rendered as an (i) popover inside the input. */
+  trailingInfo?: { message: string; ok: boolean } | null;
 }) {
   const current = value ?? "";
   const original = originalValue ?? "";
@@ -3798,52 +3799,70 @@ function EditableOcrField({
   const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
   const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
   const mismatchApi = !readOnly && hasApi && !matchesApi;
+  const hasTrailingInfo = !!(trailingInfo && trailingInfo.message);
+  const hasBadge = matchesApi || isEdited || mismatchApi;
+  const adornmentCount = (hasBadge ? 1 : 0) + (hasTrailingInfo ? 1 : 0);
+  const padRight = adornmentCount === 2 ? "pr-16" : adornmentCount === 1 ? "pr-9" : "";
   return (
     <div>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 min-h-[18px]">
         <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-        <div className="flex items-center gap-2">
-          {isEdited && (
-            <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-1.5 py-0.5 text-[10px] font-medium">
-              Edited
+        {isEdited && (
+          <button
+            type="button"
+            onClick={() => onChange(original)}
+            className="text-[10px] text-primary hover:underline"
+          >
+            Reset to OCR
+          </button>
+        )}
+      </div>
+      <div className="relative">
+        <Input
+          value={current}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder ?? "—"}
+          readOnly={readOnly}
+          tabIndex={readOnly ? -1 : undefined}
+          aria-readonly={readOnly || undefined}
+          className={cn(
+            "mt-1 bg-muted/40 border-border/60",
+            mono && "font-mono text-sm tracking-wide",
+            isEdited && "border-warning/40 bg-warning/5",
+            matchesApi && "border-success/40 bg-success/5",
+            mismatchApi && "border-warning/50 bg-warning/5",
+            readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
+            padRight,
+          )}
+        />
+        <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1">
+          {hasBadge && (
+            <span
+              className="pointer-events-auto"
+              title={
+                matchesApi
+                  ? verifiedLabel || `${label} is verified`
+                  : mismatchApi
+                    ? `Doesn't match registry value: ${apiVal}`
+                    : "Edited"
+              }
+            >
+              {matchesApi ? (
+                <BadgeCheck className="h-5 w-5 text-success" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-warning" />
+              )}
             </span>
           )}
-          {isEdited && (
-            <button
-              type="button"
-              onClick={() => onChange(original)}
-              className="text-[10px] text-primary hover:underline"
-            >
-              Reset to OCR
-            </button>
+          {hasTrailingInfo && (
+            <span className="pointer-events-auto">
+              <NameMatchInfo message={trailingInfo!.message} ok={trailingInfo!.ok} />
+            </span>
           )}
         </div>
       </div>
-      <Input
-        value={current}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "—"}
-        readOnly={readOnly}
-        tabIndex={readOnly ? -1 : undefined}
-        aria-readonly={readOnly || undefined}
-        className={cn(
-          "mt-1 bg-muted/40 border-border/60",
-          mono && "font-mono text-sm tracking-wide",
-          isEdited && "border-warning/40 bg-warning/5",
-          matchesApi && "border-success/40 bg-success/5",
-          mismatchApi && "border-warning/50 bg-warning/5",
-          readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
-        )}
-      />
-      {matchesApi && (
-        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
-          <CheckCircle2 className="h-3 w-3" />
-          {verifiedLabel || `${label} is verified`}
-        </p>
-      )}
       {mismatchApi && (
         <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
-          <AlertTriangle className="h-3 w-3 shrink-0" />
           <span className="truncate">
             Doesn't match registry value:&nbsp;
             <span className="font-medium">{apiVal}</span>
