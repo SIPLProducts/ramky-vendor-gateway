@@ -2837,31 +2837,23 @@ export function DocumentVerificationStep({
                           verifiedLabel="Branch is verified"
                           onChange={(v) => { setOcrField(setBankDoc, "branch_name", v); setBankBranchAutoFilled(false); }}
                         />
-                        {bankBranchAutoFilled && bankDoc.ocrData?.branch_name && (
-                          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" /> Auto-filled from IFSC — please verify
-                          </p>
-                        )}
                       </div>
                       <div className="md:col-span-2">
-                        <div className="flex items-start gap-1.5">
-                          <div className="flex-1 min-w-0">
-                            <EditableOcrField
-                              label="Account Holder Name"
-                              value={bankDoc.ocrData?.account_holder_name}
-                              originalValue={bankDoc.originalOcrData?.account_holder_name}
-                              verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
-                              verifiedLabel="Name matches bank record"
-                              onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
-                            />
-                          </div>
-                          {bankDoc.apiData?.holderNameMessage && (
-                            <div className="pt-6">
-                              <NameMatchInfo message={bankDoc.apiData.holderNameMessage} ok />
-                            </div>
-                          )}
-                        </div>
+                        <EditableOcrField
+                          label="Account Holder Name"
+                          value={bankDoc.ocrData?.account_holder_name}
+                          originalValue={bankDoc.originalOcrData?.account_holder_name}
+                          verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
+                          verifiedLabel="Name matches bank record"
+                          onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
+                          trailingInfo={
+                            bankDoc.apiData?.holderNameMessage
+                              ? { message: bankDoc.apiData.holderNameMessage, ok: true }
+                              : null
+                          }
+                        />
                       </div>
+
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
                         <select
