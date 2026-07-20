@@ -483,9 +483,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   <p className="text-xs text-destructive">{errors.manufacturingAddress.message}</p>
                 )}
               </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingAddressLine2">Address Line 2</Label>
                 <Input
@@ -512,6 +509,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   <p className="text-xs text-destructive">{errors.manufacturingAddressLine3.message}</p>
                 )}
               </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingAddressLine4">Address Line 4</Label>
                 <Input
@@ -525,9 +525,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   <p className="text-xs text-destructive">{errors.manufacturingAddressLine4.message}</p>
                 )}
               </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingCity">City</Label>
                 <Input
@@ -536,7 +533,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   placeholder="City"
                 />
               </div>
-
               <div className="grid gap-1.5">
                 <Label>State</Label>
                 <Controller
@@ -558,7 +554,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   )}
                 />
               </div>
+            </div>
 
+            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingPincode">PIN Code</Label>
                 <Input
@@ -571,9 +569,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   <p className="text-xs text-destructive">{errors.manufacturingPincode.message}</p>
                 )}
               </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingPhone">Office Phone</Label>
                 <Input
@@ -594,6 +589,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   placeholder="Fax number"
                 />
               </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="manufacturingEmail">Email ID</Label>
                 <Input
@@ -607,6 +605,8 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                   <p className="text-xs text-destructive">{errors.manufacturingEmail.message}</p>
                 )}
               </div>
+              <div />
+              <div />
             </div>
           </div>
         )}
