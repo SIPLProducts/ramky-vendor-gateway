@@ -2412,14 +2412,35 @@ export function DocumentVerificationStep({
                             verifiedValue={panApi.pan_number}
                             verifiedLabel="PAN is verified"
                           />
-                          <EditableOcrField
-                            label="Holder Name"
-                            value={panDoc.ocrData?.holder_name}
-                            originalValue={panDoc.originalOcrData?.holder_name}
-                            onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
-                            verifiedValue={panApi.holder_name || panApi.full_name}
-                            verifiedLabel="Name matches PAN registry"
-                          />
+                          {(() => {
+                            const msgs: string[] = [];
+                            if (panCrossCheckError) msgs.push(panCrossCheckError);
+                            if (panDoc.status === "verified" && !panCrossCheckError) {
+                              if (panDoc.apiData?.panMatchMessage) msgs.push(panDoc.apiData.panMatchMessage);
+                              if (panDoc.apiData?.nameMatchMessage) msgs.push(panDoc.apiData.nameMatchMessage);
+                              if (!panDoc.apiData?.panMatchMessage && isGstRegistered === true) {
+                                msgs.push("PAN Number verified with GST PAN Number.");
+                              }
+                              if (typeof panDoc.nameMatchScore === "number") {
+                                msgs.push(`Name match vs Legal Name: ${panDoc.nameMatchScore}%`);
+                              }
+                            }
+                            const trailingInfo = msgs.length
+                              ? { message: msgs.join("\n"), ok: !panCrossCheckError }
+                              : null;
+                            return (
+                              <EditableOcrField
+                                label="Holder Name"
+                                value={panDoc.ocrData?.holder_name}
+                                originalValue={panDoc.originalOcrData?.holder_name}
+                                onChange={(v) => setOcrField(setPanDoc, "holder_name", v)}
+                                verifiedValue={panApi.holder_name || panApi.full_name}
+                                verifiedLabel="Name matches PAN registry"
+                                trailingInfo={trailingInfo}
+                              />
+                            );
+                          })()}
+
                           {panApi.dob && (
                             <EditableOcrField
                               label="Date of Birth"
