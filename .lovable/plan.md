@@ -1,32 +1,42 @@
-## 1) Verified OCR field — keep messages below input, change border to bottom-only
 
-File: `src/components/vendor/steps/DocumentVerificationStep.tsx` (`EditableOcrField`, ~lines 3768–3881)
+## Fix 1 — Restore verification messages below verified OCR inputs
 
-- **Keep all existing messages below the input** — including the "Doesn't match registry value … Use registry value" line and any other helper/success text. No text is removed.
-- Change only the `Input` container styling so the field renders as a **single bottom border** (no top / left / right border, no rounded rectangle, no background fill):
-  - Base: `border-0 border-b rounded-none bg-transparent border-border/60 focus-visible:ring-0 focus-visible:ring-offset-0 px-0`
-  - `matchesApi` (verified): `border-b-2 border-b-success` (dark green)
-  - `mismatchApi`: `border-b-2 border-b-warning` (orange)
-  - `isEdited`: `border-b-2 border-b-warning`
-- Keep the right-aligned adornment cluster (green `BadgeCheck` / orange `AlertTriangle` / (i) popover) inside the input; reposition to `right-0` since horizontal padding is now 0.
-- No changes to props, callers, verification logic, tooltip strings, or below-input helper text.
+In `src/components/vendor/steps/DocumentVerificationStep.tsx`, `EditableOcrField` currently only shows the `verifiedLabel` text (e.g. "Verified from registry", "DOB verified from registry") as a hover tooltip on the green tick. Add it back as a small green line **below the input** whenever the value matches the API/registry value.
 
-## 2) Organization Profile — hide Buyer Company, 2-column layout, drop Firm Registration No.
+Change: below the input's `<div className="relative">…</div>`, add:
 
-File: `src/components/vendor/steps/OrganizationStep.tsx`
+```tsx
+{matchesApi && verifiedLabel && (
+  <p className="mt-1 flex items-center gap-1 text-[11px] text-success">
+    <CheckCircle2 className="h-3 w-3" />
+    <span>{verifiedLabel}</span>
+  </p>
+)}
+```
 
-- **Hide Buyer Company** (lines 318–358): remove the visible block but keep the hidden `<input type="hidden">` inside the Controller so `buyerCompanyId` still submits and validation still passes.
-- **Two-column layout** for the Organization Profile section (lines 317–478): wrap Legal Name, Trade Name, Industry Type, Organization Type, Ownership Type, and State in a single `grid md:grid-cols-2 gap-5` container so every field sits in a 2-column row.
-- **Remove Firm Registration No.** field (lines 530–539) from Statutory & Registrations, including its wrapping `md:grid-cols-2` row. `firmRegistrationNo` stays in the form schema — just not rendered.
+Result: fields like Legal Name, Trade Name, GSTIN, PAN, DOB, IFSC, Bank Name, Account Holder, etc. show a green "Verified from registry" / "DOB verified from registry" line under the field again — while the green bottom border and inline tick are kept. The orange mismatch message (with "Use registry value") is already rendered and stays untouched.
 
-## 3) Memberships & Certifications — hide Memberships and Enlistment With
+## Fix 2 — Draft data lost after browser refresh (form returns to Vendor Type screen)
 
-File: `src/components/vendor/steps/OrganizationStep.tsx` (lines 558–612)
+Root cause (unconfirmed pending a live check, but strongly indicated by the code): in `src/hooks/useVendorRegistration.tsx` the `existing-vendor` `useQuery`:
 
-- Remove the `Memberships` block (lines 566–580) and the `Enlistment With` block (lines 581–595). Keep the section header and the `Certifications` block. `memberships` / `enlistments` form fields stay in state — no schema changes.
+- runs immediately on mount,
+- calls `supabase.auth.getUser()` and **returns `null` if `user` is not yet hydrated**,
+- has a `queryKey` that does NOT depend on the authenticated user id, so it never re-runs once auth finishes hydrating.
 
-## Verification
+On a hard refresh, Supabase auth hydration frequently completes *after* the query fires → query resolves `null` → `existingFormData` stays `null` → `VendorRegistration.tsx` renders the Vendor Type selector (`!vendorTypeChosen`) instead of the saved draft.
 
-- Build passes.
-- Vendor Registration → Organization Profile: no Buyer Company row, fields 2 per row, no Firm Registration No., only Certifications under Memberships & Certifications.
-- Documents tab (GST / PAN / MSME / Bank verified panels): inputs show only a bottom border — dark green when matched, orange when mismatch/edited — with all existing helper messages still shown below.
+Change in `src/hooks/useVendorRegistration.tsx`:
+
+1. Track auth user id via `supabase.auth.onAuthStateChange` + initial `getUser()` in a small `useState<string | null>`.
+2. Gate the `existing-vendor` query with `enabled: !!userId || !!options?.onBehalfInvitationId` and include the user id in the `queryKey` so it refetches once auth is ready.
+3. Inside `queryFn`, keep the existing `user_id`/`invitation_id` filter but rely on the resolved id from state rather than re-calling `getUser()` (still fall back to `getUser()` for safety).
+
+This ensures the saved draft is loaded on every refresh, which then lets the existing effect at `VendorRegistration.tsx` line 779 hydrate `formData`, call `setVendorTypeChosen(true)`, and land the user on the correct step instead of the Vendor Type selector.
+
+No other UI is changed; the Buyer Company / Firm Reg / Memberships tweaks and other prior changes are untouched.
+
+## Files touched
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` (add below-input verified message in `EditableOcrField`)
+- `src/hooks/useVendorRegistration.tsx` (auth-gated existing-vendor query so refresh rehydrates the draft)

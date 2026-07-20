@@ -3862,6 +3862,14 @@ function EditableOcrField({
         </div>
       </div>
 
+      {matchesApi && verifiedLabel && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] text-success">
+          <CheckCircle2 className="h-3 w-3" />
+          <span>{verifiedLabel}</span>
+        </p>
+      )}
+
+
       {mismatchApi && (
         <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
           <span className="truncate">
