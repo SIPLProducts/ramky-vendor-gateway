@@ -2405,7 +2405,7 @@ export function DocumentVerificationStep({
                     return (
                       <div className="space-y-3">
                         <ReviewBanner />
-                        <div className="grid md:grid-cols-2 gap-3">
+                        <div className="grid md:grid-cols-3 gap-3">
                           <EditableOcrField
                             label="PAN Number"
                             value={panDoc.ocrData?.pan_number}
@@ -2599,7 +2599,7 @@ export function DocumentVerificationStep({
                         {msmeDoc.status === "verified" && (
                           <div className="space-y-3 pt-2">
                             <ReviewBanner />
-                            <div className="grid md:grid-cols-2 gap-3">
+                            <div className="grid md:grid-cols-3 gap-3">
                               {(() => { const m = msmeDoc.apiData?.normalized || {}; return (<>
                               <EditableOcrField
                                 label="Udyam Number"
@@ -2800,7 +2800,7 @@ export function DocumentVerificationStep({
                 verifiedFields={
                   <div className="space-y-3">
                     <ReviewBanner />
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <div className="grid md:grid-cols-3 gap-3">
                       <EditableOcrField
                         label="Account Number"
                         value={bankDoc.ocrData?.account_number}
@@ -2936,7 +2936,7 @@ export function DocumentVerificationStep({
                       }
                       verifiedFields={
                         <div className="space-y-3">
-                          <div className="grid md:grid-cols-2 gap-3">
+                          <div className="grid md:grid-cols-3 gap-3">
                             <EditableOcrField
                               label="Account Number"
                               value={bankDoc2.ocrData?.account_number}
@@ -3475,7 +3475,7 @@ function GstVerifiedDetails({
       {/* Identity */}
       <div className="space-y-2">
         <SectionHeading>Identity</SectionHeading>
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid md:grid-cols-3 gap-3">
           <EditableOcrField
             label="Legal Name"
             value={ocr.legal_name}
@@ -3525,7 +3525,7 @@ function GstVerifiedDetails({
       {hasRegistrationSection && (
         <div className="space-y-2">
           <SectionHeading>Registration</SectionHeading>
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             {ocr.gst_status && (
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">GST Status</Label>
@@ -3575,7 +3575,7 @@ function GstVerifiedDetails({
       {/* Place of Business */}
       <div className="space-y-2">
         <SectionHeading>Place of Business</SectionHeading>
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid md:grid-cols-3 gap-3">
           <div className="md:col-span-2">
             <Label htmlFor="principal-place" className="text-xs font-medium text-muted-foreground">
               Principal Place of Business
@@ -3610,7 +3610,7 @@ function GstVerifiedDetails({
       {hasJurisdiction && (
         <div className="space-y-2">
           <SectionHeading>Jurisdiction</SectionHeading>
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             {ocr.jurisdiction_centre && (
               <EditableOcrField
                 label="Centre Jurisdiction"
