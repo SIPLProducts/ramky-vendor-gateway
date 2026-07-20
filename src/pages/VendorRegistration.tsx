@@ -1448,7 +1448,7 @@ export default function VendorRegistration() {
     // International flow
     if (isInternational) {
       const intl = formData.international ?? EMPTY_INTERNATIONAL_DATA;
-      if (currentStep === registrationSteps.length) {
+      if (currentStep === lastStepId) {
         return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
       }
       switch (currentStep) {
