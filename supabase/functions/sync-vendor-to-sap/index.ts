@@ -841,7 +841,27 @@ serve(async (req) => {
             ? (tenantCode ? `${tenantName} (${tenantCode})` : tenantName)
             : null;
 
-          if (buyerEmail) {
+          // Also send the same SAP-success email to the vendor's registered email.
+          let vendorEmail: string | null = null;
+          try {
+            vendorEmail = ((vendor as any)?.primary_email || "").trim() || null;
+            if (!vendorEmail && (vendor as any)?.invitation_id) {
+              const { data: inv } = await supabase
+                .from("vendor_invitations")
+                .select("email")
+                .eq("id", (vendor as any).invitation_id)
+                .maybeSingle();
+              vendorEmail = ((inv as any)?.email || "").trim() || null;
+            }
+          } catch (_) { /* ignore */ }
+
+          const recipients: string[] = [];
+          if (buyerEmail) recipients.push(buyerEmail);
+          if (vendorEmail && vendorEmail.toLowerCase() !== (buyerEmail || "").toLowerCase()) {
+            recipients.push(vendorEmail);
+          }
+
+          if (recipients.length > 0) {
             const legal = vendor.legal_name || vendor.trade_name || "Vendor";
             const trade = vendor.trade_name || "";
             const syncedAt = new Date().toLocaleString('en-IN', {
@@ -867,10 +887,10 @@ serve(async (req) => {
                 <p>Regards,<br/>Ramky Vendor Portal</p>
               </div>`;
             const { error: mailErr } = await supabase.functions.invoke("send-smtp-email", {
-              body: { to: buyerEmail, subject, html },
+              body: { to: recipients, subject, html },
             });
             if (mailErr) {
-              console.error("buyer SAP-success email failed:", mailErr);
+              console.error("SAP-success email failed:", mailErr);
             } else {
               try {
                 await supabase.from("audit_logs").insert({
@@ -879,6 +899,8 @@ serve(async (req) => {
                     vendor_id: vendorId,
                     buyer_user_id: buyerUserId,
                     buyer_email: buyerEmail,
+                    vendor_email: vendorEmail,
+                    recipients,
                     sap_vendor_code: sapVendorCode,
                     tenant_id: (vendor as any)?.tenant_id ?? null,
                     tenant_name: tenantName,
@@ -888,6 +910,7 @@ serve(async (req) => {
               } catch (_) { /* ignore */ }
             }
           }
+
         }
       } catch (notifyErr: any) {
         console.error("buyer notification skipped:", notifyErr?.message || notifyErr);
