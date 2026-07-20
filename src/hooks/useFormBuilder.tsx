@@ -20,7 +20,7 @@ export interface FormStepConfig {
 export const BUILT_IN_STEPS: Array<Omit<FormStepConfig, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>> = [
   { step_key: 'document_verification', step_label: 'Document Verification', step_description: 'PAN / GST / MSME / Bank — OCR + API verified', step_order: 1, is_visible: true, is_built_in: true },
   { step_key: 'organization',          step_label: 'Organization Profile',   step_description: 'Company, statutory & memberships',           step_order: 2, is_visible: true, is_built_in: true },
-  { step_key: 'address',               step_label: 'Address Information',    step_description: 'Registered, manufacturing & branch',         step_order: 3, is_visible: true, is_built_in: true },
+  { step_key: 'address',               step_label: 'Contact Details',    step_description: 'Registered, manufacturing & branch',         step_order: 3, is_visible: true, is_built_in: true },
   { step_key: 'contact',               step_label: 'Contact Details',        step_description: 'Key contact persons',                        step_order: 4, is_visible: true, is_built_in: true },
   { step_key: 'financial',             step_label: 'Financial & Infrastructure', step_description: 'Turnover, facility & QHSE',              step_order: 5, is_visible: true, is_built_in: true },
   { step_key: 'review',                step_label: 'Review & Submit',        step_description: 'Verify and submit application',              step_order: 99, is_visible: true, is_built_in: true },

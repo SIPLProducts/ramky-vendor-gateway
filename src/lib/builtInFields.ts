@@ -91,7 +91,7 @@ export const BUILT_IN_FIELDS: Record<string, BuiltInField[]> = {
     { field_name: 'certifications',     display_label: 'Certifications',            field_type: 'multi-select', is_mandatory: false, group: 'Memberships' },
   ],
 
-  // ---------- Address Information ----------
+  // ---------- Contact Details (Address Information renamed) ----------
   address: [
     { field_name: 'registeredAddress',       display_label: 'Registered: Address Line 1', field_type: 'text',   is_mandatory: true,  group: 'Registered Office' },
     { field_name: 'registeredAddressLine2',  display_label: 'Registered: Address Line 2', field_type: 'text',   is_mandatory: false, group: 'Registered Office' },
