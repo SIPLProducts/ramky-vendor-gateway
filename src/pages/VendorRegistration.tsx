@@ -697,10 +697,6 @@ export default function VendorRegistration() {
   useEffect(() => {
     if (!isTokenMode) return;
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
 
     const handlePopState = (e: PopStateEvent) => {
       e.preventDefault();
@@ -732,12 +728,10 @@ export default function VendorRegistration() {
     // Push initial state
     window.history.pushState(null, '', window.location.href);
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
     };
