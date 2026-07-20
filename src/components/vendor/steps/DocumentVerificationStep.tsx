@@ -3207,30 +3207,30 @@ interface StageShellProps {
   children: React.ReactNode;
 }
 function StageShell({ icon, title, subtitle, status, verifiedAt, children }: StageShellProps) {
+  const showHeader = Boolean(title || subtitle);
   return (
     <div className="rounded-lg border border-border/60 bg-card shadow-enterprise-sm overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            {icon}
+      {showHeader && (
+        <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              {icon}
+            </div>
+            <div className="min-w-0">
+              {title && <h3 className="text-sm font-semibold text-foreground leading-tight">{title}</h3>}
+              {subtitle && <p className="text-xs text-muted-foreground leading-tight mt-0.5">{subtitle}</p>}
+            </div>
           </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground leading-tight">{title}</h3>
-            <p className="text-xs text-muted-foreground leading-tight mt-0.5">{subtitle}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            {verifiedAt && status === "verified" && (
+              <span className="hidden sm:inline text-xs text-muted-foreground">
+                · {timeAgo(verifiedAt)}
+              </span>
+            )}
+            <StatusPill status={status} />
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {verifiedAt && status === "verified" && (
-            <span className="hidden sm:inline text-xs text-muted-foreground">
-              · {timeAgo(verifiedAt)}
-            </span>
-          )}
-          <StatusPill status={status} />
-        </div>
-      </div>
-
-      {/* Body */}
+      )}
       <div className="p-5">{children}</div>
     </div>
   );
@@ -3841,10 +3841,5 @@ function EditableOcrField({
  * correct any field if the OCR mis-read the document.
  */
 function ReviewBanner() {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      <Sparkles className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-      <span>Review the extracted details. Click any field to correct it if the document was misread.</span>
-    </div>
-  );
+  return null;
 }
