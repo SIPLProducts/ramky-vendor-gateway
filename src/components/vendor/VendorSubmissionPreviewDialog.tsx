@@ -276,7 +276,6 @@ export function VendorSubmissionPreviewDialog({
                     ? `₹ ${n.toLocaleString('en-IN')} Lakhs`
                     : null;
                 };
-                const creditPeriod = Number(vendor.credit_period_expected);
                 return (
                   <div className="form-section">
                     <SectionHeader icon={TrendingUp} title="Financial Information" />
@@ -284,18 +283,6 @@ export function VendorSubmissionPreviewDialog({
                       <DataRow label={`Turnover ${formatIndianFy(fy1)}`} value={fmt(vendor.turnover_year1)} />
                       <DataRow label={`Turnover ${formatIndianFy(fy2)}`} value={fmt(vendor.turnover_year2)} />
                       <DataRow label={`Turnover ${formatIndianFy(fy3)}`} value={fmt(vendor.turnover_year3)} />
-                      <DataRow
-                        label="Credit Period Expected"
-                        value={
-                          (vendor.credit_period_expected === 0 || vendor.credit_period_expected) &&
-                          Number.isFinite(creditPeriod) &&
-                          creditPeriod >= 0
-                            ? `${vendor.credit_period_expected} days`
-                            : null
-                        }
-                      />
-                      <DataRow label="Major Customer 1" value={vendor.major_customer_1} />
-                      <DataRow label="Major Customer 2" value={vendor.major_customer_2} />
                     </div>
                   </div>
                 );
