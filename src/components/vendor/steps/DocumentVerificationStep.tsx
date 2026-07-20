@@ -2382,12 +2382,6 @@ export function DocumentVerificationStep({
                       />
                     </div>
 
-                    <FormField
-                      label="Reason for non-registration"
-                      value={gstDeclarationReason}
-                      onChange={setGstDeclarationReason}
-                      placeholder="e.g. Turnover below threshold"
-                    />
                   </div>
                 )}
               </div>
