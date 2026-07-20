@@ -1728,7 +1728,7 @@ export default function VendorRegistration() {
               onClick={() => setShowTypeBackConfirm(true)}
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Back
+              Back to main screen
             </Button>
 
           </div>
