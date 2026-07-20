@@ -562,3 +562,65 @@ button[data-action="delete"]            { --btn-action-bg: var(--btn-delete-bg);
 button[data-action="invite"]            { --btn-action-bg: var(--btn-invite-bg); --btn-action-text: var(--btn-invite-text); --btn-action-border: var(--btn-invite-border); --btn-action-radius: var(--btn-invite-radius); --btn-action-font-size: var(--btn-invite-font-size); --btn-action-hover: var(--btn-invite-hover); --btn-action-hover-text: var(--btn-invite-hover-text); --btn-action-hover-border: var(--btn-invite-hover-border); }
 
 
+
+/* ─────────────────────────────────────────────────────────────
+   Vendor Registration — bottom-border field styling
+   Applies to forms with class `.vendor-styled-form` (Organization,
+   Contact Details, Financial & Infrastructure tabs).
+
+   • Light-gray input surface, no top/left/right border, no radius.
+   • Filled field  → green bottom border (--success).
+   • Mandatory + empty (data-required + placeholder-shown / data-placeholder)
+     → orange bottom border (--warning).
+   • Read-only / disabled → neutral gray + muted text.
+   • Existing `.border-destructive` error class still wins.
+   ─────────────────────────────────────────────────────────── */
+
+.vendor-styled-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.vendor-styled-form textarea,
+.vendor-styled-form [role="combobox"] {
+  background-color: hsl(var(--muted) / 0.4);
+  border-top-width: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-radius: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
+.vendor-styled-form input:focus-visible,
+.vendor-styled-form textarea:focus-visible,
+.vendor-styled-form [role="combobox"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* filled → green */
+.vendor-styled-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(:placeholder-shown):not([readonly]):not([disabled]),
+.vendor-styled-form textarea:not(:placeholder-shown):not([readonly]):not([disabled]),
+.vendor-styled-form [role="combobox"]:not([data-disabled]):not(:has([data-placeholder])) {
+  border-bottom: 2px solid hsl(var(--success));
+}
+
+/* mandatory + empty → orange */
+.vendor-styled-form input[data-required]:placeholder-shown:not([readonly]):not([disabled]),
+.vendor-styled-form textarea[data-required]:placeholder-shown:not([readonly]):not([disabled]),
+.vendor-styled-form [role="combobox"][data-required]:not([data-disabled]):has([data-placeholder]) {
+  border-bottom: 2px solid hsl(var(--warning));
+}
+
+/* read-only / disabled → light gray, still show green when filled */
+.vendor-styled-form input[readonly],
+.vendor-styled-form input[disabled],
+.vendor-styled-form textarea[readonly],
+.vendor-styled-form textarea[disabled],
+.vendor-styled-form [role="combobox"][data-disabled] {
+  color: hsl(var(--muted-foreground));
+  cursor: default;
+}
+
+/* validation error class always wins */
+.vendor-styled-form input.border-destructive,
+.vendor-styled-form textarea.border-destructive,
+.vendor-styled-form [role="combobox"].border-destructive {
+  border-bottom-color: hsl(var(--destructive)) !important;
+}
