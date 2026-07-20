@@ -518,36 +518,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
 
         <div className="grid gap-5">
           <div className="grid gap-1.5">
-            <Label>Memberships</Label>
-            <Controller
-              name="memberships"
-              control={control}
-              render={({ field }) => (
-                <MultiSelect
-                  options={MEMBERSHIP_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
-                  selected={field.value || []}
-                  onChange={field.onChange}
-                  placeholder="Select memberships"
-                />
-              )}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label>Enlistment With</Label>
-            <Controller
-              name="enlistments"
-              control={control}
-              render={({ field }) => (
-                <MultiSelect
-                  options={ENLISTMENT_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
-                  selected={field.value || []}
-                  onChange={field.onChange}
-                  placeholder="Select enlistments"
-                />
-              )}
-            />
-          </div>
-          <div className="grid gap-1.5">
             <Label>Certifications</Label>
             <Controller
               name="certifications"
