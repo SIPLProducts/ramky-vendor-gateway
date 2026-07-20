@@ -2844,27 +2844,30 @@ export function DocumentVerificationStep({
                         )}
                       </div>
                       <div className="md:col-span-2">
-                        <EditableOcrField
-                          label="Account Holder Name"
-                          value={bankDoc.ocrData?.account_holder_name}
-                          originalValue={bankDoc.originalOcrData?.account_holder_name}
-                          verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
-                          verifiedLabel="Name matches bank record"
-                          onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
-                        />
-                        {bankDoc.apiData?.holderNameMessage && (
-                          <p className="mt-1.5 text-xs text-success flex items-start gap-1.5">
-                            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                            <span>{bankDoc.apiData.holderNameMessage}</span>
-                          </p>
-                        )}
+                        <div className="flex items-start gap-1.5">
+                          <div className="flex-1 min-w-0">
+                            <EditableOcrField
+                              label="Account Holder Name"
+                              value={bankDoc.ocrData?.account_holder_name}
+                              originalValue={bankDoc.originalOcrData?.account_holder_name}
+                              verifiedValue={bankDoc.apiData?.normalized?.account_holder_name}
+                              verifiedLabel="Name matches bank record"
+                              onChange={(v) => setOcrField(setBankDoc, "account_holder_name", v)}
+                            />
+                          </div>
+                          {bankDoc.apiData?.holderNameMessage && (
+                            <div className="pt-6">
+                              <NameMatchInfo message={bankDoc.apiData.holderNameMessage} ok />
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Account Type *</Label>
                         <select
                           value={bankAccountType}
-                          onChange={(e) => setBankAccountType(e.target.value)}
-                          className="mt-1 w-full h-10 rounded-md border border-border/60 bg-muted/40 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          disabled
+                          className="mt-1 w-full h-10 rounded-md border border-border/60 bg-muted/40 px-3 text-sm text-muted-foreground cursor-not-allowed focus:outline-none"
                         >
                           <option value="current">Current Account</option>
                           <option value="savings">Savings Account</option>
@@ -2876,9 +2879,9 @@ export function DocumentVerificationStep({
                         <Label className="text-xs font-medium text-muted-foreground">Bank Address</Label>
                         <Input
                           value={bankBranchAddress}
-                          onChange={(e) => { bankAddressTouchedRef.current = true; setBankBranchAddress(e.target.value); }}
-                          placeholder="Branch address (optional)"
-                          className="mt-1 bg-muted/40 border-border/60"
+                          readOnly
+                          placeholder="Branch address"
+                          className="mt-1 bg-muted/40 border-border/60 cursor-not-allowed"
                         />
                       </div>
                     </div>
