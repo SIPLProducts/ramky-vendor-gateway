@@ -637,9 +637,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 placeholder="Branch website"
               />
             </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchEmail">Email ID</Label>
               <Input
@@ -669,9 +666,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <p className="text-xs text-destructive">{errors.branchAddress.message}</p>
               )}
             </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchAddressLine2">Address Line 2</Label>
               <Input
@@ -698,6 +692,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <p className="text-xs text-destructive">{errors.branchAddressLine3.message}</p>
               )}
             </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchAddressLine4">Address Line 4</Label>
               <Input
@@ -711,9 +708,6 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 <p className="text-xs text-destructive">{errors.branchAddressLine4.message}</p>
               )}
             </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchCity">City</Label>
               <Input
@@ -730,6 +724,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 placeholder="State"
               />
             </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
               <Label htmlFor="branchPincode">PIN Code</Label>
               <Input
@@ -751,7 +748,9 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 defaultValue="India"
               />
             </div>
+            <div />
           </div>
+
 
           <div className="border-t pt-4 mt-2">
             <p className="text-sm font-medium text-foreground mb-4">Branch Contact Person</p>
