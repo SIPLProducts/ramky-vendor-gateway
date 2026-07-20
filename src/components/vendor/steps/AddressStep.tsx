@@ -471,18 +471,20 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
 
         {!sameAsRegistered && (
           <div className="grid gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="manufacturingAddress">Address Line 1</Label>
-              <Input
-                id="manufacturingAddress"
-                {...register('manufacturingAddress')}
-                placeholder="Building name, street address"
-                maxLength={40}
-                className={errors.manufacturingAddress ? 'border-destructive' : ''}
-              />
-              {errors.manufacturingAddress && (
-                <p className="text-xs text-destructive">{errors.manufacturingAddress.message}</p>
-              )}
+            <div className="grid md:grid-cols-3 gap-5">
+              <div className="grid gap-1.5">
+                <Label htmlFor="manufacturingAddress">Address Line 1</Label>
+                <Input
+                  id="manufacturingAddress"
+                  {...register('manufacturingAddress')}
+                  placeholder="Building name, street address"
+                  maxLength={40}
+                  className={errors.manufacturingAddress ? 'border-destructive' : ''}
+                />
+                {errors.manufacturingAddress && (
+                  <p className="text-xs text-destructive">{errors.manufacturingAddress.message}</p>
+                )}
+              </div>
             </div>
 
             <div className="grid md:grid-cols-3 gap-5">
