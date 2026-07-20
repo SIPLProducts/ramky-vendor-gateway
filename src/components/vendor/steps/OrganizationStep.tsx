@@ -491,16 +491,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
         </h3>
 
         <div className="grid gap-5">
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="firmRegistrationNo">Firm Registration No.</Label>
-              <Input
-                id="firmRegistrationNo"
-                {...register('firmRegistrationNo')}
-                placeholder="Enter registration number"
-              />
-            </div>
-          </div>
 
           <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
