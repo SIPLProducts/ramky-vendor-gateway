@@ -2215,8 +2215,8 @@ export function DocumentVerificationStep({
           <TabsContent value="gst" className="mt-4">
             <StageShell
               icon={<Building2 className="h-4 w-4" />}
-              title="GST Verification"
-              subtitle="Upload your GST certificate or declare non-registration"
+              title=""
+              subtitle=""
               status={tabStatus.gst}
               verifiedAt={gstDoc.verifiedAt}
             >
@@ -2404,8 +2404,8 @@ export function DocumentVerificationStep({
           <TabsContent value="pan" className="mt-4">
             <StageShell
               icon={<BadgeCheck className="h-4 w-4" />}
-              title="PAN Verification"
-              subtitle="Upload PAN card to extract and verify holder details"
+              title=""
+              subtitle=""
               status={tabStatus.pan}
               verifiedAt={panDoc.verifiedAt}
             >
@@ -2532,18 +2532,18 @@ export function DocumentVerificationStep({
           <TabsContent value="msme" className="mt-4">
             <StageShell
               icon={<ShieldCheck className="h-4 w-4" />}
-              title="MSME / Udyam"
-              subtitle="Optional — upload Udyam certificate or skip"
+              title=""
+              subtitle=""
               status={tabStatus.msme}
               verifiedAt={msmeDoc.verifiedAt}
             >
               <div className="space-y-5">
                 <GateRow
-                  label="Are you MSME / Udyam registered?"
+                  label="Are you MSME registered?"
                   value={isMsmeRegistered}
                   onChange={handleMsmeRegisteredChange}
                   yesLabel="Yes"
-                  noLabel="No, skip"
+                  noLabel="No"
                 />
 
                 {isMsmeRegistered === false && (
@@ -2808,8 +2808,8 @@ export function DocumentVerificationStep({
           <TabsContent value="bank" className="mt-4">
             <StageShell
               icon={<Landmark className="h-4 w-4" />}
-              title="Bank Account"
-              subtitle="Upload cancelled cheque"
+              title=""
+              subtitle=""
               status={tabStatus.bank}
               verifiedAt={bankDoc.verifiedAt}
             >
