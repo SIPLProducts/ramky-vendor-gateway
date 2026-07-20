@@ -17,7 +17,6 @@ import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/i
 import {
   Building2,
   MapPin,
-  Users,
   FileCheck,
   Landmark,
   TrendingUp,
@@ -161,7 +160,7 @@ export function VendorSubmissionPreviewDialog({
 
               {/* Address */}
               <div className="form-section">
-                <SectionHeader icon={MapPin} title="Address Information" />
+                <SectionHeader icon={MapPin} title="Contact Details" />
                 <div className="space-y-1">
                   <DataRow label="Address Line 1" value={vendor.registered_address} />
                   <DataRow label="Address Line 2" value={vendor.registered_address_line2} />
@@ -183,19 +182,6 @@ export function VendorSubmissionPreviewDialog({
                 </div>
               </div>
 
-              {/* Contact */}
-              <div className="form-section">
-                <SectionHeader icon={Users} title="Contact Information" />
-                <div className="space-y-1">
-                  <DataRow label="Primary Contact" value={vendor.primary_contact_name} />
-                  <DataRow label="Designation" value={vendor.primary_designation} />
-                  <DataRow label="Primary Email" value={vendor.primary_email} />
-                  <DataRow label="Primary Phone" value={vendor.primary_phone} />
-                  <DataRow label="CEO/MD Name" value={vendor.ceo_name} />
-                  <DataRow label="CEO/MD Email" value={vendor.ceo_email} />
-                  <DataRow label="CEO/MD Phone" value={vendor.ceo_phone} />
-                </div>
-              </div>
 
               {/* Compliance & Statutory */}
               <div className="form-section">
