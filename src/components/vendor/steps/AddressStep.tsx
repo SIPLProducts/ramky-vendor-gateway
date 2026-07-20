@@ -226,7 +226,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
         const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
         (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    })} className="space-y-6">
+    })} className="vendor-styled-form space-y-6">
 
 
       {/* Registered/Corporate Office Address */}
