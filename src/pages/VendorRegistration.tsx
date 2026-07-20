@@ -1169,7 +1169,9 @@ export default function VendorRegistration() {
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
-    setCurrentStep(step + 1);
+    // Legacy Contact Details tab (step 4) is hidden — skip straight to step 5.
+    const next = step === 3 && !isInternational ? 5 : step + 1;
+    setCurrentStep(next);
   };
 
   // Step 2 emits both organization + statutory (statutory & memberships moved here)
