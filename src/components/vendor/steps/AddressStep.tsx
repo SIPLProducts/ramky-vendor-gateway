@@ -641,32 +641,36 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="branchEmail">Email ID</Label>
-            <Input
-              id="branchEmail"
-              type="email"
-              {...register('branchEmail')}
-              placeholder="branch@company.com"
-              className={errors.branchEmail ? 'border-destructive' : ''}
-            />
-            {errors.branchEmail && (
-              <p className="text-xs text-destructive">{errors.branchEmail.message}</p>
-            )}
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="branchEmail">Email ID</Label>
+              <Input
+                id="branchEmail"
+                type="email"
+                {...register('branchEmail')}
+                placeholder="branch@company.com"
+                className={errors.branchEmail ? 'border-destructive' : ''}
+              />
+              {errors.branchEmail && (
+                <p className="text-xs text-destructive">{errors.branchEmail.message}</p>
+              )}
+            </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="branchAddress">Address Line 1</Label>
-            <Input
-              id="branchAddress"
-              {...register('branchAddress')}
-              placeholder="Branch address"
-              maxLength={40}
-              className={errors.branchAddress ? 'border-destructive' : ''}
-            />
-            {errors.branchAddress && (
-              <p className="text-xs text-destructive">{errors.branchAddress.message}</p>
-            )}
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="branchAddress">Address Line 1</Label>
+              <Input
+                id="branchAddress"
+                {...register('branchAddress')}
+                placeholder="Branch address"
+                maxLength={40}
+                className={errors.branchAddress ? 'border-destructive' : ''}
+              />
+              {errors.branchAddress && (
+                <p className="text-xs text-destructive">{errors.branchAddress.message}</p>
+              )}
+            </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
