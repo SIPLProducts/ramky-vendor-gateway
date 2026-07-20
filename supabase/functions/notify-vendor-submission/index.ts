@@ -337,6 +337,70 @@ serve(async (req) => {
       console.error("audit_logs insert failed", e);
     }
 
+    // Also send a confirmation email to the vendor's registered email.
+    if (vendorEmail) {
+      try {
+        const vendorSubject = `Application Submitted Successfully – Ref ${vendorRef}`;
+        const vendorHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#F7F9FC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F7F9FC;padding:40px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <tr><td style="background-color:#1e3a5f;padding:28px 40px;color:#ffffff;">
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#d4a574;font-weight:600;margin-bottom:6px;">Confirmation</div>
+          <div style="font-size:20px;font-weight:600;">Application Submitted Successfully</div>
+        </td></tr>
+        <tr><td style="padding:36px 40px;color:#2d3748;">
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Dear ${contactPerson || vendorName},</p>
+          <p style="margin:0 0 20px;font-size:14px;line-height:1.7;color:#4a5568;">
+            Thank you for ${resubmission ? "resubmitting" : "submitting"} your vendor registration application. We have received it successfully and it is now under review.
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:18px 22px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;color:#2d3748;">
+                <tr><td style="padding:6px 0;color:#718096;width:180px;">Vendor Name</td><td style="padding:6px 0;font-weight:600;">${vendorName}</td></tr>
+                <tr><td style="padding:6px 0;color:#718096;">Reference Number</td><td style="padding:6px 0;font-family:'SFMono-Regular',Consolas,Menlo,monospace;font-weight:600;letter-spacing:0.5px;">${vendorRef}</td></tr>
+                <tr><td style="padding:6px 0;color:#718096;">Submitted At</td><td style="padding:6px 0;">${submittedAt}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 20px;font-size:13px;line-height:1.7;color:#4a5568;">
+            Please retain the reference number above for future correspondence. Our team will review your application and you will receive further updates over email.
+          </p>
+          <p style="margin:0 0 20px;font-size:13px;line-height:1.7;color:#4a5568;">
+            For any queries, please contact <a href="mailto:${supportEmail}" style="color:#1e3a5f;text-decoration:none;font-weight:600;">${supportEmail}</a>.
+          </p>
+          <p style="margin:0;font-size:14px;line-height:1.7;color:#2d3748;">Regards,<br><span style="font-weight:600;color:#1e3a5f;">${companyName}</span></p>
+        </td></tr>
+        <tr><td style="padding:20px 16px;text-align:center;font-size:11px;color:#a0aec0;letter-spacing:0.3px;">
+          &copy; ${new Date().getFullYear()} ${companyName}. This is an automated notification.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+        const { error: vendMailErr } = await supabase.functions.invoke("send-smtp-email", {
+          body: { to: vendorEmail, subject: vendorSubject, html: vendorHtml },
+        });
+        if (vendMailErr) {
+          console.error("vendor confirmation email failed:", vendMailErr);
+        } else {
+          try {
+            await supabase.from("audit_logs").insert({
+              vendor_id: vendor.id,
+              action: "vendor_submission_confirmation_sent",
+              details: { to: vendorEmail, subject: vendorSubject, vendorRef },
+            });
+          } catch (_) { /* ignore */ }
+        }
+      } catch (e) {
+        console.error("vendor confirmation email exception:", e);
+      }
+    }
+
+
     return new Response(
       JSON.stringify({
         success: true,
