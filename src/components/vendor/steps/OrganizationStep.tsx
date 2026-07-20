@@ -329,6 +329,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               id="legalName"
               {...register('legalName')}
               placeholder="Enter registered company name"
+              data-required
               className={errors.legalName ? 'border-destructive' : ''}
             />
             {errors.legalName && (
