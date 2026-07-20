@@ -3657,15 +3657,32 @@ function FormField({
 
 function CrossCheckStrip({ ok, text, className }: { ok: boolean; text: string; className?: string }) {
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium",
-        ok ? "border-success/30 bg-success/5 text-success" : "border-destructive/30 bg-destructive/5 text-destructive",
-        className,
-      )}
-    >
-      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
-      <span>{text}</span>
+    <div className={cn("flex justify-end", className)}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="Match details"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:opacity-90",
+              ok
+                ? "border-success/30 bg-success/5 text-success"
+                : "border-destructive/30 bg-destructive/5 text-destructive",
+            )}
+          >
+            <Info className="h-3 w-3" />
+            Match details
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="max-w-sm text-xs leading-relaxed">
+          <div className="flex items-start gap-2">
+            {ok
+              ? <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+              : <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />}
+            <span className="whitespace-pre-wrap break-words">{text}</span>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
