@@ -1765,6 +1765,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     vendorStatus,
     existingFormData,
     isLoadingVendor,
+    isAuthReady,
     existingVendor,
     invitation,
     portalConfig,
