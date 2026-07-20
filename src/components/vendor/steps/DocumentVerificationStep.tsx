@@ -3777,6 +3777,7 @@ function EditableOcrField({
   verifiedValue,
   verifiedLabel,
   readOnly = true,
+  trailingInfo,
 }: {
   label: string;
   value?: string;
@@ -3786,10 +3787,12 @@ function EditableOcrField({
   placeholder?: string;
   /** Value returned by the validation API for this field (registry/penny-drop). */
   verifiedValue?: string;
-  /** Label shown next to the green tick when the value matches the API. */
+  /** Tooltip label shown on the trailing green tick when the value matches the API. */
   verifiedLabel?: string;
   /** When true, disables editing and hides Edited/Reset/Use registry affordances. */
   readOnly?: boolean;
+  /** Optional cross-check message rendered as an (i) popover inside the input. */
+  trailingInfo?: { message: string; ok: boolean } | null;
 }) {
   const current = value ?? "";
   const original = originalValue ?? "";
@@ -3798,52 +3801,70 @@ function EditableOcrField({
   const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
   const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
   const mismatchApi = !readOnly && hasApi && !matchesApi;
+  const hasTrailingInfo = !!(trailingInfo && trailingInfo.message);
+  const hasBadge = matchesApi || isEdited || mismatchApi;
+  const adornmentCount = (hasBadge ? 1 : 0) + (hasTrailingInfo ? 1 : 0);
+  const padRight = adornmentCount === 2 ? "pr-16" : adornmentCount === 1 ? "pr-9" : "";
   return (
     <div>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 min-h-[18px]">
         <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-        <div className="flex items-center gap-2">
-          {isEdited && (
-            <span className="inline-flex items-center rounded-full bg-warning/10 text-warning px-1.5 py-0.5 text-[10px] font-medium">
-              Edited
+        {isEdited && (
+          <button
+            type="button"
+            onClick={() => onChange(original)}
+            className="text-[10px] text-primary hover:underline"
+          >
+            Reset to OCR
+          </button>
+        )}
+      </div>
+      <div className="relative">
+        <Input
+          value={current}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder ?? "—"}
+          readOnly={readOnly}
+          tabIndex={readOnly ? -1 : undefined}
+          aria-readonly={readOnly || undefined}
+          className={cn(
+            "mt-1 bg-muted/40 border-border/60",
+            mono && "font-mono text-sm tracking-wide",
+            isEdited && "border-warning/40 bg-warning/5",
+            matchesApi && "border-success/40 bg-success/5",
+            mismatchApi && "border-warning/50 bg-warning/5",
+            readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
+            padRight,
+          )}
+        />
+        <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1">
+          {hasBadge && (
+            <span
+              className="pointer-events-auto"
+              title={
+                matchesApi
+                  ? verifiedLabel || `${label} is verified`
+                  : mismatchApi
+                    ? `Doesn't match registry value: ${apiVal}`
+                    : "Edited"
+              }
+            >
+              {matchesApi ? (
+                <BadgeCheck className="h-5 w-5 text-success" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-warning" />
+              )}
             </span>
           )}
-          {isEdited && (
-            <button
-              type="button"
-              onClick={() => onChange(original)}
-              className="text-[10px] text-primary hover:underline"
-            >
-              Reset to OCR
-            </button>
+          {hasTrailingInfo && (
+            <span className="pointer-events-auto">
+              <NameMatchInfo message={trailingInfo!.message} ok={trailingInfo!.ok} />
+            </span>
           )}
         </div>
       </div>
-      <Input
-        value={current}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "—"}
-        readOnly={readOnly}
-        tabIndex={readOnly ? -1 : undefined}
-        aria-readonly={readOnly || undefined}
-        className={cn(
-          "mt-1 bg-muted/40 border-border/60",
-          mono && "font-mono text-sm tracking-wide",
-          isEdited && "border-warning/40 bg-warning/5",
-          matchesApi && "border-success/40 bg-success/5",
-          mismatchApi && "border-warning/50 bg-warning/5",
-          readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
-        )}
-      />
-      {matchesApi && (
-        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
-          <CheckCircle2 className="h-3 w-3" />
-          {verifiedLabel || `${label} is verified`}
-        </p>
-      )}
       {mismatchApi && (
         <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
-          <AlertTriangle className="h-3 w-3 shrink-0" />
           <span className="truncate">
             Doesn't match registry value:&nbsp;
             <span className="font-medium">{apiVal}</span>
