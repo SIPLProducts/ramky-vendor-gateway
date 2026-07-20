@@ -270,16 +270,23 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
               {amountErrors.turnoverYear3 && <p className="text-xs text-destructive">{amountErrors.turnoverYear3}</p>}
             </div>
           </div>
+          {false && (
           <div className="grid gap-1.5">
             <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
             <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
             {amountErrors.creditPeriodExpected && <p className="text-xs text-destructive">{CREDIT_PERIOD_NEGATIVE_MSG}</p>}
           </div>
+          )}
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
         </div>
       </div>
 
-      {/* Major Customers */}
+      {/* Hidden per client request — Existing Major Customers, Authorized Distributor,
+          Manufacturing Facility Details, Connectivity Details, Type of Products,
+          Production Facilities, and QHSE Details. Wrapped in {false && (...)} so
+          the underlying form state stays intact and these can be re-enabled later. */}
+      {false && (
+      <>
       <div className="form-section">
         <h3 className="form-section-title">
           <Users className="h-5 w-5 text-primary" />
@@ -301,7 +308,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         </div>
       </div>
 
-      {/* Authorized Distributor */}
       <div className="form-section">
         <h3 className="form-section-title">
           <Building className="h-5 w-5 text-primary" />
@@ -323,7 +329,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         </div>
       </div>
 
-      {/* Manufacturing Facility Details */}
       <div className="form-section">
         <h3 className="form-section-title">
           <Factory className="h-5 w-5 text-primary" />
@@ -416,7 +421,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         </div>
       </div>
 
-      {/* Connectivity Details */}
       <div className="form-section">
         <h3 className="form-section-title">
           <MapPin className="h-5 w-5 text-primary" />
@@ -442,7 +446,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         </div>
       </div>
 
-      {/* Type of Products & Production Facilities */}
       <div className="form-section">
         <h3 className="form-section-title">
           <Package className="h-5 w-5 text-primary" />
@@ -495,7 +498,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
         </div>
       </div>
 
-      {/* QHSE Details */}
       <div className="form-section">
         <h3 className="form-section-title">
           <Shield className="h-5 w-5 text-primary" />
@@ -521,6 +523,8 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
           </div>
         </div>
       </div>
+      </>
+      )}
     </form>
   );
 }

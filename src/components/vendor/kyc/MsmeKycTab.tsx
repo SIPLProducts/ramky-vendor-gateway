@@ -232,24 +232,31 @@ export function MsmeKycTab(props: MsmeKycTabProps) {
             )}
           </div>
 
-          <div className="space-y-3">
-            <OcrUploadAndVerify
-              documentType="msme"
-              fileLabel="Upload Udyam Certificate *"
-              currentFile={props.msmeCertificateFile}
-              onFileChange={props.onMsmeCertificateFileChange}
-              runOcr={runMsmeOcr}
-              onVerifyExtracted={handleOcrVerify}
-              apiLabel="MSME"
-              onVerified={() => {}}
-              vendorId={props.vendorId}
-            />
-            {!props.msmeCertificateFile && (
-              <p className="text-xs text-destructive">
-                Udyam Certificate is required.
-              </p>
-            )}
-          </div>
+          {/* Certificate upload only appears after Udyam number is successfully validated */}
+          {manualApiResult?.ok ? (
+            <div className="space-y-3">
+              <OcrUploadAndVerify
+                documentType="msme"
+                fileLabel="Upload Udyam Certificate *"
+                currentFile={props.msmeCertificateFile}
+                onFileChange={props.onMsmeCertificateFileChange}
+                runOcr={runMsmeOcr}
+                onVerifyExtracted={handleOcrVerify}
+                apiLabel="MSME"
+                onVerified={() => {}}
+                vendorId={props.vendorId}
+              />
+              {!props.msmeCertificateFile && (
+                <p className="text-xs text-destructive">
+                  Udyam Certificate is required.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-muted p-4 text-xs text-muted-foreground">
+              Verify the Udyam number first — the certificate upload will appear once verification succeeds.
+            </div>
+          )}
         </div>
       )}
 

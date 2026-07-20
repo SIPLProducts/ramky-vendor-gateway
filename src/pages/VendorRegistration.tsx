@@ -44,8 +44,8 @@ import { safeUUID } from '@/lib/uuid';
 const builtInSteps = [
   { id: 1, title: 'Document Verification', description: '' },
   { id: 2, title: 'Organization Profile', description: '' },
-  { id: 3, title: 'Address Information', description: '' },
-  { id: 4, title: 'Contact Details', description: '' },
+  { id: 3, title: 'Contact Details', description: '' },
+  // Step 4 (legacy Contact Details tab) hidden — its fields are not required.
   { id: 5, title: 'Financial & Infrastructure', description: '' },
   // Custom tabs slot in here at runtime (ids 6..N)
   // Review is always the last step
@@ -774,7 +774,8 @@ export default function VendorRegistration() {
   };
 
   const isFirstStep = currentStep === 1;
-  const isLastStep = currentStep === registrationSteps.length;
+  const lastStepId = registrationSteps[registrationSteps.length - 1]?.id ?? 6;
+  const isLastStep = currentStep === lastStepId;
 
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
@@ -884,20 +885,21 @@ export default function VendorRegistration() {
             // Only mark a step complete if every previous step is also complete —
             // prevents e.g. step 5 showing a tick while step 2/3/4 are still blank.
             const filled: number[] = [];
-            for (const s of [1, 2, 3, 4, 5]) {
+            for (const s of [1, 2, 3, 5]) {
               if (!isDomesticStepComplete(s, existingFormData, step1Seed)) break;
               filled.push(s);
             }
             setCompletedSteps(filled);
             // For returned_to_vendor mark all completed and jump to Review
             if (isReturned) {
-              setCompletedSteps([1, 2, 3, 4, 5]);
+              setCompletedSteps([1, 2, 3, 5]);
               setIsEditMode(true);
               setCurrentStep(6);
             } else {
-              const firstMissing = [1, 2, 3, 4, 5].find(s => !filled.includes(s));
+              const firstMissing = [1, 2, 3, 5].find(s => !filled.includes(s));
               setCurrentStep(firstMissing ?? 6);
             }
+
 
           }
         } else {
@@ -1169,7 +1171,9 @@ export default function VendorRegistration() {
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
-    setCurrentStep(step + 1);
+    // Legacy Contact Details tab (step 4) is hidden — skip straight to step 5.
+    const next = step === 3 && !isInternational ? 5 : step + 1;
+    setCurrentStep(next);
   };
 
   // Step 2 emits both organization + statutory (statutory & memberships moved here)
@@ -1190,7 +1194,11 @@ export default function VendorRegistration() {
     setCurrentStep(6);
   };
 
-  const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
+  const handleBack = () => setCurrentStep((prev) => {
+    // Legacy Contact Details tab (step 4) is hidden — jump from 5 back to 3.
+    if (!isInternational && prev === 5) return 3;
+    return Math.max(1, prev - 1);
+  });
   const handleStepClick = (step: number) => {
     // Free navigation backward; forward only if all preceding steps are complete.
     if (step <= currentStep) { setCurrentStep(step); return; }
@@ -1360,9 +1368,9 @@ export default function VendorRegistration() {
     // Pre-submit gating — bounce user back to the first tab with missing
     // mandatory fields so they can see the inline errors immediately.
     if (!isInternational) {
-      const firstMissing = [1, 2, 3, 4, 5].find(s => !isDomesticStepComplete(s, formData, verifiedData));
+      const firstMissing = [1, 2, 3, 5].find(s => !isDomesticStepComplete(s, formData, verifiedData));
       if (firstMissing) {
-        const title = registrationSteps[firstMissing - 1]?.title || `Step ${firstMissing}`;
+        const title = registrationSteps.find(s => s.id === firstMissing)?.title || `Step ${firstMissing}`;
         toast({
           title: 'Please complete required fields',
           description: `${title} is incomplete. Fill the highlighted fields and try again.`,
@@ -1441,7 +1449,7 @@ export default function VendorRegistration() {
     // International flow
     if (isInternational) {
       const intl = formData.international ?? EMPTY_INTERNATIONAL_DATA;
-      if (currentStep === registrationSteps.length) {
+      if (currentStep === lastStepId) {
         return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
       }
       switch (currentStep) {
@@ -1465,7 +1473,8 @@ export default function VendorRegistration() {
       case 3:
         return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
-        return <ContactStep tenantId={tenantId} data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
+        return null; // Legacy Contact Details tab hidden
+
       case 5:
         return (
           <FinancialInfrastructureStep
@@ -1485,7 +1494,7 @@ export default function VendorRegistration() {
         );
     }
     // Last step is always Review
-    if (currentStep === registrationSteps.length) {
+    if (currentStep === lastStepId) {
       return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
     }
     // Anything in between is an admin-defined custom tab (ids 6..N-1)
@@ -1701,10 +1710,10 @@ export default function VendorRegistration() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="inline-flex items-center justify-center h-6 px-2 rounded-full bg-primary/10 text-primary text-[11px] font-semibold shrink-0">
-                  Step {currentStep} of {registrationSteps.length}
+                  Step {Math.max(1, registrationSteps.findIndex(s => s.id === currentStep) + 1)} of {registrationSteps.length}
                 </span>
                 <span className="text-xs font-medium text-foreground truncate">
-                  {registrationSteps[currentStep - 1]?.title}
+                  {registrationSteps.find(s => s.id === currentStep)?.title}
                 </span>
               </div>
             </div>
