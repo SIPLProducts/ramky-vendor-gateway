@@ -319,7 +319,7 @@ export default function VendorRegistration() {
     );
   }, [onBehalfInvitation]);
 
-  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, existingVendor } = useVendorRegistration({
+  const { saveVendor, submitVendor, resubmitVendor, runValidations, isSaving, isSubmitting, vendorId, vendorStatus, existingFormData, isLoadingVendor, isAuthReady, existingVendor } = useVendorRegistration({
     invitationToken: invitationToken || undefined,
     onBehalfInvitationId: onBehalfInvitationId || undefined,
     isOnBehalfMode,
