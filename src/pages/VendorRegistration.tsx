@@ -774,7 +774,8 @@ export default function VendorRegistration() {
   };
 
   const isFirstStep = currentStep === 1;
-  const isLastStep = currentStep === registrationSteps.length;
+  const lastStepId = registrationSteps[registrationSteps.length - 1]?.id ?? 6;
+  const isLastStep = currentStep === lastStepId;
 
   useEffect(() => {
     if (existingFormData && vendorStatus && !formDataLoadedRef.current) {
