@@ -226,7 +226,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
         const el = document.getElementById(firstKey) || document.querySelector(`[name="${firstKey}"]`);
         (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    })} className="space-y-6">
+    })} className="vendor-styled-form space-y-6">
 
 
       {/* Registered/Corporate Office Address */}
@@ -246,6 +246,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 onChange={handleAddressLine1Change}
                 placeholder="Building name, street address (overflow auto-flows into Lines 2-4)"
                 maxLength={160}
+                data-required
                 className={errors.registeredAddress ? 'border-destructive' : ''}
               />
               <p className="text-xs text-muted-foreground">
@@ -306,6 +307,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 id="registeredCity"
                 {...register('registeredCity')}
                 placeholder="City"
+                data-required
                 className={errors.registeredCity ? 'border-destructive' : ''}
               />
               {errors.registeredCity && (
@@ -320,7 +322,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 control={control}
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.registeredState ? 'border-destructive' : ''}>
+                    <SelectTrigger data-required className={errors.registeredState ? 'border-destructive' : ''}>
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
                     <SelectContent>
@@ -344,6 +346,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 id="registeredPincode"
                 {...numericField('registeredPincode', 6)}
                 placeholder="6-digit PIN"
+                data-required
                 className={errors.registeredPincode ? 'border-destructive' : ''}
               />
               {errors.registeredPincode && (
@@ -391,6 +394,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 type="email"
                 {...register('registeredEmail')}
                 placeholder="contact@company.com"
+                data-required
                 className={errors.registeredEmail ? 'border-destructive' : ''}
               />
               {errors.registeredEmail && (
@@ -406,6 +410,7 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
                 id="registeredContact1"
                 {...numericField('registeredContact1', 10)}
                 placeholder="10-digit mobile number"
+                data-required
                 className={errors.registeredContact1 ? 'border-destructive' : ''}
               />
               {errors.registeredContact1 && (

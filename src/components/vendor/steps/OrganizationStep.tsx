@@ -307,7 +307,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   };
 
   return (
-    <form id="step-form-2" onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="space-y-6">
+    <form id="step-form-2" onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="vendor-styled-form space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">
           <Building2 className="h-5 w-5 text-primary" />
@@ -329,6 +329,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               id="legalName"
               {...register('legalName')}
               placeholder="Enter registered company name"
+              data-required
               className={errors.legalName ? 'border-destructive' : ''}
             />
             {errors.legalName && (
@@ -352,7 +353,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.industryType ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.industryType ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select industry type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -375,7 +376,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.organizationType ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.organizationType ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select organization type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -398,7 +399,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className={errors.ownershipType ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.ownershipType ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select ownership type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -421,7 +422,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               control={control}
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value} disabled={isGstStateLocked}>
-                  <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                  <SelectTrigger data-required className={errors.state ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
