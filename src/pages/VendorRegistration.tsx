@@ -42,11 +42,11 @@ import { safeUUID } from '@/lib/uuid';
 // Custom admin-defined tabs are inserted between step 5 (Fin/Infra) and the
 // final Review step at runtime.
 const builtInSteps = [
-  { id: 1, title: 'Document Verification', description: 'Upload & auto-verify PAN, GST, MSME, Bank' },
-  { id: 2, title: 'Organization Profile', description: 'Company, statutory & memberships' },
-  { id: 3, title: 'Address Information', description: 'Registered, manufacturing & branch' },
-  { id: 4, title: 'Contact Details', description: 'Key contact persons' },
-  { id: 5, title: 'Financial & Infrastructure', description: 'Turnover, facility & QHSE' },
+  { id: 1, title: 'Document Verification', description: '' },
+  { id: 2, title: 'Organization Profile', description: '' },
+  { id: 3, title: 'Address Information', description: '' },
+  { id: 4, title: 'Contact Details', description: '' },
+  { id: 5, title: 'Financial & Infrastructure', description: '' },
   // Custom tabs slot in here at runtime (ids 6..N)
   // Review is always the last step
 ];

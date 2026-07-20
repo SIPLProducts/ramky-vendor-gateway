@@ -2215,8 +2215,8 @@ export function DocumentVerificationStep({
           <TabsContent value="gst" className="mt-4">
             <StageShell
               icon={<Building2 className="h-4 w-4" />}
-              title="GST Verification"
-              subtitle="Upload your GST certificate or declare non-registration"
+              title=""
+              subtitle=""
               status={tabStatus.gst}
               verifiedAt={gstDoc.verifiedAt}
             >
@@ -2272,12 +2272,6 @@ export function DocumentVerificationStep({
                             <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
                           </div>
                           <div className="flex items-center gap-2">
-                            {gstFilingChecked && gstCompliance?.previousMonthFiled && (
-                              <Badge className="bg-success text-success-foreground hover:bg-success">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                GSTR1 Filed for {gstCompliance.checkedPeriod}
-                              </Badge>
-                            )}
                             {gstFilingChecked && gstCompliance && !gstCompliance.previousMonthFiled && !gstCompliance.declarationRequired && (
                               <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground bg-muted/40">
                                 GSTR1 for {gstCompliance.checkedPeriod} not yet filed — within grace period (due 11th)
@@ -2289,16 +2283,6 @@ export function DocumentVerificationStep({
                                 GSTR1 for {gstCompliance.checkedPeriod} not filed — declaration required
                               </Badge>
                             )}
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => runGstFilingStatusCheck(gstDoc.ocrData || {})}
-                              disabled={gstFilingChecking}
-                            >
-                              <RotateCcw className={`h-3.5 w-3.5 mr-2 ${gstFilingChecking ? "animate-spin" : ""}`} />
-                              {gstFilingChecked ? "Refresh" : "Check Filing Status"}
-                            </Button>
                           </div>
                         </div>
 
@@ -2382,12 +2366,6 @@ export function DocumentVerificationStep({
                       />
                     </div>
 
-                    <FormField
-                      label="Reason for non-registration"
-                      value={gstDeclarationReason}
-                      onChange={setGstDeclarationReason}
-                      placeholder="e.g. Turnover below threshold"
-                    />
                   </div>
                 )}
               </div>
@@ -2404,8 +2382,8 @@ export function DocumentVerificationStep({
           <TabsContent value="pan" className="mt-4">
             <StageShell
               icon={<BadgeCheck className="h-4 w-4" />}
-              title="PAN Verification"
-              subtitle="Upload PAN card to extract and verify holder details"
+              title=""
+              subtitle=""
               status={tabStatus.pan}
               verifiedAt={panDoc.verifiedAt}
             >
@@ -2427,7 +2405,7 @@ export function DocumentVerificationStep({
                     return (
                       <div className="space-y-3">
                         <ReviewBanner />
-                        <div className="grid md:grid-cols-2 gap-3">
+                        <div className="grid md:grid-cols-3 gap-3">
                           <EditableOcrField
                             label="PAN Number"
                             value={panDoc.ocrData?.pan_number}
@@ -2532,18 +2510,18 @@ export function DocumentVerificationStep({
           <TabsContent value="msme" className="mt-4">
             <StageShell
               icon={<ShieldCheck className="h-4 w-4" />}
-              title="MSME / Udyam"
-              subtitle="Optional — upload Udyam certificate or skip"
+              title=""
+              subtitle=""
               status={tabStatus.msme}
               verifiedAt={msmeDoc.verifiedAt}
             >
               <div className="space-y-5">
                 <GateRow
-                  label="Are you MSME / Udyam registered?"
+                  label="Are you MSME registered?"
                   value={isMsmeRegistered}
                   onChange={handleMsmeRegisteredChange}
                   yesLabel="Yes"
-                  noLabel="No, skip"
+                  noLabel="No"
                 />
 
                 {isMsmeRegistered === false && (
@@ -2577,15 +2555,9 @@ export function DocumentVerificationStep({
                         accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.gif,.docx,.txt,.csv"
                       />
                     </div>
-
-                    <FormField
-                      label="Reason for non-registration"
-                      value={msmeDeclarationReason}
-                      onChange={setMsmeDeclarationReason}
-                      placeholder="e.g. Turnover below MSME threshold limit"
-                    />
                   </div>
                 )}
+
 
                 {isMsmeRegistered === true && (
                   <div className="space-y-4">
@@ -2627,7 +2599,7 @@ export function DocumentVerificationStep({
                         {msmeDoc.status === "verified" && (
                           <div className="space-y-3 pt-2">
                             <ReviewBanner />
-                            <div className="grid md:grid-cols-2 gap-3">
+                            <div className="grid md:grid-cols-3 gap-3">
                               {(() => { const m = msmeDoc.apiData?.normalized || {}; return (<>
                               <EditableOcrField
                                 label="Udyam Number"
@@ -2808,8 +2780,8 @@ export function DocumentVerificationStep({
           <TabsContent value="bank" className="mt-4">
             <StageShell
               icon={<Landmark className="h-4 w-4" />}
-              title="Bank Account"
-              subtitle="Upload cancelled cheque"
+              title=""
+              subtitle=""
               status={tabStatus.bank}
               verifiedAt={bankDoc.verifiedAt}
             >
@@ -2828,7 +2800,7 @@ export function DocumentVerificationStep({
                 verifiedFields={
                   <div className="space-y-3">
                     <ReviewBanner />
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <div className="grid md:grid-cols-3 gap-3">
                       <EditableOcrField
                         label="Account Number"
                         value={bankDoc.ocrData?.account_number}
@@ -2964,7 +2936,7 @@ export function DocumentVerificationStep({
                       }
                       verifiedFields={
                         <div className="space-y-3">
-                          <div className="grid md:grid-cols-2 gap-3">
+                          <div className="grid md:grid-cols-3 gap-3">
                             <EditableOcrField
                               label="Account Number"
                               value={bankDoc2.ocrData?.account_number}
@@ -3207,30 +3179,30 @@ interface StageShellProps {
   children: React.ReactNode;
 }
 function StageShell({ icon, title, subtitle, status, verifiedAt, children }: StageShellProps) {
+  const showHeader = Boolean(title || subtitle);
   return (
     <div className="rounded-lg border border-border/60 bg-card shadow-enterprise-sm overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            {icon}
+      {showHeader && (
+        <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              {icon}
+            </div>
+            <div className="min-w-0">
+              {title && <h3 className="text-sm font-semibold text-foreground leading-tight">{title}</h3>}
+              {subtitle && <p className="text-xs text-muted-foreground leading-tight mt-0.5">{subtitle}</p>}
+            </div>
           </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground leading-tight">{title}</h3>
-            <p className="text-xs text-muted-foreground leading-tight mt-0.5">{subtitle}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            {verifiedAt && status === "verified" && (
+              <span className="hidden sm:inline text-xs text-muted-foreground">
+                · {timeAgo(verifiedAt)}
+              </span>
+            )}
+            <StatusPill status={status} />
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {verifiedAt && status === "verified" && (
-            <span className="hidden sm:inline text-xs text-muted-foreground">
-              · {timeAgo(verifiedAt)}
-            </span>
-          )}
-          <StatusPill status={status} />
-        </div>
-      </div>
-
-      {/* Body */}
+      )}
       <div className="p-5">{children}</div>
     </div>
   );
@@ -3503,7 +3475,7 @@ function GstVerifiedDetails({
       {/* Identity */}
       <div className="space-y-2">
         <SectionHeading>Identity</SectionHeading>
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid md:grid-cols-3 gap-3">
           <EditableOcrField
             label="Legal Name"
             value={ocr.legal_name}
@@ -3553,7 +3525,7 @@ function GstVerifiedDetails({
       {hasRegistrationSection && (
         <div className="space-y-2">
           <SectionHeading>Registration</SectionHeading>
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             {ocr.gst_status && (
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">GST Status</Label>
@@ -3603,7 +3575,7 @@ function GstVerifiedDetails({
       {/* Place of Business */}
       <div className="space-y-2">
         <SectionHeading>Place of Business</SectionHeading>
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid md:grid-cols-3 gap-3">
           <div className="md:col-span-2">
             <Label htmlFor="principal-place" className="text-xs font-medium text-muted-foreground">
               Principal Place of Business
@@ -3638,7 +3610,7 @@ function GstVerifiedDetails({
       {hasJurisdiction && (
         <div className="space-y-2">
           <SectionHeading>Jurisdiction</SectionHeading>
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             {ocr.jurisdiction_centre && (
               <EditableOcrField
                 label="Centre Jurisdiction"
@@ -3841,10 +3813,5 @@ function EditableOcrField({
  * correct any field if the OCR mis-read the document.
  */
 function ReviewBanner() {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      <Sparkles className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-      <span>Review the extracted details. Click any field to correct it if the document was misread.</span>
-    </div>
-  );
+  return null;
 }

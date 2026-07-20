@@ -439,30 +439,19 @@ export function GstKycTab(props: GstKycTabProps) {
         <div className="space-y-4">
           <Alert>
             <AlertDescription>
-              Please download the GST Self-Declaration form, sign it, and upload the signed copy below.
+              Please download the Non-GST Self-Declaration form, sign it, and upload the signed copy below.
             </AlertDescription>
           </Alert>
 
           <Button asChild type="button" variant="outline" size="sm">
             <a href="/templates/gst-self-declaration.docx" target="_blank" rel="noopener noreferrer" download>
               <Download className="h-4 w-4 mr-2" />
-              Download GST Self-Declaration Template
+              Download Non-GST Self-Declaration Template
             </a>
           </Button>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="gstDeclarationReason">Reason for non-registration (optional)</Label>
-            <Textarea
-              id="gstDeclarationReason"
-              value={props.gstDeclarationReason}
-              onChange={(e) => props.onGstDeclarationReasonChange(e.target.value)}
-              placeholder="e.g. Turnover below GST threshold limit"
-              rows={2}
-            />
-          </div>
-
           <FileUpload
-            label="Signed GST Self-Declaration *"
+            label="Signed Non-GST Self-Declaration *"
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
             documentType="gst_self_declaration"
             onFileSelect={props.onGstSelfDeclarationFileChange}
