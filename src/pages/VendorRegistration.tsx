@@ -1179,14 +1179,11 @@ export default function VendorRegistration() {
     // step is the new step number; map to form key
     const stepKeys: Record<number, keyof VendorFormData> = {
       3: 'address',
-      4: 'contact',
     };
     const key = stepKeys[step];
     if (key) setFormData((prev) => ({ ...prev, [key]: data }));
     if (!completedSteps.includes(step)) setCompletedSteps((prev) => [...prev, step]);
-    // Legacy Contact Details tab (step 4) is hidden — skip straight to step 5.
-    const next = step === 3 && !isInternational ? 5 : step + 1;
-    setCurrentStep(next);
+    setCurrentStep(step + 1);
   };
 
   // Step 2 emits both organization + statutory (statutory & memberships moved here)
@@ -1203,15 +1200,11 @@ export default function VendorRegistration() {
       infrastructure: data.infrastructure,
       qhse: data.qhse,
     }));
-    if (!completedSteps.includes(5)) setCompletedSteps((prev) => [...prev, 5]);
-    setCurrentStep(6);
+    if (!completedSteps.includes(4)) setCompletedSteps((prev) => [...prev, 4]);
+    setCurrentStep(5);
   };
 
-  const handleBack = () => setCurrentStep((prev) => {
-    // Legacy Contact Details tab (step 4) is hidden — jump from 5 back to 3.
-    if (!isInternational && prev === 5) return 3;
-    return Math.max(1, prev - 1);
-  });
+  const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
   const handleStepClick = (step: number) => {
     // Free navigation backward; forward only if all preceding steps are complete.
     if (step <= currentStep) { setCurrentStep(step); return; }
