@@ -767,7 +767,7 @@ export default function VendorRegistration() {
   };
 
   const isFirstStep = currentStep === 1;
-  const lastStepId = registrationSteps[registrationSteps.length - 1]?.id ?? 6;
+  const lastStepId = registrationSteps[registrationSteps.length - 1]?.id ?? 5;
   const isLastStep = currentStep === lastStepId;
 
   useEffect(() => {
