@@ -2272,12 +2272,6 @@ export function DocumentVerificationStep({
                             <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
                           </div>
                           <div className="flex items-center gap-2">
-                            {gstFilingChecked && gstCompliance?.previousMonthFiled && (
-                              <Badge className="bg-success text-success-foreground hover:bg-success">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                GSTR1 Filed for {gstCompliance.checkedPeriod}
-                              </Badge>
-                            )}
                             {gstFilingChecked && gstCompliance && !gstCompliance.previousMonthFiled && !gstCompliance.declarationRequired && (
                               <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground bg-muted/40">
                                 GSTR1 for {gstCompliance.checkedPeriod} not yet filed — within grace period (due 11th)
@@ -2289,16 +2283,6 @@ export function DocumentVerificationStep({
                                 GSTR1 for {gstCompliance.checkedPeriod} not filed — declaration required
                               </Badge>
                             )}
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => runGstFilingStatusCheck(gstDoc.ocrData || {})}
-                              disabled={gstFilingChecking}
-                            >
-                              <RotateCcw className={`h-3.5 w-3.5 mr-2 ${gstFilingChecking ? "animate-spin" : ""}`} />
-                              {gstFilingChecked ? "Refresh" : "Check Filing Status"}
-                            </Button>
                           </div>
                         </div>
 
