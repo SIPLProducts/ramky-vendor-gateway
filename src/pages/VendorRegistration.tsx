@@ -985,7 +985,7 @@ export default function VendorRegistration() {
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [formData, autoSaveState, isSubmitted]);
+  }, [formData, autoSaveState, isSubmitted, vendorTypeChosen]);
 
 
 
