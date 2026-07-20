@@ -1,42 +1,44 @@
 
-## Fix 1 — Restore verification messages below verified OCR inputs
+## 1. Tabs: hide Contact Details, rename Address Information → Contact Details
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`, `EditableOcrField` currently only shows the `verifiedLabel` text (e.g. "Verified from registry", "DOB verified from registry") as a hover tooltip on the green tick. Add it back as a small green line **below the input** whenever the value matches the API/registry value.
+In `src/pages/VendorRegistration.tsx` (and any step indicator / tab list where step keys are defined):
 
-Change: below the input's `<div className="relative">…</div>`, add:
+- Remove the existing **Contact Details** tab/step from the visible steps list (keep the underlying data/fields in state so nothing breaks on submit).
+- Rename the **Address Information** tab label to **Contact Details** wherever the label is rendered (step indicator, headers, breadcrumb, validation messages).
+- Update step-completion / navigation logic so the removed tab is not required and the renamed tab is treated as the new "Contact Details" step.
 
-```tsx
-{matchesApi && verifiedLabel && (
-  <p className="mt-1 flex items-center gap-1 text-[11px] text-success">
-    <CheckCircle2 className="h-3 w-3" />
-    <span>{verifiedLabel}</span>
-  </p>
-)}
-```
+No field-level logic changes — purely tab visibility + label rename.
 
-Result: fields like Legal Name, Trade Name, GSTIN, PAN, DOB, IFSC, Bank Name, Account Holder, etc. show a green "Verified from registry" / "DOB verified from registry" line under the field again — while the green bottom border and inline tick are kept. The orange mismatch message (with "Use registry value") is already rendered and stays untouched.
+## 2. Hide extra cards on the Vendor Registration form
 
-## Fix 2 — Draft data lost after browser refresh (form returns to Vendor Type screen)
+Hide (do not delete — wrap so they can be re-enabled later) the following cards/sections wherever they appear in the vendor registration steps:
 
-Root cause (unconfirmed pending a live check, but strongly indicated by the code): in `src/hooks/useVendorRegistration.tsx` the `existing-vendor` `useQuery`:
+- Existing Major Customers
+- Authorized Distributor Details
+- Manufacturing Facility Details
+- Connectivity Details
+- Type of Products
+- Production Facilities
+- QHSE Details (Quality, Health, Safety, Environment)
 
-- runs immediately on mount,
-- calls `supabase.auth.getUser()` and **returns `null` if `user` is not yet hydrated**,
-- has a `queryKey` that does NOT depend on the authenticated user id, so it never re-runs once auth finishes hydrating.
+Also hide the **Expected Credit Period (Days)** field everywhere it renders (registration form, review/preview dialogs, admin views).
 
-On a hard refresh, Supabase auth hydration frequently completes *after* the query fires → query resolves `null` → `existingFormData` stays `null` → `VendorRegistration.tsx` renders the Vendor Type selector (`!vendorTypeChosen`) instead of the saved draft.
+Approach: comment/guard each card with a simple `{false && (...)}` or an internal `HIDDEN_SECTIONS` constant, so restoring later is a one-line change. Keep the underlying form state / schema untouched so saved data and submissions continue to work.
 
-Change in `src/hooks/useVendorRegistration.tsx`:
+## 3. MSME tab: gate certificate upload behind Udyam verification
 
-1. Track auth user id via `supabase.auth.onAuthStateChange` + initial `getUser()` in a small `useState<string | null>`.
-2. Gate the `existing-vendor` query with `enabled: !!userId || !!options?.onBehalfInvitationId` and include the user id in the `queryKey` so it refetches once auth is ready.
-3. Inside `queryFn`, keep the existing `user_id`/`invitation_id` filter but rely on the resolved id from state rather than re-calling `getUser()` (still fall back to `getUser()` for safety).
+In `src/components/vendor/kyc/MsmeKycTab.tsx`:
 
-This ensures the saved draft is loaded on every refresh, which then lets the existing effect at `VendorRegistration.tsx` line 779 hydrate `formData`, call `setVendorTypeChosen(true)`, and land the user on the correct step instead of the Vendor Type selector.
+- After the user selects **Are you MSME registered? → Yes**, initially render **only** the left column (MSME/Udyam Number + Verify button).
+- Hide the right column (Upload Udyam Certificate + its required warning) until the manual Verify call returns a successful API response (i.e. `state.status === 'passed'` or `manualApiResult?.ok` is true).
+- Once verification succeeds, reveal the upload card so the user can upload the certificate.
+- If the user edits the Udyam number after a successful verify, reset the verified state and re-hide the upload card until they verify again.
 
-No other UI is changed; the Buyer Company / Firm Reg / Memberships tweaks and other prior changes are untouched.
+No changes to the OCR flow, cross-name-match logic, or downstream `onVerifiedDetails` behaviour.
 
 ## Files touched
 
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` (add below-input verified message in `EditableOcrField`)
-- `src/hooks/useVendorRegistration.tsx` (auth-gated existing-vendor query so refresh rehydrates the draft)
+- `src/pages/VendorRegistration.tsx` — hide Contact Details tab, rename Address Information → Contact Details, hide Expected Credit Period + listed cards if they live here.
+- Step files under `src/components/vendor/steps/` (e.g. the step rendering the listed cards, and the Address/Contact step) — hide the listed sections and the Expected Credit Period field.
+- `src/components/vendor/kyc/MsmeKycTab.tsx` — gate the Udyam certificate upload card behind a successful Udyam number verification.
+- Any step-indicator component (e.g. `EnterpriseStepIndicator` / `HorizontalStepIndicator`) if step labels are defined there rather than in the page.
