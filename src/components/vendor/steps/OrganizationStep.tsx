@@ -307,7 +307,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
   };
 
   return (
-    <form id="step-form-2" onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="space-y-6">
+    <form id="step-form-2" onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="vendor-styled-form space-y-6">
       <div className="form-section">
         <h3 className="form-section-title">
           <Building2 className="h-5 w-5 text-primary" />
