@@ -2752,26 +2752,25 @@ export function DocumentVerificationStep({
                               <RotateCcw className="h-3.5 w-3.5 mr-1" />
                               Re-validate
                             </Button>
+                            <div className="pt-2">
+                              <FileUpload
+                                label="Upload Udyam Certificate *"
+                                documentType="msme_certificate"
+                                vendorId={vendorId}
+                                currentFile={msmeDoc.file ?? null}
+                                onFileSelect={(file) =>
+                                  setMsmeDoc((prev) => ({ ...prev, file: file ?? undefined }))
+                                }
+                              />
+                              {!msmeDoc.file && (
+                                <p className="mt-1 text-xs text-destructive">
+                                  Udyam certificate upload is required to proceed.
+                                </p>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
-
-                    <div className="pt-2">
-                      <FileUpload
-                        label="Upload Udyam Certificate *"
-                        documentType="msme_certificate"
-                        vendorId={vendorId}
-                        currentFile={msmeDoc.file ?? null}
-                        onFileSelect={(file) =>
-                          setMsmeDoc((prev) => ({ ...prev, file: file ?? undefined }))
-                        }
-                      />
-                      {msmeDoc.status === "verified" && !msmeDoc.file && (
-                        <p className="mt-1 text-xs text-destructive">
-                          Udyam certificate upload is required to proceed.
-                        </p>
-                      )}
-                    </div>
                   </div>
                 )}
 
