@@ -3826,16 +3826,16 @@ function EditableOcrField({
           tabIndex={readOnly ? -1 : undefined}
           aria-readonly={readOnly || undefined}
           className={cn(
-            "mt-1 bg-muted/40 border-border/60",
+            "mt-1 border-0 border-b rounded-none bg-transparent border-border/60 px-0 focus-visible:ring-0 focus-visible:ring-offset-0",
             mono && "font-mono text-sm tracking-wide",
-            isEdited && "border-warning/40 bg-warning/5",
-            matchesApi && "border-success/40 bg-success/5",
-            mismatchApi && "border-warning/50 bg-warning/5",
-            readOnly && "cursor-default focus-visible:ring-0 focus-visible:ring-offset-0",
+            isEdited && "border-b-2 border-b-warning",
+            matchesApi && "border-b-2 border-b-success",
+            mismatchApi && "border-b-2 border-b-warning",
+            readOnly && "cursor-default",
             padRight,
           )}
         />
-        <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-1">
           {hasBadge && (
             <span
               className="pointer-events-auto"
@@ -3861,6 +3861,7 @@ function EditableOcrField({
           )}
         </div>
       </div>
+
       {mismatchApi && (
         <p className="mt-1 flex items-center gap-1 text-[11px] text-warning">
           <span className="truncate">

@@ -314,48 +314,14 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           Organization Profile
         </h3>
 
-        <div className="grid gap-5">
-          <div className="grid gap-1.5">
-            <Label htmlFor="buyerCompanyDisplay">Buyer Company *</Label>
-            <Controller
-              name="buyerCompanyId"
-              control={control}
-              render={({ field }) => {
-                const company = buyerCompanies?.find((c) => c.id === field.value);
-                const display = company
-                  ? `${company.name} (${company.code})`
-                  : '';
-                const showLoading = isLoadingCompanies && field.value && !company;
-                return (
-                  <>
-                    <input type="hidden" value={field.value || ''} readOnly />
-                    <div
-                      id="buyerCompanyDisplay"
-                      className={
-                        'flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm ' +
-                        (errors.buyerCompanyId ? 'border-destructive' : 'border-input')
-                      }
-                    >
-                      {showLoading ? (
-                        <span className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading company…
-                        </span>
-                      ) : display ? (
-                        <span className="font-medium text-foreground">{display}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Not assigned</span>
-                      )}
-                    </div>
-                  </>
-                );
-              }}
-            />
-            <p className="text-xs text-muted-foreground">Assigned by buyer — cannot be changed.</p>
-            {errors.buyerCompanyId && (
-              <p className="text-xs text-destructive">{errors.buyerCompanyId.message}</p>
+        <div className="grid md:grid-cols-2 gap-5">
+          <Controller
+            name="buyerCompanyId"
+            control={control}
+            render={({ field }) => (
+              <input type="hidden" value={field.value || ''} readOnly />
             )}
-          </div>
+          />
 
           <div className="grid gap-1.5">
             <Label htmlFor="legalName">Legal Name of Organization *</Label>
@@ -379,52 +345,50 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
             />
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label>Type of Industry *</Label>
-              <Controller
-                name="industryType"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.industryType ? 'border-destructive' : ''}>
-                      <SelectValue placeholder="Select industry type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INDUSTRY_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.industryType && (
-                <p className="text-xs text-destructive">{errors.industryType.message}</p>
+          <div className="grid gap-1.5">
+            <Label>Type of Industry *</Label>
+            <Controller
+              name="industryType"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className={errors.industryType ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Select industry type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDUSTRY_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-            </div>
+            />
+            {errors.industryType && (
+              <p className="text-xs text-destructive">{errors.industryType.message}</p>
+            )}
+          </div>
 
-            <div className="grid gap-1.5">
-              <Label>Type of Organization *</Label>
-              <Controller
-                name="organizationType"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.organizationType ? 'border-destructive' : ''}>
-                      <SelectValue placeholder="Select organization type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ORGANIZATION_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.organizationType && (
-                <p className="text-xs text-destructive">{errors.organizationType.message}</p>
+          <div className="grid gap-1.5">
+            <Label>Type of Organization *</Label>
+            <Controller
+              name="organizationType"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className={errors.organizationType ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Select organization type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORGANIZATION_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-            </div>
+            />
+            {errors.organizationType && (
+              <p className="text-xs text-destructive">{errors.organizationType.message}</p>
+            )}
           </div>
 
           <div className="grid gap-1.5">
@@ -449,7 +413,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
               <p className="text-xs text-destructive">{errors.ownershipType.message}</p>
             )}
           </div>
-
 
           <div className="grid gap-1.5">
             <Label>State *</Label>
@@ -477,6 +440,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           {/* Accounting Group is derived from vendor type (Domestic / International) selected in step 1. */}
         </div>
       </div>
+
 
       {/* SAP Classification (Domestic) — values are passed to SAP Sync popup and editable there */}
       <div className="form-section">
@@ -527,16 +491,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
         </h3>
 
         <div className="grid gap-5">
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="firmRegistrationNo">Firm Registration No.</Label>
-              <Input
-                id="firmRegistrationNo"
-                {...register('firmRegistrationNo')}
-                placeholder="Enter registration number"
-              />
-            </div>
-          </div>
 
           <div className="grid md:grid-cols-3 gap-5">
             <div className="grid gap-1.5">
@@ -563,36 +517,6 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
         </h3>
 
         <div className="grid gap-5">
-          <div className="grid gap-1.5">
-            <Label>Memberships</Label>
-            <Controller
-              name="memberships"
-              control={control}
-              render={({ field }) => (
-                <MultiSelect
-                  options={MEMBERSHIP_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
-                  selected={field.value || []}
-                  onChange={field.onChange}
-                  placeholder="Select memberships"
-                />
-              )}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label>Enlistment With</Label>
-            <Controller
-              name="enlistments"
-              control={control}
-              render={({ field }) => (
-                <MultiSelect
-                  options={ENLISTMENT_OPTIONS.map((opt) => ({ label: opt, value: opt }))}
-                  selected={field.value || []}
-                  onChange={field.onChange}
-                  placeholder="Select enlistments"
-                />
-              )}
-            />
-          </div>
           <div className="grid gap-1.5">
             <Label>Certifications</Label>
             <Controller
