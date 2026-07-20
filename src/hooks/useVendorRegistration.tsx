@@ -179,7 +179,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (options?.onBehalfInvitationId) {
         query = query.eq('invitation_id', options.onBehalfInvitationId);
       } else {
-        query = query.eq('user_id', user.id);
+        if (!userId) return null;
+        query = query.eq('user_id', userId);
+
       }
 
       const { data, error } = await query.maybeSingle();
