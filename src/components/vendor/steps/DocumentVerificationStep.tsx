@@ -2555,15 +2555,9 @@ export function DocumentVerificationStep({
                         accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.gif,.docx,.txt,.csv"
                       />
                     </div>
-
-                    <FormField
-                      label="Reason for non-registration"
-                      value={msmeDeclarationReason}
-                      onChange={setMsmeDeclarationReason}
-                      placeholder="e.g. Turnover below MSME threshold limit"
-                    />
                   </div>
                 )}
+
 
                 {isMsmeRegistered === true && (
                   <div className="space-y-4">
