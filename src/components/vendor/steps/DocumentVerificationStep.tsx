@@ -3486,7 +3486,9 @@ function GstVerifiedDetails({
             verifiedValue={api.legal_name}
             verifiedLabel="Legal Name is verified"
             onChange={(v) => onChangeField("legal_name", v)}
+            trailingInfo={legalNameInfo ?? null}
           />
+
           <EditableOcrField
             label="Trade Name"
             value={ocr.trade_name}
