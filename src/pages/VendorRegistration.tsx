@@ -1471,7 +1471,8 @@ export default function VendorRegistration() {
       case 3:
         return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
-        return <ContactStep tenantId={tenantId} data={formData.contact} onNext={(data) => handleStepComplete(4, data)} onBack={handleBack} />;
+        return null; // Legacy Contact Details tab hidden
+
       case 5:
         return (
           <FinancialInfrastructureStep
