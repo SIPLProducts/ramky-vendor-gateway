@@ -128,12 +128,6 @@ function isDomesticStepComplete(
       );
     }
     case 4: {
-      // ContactStep treats CEO/MD contact fields as optional and performs
-      // format validation when the user clicks Continue on that tab. Do not
-      // add stricter mandatory checks again at final submit.
-      return true;
-    }
-    case 5: {
       // Financial & Infrastructure has no mandatory fields. Its own tab
       // handles format validation on Continue, so blank values must not block
       // final submit.
