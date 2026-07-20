@@ -723,8 +723,7 @@ export default function AdminInvitations() {
             <DialogHeader>
               <DialogTitle>Create Vendor Invitation</DialogTitle>
               <DialogDescription>
-                Send a registration link to a new vendor. They will use this link to create
-                their account and submit their details.
+                Send a registration link to a new vendor.
               </DialogDescription>
             </DialogHeader>
 
@@ -758,7 +757,7 @@ export default function AdminInvitations() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="vendor-phone">Phone Number</Label>
+                <Label htmlFor="vendor-phone">Contact Number</Label>
                 <Input
                   id="vendor-phone"
                   type="tel"

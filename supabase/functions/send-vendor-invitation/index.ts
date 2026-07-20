@@ -151,7 +151,7 @@ const handler = async (req: Request): Promise<Response> => {
                             <tr>
                               <td style="padding:8px 0; font-size:14px; color:#2d3748; line-height:1.6;">
                                 <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background-color:#1e3a5f; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:14px; font-family:Georgia,serif;">I</span>
-                                Access Registration Portal
+                                Access Registration Portal Using Below Link
                               </td>
                             </tr>
                             <tr>
@@ -208,7 +208,6 @@ const handler = async (req: Request): Promise<Response> => {
                     <div style="height:1px; background-color:#e2e8f0; margin:0 0 24px 0; line-height:1px; font-size:0;">&nbsp;</div>
 
                     <p style="margin:0; font-size:14px; line-height:1.7; color:#2d3748;">
-                      Respectfully,<br>
                       <span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; font-weight:600; color:#1e3a5f; text-transform:capitalize;">Procurement Team</span><br>
                       <span style="color:#718096; font-size:13px;">${companyName}</span>
                     </p>
