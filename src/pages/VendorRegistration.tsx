@@ -1470,7 +1470,7 @@ export default function VendorRegistration() {
       }
       return null;
     }
-    // Built-in domestic steps 1..5
+    // Built-in domestic steps 1..4
     switch (currentStep) {
       case 1:
         return null; // rendered persistently outside renderStep
@@ -1479,9 +1479,6 @@ export default function VendorRegistration() {
       case 3:
         return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
-        return null; // Legacy Contact Details tab hidden
-
-      case 5:
         return (
           <FinancialInfrastructureStep
             tenantId={tenantId}
@@ -1503,8 +1500,8 @@ export default function VendorRegistration() {
     if (currentStep === lastStepId) {
       return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
     }
-    // Anything in between is an admin-defined custom tab (ids 6..N-1)
-    const customIdx = currentStep - 6;
+    // Anything in between is an admin-defined custom tab (ids 5..N-1)
+    const customIdx = currentStep - 5;
     const customStep = customSteps[customIdx];
     if (customStep) {
       const fields = fieldsByStep[customStep.step_key] || [];
