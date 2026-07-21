@@ -1,39 +1,28 @@
-# Vendor Confirmation Emails & Post-Submit Screen Cleanup
+## Goal
+In the GST/PAN/MSME/Bank verified panels, remove the green success text that appears below each input (e.g. "Legal Name is verified", "Verified from registry", "Active per registry"). At the same time make the GST section headers (Identity, Registration, Place of Business, Jurisdiction) smaller and add an orange underline below each header.
 
-## 1. Hide the Application Progress diagram for vendors
-**File:** `src/components/vendor/SuccessScreen.tsx`
+## Changes
 
-Remove (or conditionally hide) the block that renders:
-```
-<h2>Application Progress</h2>
-<RegistrationStatusTracker ... />
-```
-(lines ~196–200). The vendor will still see the status header (title, message, reference number) and the "What Happens Next?" section, but the multi-stage progress diagram will no longer be shown after submission.
+### 1. Update `SectionHeading` styling
+File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- Reduce the header text size further (e.g. `text-[10px]` or `text-[11px]`).
+- Add an orange bottom border (`border-b border-warning/70` or `border-orange-500`) under the header text.
+- Keep uppercase, tracking-wide treatment so it still looks like a label.
 
-The `RegistrationStatusTracker` component itself stays available for internal/admin screens (`VendorStatus.tsx`) — only the vendor-facing SuccessScreen loses it.
+### 2. Hide verified success messages below inputs
+File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- In the `EditableOcrField` component, remove the `matchesApi && verifiedLabel` block that renders the green `<p>` text below the input.
+- Keep the green border on the input and the success check icon inside the input (already present); only the text below is removed.
+- Keep the mismatch warning block (`mismatchApi`) unchanged so registry mismatches still warn the user.
 
-## 2. Send submission confirmation email to the vendor
-**File:** `supabase/functions/notify-vendor-submission/index.ts`
+### 3. Remove additional GST verified messages
+File: `src/components/vendor/steps/DocumentVerificationStep.tsx`
+- Remove the "Matches registry address" success message below the Principal Place of Business input.
+- Remove the `Active per registry` suffix from the GST Status pill in the Registration section.
 
-Currently this function emails the buyer/inviter after the vendor submits. Add a second email addressed to the vendor's registered email (`invite.email` / `vendor.primary_email`) with:
-- Subject: `Application Submitted Successfully – Ref <reference_number>`
-- Body: friendly confirmation that the application has been received, the **Reference Number**, submitted-at timestamp, and a note that the buyer/approvers have been notified and further updates will follow by email.
+### 4. Verify no side effects
+- Run `tsgo` typecheck to confirm the component still compiles.
+- The change will automatically apply to all verified panels because `EditableOcrField` is shared across GST, PAN, MSME, and Bank tabs.
 
-Implementation notes:
-- Reuse the same `send-smtp-email` invoke pattern already in the file.
-- Skip sending if `vendorEmail` is empty; wrap in try/catch so a vendor-email failure doesn't break the buyer notification flow.
-- Add an `audit_logs` row with `action: "vendor_submission_confirmation_sent"`.
-
-## 3. Also send the "Vendor Created in SAP" email to the vendor
-**File:** `supabase/functions/sync-vendor-to-sap/index.ts` (around lines 820–890)
-
-Today the SAP-success email goes only to the buyer. Extend that block so the same HTML email is also delivered to the vendor's registered email:
-- Resolve `vendorEmail` from `vendor.primary_email` (fallback to the linked `vendor_invitations.email`).
-- Add it to the `to` list (or send a second `send-smtp-email` call) alongside the buyer.
-- Keep the existing subject/body (already includes Reference No. and SAP Vendor Code).
-- Extend the `sap_sync_buyer_notified` audit entry to record `vendor_email` as well (or add a companion `sap_sync_vendor_notified` entry).
-
-## Technical Details
-- No schema changes required — `vendors.primary_email`, `vendors.reference_number`, and `vendor_invitations.email` already exist and are read by these functions.
-- No frontend logic changes for submission — the existing `notify-vendor-submission` invoke in `useVendorRegistration.tsx` continues to fire; the vendor email is added inside the edge function.
-- SMTP transport is unchanged (uses `send-smtp-email` with configured portal SMTP).
+## Result
+All verified panels will show only the input with the green bottom border and the check icon inside the input; no extra green text below fields. GST section headers will appear smaller with an orange underline.
