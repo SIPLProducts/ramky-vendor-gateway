@@ -3534,12 +3534,6 @@ function GstVerifiedDetails({
                 <Label className="text-xs font-medium text-muted-foreground">GST Status</Label>
                 <div className="mt-1 h-10 flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3">
                   <GstStatusPill status={ocr.gst_status} />
-                  {statusVerified && (
-                    <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-success">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {apiGstStatus} per registry
-                    </span>
-                  )}
                 </div>
               </div>
             )}
