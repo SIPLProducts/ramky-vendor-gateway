@@ -94,7 +94,7 @@ export function ReportsScreenConfigCard() {
             key={g.title}
             className="space-y-3 rounded-lg border p-4 border-l-4 border-l-green-500"
           >
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-muted-foreground">
               {g.title}
             </h3>
             <div className="grid gap-3 md:grid-cols-3">
