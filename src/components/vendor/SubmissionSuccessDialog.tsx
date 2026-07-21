@@ -87,7 +87,7 @@ export function SubmissionSuccessDialog({
           {vendorIdentity && (vendorIdentity.vendorEmail || vendorIdentity.vendorPhone || vendorIdentity.vendorName) && (
             <div className="rounded-md border bg-muted/40 p-3 text-left text-foreground text-xs space-y-1.5">
               <div className="text-xs text-muted-foreground font-medium">
-                Vendor details
+                Vendor Details
               </div>
               {vendorIdentity.vendorName && (
                 <div className="flex items-center gap-2">
