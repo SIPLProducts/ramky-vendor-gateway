@@ -86,7 +86,7 @@ export function SubmissionSuccessDialog({
 
           {vendorIdentity && (vendorIdentity.vendorEmail || vendorIdentity.vendorPhone || vendorIdentity.vendorName) && (
             <div className="rounded-md border bg-muted/40 p-3 text-left text-foreground text-xs space-y-1.5">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+              <div className="text-xs text-muted-foreground font-medium">
                 Vendor details
               </div>
               {vendorIdentity.vendorName && (
@@ -118,7 +118,7 @@ export function SubmissionSuccessDialog({
 
           {isSuccess && inviter?.email && (
             <div className="rounded-md border bg-muted/40 p-3 text-foreground">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1">
+              <div className="text-xs text-muted-foreground font-medium mb-1">
                 Notification sent to
               </div>
               <div className="flex items-center justify-center gap-2 font-medium text-sm">
