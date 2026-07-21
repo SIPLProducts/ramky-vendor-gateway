@@ -3584,13 +3584,6 @@ function GstVerifiedDetails({
               placeholder="As per GST certificate"
               className="mt-1"
             />
-            {api.address && editablePrincipalPlace.trim().length > 0 &&
-              normalizeForCompare(editablePrincipalPlace) === normalizeForCompare(String(api.address)) && (
-                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Matches registry address
-                </p>
-              )}
           </div>
           {hasAdditional && (
             <div className="md:col-span-2">
