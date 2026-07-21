@@ -3433,8 +3433,10 @@ function ChipList({ items }: { items?: string[] }) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-warning/70 pb-1">
-      {children}
+    <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <span className="inline-block border-b border-warning/70 pb-1 w-fit">
+        {children}
+      </span>
     </h4>
   );
 }
