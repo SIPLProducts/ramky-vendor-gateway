@@ -362,7 +362,7 @@ export default function Dashboard() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                  <p className="text-xs font-semibold text-muted-foreground truncate">
                     {c.label}
                   </p>
                   {isLoading ? (
