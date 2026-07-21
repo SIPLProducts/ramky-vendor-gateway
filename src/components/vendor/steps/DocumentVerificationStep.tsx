@@ -3433,7 +3433,7 @@ function ChipList({ items }: { items?: string[] }) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-warning/70 pb-1">
       {children}
     </h4>
   );
@@ -3534,12 +3534,6 @@ function GstVerifiedDetails({
                 <Label className="text-xs font-medium text-muted-foreground">GST Status</Label>
                 <div className="mt-1 h-10 flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3">
                   <GstStatusPill status={ocr.gst_status} />
-                  {statusVerified && (
-                    <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-success">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {apiGstStatus} per registry
-                    </span>
-                  )}
                 </div>
               </div>
             )}
@@ -3590,13 +3584,6 @@ function GstVerifiedDetails({
               placeholder="As per GST certificate"
               className="mt-1"
             />
-            {api.address && editablePrincipalPlace.trim().length > 0 &&
-              normalizeForCompare(editablePrincipalPlace) === normalizeForCompare(String(api.address)) && (
-                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-success">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Matches registry address
-                </p>
-              )}
           </div>
           {hasAdditional && (
             <div className="md:col-span-2">
@@ -3861,11 +3848,6 @@ function EditableOcrField({
         </div>
       </div>
 
-      {matchesApi && verifiedLabel && (
-        <p className="mt-1 text-[11px] text-success">
-          <span>{verifiedLabel}</span>
-        </p>
-      )}
 
 
       {mismatchApi && (
