@@ -116,7 +116,7 @@ export function NotificationSettings() {
 
         {/* Notification types info */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <p className="text-xs font-medium text-muted-foreground">
             You'll be notified about:
           </p>
           <ul className="text-sm text-muted-foreground space-y-1">

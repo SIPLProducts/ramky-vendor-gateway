@@ -144,7 +144,7 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
         collapsed ? "justify-center" : "justify-between items-center"
       )}>
         {!collapsed && (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50 px-2">
+          <span className="text-xs font-semibold text-sidebar-foreground/50 px-2">
             Navigation
           </span>
         )}

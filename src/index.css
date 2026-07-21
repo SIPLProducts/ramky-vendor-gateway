@@ -624,3 +624,19 @@ button[data-action="invite"]            { --btn-action-bg: var(--btn-invite-bg);
 .vendor-styled-form [role="combobox"].border-destructive {
   border-bottom-color: hsl(var(--destructive)) !important;
 }
+
+
+/* ============================================================
+ * Global: bold user-entered input values (Camel/Title case labels
+ * remain normal weight via their own classes).
+ * ============================================================ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea,
+select,
+[role="combobox"] {
+  font-weight: 500;
+}
+input::placeholder,
+textarea::placeholder {
+  font-weight: 400;
+}
