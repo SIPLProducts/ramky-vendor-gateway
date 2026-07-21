@@ -3848,11 +3848,6 @@ function EditableOcrField({
         </div>
       </div>
 
-      {matchesApi && verifiedLabel && (
-        <p className="mt-1 text-[11px] text-success">
-          <span>{verifiedLabel}</span>
-        </p>
-      )}
 
 
       {mismatchApi && (
