@@ -132,7 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <div style="height:2px; width:48px; background-color:#d4a574; margin:0 0 28px 0; line-height:2px; font-size:0;">&nbsp;</div>
 
                     <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#2d3748;">
-                      Dear Valued Business Partner,
+                      Dear Business Partner,
                     </p>
 
                     <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#2d3748;">
@@ -163,7 +163,13 @@ const handler = async (req: Request): Promise<Response> => {
                             <tr>
                               <td style="padding:8px 0; font-size:14px; color:#2d3748; line-height:1.6;">
                                 <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background-color:#1e3a5f; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:14px; font-family:Georgia,serif;">III</span>
-                                Verification &amp; Approval
+                                Verification &amp; Approval Status
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding:8px 0; font-size:14px; color:#2d3748; line-height:1.6;">
+                                <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background-color:#1e3a5f; color:#ffffff; text-align:center; font-size:12px; font-weight:600; margin-right:14px; font-family:Georgia,serif;">IV</span>
+                                Keep your GST, PAN, MSME (if applicable), and Bank documents ready for upload.
                               </td>
                             </tr>
                           </table>
