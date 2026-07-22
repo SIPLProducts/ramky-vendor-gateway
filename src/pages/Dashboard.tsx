@@ -155,10 +155,12 @@ export default function Dashboard() {
     const start = startOfDay(d);
     setDateFrom(start);
     if (dateTo && start > dateTo) setDateTo(endOfDay(d));
+    setFromOpen(false);
   };
   const handleToSelect = (d: Date | undefined) => {
     if (!d) return;
     setDateTo(endOfDay(d));
+    setToOpen(false);
   };
 
 
