@@ -558,13 +558,40 @@ export default function UserManagement() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Search by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
                 </div>
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All roles</SelectItem>
-                    {ALL_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {(() => {
+                  const CUSTOM_ORDER = ['Buyer', 'SCM CO', 'SCM Head', 'Finance 1', 'Finance 2', 'CEO Office', 'SAP Team'];
+                  const byName = new Map(customRoles.map((c) => [c.name.trim().toLowerCase(), c]));
+                  const orderedCustom = CUSTOM_ORDER
+                    .map((name) => ({ name, cr: byName.get(name.toLowerCase()) }))
+                    .filter((x) => !!x.cr) as { name: string; cr: CustomRoleOpt }[];
+                  const builtIn: { value: string; label: string }[] = [
+                    { value: 'admin', label: 'Admin' },
+                    { value: 'sharvi_admin', label: 'Sharvi Admin' },
+                  ];
+                  const selectedLabel =
+                    roleFilter === 'all'
+                      ? 'All Roles'
+                      : roleFilter.startsWith('custom:')
+                      ? orderedCustom.find((o) => `custom:${o.cr.id}` === roleFilter)?.name ?? 'All Roles'
+                      : builtIn.find((b) => b.value === roleFilter)?.label ?? 'All Roles';
+                  return (
+                    <Select value={roleFilter} onValueChange={setRoleFilter}>
+                      <SelectTrigger className="w-full sm:w-48">
+                        <SelectValue>{selectedLabel}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Roles</SelectItem>
+                        {orderedCustom.map(({ name, cr }) => (
+                          <SelectItem key={cr.id} value={`custom:${cr.id}`}>{name}</SelectItem>
+                        ))}
+                        {builtIn.map((b) => (
+                          <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
+
               </div>
 
               <div className="border rounded-md">
