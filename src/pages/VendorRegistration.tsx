@@ -1608,19 +1608,20 @@ export default function VendorRegistration() {
           )}
         </header>
         <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-          <div className="relative w-full max-w-md rounded-[12px] overflow-hidden bg-transparent">
+          <div className="relative w-full max-w-md rounded-[12px] overflow-hidden bg-blue-50/90 backdrop-blur-sm border border-blue-100 shadow-2xl">
             <div className="relative p-5 sm:p-6 space-y-5">
               {isTokenMode && invitationEmail && (
-                <div className="p-3 bg-white/10 border border-white/20 rounded-lg backdrop-blur-sm">
-                  <p className="text-sm text-white/80">
-                    <span className="font-medium text-white">Invited Email:</span> {invitationEmail}
+                <div className="p-3 bg-white/70 border border-blue-100 rounded-lg">
+                  <p className="text-sm text-slate-700">
+                    <span className="font-medium text-slate-900">Invited Email:</span> {invitationEmail}
                   </p>
                 </div>
               )}
               <div className="space-y-1">
-                <h1 className="text-xl font-semibold text-white drop-shadow">Select Vendor Type</h1>
-                <p className="text-sm text-white/80 drop-shadow">Choose the vendor category to begin your registration. You can change this later.</p>
+                <h1 className="text-xl font-semibold text-slate-900">Select Vendor Type</h1>
+                <p className="text-sm text-slate-600">Choose the vendor category to begin your registration. You can change this later.</p>
               </div>
+
               <VendorTypeSelector
                 value={pendingChoiceType}
                 onChange={setPendingChoiceType}
