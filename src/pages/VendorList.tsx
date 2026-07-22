@@ -394,13 +394,11 @@ export default function VendorList() {
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex-1">
               <Input
-                placeholder="Search by Buyer Company, Invited By, Vendor, GSTIN, Location, SAP Code"
+                placeholder="Search"
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-10"
               />
             </div>
             <Select value={statusFilter} onValueChange={handleFilterChange}>

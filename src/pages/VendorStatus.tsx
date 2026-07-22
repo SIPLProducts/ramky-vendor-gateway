@@ -101,9 +101,9 @@ export default function VendorStatus() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <Button variant="outline" onClick={() => navigate('/dashboard')} className="gap-2">
+        <Button variant="outline" onClick={() => navigate('/vendors')} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
+          Back
         </Button>
         <h1 className="text-2xl font-semibold">Vendor Status</h1>
       </div>

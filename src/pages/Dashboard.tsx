@@ -10,8 +10,6 @@ import {
   Clock,
   Download,
   FileText,
-  
-  Search,
   XCircle,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -403,13 +401,12 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="w-64">
             <Input
-              placeholder="Search table..."
+              placeholder="Search"
               value={tableSearch}
               onChange={(e) => setTableSearch(e.target.value)}
-              className="h-9 pl-9"
+              className="h-9"
             />
           </div>
         </CardHeader>
