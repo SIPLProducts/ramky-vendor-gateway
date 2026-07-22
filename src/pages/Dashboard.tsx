@@ -302,9 +302,10 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-muted-foreground">From</Label>
-            <Popover>
+            <Popover open={fromOpen} onOpenChange={setFromOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="outline"
                   className={cn('h-9 w-[160px] justify-start text-left font-normal', !dateFrom && 'text-muted-foreground')}
                 >
@@ -318,7 +319,6 @@ export default function Dashboard() {
                   selected={dateFrom ?? undefined}
                   onSelect={handleFromSelect}
                   disabled={(d) => d > new Date() || (dateTo ? d > dateTo : false)}
-                  initialFocus
                   className={cn('p-3 pointer-events-auto')}
                 />
               </PopoverContent>
@@ -326,9 +326,10 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-muted-foreground">To</Label>
-            <Popover>
+            <Popover open={toOpen} onOpenChange={setToOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="outline"
                   className={cn('h-9 w-[160px] justify-start text-left font-normal', !dateTo && 'text-muted-foreground')}
                 >
@@ -342,7 +343,6 @@ export default function Dashboard() {
                   selected={dateTo ?? undefined}
                   onSelect={handleToSelect}
                   disabled={(d) => d > new Date() || (dateFrom ? d < startOfDay(dateFrom) : false)}
-                  initialFocus
                   className={cn('p-3 pointer-events-auto')}
                 />
               </PopoverContent>
