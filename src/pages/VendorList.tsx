@@ -365,7 +365,22 @@ export default function VendorList() {
           <h1 className="text-2xl font-bold text-foreground">All Vendors</h1>
           <p className="text-muted-foreground">Complete list of registered vendors</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
+            className="flex items-center gap-2"
+          >
+            <Input
+              placeholder="Enter Reference Number"
+              value={trackRef}
+              onChange={(e) => setTrackRef(e.target.value)}
+              className="h-9 w-56"
+            />
+            <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
+              {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
+          </form>
           <Button onClick={() => refetch()} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
