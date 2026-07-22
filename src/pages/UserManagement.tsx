@@ -635,6 +635,16 @@ export default function UserManagement() {
                           <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
+                            {u.role ? (
+                              <span className="text-xs capitalize">
+                                {u.role === 'sharvi_admin' ? 'Sharvi Admin' : u.role === 'customer_admin' ? 'Customer Admin' : u.role.replace('_', ' ')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </TableCell>
+
+                          <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {u.customRoles.length === 0
                                 ? <span className="text-muted-foreground text-xs">—</span>
