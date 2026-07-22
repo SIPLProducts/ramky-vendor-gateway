@@ -132,7 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <div style="height:2px; width:48px; background-color:#d4a574; margin:0 0 28px 0; line-height:2px; font-size:0;">&nbsp;</div>
 
                     <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#2d3748;">
-                      Dear Valued Business Partner,
+                      Dear Business Partner,
                     </p>
 
                     <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#2d3748;">
