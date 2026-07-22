@@ -113,6 +113,8 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
   const [trackRef, setTrackRef] = useState('');
   const [isTracking, setIsTracking] = useState(false);
   const navigate = useNavigate();
