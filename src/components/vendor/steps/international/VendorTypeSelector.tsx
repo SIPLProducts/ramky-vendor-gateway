@@ -9,53 +9,77 @@ interface Props {
 }
 
 function IndianFlagIcon({ className }: { className?: string }) {
+  // 24-spoke Ashoka Chakra
+  const spokes = Array.from({ length: 24 }, (_, i) => i * 15);
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2" y="5" width="20" height="14" rx="2" fill="#FF9932" stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
-      <path d="M2 9.667h20v4.667H2z" fill="#FFFFFF" />
-      <path d="M2 14.333h20V19H2z" fill="#138808" />
-      <g stroke="#000080" strokeWidth="0.5" strokeLinecap="round">
-        <circle cx="12" cy="12" r="2.2" />
-        <path d="M12 9.8v4.4M9.8 12h4.4M10.44 10.44l3.12 3.12M13.56 10.44l-3.12 3.12" />
+    <svg className={className} viewBox="0 0 36 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="36" height="8" y="0" fill="#FF9933" />
+      <rect width="36" height="8" y="8" fill="#FFFFFF" />
+      <rect width="36" height="8" y="16" fill="#138808" />
+      <g transform="translate(18 12)" stroke="#000080" strokeWidth="0.35" fill="none">
+        <circle r="3" />
+        <circle r="0.6" fill="#000080" />
+        {spokes.map((deg) => (
+          <line key={deg} x1="0" y1="0" x2="0" y2="-3" transform={`rotate(${deg})`} />
+        ))}
+      </g>
+      <rect width="36" height="24" fill="none" stroke="#00000010" />
+    </svg>
+  );
+}
+
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="gsphere" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#7DD3FC" />
+          <stop offset="60%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#1E3A8A" />
+        </radialGradient>
+      </defs>
+      <circle cx="24" cy="24" r="20" fill="url(#gsphere)" />
+      {/* Continents silhouettes */}
+      <g fill="#16A34A" opacity="0.9">
+        <path d="M12 18c2-3 5-4 8-3 2 0 3 2 2 4-1 3-4 3-6 5-3 1-6-2-4-6z" />
+        <path d="M26 14c3-1 6 1 7 3-1 2-3 2-4 4s-4 2-5 0 0-6 2-7z" />
+        <path d="M22 27c3 0 6 1 7 4 1 3-2 6-5 6-4 0-6-3-5-6 0-2 1-4 3-4z" />
+        <path d="M34 25c2 0 3 2 2 4-1 3-4 2-4 0s0-4 2-4z" />
+      </g>
+      {/* Meridians / equator */}
+      <g fill="none" stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="0.6">
+        <ellipse cx="24" cy="24" rx="20" ry="20" />
+        <ellipse cx="24" cy="24" rx="20" ry="8" />
+        <ellipse cx="24" cy="24" rx="8" ry="20" />
+        <line x1="4" y1="24" x2="44" y2="24" />
       </g>
     </svg>
   );
 }
 
-function WorldMapIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 8h-2a2 2 0 0 0 -2 2a2 2 0 1 1 -4 0v-1a2 2 0 0 0 -2 -2h-1a2 2 0 0 1 -2 -2v-.5" />
-      <path d="M3 12h3a2 2 0 0 1 2 2v.5a1.5 1.5 0 0 0 1.5 1.5a1.5 1.5 0 0 1 1.5 1.5v3.25" />
-      <path d="M15 20.5v-3.5a2 2 0 0 1 2 -2h3.5" />
-      <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-    </svg>
-  );
-}
-
-const OPTIONS: { value: VendorOriginType; title: string; Icon: React.ElementType }[] = [
-  { value: 'domestic', title: 'Domestic Vendor', Icon: IndianFlagIcon },
-  { value: 'international', title: 'International Vendor', Icon: WorldMapIcon },
+const OPTIONS: {
+  value: VendorOriginType;
+  title: string;
+  desc: string;
+  Icon: React.ElementType;
+}[] = [
+  {
+    value: 'domestic',
+    title: 'Domestic Vendor',
+    desc: 'Indian vendors — full KYC, GST, PAN, MSME and Bank flow',
+    Icon: IndianFlagIcon,
+  },
+  {
+    value: 'international',
+    title: 'International Vendor',
+    desc: 'Overseas vendors — SWIFT/IBAN, country & region based flow',
+    Icon: GlobeIcon,
+  },
 ];
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div
-      role="radiogroup"
-      aria-label="Vendor Type"
-      className="grid gap-3 md:grid-cols-2"
-    >
+    <div role="radiogroup" aria-label="Vendor Type" className="grid gap-4 md:grid-cols-2">
       {OPTIONS.map((opt) => {
         const selected = value === opt.value;
         return (
@@ -67,38 +91,50 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
             disabled={disabled}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'group relative flex items-start gap-3 rounded-xl border-2 bg-card p-4 text-left transition-all',
-              'hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60',
-              selected
-                ? 'border-emerald-500 bg-emerald-50/60 shadow-[0_0_0_4px_hsl(var(--background))_inset,0_8px_24px_-12px_rgba(16,185,129,0.4)]'
-                : 'border-border hover:border-emerald-300',
-              disabled && 'opacity-60 cursor-not-allowed',
+              'group relative overflow-hidden flex items-center gap-4 rounded-xl p-5 pl-6 text-left',
+              'border border-blue-100 bg-blue-50/60 shadow-sm',
+              'transition-all duration-200 ease-out',
+              'hover:shadow-md hover:-translate-y-0.5 hover:bg-blue-50',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/50',
+              selected && 'bg-blue-100/70 ring-1 ring-brand-green/40 shadow-md',
+              disabled && 'opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-sm',
             )}
           >
-            <div
-              className={cn(
-                'h-10 w-10 shrink-0 rounded-lg flex items-center justify-center',
-                selected ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground',
-              )}
-            >
-              <opt.Icon className="h-5 w-5" />
+            {/* Left accent bar */}
+            <span
+              aria-hidden="true"
+              className="absolute left-0 top-0 h-full w-1.5 bg-brand-green rounded-l-xl"
+            />
+
+            {/* Icon tile */}
+            <div className="h-12 w-12 shrink-0 rounded-lg bg-white shadow-sm ring-1 ring-black/5 flex items-center justify-center overflow-hidden">
+              <opt.Icon className="h-8 w-8" />
             </div>
-            <div className="flex-1 min-w-0">
+
+            {/* Text */}
+            <div className="flex-1 min-w-0 pr-10">
               <div className="flex items-center gap-2">
-                <span className={cn('text-sm font-semibold', selected ? 'text-emerald-700' : 'text-foreground')}>
+                <span className="text-[18px] font-semibold text-slate-900 leading-tight">
                   {opt.title}
                 </span>
                 {selected && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2 py-0.5">
                     <Check className="h-3 w-3" /> Selected
                   </span>
                 )}
               </div>
+              <p className="mt-1 text-[14px] font-medium text-slate-600 leading-snug">
+                {opt.desc}
+              </p>
             </div>
+
+            {/* Radio indicator */}
             <span
               className={cn(
-                'absolute top-3 right-3 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all',
-                selected ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground/40 bg-transparent',
+                'absolute top-4 right-4 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all',
+                selected
+                  ? 'border-brand-green bg-brand-green'
+                  : 'border-slate-300 bg-white',
               )}
             >
               {selected && <Check className="h-3 w-3 text-white" />}
