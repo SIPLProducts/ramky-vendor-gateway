@@ -1545,16 +1545,16 @@ export default function VendorRegistration() {
   if (isSubmitted && !isEditMode) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+        <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
           {isTokenMode ? (
             <div className="flex items-center gap-3">
-              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-              <span className="text-sm font-semibold text-foreground">Vendor Portal</span>
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+              <span className="text-sm font-semibold text-black">Vendor Portal</span>
             </div>
           ) : (
             <Link to="/" className="flex items-center gap-3">
-              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-              <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+              <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
             </Link>
           )}
         </header>
@@ -1594,16 +1594,16 @@ export default function VendorRegistration() {
           backgroundAttachment: 'fixed',
         }}
       >
-        <header className="h-14 border-b border-white/10 bg-slate-950/60 backdrop-blur-sm px-6 flex items-center justify-between sticky top-0 z-50">
+        <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
             <div className="flex items-center gap-3">
-              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-              <span className="text-sm font-semibold text-white">Vendor Registration</span>
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+              <span className="text-sm font-semibold text-black">Vendor Registration</span>
             </div>
           ) : (
             <Link to="/" className="flex items-center gap-3">
-              <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-              <span className="text-sm font-semibold text-white hidden sm:block">Vendor Portal</span>
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+              <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
             </Link>
           )}
         </header>
@@ -1647,16 +1647,16 @@ export default function VendorRegistration() {
   return (
     <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
       {/* Header */}
-      <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+      <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         {isTokenMode ? (
           <div className="flex items-center gap-3">
-            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-            <span className="text-sm font-semibold text-foreground">Vendor Registration</span>
+            <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+            <span className="text-sm font-semibold text-black">Vendor Registration</span>
           </div>
         ) : (
           <Link to="/" className="flex items-center gap-3">
-            <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-            <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+            <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+            <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
           </Link>
         )}
         <div className="flex items-center gap-4">

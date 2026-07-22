@@ -1,17 +1,16 @@
 import { Link } from 'react-router-dom';
 import { HelpCircle, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ramkyLogo from '@/assets/ramky-logo.png';
 
 export function PublicHeader() {
   return (
-    <header className="h-14 border-b bg-card/80 backdrop-blur-lg px-6 flex items-center justify-between sticky top-0 z-50">
+    <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-primary/20">
-            <span className="text-white font-bold text-sm">R</span>
-          </div>
+          <img src={ramkyLogo} alt="Ramky Vendor Portal" className="h-10 w-auto object-contain" />
           <div>
-            <h1 className="text-base font-bold text-foreground">Ramky Vendor Portal</h1>
+            <h1 className="text-base font-bold text-black">Ramky Vendor Portal</h1>
           </div>
         </div>
       </div>
