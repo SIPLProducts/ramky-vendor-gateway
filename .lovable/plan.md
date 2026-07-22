@@ -1,17 +1,7 @@
-### Plan
+Update the search input placeholder in the Vendor Invitations page.
 
-1. **Search input placeholder and icon cleanup**
-   - In `src/pages/VendorList.tsx` (All Vendors filter input):
-     - Change placeholder from `"Search by Buyer Company, Invited By, Vendor, GSTIN, Location, SAP Code"` to `"Search"`.
-     - Remove the leading `Search` icon and switch the wrapper from `relative` to a plain flex container.
-   - In `src/pages/Dashboard.tsx` (Vendor Applications table search input):
-     - Change placeholder from `"Search table..."` to `"Search"`.
-     - Remove the leading `Search` icon.
-     - Remove the unused `Search` import from the `lucide-react` import block.
+- File: `src/pages/AdminInvitations.tsx`
+- Line ~933
+- Change placeholder text from `"Search by Name, Email or Phone Number"` to `"Search by Name, Email or Mobile"`
 
-2. **Vendor Status back navigation**
-   - In `src/pages/VendorStatus.tsx`:
-     - Change the button label from `"Back to Dashboard"` to `"Back"`.
-     - Change the navigation target from `/dashboard` to `/vendors` so users return to the All Vendors screen after tracking by reference number.
-
-No other logic or behavior changes.
+No other changes. This is a pure UI text update in the existing search input.
