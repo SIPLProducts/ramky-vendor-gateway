@@ -1,39 +1,37 @@
-Plan: Update the main navigation bars across the application to use a taller white header with black text and a larger, clearer Ramky logo, while preserving responsiveness and functionality.
+## Goal
+Make the Vendor Registration landing screen (Select Vendor Type) fit within the viewport at 100% zoom on mobile, tablet, laptop, and desktop — no horizontal scroll and no unnecessary vertical scroll — without touching any functionality.
 
-Files to edit:
-- `src/components/layout/Header.tsx` (main app header)
-- `src/components/layout/PublicHeader.tsx` (public/unauthenticated header)
-- `src/components/layout/MobileHeader.tsx` (mobile app header)
-- `src/pages/VendorRegistration.tsx` (vendor registration flow headers)
-- `src/pages/VendorLogin.tsx` (vendor login header)
-- `src/pages/VendorInviteAccept.tsx` (vendor invite accept header)
-- `src/pages/VendorInviteCallback.tsx` (vendor invite callback header)
+## Root cause
+- The outer container uses `min-h-screen` with a sticky `h-16` header, but `<main>` uses `p-8` and the card stacks two option cards with `p-5` + `h-32` illustrations + heading + big vertical gaps. On short laptop viewports (~700–800px useable height) the card overflows and forces vertical scroll.
+- Card width is capped at `max-w-md` which is fine on desktop, but on wide screens the two options stack vertically (wasting horizontal space and forcing scroll). On very small phones the fixed `h-32` image + paddings pushes height further.
+- No `overflow-x` guard on the fixed background container.
 
-Changes:
-1. Increase navbar height
-   - Desktop/main headers: change from `h-14` to `h-16` or `h-18` (e.g., `h-16` for a balanced, professional look).
-   - Mobile header: change from `h-14` to `h-16` to match.
-   - Adjust internal padding and element sizes so the logo, icons, and buttons stay vertically centered.
+## Changes (UI/layout only)
 
-2. Set background color to white
-   - Replace `bg-card/80`, `bg-card`, `bg-background`, `bg-slate-950/60`, and `bg-white/80` with `bg-white` on the header element.
-   - Keep the bottom border (`border-b`) for separation; adjust to a light border such as `border-border` or `border-gray-200` if needed.
+### 1. `src/pages/VendorRegistration.tsx` (landing branch, ~lines 1587–1642)
+- Change outer wrapper to `min-h-screen` + `overflow-x-hidden`.
+- Change `<main>` padding to `p-3 sm:p-6` and allow it to scroll internally only if truly needed: `flex-1 flex items-center justify-center`.
+- Card container: bump responsive width so it uses horizontal space on larger screens instead of growing tall:
+  - `w-full max-w-md md:max-w-3xl lg:max-w-4xl`
+- Inner padding: `p-4 sm:p-5 md:p-6`, `space-y-3 sm:space-y-4`.
+- Heading: `text-lg sm:text-xl`; description `text-xs sm:text-sm`.
+- Continue button row: keep as-is but `pt-1`.
 
-3. Change navigation text to black
-   - Replace `text-foreground` and `text-white` text colors on the header title/brand with `text-black` or `text-slate-950`.
-   - Keep other header controls (icons, dropdown items, notification badges) using their existing semantic colors so they remain readable.
+### 2. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
+- Switch layout to responsive grid so cards sit side-by-side on tablet+ and stack on mobile:
+  - `grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4`
+- Reduce per-card vertical footprint:
+  - Card padding: `p-3 sm:p-4`
+  - Title: `text-base sm:text-[17px]`
+  - Illustration: `h-20 sm:h-24 md:h-28` (down from fixed `h-32`), `mt-2`
+- Keep all classes, roles, aria, selected badge, onChange behavior unchanged.
 
-4. Replace the small gradient "R" icon with the actual Ramky logo and increase its size
-   - In `Header.tsx` and `PublicHeader.tsx`, replace the `h-9 w-9` gradient "R" icon block with the `ramkyLogo` image, set to a larger size such as `h-10 w-auto` or `h-12 w-auto`.
-   - In `MobileHeader.tsx`, increase the logo from `h-9 w-9` to `h-11 w-auto` or `h-12 w-auto`.
-   - In vendor-facing pages, increase the logo from `h-8 w-auto` to `h-10 w-auto` or `h-12 w-auto`.
-   - Ensure `object-contain` is used on the image so the logo scales without distortion.
+### 3. Guard against horizontal overflow globally on this page
+- Add `overflow-x-hidden` to the outer background `<div>` so the fixed background image never triggers a horizontal scrollbar on narrow widths.
 
-5. Ensure responsiveness
-   - Keep the existing flex layout, sticky positioning, and mobile/desktop breakpoints.
-   - Make sure the larger logo and height do not break the mobile menu toggle or tenant switcher spacing.
-   - Keep text truncation and hiding utilities (`hidden sm:block`, `truncate`) intact.
+## Out of scope
+- No changes to form logic, routing, state, validation, or the multi-step wizard screens (only the landing "Select Vendor Type" screen and its selector component).
+- No color, branding, or copy changes.
 
-6. No functionality changes
-   - Do not alter routing, auth logic, sign-out handlers, notification badges, tenant switcher, or any business logic.
-   - Only update visual styles and logo sizing.
+## Verification
+- Preview at 360px, 768px, 1024px, 1280px, 1440px widths — confirm no horizontal scroll and the card + both options + Continue button fit within viewport height at 100% zoom.

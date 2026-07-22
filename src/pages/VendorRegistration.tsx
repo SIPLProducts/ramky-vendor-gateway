@@ -1585,7 +1585,7 @@ export default function VendorRegistration() {
     };
     return (
       <div
-        className="min-h-screen flex flex-col"
+        className="min-h-screen flex flex-col overflow-x-hidden"
         style={{
           backgroundImage: `url(${vendorTypeBgAsset.url})`,
           backgroundSize: 'cover',
@@ -1594,7 +1594,7 @@ export default function VendorRegistration() {
           backgroundAttachment: 'fixed',
         }}
       >
-        <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50">
+        <header className="h-16 border-b bg-white px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
             <div className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
@@ -1607,9 +1607,9 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-          <div className="relative w-full max-w-md rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl">
-            <div className="relative p-5 sm:p-6 space-y-5">
+        <main className="flex-1 flex items-center justify-center p-3 sm:p-6">
+          <div className="relative w-full max-w-md md:max-w-3xl lg:max-w-4xl rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl">
+            <div className="relative p-4 sm:p-5 md:p-6 space-y-3 sm:space-y-4">
               {isTokenMode && invitationEmail && (
                 <div className="p-3 bg-white/70 border border-blue-100 rounded-lg">
                   <p className="text-sm text-slate-700">
@@ -1618,8 +1618,8 @@ export default function VendorRegistration() {
                 </div>
               )}
               <div className="space-y-1">
-                <h1 className="text-xl font-semibold text-white">Select Vendor Type</h1>
-                <p className="text-sm text-white/90">Choose the vendor category to begin your registration. You can change this later.</p>
+                <h1 className="text-lg sm:text-xl font-semibold text-white">Select Vendor Type</h1>
+                <p className="text-xs sm:text-sm text-white/90">Choose the vendor category to begin your registration. You can change this later.</p>
               </div>
 
               <VendorTypeSelector
@@ -1627,7 +1627,7 @@ export default function VendorRegistration() {
                 onChange={setPendingChoiceType}
                 disabled={isSubmitting}
               />
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end pt-1">
                 <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
                   Continue
                   <ChevronRight className="h-4 w-4 ml-2" />
