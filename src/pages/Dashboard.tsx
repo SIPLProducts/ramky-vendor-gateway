@@ -396,13 +396,24 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base">Vendor Applications</CardTitle>
-          {statusFilter !== 'all' && (
-            <div className="text-xs text-muted-foreground">
-              Showing: <span className="font-medium text-foreground">{cards.find((c) => c.key === statusFilter)?.label}</span>
-              <button type="button" onClick={() => setStatusFilter('all')} className="ml-2 text-primary hover:underline">Clear filter</button>
-            </div>
-          )}
+          <div className="flex items-center gap-3 min-w-0">
+            <CardTitle className="text-base whitespace-nowrap">Vendor Applications</CardTitle>
+            {statusFilter !== 'all' && (
+              <div className="text-xs text-muted-foreground">
+                Showing: <span className="font-medium text-foreground">{cards.find((c) => c.key === statusFilter)?.label}</span>
+                <button type="button" onClick={() => setStatusFilter('all')} className="ml-2 text-primary hover:underline">Clear filter</button>
+              </div>
+            )}
+          </div>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search table..."
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              className="h-9 pl-9"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-md border">
