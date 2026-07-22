@@ -1,17 +1,11 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { HelpCircle, Phone, Mail } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantContext } from '@/hooks/useTenantContext';
+import { useAuth } from '@/hooks/useAuth';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
 interface EnterpriseHeaderProps {
