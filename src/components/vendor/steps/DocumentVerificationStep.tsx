@@ -1216,11 +1216,20 @@ export function DocumentVerificationStep({
     setDoc({ status: "ocr", fileName: file.name, fileSize: file.size, file });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: ocrRes.error || "Could not read document" });
+      const errMsg = ocrRes.error || "Could not read document";
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: errMsg });
       if (kind === "cheque") {
         openBankManualPopup(
           chequeTargetRef.current,
           ocrRes.error || "We couldn't read your cheque. Please enter your bank details manually.",
+        );
+      } else if (kind === "gst") {
+        openGstManualPopup(
+          "We couldn't read your GST certificate. Please enter your 15-character GSTIN and we'll verify it.",
+        );
+      } else if (kind === "pan") {
+        openPanManualPopup(
+          "We couldn't read your PAN card. Please enter your 10-character PAN and we'll verify it.",
         );
       }
       return;
@@ -1236,6 +1245,18 @@ export function DocumentVerificationStep({
           "We couldn't read your cheque clearly. Please enter your bank details manually.",
           acc,
           ifsc,
+        );
+      } else if (kind === "gst") {
+        const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
+        openGstManualPopup(
+          "We couldn't read your GST certificate clearly. Please enter your 15-character GSTIN.",
+          gstin,
+        );
+      } else if (kind === "pan") {
+        const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
+        openPanManualPopup(
+          "We couldn't read your PAN card clearly. Please enter your 10-character PAN.",
+          pan,
         );
       }
       return;
