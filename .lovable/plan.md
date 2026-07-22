@@ -1,33 +1,35 @@
-## Redesign Domestic & International vendor type cards
+## Redesign Vendor Type selection to match reference screenshot
 
-**File:** `src/components/vendor/steps/international/VendorTypeSelector.tsx` (only file touched)
+**File touched:** `src/components/vendor/steps/international/VendorTypeSelector.tsx` (only)
+**New assets:** two 3D illustration images generated via imagegen into `src/assets/`
 
-### Visual changes
-- Card background: soft blue tint (`bg-blue-50/60`, selected: `bg-blue-100/70`).
-- Left accent bar: 4px solid brand green (`#00a13a` from `tailwind.config.ts` `brand.green`) applied via a left border or absolute-positioned `::before` bar, full card height, rounded on the left.
-- Container: `rounded-xl`, `shadow-sm`, hover `shadow-md` + subtle lift (`hover:-translate-y-0.5 transition`), keyboard focus ring preserved.
-- Padding: `p-5`, gap `gap-4` between icon and text; responsive grid stays `md:grid-cols-2`.
+### Container / background
+- Wrap the radio group in a dark navy gradient panel (`bg-gradient-to-b from-[#0b1a3a] via-[#0f2350] to-[#0b1a3a]`), rounded-2xl, padded `p-6`, subtle inner glow.
+- Small heading above the cards inside the panel:
+  - Title: "Select Vendor Type" — `text-white text-lg font-semibold`
+  - Subtitle: "Choose the vendor category to begin your registration. You can change this later." — `text-white/60 text-xs`
 
-### Icon treatment
-- Replace inline SVGs with high-quality flag graphics:
-  - Domestic: Indian flag rendered via emoji-quality SVG (crisp tricolor + detailed 24-spoke Ashoka Chakra) placed in a rounded white tile (`h-12 w-12 rounded-lg bg-white shadow-sm flex items-center justify-center`).
-  - International: stylized globe/world icon (upgraded SVG with meridians + continents silhouette) in the same tile treatment.
-- Icon sits on the LEFT of the title, vertically centered with the text block.
+### Cards (stacked vertically, not grid)
+- Change layout from `md:grid-cols-2` to a single-column vertical stack with `gap-4`.
+- Each card:
+  - White background (`bg-white`), `rounded-xl`, `shadow-lg`, `p-5`, relative.
+  - Title centered at top: `text-[18px] font-semibold text-slate-900`.
+  - Large 3D illustration centered in the middle (`h-40` container, `object-contain`).
+  - Description centered below illustration: `text-[13px] font-medium text-slate-600`.
+  - Green "SELECTED" pill in top-right when selected (brand-green background, white text, rounded-full, tiny check icon) — same style as reference.
+  - Subtle hover lift (`hover:-translate-y-0.5 hover:shadow-xl transition`).
+  - Selected state: `ring-2 ring-brand-green` around the card.
+- Remove the left green accent bar and the small white icon tile from the current design — reference does not use them.
 
-### Typography
-- Title: `text-[18px] font-semibold text-slate-900`.
-- Add short description line back under the title at `text-[14px] font-medium text-slate-600`:
-  - Domestic: "Indian vendors — full KYC, GST, PAN, MSME and Bank flow"
-  - International: "Overseas vendors — SWIFT/IBAN, country & region based flow"
-  (Matches the reference screenshot which shows description text.)
+### Illustrations (generated with imagegen, premium quality, transparent PNG)
+- `src/assets/vendor-domestic-3d.png` — 3D illustration: stack of Indian KYC documents (PAN card, GST certificate with ₹ / GST tags, Aadhaar-style ID) fanned out, with a small Indian flag ribbon on top. Clean isometric 3D, soft shadows, white background, matches reference style.
+- `src/assets/vendor-international-3d.png` — 3D illustration: globe with a small airplane orbiting, a suitcase and passport in front, compass beside. Isometric 3D, soft shadows, white background, matches reference style.
+- Import both as ES6 image imports and render via `<img>` inside each card.
 
-### Selected state
-- Keep existing "Selected" pill (top-right) and radio dot, but restyle to brand green (`brand.green`) instead of emerald so it matches the left accent bar.
-- Selected card: green left bar remains, slightly stronger blue background, green ring (`ring-1 ring-brand-green/40`).
-
-### Preserved
-- All props, `onChange`, `disabled`, `role="radio"`, aria state, keyboard focus.
-- Grid layout, parent integration in `VendorRegistration.tsx` — no other files edited.
+### Radio semantics preserved
+- `role="radiogroup"`, `role="radio"`, `aria-checked`, keyboard focus ring, `disabled` handling, `onChange(value)` contract — all unchanged.
+- Props/interface unchanged; only visuals change. No other files edited.
 
 ### Validation
-- Run typecheck/build after edit.
+- Typecheck + build.
+- Playwright screenshot of `/vendor/registration` to visually confirm the panel matches the reference (dark navy panel, two stacked white cards with 3D art, selected pill on the active card).
