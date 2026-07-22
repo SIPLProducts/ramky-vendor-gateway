@@ -1,31 +1,26 @@
-## Dashboard Date Filter Enhancements
+## Problem
+Current From/To filters render as a Button that opens a Popover Calendar. User expects an input-styled field with a calendar icon (like a normal date picker) — not a button — while still preventing manual typing and enforcing range rules.
 
-Replace the native `<input type="date">` From/To fields on the Dashboard header with shadcn Popover + Calendar date pickers, and enforce range validation.
+## Changes (src/pages/Dashboard.tsx only)
 
-### Changes (all in `src/pages/Dashboard.tsx`)
+Replace the Button-based popover trigger with an input-styled trigger:
 
-1. **Replace inputs with Date Pickers**
-   - Swap both `<Input type="date">` fields for `Popover` + `Button` trigger + `Calendar` (mode="single"), matching the shadcn datepicker pattern (with `pointer-events-auto`).
-   - Trigger button shows formatted date (`dd-MM-yyyy` via existing `formatDate` helper) or a placeholder ("Pick a date").
-   - No text input — selection only via calendar.
+- Render each From/To as a read-only styled input (same look as other form inputs on the page: `h-9`, bordered, rounded, background) with:
+  - The formatted date (`dd-MM-yyyy`) as its displayed value, or placeholder `Select date`.
+  - A trailing calendar icon button inside the input on the right.
+- Wrap the whole input in `PopoverTrigger asChild` so clicking anywhere on the field (input or icon) opens the calendar.
+- Keep the input `readOnly` and add `onKeyDown={(e) => e.preventDefault()}` so nothing can be typed, pasted, or cleared via keyboard.
+- Keep the existing Calendar with the same `disabled` rules already in place:
+  - From: disables future dates and dates after To.
+  - To: disables dates before From.
+- Keep the auto-correction that shifts To when From moves past it.
+- No Clear button (already removed).
+- Popover closes on select (existing behavior via `setFromOpen(false)` / `setToOpen(false)` in handlers).
 
-2. **Remove Clear button**
-   - Delete the "Clear" button and its handler.
+No other files touched. No business-logic changes.
 
-3. **From Date constraints (via Calendar `disabled` prop)**
-   - Disable dates after today (no future dates).
-   - Disable dates after the currently selected To Date.
-
-4. **To Date constraints (via Calendar `disabled` prop)**
-   - Disable dates before the currently selected From Date.
-   - (No future restriction on To unless requested — keeping as-is.)
-
-5. **Selection behavior**
-   - On From select: set `dateFrom` via `startOfDay`; leave To alone (already guarded by disabled dates).
-   - On To select: set `dateTo` via `endOfDay`.
-   - Close the popover on selection.
-
-### Technical Notes
-- Reuse existing imports: `Popover/PopoverTrigger/PopoverContent`, `Calendar`, `Button`, `CalendarIcon` from lucide-react, `format` from date-fns, `cn` from `@/lib/utils`.
-- Keep existing `dateFrom`/`dateTo` state, `fromIso`/`toIso` derivation, and query keys unchanged — only the input UI and setters change.
-- Defaults remain: From = today − 30 days, To = today.
+## Acceptance
+- From/To look like input fields with a calendar icon, not buttons.
+- Clicking the field or the icon opens the calendar and a date can be selected.
+- Typing/pasting into the field does nothing.
+- Range constraints (no future From, To ≥ From) still enforced by disabled days in the calendar.
