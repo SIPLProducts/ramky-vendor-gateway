@@ -1720,7 +1720,62 @@ export function DocumentVerificationStep({
     });
   };
 
-  // Submit manual bank details from the popup → re-verify via configured BANK provider.
+  // Submit manually-entered GSTIN → re-run GST validation and populate gstDoc
+  // as if OCR had succeeded, keeping the rest of the pipeline intact.
+  const handleGstManualSubmit = async (gstin: string): Promise<{ ok: boolean; message?: string }> => {
+    const clean = String(gstin || "").toUpperCase().trim();
+    if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(clean)) {
+      return { ok: false, message: "Please enter a valid 15-character GSTIN." };
+    }
+    const ocr: Record<string, any> = { gstin: clean };
+    const v = await verifyApi("gst", ocr);
+    if (!v.ok) return { ok: false, message: (v as any).message || "GSTIN verification failed." };
+    const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
+    setGstDoc((prev) => ({
+      status: "verified",
+      fileName: prev.fileName,
+      fileSize: prev.fileSize,
+      file: prev.file,
+      ocrData: merged,
+      originalOcrData: ocr,
+      apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
+      verifiedAt: Date.now(),
+      ocrModel: prev.ocrModel,
+    }));
+    const apiAddress =
+      (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
+    if (apiAddress) setEditablePrincipalPlace(apiAddress);
+    if (merged.gstin) void runGstFilingStatusCheck(merged);
+    return { ok: true };
+  };
+
+  // Submit manually-entered PAN → re-run PAN Comprehensive Validation and
+  // populate panDoc as if OCR had succeeded.
+  const handlePanManualSubmit = async (pan: string): Promise<{ ok: boolean; message?: string }> => {
+    const clean = String(pan || "").toUpperCase().trim();
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(clean)) {
+      return { ok: false, message: "Please enter a valid 10-character PAN." };
+    }
+    const ocr: Record<string, any> = { pan_number: clean };
+    const v = await verifyApi("pan", ocr);
+    if (!v.ok) return { ok: false, message: (v as any).message || "PAN verification failed." };
+    const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
+    setPanDoc((prev) => ({
+      status: "verified",
+      fileName: prev.fileName,
+      fileSize: prev.fileSize,
+      file: prev.file,
+      ocrData: merged,
+      originalOcrData: ocr,
+      apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
+      verifiedAt: Date.now(),
+      ocrModel: prev.ocrModel,
+    }));
+    setPanCrossCheckError(null);
+    return { ok: true };
+  };
+
+
   const handleBankPopupSubmit = async () => {
     const account = bankPopup.account.replace(/\s+/g, "");
     const ifsc = bankPopup.ifsc.toUpperCase().trim();
