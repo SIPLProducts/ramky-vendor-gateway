@@ -48,7 +48,10 @@ interface OcrUploadAndVerifyProps {
   skipVerifyPhase?: boolean;
   /** Friendly label shown above the API response card (e.g. "GST OCR"). */
   apiLabel?: string;
+  /** Fired when the OCR / verification pipeline fails, so the parent can open a manual-entry fallback. */
+  onOcrFailed?: (reason: string) => void;
 }
+
 
 type Phase = 'idle' | 'preparing' | 'ocr' | 'verifying' | 'passed' | 'failed';
 
