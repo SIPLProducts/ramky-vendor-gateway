@@ -1279,6 +1279,12 @@ export function DocumentVerificationStep({
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
         openBankManualPopup(chequeTargetRef.current, msg, acc, ifsc);
+      } else if (kind === "gst") {
+        const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
+        openGstManualPopup(msg, gstin);
+      } else if (kind === "pan") {
+        const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
+        openPanManualPopup(msg, pan);
       }
       return;
     }
