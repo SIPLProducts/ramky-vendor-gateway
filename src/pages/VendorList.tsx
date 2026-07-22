@@ -63,6 +63,7 @@ import {
   FolderOpen,
   MessageSquare,
   Tags,
+  Loader2,
 } from 'lucide-react';
 import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import { Skeleton } from '@/components/ui/skeleton';
