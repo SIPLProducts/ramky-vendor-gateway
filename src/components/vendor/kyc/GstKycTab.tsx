@@ -349,7 +349,9 @@ export function GstKycTab(props: GstKycTabProps) {
               apiLabel="GST OCR"
               onVerified={() => { /* state already updated via props */ }}
               vendorId={props.vendorId}
+              onOcrFailed={() => setManualFallbackOpen(true)}
             />
+
           </TabsContent>
         </Tabs>
       ) : null}
