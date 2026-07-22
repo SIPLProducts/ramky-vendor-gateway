@@ -101,7 +101,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
 
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border h-14 px-3 flex items-center justify-between safe-area-top gap-2">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 h-16 px-3 flex items-center justify-between safe-area-top gap-2">
       {/* Left: Hamburger + Logo */}
       <div className="flex items-center gap-2 min-w-0">
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -139,8 +139,8 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
           </SheetContent>
         </Sheet>
         <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
-          <img src={ramkyLogo} alt="Ramky" className="h-9 w-9 object-contain shrink-0" />
-          <span className="font-semibold text-sm truncate">Ramky VMS</span>
+          <img src={ramkyLogo} alt="Ramky" className="h-11 w-auto object-contain shrink-0" />
+          <span className="font-semibold text-sm truncate text-black">Ramky VMS</span>
         </Link>
       </div>
 
