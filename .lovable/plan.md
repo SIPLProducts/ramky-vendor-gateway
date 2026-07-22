@@ -1,7 +1,13 @@
-Update the vendor invitation email in `supabase/functions/send-vendor-invitation/index.ts` to reflect the requested wording changes.
+## Changes to `src/components/layout/Sidebar.tsx`
 
-1. Greeting line: change `Dear Valued Business Partner,` to `Dear Business Partner,`.
-2. Change the third process step `Verification & Approval` to `Verification & Approval Status`.
-3. Add a fourth step after the existing III item: `IV. Keep your GST, PAN, MSME (if applicable), and Bank documents ready for upload.`
+1. **Remove "Settings"** menu item from the user profile dropdown.
+2. **Remove the role label** (`displayRole`) under the user name in both:
+   - Sidebar footer (below name)
+   - Dropdown menu header
+3. **Remove "Help & Support"** from the navigation list.
+4. **Add a Logout icon button** in the sidebar navigation area (in place of Help & Support). Clicking it calls the existing `handleLogout` which signs out and navigates to `/auth`.
+   - Uses the existing `LogOut` icon.
+   - Styled consistently with other nav items (with tooltip when collapsed).
+   - Text color styled as destructive (red-tinted) to distinguish it.
 
-After the changes, deploy the updated Edge Function so the new copy is live.
+No other functionality changes — Change Password and Sign Out in the dropdown remain intact.

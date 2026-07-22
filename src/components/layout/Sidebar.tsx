@@ -88,7 +88,7 @@ const navItems: NavItem[] = [
   { label: 'Reports', href: '/reports', icon: BarChart3, screenKey: 'reports' },
   { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
   { label: 'Email Configuration', href: '/admin/email-config', icon: Mail, screenKey: 'email_configuration' },
-  { label: 'Help & Support', href: '/support', icon: HelpCircle, screenKey: 'support' },
+  
 ];
 
 const roleLabels: Record<string, string> = {
@@ -234,6 +234,37 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
 
           return linkContent;
         })}
+
+        {/* Logout button */}
+        {(() => {
+          const logoutBtn = (
+            <button
+              onClick={handleLogout}
+              className={cn(
+                'w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 border border-transparent text-destructive hover:bg-destructive/10',
+                collapsed ? 'justify-center p-2.5' : 'px-3 py-2 mx-1'
+              )}
+            >
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">Logout</span>}
+            </button>
+          );
+          if (collapsed) {
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>{logoutBtn}</TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  className="bg-slate-900 text-white border-0 px-3 py-1.5 text-xs font-medium rounded-full shadow-lg"
+                  sideOffset={8}
+                >
+                  Logout
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
+          return logoutBtn;
+        })()}
       </nav>
 
       {/* User Profile Footer */}
@@ -264,7 +295,6 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                     <>
                       <div className="flex-1 text-left min-w-0">
                         <p className="text-sm font-medium text-sidebar-foreground truncate">{userName}</p>
-                        <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
                       </div>
                       <Bell className="h-4 w-4 text-sidebar-foreground/60" />
                     </>
@@ -291,16 +321,9 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
             <DropdownMenuLabel>
               <div>
                 <p className="font-medium">{userName}</p>
-                <p className="text-xs text-muted-foreground font-normal">{displayRole}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="cursor-pointer">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setChangePasswordOpen(true)}
               className="cursor-pointer"
