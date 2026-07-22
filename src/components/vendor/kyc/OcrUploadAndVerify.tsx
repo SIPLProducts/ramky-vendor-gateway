@@ -67,6 +67,8 @@ export function OcrUploadAndVerify({
   vendorId,
   skipVerifyPhase,
   apiLabel,
+  onOcrFailed,
+
 }: OcrUploadAndVerifyProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<string>('');
