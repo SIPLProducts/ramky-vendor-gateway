@@ -1,13 +1,13 @@
-## Correct target: top navigation bar (`EnterpriseHeader`), not the sidebar
+## Changes
 
-### 1. `src/components/layout/EnterpriseHeader.tsx`
-- Remove the entire "Help & Support" dropdown block (the `HelpCircle` button with Help Center/email/phone menu).
-- In its place, add a **Logout icon button** (using `LogOut` from lucide-react) that:
-  - On click, calls `supabase.auth.signOut()` (via `useAuth().signOut`) and navigates to `/auth`.
-  - Shows a tooltip "Logout" on hover.
+### 1. `src/pages/Dashboard.tsx`
+- Remove the "Reference Number" input, Search button, `trackRef`/`isTracking` state, `handleTrackByReference`, and related imports (`Loader2`, `Search` if unused elsewhere, `useNavigate`, `useToast`, `Label` if unused).
+- In the "Vendor Applications" `CardHeader`, add a search `Input` at the right end of the header row (alongside the existing "Showing: …" indicator).
+- Add local `tableSearch` state. Filter `filteredVendors` further by case-insensitive substring match across the visible column values: Reference Number, Invited By (name), Vendor Name (`pickVendorDisplayName`), Vendor Email (`display_email`), Status label, and Created Date (formatted).
+- Empty-state text stays; message adjusts when a search yields no rows.
 
-### 2. `src/components/layout/Sidebar.tsx`
-- Revert the Logout button that was just added to the sidebar navigation (restore the nav to end with just the mapped items).
-- Keep the earlier changes intact: Settings menu item removed, role label removed.
+### 2. `src/pages/VendorList.tsx`
+- Add a "Reference Number" tracker in the top header area (next to Refresh/Export): small `Input` + "Search" button (with `Loader2` while loading). On submit, query `vendors` by `reference_number` and navigate to `/vendor-status/{id}`; show toast on not-found / error. Behaviour identical to the current Dashboard implementation.
+- No change to existing search-in-table box or filters.
 
-No other files or functionality affected.
+No routing, backend, or query-shape changes.
