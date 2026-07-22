@@ -1,34 +1,24 @@
-## Vendor Type Selection Card — Background Image + Narrower Centered Layout
+## Goal
 
-### Assets
-1. Upload the reference `Background_MainScreen_Image.png` as a Lovable asset:
-   - `lovable-assets create --file /mnt/user-uploads/Background_MainScreen_Image.png --filename vendor-type-bg.png > src/assets/vendor-type-bg.png.asset.json`
-   - Import via `import bgAsset from '@/assets/vendor-type-bg.png.asset.json'` for the CDN URL.
+Apply the uploaded `Background_MainScreen_Image.png` as the background of the **entire Vendor Registration main screen** (not just the Select Vendor Type card). The Select Vendor Type card itself should be **transparent** so the background image shows through.
 
-### Files to modify
+## Changes
 
-**1. `src/pages/VendorRegistration.tsx` (around lines 1600–1624)**
-- Reduce the outer card width: change `max-w-2xl` → `max-w-md` (≈ 448px) so the card is noticeably narrower and centered on the page (already inside `flex items-center justify-center`).
-- Apply the uploaded image as the card background:
-  - `style={{ backgroundImage: \`url(${bgAsset.url})\`, backgroundSize: 'cover', backgroundPosition: 'center' }}`
-  - Add a subtle dark overlay (e.g. `bg-slate-900/40` layer or `bg-gradient-to-b from-slate-900/60 to-slate-900/80`) so foreground text and cards remain legible over the busy blue tech image.
-- Update heading + description colors to white / white-70 to sit on the dark image.
-- Keep vertical padding responsive: `p-5 sm:p-6` and `space-y-5`.
-- Preserve `Invited Email` banner, `VendorTypeSelector`, and Continue button unchanged in behavior.
+### 1. `src/pages/VendorRegistration.tsx`
+- Remove the background image styling currently applied to the Select Vendor Type card wrapper (`max-w-md` centered card with `Background_MainScreen_Image.png`).
+- Apply the background image to the **outermost page container** of the vendor registration screen so it covers the whole viewport area:
+  - `background-image: url(Background_MainScreen_Image.png)`
+  - `background-size: cover`
+  - `background-position: center`
+  - `background-repeat: no-repeat`
+  - Add a subtle dark/blue gradient overlay only where needed for text legibility (kept minimal so image remains visible).
+- Restore the Select Vendor Type card to its natural width and centering (no forced `max-w-md`), but with a **transparent background** (`bg-transparent`, no shadow, no border) so the main-screen background image shows through.
 
-**2. `src/components/vendor/steps/international/VendorTypeSelector.tsx`**
-- Remove the inner blue panel background (`bg-[#eaf2fb] border-[#d6e4f5]`) since the parent card now owns the background image. Change wrapper to transparent (`p-0` or a light translucent white `bg-white/5`) so the two white option cards float over the image.
-- Keep white option cards, 3D illustrations, titles, selected pill, radiogroup semantics — no functional changes.
+### 2. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
+- Ensure the inner container has no opaque background (`bg-transparent`).
+- Keep the two Domestic / International option cards as-is (they remain visible on top of the transparent parent + main background).
 
-### Responsiveness
-- Mobile (`<640px`): card spans nearly full width via `w-full max-w-md` + `p-4` container padding already present on `<main>`.
-- Tablet/Laptop/Desktop: fixed `max-w-md` keeps card compact and centered.
-- Background image uses `bg-cover bg-center` so it scales cleanly at every breakpoint.
-
-### Out of scope
-- No changes to selection logic, routing, validation, or any downstream steps.
-- No changes to the main multi-step registration layout (only the pre-step "Select Vendor Type" screen).
-
-### Verification
-- Typecheck + build.
-- Playwright screenshot of `/vendor/registration` at 375px, 768px, 1280px widths confirming: narrower centered card, uploaded background image visible, two white option cards legible, Continue button works.
+## Out of scope
+- No changes to business logic, validations, or step flow.
+- No changes to the Domestic/International option card contents.
+- Background image asset already uploaded to CDN — reused as-is.
