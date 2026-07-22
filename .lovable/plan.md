@@ -1,19 +1,48 @@
-## Fix: Do not open PAN Manual Entry popup on PAN-vs-GSTIN mismatch
+## Problem
 
-### Problem
-When the PAN extracted from the uploaded PAN card doesn't match the PAN derived from GSTIN (e.g. `AAHFO8598G` vs `AAZFR3901L`), `DocumentVerificationStep.tsx` currently opens the "Enter PAN manually" popup. This lets a vendor type the GST-derived PAN, bypass the check, and proceed with a PAN document belonging to a different entity.
+On `User Management → Users` tab, the "All Roles" dropdown is incorrect:
 
-### Root cause
-In `runDocFlow` (around line 1285–1288), any `verifyApi("pan")` failure opens the manual popup. `verifyApi` for `pan` (line 904–908) returns this specific mismatch as a verification failure, so it falls into the same branch as OCR/read failures.
+1. Shows raw built-in role keys with underscores (`customer_admin`, `sharvi_admin`) and inconsistent casing.
+2. Lists `vendor`, even though pure vendor users are hidden from this tab (dead option).
+3. Missing the actual working roles used in the system: **Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office, SAP Team** — these are custom roles and never appear in the filter.
+4. Filter logic only compares `u.role` (built-in), so custom-role filtering wouldn't work even if listed.
 
-### Change
-In `src/components/vendor/steps/DocumentVerificationStep.tsx`, inside the `kind === "pan"` failure branch of `runDocFlow`:
+## Target dropdown list
 
-- Detect the PAN-vs-GSTIN mismatch by matching the message returned from `verifyApi` (`"does not match PAN derived from GSTIN"`).
-- When matched: keep the existing `setDoc({ status: "failed", ... errorMessage: msg })` inline error (already shown under the file pill and in the alert) and simply skip the `openPanManualPopup(...)` call. Vendor must upload the correct PAN document to proceed.
-- All other PAN verification failures (invalid/unreadable PAN, PAN Comprehensive rejected, provider not configured, etc.) continue to open the manual entry popup exactly as today.
+Per your list, the dropdown should contain exactly:
 
-No other flows (GST, MSME, Bank) or OCR failure branches are touched.
+- All Roles (default)
+- Buyer
+- SCM CO
+- SCM Head
+- Finance 1
+- Finance 2
+- CEO Office
+- SAP Team
+- Admin
+- Sharvi Admin
 
-### Files
-- `src/components/vendor/steps/DocumentVerificationStep.tsx` — one guarded conditional around the `openPanManualPopup(msg, pan)` call at ~line 1287.
+The first 7 (Buyer → SAP Team) are **custom roles** stored in `custom_roles` table. Admin and Sharvi Admin are **built-in** roles.
+
+## Fix (scope: `src/pages/UserManagement.tsx` only)
+
+1. **Rebuild dropdown options** dynamically:
+   - `All Roles` first.
+   - Custom roles from `customRoles` state, filtered to the known set (Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office, SAP Team), ordered in that exact sequence. Option value = `custom:<id>`.
+   - Built-in `Admin` (value `admin`) and `Sharvi Admin` (value `sharvi_admin`) appended at the end with clean Title Case labels.
+   - Drop `vendor`, `finance`, `purchase`, `approver`, `customer_admin` from the filter (they're placeholder/legacy built-ins not used as user-facing roles anymore).
+
+2. **Extend filter logic** in the `filtered` memo:
+   - `all` → no role filter.
+   - Value starts with `custom:` → keep users whose `customRoles[]` contains that id.
+   - Otherwise → keep users whose built-in `u.role` equals the value.
+
+3. **Trigger label**: render the selected option's clean label ("SCM CO", "Sharvi Admin"), not the raw key.
+
+No changes to backend, schema, other screens, search box, or tenant scope.
+
+## Technical notes
+
+- `customRoles` is already loaded in `loadData()` — matched by exact `name` (case-insensitive) against the target list.
+- If a target custom role doesn't exist in DB yet, it's simply skipped (dropdown stays clean).
+- `nonVendorUsers` already hides pure vendors, so removing `vendor` from the filter aligns the two.
