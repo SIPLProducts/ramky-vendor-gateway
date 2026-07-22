@@ -13,6 +13,8 @@ interface EnterpriseHeaderProps {
 }
 
 export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const {
     myTenants, activeTenantId, setActiveTenantId,
     activeTenantIds, setActiveTenantIds,
