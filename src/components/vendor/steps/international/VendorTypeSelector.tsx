@@ -45,13 +45,14 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full rounded-xl bg-white p-5 text-left',
-                'shadow-lg transition-all duration-200 ease-out',
-                'hover:-translate-y-0.5 hover:shadow-2xl',
+                'group relative w-full rounded-xl bg-white/50 backdrop-blur-sm border border-white/60 p-5 text-left',
+                'shadow-md transition-all duration-200 ease-out',
+                'hover:-translate-y-0.5 hover:shadow-xl hover:bg-white/70',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                selected && 'ring-2 ring-brand-green',
-                disabled && 'opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-lg',
+                selected && 'ring-2 ring-brand-green bg-white/80',
+                disabled && 'opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-md',
               )}
+
             >
               {selected && (
                 <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2.5 py-1 shadow">
