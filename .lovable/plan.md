@@ -1,13 +1,17 @@
-## Changes
+### Plan
 
-### 1. `src/pages/Dashboard.tsx`
-- Remove the "Reference Number" input, Search button, `trackRef`/`isTracking` state, `handleTrackByReference`, and related imports (`Loader2`, `Search` if unused elsewhere, `useNavigate`, `useToast`, `Label` if unused).
-- In the "Vendor Applications" `CardHeader`, add a search `Input` at the right end of the header row (alongside the existing "Showing: …" indicator).
-- Add local `tableSearch` state. Filter `filteredVendors` further by case-insensitive substring match across the visible column values: Reference Number, Invited By (name), Vendor Name (`pickVendorDisplayName`), Vendor Email (`display_email`), Status label, and Created Date (formatted).
-- Empty-state text stays; message adjusts when a search yields no rows.
+1. **Search input placeholder and icon cleanup**
+   - In `src/pages/VendorList.tsx` (All Vendors filter input):
+     - Change placeholder from `"Search by Buyer Company, Invited By, Vendor, GSTIN, Location, SAP Code"` to `"Search"`.
+     - Remove the leading `Search` icon and switch the wrapper from `relative` to a plain flex container.
+   - In `src/pages/Dashboard.tsx` (Vendor Applications table search input):
+     - Change placeholder from `"Search table..."` to `"Search"`.
+     - Remove the leading `Search` icon.
+     - Remove the unused `Search` import from the `lucide-react` import block.
 
-### 2. `src/pages/VendorList.tsx`
-- Add a "Reference Number" tracker in the top header area (next to Refresh/Export): small `Input` + "Search" button (with `Loader2` while loading). On submit, query `vendors` by `reference_number` and navigate to `/vendor-status/{id}`; show toast on not-found / error. Behaviour identical to the current Dashboard implementation.
-- No change to existing search-in-table box or filters.
+2. **Vendor Status back navigation**
+   - In `src/pages/VendorStatus.tsx`:
+     - Change the button label from `"Back to Dashboard"` to `"Back"`.
+     - Change the navigation target from `/dashboard` to `/vendors` so users return to the All Vendors screen after tracking by reference number.
 
-No routing, backend, or query-shape changes.
+No other logic or behavior changes.
