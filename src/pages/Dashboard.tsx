@@ -101,7 +101,7 @@ function statusBadge(status: string) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
-const toInputValue = (d: Date | null) => (d ? format(d, 'yyyy-MM-dd') : '');
+const displayDate = (d: Date | null) => (d ? format(d, 'dd-MM-yyyy') : '');
 
 export default function Dashboard() {
   const { user } = useAuth();
