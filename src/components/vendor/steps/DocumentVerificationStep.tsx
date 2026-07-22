@@ -1283,8 +1283,16 @@ export function DocumentVerificationStep({
         const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
         openGstManualPopup(msg, gstin);
       } else if (kind === "pan") {
-        const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
-        openPanManualPopup(msg, pan);
+        // Skip manual entry when the failure is a PAN-vs-GSTIN mismatch —
+        // allowing manual entry would let the vendor bypass the check by
+        // typing the GST-derived PAN even though the uploaded PAN card
+        // belongs to a different entity. Vendor must upload the correct
+        // PAN document instead.
+        const isPanGstMismatch = /does not match PAN derived from GSTIN/i.test(msg);
+        if (!isPanGstMismatch) {
+          const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
+          openPanManualPopup(msg, pan);
+        }
       }
       return;
     }
