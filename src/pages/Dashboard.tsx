@@ -300,32 +300,59 @@ export default function Dashboard() {
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="from" className="text-xs font-medium text-muted-foreground">From</Label>
-            <Input
-              id="from"
-              type="date"
-              value={toInputValue(dateFrom)}
-              onChange={(e) => handleFromChange(e.target.value)}
-              className="h-9 w-[160px]"
-            />
+            <Label className="text-xs font-medium text-muted-foreground">From</Label>
+            <Popover open={fromOpen} onOpenChange={setFromOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'h-9 w-[160px] justify-start text-left font-normal',
+                    !dateFrom && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateFrom ? displayDate(dateFrom) : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom ?? undefined}
+                  onSelect={handleFromSelect}
+                  disabled={(d) => d > today || (dateTo ? d > dateTo : false)}
+                  initialFocus
+                  className={cn('p-3 pointer-events-auto')}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="to" className="text-xs font-medium text-muted-foreground">To</Label>
-
-            <Input
-              id="to"
-              type="date"
-              value={toInputValue(dateTo)}
-              onChange={(e) => handleToChange(e.target.value)}
-              className="h-9 w-[160px]"
-            />
+            <Label className="text-xs font-medium text-muted-foreground">To</Label>
+            <Popover open={toOpen} onOpenChange={setToOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'h-9 w-[160px] justify-start text-left font-normal',
+                    !dateTo && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateTo ? displayDate(dateTo) : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo ?? undefined}
+                  onSelect={handleToSelect}
+                  disabled={(d) => (dateFrom ? d < startOfDay(dateFrom) : false)}
+                  initialFocus
+                  className={cn('p-3 pointer-events-auto')}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => { setDateFrom(null); setDateTo(null); }}
-          >
-            Clear
-          </Button>
           <form
             onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
             className="flex items-end gap-2"
