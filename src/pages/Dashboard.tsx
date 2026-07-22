@@ -5,6 +5,7 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { formatDateTime } from '@/lib/dateFormat';
 import * as XLSX from 'xlsx';
 import {
+  CalendarIcon,
   CheckCircle,
   Clock,
   Download,
@@ -13,6 +14,8 @@ import {
   Search,
   XCircle,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,7 +101,7 @@ function statusBadge(status: string) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
-const toInputValue = (d: Date | null) => (d ? format(d, 'yyyy-MM-dd') : '');
+const displayDate = (d: Date | null) => (d ? format(d, 'dd-MM-yyyy') : '');
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -143,17 +146,21 @@ export default function Dashboard() {
   const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
   const toIso = dateTo ? endOfDay(dateTo).toISOString() : null;
 
-  const handleFromChange = (val: string) => {
-    if (!val) { setDateFrom(null); return; }
-    const d = startOfDay(new Date(val));
-    setDateFrom(d);
-    if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
+  const today = endOfDay(new Date());
+
+  const handleFromSelect = (d: Date | undefined) => {
+    if (!d) return;
+    const start = startOfDay(d);
+    setDateFrom(start);
+    if (dateTo && start > dateTo) setDateTo(endOfDay(d));
+    setFromOpen(false);
   };
-  const handleToChange = (val: string) => {
-    if (!val) { setDateTo(null); return; }
-    const d = endOfDay(new Date(val));
-    setDateTo(d);
-    if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+  const handleToSelect = (d: Date | undefined) => {
+    if (!d) return;
+    setDateTo(endOfDay(d));
+    setToOpen(false);
   };
 
   const { data: vendors = [], isLoading } = useQuery({
@@ -293,32 +300,59 @@ export default function Dashboard() {
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="from" className="text-xs font-medium text-muted-foreground">From</Label>
-            <Input
-              id="from"
-              type="date"
-              value={toInputValue(dateFrom)}
-              onChange={(e) => handleFromChange(e.target.value)}
-              className="h-9 w-[160px]"
-            />
+            <Label className="text-xs font-medium text-muted-foreground">From</Label>
+            <Popover open={fromOpen} onOpenChange={setFromOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'h-9 w-[160px] justify-start text-left font-normal',
+                    !dateFrom && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateFrom ? displayDate(dateFrom) : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom ?? undefined}
+                  onSelect={handleFromSelect}
+                  disabled={(d) => d > today || (dateTo ? d > dateTo : false)}
+                  initialFocus
+                  className={cn('p-3 pointer-events-auto')}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="to" className="text-xs font-medium text-muted-foreground">To</Label>
-
-            <Input
-              id="to"
-              type="date"
-              value={toInputValue(dateTo)}
-              onChange={(e) => handleToChange(e.target.value)}
-              className="h-9 w-[160px]"
-            />
+            <Label className="text-xs font-medium text-muted-foreground">To</Label>
+            <Popover open={toOpen} onOpenChange={setToOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'h-9 w-[160px] justify-start text-left font-normal',
+                    !dateTo && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateTo ? displayDate(dateTo) : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo ?? undefined}
+                  onSelect={handleToSelect}
+                  disabled={(d) => (dateFrom ? d < startOfDay(dateFrom) : false)}
+                  initialFocus
+                  className={cn('p-3 pointer-events-auto')}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => { setDateFrom(null); setDateTo(null); }}
-          >
-            Clear
-          </Button>
           <form
             onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
             className="flex items-end gap-2"
