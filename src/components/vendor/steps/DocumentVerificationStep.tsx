@@ -3237,7 +3237,34 @@ export function DocumentVerificationStep({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ManualEntryFallbackDialog
+        open={gstManualPopup.open}
+        onOpenChange={(o) => setGstManualPopup((p) => ({ ...p, open: o }))}
+        title="Enter GSTIN manually"
+        description={gstManualPopup.reason}
+        label="GSTIN *"
+        placeholder="e.g. 20AAPCS1562H1ZG"
+        maxLength={15}
+        pattern={/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/}
+        initialValue={gstManualPopup.prefill}
+        onVerify={handleGstManualSubmit}
+      />
+
+      <ManualEntryFallbackDialog
+        open={panManualPopup.open}
+        onOpenChange={(o) => setPanManualPopup((p) => ({ ...p, open: o }))}
+        title="Enter PAN manually"
+        description={panManualPopup.reason}
+        label="PAN *"
+        placeholder="AAAAA9999A"
+        maxLength={10}
+        pattern={/^[A-Z]{5}[0-9]{4}[A-Z]$/}
+        initialValue={panManualPopup.prefill}
+        onVerify={handlePanManualSubmit}
+      />
     </form>
+
   );
 }
 
