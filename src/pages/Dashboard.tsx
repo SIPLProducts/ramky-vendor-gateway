@@ -112,8 +112,6 @@ export default function Dashboard() {
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
   const [tableSearch, setTableSearch] = useState('');
-  const navigate = useNavigate();
-  const { toast } = useToast();
 
 
   const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
