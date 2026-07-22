@@ -321,16 +321,9 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
             <DropdownMenuLabel>
               <div>
                 <p className="font-medium">{userName}</p>
-                <p className="text-xs text-muted-foreground font-normal">{displayRole}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="cursor-pointer">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setChangePasswordOpen(true)}
               className="cursor-pointer"
