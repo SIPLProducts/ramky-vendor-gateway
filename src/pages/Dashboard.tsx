@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { formatDateTime } from '@/lib/dateFormat';
 import * as XLSX from 'xlsx';
@@ -10,7 +10,7 @@ import {
   Clock,
   Download,
   FileText,
-  Loader2,
+  
   Search,
   XCircle,
 } from 'lucide-react';
@@ -37,7 +37,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
 import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
-import { useToast } from '@/hooks/use-toast';
+
 
 type VendorRow = {
   id: string;
@@ -111,37 +111,8 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
-  const [trackRef, setTrackRef] = useState('');
-  const [isTracking, setIsTracking] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [tableSearch, setTableSearch] = useState('');
 
-  const handleTrackByReference = async () => {
-    const ref = trackRef.trim();
-    if (!ref) {
-      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
-      return;
-    }
-    setIsTracking(true);
-    try {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('reference_number', ref)
-        .maybeSingle();
-      if (error) throw error;
-      const vendorId = data?.id ?? null;
-      if (!vendorId) {
-        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
-        return;
-      }
-      navigate(`/vendor-status/${vendorId}`);
-    } catch (e: any) {
-      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
-    } finally {
-      setIsTracking(false);
-    }
-  };
 
   const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
   const toIso = dateTo ? endOfDay(dateTo).toISOString() : null;
@@ -248,12 +219,29 @@ export default function Dashboard() {
     return { total: vendors.length, pending, approved, rejected };
   }, [vendors]);
 
-  const filteredVendors = useMemo(() => {
+  const statusFilteredVendors = useMemo(() => {
     if (statusFilter === 'all') return vendors;
     if (statusFilter === 'approved') return vendors.filter((v) => APPROVED_STATUSES.has(v.status));
     if (statusFilter === 'rejected') return vendors.filter((v) => REJECTED_STATUSES.has(v.status));
     return vendors.filter((v) => PENDING_STATUSES.has(v.status));
   }, [vendors, statusFilter]);
+
+  const filteredVendors = useMemo(() => {
+    const q = tableSearch.toLowerCase().trim();
+    if (!q) return statusFilteredVendors;
+    return statusFilteredVendors.filter((v) => {
+      const hay = [
+        v.reference_number ?? '',
+        v.invited_by?.name ?? '',
+        pickVendorDisplayName(v) || '',
+        v.display_email ?? '',
+        STATUS_LABELS[v.status]?.label ?? v.status,
+        formatDateTime(v.created_at),
+      ].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }, [statusFilteredVendors, tableSearch]);
+
 
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
@@ -355,25 +343,6 @@ export default function Dashboard() {
               </PopoverContent>
             </Popover>
           </div>
-          <form
-            onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
-            className="flex items-end gap-2"
-          >
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="track-ref" className="text-xs font-medium text-muted-foreground">Reference Number</Label>
-              <Input
-                id="track-ref"
-                placeholder="Enter Reference Number"
-                value={trackRef}
-                onChange={(e) => setTrackRef(e.target.value)}
-                className="h-9 w-56"
-              />
-            </div>
-            <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
-              {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              Search
-            </Button>
-          </form>
           <Button onClick={handleExport} disabled={filteredVendors.length === 0}>
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
@@ -425,13 +394,24 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base">Vendor Applications</CardTitle>
-          {statusFilter !== 'all' && (
-            <div className="text-xs text-muted-foreground">
-              Showing: <span className="font-medium text-foreground">{cards.find((c) => c.key === statusFilter)?.label}</span>
-              <button type="button" onClick={() => setStatusFilter('all')} className="ml-2 text-primary hover:underline">Clear filter</button>
-            </div>
-          )}
+          <div className="flex items-center gap-3 min-w-0">
+            <CardTitle className="text-base whitespace-nowrap">Vendor Applications</CardTitle>
+            {statusFilter !== 'all' && (
+              <div className="text-xs text-muted-foreground">
+                Showing: <span className="font-medium text-foreground">{cards.find((c) => c.key === statusFilter)?.label}</span>
+                <button type="button" onClick={() => setStatusFilter('all')} className="ml-2 text-primary hover:underline">Clear filter</button>
+              </div>
+            )}
+          </div>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search table..."
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              className="h-9 pl-9"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-md border">

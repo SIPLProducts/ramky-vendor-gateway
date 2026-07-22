@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -62,6 +63,7 @@ import {
   FolderOpen,
   MessageSquare,
   Tags,
+  Loader2,
 } from 'lucide-react';
 import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -120,6 +122,37 @@ const STATUS_FILTER_GROUPS: Record<string, string[]> = {
 
 export default function VendorList() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [trackRef, setTrackRef] = useState('');
+  const [isTracking, setIsTracking] = useState(false);
+
+  const handleTrackByReference = async () => {
+    const ref = trackRef.trim();
+    if (!ref) {
+      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
+      return;
+    }
+    setIsTracking(true);
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('reference_number', ref)
+        .maybeSingle();
+      if (error) throw error;
+      const vendorId = data?.id ?? null;
+      if (!vendorId) {
+        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
+        return;
+      }
+      navigate(`/vendor-status/${vendorId}`);
+    } catch (e: any) {
+      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
+    } finally {
+      setIsTracking(false);
+    }
+  };
+
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -332,7 +365,22 @@ export default function VendorList() {
           <h1 className="text-2xl font-bold text-foreground">All Vendors</h1>
           <p className="text-muted-foreground">Complete list of registered vendors</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleTrackByReference(); }}
+            className="flex items-center gap-2"
+          >
+            <Input
+              placeholder="Enter Reference Number"
+              value={trackRef}
+              onChange={(e) => setTrackRef(e.target.value)}
+              className="h-9 w-56"
+            />
+            <Button type="submit" variant="outline" disabled={isTracking} className="gap-1">
+              {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
+          </form>
           <Button onClick={() => refetch()} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
