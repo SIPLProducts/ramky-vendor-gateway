@@ -1618,8 +1618,8 @@ export default function VendorRegistration() {
                 </div>
               )}
               <div className="space-y-1">
-                <h1 className="text-xl font-semibold text-slate-900">Select Vendor Type</h1>
-                <p className="text-sm text-slate-600">Choose the vendor category to begin your registration. You can change this later.</p>
+                <h1 className="text-xl font-semibold text-white">Select Vendor Type</h1>
+                <p className="text-sm text-white/90">Choose the vendor category to begin your registration. You can change this later.</p>
               </div>
 
               <VendorTypeSelector
