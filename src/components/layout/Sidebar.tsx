@@ -88,7 +88,7 @@ const navItems: NavItem[] = [
   { label: 'Reports', href: '/reports', icon: BarChart3, screenKey: 'reports' },
   { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
   { label: 'Email Configuration', href: '/admin/email-config', icon: Mail, screenKey: 'email_configuration' },
-  { label: 'Help & Support', href: '/support', icon: HelpCircle, screenKey: 'support' },
+  
 ];
 
 const roleLabels: Record<string, string> = {
