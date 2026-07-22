@@ -252,10 +252,10 @@ export default function VendorInviteAccept() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
-      <header className="h-14 border-b bg-white/80 backdrop-blur-sm px-6 flex items-center justify-center">
+      <header className="h-16 border-b bg-white px-6 flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <img src={ramkyLogo} alt="Vendor Portal" className="h-8 w-auto" />
-          <span className="text-sm font-semibold text-foreground">Vendor Portal</span>
+          <img src={ramkyLogo} alt="Vendor Portal" className="h-10 w-auto object-contain" />
+          <span className="text-sm font-semibold text-black">Vendor Portal</span>
         </div>
       </header>
 
