@@ -27,7 +27,7 @@ import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRi
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
-import vendorTypeBgAsset from '@/assets/vendor-type-bg.png.asset.json';
+import vendorTypeBg from '@/assets/vendor-type-bg.png';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -1587,7 +1587,7 @@ export default function VendorRegistration() {
       <div
         className="h-screen flex flex-col overflow-hidden"
         style={{
-          backgroundImage: `url(${vendorTypeBgAsset.url})`,
+          backgroundImage: `url(${vendorTypeBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
