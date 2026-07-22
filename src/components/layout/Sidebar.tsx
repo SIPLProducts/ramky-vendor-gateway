@@ -295,7 +295,6 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
                     <>
                       <div className="flex-1 text-left min-w-0">
                         <p className="text-sm font-medium text-sidebar-foreground truncate">{userName}</p>
-                        <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
                       </div>
                       <Bell className="h-4 w-4 text-sidebar-foreground/60" />
                     </>
