@@ -1584,33 +1584,42 @@ export default function VendorRegistration() {
       setCurrentStep(1);
     };
     return (
-      <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
-        <header className="h-14 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+      <div
+        className="min-h-screen flex flex-col"
+        style={{
+          backgroundImage: `url(${vendorTypeBgAsset.url})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed',
+        }}
+      >
+        <header className="h-14 border-b border-white/10 bg-slate-950/60 backdrop-blur-sm px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
             <div className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-              <span className="text-sm font-semibold text-foreground">Vendor Registration</span>
+              <span className="text-sm font-semibold text-white">Vendor Registration</span>
             </div>
           ) : (
             <Link to="/" className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-8 w-auto" />
-              <span className="text-sm font-semibold text-foreground hidden sm:block">Vendor Portal</span>
+              <span className="text-sm font-semibold text-white hidden sm:block">Vendor Portal</span>
             </Link>
           )}
         </header>
         <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-          <div className="relative w-full max-w-md rounded-[12px] overflow-hidden bg-[#eaf2fb] shadow-lg border border-blue-100">
+          <div className="relative w-full max-w-md rounded-[12px] overflow-hidden bg-transparent">
             <div className="relative p-5 sm:p-6 space-y-5">
               {isTokenMode && invitationEmail && (
-                <div className="p-3 bg-white/70 border border-blue-100 rounded-lg">
-                  <p className="text-sm text-foreground/80">
-                    <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
+                <div className="p-3 bg-white/10 border border-white/20 rounded-lg backdrop-blur-sm">
+                  <p className="text-sm text-white/80">
+                    <span className="font-medium text-white">Invited Email:</span> {invitationEmail}
                   </p>
                 </div>
               )}
               <div className="space-y-1">
-                <h1 className="text-xl font-semibold text-foreground">Select Vendor Type</h1>
-                <p className="text-sm text-muted-foreground">Choose the vendor category to begin your registration. You can change this later.</p>
+                <h1 className="text-xl font-semibold text-white drop-shadow">Select Vendor Type</h1>
+                <p className="text-sm text-white/80 drop-shadow">Choose the vendor category to begin your registration. You can change this later.</p>
               </div>
               <VendorTypeSelector
                 value={pendingChoiceType}
@@ -1626,7 +1635,6 @@ export default function VendorRegistration() {
             </div>
           </div>
         </main>
-
 
 
 
