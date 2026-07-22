@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import ramkyLogo from '@/assets/ramky-logo.png';
 
 interface HeaderProps {
   userRole: 'vendor' | 'finance' | 'purchase' | 'admin';
