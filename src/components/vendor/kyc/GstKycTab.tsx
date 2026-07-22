@@ -440,6 +440,43 @@ export function GstKycTab(props: GstKycTabProps) {
         vendorId={props.vendorId}
       />
 
+      <ManualEntryFallbackDialog
+        open={manualFallbackOpen}
+        onOpenChange={setManualFallbackOpen}
+        title="Enter GSTIN manually"
+        description="We couldn't read the GST certificate. Type the 15-character GSTIN and we'll validate it against the GST registry."
+        label="GSTIN *"
+        placeholder="22AAAAA0000A1Z5"
+        maxLength={15}
+        pattern={/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/}
+        initialValue={props.gstin}
+        onVerify={async (gstin) => {
+          props.onGstinChange(gstin);
+          reset();
+          const r = await callProvider({ providerName: 'GST', input: { gstin, id_number: gstin } });
+          toastKycResult('GST', r);
+          if (!r.found) return { ok: false, message: 'GST validation provider not configured.' };
+          if (!r.ok || !r.data) return { ok: false, message: r.message || r.message_code || 'GST verification failed' };
+          const data = r.data;
+          const apiName = String(data.legal_name || data.business_name || data.trade_name || '').trim();
+          setVerifiedLegalName(apiName);
+          const check = evalLegalName(apiName);
+          setLegalNameCheck(check.status);
+          setLegalNameCheckMessage(check.message);
+          if (check.status === 'failed') {
+            setState({ status: 'failed', message: check.message, data });
+            return { ok: false, message: check.message };
+          }
+          const okMsg = check.message || `GSTIN is verified${apiName ? ` — ${apiName}` : ''}`;
+          setState({ status: 'passed', message: okMsg, data });
+          setVerifiedGstData(data);
+          void runFilingStatusCheck(data);
+          return { ok: true };
+        }}
+      />
+
+
+
 
       {props.isGstRegistered ? null : (
         <div className="space-y-4">
