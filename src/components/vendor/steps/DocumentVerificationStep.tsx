@@ -242,6 +242,9 @@ function timeAgo(ts?: number) {
 
 function friendlyModelName(model?: string): string | undefined {
   if (!model) return undefined;
+  // Hide raw KYC provider codes (e.g. PAN_OCR / GST_OCR / MSME_OCR / BANK_OCR)
+  // — those are internal identifiers and add noise to the file pill.
+  if (/^(PAN|GST|MSME|BANK|CHEQUE)_OCR$/i.test(model)) return undefined;
   const map: Record<string, string> = {
     "google/gemini-2.5-pro": "Gemini 2.5 Pro",
     "google/gemini-2.5-flash": "Gemini 2.5 Flash",
