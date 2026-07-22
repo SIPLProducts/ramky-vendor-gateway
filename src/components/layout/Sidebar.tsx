@@ -234,37 +234,6 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
 
           return linkContent;
         })}
-
-        {/* Logout button */}
-        {(() => {
-          const logoutBtn = (
-            <button
-              onClick={handleLogout}
-              className={cn(
-                'w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 border border-transparent text-destructive hover:bg-destructive/10',
-                collapsed ? 'justify-center p-2.5' : 'px-3 py-2 mx-1'
-              )}
-            >
-              <LogOut className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="truncate">Logout</span>}
-            </button>
-          );
-          if (collapsed) {
-            return (
-              <Tooltip>
-                <TooltipTrigger asChild>{logoutBtn}</TooltipTrigger>
-                <TooltipContent
-                  side="right"
-                  className="bg-slate-900 text-white border-0 px-3 py-1.5 text-xs font-medium rounded-full shadow-lg"
-                  sideOffset={8}
-                >
-                  Logout
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
-          return logoutBtn;
-        })()}
       </nav>
 
       {/* User Profile Footer */}

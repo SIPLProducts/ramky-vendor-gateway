@@ -1,17 +1,11 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { HelpCircle, Phone, Mail } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantContext } from '@/hooks/useTenantContext';
+import { useAuth } from '@/hooks/useAuth';
 import ramkyLogo from '@/assets/ramky-logo.png';
 
 interface EnterpriseHeaderProps {
@@ -19,6 +13,8 @@ interface EnterpriseHeaderProps {
 }
 
 export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const {
     myTenants, activeTenantId, setActiveTenantId,
     activeTenantIds, setActiveTenantIds,
@@ -74,38 +70,22 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
           )
         )}
         {showHelp && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <HelpCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">Help & Support</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  try { await signOut(); } finally { navigate('/auth', { replace: true }); }
+                }}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                aria-label="Logout"
+              >
+                <LogOut className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>Need Assistance?</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/support" className="flex items-center gap-2 cursor-pointer">
-                  <HelpCircle className="h-4 w-4" />
-                  Help Center & FAQs
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                <span>vendor.support@ramky.com</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                <span>+91 40 2354 6789</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/feedback" className="cursor-pointer">
-                  Share Feedback
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Logout</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </header>
