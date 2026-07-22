@@ -119,7 +119,9 @@ const EMPTY_RESULT: PanTabResult = { ocrPan: '', ocrName: '', panCheck: 'idle', 
 export function PanKycTab(props: PanKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const [localResult, setLocalResult] = useState<PanTabResult>(EMPTY_RESULT);
+  const [manualFallbackOpen, setManualFallbackOpen] = useState(false);
   const result = props.ocrResult ?? localResult;
+
   const { ocrPan, ocrName, panCheck, nameCheck, nameCheckMessage, nameMatchResult, panStatus, aadhaarLinked } = result;
   const updateResult = (next: Partial<PanTabResult>) => {
     const merged = { ...result, ...next };
