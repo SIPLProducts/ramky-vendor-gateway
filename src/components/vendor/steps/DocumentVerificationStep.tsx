@@ -703,6 +703,21 @@ export function DocumentVerificationStep({
     });
   };
 
+  // Manual entry fallback popups for GST / PAN — opened when OCR is unreadable
+  // or the validation API rejects the extracted value. Vendor types the ID and
+  // we re-run the existing GST / PAN Comprehensive provider.
+  const [gstManualPopup, setGstManualPopup] = useState<{ open: boolean; reason: string; prefill: string }>({
+    open: false, reason: "", prefill: "",
+  });
+  const [panManualPopup, setPanManualPopup] = useState<{ open: boolean; reason: string; prefill: string }>({
+    open: false, reason: "", prefill: "",
+  });
+  const openGstManualPopup = (reason: string, prefill = "") =>
+    setGstManualPopup({ open: true, reason, prefill });
+  const openPanManualPopup = (reason: string, prefill = "") =>
+    setPanManualPopup({ open: true, reason, prefill });
+
+
   // ---------- Verification ----------
   // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
   // Other kinds still use a lightweight simulation pending real provider wiring.
