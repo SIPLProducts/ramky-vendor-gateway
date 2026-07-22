@@ -45,11 +45,11 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full rounded-xl bg-white/50 backdrop-blur-sm border border-white/60 p-5 text-left',
+                'group relative w-full rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 text-left',
                 'shadow-md transition-all duration-200 ease-out',
-                'hover:-translate-y-0.5 hover:shadow-xl hover:bg-white/70',
+                'hover:-translate-y-0.5 hover:shadow-xl hover:bg-white/60',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                selected && 'ring-2 ring-brand-green bg-white/80',
+                selected && 'ring-2 ring-brand-green bg-white/75',
                 disabled && 'opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-md',
               )}
 
