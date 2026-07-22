@@ -384,6 +384,15 @@ export default function UserManagement() {
         if (roleFilter.startsWith('custom:')) {
           const cid = roleFilter.slice('custom:'.length);
           if (!u.customRoles.some((c) => c.id === cid)) return false;
+        } else if (roleFilter === 'admin' || roleFilter === 'sharvi_admin') {
+          const label = roleFilter === 'admin' ? 'admin' : 'sharvi admin';
+          const altLabel = roleFilter === 'admin' ? '' : 'sharvi_admin';
+          const matchesBuiltIn = u.role === roleFilter;
+          const matchesCustom = u.customRoles.some((c) => {
+            const n = c.name.trim().toLowerCase();
+            return n === label || (altLabel && n === altLabel);
+          });
+          if (!matchesBuiltIn && !matchesCustom) return false;
         } else if (u.role !== roleFilter) {
           return false;
         }
@@ -392,6 +401,7 @@ export default function UserManagement() {
       return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
     });
   }, [nonVendorUsers, search, roleFilter]);
+
 
 
   const stats = useMemo(() => {
