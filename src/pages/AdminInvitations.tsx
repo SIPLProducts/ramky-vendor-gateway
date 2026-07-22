@@ -930,7 +930,7 @@ export default function AdminInvitations() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative w-64">
                 <Input
-                  placeholder="Search by Name, Email or Phone Number"
+                  placeholder="Search by Name, Email or Mobile"
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
                 />
