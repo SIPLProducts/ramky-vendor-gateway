@@ -1,53 +1,56 @@
 ## Goal
 
-Improve the OCR failure experience in the Vendor Registration KYC step and clean up the response UI.
+Add a Manual Entry fallback popup for **GST** and **PAN** OCR failures inside the Document Verification step (mirroring the existing Bank cheque manual-entry flow), without changing any working behaviour.
 
-1. When **GST OCR** fails on upload, open a **manual entry popup** where the vendor types the GSTIN and it is validated via the configured **GSTIN Validation** provider (`GST`) using `{ id_number: "<GSTIN>" }`.
-2. When **PAN OCR** fails on upload, open a **manual entry popup** where the vendor types the PAN and it is validated via the configured **PAN Comprehensive Validation** provider (`PAN`) using `{ id_number: "<PAN>" }`.
-3. Remove the raw provider code badge (`GST_OCR`, `PAN_OCR`, `BANK_OCR`, `MSME_OCR`, `GST`, `PAN`, …) that currently appears next to the API response title.
+## Where the change goes
 
-Scope is limited to the vendor-facing KYC UI — no schema, no edge-function changes.
+The active document verification UI is `src/components/vendor/steps/DocumentVerificationStep.tsx` (the tabbed GST → PAN → MSME → Bank flow shown in the screenshot). Bank already has `openBankManualPopup(...)` triggered from OCR/verify failure. GST and PAN currently just render a "Failed" pill with a Retry — no manual entry option.
 
-## Changes
+The reusable dialog `src/components/vendor/kyc/ManualEntryFallbackDialog.tsx` already exists and will be used as-is.
 
-### 1. New component: `src/components/vendor/kyc/ManualEntryFallbackDialog.tsx`
+## Behaviour
 
-Reusable modal (built on `Dialog`) that:
-- Accepts `open`, `onOpenChange`, `title` ("Enter GSTIN manually" / "Enter PAN manually"), `label`, `placeholder`, `maxLength`, `pattern` (client regex), and an async `onVerify(value)` handler.
-- Renders one `Input` + a "Verify" button (loading, success, failure states) and shows the API message inline.
-- On successful verification it invokes an `onSuccess(apiResult)` callback and closes.
+### PAN tab
+When the PAN pipeline fails (OCR unreadable, OCR returned invalid PAN, or PAN Comprehensive Validation returned an error such as "Invalid PAN"):
+- Open a **Manual Entry** popup titled "Enter PAN manually".
+- Input: 10-char PAN, pattern `^[A-Z]{5}[0-9]{4}[A-Z]$`, upper-cased, monospace.
+- On Submit → call the existing `PAN` provider (PAN Comprehensive Validation) with `{ id_number: <pan>, pan: <pan> }`.
+- On success:
+  - Populate PAN doc state as if OCR had succeeded (status `verified`, `ocrData` filled from API response, `apiData` from the response).
+  - Cross-check the returned holder name against GST/MSME/Bank names using the existing name-match logic — same rules as the OCR path.
+  - Persist `pan_status` / `pan_aadhaar_linked` / `pan_comprehensive_verified_at` the same way the OCR path does.
+  - Close the popup and let the workflow advance to MSME normally.
+- On failure: show the API error message inside the popup (popup stays open).
 
-### 2. `src/components/vendor/kyc/OcrUploadAndVerify.tsx`
+### GST tab
+When the GST pipeline fails (OCR could not detect a GSTIN, "No GSTIN detected", or GSTIN Validation API rejects):
+- Open a **Manual Entry** popup titled "Enter GST manually".
+- Input: 15-char GSTIN, pattern `^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$`.
+- On Submit → call the existing `GST` provider with `{ id_number: <gstin> }`.
+- On success:
+  - Populate GST doc state as if OCR had succeeded (`verified`, `ocrData` merged with the normalized registry payload, `apiData` from the response).
+  - Downstream chain (PAN derived from GST etc.) continues normally.
+- On failure: show the API error message inside the popup.
 
-- Add optional prop `onOcrFailed?: (reason: string) => void`.
-- In `runPipeline`, when the OCR phase returns `!success` (or the verify phase fails because OCR could not be read), call `onOcrFailed(message)` after setting the failed state. The existing Retry button stays.
+### Trigger points inside `runOcrAndVerify`
+Add gst/pan branches next to the existing `cheque` branch in the failure paths already at lines ~1200 and ~1226:
+1. OCR unreadable / confidence too low → open the corresponding manual popup, prefilled with any partial value OCR read.
+2. Verification API returned not-ok → open the popup, prefilled with the OCR-read value so the vendor can correct 1-2 characters.
 
-### 3. `src/components/vendor/kyc/GstKycTab.tsx`
+Manual retry (existing "Retry" button) stays intact. Popup can also be re-opened via an explicit "Enter manually" link added to the failed pill for GST/PAN, matching Bank's existing manual entry affordance.
 
-- Add local state `manualFallbackOpen`.
-- Pass `onOcrFailed={() => setManualFallbackOpen(true)}` to `OcrUploadAndVerify` (upload tab).
-- Render `<ManualEntryFallbackDialog>` for GSTIN. On Verify:
-  - Call `callProvider({ providerName: 'GST', input: { id_number: gstin } })`.
-  - On `ok`, run the existing post-verification flow (set `gstin`, update `verifiedGstData`, trigger filing status check, name-match, `persistGstValidation`, `onStatusChange('passed')`, close dialog).
-  - On failure, keep the dialog open and show the API `message` / `message_code`.
-- Extract the existing "verified data → downstream side effects" block currently used by manual mode into a small helper so both the manual tab and the fallback dialog share it.
+## Cosmetic cleanup (part of the same request)
 
-### 4. `src/components/vendor/kyc/PanKycTab.tsx`
+Remove the raw provider badge (`PAN_OCR`, `GST_OCR`, `BANK_OCR`, `MSME_OCR`) shown in the file pill next to the filename — the screenshot shows the green "PAN_OCR" chip. In `DocumentVerificationStep.tsx` around line 3347, drop the badge when `ocrModel` is one of the provider codes (keep it for actual model names like "Gemini 2.5 Pro"). The `friendlyModelName` map already covers real model names; we just filter out raw provider codes.
 
-- Add local state `manualFallbackOpen`.
-- Pass `onOcrFailed={() => setManualFallbackOpen(true)}` to `OcrUploadAndVerify`.
-- Render `<ManualEntryFallbackDialog>` for PAN (10 chars, regex `^[A-Z]{5}[0-9]{4}[A-Z]$`). On Verify:
-  - Call `callProvider({ providerName: 'PAN', input: { id_number: pan } })` (PAN Comprehensive).
-  - On success: set `props.pan`, parse `panStatus` / `aadhaarLinked` via the existing helpers, `updateResult(...)`, fire `onComprehensiveResult`, persist to `vendors` (same block already used by `runPanComprehensive`), set `onStatusChange('passed')`, close dialog.
-  - Cross-name check against GST/MSME/Bank is still run when those names exist.
-  - On failure keep the dialog open with the API message.
-- Gate opening the dialog on `props.gstVerified` (same guard as OCR path); if GST isn't verified yet, show the existing warning instead.
+## Technical notes
 
-### 5. `src/components/vendor/kyc/ApiResponseDetails.tsx`
+- No changes to Bank flow.
+- No changes to `useConfiguredKycApi`, backend, or provider configuration.
+- No changes to the KYC-tab files (`GstKycTab.tsx`, `PanKycTab.tsx`) — they already have this behaviour but they're not the components rendered in the current registration UI.
+- Reuses `ManualEntryFallbackDialog`, adds two local state slots (`gstManualPopup`, `panManualPopup`) and two submit handlers alongside `bankPopup`.
+- On successful manual submission we synthesize the same `setDoc({ status: "verified", ... })` shape used by the OCR success path so all downstream logic (cross-tab locks, progress ring, "Continue" enablement, DMS payload) works identically.
 
-- Remove the `<Badge variant="outline">{result.provider_name}</Badge>` line in the header so raw provider codes like `GST_OCR`, `PAN_OCR`, `BANK_OCR` no longer show up next to responses. Success/failure badge, status code, and message stay.
+## Files to modify
 
-## Out of scope
-
-- MSME and Bank OCR failure flows (user asked only for GST + PAN popups). Bank already has its own manual entry path.
-- Any change to the configured KYC API providers, edge functions, or database.
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` — add gst/pan manual popup state, open triggers in the failure branches, submit handlers, dialog JSX, and provider-code badge filter.

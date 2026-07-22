@@ -27,6 +27,7 @@ import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 import { GstFilingStatusTable, normalizeFilingStatus, evaluateGstr1Compliance, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
+import { ManualEntryFallbackDialog } from "@/components/vendor/kyc/ManualEntryFallbackDialog";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
@@ -242,6 +243,9 @@ function timeAgo(ts?: number) {
 
 function friendlyModelName(model?: string): string | undefined {
   if (!model) return undefined;
+  // Hide raw KYC provider codes (e.g. PAN_OCR / GST_OCR / MSME_OCR / BANK_OCR)
+  // — those are internal identifiers and add noise to the file pill.
+  if (/^(PAN|GST|MSME|BANK|CHEQUE)_OCR$/i.test(model)) return undefined;
   const map: Record<string, string> = {
     "google/gemini-2.5-pro": "Gemini 2.5 Pro",
     "google/gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -698,6 +702,21 @@ export function DocumentVerificationStep({
       error: "",
     });
   };
+
+  // Manual entry fallback popups for GST / PAN — opened when OCR is unreadable
+  // or the validation API rejects the extracted value. Vendor types the ID and
+  // we re-run the existing GST / PAN Comprehensive provider.
+  const [gstManualPopup, setGstManualPopup] = useState<{ open: boolean; reason: string; prefill: string }>({
+    open: false, reason: "", prefill: "",
+  });
+  const [panManualPopup, setPanManualPopup] = useState<{ open: boolean; reason: string; prefill: string }>({
+    open: false, reason: "", prefill: "",
+  });
+  const openGstManualPopup = (reason: string, prefill = "") =>
+    setGstManualPopup({ open: true, reason, prefill });
+  const openPanManualPopup = (reason: string, prefill = "") =>
+    setPanManualPopup({ open: true, reason, prefill });
+
 
   // ---------- Verification ----------
   // For GST, hit the configured `GST` provider (Surepass GSTIN validation).
@@ -1197,11 +1216,20 @@ export function DocumentVerificationStep({
     setDoc({ status: "ocr", fileName: file.name, fileSize: file.size, file });
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: ocrRes.error || "Could not read document" });
+      const errMsg = ocrRes.error || "Could not read document";
+      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: errMsg });
       if (kind === "cheque") {
         openBankManualPopup(
           chequeTargetRef.current,
           ocrRes.error || "We couldn't read your cheque. Please enter your bank details manually.",
+        );
+      } else if (kind === "gst") {
+        openGstManualPopup(
+          "We couldn't read your GST certificate. Please enter your 15-character GSTIN and we'll verify it.",
+        );
+      } else if (kind === "pan") {
+        openPanManualPopup(
+          "We couldn't read your PAN card. Please enter your 10-character PAN and we'll verify it.",
         );
       }
       return;
@@ -1217,6 +1245,18 @@ export function DocumentVerificationStep({
           "We couldn't read your cheque clearly. Please enter your bank details manually.",
           acc,
           ifsc,
+        );
+      } else if (kind === "gst") {
+        const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
+        openGstManualPopup(
+          "We couldn't read your GST certificate clearly. Please enter your 15-character GSTIN.",
+          gstin,
+        );
+      } else if (kind === "pan") {
+        const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
+        openPanManualPopup(
+          "We couldn't read your PAN card clearly. Please enter your 10-character PAN.",
+          pan,
         );
       }
       return;
@@ -1239,6 +1279,12 @@ export function DocumentVerificationStep({
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
         openBankManualPopup(chequeTargetRef.current, msg, acc, ifsc);
+      } else if (kind === "gst") {
+        const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
+        openGstManualPopup(msg, gstin);
+      } else if (kind === "pan") {
+        const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
+        openPanManualPopup(msg, pan);
       }
       return;
     }
@@ -1674,7 +1720,62 @@ export function DocumentVerificationStep({
     });
   };
 
-  // Submit manual bank details from the popup → re-verify via configured BANK provider.
+  // Submit manually-entered GSTIN → re-run GST validation and populate gstDoc
+  // as if OCR had succeeded, keeping the rest of the pipeline intact.
+  const handleGstManualSubmit = async (gstin: string): Promise<{ ok: boolean; message?: string }> => {
+    const clean = String(gstin || "").toUpperCase().trim();
+    if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(clean)) {
+      return { ok: false, message: "Please enter a valid 15-character GSTIN." };
+    }
+    const ocr: Record<string, any> = { gstin: clean };
+    const v = await verifyApi("gst", ocr);
+    if (!v.ok) return { ok: false, message: (v as any).message || "GSTIN verification failed." };
+    const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
+    setGstDoc((prev) => ({
+      status: "verified",
+      fileName: prev.fileName,
+      fileSize: prev.fileSize,
+      file: prev.file,
+      ocrData: merged,
+      originalOcrData: ocr,
+      apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
+      verifiedAt: Date.now(),
+      ocrModel: prev.ocrModel,
+    }));
+    const apiAddress =
+      (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
+    if (apiAddress) setEditablePrincipalPlace(apiAddress);
+    if (merged.gstin) void runGstFilingStatusCheck(merged);
+    return { ok: true };
+  };
+
+  // Submit manually-entered PAN → re-run PAN Comprehensive Validation and
+  // populate panDoc as if OCR had succeeded.
+  const handlePanManualSubmit = async (pan: string): Promise<{ ok: boolean; message?: string }> => {
+    const clean = String(pan || "").toUpperCase().trim();
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(clean)) {
+      return { ok: false, message: "Please enter a valid 10-character PAN." };
+    }
+    const ocr: Record<string, any> = { pan_number: clean };
+    const v = await verifyApi("pan", ocr);
+    if (!v.ok) return { ok: false, message: (v as any).message || "PAN verification failed." };
+    const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
+    setPanDoc((prev) => ({
+      status: "verified",
+      fileName: prev.fileName,
+      fileSize: prev.fileSize,
+      file: prev.file,
+      ocrData: merged,
+      originalOcrData: ocr,
+      apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
+      verifiedAt: Date.now(),
+      ocrModel: prev.ocrModel,
+    }));
+    setPanCrossCheckError(null);
+    return { ok: true };
+  };
+
+
   const handleBankPopupSubmit = async () => {
     const account = bankPopup.account.replace(/\s+/g, "");
     const ifsc = bankPopup.ifsc.toUpperCase().trim();
@@ -3136,7 +3237,34 @@ export function DocumentVerificationStep({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ManualEntryFallbackDialog
+        open={gstManualPopup.open}
+        onOpenChange={(o) => setGstManualPopup((p) => ({ ...p, open: o }))}
+        title="Enter GSTIN manually"
+        description={gstManualPopup.reason}
+        label="GSTIN *"
+        placeholder="e.g. 20AAPCS1562H1ZG"
+        maxLength={15}
+        pattern={/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/}
+        initialValue={gstManualPopup.prefill}
+        onVerify={handleGstManualSubmit}
+      />
+
+      <ManualEntryFallbackDialog
+        open={panManualPopup.open}
+        onOpenChange={(o) => setPanManualPopup((p) => ({ ...p, open: o }))}
+        title="Enter PAN manually"
+        description={panManualPopup.reason}
+        label="PAN *"
+        placeholder="AAAAA9999A"
+        maxLength={10}
+        pattern={/^[A-Z]{5}[0-9]{4}[A-Z]$/}
+        initialValue={panManualPopup.prefill}
+        onVerify={handlePanManualSubmit}
+      />
     </form>
+
   );
 }
 
