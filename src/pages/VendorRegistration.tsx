@@ -1585,7 +1585,7 @@ export default function VendorRegistration() {
     };
     return (
       <div
-        className="min-h-screen flex flex-col overflow-x-hidden"
+        className="h-screen flex flex-col overflow-hidden"
         style={{
           backgroundImage: `url(${vendorTypeBgAsset.url})`,
           backgroundSize: 'cover',
@@ -1594,7 +1594,7 @@ export default function VendorRegistration() {
           backgroundAttachment: 'fixed',
         }}
       >
-        <header className="h-16 border-b bg-white px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
+        <header className="h-16 shrink-0 border-b bg-white px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
             <div className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
@@ -1607,18 +1607,18 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <main className="flex-1 flex items-center justify-center p-3 sm:p-6">
-          <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl">
-            <div className="relative p-4 sm:p-5 md:p-6 space-y-3 sm:space-y-4">
+        <main className="flex-1 min-h-0 flex items-center justify-center p-2 sm:p-4 md:p-6">
+          <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl max-h-full rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col">
+            <div className="relative p-3 sm:p-4 md:p-5 space-y-2 sm:space-y-3 flex-1 min-h-0 flex flex-col">
               {isTokenMode && invitationEmail && (
-                <div className="p-3 bg-white/70 border border-blue-100 rounded-lg">
+                <div className="p-2 sm:p-3 bg-white/70 border border-blue-100 rounded-lg shrink-0">
                   <p className="text-sm text-slate-700">
                     <span className="font-medium text-slate-900">Invited Email:</span> {invitationEmail}
                   </p>
                 </div>
               )}
-              <div className="space-y-1">
-                <h1 className="text-lg sm:text-xl font-semibold text-white">Select Vendor Type</h1>
+              <div className="space-y-1 shrink-0">
+                <h1 className="text-base sm:text-lg md:text-xl font-semibold text-white">Select Vendor Type</h1>
                 <p className="text-xs sm:text-sm text-white/90">Choose the vendor category to begin your registration. You can change this later.</p>
               </div>
 
@@ -1627,7 +1627,7 @@ export default function VendorRegistration() {
                 onChange={setPendingChoiceType}
                 disabled={isSubmitting}
               />
-              <div className="flex justify-end pt-1">
+              <div className="flex justify-end pt-1 shrink-0">
                 <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
                   Continue
                   <ChevronRight className="h-4 w-4 ml-2" />
@@ -1636,6 +1636,7 @@ export default function VendorRegistration() {
             </div>
           </div>
         </main>
+
 
 
 

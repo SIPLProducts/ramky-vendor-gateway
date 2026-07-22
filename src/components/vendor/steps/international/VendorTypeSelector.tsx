@@ -32,8 +32,8 @@ const OPTIONS: {
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div className="rounded-xl p-0">
-      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-3 sm:gap-4">
+    <div className="rounded-xl p-0 flex-1 min-h-0 flex">
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 w-full flex-1 min-h-0">
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
           return (
@@ -45,10 +45,11 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 p-3 sm:p-4 text-left',
+                'group relative w-full rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 p-2 sm:p-3 md:p-4 text-left',
                 'shadow-md transition-all duration-200 ease-out',
                 'hover:-translate-y-0.5 hover:shadow-xl hover:bg-white/60',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
+                'flex-1 min-h-0 flex flex-col items-center justify-center',
                 selected && 'ring-2 ring-brand-green bg-white/75',
                 disabled && 'opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-md',
               )}
@@ -60,15 +61,15 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 </span>
               )}
 
-              <h4 className="text-center text-base sm:text-[17px] font-semibold text-slate-900 leading-tight">
+              <h4 className="text-center text-sm sm:text-base md:text-[17px] font-semibold text-slate-900 leading-tight">
                 {opt.title}
               </h4>
 
-              <div className="mt-2 flex justify-center">
+              <div className="mt-2 flex-1 min-h-0 w-full flex items-center justify-center">
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="h-20 sm:h-24 md:h-28 w-auto object-contain select-none pointer-events-none"
+                  className="max-h-[16vh] sm:max-h-[18vh] md:max-h-[20vh] h-full w-auto object-contain select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
@@ -79,3 +80,4 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
     </div>
   );
 }
+
