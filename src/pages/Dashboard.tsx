@@ -146,17 +146,21 @@ export default function Dashboard() {
   const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
   const toIso = dateTo ? endOfDay(dateTo).toISOString() : null;
 
-  const handleFromChange = (val: string) => {
-    if (!val) { setDateFrom(null); return; }
-    const d = startOfDay(new Date(val));
-    setDateFrom(d);
-    if (dateTo && d > dateTo) setDateTo(endOfDay(d));
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
+  const today = endOfDay(new Date());
+
+  const handleFromSelect = (d: Date | undefined) => {
+    if (!d) return;
+    const start = startOfDay(d);
+    setDateFrom(start);
+    if (dateTo && start > dateTo) setDateTo(endOfDay(d));
+    setFromOpen(false);
   };
-  const handleToChange = (val: string) => {
-    if (!val) { setDateTo(null); return; }
-    const d = endOfDay(new Date(val));
-    setDateTo(d);
-    if (dateFrom && d < dateFrom) setDateFrom(startOfDay(new Date(val)));
+  const handleToSelect = (d: Date | undefined) => {
+    if (!d) return;
+    setDateTo(endOfDay(d));
+    setToOpen(false);
   };
 
   const { data: vendors = [], isLoading } = useQuery({
