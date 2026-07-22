@@ -1,13 +1,13 @@
-## Changes to `src/components/layout/Sidebar.tsx`
+## Correct target: top navigation bar (`EnterpriseHeader`), not the sidebar
 
-1. **Remove "Settings"** menu item from the user profile dropdown.
-2. **Remove the role label** (`displayRole`) under the user name in both:
-   - Sidebar footer (below name)
-   - Dropdown menu header
-3. **Remove "Help & Support"** from the navigation list.
-4. **Add a Logout icon button** in the sidebar navigation area (in place of Help & Support). Clicking it calls the existing `handleLogout` which signs out and navigates to `/auth`.
-   - Uses the existing `LogOut` icon.
-   - Styled consistently with other nav items (with tooltip when collapsed).
-   - Text color styled as destructive (red-tinted) to distinguish it.
+### 1. `src/components/layout/EnterpriseHeader.tsx`
+- Remove the entire "Help & Support" dropdown block (the `HelpCircle` button with Help Center/email/phone menu).
+- In its place, add a **Logout icon button** (using `LogOut` from lucide-react) that:
+  - On click, calls `supabase.auth.signOut()` (via `useAuth().signOut`) and navigates to `/auth`.
+  - Shows a tooltip "Logout" on hover.
 
-No other functionality changes — Change Password and Sign Out in the dropdown remain intact.
+### 2. `src/components/layout/Sidebar.tsx`
+- Revert the Logout button that was just added to the sidebar navigation (restore the nav to end with just the mapped items).
+- Keep the earlier changes intact: Settings menu item removed, role label removed.
+
+No other files or functionality affected.
