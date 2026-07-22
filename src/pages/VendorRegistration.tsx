@@ -27,6 +27,7 @@ import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRi
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo.png';
+import vendorTypeBgAsset from '@/assets/vendor-type-bg.png.asset.json';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -1598,28 +1599,38 @@ export default function VendorRegistration() {
           )}
         </header>
         <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-          <div className="w-full max-w-2xl bg-card rounded-[10px] shadow-lg border p-6 sm:p-8 space-y-6">
-            {isTokenMode && invitationEmail && (
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
-                </p>
+          <div
+            className="relative w-full max-w-md rounded-[12px] shadow-2xl border border-white/10 overflow-hidden"
+            style={{
+              backgroundImage: `url(${vendorTypeBgAsset.url})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-900/60 to-slate-950/80" aria-hidden="true" />
+            <div className="relative p-5 sm:p-6 space-y-5">
+              {isTokenMode && invitationEmail && (
+                <div className="p-3 bg-white/10 border border-white/20 rounded-lg backdrop-blur-sm">
+                  <p className="text-sm text-white/80">
+                    <span className="font-medium text-white">Invited Email:</span> {invitationEmail}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-1">
+                <h1 className="text-xl font-semibold text-white">Select Vendor Type</h1>
+                <p className="text-sm text-white/70">Choose the vendor category to begin your registration. You can change this later.</p>
               </div>
-            )}
-            <div className="space-y-1">
-              <h1 className="text-xl font-semibold text-foreground">Select Vendor Type</h1>
-              <p className="text-sm text-muted-foreground">Choose the vendor category to begin your registration. You can change this later.</p>
-            </div>
-            <VendorTypeSelector
-              value={pendingChoiceType}
-              onChange={setPendingChoiceType}
-              disabled={isSubmitting}
-            />
-            <div className="flex justify-end pt-2">
-              <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
-                Continue
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
+              <VendorTypeSelector
+                value={pendingChoiceType}
+                onChange={setPendingChoiceType}
+                disabled={isSubmitting}
+              />
+              <div className="flex justify-end pt-2">
+                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
+                  Continue
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </div>
           </div>
         </main>
