@@ -94,7 +94,6 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{opt.desc}</p>
             </div>
             <span
               className={cn(
