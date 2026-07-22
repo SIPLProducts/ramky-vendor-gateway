@@ -1,4 +1,4 @@
-import { Check, Globe2, MapPin } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VendorOriginType } from '@/types/vendor';
 
@@ -8,9 +8,45 @@ interface Props {
   disabled?: boolean;
 }
 
-const OPTIONS: { value: VendorOriginType; title: string; desc: string; Icon: React.ElementType }[] = [
-  { value: 'domestic', title: 'Domestic Vendor', desc: 'Indian vendors — full KYC, GST, PAN, MSME and Bank flow', Icon: MapPin },
-  { value: 'international', title: 'International Vendor', desc: 'Overseas vendors — SWIFT/IBAN, country & region based flow', Icon: Globe2 },
+function IndianFlagIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="5" width="20" height="14" rx="2" fill="#FF9932" stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
+      <path d="M2 9.667h20v4.667H2z" fill="#FFFFFF" />
+      <path d="M2 14.333h20V19H2z" fill="#138808" />
+      <g stroke="#000080" strokeWidth="0.5" strokeLinecap="round">
+        <circle cx="12" cy="12" r="2.2" />
+        <path d="M12 9.8v4.4M9.8 12h4.4M10.44 10.44l3.12 3.12M13.56 10.44l-3.12 3.12" />
+      </g>
+    </svg>
+  );
+}
+
+function WorldMapIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 8h-2a2 2 0 0 0 -2 2a2 2 0 1 1 -4 0v-1a2 2 0 0 0 -2 -2h-1a2 2 0 0 1 -2 -2v-.5" />
+      <path d="M3 12h3a2 2 0 0 1 2 2v.5a1.5 1.5 0 0 0 1.5 1.5a1.5 1.5 0 0 1 1.5 1.5v3.25" />
+      <path d="M15 20.5v-3.5a2 2 0 0 1 2 -2h3.5" />
+      <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+    </svg>
+  );
+}
+
+const OPTIONS: { value: VendorOriginType; title: string; Icon: React.ElementType }[] = [
+  { value: 'domestic', title: 'Domestic Vendor', Icon: IndianFlagIcon },
+  { value: 'international', title: 'International Vendor', Icon: WorldMapIcon },
 ];
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
