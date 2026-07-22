@@ -14,6 +14,8 @@ import { mergeOcrExtracted } from '@/lib/kycExtract';
 import { formatPanStatus, formatAadhaarLinked } from '@/lib/panComprehensive';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { ManualEntryFallbackDialog } from './ManualEntryFallbackDialog';
+
 
 export type PanCheckStatus = 'idle' | 'passed' | 'failed';
 export interface PanTabResult {
@@ -117,7 +119,9 @@ const EMPTY_RESULT: PanTabResult = { ocrPan: '', ocrName: '', panCheck: 'idle', 
 export function PanKycTab(props: PanKycTabProps) {
   const { callProvider } = useConfiguredKycApi();
   const [localResult, setLocalResult] = useState<PanTabResult>(EMPTY_RESULT);
+  const [manualFallbackOpen, setManualFallbackOpen] = useState(false);
   const result = props.ocrResult ?? localResult;
+
   const { ocrPan, ocrName, panCheck, nameCheck, nameCheckMessage, nameMatchResult, panStatus, aadhaarLinked } = result;
   const updateResult = (next: Partial<PanTabResult>) => {
     const merged = { ...result, ...next };
@@ -316,7 +320,80 @@ export function PanKycTab(props: PanKycTabProps) {
         apiLabel="PAN OCR"
         onVerified={() => { /* state pushed via props */ }}
         vendorId={props.vendorId}
+        onOcrFailed={() => { if (props.gstVerified) setManualFallbackOpen(true); }}
       />
+
+      <ManualEntryFallbackDialog
+        open={manualFallbackOpen}
+        onOpenChange={setManualFallbackOpen}
+        title="Enter PAN manually"
+        description="We couldn't read the PAN card. Type the 10-character PAN and we'll run PAN Comprehensive Validation."
+        label="PAN *"
+        placeholder="AAAAA9999A"
+        maxLength={10}
+        pattern={/^[A-Z]{5}[0-9]{4}[A-Z]$/}
+        initialValue={props.pan}
+        onVerify={async (pan) => {
+          props.onPanChange(pan);
+          const cr = await callProvider({ providerName: 'PAN', input: { id_number: pan, pan } });
+          if (!cr?.found) return { ok: false, message: 'PAN Comprehensive Validation provider not configured.' };
+          if (!cr.ok || !cr.data) return { ok: false, message: cr.message || cr.message_code || 'PAN verification failed' };
+
+          const rawStatus = parsePanStatus(cr);
+          const aadhaarLinkedVal = parseAadhaarLinked(cr);
+          const extractedName = pickStr(cr.data.full_name || cr.data.name || cr.data.holder_name).trim();
+
+          const panOk = props.gstPanNumber ? panMatch(pan, props.gstPanNumber) : true;
+          const nameEval = evaluateCrossNameMatch(extractedName, [
+            { field: 'GST Legal Name', value: props.gstLegalName },
+            { field: 'GST Trade Name', value: props.gstTradeName },
+            { field: 'MSME Enterprise Name', value: props.msmeEnterpriseName },
+            { field: 'Bank Account Holder Name', value: props.bankAccountHolderName },
+          ]);
+          const nameOk = nameEval.skipped ? true : nameEval.passed;
+          const nameMessage = nameEval.skipped
+            ? 'PAN captured (no other verified names yet to cross-check).'
+            : nameEval.passed
+              ? formatCrossMatchSuccess('PAN Holder Name', nameEval.matches)
+              : formatCrossMatchFailure('PAN Holder Name', nameEval.best);
+
+          updateResult({
+            ocrPan: pan,
+            ocrName: extractedName,
+            panCheck: panOk ? 'passed' : 'failed',
+            nameCheck: nameOk ? 'passed' : 'failed',
+            nameCheckMessage: nameMessage,
+            nameMatchResult: nameEval,
+            panStatus: rawStatus,
+            aadhaarLinked: aadhaarLinkedVal,
+          });
+          props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked: aadhaarLinkedVal });
+          props.onVerifiedDetails?.(cr.data);
+
+          if (props.vendorId) {
+            const dbPatch: Record<string, any> = {
+              pan_comprehensive_verified_at: new Date().toISOString(),
+            };
+            if (rawStatus != null) dbPatch.pan_status = rawStatus;
+            if (aadhaarLinkedVal != null) dbPatch.pan_aadhaar_linked = aadhaarLinkedVal;
+            supabase.from('vendors').update(dbPatch).eq('id', props.vendorId)
+              .then(({ error }) => { if (error) console.warn('[PanKycTab] persist failed', error); });
+          }
+
+          if (panOk && nameOk) {
+            props.onStatusChange?.('passed');
+            return { ok: true };
+          }
+          props.onStatusChange?.('failed');
+          return {
+            ok: false,
+            message: panOk
+              ? nameMessage
+              : `PAN does not match the verified GST PAN Number${props.gstPanNumber ? ` (${props.gstPanNumber})` : ''}.`,
+          };
+        }}
+      />
+
 
       {showFieldChecks && (
         <div className="space-y-2">

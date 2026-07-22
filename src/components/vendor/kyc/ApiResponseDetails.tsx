@@ -151,9 +151,8 @@ export function ApiResponseDetails({ result, title }: ApiResponseDetailsProps) {
         <Badge variant={ok ? "default" : "destructive"} className="capitalize">
           {ok ? "success" : "failed"}
         </Badge>
-        {result.provider_name && (
-          <Badge variant="outline">{result.provider_name}</Badge>
-        )}
+        {/* provider_name badge intentionally hidden — raw codes like GST_OCR/PAN_OCR are noise to vendors */}
+
         {statusCode != null && (
           <Badge variant="outline">status {statusCode}</Badge>
         )}

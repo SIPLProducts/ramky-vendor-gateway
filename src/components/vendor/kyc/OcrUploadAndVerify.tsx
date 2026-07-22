@@ -48,7 +48,10 @@ interface OcrUploadAndVerifyProps {
   skipVerifyPhase?: boolean;
   /** Friendly label shown above the API response card (e.g. "GST OCR"). */
   apiLabel?: string;
+  /** Fired when the OCR / verification pipeline fails, so the parent can open a manual-entry fallback. */
+  onOcrFailed?: (reason: string) => void;
 }
+
 
 type Phase = 'idle' | 'preparing' | 'ocr' | 'verifying' | 'passed' | 'failed';
 
@@ -64,6 +67,8 @@ export function OcrUploadAndVerify({
   vendorId,
   skipVerifyPhase,
   apiLabel,
+  onOcrFailed,
+
 }: OcrUploadAndVerifyProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<string>('');
@@ -102,8 +107,10 @@ export function OcrUploadAndVerify({
     setOcrResult(ocr.apiResult);
 
     if (!ocr.success || !ocr.extracted) {
+      const msg = ocr.error || 'Could not read the document. Please upload a clearer scan.';
       setPhase('failed');
-      setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
+      setMessage(msg);
+      onOcrFailed?.(msg);
       return;
     }
 
@@ -119,10 +126,13 @@ export function OcrUploadAndVerify({
       setMessage(verify.message || 'Verified successfully.');
       onVerified({ extracted: ocr.extracted, apiData: verify.apiData });
     } else {
+      const msg = verify.message || 'Verification failed.';
       setPhase('failed');
-      setMessage(verify.message || 'Verification failed.');
+      setMessage(msg);
+      onOcrFailed?.(msg);
     }
   };
+
 
   const handleFileSelect = async (file: File | null) => {
     onFileChange(file);
