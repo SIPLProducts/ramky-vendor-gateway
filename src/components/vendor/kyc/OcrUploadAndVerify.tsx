@@ -107,8 +107,10 @@ export function OcrUploadAndVerify({
     setOcrResult(ocr.apiResult);
 
     if (!ocr.success || !ocr.extracted) {
+      const msg = ocr.error || 'Could not read the document. Please upload a clearer scan.';
       setPhase('failed');
-      setMessage(ocr.error || 'Could not read the document. Please upload a clearer scan.');
+      setMessage(msg);
+      onOcrFailed?.(msg);
       return;
     }
 
@@ -124,10 +126,13 @@ export function OcrUploadAndVerify({
       setMessage(verify.message || 'Verified successfully.');
       onVerified({ extracted: ocr.extracted, apiData: verify.apiData });
     } else {
+      const msg = verify.message || 'Verification failed.';
       setPhase('failed');
-      setMessage(verify.message || 'Verification failed.');
+      setMessage(msg);
+      onOcrFailed?.(msg);
     }
   };
+
 
   const handleFileSelect = async (file: File | null) => {
     onFileChange(file);
