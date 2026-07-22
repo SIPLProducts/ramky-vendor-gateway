@@ -33,7 +33,7 @@ const OPTIONS: {
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
     <div className="rounded-xl p-0">
-      <div role="radiogroup" aria-label="Vendor Type" className="flex flex-col gap-3">{/* transparent — parent card owns the background */}
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
           return (
@@ -45,7 +45,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 text-left',
+                'group relative w-full rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 p-3 sm:p-4 text-left',
                 'shadow-md transition-all duration-200 ease-out',
                 'hover:-translate-y-0.5 hover:shadow-xl hover:bg-white/60',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
@@ -60,15 +60,15 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 </span>
               )}
 
-              <h4 className="text-center text-[18px] font-semibold text-slate-900 leading-tight">
+              <h4 className="text-center text-base sm:text-[17px] font-semibold text-slate-900 leading-tight">
                 {opt.title}
               </h4>
 
-              <div className="mt-3 flex justify-center">
+              <div className="mt-2 flex justify-center">
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="h-32 w-auto object-contain select-none pointer-events-none"
+                  className="h-20 sm:h-24 md:h-28 w-auto object-contain select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
