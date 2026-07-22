@@ -103,7 +103,15 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const isCustom = selectedRole.startsWith('custom:');
   const customRoleId = isCustom ? selectedRole.slice('custom:'.length) : null;
   const builtInRole: AppRole = isCustom ? 'approver' : (selectedRole as AppRole);
-  const tenantOptional = selectedRole === 'sharvi_admin' || selectedRole === 'admin';
+  const selectedCustomName = isCustom
+    ? (customRoles.find((c) => c.id === customRoleId)?.name ?? '').trim().toLowerCase()
+    : '';
+  const tenantOptional =
+    selectedRole === 'sharvi_admin' ||
+    selectedRole === 'admin' ||
+    selectedCustomName === 'admin' ||
+    selectedCustomName === 'sharvi admin' ||
+    selectedCustomName === 'sharvi_admin';
 
   useEffect(() => {
     if (tenantOptional) {
