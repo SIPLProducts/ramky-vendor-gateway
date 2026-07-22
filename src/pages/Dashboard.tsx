@@ -303,16 +303,17 @@ export default function Dashboard() {
             <Label className="text-xs font-medium text-muted-foreground">From</Label>
             <Popover open={fromOpen} onOpenChange={setFromOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'h-9 w-[160px] justify-start text-left font-normal',
-                    !dateFrom && 'text-muted-foreground'
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateFrom ? displayDate(dateFrom) : <span>Pick a date</span>}
-                </Button>
+                <div className="relative w-[170px] cursor-pointer">
+                  <Input
+                    readOnly
+                    value={dateFrom ? displayDate(dateFrom) : ''}
+                    placeholder="Select date"
+                    onKeyDown={(e) => e.preventDefault()}
+                    onPaste={(e) => e.preventDefault()}
+                    className="h-9 pr-9 cursor-pointer caret-transparent"
+                  />
+                  <CalendarIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
@@ -330,16 +331,17 @@ export default function Dashboard() {
             <Label className="text-xs font-medium text-muted-foreground">To</Label>
             <Popover open={toOpen} onOpenChange={setToOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'h-9 w-[160px] justify-start text-left font-normal',
-                    !dateTo && 'text-muted-foreground'
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateTo ? displayDate(dateTo) : <span>Pick a date</span>}
-                </Button>
+                <div className="relative w-[170px] cursor-pointer">
+                  <Input
+                    readOnly
+                    value={dateTo ? displayDate(dateTo) : ''}
+                    placeholder="Select date"
+                    onKeyDown={(e) => e.preventDefault()}
+                    onPaste={(e) => e.preventDefault()}
+                    className="h-9 pr-9 cursor-pointer caret-transparent"
+                  />
+                  <CalendarIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
