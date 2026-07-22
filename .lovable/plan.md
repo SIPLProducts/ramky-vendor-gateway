@@ -1,17 +1,15 @@
+# Select Vendor Type Card Polish
+
 ## Goal
+Update the visual styling of the main "Select Vendor Type" card on the vendor registration landing screen so it has a light blue border and a semi-transparent background, while keeping the existing background image and functionality intact.
 
-Keep the main-screen background image, but give the **Select Vendor Type** card a **light blue** background and make the **Domestic** / **International** option cards **semi-transparent**.
+## What will change
+- File: `src/pages/VendorRegistration.tsx` — the card that contains the "Select Vendor Type" heading and the `VendorTypeSelector`.
+- Adjust the border color to a visible light blue (e.g., `border-blue-200`).
+- Adjust the background to be semi-transparent (e.g., `bg-blue-50/70`) so the main-screen background image still shows through.
+- Keep the Domestic/International option cards semi-transparent as already configured in `VendorTypeSelector.tsx`.
+- No functional or business logic changes.
 
-## Changes
-
-### 1. `src/pages/VendorRegistration.tsx`
-- Keep the fixed `Background_MainScreen_Image.png` on the outer page container (unchanged).
-- Update the Select Vendor Type card wrapper (currently `bg-transparent`) to use a light blue background (e.g. `bg-blue-50/90` with subtle border + soft shadow) so it stands out on the image.
-- Switch the heading/description text back to dark tones (readable on light blue).
-
-### 2. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
-- Make the Domestic and International option cards semi-transparent (e.g. `bg-white/40` with `backdrop-blur-sm`, keeping the green left accent bar, icon tile, and typography).
-- Preserve hover elevation and selected state styling.
-
-## Out of scope
-- No changes to business logic, form flow, or the background image asset.
+## Notes
+- Layout, responsiveness, hover states, and the option-card images remain untouched.
+- The header and "Continue" button remain unchanged.
