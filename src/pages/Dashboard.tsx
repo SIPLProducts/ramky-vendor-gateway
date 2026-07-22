@@ -113,8 +113,6 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
-  const [fromOpen, setFromOpen] = useState(false);
-  const [toOpen, setToOpen] = useState(false);
   const [trackRef, setTrackRef] = useState('');
   const [isTracking, setIsTracking] = useState(false);
   const navigate = useNavigate();
@@ -155,12 +153,10 @@ export default function Dashboard() {
     const start = startOfDay(d);
     setDateFrom(start);
     if (dateTo && start > dateTo) setDateTo(endOfDay(d));
-    setFromOpen(false);
   };
   const handleToSelect = (d: Date | undefined) => {
     if (!d) return;
     setDateTo(endOfDay(d));
-    setToOpen(false);
   };
 
 
@@ -302,10 +298,9 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-muted-foreground">From</Label>
-            <Popover open={fromOpen} onOpenChange={setFromOpen}>
+            <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  type="button"
                   variant="outline"
                   className={cn('h-9 w-[160px] justify-start text-left font-normal', !dateFrom && 'text-muted-foreground')}
                 >
@@ -319,6 +314,7 @@ export default function Dashboard() {
                   selected={dateFrom ?? undefined}
                   onSelect={handleFromSelect}
                   disabled={(d) => d > new Date() || (dateTo ? d > dateTo : false)}
+                  initialFocus
                   className={cn('p-3 pointer-events-auto')}
                 />
               </PopoverContent>
@@ -326,10 +322,9 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-muted-foreground">To</Label>
-            <Popover open={toOpen} onOpenChange={setToOpen}>
+            <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  type="button"
                   variant="outline"
                   className={cn('h-9 w-[160px] justify-start text-left font-normal', !dateTo && 'text-muted-foreground')}
                 >
@@ -343,6 +338,7 @@ export default function Dashboard() {
                   selected={dateTo ?? undefined}
                   onSelect={handleToSelect}
                   disabled={(d) => d > new Date() || (dateFrom ? d < startOfDay(dateFrom) : false)}
+                  initialFocus
                   className={cn('p-3 pointer-events-auto')}
                 />
               </PopoverContent>
