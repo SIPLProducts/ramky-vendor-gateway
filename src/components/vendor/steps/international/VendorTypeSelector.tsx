@@ -1,6 +1,8 @@
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VendorOriginType } from '@/types/vendor';
+import domesticIllustration from '@/assets/vendor-domestic-3d.png';
+import internationalIllustration from '@/assets/vendor-international-3d.png';
 
 interface Props {
   value: VendorOriginType;
@@ -11,23 +13,26 @@ interface Props {
 const OPTIONS: {
   value: VendorOriginType;
   title: string;
-  desc: string;
+  image: string;
+  alt: string;
 }[] = [
   {
     value: 'domestic',
     title: 'Domestic Vendor',
-    desc: 'Indian vendors — full KYC, GST, PAN, MSME and Bank flow',
+    image: domesticIllustration,
+    alt: 'Domestic vendor illustration',
   },
   {
     value: 'international',
     title: 'International Vendor',
-    desc: 'Overseas vendors — SWIFT/IBAN, country & region based flow',
+    image: internationalIllustration,
+    alt: 'International vendor illustration',
   },
 ];
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div className="rounded-2xl p-6 bg-blue-50/60 border border-blue-100/80 shadow-sm">
+    <div className="rounded-2xl p-6 bg-[#eaf2fb] border border-[#d6e4f5] shadow-sm">
       <div role="radiogroup" aria-label="Vendor Type" className="flex flex-col gap-4">
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
@@ -58,9 +63,14 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 {opt.title}
               </h4>
 
-              <p className="text-center text-[13px] font-medium text-slate-600 leading-snug mt-2">
-                {opt.desc}
-              </p>
+              <div className="mt-3 flex justify-center">
+                <img
+                  src={opt.image}
+                  alt={opt.alt}
+                  className="h-32 w-auto object-contain select-none pointer-events-none"
+                  draggable={false}
+                />
+              </div>
             </button>
           );
         })}
