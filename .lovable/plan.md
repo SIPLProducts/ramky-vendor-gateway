@@ -1,48 +1,18 @@
-## Problem
+## Problems
 
-On `User Management → Users` tab, the "All Roles" dropdown is incorrect:
+1. **Create User → Tenant validation still fires for Admin.** Screenshot shows Role = "Admin" with the "Tenant required" toast. `CreateUserDialog` only marks `tenantOptional` when `selectedRole === 'sharvi_admin' || selectedRole === 'admin'`, but the dialog's built-in `ROLES` list is only `['vendor', 'sharvi_admin']`. "Admin" is being selected as a **custom role** (`custom:<id>`), so `tenantOptional` stays false and the tenant selector is enforced.
+2. **Admin / Sharvi Admin users don't appear when filtering by those options.** The Users table has no built-in-role column, and when a user has role `admin` / `sharvi_admin` with no custom role, nothing in the row shows their role. Additionally, `admin-create-user` may assign `approver` as built-in when a custom role is used, so a user shown as "Admin" (custom role) has `u.role === 'approver'` — filtering by the Admin/Sharvi Admin dropdown option (built-in keys) won't match them.
 
-1. Shows raw built-in role keys with underscores (`customer_admin`, `sharvi_admin`) and inconsistent casing.
-2. Lists `vendor`, even though pure vendor users are hidden from this tab (dead option).
-3. Missing the actual working roles used in the system: **Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office, SAP Team** — these are custom roles and never appear in the filter.
-4. Filter logic only compares `u.role` (built-in), so custom-role filtering wouldn't work even if listed.
+## Fix (scope: two files)
 
-## Target dropdown list
+### A. `src/components/admin/CreateUserDialog.tsx`
+- Add `admin` to the built-in `ROLES` list so it can be picked as a real built-in role: `['vendor', 'admin', 'sharvi_admin']`.
+- Extend `tenantOptional` to also cover custom roles whose name is "Admin" or "Sharvi Admin" (case-insensitive). Match by looking up the selected `custom:<id>` in the `customRoles` prop.
+- When `tenantOptional` is true, skip the SAP tenant fetch UI enforcement (already handled) and don't require `selectedCodes.length > 0` on submit (already handled — this just extends the trigger).
 
-Per your list, the dropdown should contain exactly:
+### B. `src/pages/UserManagement.tsx`
+- Add a **Role** column to the Users table (between Custom Roles and Tenants) showing a Title Case label for the built-in role (`Admin`, `Sharvi Admin`, `Approver`, etc.) or `—` when null. Bump `colSpan` from 8 to 9 on the loading / empty rows.
+- Update the role filter to also match users whose **custom role name** equals the built-in label when a built-in option is selected. Concretely: if `roleFilter === 'admin'` keep users where `u.role === 'admin'` OR any `u.customRoles[].name` equals "Admin" (case-insensitive); same for `sharvi_admin` ↔ "Sharvi Admin". This covers users created via a custom "Admin" role that internally maps to `approver`.
+- Dropdown list stays as approved earlier (Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office, SAP Team, Admin, Sharvi Admin).
 
-- All Roles (default)
-- Buyer
-- SCM CO
-- SCM Head
-- Finance 1
-- Finance 2
-- CEO Office
-- SAP Team
-- Admin
-- Sharvi Admin
-
-The first 7 (Buyer → SAP Team) are **custom roles** stored in `custom_roles` table. Admin and Sharvi Admin are **built-in** roles.
-
-## Fix (scope: `src/pages/UserManagement.tsx` only)
-
-1. **Rebuild dropdown options** dynamically:
-   - `All Roles` first.
-   - Custom roles from `customRoles` state, filtered to the known set (Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office, SAP Team), ordered in that exact sequence. Option value = `custom:<id>`.
-   - Built-in `Admin` (value `admin`) and `Sharvi Admin` (value `sharvi_admin`) appended at the end with clean Title Case labels.
-   - Drop `vendor`, `finance`, `purchase`, `approver`, `customer_admin` from the filter (they're placeholder/legacy built-ins not used as user-facing roles anymore).
-
-2. **Extend filter logic** in the `filtered` memo:
-   - `all` → no role filter.
-   - Value starts with `custom:` → keep users whose `customRoles[]` contains that id.
-   - Otherwise → keep users whose built-in `u.role` equals the value.
-
-3. **Trigger label**: render the selected option's clean label ("SCM CO", "Sharvi Admin"), not the raw key.
-
-No changes to backend, schema, other screens, search box, or tenant scope.
-
-## Technical notes
-
-- `customRoles` is already loaded in `loadData()` — matched by exact `name` (case-insensitive) against the target list.
-- If a target custom role doesn't exist in DB yet, it's simply skipped (dropdown stays clean).
-- `nonVendorUsers` already hides pure vendors, so removing `vendor` from the filter aligns the two.
+No backend or edge-function changes. No changes to other screens.

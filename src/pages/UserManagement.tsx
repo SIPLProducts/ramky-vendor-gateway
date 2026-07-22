@@ -384,6 +384,15 @@ export default function UserManagement() {
         if (roleFilter.startsWith('custom:')) {
           const cid = roleFilter.slice('custom:'.length);
           if (!u.customRoles.some((c) => c.id === cid)) return false;
+        } else if (roleFilter === 'admin' || roleFilter === 'sharvi_admin') {
+          const label = roleFilter === 'admin' ? 'admin' : 'sharvi admin';
+          const altLabel = roleFilter === 'admin' ? '' : 'sharvi_admin';
+          const matchesBuiltIn = u.role === roleFilter;
+          const matchesCustom = u.customRoles.some((c) => {
+            const n = c.name.trim().toLowerCase();
+            return n === label || (altLabel && n === altLabel);
+          });
+          if (!matchesBuiltIn && !matchesCustom) return false;
         } else if (u.role !== roleFilter) {
           return false;
         }
@@ -392,6 +401,7 @@ export default function UserManagement() {
       return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
     });
   }, [nonVendorUsers, search, roleFilter]);
+
 
 
   const stats = useMemo(() => {
@@ -600,6 +610,7 @@ export default function UserManagement() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Tenants</TableHead>
                       <TableHead>Status</TableHead>
@@ -611,17 +622,28 @@ export default function UserManagement() {
                   <TableBody>
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                       ))
                     ) : filtered.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         No users found
                       </TableCell></TableRow>
+
                     ) : (
                       filtered.map((u) => (
                         <TableRow key={u.id}>
                           <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
                           <TableCell>{u.email}</TableCell>
+                          <TableCell>
+                            {u.role ? (
+                              <span className="text-xs capitalize">
+                                {u.role === 'sharvi_admin' ? 'Sharvi Admin' : u.role === 'customer_admin' ? 'Customer Admin' : u.role.replace('_', ' ')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </TableCell>
+
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {u.customRoles.length === 0
