@@ -1587,7 +1587,7 @@ export default function VendorRegistration() {
       <div
         className="h-screen flex flex-col overflow-hidden"
         style={{
-          backgroundImage: `url(${vendorTypeBgAsset.url})`,
+          backgroundImage: `url(${vendorTypeBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
