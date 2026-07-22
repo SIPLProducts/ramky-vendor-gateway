@@ -380,11 +380,19 @@ export default function UserManagement() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return nonVendorUsers.filter((u) => {
-      if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+      if (roleFilter !== 'all') {
+        if (roleFilter.startsWith('custom:')) {
+          const cid = roleFilter.slice('custom:'.length);
+          if (!u.customRoles.some((c) => c.id === cid)) return false;
+        } else if (u.role !== roleFilter) {
+          return false;
+        }
+      }
       if (!q) return true;
       return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
     });
   }, [nonVendorUsers, search, roleFilter]);
+
 
   const stats = useMemo(() => {
     const counts: Record<string, number> = {};
