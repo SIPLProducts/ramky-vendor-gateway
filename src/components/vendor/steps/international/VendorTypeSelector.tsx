@@ -32,8 +32,8 @@ const OPTIONS: {
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div className="rounded-2xl p-6 bg-[#eaf2fb] border border-[#d6e4f5] shadow-sm">
-      <div role="radiogroup" aria-label="Vendor Type" className="flex flex-col gap-4">
+    <div className="rounded-xl p-0">
+      <div role="radiogroup" aria-label="Vendor Type" className="flex flex-col gap-3">{/* transparent — parent card owns the background */}
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
           return (
