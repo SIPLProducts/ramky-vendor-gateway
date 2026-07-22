@@ -221,12 +221,29 @@ export default function Dashboard() {
     return { total: vendors.length, pending, approved, rejected };
   }, [vendors]);
 
-  const filteredVendors = useMemo(() => {
+  const statusFilteredVendors = useMemo(() => {
     if (statusFilter === 'all') return vendors;
     if (statusFilter === 'approved') return vendors.filter((v) => APPROVED_STATUSES.has(v.status));
     if (statusFilter === 'rejected') return vendors.filter((v) => REJECTED_STATUSES.has(v.status));
     return vendors.filter((v) => PENDING_STATUSES.has(v.status));
   }, [vendors, statusFilter]);
+
+  const filteredVendors = useMemo(() => {
+    const q = tableSearch.toLowerCase().trim();
+    if (!q) return statusFilteredVendors;
+    return statusFilteredVendors.filter((v) => {
+      const hay = [
+        v.reference_number ?? '',
+        v.invited_by?.name ?? '',
+        pickVendorDisplayName(v) || '',
+        v.display_email ?? '',
+        STATUS_LABELS[v.status]?.label ?? v.status,
+        formatDateTime(v.created_at),
+      ].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }, [statusFilteredVendors, tableSearch]);
+
 
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
