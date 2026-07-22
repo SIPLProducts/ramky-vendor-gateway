@@ -63,6 +63,8 @@ export function GstKycTab(props: GstKycTabProps) {
   const [verifiedGstData, setVerifiedGstData] = useState<Record<string, any> | null>(null);
   const [filingChecking, setFilingChecking] = useState(false);
   const [filingChecked, setFilingChecked] = useState(false);
+  const [manualFallbackOpen, setManualFallbackOpen] = useState(false);
+
 
   const persistGstValidation = async (data: Record<string, any>, message: string) => {
     if (!props.vendorId) return;
