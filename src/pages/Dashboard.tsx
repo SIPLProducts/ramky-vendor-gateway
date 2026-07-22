@@ -111,37 +111,10 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFrom, setDateFrom] = useState<Date | null>(() => startOfDay(subDays(new Date(), 30)));
   const [dateTo, setDateTo] = useState<Date | null>(() => endOfDay(new Date()));
-  const [trackRef, setTrackRef] = useState('');
-  const [isTracking, setIsTracking] = useState(false);
+  const [tableSearch, setTableSearch] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleTrackByReference = async () => {
-    const ref = trackRef.trim();
-    if (!ref) {
-      toast({ title: 'Reference Number required', description: 'Please enter a Reference Number.', variant: 'destructive' });
-      return;
-    }
-    setIsTracking(true);
-    try {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('reference_number', ref)
-        .maybeSingle();
-      if (error) throw error;
-      const vendorId = data?.id ?? null;
-      if (!vendorId) {
-        toast({ title: 'Not found', description: 'No vendor found with this Reference Number, or you do not have access.', variant: 'destructive' });
-        return;
-      }
-      navigate(`/vendor-status/${vendorId}`);
-    } catch (e: any) {
-      toast({ title: 'Search failed', description: e?.message ?? 'Unable to search at this time.', variant: 'destructive' });
-    } finally {
-      setIsTracking(false);
-    }
-  };
 
   const fromIso = dateFrom ? startOfDay(dateFrom).toISOString() : null;
   const toIso = dateTo ? endOfDay(dateTo).toISOString() : null;
