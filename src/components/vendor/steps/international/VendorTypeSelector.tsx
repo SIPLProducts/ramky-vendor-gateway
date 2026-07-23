@@ -37,7 +37,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
           return (
-          return (
+
             <button
               key={opt.value}
               type="button"
