@@ -45,35 +45,35 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 p-2 sm:p-3 md:p-4 text-left',
+                'group relative w-full overflow-hidden rounded-xl bg-white text-left',
                 'shadow-md transition-all duration-200 ease-out',
-                'hover:-translate-y-0.5 hover:shadow-xl hover:bg-white/60',
+                'hover:-translate-y-0.5 hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                'flex-1 min-h-0 flex flex-col items-center justify-center',
-                selected && 'ring-2 ring-brand-green bg-white/75',
+                'flex-1 min-h-0 flex flex-col',
+                selected && 'ring-2 ring-brand-green',
                 disabled && 'opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-md',
               )}
-
             >
               {selected && (
-                <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2.5 py-1 shadow">
+                <span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2.5 py-1 shadow">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
 
-              <h4 className="text-center text-sm sm:text-base md:text-[17px] font-semibold text-slate-900 leading-tight">
-                {opt.title}
-              </h4>
-
-              <div className="mt-2 flex-1 min-h-0 w-full flex items-center justify-center">
+              <div className="flex-1 min-h-0 w-full overflow-hidden">
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="max-h-[16vh] sm:max-h-[18vh] md:max-h-[20vh] h-full w-auto object-contain select-none pointer-events-none"
+                  className="w-full h-full object-cover select-none pointer-events-none transition-transform duration-300 group-hover:scale-[1.03]"
                   draggable={false}
                 />
               </div>
+
+              <h4 className="w-full text-center py-2 sm:py-3 text-sm sm:text-base md:text-[17px] font-semibold text-slate-900 leading-tight bg-white">
+                {opt.title}
+              </h4>
             </button>
+
           );
         })}
       </div>
