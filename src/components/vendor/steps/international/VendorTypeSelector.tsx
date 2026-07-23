@@ -65,7 +65,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="absolute inset-0 w-full h-full object-contain object-center select-none pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-fill select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
