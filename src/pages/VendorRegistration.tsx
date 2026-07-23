@@ -1585,7 +1585,7 @@ export default function VendorRegistration() {
     };
     return (
       <div
-        className="min-h-screen flex flex-col"
+        className="h-screen overflow-hidden flex flex-col"
         style={{
           backgroundImage: `url(${vendorTypeBg})`,
           backgroundSize: 'cover',
@@ -1607,19 +1607,19 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <main className="flex-1 flex items-center justify-center p-2 sm:p-4 h-[calc(100vh-4rem)] overflow-hidden">
-          <div className="relative w-[90%] sm:w-[65%] md:w-[50%] lg:w-[40%] max-w-md rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col max-h-full">
-            <div className="relative p-3 space-y-2 flex flex-col overflow-y-auto">
+        <main className="h-[calc(100vh-4rem)] min-h-0 flex items-center justify-center p-1.5 sm:p-2 overflow-hidden">
+          <div className="relative w-[88%] sm:w-[60%] md:w-[48%] lg:w-[38%] max-w-sm rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col max-h-full">
+            <div className="relative p-2 sm:p-2.5 space-y-1.5 flex flex-col overflow-hidden">
 
               {isTokenMode && invitationEmail && (
-                <div className="p-2 bg-white/70 border border-blue-100 rounded-lg shrink-0">
+                <div className="p-1.5 bg-white/70 border border-blue-100 rounded-lg shrink-0">
                   <p className="text-sm text-slate-700">
                     <span className="font-medium text-slate-900">Invited Email:</span> {invitationEmail}
                   </p>
                 </div>
               )}
-              <div className="space-y-1 shrink-0">
-                <h1 className="text-base sm:text-lg md:text-xl font-semibold text-white">Select Vendor Type</h1>
+              <div className="shrink-0">
+                <h1 className="text-sm sm:text-base md:text-lg font-semibold text-white leading-tight">Select Vendor Type</h1>
               </div>
 
               <VendorTypeSelector
@@ -1627,8 +1627,8 @@ export default function VendorRegistration() {
                 onChange={setPendingChoiceType}
                 disabled={isSubmitting}
               />
-              <div className="flex justify-end pt-1 shrink-0">
-                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[140px]">
+              <div className="flex justify-end pt-0.5 shrink-0">
+                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[128px] h-9">
                   Continue
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
