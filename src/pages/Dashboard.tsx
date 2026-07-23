@@ -209,17 +209,19 @@ export default function Dashboard() {
 
 
   const counts = useMemo(() => {
-    let pending = 0, approved = 0, rejected = 0;
+    let draft = 0, pending = 0, approved = 0, rejected = 0;
     for (const v of vendors) {
-      if (APPROVED_STATUSES.has(v.status)) approved++;
+      if (DRAFT_STATUSES.has(v.status)) draft++;
+      else if (APPROVED_STATUSES.has(v.status)) approved++;
       else if (REJECTED_STATUSES.has(v.status)) rejected++;
       else if (PENDING_STATUSES.has(v.status)) pending++;
     }
-    return { total: vendors.length, pending, approved, rejected };
+    return { total: vendors.length, draft, pending, approved, rejected };
   }, [vendors]);
 
   const statusFilteredVendors = useMemo(() => {
     if (statusFilter === 'all') return vendors;
+    if (statusFilter === 'draft') return vendors.filter((v) => DRAFT_STATUSES.has(v.status));
     if (statusFilter === 'approved') return vendors.filter((v) => APPROVED_STATUSES.has(v.status));
     if (statusFilter === 'rejected') return vendors.filter((v) => REJECTED_STATUSES.has(v.status));
     return vendors.filter((v) => PENDING_STATUSES.has(v.status));
