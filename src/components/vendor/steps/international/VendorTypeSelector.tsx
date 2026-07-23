@@ -61,18 +61,22 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 </span>
               )}
 
-              <div className="relative w-full aspect-[100/57] overflow-hidden bg-white">
+              <div
+                className="relative w-full overflow-hidden bg-white"
+                style={{ height: 'clamp(90px, 18vh, 220px)' }}
+              >
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="absolute inset-0 w-full h-full object-fill select-none pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
 
-              <h4 className="w-full shrink-0 text-center py-2 sm:py-3 text-sm sm:text-base md:text-[17px] font-semibold text-slate-900 leading-tight bg-white">
+              <h4 className="w-full shrink-0 text-center py-1.5 text-sm sm:text-base font-semibold text-slate-900 leading-tight bg-white">
                 {opt.title}
               </h4>
+
             </button>
 
 
