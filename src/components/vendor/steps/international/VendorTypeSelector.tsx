@@ -46,7 +46,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full max-w-[420px] mx-auto overflow-hidden rounded-xl bg-white text-left',
+                'group relative w-full max-w-[300px] mx-auto overflow-hidden rounded-xl bg-white text-left',
                 'shadow-md transition-shadow duration-200',
                 'hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
@@ -56,12 +56,15 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               )}
             >
               {selected && (
-                <span className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2.5 py-1 shadow">
+                <span className="absolute top-2 right-2 z-20 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2 py-0.5 shadow">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
 
-              <div className="relative w-full aspect-video overflow-hidden bg-white">
+              <div
+                className="relative w-full overflow-hidden bg-white"
+                style={{ height: 'clamp(80px, 14vh, 150px)' }}
+              >
                 <img
                   src={opt.image}
                   alt={opt.alt}
@@ -70,7 +73,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 />
               </div>
 
-              <h4 className="w-full shrink-0 text-center py-1.5 text-sm sm:text-base font-semibold text-slate-900 leading-tight bg-white">
+              <h4 className="w-full shrink-0 text-center py-1 text-xs sm:text-sm font-semibold text-slate-900 leading-tight bg-white">
                 {opt.title}
               </h4>
 
