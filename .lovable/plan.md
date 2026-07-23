@@ -1,23 +1,41 @@
-Goal: optimize only the Vendor Type selection UI so the full Select Vendor Type section fits inside the viewport at 100% zoom, with no page scrollbar and no image cropping.
+## Dashboard Tile Updates (`src/pages/Dashboard.tsx`)
 
-Plan:
-1. Update the Vendor Type gating screen wrapper in `VendorRegistration.tsx`:
-   - Use a fixed viewport-height page container instead of `min-h-screen` for this screen.
-   - Keep the header at 64px and make the main area exactly the remaining height.
-   - Reduce outer padding and inner panel padding/gaps so content fits in shorter laptop viewports.
-   - Remove the inner `overflow-y-auto` fallback that creates the visible scrollbar on this screen.
+1. **Include drafts in the query**
+   - Remove `.neq('status', 'draft')` so draft vendors are fetched.
 
-2. Update `VendorTypeSelector.tsx` sizing:
-   - Slightly reduce each card’s max width.
-   - Replace the current large `clamp(180px, 32vh, 400px)` image height with a responsive height based on available viewport, so two vertical cards plus title/button fit naturally.
-   - Keep `object-contain` so the Indian flag and world map remain fully visible without cropping or overflow.
-   - Reduce card title padding and grid gaps.
+2. **Add a 5th tile: Draft**
+   - Extend `StatusFilter` type to `'all' | 'draft' | 'pending' | 'approved' | 'rejected'`.
+   - Add `DRAFT_STATUSES = new Set(['draft'])`; count separately (currently draft falls under Pending — will remove from `PENDING_STATUSES`).
+   - Update `counts` and `statusFilteredVendors` to handle Draft.
+   - Change grid to `lg:grid-cols-5`.
 
-3. Preserve existing functionality:
-   - Do not change vendor type selection state, Continue behavior, disabled states, routing, or backend logic.
-   - Only adjust layout classes/styles for this selection screen.
+3. **Colored tile backgrounds + selected highlight**
 
-4. Verify after implementation:
-   - Check the current viewport size similar to the user’s preview.
-   - Confirm no vertical scrollbar appears on the Vendor Type selection screen.
-   - Confirm both images are fully visible and cards remain vertically stacked and responsive.
+   Each card gets a light tinted background, colored icon chip, and a stronger ring + border when selected:
+
+   | Tile | Background | Icon color | Selected ring |
+   |------|------------|-----------|---------------|
+   | Total | `bg-blue-50` | `text-blue-600` on `bg-blue-100` | `ring-2 ring-blue-500` |
+   | Pending | `bg-orange-50` | `text-orange-600` on `bg-orange-100` | `ring-2 ring-orange-500` |
+   | Approved | `bg-green-50` | `text-green-600` on `bg-green-100` | `ring-2 ring-green-500` |
+   | Rejected | `bg-red-50` | `text-red-600` on `bg-red-100` | `ring-2 ring-red-500` |
+   | Draft | `bg-slate-50` | `text-slate-600` on `bg-slate-100` | `ring-2 ring-slate-500` (icon: `FileEdit`) |
+
+   Refactor `cards` array to carry `bgClass`, `iconBgClass`, `iconColorClass`, and `ringClass` so per-card styling is data-driven. Update the Card `className` to apply `bgClass` always and `ringClass` when `active`.
+
+## Seed Local Test Data
+
+Insert ~10 sample vendors covering every tile via the insert tool:
+- 2 × `draft`
+- 3 × pending (mix of `buyer_review`, `finance_1_review`, `pending_sap_sync`)
+- 3 × approved (`sap_synced`, `dms_synced`)
+- 2 × rejected (`sap_team_rejected`, `sap_team_closed`)
+
+Each row will have: `id = gen_random_uuid()`, realistic `legal_name`/`trade_name`, unique `primary_email`, `vendor_type='domestic'`, `created_at = now() - interval '<n> days'`, `tenant_id = NULL` (visible to admin users). No FK to `auth.users` needed since `user_id` will be NULL.
+
+Note: since `assign_vendor_reference_number` only fires on transition into a review status, seeded review-status rows will get reference numbers via the trigger; drafts will have `NULL` reference (correct behavior).
+
+## Out of scope
+- No changes to filtering logic outside Dashboard.
+- No changes to VendorList, Reports, or backend policies.
+- Existing "All Applications" tile continues to show every status.

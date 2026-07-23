@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Clock,
   Download,
+  FileEdit,
   FileText,
   XCircle,
 } from 'lucide-react';
@@ -54,8 +55,9 @@ type VendorRow = {
 };
 
 
+const DRAFT_STATUSES = new Set(['draft']);
+
 const PENDING_STATUSES = new Set([
-  'draft',
   'submitted',
   'validation_pending',
   'buyer_review',
@@ -73,7 +75,7 @@ const PENDING_STATUSES = new Set([
 const APPROVED_STATUSES = new Set(['sap_synced', 'dms_synced']);
 const REJECTED_STATUSES = new Set(['sap_team_rejected', 'sap_team_closed']);
 
-type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected';
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
@@ -141,8 +143,7 @@ export default function Dashboard() {
       let q = supabase
         .from('vendors')
         .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
-        .order('created_at', { ascending: false })
-        .neq('status', 'draft');
+        .order('created_at', { ascending: false });
 
       if (fromIso) q = q.gte('created_at', fromIso);
       if (toIso) q = q.lte('created_at', toIso);
@@ -208,17 +209,19 @@ export default function Dashboard() {
 
 
   const counts = useMemo(() => {
-    let pending = 0, approved = 0, rejected = 0;
+    let draft = 0, pending = 0, approved = 0, rejected = 0;
     for (const v of vendors) {
-      if (APPROVED_STATUSES.has(v.status)) approved++;
+      if (DRAFT_STATUSES.has(v.status)) draft++;
+      else if (APPROVED_STATUSES.has(v.status)) approved++;
       else if (REJECTED_STATUSES.has(v.status)) rejected++;
       else if (PENDING_STATUSES.has(v.status)) pending++;
     }
-    return { total: vendors.length, pending, approved, rejected };
+    return { total: vendors.length, draft, pending, approved, rejected };
   }, [vendors]);
 
   const statusFilteredVendors = useMemo(() => {
     if (statusFilter === 'all') return vendors;
+    if (statusFilter === 'draft') return vendors.filter((v) => DRAFT_STATUSES.has(v.status));
     if (statusFilter === 'approved') return vendors.filter((v) => APPROVED_STATUSES.has(v.status));
     if (statusFilter === 'rejected') return vendors.filter((v) => REJECTED_STATUSES.has(v.status));
     return vendors.filter((v) => PENDING_STATUSES.has(v.status));
@@ -261,11 +264,21 @@ export default function Dashboard() {
     XLSX.writeFile(wb, fname);
   };
 
-  const cards: Array<{ key: StatusFilter; label: string; value: number; icon: typeof FileText; color: string }> = [
-    { key: 'all', label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
-    { key: 'pending', label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
-    { key: 'approved', label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
-    { key: 'rejected', label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
+  const cards: Array<{
+    key: StatusFilter;
+    label: string;
+    value: number;
+    icon: typeof FileText;
+    bgClass: string;
+    iconBgClass: string;
+    iconColorClass: string;
+    ringClass: string;
+  }> = [
+    { key: 'all', label: 'Total Applications', value: counts.total, icon: FileText, bgClass: 'bg-blue-50', iconBgClass: 'bg-blue-100', iconColorClass: 'text-blue-600', ringClass: 'ring-2 ring-blue-500 border-blue-500' },
+    { key: 'draft', label: 'Draft Applications', value: counts.draft, icon: FileEdit, bgClass: 'bg-slate-50', iconBgClass: 'bg-slate-200', iconColorClass: 'text-slate-600', ringClass: 'ring-2 ring-slate-500 border-slate-500' },
+    { key: 'pending', label: 'Pending Applications', value: counts.pending, icon: Clock, bgClass: 'bg-orange-50', iconBgClass: 'bg-orange-100', iconColorClass: 'text-orange-600', ringClass: 'ring-2 ring-orange-500 border-orange-500' },
+    { key: 'approved', label: 'Approved Applications', value: counts.approved, icon: CheckCircle, bgClass: 'bg-green-50', iconBgClass: 'bg-green-100', iconColorClass: 'text-green-600', ringClass: 'ring-2 ring-green-500 border-green-500' },
+    { key: 'rejected', label: 'Rejected Applications', value: counts.rejected, icon: XCircle, bgClass: 'bg-red-50', iconBgClass: 'bg-red-100', iconColorClass: 'text-red-600', ringClass: 'ring-2 ring-red-500 border-red-500' },
   ];
 
   const toggleFilter = (key: StatusFilter) => {
@@ -348,7 +361,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map((c) => {
           const active = statusFilter === c.key;
           return (
@@ -360,7 +373,8 @@ export default function Dashboard() {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
               className={cn(
                 'cursor-pointer p-5 transition hover:shadow-md',
-                active && 'ring-1 ring-primary border-primary'
+                c.bgClass,
+                active && c.ringClass
               )}
             >
               <div className="flex items-start justify-between gap-3">
@@ -377,8 +391,9 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0',
-                  c.color
+                  'flex h-10 w-10 items-center justify-center rounded-lg flex-shrink-0',
+                  c.iconBgClass,
+                  c.iconColorClass
                 )}>
                   <c.icon className="h-5 w-5" />
                 </div>
