@@ -1,20 +1,17 @@
 ## Goal
-Shrink the Domestic and International cards on the Vendor Type selection screen so the flag and map images fit cleanly inside the "Select Vendor Type" panel without cropping, overflow, or page scroll — at every resolution.
+Make the Domestic (Indian flag) and International (world map) images fully and clearly visible by increasing the image container height.
 
 ## Changes
 
-### 1. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
-- Reduce card max width from `max-w-[420px]` to a smaller cap (e.g. `max-w-[300px]`) and center via `mx-auto`.
-- Shrink the image container height using a responsive `clamp()` (e.g. `clamp(80px, 14vh, 150px)`) instead of a pure 16:9 aspect ratio, so both cards + label fit inside the panel on short viewports.
-- Keep `object-cover` so images fill the frame edge-to-edge without white gaps.
-- Tighten internal paddings and label spacing to match the smaller footprint.
+### `src/components/vendor/steps/international/VendorTypeSelector.tsx`
+- Increase the image container height from `clamp(80px, 14vh, 150px)` to a taller cap — up to `400px` — e.g. `clamp(180px, 32vh, 400px)`.
+- Switch the image from `object-cover` to `object-contain` so the entire flag / world map is visible without cropping (cover was cutting edges when the container grew taller than the image aspect).
+- Keep card `max-w-[300px]` and existing layout; only the image frame grows.
 
-### 2. `src/pages/VendorRegistration.tsx`
-- Narrow the "Select Vendor Type" panel wrapper (e.g. `max-w-md`, `lg:w-[40%]`) so the whole section is proportional to the reduced cards.
-- Keep `h-[calc(100vh-4rem)] overflow-hidden` on `<main>` and the existing inner `overflow-y-auto` safety fallback.
+### `src/pages/VendorRegistration.tsx`
+- No structural change needed. The panel already has `overflow-y-auto` as a fallback if the taller cards exceed viewport height on very short screens.
 
 ## Result
-- Cards become compact (~300px wide, ~150px tall max), stacked vertically.
-- Flag and world-map images render fully inside each card at all breakpoints.
-- No page scroll on standard laptop/desktop; graceful fallback scroll only on very short viewports.
-- No changes to selection logic, routing, or any other functionality.
+- Image frame scales up to 400px tall on large screens.
+- Full flag and world map render inside each card with no cropping.
+- Layout stays responsive; scroll appears only on unusually short viewports.

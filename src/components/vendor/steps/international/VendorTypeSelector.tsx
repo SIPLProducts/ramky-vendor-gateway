@@ -63,12 +63,12 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
 
               <div
                 className="relative w-full overflow-hidden bg-white"
-                style={{ height: 'clamp(80px, 14vh, 150px)' }}
+                style={{ height: 'clamp(180px, 32vh, 400px)' }}
               >
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
