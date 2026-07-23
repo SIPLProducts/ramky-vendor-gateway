@@ -518,6 +518,34 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               {extraPanel(actionItem.item)}
             </div>
           )}
+          {isBuyer && actionItem?.action === 'approve' && (
+            <div className="border rounded-md p-3 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Award className="h-4 w-4 text-primary" />
+                Classification
+                <span className="text-destructive">*</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Required before approval. These values will be sent to SAP Sync.
+              </p>
+              <ClassificationField
+                label="Material Group for Vendors"
+                required
+                masterType="material_group_vendor"
+                value={buyerClassification.materialGroupVendor}
+                onChange={(v) => setBuyerClassification((p) => ({ ...p, materialGroupVendor: v }))}
+                selectPlaceholder="Select material groups"
+              />
+              <ClassificationField
+                label="Vendor Category"
+                required
+                masterType="vendor_category"
+                value={buyerClassification.vendorCategory}
+                onChange={(v) => setBuyerClassification((p) => ({ ...p, vendorCategory: v }))}
+                selectPlaceholder="Select vendor categories"
+              />
+            </div>
+          )}
           <Textarea
             placeholder={
               actionItem?.action === 'reject'
@@ -534,7 +562,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <Button variant="outline" onClick={() => setActionItem(null)}>Cancel</Button>
             <Button
               onClick={submit}
-              disabled={submitting || !comments.trim()}
+              disabled={
+                submitting ||
+                !comments.trim() ||
+                (isBuyer && actionItem?.action === 'approve' && (
+                  buyerClassification.materialGroupVendor.length === 0 ||
+                  buyerClassification.vendorCategory.length === 0
+                ))
+              }
               variant="outline"
               className={
                 actionItem?.action === 'reject'
