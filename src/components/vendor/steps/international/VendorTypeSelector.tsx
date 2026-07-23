@@ -33,7 +33,7 @@ const OPTIONS: {
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
     <div className="rounded-xl p-0 w-full shrink-0">
-      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 min-[760px]:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full">
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 w-full">
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
           return (
