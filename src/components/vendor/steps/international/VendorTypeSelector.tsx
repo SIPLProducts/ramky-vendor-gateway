@@ -46,7 +46,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full overflow-hidden rounded-xl bg-white text-left',
+                'group relative w-full max-w-[420px] mx-auto overflow-hidden rounded-xl bg-white text-left',
                 'shadow-md transition-shadow duration-200',
                 'hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
@@ -61,14 +61,11 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 </span>
               )}
 
-              <div
-                className="relative w-full overflow-hidden bg-white"
-                style={{ height: 'clamp(90px, 18vh, 220px)' }}
-              >
+              <div className="relative w-full aspect-video overflow-hidden bg-white">
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
@@ -78,6 +75,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               </h4>
 
             </button>
+
 
 
 
