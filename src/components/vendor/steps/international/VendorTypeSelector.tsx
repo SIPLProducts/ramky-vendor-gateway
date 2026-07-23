@@ -36,7 +36,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
       <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 w-full flex-1 min-h-0">
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
-          const isDomestic = opt.value === 'domestic';
+          return (
           return (
             <button
               key={opt.value}
