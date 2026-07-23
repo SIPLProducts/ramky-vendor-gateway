@@ -1,17 +1,23 @@
-## Goal
-Make the Domestic (Indian flag) and International (world map) images fully and clearly visible by increasing the image container height.
+Goal: optimize only the Vendor Type selection UI so the full Select Vendor Type section fits inside the viewport at 100% zoom, with no page scrollbar and no image cropping.
 
-## Changes
+Plan:
+1. Update the Vendor Type gating screen wrapper in `VendorRegistration.tsx`:
+   - Use a fixed viewport-height page container instead of `min-h-screen` for this screen.
+   - Keep the header at 64px and make the main area exactly the remaining height.
+   - Reduce outer padding and inner panel padding/gaps so content fits in shorter laptop viewports.
+   - Remove the inner `overflow-y-auto` fallback that creates the visible scrollbar on this screen.
 
-### `src/components/vendor/steps/international/VendorTypeSelector.tsx`
-- Increase the image container height from `clamp(80px, 14vh, 150px)` to a taller cap — up to `400px` — e.g. `clamp(180px, 32vh, 400px)`.
-- Switch the image from `object-cover` to `object-contain` so the entire flag / world map is visible without cropping (cover was cutting edges when the container grew taller than the image aspect).
-- Keep card `max-w-[300px]` and existing layout; only the image frame grows.
+2. Update `VendorTypeSelector.tsx` sizing:
+   - Slightly reduce each card’s max width.
+   - Replace the current large `clamp(180px, 32vh, 400px)` image height with a responsive height based on available viewport, so two vertical cards plus title/button fit naturally.
+   - Keep `object-contain` so the Indian flag and world map remain fully visible without cropping or overflow.
+   - Reduce card title padding and grid gaps.
 
-### `src/pages/VendorRegistration.tsx`
-- No structural change needed. The panel already has `overflow-y-auto` as a fallback if the taller cards exceed viewport height on very short screens.
+3. Preserve existing functionality:
+   - Do not change vendor type selection state, Continue behavior, disabled states, routing, or backend logic.
+   - Only adjust layout classes/styles for this selection screen.
 
-## Result
-- Image frame scales up to 400px tall on large screens.
-- Full flag and world map render inside each card with no cropping.
-- Layout stays responsive; scroll appears only on unusually short viewports.
+4. Verify after implementation:
+   - Check the current viewport size similar to the user’s preview.
+   - Confirm no vertical scrollbar appears on the Vendor Type selection screen.
+   - Confirm both images are fully visible and cards remain vertically stacked and responsive.
