@@ -264,11 +264,21 @@ export default function Dashboard() {
     XLSX.writeFile(wb, fname);
   };
 
-  const cards: Array<{ key: StatusFilter; label: string; value: number; icon: typeof FileText; color: string }> = [
-    { key: 'all', label: 'Total Applications', value: counts.total, icon: FileText, color: 'text-primary' },
-    { key: 'pending', label: 'Pending Applications', value: counts.pending, icon: Clock, color: 'text-amber-600' },
-    { key: 'approved', label: 'Approved Applications', value: counts.approved, icon: CheckCircle, color: 'text-emerald-600' },
-    { key: 'rejected', label: 'Rejected Applications', value: counts.rejected, icon: XCircle, color: 'text-destructive' },
+  const cards: Array<{
+    key: StatusFilter;
+    label: string;
+    value: number;
+    icon: typeof FileText;
+    bgClass: string;
+    iconBgClass: string;
+    iconColorClass: string;
+    ringClass: string;
+  }> = [
+    { key: 'all', label: 'Total Applications', value: counts.total, icon: FileText, bgClass: 'bg-blue-50', iconBgClass: 'bg-blue-100', iconColorClass: 'text-blue-600', ringClass: 'ring-2 ring-blue-500 border-blue-500' },
+    { key: 'draft', label: 'Draft Applications', value: counts.draft, icon: FileEdit, bgClass: 'bg-slate-50', iconBgClass: 'bg-slate-200', iconColorClass: 'text-slate-600', ringClass: 'ring-2 ring-slate-500 border-slate-500' },
+    { key: 'pending', label: 'Pending Applications', value: counts.pending, icon: Clock, bgClass: 'bg-orange-50', iconBgClass: 'bg-orange-100', iconColorClass: 'text-orange-600', ringClass: 'ring-2 ring-orange-500 border-orange-500' },
+    { key: 'approved', label: 'Approved Applications', value: counts.approved, icon: CheckCircle, bgClass: 'bg-green-50', iconBgClass: 'bg-green-100', iconColorClass: 'text-green-600', ringClass: 'ring-2 ring-green-500 border-green-500' },
+    { key: 'rejected', label: 'Rejected Applications', value: counts.rejected, icon: XCircle, bgClass: 'bg-red-50', iconBgClass: 'bg-red-100', iconColorClass: 'text-red-600', ringClass: 'ring-2 ring-red-500 border-red-500' },
   ];
 
   const toggleFilter = (key: StatusFilter) => {
