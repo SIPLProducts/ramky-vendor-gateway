@@ -101,6 +101,17 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!actionItem) return;
     setSubmitting(true);
     try {
+      // Buyer approve: persist Classification onto vendor before routing forward
+      if (isBuyer && actionItem.action === 'approve') {
+        const { error: clsErr } = await supabase.from('vendors').update({
+          material_group_vendor: buyerClassification.materialGroupVendor[0] ?? null,
+          material_group_vendors: buyerClassification.materialGroupVendor,
+          vendor_category: buyerClassification.vendorCategory[0] ?? null,
+          vendor_categories: buyerClassification.vendorCategory,
+        }).eq('id', actionItem.item.vendorId);
+        if (clsErr) throw clsErr;
+      }
+
       const { data, error } = await supabase.functions.invoke('process-approval-action', {
         body: {
           progress_id: actionItem.item.progressId,
