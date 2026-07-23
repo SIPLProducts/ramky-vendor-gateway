@@ -1,6 +1,10 @@
-Plan:
-1. Update the Vendor Type selector card image layout so the image is never cropped.
-2. Replace the current `object-cover` behavior with a true fit-to-card behavior and align the image container to the actual asset ratio, so the full Indian flag and world map remain visible.
-3. Make the selector responsive for short screens by allowing the two cards to scale down cleanly inside the available height instead of clipping.
-4. Keep the existing vendor type selection logic, Continue button, selected state, and disabled state unchanged.
-5. Remove any remaining animation-related styling from this selector if still present, since you asked for no animation.
+Change the Vendor Type selector so that the Domestic and International cards always appear in a vertical stack instead of side-by-side on larger screens.
+
+Current state: `VendorTypeSelector.tsx` uses `grid-cols-1 min-[760px]:grid-cols-2`, so the two cards sit next to each other on desktop/tablet widths.
+
+Planned change:
+1. In `src/components/vendor/steps/international/VendorTypeSelector.tsx`, remove the two-column breakpoint (`min-[760px]:grid-cols-2`) so the grid remains single-column at all widths.
+2. Keep the existing card styling, image fit, selected state, and accessibility attributes unchanged.
+3. Verify the selector renders vertically in the preview at the current desktop viewport.
+
+This is a single-file, presentation-only change. No backend, route, or functional logic changes are required.
