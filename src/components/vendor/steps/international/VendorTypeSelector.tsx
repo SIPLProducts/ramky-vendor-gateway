@@ -32,8 +32,8 @@ const OPTIONS: {
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div className="rounded-xl p-0 flex-1 min-h-0 flex">
-      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 w-full flex-1 min-h-0">
+    <div className="rounded-xl p-0 w-full shrink-0">
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 min-[760px]:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full">
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
           return (
@@ -50,7 +50,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 'shadow-md transition-shadow duration-200',
                 'hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                'flex-1 min-h-0 flex flex-col',
+                'flex flex-col',
                 selected && 'ring-2 ring-brand-green shadow-[0_0_0_4px_rgba(34,197,94,0.15)]',
                 disabled && 'opacity-60 cursor-not-allowed hover:shadow-md',
               )}
@@ -61,16 +61,16 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 </span>
               )}
 
-              <div className="relative w-full aspect-[16/9] overflow-hidden">
+              <div className="relative w-full aspect-[100/57] overflow-hidden bg-white">
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="absolute inset-0 w-full h-full object-cover object-center select-none pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-fill select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
 
-              <h4 className="w-full text-center py-2 sm:py-3 text-sm sm:text-base md:text-[17px] font-semibold text-slate-900 leading-tight bg-white">
+              <h4 className="w-full shrink-0 text-center py-2 sm:py-3 text-sm sm:text-base md:text-[17px] font-semibold text-slate-900 leading-tight bg-white">
                 {opt.title}
               </h4>
             </button>
