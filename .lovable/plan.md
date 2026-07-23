@@ -1,35 +1,30 @@
-## Goal
+## Problem
 
-On the "Select Vendor Type" screen, remove page scroll and make the selection card occupy ~50% of the viewport width (instead of the current full-width `max-w-4xl` panel). The two vendor cards (Domestic / International) should scale their image height responsively so both cards + header + Continue button always fit the visible viewport without scrolling, while keeping the flag/map images clearly visible.
+On the Select Vendor Type screen, each card is wider than the image's natural aspect, so with `object-contain` there are large white gaps on the left/right of the flag and map. The user wants the image to fill each card edge-to-edge, with no cropping and no gaps, while the panel stays responsive.
 
-## Changes
+## Fix
 
-### 1. `src/pages/VendorRegistration.tsx` (choice screen container, ~line 1610-1636)
+### 1. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
 
-- Change outer panel from `max-w-4xl` → `max-w-xl` (roughly 50% of a typical desktop viewport). Add `w-[92%] sm:w-[70%] md:w-[55%] lg:w-[45%]` so it responsively lands near 50% on desktop and stays usable on smaller screens.
-- Change `<main>` from `flex items-center justify-center` to also constrain height: `h-[calc(100vh-4rem)] overflow-hidden` so the layout never scrolls (header is `h-16`).
-- Reduce vertical paddings/gaps in the inner panel so content always fits: `p-3 space-y-2` on all breakpoints.
+- Constrain each card to a width that matches the image's aspect ratio, so the image can fill it cleanly:
+  - Wrap each `<button>` card in a centered container: `mx-auto w-full max-w-[420px]`.
+  - Replace the fixed-height (`clamp(...)`) image container with a natural `aspect-video` (16:9) container.
+  - Switch the `<img>` back to `object-cover` — since card width and container aspect now match the source image aspect, cover fills the box without cropping visible content and without side gaps.
+- Keep vertical stacking (single column) and the `py-1.5` compact title.
 
-### 2. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
+### 2. `src/pages/VendorRegistration.tsx` (choice panel, ~line 1610)
 
-- Keep vertical stacking (single column).
-- Replace fixed `aspect-[100/57]` image container with a height that adapts to viewport so both cards fit without scroll. Use CSS `clamp` via inline style, e.g. image container height = `clamp(90px, 18vh, 220px)`. This guarantees:
-  - On short viewports (e.g. 908×532) each image is ~95px tall → both cards + title + button fit.
-  - On tall desktops each image grows up to ~220px for clarity.
-- Switch image fitting from `object-fill` back to `object-contain` with `bg-white` — combined with the responsive height, images stay fully visible and undistorted at every resolution.
-- Reduce title padding to `py-1.5` to save vertical space.
+- Keep the panel responsive but slightly wider so a 420px card + padding fits without horizontal squeeze:
+  - Change panel widths to `w-[92%] sm:w-[75%] md:w-[60%] lg:w-[50%] max-w-lg`.
+  - Keep `h-[calc(100vh-4rem)] overflow-hidden` on `<main>` and compact inner paddings so no page scroll appears.
+- Add `overflow-y-auto` on the inner panel content only as a safety net for very short viewports (so the cards themselves never get clipped, but the outer page still doesn't scroll).
 
 ### 3. Verification
 
-Use Playwright (headless Chromium) to load `/vendor/registration` at three viewports and confirm:
-- 908 × 532 (current preview) — no scrollbar, both cards visible, images clear.
-- 1280 × 800 desktop — panel ~50% width, both cards visible.
-- 390 × 844 mobile — panel ~92% width, no horizontal scroll, images clear.
-
-Capture a screenshot per viewport and inspect.
+Playwright headless run at three viewports — 390×844 (mobile), 908×532 (current preview), 1280×800 (desktop). For each: screenshot, confirm both cards fully visible, image fills each card edge-to-edge with no white side gaps, and no page scrollbar.
 
 ## Out of scope
 
-- No changes to the Domestic/International image assets themselves.
-- No changes to the main registration form after "Continue" is clicked.
-- No animation reintroduced (user previously asked for it removed).
+- No changes to the flag/map assets themselves.
+- No animations reintroduced.
+- No changes to the main registration form after Continue.
