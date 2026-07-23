@@ -1,27 +1,27 @@
 ## Problem
-At 100% viewport zoom the card image area is short and wide, so `object-cover` on the 16:9 flag/map crops out most of the image — the Indian flag only shows the white middle band with the chakra, and the world map loses top/bottom continents. It looks broken.
+1. White gaps around the images: `object-contain` on a 16:9 image inside a card whose aspect ratio doesn't match the image causes letterboxing (side gaps when card is taller than 16:9, top/bottom gaps when wider). Setting a colored background just makes the gap visible instead of white.
+2. Wave/float animations feel jittery and cheap.
 
 ## Fix
 
 ### `src/components/vendor/steps/international/VendorTypeSelector.tsx`
-- Switch the image `<img>` from `object-cover` to `object-contain` so the entire flag / entire world map is always visible regardless of card aspect ratio. No more cropping the chakra or the continents.
-- Give the image area a subtle branded background (light slate gradient) so `object-contain` letterboxing looks intentional instead of empty white gaps.
-- Guarantee a minimum image height (`min-h-[140px]`) so short viewports still show a readable image.
-- Add tasteful, lightweight animations (no new libraries — reuse existing Tailwind `animate-fade-in` and CSS transforms):
-  - Card entry: staggered `animate-fade-in` on mount (delay 0ms / 120ms).
-  - Flag: gentle continuous `wave` sway (subtle skew + translate keyframe, ~6s ease-in-out infinite) so the domestic flag feels alive.
-  - Map: slow continuous `float` (translateY 0 → -4px → 0, ~5s ease-in-out infinite) plus a soft pulsing glow behind it.
-  - Hover: existing lift + a light shine sweep (diagonal gradient translating across the image once on hover) for polish.
-  - Selected state: keep the green ring; add a soft outer glow pulse.
-- Keep title bar, Selected badge, click handler, and radio semantics unchanged.
+- Give the image container a **fixed 16:9 aspect ratio** (`aspect-[16/9]`) that matches the source images (1600×900). Remove `min-h-[140px]` and the gradient background — no longer needed.
+- Switch back to `object-cover` on the `<img>`. With matching aspect ratio + cover, the entire image fills the box with zero gaps on any viewport width. No cropping either, because ratios match.
+- Drop the wave/float/shine animations and replace with a **Ken Burns** effect (slow, premium, no jitter):
+  - Continuous slow zoom + subtle pan (`scale(1) translate(0,0)` → `scale(1.06) translate(-1.5%, -1%)` → back), ~14s ease-in-out infinite. Feels cinematic, not shaky.
+  - Card hover: gentle lift (already there) + slight extra zoom on the image (`group-hover:scale-[1.08]`) with a smooth 700ms transition.
+  - Entry: keep the staggered `animate-fade-in` on mount.
+  - Selected: keep the green ring + soft outer glow.
+- Remove `flag-wave`, `map-float`, `shine-sweep` keyframes usage from the component.
 
 ### `tailwind.config.ts`
-- Add two keyframes + animations used above: `flag-wave` and `map-float`. No other config changes.
+- Remove the now-unused `flag-wave`, `map-float`, `shine-sweep` keyframes and animations.
+- Add one new keyframe/animation: `ken-burns` (14s ease-in-out infinite).
 
 ### Do not touch
 - Vendor Registration page, image files, on-behalf flow, classification logic, or any other component.
 
 ## Verification
 - Build succeeds.
-- At 100% zoom (908×532 viewport): full Indian flag visible with gentle wave motion; full world map visible with gentle float motion; no cropping of chakra or continents.
-- At larger viewports: images scale up cleanly, animations remain subtle and non-distracting.
+- No white gaps around either image at any viewport width; both images fully visible edge-to-edge.
+- Motion feels slow and premium, not jittery.
