@@ -32,8 +32,8 @@ const OPTIONS: {
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div className="rounded-xl p-0 w-full shrink-0">
-      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 w-full">
+    <div className="rounded-xl p-0 w-full min-h-0 shrink">
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-1.5 sm:gap-2 w-full">
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
           return (
@@ -46,7 +46,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full max-w-[300px] mx-auto overflow-hidden rounded-xl bg-white text-left',
+                'group relative w-full max-w-[280px] mx-auto overflow-hidden rounded-xl bg-white text-left',
                 'shadow-md transition-shadow duration-200',
                 'hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
@@ -63,7 +63,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
 
               <div
                 className="relative w-full overflow-hidden bg-white"
-                style={{ height: 'clamp(180px, 32vh, 400px)' }}
+                style={{ height: 'clamp(128px, 28vh, 205px)' }}
               >
                 <img
                   src={opt.image}
@@ -73,7 +73,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 />
               </div>
 
-              <h4 className="w-full shrink-0 text-center py-1 text-xs sm:text-sm font-semibold text-slate-900 leading-tight bg-white">
+              <h4 className="w-full shrink-0 text-center py-0.5 text-xs sm:text-sm font-semibold text-slate-900 leading-tight bg-white">
                 {opt.title}
               </h4>
 
