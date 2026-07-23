@@ -126,10 +126,6 @@ export default {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
-        "ken-burns": {
-          "0%, 100%": { transform: "scale(1) translate3d(0, 0, 0)" },
-          "50%": { transform: "scale(1.06) translate3d(-1.5%, -1%, 0)" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -137,7 +133,6 @@ export default {
         "fade-in": "fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         "slide-in": "slide-in 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         shimmer: "shimmer 2s linear infinite",
-        "ken-burns": "ken-burns 14s ease-in-out infinite",
       },
 
 
