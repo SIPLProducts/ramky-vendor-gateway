@@ -1,8 +1,8 @@
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VendorOriginType } from '@/types/vendor';
-import domesticIllustration from '@/assets/vendor-domestic-3d.png';
-import internationalIllustration from '@/assets/vendor-international-3d.png';
+import domesticIllustration from '@/assets/vendor-domestic-flag.png';
+import internationalIllustration from '@/assets/vendor-international-map.png';
 
 interface Props {
   value: VendorOriginType;
@@ -20,13 +20,13 @@ const OPTIONS: {
     value: 'domestic',
     title: 'Domestic Vendor',
     image: domesticIllustration,
-    alt: 'Domestic vendor illustration',
+    alt: 'Indian flag',
   },
   {
     value: 'international',
     title: 'International Vendor',
     image: internationalIllustration,
-    alt: 'International vendor illustration',
+    alt: 'World map',
   },
 ];
 
