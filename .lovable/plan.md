@@ -1,22 +1,27 @@
-## Goal
-Make the Domestic and International vendor type cards more visually striking by using full-bleed imagery, removing the visible image frame, and upgrading the Indian flag to a beautiful waving version.
+## Problem
+At 100% viewport zoom the card image area is short and wide, so `object-cover` on the 16:9 flag/map crops out most of the image — the Indian flag only shows the white middle band with the chakra, and the world map loses top/bottom continents. It looks broken.
 
-## Changes
+## Fix
 
-### 1. Regenerate hero images
-- `src/assets/vendor-domestic-flag.png` — replace with a **waving Indian flag** (silk/fabric texture, natural folds, soft cinematic lighting, tricolor with Ashoka Chakra crisp and centered). Wider aspect ratio (e.g. 1600×900) so it fills the card edge-to-edge without cropping the chakra.
-- `src/assets/vendor-international-map.png` — regenerate as a wider, edge-to-edge world map (globe/continents visual) matched to the same aspect ratio for visual parity.
+### `src/components/vendor/steps/international/VendorTypeSelector.tsx`
+- Switch the image `<img>` from `object-cover` to `object-contain` so the entire flag / entire world map is always visible regardless of card aspect ratio. No more cropping the chakra or the continents.
+- Give the image area a subtle branded background (light slate gradient) so `object-contain` letterboxing looks intentional instead of empty white gaps.
+- Guarantee a minimum image height (`min-h-[140px]`) so short viewports still show a readable image.
+- Add tasteful, lightweight animations (no new libraries — reuse existing Tailwind `animate-fade-in` and CSS transforms):
+  - Card entry: staggered `animate-fade-in` on mount (delay 0ms / 120ms).
+  - Flag: gentle continuous `wave` sway (subtle skew + translate keyframe, ~6s ease-in-out infinite) so the domestic flag feels alive.
+  - Map: slow continuous `float` (translateY 0 → -4px → 0, ~5s ease-in-out infinite) plus a soft pulsing glow behind it.
+  - Hover: existing lift + a light shine sweep (diagonal gradient translating across the image once on hover) for polish.
+  - Selected state: keep the green ring; add a soft outer glow pulse.
+- Keep title bar, Selected badge, click handler, and radio semantics unchanged.
 
-### 2. Update `src/components/vendor/steps/international/VendorTypeSelector.tsx`
-- Remove the inner bordered image container (drop `border`, `rounded`, inner padding around the `<img>`).
-- Make the image **full-width and full-bleed** inside the card: image spans 100% width, no side padding, sits flush to the card edges at the top.
-- Keep the card's own outer rounded corners; clip the image with matching top rounding (`rounded-t-*`) so no white gap shows around it.
-- Preserve current text, selection state, hover, and click behavior — no logic changes.
+### `tailwind.config.ts`
+- Add two keyframes + animations used above: `flag-wave` and `map-float`. No other config changes.
 
-### 3. Do not touch
-- Vendor Registration page logic, subtitle removal, on-behalf flow, or any other component.
-- Classification card behavior.
+### Do not touch
+- Vendor Registration page, image files, on-behalf flow, classification logic, or any other component.
 
 ## Verification
-- Build succeeds and both new PNGs are bundled.
-- Cards render with edge-to-edge imagery, no visible inner border, and the Indian flag appears as a natural waving flag.
+- Build succeeds.
+- At 100% zoom (908×532 viewport): full Indian flag visible with gentle wave motion; full world map visible with gentle float motion; no cropping of chakra or continents.
+- At larger viewports: images scale up cleanly, animations remain subtle and non-distracting.
