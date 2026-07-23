@@ -357,7 +357,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => {
           const active = statusFilter === c.key;
           return (
