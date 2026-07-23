@@ -55,8 +55,9 @@ type VendorRow = {
 };
 
 
+const DRAFT_STATUSES = new Set(['draft']);
+
 const PENDING_STATUSES = new Set([
-  'draft',
   'submitted',
   'validation_pending',
   'buyer_review',
@@ -74,7 +75,7 @@ const PENDING_STATUSES = new Set([
 const APPROVED_STATUSES = new Set(['sap_synced', 'dms_synced']);
 const REJECTED_STATUSES = new Set(['sap_team_rejected', 'sap_team_closed']);
 
-type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected';
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
