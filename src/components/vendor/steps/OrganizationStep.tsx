@@ -83,11 +83,12 @@ interface OrganizationStepProps {
   statutoryData: StatutoryDetails;
   vendorId?: string;
   tenantId?: string | null;
+  showClassification?: boolean;
   onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
   onLiveUpdate?: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNext, onLiveUpdate }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, tenantId, showClassification = true, onNext, onLiveUpdate }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
@@ -444,6 +445,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
 
 
       {/* SAP Classification (Domestic) — values are passed to SAP Sync popup and editable there */}
+      {showClassification && (
       <div className="form-section">
         <h3 className="form-section-title">
           <Award className="h-5 w-5 text-primary" />
@@ -482,6 +484,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNe
           />
         </div>
       </div>
+      )}
 
 
       {/* Statutory & Registrations (moved from Commercial Details) */}

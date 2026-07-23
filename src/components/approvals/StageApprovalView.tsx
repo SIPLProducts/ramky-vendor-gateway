@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,9 +10,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare } from 'lucide-react';
+import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare, Award } from 'lucide-react';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { formatDateTime } from '@/lib/dateFormat';
+import { ClassificationField } from '@/components/vendor/ClassificationField';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
@@ -65,6 +66,32 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   >(null);
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
   const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
+  const [buyerClassification, setBuyerClassification] = useState<{ materialGroupVendor: string[]; vendorCategory: string[] }>({ materialGroupVendor: [], vendorCategory: [] });
+
+  // Prefill Buyer classification from vendor row when approve dialog opens
+  useEffect(() => {
+    if (!isBuyer || !actionItem || actionItem.action !== 'approve') {
+      setBuyerClassification({ materialGroupVendor: [], vendorCategory: [] });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('vendors')
+        .select('material_group_vendor, material_group_vendors, vendor_category, vendor_categories')
+        .eq('id', actionItem.item.vendorId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const mg: string[] = Array.isArray((data as any).material_group_vendors) && (data as any).material_group_vendors.length
+        ? (data as any).material_group_vendors
+        : ((data as any).material_group_vendor ? [(data as any).material_group_vendor] : []);
+      const vc: string[] = Array.isArray((data as any).vendor_categories) && (data as any).vendor_categories.length
+        ? (data as any).vendor_categories
+        : ((data as any).vendor_category ? [(data as any).vendor_category] : []);
+      setBuyerClassification({ materialGroupVendor: mg, vendorCategory: vc });
+    })();
+    return () => { cancelled = true; };
+  }, [actionItem, isBuyer]);
 
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
   const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
@@ -74,6 +101,17 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!actionItem) return;
     setSubmitting(true);
     try {
+      // Buyer approve: persist Classification onto vendor before routing forward
+      if (isBuyer && actionItem.action === 'approve') {
+        const { error: clsErr } = await supabase.from('vendors').update({
+          material_group_vendor: buyerClassification.materialGroupVendor[0] ?? null,
+          material_group_vendors: buyerClassification.materialGroupVendor,
+          vendor_category: buyerClassification.vendorCategory[0] ?? null,
+          vendor_categories: buyerClassification.vendorCategory,
+        }).eq('id', actionItem.item.vendorId);
+        if (clsErr) throw clsErr;
+      }
+
       const { data, error } = await supabase.functions.invoke('process-approval-action', {
         body: {
           progress_id: actionItem.item.progressId,
@@ -458,7 +496,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       </Card>
 
       <Dialog open={!!actionItem} onOpenChange={(o) => { if (!o) { setActionItem(null); setComments(''); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {actionItem?.action === 'approve'
@@ -480,6 +518,34 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               {extraPanel(actionItem.item)}
             </div>
           )}
+          {isBuyer && actionItem?.action === 'approve' && (
+            <div className="border rounded-md p-3 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Award className="h-4 w-4 text-primary" />
+                Classification
+                <span className="text-destructive">*</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Required before approval. These values will be sent to SAP Sync.
+              </p>
+              <ClassificationField
+                label="Material Group for Vendors"
+                required
+                masterType="material_group_vendor"
+                value={buyerClassification.materialGroupVendor}
+                onChange={(v) => setBuyerClassification((p) => ({ ...p, materialGroupVendor: v }))}
+                selectPlaceholder="Select material groups"
+              />
+              <ClassificationField
+                label="Vendor Category"
+                required
+                masterType="vendor_category"
+                value={buyerClassification.vendorCategory}
+                onChange={(v) => setBuyerClassification((p) => ({ ...p, vendorCategory: v }))}
+                selectPlaceholder="Select vendor categories"
+              />
+            </div>
+          )}
           <Textarea
             placeholder={
               actionItem?.action === 'reject'
@@ -496,7 +562,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <Button variant="outline" onClick={() => setActionItem(null)}>Cancel</Button>
             <Button
               onClick={submit}
-              disabled={submitting || !comments.trim()}
+              disabled={
+                submitting ||
+                !comments.trim() ||
+                (isBuyer && actionItem?.action === 'approve' && (
+                  buyerClassification.materialGroupVendor.length === 0 ||
+                  buyerClassification.vendorCategory.length === 0
+                ))
+              }
               variant="outline"
               className={
                 actionItem?.action === 'reject'
