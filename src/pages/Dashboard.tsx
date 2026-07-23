@@ -361,7 +361,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map((c) => {
           const active = statusFilter === c.key;
           return (
@@ -373,7 +373,8 @@ export default function Dashboard() {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(c.key); } }}
               className={cn(
                 'cursor-pointer p-5 transition hover:shadow-md',
-                active && 'ring-1 ring-primary border-primary'
+                c.bgClass,
+                active && c.ringClass
               )}
             >
               <div className="flex items-start justify-between gap-3">
@@ -390,8 +391,9 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0',
-                  c.color
+                  'flex h-10 w-10 items-center justify-center rounded-lg flex-shrink-0',
+                  c.iconBgClass,
+                  c.iconColorClass
                 )}>
                   <c.icon className="h-5 w-5" />
                 </div>
