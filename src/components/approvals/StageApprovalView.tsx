@@ -496,7 +496,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       </Card>
 
       <Dialog open={!!actionItem} onOpenChange={(o) => { if (!o) { setActionItem(null); setComments(''); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {actionItem?.action === 'approve'
