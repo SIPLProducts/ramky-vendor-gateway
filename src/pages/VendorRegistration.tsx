@@ -1608,7 +1608,7 @@ export default function VendorRegistration() {
           )}
         </header>
         <main className="flex-1 flex items-center justify-center p-2 sm:p-4 h-[calc(100vh-4rem)] overflow-hidden">
-          <div className="relative w-[92%] sm:w-[75%] md:w-[60%] lg:w-[50%] max-w-lg rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col max-h-full">
+          <div className="relative w-[90%] sm:w-[65%] md:w-[50%] lg:w-[40%] max-w-md rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col max-h-full">
             <div className="relative p-3 space-y-2 flex flex-col overflow-y-auto">
 
               {isTokenMode && invitationEmail && (
