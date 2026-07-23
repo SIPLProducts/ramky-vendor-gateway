@@ -445,6 +445,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
 
 
       {/* SAP Classification (Domestic) — values are passed to SAP Sync popup and editable there */}
+      {showClassification && (
       <div className="form-section">
         <h3 className="form-section-title">
           <Award className="h-5 w-5 text-primary" />
@@ -483,6 +484,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
           />
         </div>
       </div>
+      )}
 
 
       {/* Statutory & Registrations (moved from Commercial Details) */}
