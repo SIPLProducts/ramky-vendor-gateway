@@ -83,11 +83,12 @@ interface OrganizationStepProps {
   statutoryData: StatutoryDetails;
   vendorId?: string;
   tenantId?: string | null;
+  showClassification?: boolean;
   onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
   onLiveUpdate?: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, vendorId, tenantId, onNext, onLiveUpdate }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, tenantId, showClassification = true, onNext, onLiveUpdate }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
