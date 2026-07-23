@@ -143,8 +143,7 @@ export default function Dashboard() {
       let q = supabase
         .from('vendors')
         .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
-        .order('created_at', { ascending: false })
-        .neq('status', 'draft');
+        .order('created_at', { ascending: false });
 
       if (fromIso) q = q.gte('created_at', fromIso);
       if (toIso) q = q.lte('created_at', toIso);
