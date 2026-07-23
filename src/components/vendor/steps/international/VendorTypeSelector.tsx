@@ -32,8 +32,8 @@ const OPTIONS: {
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
-    <div className="rounded-xl p-0 flex-1 min-h-0 flex overflow-hidden">
-      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 w-full flex-1 min-h-0 auto-rows-fr">
+    <div className="rounded-xl p-0 w-full shrink-0">
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 min-[760px]:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full">
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
           return (
@@ -50,7 +50,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 'shadow-md transition-shadow duration-200',
                 'hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                'min-h-0 flex flex-col',
+                'flex flex-col',
                 selected && 'ring-2 ring-brand-green shadow-[0_0_0_4px_rgba(34,197,94,0.15)]',
                 disabled && 'opacity-60 cursor-not-allowed hover:shadow-md',
               )}
@@ -61,7 +61,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 </span>
               )}
 
-              <div className="relative w-full flex-1 min-h-0 overflow-hidden bg-white">
+              <div className="relative w-full aspect-[100/57] overflow-hidden bg-white">
                 <img
                   src={opt.image}
                   alt={opt.alt}
