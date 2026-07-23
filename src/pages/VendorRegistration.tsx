@@ -1607,11 +1607,11 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <main className="flex-1 flex items-center justify-center p-2 sm:p-4 md:p-6">
-          <div className="relative w-full max-w-4xl rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col">
-            <div className="relative p-3 sm:p-4 md:p-5 space-y-2 sm:space-y-3 flex flex-col">
+        <main className="flex-1 flex items-center justify-center p-2 sm:p-4 h-[calc(100vh-4rem)] overflow-hidden">
+          <div className="relative w-[92%] sm:w-[70%] md:w-[55%] lg:w-[45%] max-w-xl rounded-[12px] overflow-hidden bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col max-h-full">
+            <div className="relative p-3 space-y-2 flex flex-col overflow-hidden">
               {isTokenMode && invitationEmail && (
-                <div className="p-2 sm:p-3 bg-white/70 border border-blue-100 rounded-lg shrink-0">
+                <div className="p-2 bg-white/70 border border-blue-100 rounded-lg shrink-0">
                   <p className="text-sm text-slate-700">
                     <span className="font-medium text-slate-900">Invited Email:</span> {invitationEmail}
                   </p>
@@ -1635,6 +1635,7 @@ export default function VendorRegistration() {
             </div>
           </div>
         </main>
+
 
 
 
