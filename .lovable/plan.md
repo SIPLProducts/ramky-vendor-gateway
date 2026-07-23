@@ -1,30 +1,20 @@
-## Problem
+## Goal
+Shrink the Domestic and International cards on the Vendor Type selection screen so the flag and map images fit cleanly inside the "Select Vendor Type" panel without cropping, overflow, or page scroll — at every resolution.
 
-On the Select Vendor Type screen, each card is wider than the image's natural aspect, so with `object-contain` there are large white gaps on the left/right of the flag and map. The user wants the image to fill each card edge-to-edge, with no cropping and no gaps, while the panel stays responsive.
-
-## Fix
+## Changes
 
 ### 1. `src/components/vendor/steps/international/VendorTypeSelector.tsx`
+- Reduce card max width from `max-w-[420px]` to a smaller cap (e.g. `max-w-[300px]`) and center via `mx-auto`.
+- Shrink the image container height using a responsive `clamp()` (e.g. `clamp(80px, 14vh, 150px)`) instead of a pure 16:9 aspect ratio, so both cards + label fit inside the panel on short viewports.
+- Keep `object-cover` so images fill the frame edge-to-edge without white gaps.
+- Tighten internal paddings and label spacing to match the smaller footprint.
 
-- Constrain each card to a width that matches the image's aspect ratio, so the image can fill it cleanly:
-  - Wrap each `<button>` card in a centered container: `mx-auto w-full max-w-[420px]`.
-  - Replace the fixed-height (`clamp(...)`) image container with a natural `aspect-video` (16:9) container.
-  - Switch the `<img>` back to `object-cover` — since card width and container aspect now match the source image aspect, cover fills the box without cropping visible content and without side gaps.
-- Keep vertical stacking (single column) and the `py-1.5` compact title.
+### 2. `src/pages/VendorRegistration.tsx`
+- Narrow the "Select Vendor Type" panel wrapper (e.g. `max-w-md`, `lg:w-[40%]`) so the whole section is proportional to the reduced cards.
+- Keep `h-[calc(100vh-4rem)] overflow-hidden` on `<main>` and the existing inner `overflow-y-auto` safety fallback.
 
-### 2. `src/pages/VendorRegistration.tsx` (choice panel, ~line 1610)
-
-- Keep the panel responsive but slightly wider so a 420px card + padding fits without horizontal squeeze:
-  - Change panel widths to `w-[92%] sm:w-[75%] md:w-[60%] lg:w-[50%] max-w-lg`.
-  - Keep `h-[calc(100vh-4rem)] overflow-hidden` on `<main>` and compact inner paddings so no page scroll appears.
-- Add `overflow-y-auto` on the inner panel content only as a safety net for very short viewports (so the cards themselves never get clipped, but the outer page still doesn't scroll).
-
-### 3. Verification
-
-Playwright headless run at three viewports — 390×844 (mobile), 908×532 (current preview), 1280×800 (desktop). For each: screenshot, confirm both cards fully visible, image fills each card edge-to-edge with no white side gaps, and no page scrollbar.
-
-## Out of scope
-
-- No changes to the flag/map assets themselves.
-- No animations reintroduced.
-- No changes to the main registration form after Continue.
+## Result
+- Cards become compact (~300px wide, ~150px tall max), stacked vertically.
+- Flag and world-map images render fully inside each card at all breakpoints.
+- No page scroll on standard laptop/desktop; graceful fallback scroll only on very short viewports.
+- No changes to selection logic, routing, or any other functionality.
