@@ -49,30 +49,6 @@ const asPersistedFile = (doc?: any): PersistedDocumentFile | null => {
   } as PersistedDocumentFile;
 };
 
-const _getFunctionErrorMessage_unused = async (error: any, fallback: string): Promise<string> => {
-  const response = error?.context;
-  if (response && typeof response.clone === 'function') {
-    try {
-      const text = await response.clone().text();
-      if (text) {
-        try {
-          const payload = JSON.parse(text);
-          const primary = payload?.error || payload?.message || payload?.msg;
-          const details = typeof payload?.details === 'string' ? payload.details : null;
-          const step = typeof payload?.step === 'string' ? `step: ${payload.step}` : null;
-          const message = [primary, details, step].filter(Boolean).join(' — ');
-          if (message) return message;
-        } catch {
-          return text;
-        }
-      }
-    } catch {
-      // Fall back to the SDK error message below.
-    }
-  }
-
-  return error?.message || fallback;
-};
 
 // Extended vendor record type to include all new fields
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
