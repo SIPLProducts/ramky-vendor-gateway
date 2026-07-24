@@ -234,9 +234,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Check if vendor can edit their registration
   const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
 
-  // Upload document to Supabase Storage. Path convention:
+  // Upload document through the backend. Path convention stays:
   //   {vendorId}/{documentType}/{filename}
-  // Matches storage RLS which checks the vendor row by the first folder.
   const uploadDocument = async (file: File, vendorIdForUpload: string, documentType: DocumentType): Promise<DocumentUploadResult | null> => {
     if (!file) return null;
 
@@ -310,10 +309,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           continue;
         }
 
-        // Upload-first, then update metadata, then remove the previous storage
-        // object. This guarantees vendor_documents rows always point to a file
-        // that actually exists in storage (prevents "File missing in storage"
-        // errors when the new upload would have failed after deleting the old).
+        // Backend uploads first, saves metadata, then removes the previous
+        // object so vendor_documents always points to an existing file.
         const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
         if (!result) continue;
 
