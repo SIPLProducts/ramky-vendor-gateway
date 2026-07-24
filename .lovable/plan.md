@@ -1,38 +1,111 @@
-## Goal
+## Good news — DEV and PROD Storage are already isolated
 
-Make Production behave exactly like Development for these two Edge Functions:
+Your output confirms it:
 
-- `upload-vendor-document`
-- `log-login-attempt`
+| | DEV | PROD |
+|---|---|---|
+| Storage host path | `/opt/Ramky_Applications/DEV/VMS/backend/volumes/storage` | `/opt/Ramky_Applications/PROD/VMS/backend/volumes/storage` |
+| DB host path | `/opt/Ramky_Applications/DEV/VMS/backend/volumes/db/data` | `/opt/Ramky_Applications/PROD/VMS/backend/volumes/db/data` |
+| In-container path (identical, and that's fine) | `/var/lib/storage` | `/var/lib/storage` |
 
-No new diagnostic scripts. No KYC changes. No frontend/database changes.
+Each container mounts a **different host directory** into the same in-container path `/var/lib/storage`. That's how Docker works — it looks like "the same folder" only from inside the container. DEV files never touch PROD's disk and vice versa. No isolation problem.
 
-## Why they fail in Production
-
-`InvalidWorkerCreation: could not find an appropriate entrypoint` means the Production self-host functions container cannot see `index.ts` for these functions inside its mounted volume `backend/volumes/functions/<name>/index.ts`. Development works because the deploy on DEV copied both folders and the functions container was recreated after the copy. PROD is missing that step for these two functions.
-
-This is purely a deployment sync issue on the Production server, not a code or KYC configuration issue.
-
-## Fix (Production, no new scripts)
-
-Run the existing deploy path on the Production server so the two function folders get copied into the functions volume and the functions container reloads them — same command DEV already uses.
-
+You can prove it in one command:
 ```bash
-cd /path/to/latest/repo/on/prod
-sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
-  bash scripts/selfhost/deploy-latest.sh \
-  --skip-build --skip-migrations --skip-frontend
+ls -1 /opt/Ramky_Applications/DEV/VMS/backend/volumes/storage/stub/vendor-documents 2>/dev/null | head
+ls -1 /opt/Ramky_Applications/PROD/VMS/backend/volumes/storage/stub/vendor-documents 2>/dev/null | head
+```
+Different file lists = fully isolated.
+
+## So we're back to the original problem
+
+DEV uploads succeed, PROD returns `new row violates row-level security policy`. Same code, isolated storage, different DBs — the divergence is in **PROD's `storage.objects` policies**. Plan below picks up exactly there, unchanged from what you already approved in principle.
+
+## Plan
+
+### 1. Frontend — revert to direct upload
+`src/hooks/useVendorRegistration.tsx`: replace the `supabase.functions.invoke('upload-vendor-document', ...)` block with:
+```ts
+const path = `${vendorId}/${docType}/${Date.now()}_${file.name}`;
+const { error } = await supabase.storage
+  .from('vendor-documents')
+  .upload(path, file, { upsert: true, contentType: file.type });
+```
+Restore the original toast that surfaces the raw Storage error.
+
+### 2. Delete the Edge Function
+- Remove `supabase/functions/upload-vendor-document/` from the repo.
+- Delete the deployed function via the delete tool.
+- On PROD host:
+  ```bash
+  rm -rf /opt/Ramky_Applications/PROD/VMS/backend/volumes/functions/upload-vendor-document
+  docker compose -p supabase-prod up -d --force-recreate --no-deps functions
+  ```
+
+### 3. Dump DEV's `vendor-documents` config as the source of truth
+Run on DEV (Studio → SQL) and paste the result:
+```sql
+-- Bucket row
+SELECT id, public, file_size_limit, allowed_mime_types
+FROM storage.buckets WHERE id = 'vendor-documents';
+
+-- All policies on storage.objects
+SELECT policyname, cmd, roles, qual, with_check
+FROM pg_policies
+WHERE schemaname='storage' AND tablename='objects'
+ORDER BY policyname;
+
+-- RLS flag
+SELECT relrowsecurity, relforcerowsecurity
+FROM pg_class WHERE relname='objects' AND relnamespace='storage'::regnamespace;
 ```
 
-That single command:
-1. rsyncs `supabase/functions/` (including `upload-vendor-document` and `log-login-attempt`) into `backend/volumes/functions/`
-2. Preserves the `main` router (already handled by the existing script)
-3. Recreates the `functions` container so edge-runtime picks up the new folders
+### 4. Run the same three queries on PROD and diff
+Any policy present on DEV but missing/different on PROD is a suspect. Any policy on PROD not on DEV is leftover garbage from earlier attempts.
 
-After it finishes, both URLs will stop returning `InvalidWorkerCreation` and behave the same as DEV.
+### 5. Rebuild PROD policies to match DEV exactly
+Idempotent:
+```sql
+DO $$
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname='storage' AND tablename='objects'
+      AND policyname LIKE 'vendor_documents_%'
+  LOOP
+    EXECUTE format('DROP POLICY %I ON storage.objects', p.policyname);
+  END LOOP;
+END $$;
 
-## Small script change (only if you want the deploy to also verify `log-login-attempt`)
+-- Then paste the CREATE POLICY statements built from DEV's Step-3 dump, verbatim.
+```
 
-Optional, safe one-line addition to the existing `scripts/selfhost/deploy-latest.sh` and `scripts/lib/40-functions.sh` to also verify `log-login-attempt/index.ts` was copied, matching how they already verify `upload-vendor-document` and `kyc-api-execute`. No new files, no new diagnostic scripts.
+### 6. Signed-in probe on PROD (should return 200)
+```bash
+USER_JWT='<paste sb-...-auth-token access_token from browser devtools>'
+ANON_KEY='<PROD anon key>'
+VENDOR_ID='<vendor id owned by that user>'
 
-If you don't want even this, we can skip it and just run the deploy command above — that alone will fix Production.
+curl -i -X POST \
+  "http://127.0.0.1:8010/storage/v1/object/vendor-documents/$VENDOR_ID/diagnostic/probe-$(date +%s).txt" \
+  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $USER_JWT" \
+  -H "Content-Type: text/plain" --data 'probe' --max-time 10
+```
+- 200 → repeat the same call through `https://vendx.ramky.com/supabase/storage/v1/...` — if that's 403, PROD Nginx is stripping `Authorization`/`apikey` on `/supabase/storage/`.
+- 403 → policies still don't match; re-diff Step 4.
+
+### 7. Verify in the browser
+Submit a vendor application → `gst_certificate` uploads with 200, no `upload-vendor-document` calls in the network tab.
+
+## Not doing
+
+- No service_role policy on `storage.objects`.
+- No `ALTER ROLE ... BYPASSRLS`.
+- No new Edge Function.
+- No schema change that DEV doesn't already have.
+
+## Confirm to proceed
+
+1. OK to delete `upload-vendor-document` (repo + live project + PROD mount) and revert the frontend?
+2. Will you run Step 3 on DEV and Step 4 on PROD and paste both outputs so I can generate the exact `CREATE POLICY` statements for Step 5?
