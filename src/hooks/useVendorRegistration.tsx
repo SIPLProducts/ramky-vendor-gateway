@@ -49,7 +49,7 @@ const asPersistedFile = (doc?: any): PersistedDocumentFile | null => {
   } as PersistedDocumentFile;
 };
 
-const getFunctionErrorMessage = async (error: any, fallback: string): Promise<string> => {
+const _getFunctionErrorMessage_unused = async (error: any, fallback: string): Promise<string> => {
   const response = error?.context;
   if (response && typeof response.clone === 'function') {
     try {
