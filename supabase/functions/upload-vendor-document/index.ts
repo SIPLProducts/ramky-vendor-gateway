@@ -71,7 +71,13 @@ serve(async (req) => {
     }
     log('auth_ok', { userId: auth.userId });
 
-    const form = await req.formData();
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      log('invalid_form_data');
+      return json(400, { error: 'Upload request must be multipart form data' });
+    }
     const vendorIdValue = form.get('vendorId');
     const documentTypeValue = form.get('documentType');
 
