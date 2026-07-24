@@ -259,43 +259,66 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Check if vendor can edit their registration
   const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
 
-  // Upload document through the backend. Path convention stays:
-  //   {vendorId}/{documentType}/{filename}
+  // Upload document directly to Storage. Path convention:
+  //   {vendorId}/{documentType}/{timestamp}_{filename}
+  // RLS on storage.objects gates access based on the authenticated user's
+  // link to the vendor row (owner, email match, or invitation.created_by).
   const uploadDocument = async (file: File, vendorIdForUpload: string, documentType: DocumentType): Promise<DocumentUploadResult | null> => {
     if (!file) return null;
 
-    const body = new FormData();
-    body.append('vendorId', vendorIdForUpload);
-    body.append('documentType', documentType);
-    body.append('file', file, file.name);
+    const safeName = (file.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${vendorIdForUpload}/${documentType}/${Date.now()}_${safeName}`;
+    const contentType = file.type || 'application/octet-stream';
 
-    // Upload via a secured backend function instead of direct browser Storage
-    // writes. Self-hosted production Storage RLS can reject the browser insert
-    // even when the app session is valid; the function verifies the user/vendor
-    // link, uploads with backend privileges, and saves metadata atomically.
-    const { data, error } = await supabase.functions.invoke('upload-vendor-document', { body });
+    // Look up any existing document so we can clean up the previous object
+    // after the new upload + metadata upsert succeed.
+    const { data: existingDoc } = await supabase
+      .from('vendor_documents')
+      .select('id, file_path')
+      .eq('vendor_id', vendorIdForUpload)
+      .eq('document_type', documentType)
+      .maybeSingle();
 
-    if (error) {
-      console.error(`Failed to upload ${documentType}:`, error);
-      const message = await getFunctionErrorMessage(error, 'Upload service failed');
-      throw new Error(`Failed to upload ${documentType}: ${message}`);
+    const { error: uploadError } = await supabase.storage
+      .from('vendor-documents')
+      .upload(filePath, file, { upsert: false, contentType });
+
+    if (uploadError) {
+      console.error(`Failed to upload ${documentType}:`, uploadError);
+      throw new Error(`Failed to upload ${documentType}: ${uploadError.message}`);
     }
 
-    if (data?.error || data?.msg || data?.message) {
-      const message = data.error || data.msg || data.message;
-      throw new Error(`Failed to upload ${documentType}: ${message}`);
+    const { error: metadataError } = await supabase
+      .from('vendor_documents')
+      .upsert(
+        {
+          vendor_id: vendorIdForUpload,
+          document_type: documentType,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+          mime_type: contentType,
+        },
+        { onConflict: 'vendor_id,document_type' },
+      );
+
+    if (metadataError) {
+      // Roll back the newly uploaded object so metadata and storage stay in sync.
+      await supabase.storage.from('vendor-documents').remove([filePath]);
+      throw new Error(`Failed to save document metadata for ${documentType}: ${metadataError.message}`);
     }
 
-    if (!data?.filePath) {
-      throw new Error(`Failed to upload ${documentType}: upload service returned no file path`);
+    const previousPath = existingDoc?.file_path;
+    if (previousPath && previousPath !== filePath) {
+      await supabase.storage.from('vendor-documents').remove([previousPath]);
     }
 
     return {
-      documentType: data.documentType,
-      filePath: data.filePath,
-      fileName: data.fileName,
-      fileSize: data.fileSize,
-      mimeType: data.mimeType,
+      documentType,
+      filePath,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: contentType,
     };
   };
 
