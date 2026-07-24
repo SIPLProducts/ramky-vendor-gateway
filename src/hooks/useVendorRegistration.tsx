@@ -269,28 +269,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     };
   };
 
-  // Save document metadata to vendor_documents table (atomic upsert against unique index)
-  const saveDocumentMetadata = async (vendorIdForDoc: string, doc: DocumentUploadResult) => {
-    const { error } = await supabase
-      .from('vendor_documents')
-      .upsert(
-        {
-          vendor_id: vendorIdForDoc,
-          document_type: doc.documentType,
-          file_name: doc.fileName,
-          file_path: doc.filePath,
-          file_size: doc.fileSize,
-          mime_type: doc.mimeType,
-        },
-        { onConflict: 'vendor_id,document_type' }
-      );
-
-    if (error) {
-      console.error(`Failed to save document metadata for ${doc.documentType}:`, error);
-      throw new Error(`Failed to save document metadata for ${doc.documentType}: ${error.message}`);
-    }
-  };
-
   // Serialize concurrent upload runs (autosave + manual save) to avoid races on the
   // unique index (vendor_id, document_type).
   const uploadInFlight = useRef<Promise<void> | null>(null);
