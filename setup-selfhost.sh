@@ -69,6 +69,67 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 log()  { echo -e "\n=== $* ==="; }
 warn() { echo "WARN: $*" >&2; }
 
+ensure_functions_main() {
+  local fn_dst="${BACKEND_DIR}/volumes/functions"
+  mkdir -p "$fn_dst/main"
+  if [[ -f "$fn_dst/main/index.ts" ]]; then
+    echo "  self-host function router found"
+    return 0
+  fi
+
+  echo "  self-host function router missing; creating $fn_dst/main/index.ts"
+  cat > "$fn_dst/main/index.ts" <<'TS'
+console.log('main function router started')
+
+Deno.serve(async (req: Request) => {
+  const url = new URL(req.url)
+  const pathParts = url.pathname.split('/')
+  const serviceName = pathParts[1]
+
+  if (!serviceName) {
+    return new Response(JSON.stringify({ msg: 'missing function name in request' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const servicePath = `/home/deno/functions/${serviceName}`
+  console.error(`serving the request with ${servicePath}`)
+
+  try {
+    const worker = await EdgeRuntime.userWorkers.create({
+      servicePath,
+      memoryLimitMb: 150,
+      workerTimeoutMs: 120000,
+      noModuleCache: false,
+      importMapPath: null,
+      envVars: Object.entries(Deno.env.toObject()),
+    })
+    return await worker.fetch(req)
+  } catch (e) {
+    return new Response(JSON.stringify({ msg: e instanceof Error ? e.toString() : String(e) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+})
+TS
+}
+
+verify_function_entrypoint() {
+  local fn_dst="${BACKEND_DIR}/volumes/functions"
+  local name="$1"
+  if [[ -f "$fn_dst/$name/index.ts" ]]; then
+    echo "  $name entrypoint found"
+  else
+    echo "ERROR: $name/index.ts missing from deployed functions at $fn_dst" >&2
+    echo "Expected: $fn_dst/$name/index.ts" >&2
+    echo "Current deployed function folders:" >&2
+    ls -la "$fn_dst" >&2 || true
+    exit 1
+  fi
+}
+
 trap 'rc=$?; echo; echo "!!! setup failed at line $LINENO (exit $rc)"; tail -n 40 "$LOG_FILE" || true; exit $rc' ERR
 
 HOST_IP="${HOST_IP_OVERRIDE:-$(hostname -I 2>/dev/null | awk "{print \$1}")}"
@@ -319,8 +380,19 @@ fi
 # ---------- 9. Edge functions ----------
 if [[ $SKIP_FUNCTIONS -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
   log "Syncing edge functions"
-  rsync -a --delete "$SOURCE_DIR/supabase/functions/" "$BACKEND_DIR/volumes/functions/"
-  ( cd "$BACKEND_DIR" && docker compose restart functions ) || true
+  mkdir -p "$BACKEND_DIR/volumes/functions"
+  # Do not --delete: self-host requires the upstream/generated 'main' router.
+  # Deleting it causes InvalidWorkerCreation/could not find entrypoint errors.
+  rsync -a --exclude '_shared' "$SOURCE_DIR/supabase/functions/" "$BACKEND_DIR/volumes/functions/"
+  if [[ -d "$SOURCE_DIR/supabase/functions/_shared" ]]; then
+    rsync -a "$SOURCE_DIR/supabase/functions/_shared/" "$BACKEND_DIR/volumes/functions/_shared/"
+  fi
+  ensure_functions_main
+  verify_function_entrypoint "main"
+  verify_function_entrypoint "upload-vendor-document"
+  verify_function_entrypoint "kyc-api-execute"
+  ( cd "$BACKEND_DIR" && docker compose up -d --force-recreate functions ) || \
+    ( cd "$BACKEND_DIR" && docker compose restart functions ) || true
 fi
 
 # ---------- 10. Frontend build ----------
