@@ -83,6 +83,7 @@ ensure_functions_main
 verify_function_entrypoint "main"
 verify_function_entrypoint "upload-vendor-document"
 verify_function_entrypoint "kyc-api-execute"
+verify_function_entrypoint "log-login-attempt"
 
 ls -1 "$FN_DST" | sed 's/^/  fn: /' || true
 
