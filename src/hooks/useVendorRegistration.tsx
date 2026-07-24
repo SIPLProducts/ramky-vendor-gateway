@@ -244,9 +244,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `${vendorIdForUpload}/${documentType}/${Date.now()}_${safeName}`;
 
+    // Use upsert:false — filenames are already timestamp-unique, and upsert:true
+    // triggers extra storage RLS checks (SELECT/UPDATE on storage.objects) that
+    // fail for on-behalf/invitation flows where the row doesn't yet exist.
     const { error: uploadError } = await supabase.storage
       .from('vendor-documents')
-      .upload(filePath, file, { upsert: true });
+      .upload(filePath, file, { upsert: false });
 
     if (uploadError) {
       console.error(`Failed to upload ${documentType}:`, uploadError);
