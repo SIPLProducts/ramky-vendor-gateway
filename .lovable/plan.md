@@ -1,48 +1,53 @@
-The production error is happening on the browser’s direct Storage upload:
+The new error confirms the old Storage RLS problem is bypassed now. The current failure is self-host edge runtime booting `upload-vendor-document` and not finding a valid function entrypoint:
 
 ```text
-POST /storage/v1/object/vendor-documents/{vendorId}/...
-new row violates row-level security policy
+InvalidWorkerCreation: worker boot error: failed to bootstrap runtime: could not find an appropriate entrypoint
 ```
 
-Because dev works and production still fails after policy/proxy changes, the reliable fix is to stop uploading vendor documents directly from the browser. I will move document upload into a secured backend function that verifies the logged-in user, checks vendor/invitation ownership, then uploads with backend privileges. This will work for both **email invitation vendor flow** and **Create Vendor / on-behalf flow**.
+That means production does not have the new function folder deployed correctly, or the self-host runtime cannot detect its `index.ts` entrypoint.
 
 ## Plan
 
-1. **Create secured backend upload function**
-   - Add `upload-vendor-document` function.
-   - Accept `vendorId`, `documentType`, and `file`.
-   - Verify the request Authorization token.
-   - Allow upload only when the user is linked to the vendor by one of these paths:
-     - `vendors.user_id = current user`
-     - `vendors.invitation_id` points to an invitation where `created_by = current user` or `user_id = current user`
-     - `vendor_invitations.vendor_id = vendor.id` where `created_by = current user` or `user_id = current user`
-   - Upload the file to `vendor-documents/{vendorId}/{documentType}/...` using backend privileges.
-   - Upsert `vendor_documents` metadata.
-   - Remove the previous file for the same document type after the new file is saved.
+1. **Harden the new upload function entrypoint**
+   - Update `upload-vendor-document` to follow the same entrypoint pattern as the existing working self-host functions.
+   - Use an explicit `serve(...)` import style and local CORS headers consistent with the rest of this project.
+   - Keep the existing authorization logic for both:
+     - email invitation vendors
+     - Create Vendor / on-behalf buyers
 
-2. **Update vendor registration upload logic**
-   - Change `src/hooks/useVendorRegistration.tsx` so `uploadAllDocuments()` calls the new backend function instead of `supabase.storage.from(...).upload()` directly.
-   - Keep the existing save draft and submit behavior unchanged.
-   - Keep file path format the same, so DMS/SAP sync and document preview continue to work.
+2. **Improve frontend error display**
+   - Update the upload caller so a backend JSON error like `InvalidWorkerCreation` is shown clearly instead of only:
+     ```text
+     Edge Function returned a non-2xx status code
+     ```
+   - This helps confirm the exact server-side issue immediately from the toast.
 
-3. **Handle both flows explicitly**
-   - Email-link vendors: authorization works through invitation `user_id` / vendor `user_id`.
-   - Create Vendor/on-behalf buyers: authorization works through invitation `created_by` and `vendors.invitation_id`.
+3. **Fix self-host deployment coverage**
+   - Update the self-host deploy script so it verifies that the deployed functions directory contains:
+     ```text
+     upload-vendor-document/index.ts
+     ```
+   - This prevents frontend code from calling a function that was not actually copied into the self-host backend volume.
 
-4. **Add useful production diagnostics**
-   - If upload is denied, return a clear error like:
+4. **Add safe function diagnostics**
+   - Add non-secret logs for the upload function stages:
+     - function reached
+     - user authenticated
+     - vendor access checked
+     - storage upload attempted
+     - metadata saved
+   - No keys, tokens, or file contents will be logged.
 
-```text
-Upload not allowed for this vendor and current user
-```
-
-   - This avoids the confusing Storage RLS message.
-
-5. **Deployment note for self-hosted production**
-   - After code is approved and implemented, deploy the new function to your production self-hosted server along with the frontend.
-   - This fix does not require more Storage policy changes because the browser will no longer perform the failing direct Storage insert.
+5. **Production deploy requirement**
+   - After implementation, this must be deployed to the self-host server backend functions volume and the functions container must be restarted.
+   - Publishing/updating only the frontend is not enough for this error because the failing part is the backend function runtime.
 
 ## Expected Result
 
-Save Draft and Submit Application should upload documents successfully in production for both invitation/email vendors and Create Vendor/on-behalf registrations.
+The request to:
+
+```text
+/supabase/functions/v1/upload-vendor-document
+```
+
+will boot correctly and process uploads through the backend for both email-link and on-behalf vendor flows.
