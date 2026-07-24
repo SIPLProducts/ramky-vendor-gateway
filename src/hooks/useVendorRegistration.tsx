@@ -49,6 +49,31 @@ const asPersistedFile = (doc?: any): PersistedDocumentFile | null => {
   } as PersistedDocumentFile;
 };
 
+const getFunctionErrorMessage = async (error: any, fallback: string): Promise<string> => {
+  const response = error?.context;
+  if (response && typeof response.clone === 'function') {
+    try {
+      const text = await response.clone().text();
+      if (text) {
+        try {
+          const payload = JSON.parse(text);
+          const primary = payload?.error || payload?.message || payload?.msg;
+          const details = typeof payload?.details === 'string' ? payload.details : null;
+          const step = typeof payload?.step === 'string' ? `step: ${payload.step}` : null;
+          const message = [primary, details, step].filter(Boolean).join(' — ');
+          if (message) return message;
+        } catch {
+          return text;
+        }
+      }
+    } catch {
+      // Fall back to the SDK error message below.
+    }
+  }
+
+  return error?.message || fallback;
+};
+
 // Extended vendor record type to include all new fields
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VendorRecord = Record<string, any>;
@@ -252,7 +277,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
     if (error) {
       console.error(`Failed to upload ${documentType}:`, error);
-      throw new Error(`Failed to upload ${documentType}: ${error.message}`);
+      const message = await getFunctionErrorMessage(error, 'Upload service failed');
+      throw new Error(`Failed to upload ${documentType}: ${message}`);
+    }
+
+    if (data?.error || data?.msg || data?.message) {
+      const message = data.error || data.msg || data.message;
+      throw new Error(`Failed to upload ${documentType}: ${message}`);
     }
 
     if (!data?.filePath) {
