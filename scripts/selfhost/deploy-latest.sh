@@ -135,6 +135,7 @@ if [[ $SKIP_FN -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
   verify_function_entrypoint "main"
   verify_function_entrypoint "upload-vendor-document"
   verify_function_entrypoint "kyc-api-execute"
+  verify_function_entrypoint "log-login-attempt"
   echo ">> Verifying WHOLDTAX final-boundary fix in deployed functions"
   grep -R "wholdtax-final-boundary-v2" "$FN_DST/sync-vendor-to-sap" "$FN_DST/sync-vendors-to-sap-bulk" >/dev/null \
     && echo "   WHOLDTAX fix marker found" \
