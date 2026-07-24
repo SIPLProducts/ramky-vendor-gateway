@@ -72,6 +72,35 @@ sudo bash scripts/selfhost/deploy-latest.sh --skip-frontend
 
 ---
 
+## Diagnosing `InvalidWorkerCreation: could not find an appropriate entrypoint`
+
+This error means the self-host functions runtime cannot see the function folder
+or the required `index.ts` entrypoint inside the mounted functions volume.
+
+Run this on the server from the latest repo checkout:
+
+```bash
+sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS bash scripts/selfhost/diagnose-functions.sh
+```
+
+For DEV, change `APP_ROOT` to `/opt/Ramky_Applications/DEV/VMS`.
+
+The diagnostic checks:
+
+1. `backend/volumes/functions/main/index.ts` — the self-host router
+2. `backend/volumes/functions/upload-vendor-document/index.ts`
+3. `backend/volumes/functions/kyc-api-execute/index.ts`
+4. Whether the same files are visible inside the `functions` container
+5. Recent runtime logs for entrypoint errors
+
+To repair the functions volume and recreate the runtime container:
+
+```bash
+sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS bash scripts/selfhost/deploy-latest.sh --skip-build --skip-migrations --skip-frontend
+```
+
+---
+
 ## Just fix the migration error, nothing else
 
 ```bash

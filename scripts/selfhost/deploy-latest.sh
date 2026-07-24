@@ -40,6 +40,65 @@ done
 [[ $EUID -eq 0 ]] || { echo "Run with sudo."; exit 1; }
 [[ -d "$SOURCE_DIR/supabase" ]] || { echo "SOURCE_DIR=$SOURCE_DIR has no supabase/ folder."; exit 1; }
 
+ensure_functions_main() {
+  mkdir -p "$FN_DST/main"
+  if [[ -f "$FN_DST/main/index.ts" ]]; then
+    echo "   self-host function router found"
+    return 0
+  fi
+
+  echo "   self-host function router missing; creating $FN_DST/main/index.ts"
+  cat > "$FN_DST/main/index.ts" <<'TS'
+console.log('main function router started')
+
+Deno.serve(async (req: Request) => {
+  const url = new URL(req.url)
+  const pathParts = url.pathname.split('/')
+  const serviceName = pathParts[1]
+
+  if (!serviceName) {
+    return new Response(JSON.stringify({ msg: 'missing function name in request' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const servicePath = `/home/deno/functions/${serviceName}`
+  console.error(`serving the request with ${servicePath}`)
+
+  try {
+    const worker = await EdgeRuntime.userWorkers.create({
+      servicePath,
+      memoryLimitMb: 150,
+      workerTimeoutMs: 120000,
+      noModuleCache: false,
+      importMapPath: null,
+      envVars: Object.entries(Deno.env.toObject()),
+    })
+    return await worker.fetch(req)
+  } catch (e) {
+    return new Response(JSON.stringify({ msg: e instanceof Error ? e.toString() : String(e) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+})
+TS
+}
+
+verify_function_entrypoint() {
+  local name="$1"
+  if [[ -f "$FN_DST/$name/index.ts" ]]; then
+    echo "   $name entrypoint found"
+  else
+    echo "ERROR: $name/index.ts missing from deployed functions at $FN_DST" >&2
+    echo "Expected: $FN_DST/$name/index.ts" >&2
+    echo "Current deployed function folders:" >&2
+    ls -la "$FN_DST" >&2 || true
+    exit 1
+  fi
+}
+
 echo "=========================================================="
 echo " VMS self-host deploy   $(date -Is)"
 echo " Source repo : $SOURCE_DIR"
@@ -65,21 +124,23 @@ fi
 if [[ $SKIP_FN -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
   echo ">> Syncing edge functions -> $FN_DST"
   mkdir -p "$FN_DST"
-  # Don't --delete: keep upstream 'main' container glue if present
+  # Do not --delete: self-host requires the upstream/generated 'main' router.
+  # Deleting it causes InvalidWorkerCreation/could not find entrypoint errors.
   rsync -a --exclude '_shared' "$SOURCE_DIR/supabase/functions/" "$FN_DST/"
   if [[ -d "$SOURCE_DIR/supabase/functions/_shared" ]]; then
     rsync -a "$SOURCE_DIR/supabase/functions/_shared/" "$FN_DST/_shared/"
   fi
-  echo ">> Verifying upload-vendor-document function deployed"
-  [[ -f "$FN_DST/upload-vendor-document/index.ts" ]] \
-    && echo "   upload-vendor-document entrypoint found" \
-    || { echo "ERROR: upload-vendor-document/index.ts missing from deployed functions"; exit 1; }
+  echo ">> Verifying self-host function router and critical functions"
+  ensure_functions_main
+  verify_function_entrypoint "main"
+  verify_function_entrypoint "upload-vendor-document"
+  verify_function_entrypoint "kyc-api-execute"
   echo ">> Verifying WHOLDTAX final-boundary fix in deployed functions"
   grep -R "wholdtax-final-boundary-v2" "$FN_DST/sync-vendor-to-sap" "$FN_DST/sync-vendors-to-sap-bulk" >/dev/null \
     && echo "   WHOLDTAX fix marker found" \
     || { echo "ERROR: WHOLDTAX fix marker missing from deployed functions"; exit 1; }
-  echo ">> Restarting functions container"
-  docker compose -f "$COMPOSE_FILE" restart functions
+  echo ">> Recreating functions container so edge-runtime reloads function entrypoints"
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate functions || docker compose -f "$COMPOSE_FILE" restart functions
 fi
 
 # ---------- 3. Frontend ----------
