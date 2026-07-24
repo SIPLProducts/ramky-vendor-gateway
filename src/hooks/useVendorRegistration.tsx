@@ -234,57 +234,38 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // Check if vendor can edit their registration
   const canEdit = vendorStatus ? EDITABLE_STATUSES.includes(vendorStatus) : true;
 
-  // Upload document to Supabase Storage. Path convention:
+  // Upload document through the backend. Path convention stays:
   //   {vendorId}/{documentType}/{filename}
-  // Matches storage RLS which checks the vendor row by the first folder.
   const uploadDocument = async (file: File, vendorIdForUpload: string, documentType: DocumentType): Promise<DocumentUploadResult | null> => {
     if (!file) return null;
 
-    // Sanitize filename, keep extension; prefix timestamp for uniqueness
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const filePath = `${vendorIdForUpload}/${documentType}/${Date.now()}_${safeName}`;
+    const body = new FormData();
+    body.append('vendorId', vendorIdForUpload);
+    body.append('documentType', documentType);
+    body.append('file', file, file.name);
 
-    // Use upsert:false — filenames are already timestamp-unique, and upsert:true
-    // triggers extra storage RLS checks (SELECT/UPDATE on storage.objects) that
-    // fail for on-behalf/invitation flows where the row doesn't yet exist.
-    const { error: uploadError } = await supabase.storage
-      .from('vendor-documents')
-      .upload(filePath, file, { upsert: false });
+    // Upload via a secured backend function instead of direct browser Storage
+    // writes. Self-hosted production Storage RLS can reject the browser insert
+    // even when the app session is valid; the function verifies the user/vendor
+    // link, uploads with backend privileges, and saves metadata atomically.
+    const { data, error } = await supabase.functions.invoke('upload-vendor-document', { body });
 
-    if (uploadError) {
-      console.error(`Failed to upload ${documentType}:`, uploadError);
-      throw new Error(`Failed to upload ${documentType}: ${uploadError.message}`);
+    if (error) {
+      console.error(`Failed to upload ${documentType}:`, error);
+      throw new Error(`Failed to upload ${documentType}: ${error.message}`);
+    }
+
+    if (!data?.filePath) {
+      throw new Error(`Failed to upload ${documentType}: upload service returned no file path`);
     }
 
     return {
-      documentType,
-      filePath,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
+      documentType: data.documentType,
+      filePath: data.filePath,
+      fileName: data.fileName,
+      fileSize: data.fileSize,
+      mimeType: data.mimeType,
     };
-  };
-
-  // Save document metadata to vendor_documents table (atomic upsert against unique index)
-  const saveDocumentMetadata = async (vendorIdForDoc: string, doc: DocumentUploadResult) => {
-    const { error } = await supabase
-      .from('vendor_documents')
-      .upsert(
-        {
-          vendor_id: vendorIdForDoc,
-          document_type: doc.documentType,
-          file_name: doc.fileName,
-          file_path: doc.filePath,
-          file_size: doc.fileSize,
-          mime_type: doc.mimeType,
-        },
-        { onConflict: 'vendor_id,document_type' }
-      );
-
-    if (error) {
-      console.error(`Failed to save document metadata for ${doc.documentType}:`, error);
-      throw new Error(`Failed to save document metadata for ${doc.documentType}: ${error.message}`);
-    }
   };
 
   // Serialize concurrent upload runs (autosave + manual save) to avoid races on the
@@ -316,18 +297,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         { file: formData.international?.documents?.swiftIbanFile ?? null, type: 'swift_iban_details' },
       ];
 
-      // Fetch existing docs once to dedupe
-      const { data: existingDocs } = await supabase
-        .from('vendor_documents')
-        .select('id, document_type, file_name, file_size, file_path')
-        .eq('vendor_id', vendorIdForUpload);
-      const existingByType = new Map<string, { id: string; file_name: string; file_size: number | null; file_path: string }>();
-      (existingDocs || []).forEach((d: any) => existingByType.set(d.document_type, d));
-
       for (const doc of documentsToUpload) {
         if (!doc.file) continue;
         if ((doc.file as PersistedDocumentFile).__persistedDocument) continue;
-        const existing = existingByType.get(doc.type);
 
         // Skip ONLY if this exact File instance was already uploaded in this
         // session. Name+size matching is unreliable — re-exports/scans often
@@ -337,23 +309,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           continue;
         }
 
-        // Upload-first, then update metadata, then remove the previous storage
-        // object. This guarantees vendor_documents rows always point to a file
-        // that actually exists in storage (prevents "File missing in storage"
-        // errors when the new upload would have failed after deleting the old).
+        // Backend uploads first, saves metadata, then removes the previous
+        // object so vendor_documents always points to an existing file.
         const result = await uploadDocument(doc.file, vendorIdForUpload, doc.type);
         if (!result) continue;
 
-        await saveDocumentMetadata(vendorIdForUpload, result);
         uploadedFilesRef.current.add(doc.file);
-
-        if (existing && existing.file_path && existing.file_path !== result.filePath) {
-          try {
-            await supabase.storage.from('vendor-documents').remove([existing.file_path]);
-          } catch (e) {
-            console.warn('Failed to remove old storage object:', e);
-          }
-        }
       }
     };
 
