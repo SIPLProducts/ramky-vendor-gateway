@@ -20,6 +20,7 @@ import type { AppRole } from '@/components/admin/ChangeRoleDialog';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
 import { ReplaceUserDialog } from '@/components/admin/ReplaceUserDialog';
+import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
 import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
