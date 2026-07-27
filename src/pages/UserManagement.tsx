@@ -86,24 +86,9 @@ export default function UserManagement() {
     pendingPatch: { full_name: string; status: 'active' | 'inactive'; role: AppRole; tenantIds: string[]; customRoleIds: string[] };
   }>(null);
 
-  const handleDeleteUser = async () => {
-    if (!deleteUser) return;
-    setDeleting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: { user_id: deleteUser.id },
-      });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      toast({ title: 'User deleted', description: deleteUser.email });
-      setDeleteUser(null);
-      await loadData();
-    } catch (err: any) {
-      toast({ title: 'Delete failed', description: err.message ?? String(err), variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
-  };
+  // Deletion is handled by DeleteUserDialog, which enforces replacement-user selection
+  // for anyone with active approval workload before invoking admin-delete-user.
+
 
   const fetchAll = async <T,>(
     table: 'user_tenants' | 'user_custom_roles',
