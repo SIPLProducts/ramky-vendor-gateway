@@ -20,6 +20,7 @@ import type { AppRole } from '@/components/admin/ChangeRoleDialog';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { EditUserDialog, EditUserData } from '@/components/admin/EditUserDialog';
 import { ReplaceUserDialog } from '@/components/admin/ReplaceUserDialog';
+import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
 import { CustomRoleDialog, CustomRoleData } from '@/components/admin/CustomRoleDialog';
 import { CustomRolePermissionsMatrix } from '@/components/admin/CustomRolePermissionsMatrix';
 import { ApprovalMatrixConfig } from '@/components/admin/ApprovalMatrixConfig';
@@ -85,24 +86,9 @@ export default function UserManagement() {
     pendingPatch: { full_name: string; status: 'active' | 'inactive'; role: AppRole; tenantIds: string[]; customRoleIds: string[] };
   }>(null);
 
-  const handleDeleteUser = async () => {
-    if (!deleteUser) return;
-    setDeleting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: { user_id: deleteUser.id },
-      });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      toast({ title: 'User deleted', description: deleteUser.email });
-      setDeleteUser(null);
-      await loadData();
-    } catch (err: any) {
-      toast({ title: 'Delete failed', description: err.message ?? String(err), variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
-  };
+  // Deletion is handled by DeleteUserDialog, which enforces replacement-user selection
+  // for anyone with active approval workload before invoking admin-delete-user.
+
 
   const fetchAll = async <T,>(
     table: 'user_tenants' | 'user_custom_roles',
@@ -946,28 +932,13 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteUser} onOpenChange={(o) => !o && !deleting && setDeleteUser(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete user?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <strong>{deleteUser?.email}</strong> and remove all role,
-              tenant and custom-role assignments. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteUser(); }}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteUserDialog
+        open={!!deleteUser}
+        onOpenChange={(o) => { if (!o) setDeleteUser(null); }}
+        targetUser={deleteUser ? { id: deleteUser.id, email: deleteUser.email, full_name: deleteUser.full_name } : null}
+        onDeleted={() => { setDeleteUser(null); loadData(); }}
+      />
+
     </div>
   );
 }
