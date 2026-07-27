@@ -1,111 +1,58 @@
-## Good news — DEV and PROD Storage are already isolated
+## Goal
 
-Your output confirms it:
+Prevent data loss when deleting an approver. Before any delete, force the admin to reassign that user's active workload (approval flow slots, approval matrix, buyer↔SCM mappings, and any in-flight pending approval steps) to another eligible active user — mirroring the existing Inactivate flow.
 
-| | DEV | PROD |
-|---|---|---|
-| Storage host path | `/opt/Ramky_Applications/DEV/VMS/backend/volumes/storage` | `/opt/Ramky_Applications/PROD/VMS/backend/volumes/storage` |
-| DB host path | `/opt/Ramky_Applications/DEV/VMS/backend/volumes/db/data` | `/opt/Ramky_Applications/PROD/VMS/backend/volumes/db/data` |
-| In-container path (identical, and that's fine) | `/var/lib/storage` | `/var/lib/storage` |
+## Current behavior (verified from code)
 
-Each container mounts a **different host directory** into the same in-container path `/var/lib/storage`. That's how Docker works — it looks like "the same folder" only from inside the container. DEV files never touch PROD's disk and vice versa. No isolation problem.
-
-You can prove it in one command:
-```bash
-ls -1 /opt/Ramky_Applications/DEV/VMS/backend/volumes/storage/stub/vendor-documents 2>/dev/null | head
-ls -1 /opt/Ramky_Applications/PROD/VMS/backend/volumes/storage/stub/vendor-documents 2>/dev/null | head
-```
-Different file lists = fully isolated.
-
-## So we're back to the original problem
-
-DEV uploads succeed, PROD returns `new row violates row-level security policy`. Same code, isolated storage, different DBs — the divergence is in **PROD's `storage.objects` policies**. Plan below picks up exactly there, unchanged from what you already approved in principle.
+- `supabase/functions/admin-delete-user/index.ts` nullifies references on `vendor_invitations`, `vendors.finance_reviewed_by/purchase_reviewed_by`, `portal_config`, `audit_logs`, then deletes rows from `buyer_scm_mappings`, `approval_matrix_approvers`, `user_custom_roles`, `user_tenants`, `user_roles`, `profiles`, and the auth user.
+- Nothing rewires `buyer_approval_flows.*_user_id` or in-flight `vendor_approval_progress` rows whose `acted_by`/next-approver identity depends on this user via `buyer_approval_flows`. Result: after delete, pending approvals point at a removed user and get stuck.
+- `reassign-user-work` already implements the exact preview + apply logic we need (eligible replacements, flow columns, matrix dedupe, mapping dedupe) for the Inactivate flow.
 
 ## Plan
 
-### 1. Frontend — revert to direct upload
-`src/hooks/useVendorRegistration.tsx`: replace the `supabase.functions.invoke('upload-vendor-document', ...)` block with:
-```ts
-const path = `${vendorId}/${docType}/${Date.now()}_${file.name}`;
-const { error } = await supabase.storage
-  .from('vendor-documents')
-  .upload(path, file, { upsert: true, contentType: file.type });
-```
-Restore the original toast that surfaces the raw Storage error.
+### 1. Backend — new required reassignment step in delete
 
-### 2. Delete the Edge Function
-- Remove `supabase/functions/upload-vendor-document/` from the repo.
-- Delete the deployed function via the delete tool.
-- On PROD host:
-  ```bash
-  rm -rf /opt/Ramky_Applications/PROD/VMS/backend/volumes/functions/upload-vendor-document
-  docker compose -p supabase-prod up -d --force-recreate --no-deps functions
-  ```
+Edit `supabase/functions/admin-delete-user/index.ts`:
 
-### 3. Dump DEV's `vendor-documents` config as the source of truth
-Run on DEV (Studio → SQL) and paste the result:
-```sql
--- Bucket row
-SELECT id, public, file_size_limit, allowed_mime_types
-FROM storage.buckets WHERE id = 'vendor-documents';
+- Accept a new required body field `replacement_user_id` (uuid).
+- Before any destructive work, verify the replacement is:
+  - active, not the caller, not the target,
+  - eligible under the same rules used by `reassign-user-work` (shared custom role if target has one, else shared built-in role).
+  - If missing/invalid → return `{ ok:false, error, code:'replacement_required' | 'replacement_invalid' }` with the same structured shape used today.
+- Run the same reassignment logic used by `reassign-user-work` apply-mode against the target user, in this order, before existing cleanup:
+  1. `buyer_approval_flows` — update each of the 5 approver columns.
+  2. `approval_matrix_approvers` — reassign with dedupe on `(level_id, user_id)`.
+  3. `buyer_scm_mappings` — reassign both `scm_manager_user_id` and `buyer_user_id` with dedupe.
+  4. `vendor_approval_progress` — reassign in-flight rows (`status='pending'` and `acted_by = target`) `acted_by → replacement`. Also cover any historical rows where `acted_by = target` only if `status='pending'`; keep completed history intact.
+- Keep existing nullify + delete steps for the target user afterward. Remove the current unconditional `buyer_scm_mappings.delete_as_buyer/as_scm` and `approval_matrix_approvers.delete` — those rows should already have been reassigned; only rows that couldn't move (none, since reassignment is exhaustive) would remain. Safer: leave the deletes in place as a final safety net so residual rows can't block user delete.
+- Write an `audit_logs` entry `action='user_deleted_with_reassignment'` including `replacement_user_id`, replacement email, and per-table counts.
 
--- All policies on storage.objects
-SELECT policyname, cmd, roles, qual, with_check
-FROM pg_policies
-WHERE schemaname='storage' AND tablename='objects'
-ORDER BY policyname;
+### 2. Frontend — force reassignment picker before delete
 
--- RLS flag
-SELECT relrowsecurity, relforcerowsecurity
-FROM pg_class WHERE relname='objects' AND relnamespace='storage'::regnamespace;
-```
+Edit `src/pages/UserManagement.tsx` (delete trigger) and reuse the existing `ReplaceUserDialog.tsx` pattern (already used for Inactivate).
 
-### 4. Run the same three queries on PROD and diff
-Any policy present on DEV but missing/different on PROD is a suspect. Any policy on PROD not on DEV is leftover garbage from earlier attempts.
+- Replace the current confirm-and-delete with a two-step dialog:
+  1. Call `reassign-user-work` in `preview` mode for the target to fetch `counts` + `eligible` list.
+  2. Show an "eligible replacement" dropdown (same UX as inactivate). Disable Delete until a replacement is selected.
+  3. If `counts` are all zero AND target holds no approver seats, allow "Delete without reassignment" (still pass no `replacement_user_id`; backend will accept when workload is empty).
+- On confirm, invoke `admin-delete-user` with `{ user_id, replacement_user_id }`.
+- Surface backend structured errors (`code:'replacement_required' | 'replacement_invalid'`) as toasts and keep the dialog open.
 
-### 5. Rebuild PROD policies to match DEV exactly
-Idempotent:
-```sql
-DO $$
-DECLARE p record;
-BEGIN
-  FOR p IN
-    SELECT policyname FROM pg_policies
-    WHERE schemaname='storage' AND tablename='objects'
-      AND policyname LIKE 'vendor_documents_%'
-  LOOP
-    EXECUTE format('DROP POLICY %I ON storage.objects', p.policyname);
-  END LOOP;
-END $$;
+### 3. No DB migration required
 
--- Then paste the CREATE POLICY statements built from DEV's Step-3 dump, verbatim.
-```
+All tables and columns already exist; changes are purely in the edge function and UI.
 
-### 6. Signed-in probe on PROD (should return 200)
-```bash
-USER_JWT='<paste sb-...-auth-token access_token from browser devtools>'
-ANON_KEY='<PROD anon key>'
-VENDOR_ID='<vendor id owned by that user>'
+## Verification
 
-curl -i -X POST \
-  "http://127.0.0.1:8010/storage/v1/object/vendor-documents/$VENDOR_ID/diagnostic/probe-$(date +%s).txt" \
-  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $USER_JWT" \
-  -H "Content-Type: text/plain" --data 'probe' --max-time 10
-```
-- 200 → repeat the same call through `https://vendx.ramky.com/supabase/storage/v1/...` — if that's 403, PROD Nginx is stripping `Authorization`/`apikey` on `/supabase/storage/`.
-- 403 → policies still don't match; re-diff Step 4.
+- Delete a Finance 2 approver who has: a seat in `buyer_approval_flows.finance_2_user_id`, a pending `vendor_approval_progress` row at FINANCE_2, an `approval_matrix_approvers` row, and a `buyer_scm_mappings` row. After delete:
+  - Replacement user appears in the flow slot, the pending progress row's `acted_by` = replacement (still `pending`), matrix + mapping rows reassigned with no unique-constraint errors.
+  - Vendor list still shows the request; replacement can act on it.
+  - `audit_logs` has `user_deleted_with_reassignment` with counts > 0.
+- Delete a user with zero workload → proceeds without requiring a replacement.
+- Attempt delete without a replacement while workload > 0 → blocked with clear error.
 
-### 7. Verify in the browser
-Submit a vendor application → `gst_certificate` uploads with 200, no `upload-vendor-document` calls in the network tab.
+## Files touched
 
-## Not doing
-
-- No service_role policy on `storage.objects`.
-- No `ALTER ROLE ... BYPASSRLS`.
-- No new Edge Function.
-- No schema change that DEV doesn't already have.
-
-## Confirm to proceed
-
-1. OK to delete `upload-vendor-document` (repo + live project + PROD mount) and revert the frontend?
-2. Will you run Step 3 on DEV and Step 4 on PROD and paste both outputs so I can generate the exact `CREATE POLICY` statements for Step 5?
+- `supabase/functions/admin-delete-user/index.ts` — add replacement validation + reassignment steps + new audit action.
+- `src/pages/UserManagement.tsx` — swap plain delete confirm for reassignment dialog.
+- Reuse `src/components/admin/ReplaceUserDialog.tsx` (or a small variant) for the picker; no schema changes.
