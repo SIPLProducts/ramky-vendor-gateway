@@ -130,24 +130,19 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!actionItem) return;
     setSubmitting(true);
     try {
-      // Buyer approve: persist Classification onto vendor before routing forward
+      const body: any = {
+        progress_id: actionItem.item.progressId,
+        action: actionItem.action,
+        comments: comments.trim() || null,
+      };
       if (isBuyer && actionItem.action === 'approve') {
-        const { error: clsErr } = await supabase.from('vendors').update({
-          material_group_vendor: buyerClassification.materialGroupVendor[0] ?? null,
+        body.classification = {
           material_group_vendors: buyerClassification.materialGroupVendor,
-          vendor_category: buyerClassification.vendorCategory[0] ?? null,
           vendor_categories: buyerClassification.vendorCategory,
-        }).eq('id', actionItem.item.vendorId);
-        if (clsErr) throw clsErr;
+        };
       }
 
-      const { data, error } = await supabase.functions.invoke('process-approval-action', {
-        body: {
-          progress_id: actionItem.item.progressId,
-          action: actionItem.action,
-          comments: comments.trim() || null,
-        },
-      });
+      const { data, error } = await supabase.functions.invoke('process-approval-action', { body });
       if (error) throw error;
 
       // Non-buyer rejection: email may have failed → ask for confirmation.
