@@ -439,13 +439,14 @@ export default function Dashboard() {
                   <TableHead>Vendor Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created Date</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-4 w-full" />
                         </TableCell>
@@ -454,7 +455,7 @@ export default function Dashboard() {
                   ))
                 ) : filteredVendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       {statusFilter === 'all' ? 'No vendor applications in this date range.' : 'No vendor applications match this filter.'}
                     </TableCell>
                   </TableRow>
@@ -479,6 +480,30 @@ export default function Dashboard() {
                       <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="View"
+                            onClick={() => setViewVendorId(v.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Comments"
+                            onClick={() => setCommentsVendor({
+                              id: v.id,
+                              name: pickVendorDisplayName(v) || v.legal_name || '',
+                              ref: v.reference_number || '',
+                            })}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -487,6 +512,20 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <VendorReviewDialog
+        vendorId={viewVendorId}
+        open={!!viewVendorId}
+        onOpenChange={(o) => { if (!o) setViewVendorId(null); }}
+      />
+
+      <ApprovalCommentsDialog
+        open={!!commentsVendor}
+        onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
+        vendorId={commentsVendor?.id ?? null}
+        vendorName={commentsVendor?.name}
+        referenceNumber={commentsVendor?.ref}
+      />
     </div>
   );
 }
