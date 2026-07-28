@@ -1,16 +1,22 @@
-Delete user `sunilkumar@sharviinfotech.com` from the Lovable Cloud (dev) database so the email can be re-used in the Add User flow.
+## Root cause
 
-## Steps
+- `sunilakula1919@gmail.com` has **two** rows in `public.user_roles`: `vendor` (auto-inserted by the `handle_new_user` trigger on signup) and `approver` (added later by `admin-create-user`).
+- `useAuth.loadRoles()` fetches the role with `.maybeSingle()`, which errors with PGRST116 ("multiple rows returned") — visible in the console logs.
+- On error, `userRole` stays `null` and `rolesError = true`. The `Auth.tsx` redirect effect requires `userRole` to be set before navigating, so the user is stuck on `/auth` even though sign-in itself returns 200 (confirmed in auth logs).
 
-1. Look up the user id in `auth.users` for that email.
-2. Detach / delete all references in this order:
-   - `public.vendor_invitations`: set `user_id = NULL` and `created_by = NULL` where they match (preserve invitation history).
-   - `public.user_custom_roles`, `public.user_roles`, `public.user_tenants`: delete rows for that user.
-   - `public.buyer_approval_flows`: null out `scm_manager_user_id`, `scm_head_user_id`, `finance_1_user_id`, `finance_2_user_id`, `ceo_office_user_id` references; delete rows where `buyer_user_id` matches.
-   - `public.buyer_scm_mappings`: delete rows where `buyer_user_id` or `scm_manager_user_id` matches.
-   - `public.approval_matrix_approvers`: delete rows for that user.
-   - `public.profiles`: delete the row with matching id.
-   - `auth.users`: delete the user row.
-3. Verify via a read query that the email is gone.
+Any admin-created non-vendor user is at risk of the same issue.
 
-Executed as a single SQL block through the data tool.
+## Fix
+
+1. **Data cleanup for this user** — delete the stray `vendor` row so only `approver` remains:
+   ```sql
+   DELETE FROM public.user_roles
+   WHERE user_id = '4ccfd629-b769-4fe3-b187-ba1ab1f33b0a'
+     AND role = 'vendor';
+   ```
+
+2. **Prevent recurrence in `admin-create-user`** — when the edge function assigns a non-vendor role, first delete any existing `vendor` row for that `user_id`, then upsert the target role (so re-runs don't duplicate).
+
+3. **Defensive fix in `useAuth.loadRoles`** — replace `.maybeSingle()` with a `.select('role').order(...).limit(1)` fetch (or read all rows and pick the highest-priority non-vendor role) so a duplicate never blocks login again. Also clear `rolesError` UI gate so a role-fetch failure falls back to `vendor` instead of hanging.
+
+After step 1 the user can log in immediately; steps 2 and 3 stop this class of bug for future admin-created users.
