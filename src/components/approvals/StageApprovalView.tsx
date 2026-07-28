@@ -229,6 +229,15 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!rejectedAction) return;
     setRejectedSubmitting(true);
     try {
+      if (isBuyer && rejectedAction.action === 'approve') {
+        const { error: clsErr } = await supabase.from('vendors').update({
+          material_group_vendor: rejectedClassification.materialGroupVendor[0] ?? null,
+          material_group_vendors: rejectedClassification.materialGroupVendor,
+          vendor_category: rejectedClassification.vendorCategory[0] ?? null,
+          vendor_categories: rejectedClassification.vendorCategory,
+        }).eq('id', rejectedAction.item.vendorId);
+        if (clsErr) throw clsErr;
+      }
       const fnName =
         rejectedAction.action === 'approve' ? 'buyer-reapprove-rejected' : 'buyer-return-to-vendor';
       const { error } = await supabase.functions.invoke(fnName, {
