@@ -335,7 +335,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     )}
                     {it.rejectionComments && (
                       <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                        <strong>Returned from {it.rejectionFromStage}:</strong>{' '}
+                        <strong>Returned from {it.rejectionFromStage ? formatStageLevelHistory(it.rejectionFromStage, 1) : 'Approver'}:</strong>{' '}
                         {it.rejectionComments}
                       </div>
                     )}
