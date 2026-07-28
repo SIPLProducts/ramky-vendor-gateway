@@ -715,6 +715,20 @@ export default function UserManagement() {
                               >
                                 <Pencil className="h-4 w-4 mr-1" /> Edit
                               </Button>
+                              {u.status === 'inactive' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setReassignCtx({
+                                    id: u.id, email: u.email, full_name: u.full_name,
+                                    roleLabel: u.customRoles.map((c) => c.name).join(', ') || u.role,
+                                    tenantNames: u.tenants.map((t) => t.name),
+                                  })}
+                                  title="Reassign this user's leftover vendors, approval flows and mappings"
+                                >
+                                  Reassign work
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -727,6 +741,7 @@ export default function UserManagement() {
                               </Button>
                             </div>
                           </TableCell>
+
                         </TableRow>
                       ))
                     )}
