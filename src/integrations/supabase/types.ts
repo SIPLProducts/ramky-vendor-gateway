@@ -1580,6 +1580,53 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_approval_history: {
+        Row: {
+          acted_at: string
+          acted_by: string | null
+          action: string
+          comments: string | null
+          created_at: string
+          from_stage: string | null
+          id: string
+          level_number: number | null
+          stage: string
+          vendor_id: string
+        }
+        Insert: {
+          acted_at?: string
+          acted_by?: string | null
+          action: string
+          comments?: string | null
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          level_number?: number | null
+          stage: string
+          vendor_id: string
+        }
+        Update: {
+          acted_at?: string
+          acted_by?: string | null
+          action?: string
+          comments?: string | null
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          level_number?: number | null
+          stage?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_approval_history_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_approval_progress: {
         Row: {
           acted_at: string | null

@@ -173,6 +173,12 @@ Deno.serve(async (req) => {
       details: { remarks, stage: 'SAP_TEAM' },
     });
 
+    await admin.from('vendor_approval_history').insert({
+      vendor_id: vendorId, stage: 'SAP_TEAM', level_number: null,
+      action: 'returned_to_buyer', from_stage: 'SAP_TEAM',
+      comments: remarks ?? null, acted_by: auth.userId, acted_at: nowIso,
+    });
+
     try {
       await admin.from('audit_logs').insert({
         action: emailSent ? 'buyer_notified_rejection_email' : 'buyer_rejection_email_failed',

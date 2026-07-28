@@ -110,6 +110,10 @@ Deno.serve(async (req) => {
         await admin.from('vendor_approval_progress').update({
           status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
         }).eq('id', progress_id);
+        await admin.from('vendor_approval_history').insert({
+          vendor_id: progress.vendor_id, stage: curStage, level_number: progress.level_number,
+          action: 'rejected', comments: comments ?? null, acted_by: userId, acted_at: nowIso,
+        });
         await admin.from('vendors').update({ status: 'returned_to_vendor', ...vendorRejectionPatch }).eq('id', progress.vendor_id);
         await admin.from('audit_logs').insert({
           action: 'vendor_buyer_rejected', user_id: userId, vendor_id: progress.vendor_id, details: { comments },
@@ -225,6 +229,10 @@ Deno.serve(async (req) => {
       await admin.from('vendor_approval_progress').update({
         status: 'rejected', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
       }).eq('id', progress_id);
+      await admin.from('vendor_approval_history').insert({
+        vendor_id: progress.vendor_id, stage: curStage, level_number: progress.level_number,
+        action: 'rejected', from_stage: curStage, comments: comments ?? null, acted_by: userId, acted_at: nowIso,
+      });
       await admin.from('vendor_approval_progress')
         .update({ status: 'cancelled', acted_at: nowIso, completed_at: nowIso })
         .eq('vendor_id', progress.vendor_id).eq('status', 'pending');
@@ -269,6 +277,10 @@ Deno.serve(async (req) => {
     await admin.from('vendor_approval_progress').update({
       status: 'approved', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
     }).eq('id', progress_id);
+    await admin.from('vendor_approval_history').insert({
+      vendor_id: progress.vendor_id, stage: curStage, level_number: progress.level_number,
+      action: 'approved', comments: comments ?? null, acted_by: userId, acted_at: nowIso,
+    });
 
     const remaining = (allProgress ?? [])
       .filter((p) => p.status === 'pending' && p.id !== progress_id);

@@ -17,15 +17,28 @@ interface Props {
 
 interface Row {
   id: string;
-  level_number: number;
-  status: string;
+  level_number: number | null;
+  action: string;
   stage: string;
+  from_stage: string | null;
   comments: string | null;
-  rejection_comments: string | null;
-  rejection_from_stage: string | null;
   acted_at: string | null;
   acted_by_name: string | null;
 }
+
+const ACTION_LABEL: Record<string, string> = {
+  approved: 'Approved',
+  rejected: 'Rejected',
+  returned_to_buyer: 'Returned to Buyer',
+  returned_to_vendor: 'Returned to Vendor',
+  resubmitted: 'Resubmitted',
+};
+
+const actionVariant = (a: string): 'secondary' | 'destructive' | 'outline' | 'default' => {
+  if (a === 'approved' || a === 'resubmitted') return 'secondary';
+  if (a === 'rejected') return 'destructive';
+  return 'outline';
+};
 
 export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorName, referenceNumber }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -36,27 +49,26 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data: progress } = await supabase
-        .from('vendor_approval_progress')
-        .select('id, level_number, status, stage, acted_at, acted_by, comments, rejection_comments, rejection_from_stage')
+      const { data: hist } = await supabase
+        .from('vendor_approval_history' as any)
+        .select('id, level_number, stage, action, from_stage, comments, acted_by, acted_at')
         .eq('vendor_id', vendorId)
-        .order('level_number', { ascending: true });
+        .order('acted_at', { ascending: true });
 
-      const userIds = (progress ?? []).map((p: any) => p.acted_by).filter(Boolean) as string[];
+      const userIds = (hist ?? []).map((p: any) => p.acted_by).filter(Boolean) as string[];
       const { data: profiles } = userIds.length > 0
         ? await supabase.from('profiles').select('id, full_name, email').in('id', userIds)
         : { data: [] as any[] };
       const pMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name ?? p.email]));
 
       if (cancelled) return;
-      setRows((progress ?? []).map((p: any) => ({
+      setRows((hist ?? []).map((p: any) => ({
         id: p.id,
         level_number: p.level_number,
-        status: p.status,
         stage: p.stage ?? 'SCM_MANAGER',
+        action: p.action,
+        from_stage: p.from_stage,
         comments: p.comments,
-        rejection_comments: p.rejection_comments,
-        rejection_from_stage: p.rejection_from_stage,
         acted_at: p.acted_at,
         acted_by_name: p.acted_by ? (pMap.get(p.acted_by) ?? null) : null,
       })));
@@ -64,9 +76,6 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
     })();
     return () => { cancelled = true; };
   }, [open, vendorId]);
-
-  const statusVariant = (s: string): 'secondary' | 'destructive' | 'outline' =>
-    s === 'approved' ? 'secondary' : s === 'rejected' ? 'destructive' : 'outline';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,33 +102,34 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
                 <TableRow>
                   <TableHead>Approval Stage</TableHead>
                   <TableHead>Approver Name</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Action</TableHead>
                   <TableHead>Comments</TableHead>
                   <TableHead className="whitespace-nowrap">Date &amp; Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => {
-                  const comment = r.comments
-                    || (r.rejection_comments
-                        ? `Returned from ${r.rejection_from_stage ?? 'next stage'}: ${r.rejection_comments}`
-                        : null);
-                  return (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number)}
-                      </TableCell>
-                      <TableCell>{r.acted_by_name ?? '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant(r.status)}>{r.status}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-pre-wrap text-sm">{comment ?? '—'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDateTime(r.acted_at, '—')}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">
+                      {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number ?? 1)}
+                      {r.from_stage && r.from_stage !== r.stage && r.action !== 'rejected' && (
+                        <div className="text-xs text-muted-foreground">
+                          from {formatStageLevelHistory(r.from_stage as ApprovalStage, 1)}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{r.acted_by_name ?? '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={actionVariant(r.action)}>
+                        {ACTION_LABEL[r.action] ?? r.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-pre-wrap text-sm">{r.comments ?? '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {formatDateTime(r.acted_at, '—')}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
