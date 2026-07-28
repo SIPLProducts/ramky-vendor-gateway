@@ -85,6 +85,10 @@ export default function UserManagement() {
     inactiveUser: { id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[] };
     pendingPatch: { full_name: string; status: 'active' | 'inactive'; role: AppRole; tenantIds: string[]; customRoleIds: string[] };
   }>(null);
+  const [reassignCtx, setReassignCtx] = useState<null | {
+    id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[];
+  }>(null);
+
 
   // Deletion is handled by DeleteUserDialog, which enforces replacement-user selection
   // for anyone with active approval workload before invoking admin-delete-user.
