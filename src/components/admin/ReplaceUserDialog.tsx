@@ -229,8 +229,9 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>Cancel</Button>
           <Button onClick={handleConfirm} disabled={!replacementId || applying || loading}>
             {applying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Confirm & Inactivate
+            {reassignOnly ? 'Reassign Work' : 'Confirm & Inactivate'}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>
