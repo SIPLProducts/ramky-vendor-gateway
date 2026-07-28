@@ -22,7 +22,14 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   inactiveUser: { id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[] } | null;
   onConfirmed: () => void; // called after successful reassignment (caller then flips status)
+  /**
+   * When true, the dialog is used to reassign work for a user who is ALREADY
+   * inactive. The confirm button label switches to "Reassign work" and no
+   * subsequent status flip is expected from the caller.
+   */
+  reassignOnly?: boolean;
 }
+
 
 export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirmed }: Props) {
   const { toast } = useToast();
