@@ -422,7 +422,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                 <TableCell>
                   <Badge variant="destructive">
                     {it.rejectionFromStage
-                      ? String(it.rejectionFromStage).replace(/_/g, ' ')
+                      ? formatStageLevelHistory(it.rejectionFromStage, 1)
                       : '—'}
                   </Badge>
                 </TableCell>
