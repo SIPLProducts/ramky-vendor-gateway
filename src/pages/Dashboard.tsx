@@ -9,9 +9,13 @@ import {
   CheckCircle,
   Clock,
   Download,
+  Eye,
   FileText,
+  MessageSquare,
   XCircle,
 } from 'lucide-react';
+import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
+import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
