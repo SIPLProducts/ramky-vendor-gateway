@@ -689,7 +689,16 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectedAction(null)}>Cancel</Button>
-            <Button onClick={submitRejectedAction} disabled={rejectedSubmitting}>
+            <Button
+              onClick={submitRejectedAction}
+              disabled={
+                rejectedSubmitting ||
+                (isBuyer && rejectedAction?.action === 'approve' && (
+                  rejectedClassification.materialGroupVendor.length === 0 ||
+                  rejectedClassification.vendorCategory.length === 0
+                ))
+              }
+            >
               {rejectedSubmitting
                 ? 'Submitting...'
                 : rejectedAction?.action === 'approve' ? 'Confirm Approve' : 'Send to Vendor'}
