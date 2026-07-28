@@ -14,10 +14,21 @@ interface Props {
   selectPlaceholder?: string;
 }
 
+const toProperCase = (s: string) => {
+  if (!s) return s;
+  // Only transform if entirely uppercase (letters); leave mixed-case as-is
+  if (!/[a-z]/.test(s) && /[A-Z]/.test(s)) {
+    return s
+      .toLowerCase()
+      .replace(/\b([a-z])/g, (_, c) => c.toUpperCase());
+  }
+  return s;
+};
+
 const toOptions = (rows: SapMasterRow[] | undefined) =>
   (rows || []).map((r) => ({
     value: r.code,
-    label: r.description || r.code,
+    label: toProperCase(r.description || r.code),
   }));
 
 export function ClassificationField({
