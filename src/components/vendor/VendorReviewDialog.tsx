@@ -22,6 +22,7 @@ import { ValidationResult } from '@/types/vendor';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
 import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
+import { useSapMasterData } from '@/hooks/useSapMasterData';
 import {
   Building2,
   MapPin,
@@ -205,6 +206,27 @@ export function VendorReviewDialog({
     invitedAt: string | null;
   } | null>(null);
   const { callProvider } = useConfiguredKycApi();
+
+  // Classification master data — for Proper Case display of codes
+  const { data: mgvRows } = useSapMasterData('material_group_vendor');
+  const { data: vcRows } = useSapMasterData('vendor_category');
+  const { data: cfRows } = useSapMasterData('vendor_cashflow');
+  const { data: tcRows } = useSapMasterData('tier_category');
+  const buildDescMap = (rows: any[] | undefined) => {
+    const m = new Map<string, string>();
+    (rows || []).forEach((r) => {
+      if (r?.code) m.set(String(r.code), r.description || r.code);
+    });
+    return m;
+  };
+  const mgvMap = buildDescMap(mgvRows as any);
+  const vcMap = buildDescMap(vcRows as any);
+  const cfMap = buildDescMap(cfRows as any);
+  const tcMap = buildDescMap(tcRows as any);
+  const fmtCodes = (arr: any, map: Map<string, string>) =>
+    Array.isArray(arr) && arr.length
+      ? arr.map((c) => map.get(String(c)) || String(c)).join(', ')
+      : '-';
 
   useEffect(() => {
     let cancelled = false;
@@ -596,22 +618,21 @@ export function VendorReviewDialog({
                   {/* Classification Details */}
                   {(() => {
                     const v = vendor as any;
-                    const fmtArr = (arr: any) => Array.isArray(arr) && arr.length ? arr.join(', ') : '-';
                     return (
                       <SectionCard icon={Tags} title="Classification Details">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="border border-border rounded-lg p-3 space-y-2">
                             <p className="text-xs font-semibold text-primary">Vendor_Details</p>
                             <div className="grid grid-cols-1 gap-2 text-sm">
-                              <div><p className="text-muted-foreground">Material Group for Vendors</p><p className="font-medium">{fmtArr(v.material_group_vendors)}</p></div>
-                              <div><p className="text-muted-foreground">Vendor Category</p><p className="font-medium">{fmtArr(v.vendor_categories)}</p></div>
+                              <div><p className="text-muted-foreground">Material Group for Vendors</p><p className="font-medium">{fmtCodes(v.material_group_vendors, mgvMap)}</p></div>
+                              <div><p className="text-muted-foreground">Vendor Category</p><p className="font-medium">{fmtCodes(v.vendor_categories, vcMap)}</p></div>
                             </div>
                           </div>
                           <div className="border border-border rounded-lg p-3 space-y-2">
                             <p className="text-xs font-semibold text-primary">Vendor_CFSTMT</p>
                             <div className="grid grid-cols-1 gap-2 text-sm">
-                              <div><p className="text-muted-foreground">Vendor Cash Flow</p><p className="font-medium">{fmtArr(v.vendor_cashflow)}</p></div>
-                              <div><p className="text-muted-foreground">Tier Category</p><p className="font-medium">{fmtArr(v.tier_category)}</p></div>
+                              <div><p className="text-muted-foreground">Vendor Cash Flow</p><p className="font-medium">{fmtCodes(v.vendor_cashflow, cfMap)}</p></div>
+                              <div><p className="text-muted-foreground">Tier Category</p><p className="font-medium">{fmtCodes(v.tier_category, tcMap)}</p></div>
                             </div>
                           </div>
                         </div>
