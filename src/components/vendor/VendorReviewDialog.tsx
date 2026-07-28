@@ -455,7 +455,7 @@ export function VendorReviewDialog({
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
-            {(vendor && getSapName1(vendor)) || vendor?.legal_name || 'Vendor Details'}
+            {(vendor && formatVendorName(vendor)) || toProperCase(vendor?.legal_name) || 'Vendor Details'}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
