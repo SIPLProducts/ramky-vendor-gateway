@@ -1,15 +1,30 @@
-## Issue
+## Problem
 
-The Approve / Reject dialogs in `StageApprovalView.tsx` keep whatever text was typed the previous time the dialog was opened. `comments` and `rejectedRemarks` are only cleared on successful submit — not when the dialog is closed via Cancel, nor when it is reopened for a different vendor. So the "first time entered" comment keeps showing up.
+When a Buyer re-approves after a rejection (e.g. from SCM Manager), the comment saved to the approval history is auto-generated:
+
+`Approved after rejection by SCM_MANAGER — Verifyed and approved`
+
+The buyer wants only their own comment (`Verifyed and approved`) to appear — no auto-prefix, no stage name.
+
+## Root cause
+
+`supabase/functions/buyer-reapprove-rejected/index.ts` (line 113) constructs a synthetic string before saving the BUYER approval row:
+
+```ts
+const buyerComment = `Approved after rejection${fromStage ? ` by ${fromStage}` : ''}${comments ? ` — ${comments}` : ''}`;
+```
+
+That prefix is what's showing in the comments history.
 
 ## Fix
 
-File: `src/components/approvals/StageApprovalView.tsx`
+In `supabase/functions/buyer-reapprove-rejected/index.ts`:
 
-- Add a `useEffect` that resets `comments` to `''` whenever `actionItem` changes (opens for a new vendor or is closed).
-- Add a `useEffect` that resets `rejectedRemarks` to `''` whenever `rejectedAction` changes.
+- Remove the `buyerComment` template.
+- Save the buyer's raw `comments` value directly into `vendor_approval_progress.comments` (empty string / null if not provided — matching the normal approve flow in `process-approval-action`).
 
-No other behavior changes.
+No UI changes; no other flows touched. Rejection metadata clearing and chain re-seeding stay as-is.
 
-## Out of scope
-- No changes to how comments are persisted, displayed in history, or sent to edge functions.
+## Result
+
+Comments history for a buyer re-approval will show exactly what the buyer typed, e.g. `Verifyed and approved`, with no `Approved after rejection by SCM_MANAGER — ` prefix.
