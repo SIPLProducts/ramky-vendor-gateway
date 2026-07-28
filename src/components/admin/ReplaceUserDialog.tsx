@@ -31,7 +31,7 @@ interface Props {
 }
 
 
-export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirmed }: Props) {
+export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirmed, reassignOnly = false }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
