@@ -766,43 +766,47 @@ export default function SAPSync() {
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                             {dupRaw && (
-                              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
-                                <div className="px-3 py-2 bg-amber-100 border-b border-amber-200">
-                                  <p className="text-xs font-semibold text-amber-900">Existing Vendor Details (from SAP)</p>
+                              <div className="mt-3 rounded-xl border border-amber-300 bg-gradient-to-b from-amber-50 to-white overflow-hidden shadow-sm ring-1 ring-amber-200/60">
+                                <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100 to-red-100 border-b border-amber-300 flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-amber-700" />
+                                  <div>
+                                    <p className="text-sm font-bold text-amber-900 leading-tight">Existing Vendor Details</p>
+                                    <p className="text-[11px] text-amber-800/80">Vendor already exists in SAP</p>
+                                  </div>
                                 </div>
                                 <table className="w-full text-sm">
                                   <tbody>
                                     {dupParts.length >= 2 ? (
                                       <>
                                         {dupSapCode && (
-                                          <tr className="border-b border-amber-100">
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50 w-1/3">SAP Vendor Code</td>
-                                            <td className="px-3 py-2 font-mono text-amber-950">{dupSapCode}</td>
+                                          <tr className="border-b border-amber-100 odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900 w-1/3">SAP Vendor Code</td>
+                                            <td className="px-4 py-2 font-mono text-amber-950">{dupSapCode}</td>
                                           </tr>
                                         )}
                                         {dupName && (
-                                          <tr className="border-b border-amber-100">
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">Vendor Name</td>
-                                            <td className="px-3 py-2 text-amber-950">{dupName}</td>
+                                          <tr className="border-b border-amber-100 odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900">Vendor Name</td>
+                                            <td className="px-4 py-2 text-amber-950">{dupName}</td>
                                           </tr>
                                         )}
                                         {dupPan && (
-                                          <tr className="border-b border-amber-100">
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">PAN Number</td>
-                                            <td className="px-3 py-2 font-mono text-amber-950">{dupPan}</td>
+                                          <tr className="border-b border-amber-100 odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900">PAN Number</td>
+                                            <td className="px-4 py-2 font-mono text-amber-950">{dupPan}</td>
                                           </tr>
                                         )}
                                         {dupGstin && (
-                                          <tr>
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">GSTIN</td>
-                                            <td className="px-3 py-2 font-mono text-amber-950">{dupGstin}</td>
+                                          <tr className="odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900">GSTIN</td>
+                                            <td className="px-4 py-2 font-mono text-amber-950">{dupGstin}</td>
                                           </tr>
                                         )}
                                       </>
                                     ) : (
                                       <tr>
-                                        <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50 w-1/3">Details</td>
-                                        <td className="px-3 py-2 text-amber-950 whitespace-pre-wrap">{dupRaw}</td>
+                                        <td className="px-4 py-2 font-semibold text-amber-900 w-1/3 bg-amber-50/60">Details</td>
+                                        <td className="px-4 py-2 text-amber-950 whitespace-pre-wrap">{dupRaw}</td>
                                       </tr>
                                     )}
                                   </tbody>
