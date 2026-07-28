@@ -1133,6 +1133,14 @@ export default function SAPSync() {
                 const success = item?.success ?? (r?.MSGTYP === 'S');
                 const ref = item?.refNo || getSapRowRef(r) || getSapRowRef(item?.totRaw);
                 const message = item?.message || getSapRowMessage(r) || getSapRowMessage(item?.totRaw) || 'No message returned from SAP';
+                const sapCode = r.VENDOR ?? r.BP_LIFNR ?? '';
+                const dup = isPanDuplicateResponse(item?.sapResponse || item);
+                if (success && (sapCode || r.BPNAME)) {
+                  return <SuccessVendorTable key={i} sapCode={sapCode} bpName={r.BPNAME} refNo={ref} message={message} />;
+                }
+                if (dup.matched && dup.msgText) {
+                  return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
+                }
                 return (
                 <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
                   <div className="flex items-center justify-between">
@@ -1143,7 +1151,7 @@ export default function SAPSync() {
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     {ref && <p>Ref No: <span className="font-mono">{ref}</span></p>}
-                    {(r.VENDOR || r.BP_LIFNR) && <p>SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR ?? r.BP_LIFNR}</span></p>}
+                    {sapCode && <p>SAP Vendor Code: <span className="font-mono font-semibold">{sapCode}</span></p>}
                   </div>
                 </div>
               );})}
