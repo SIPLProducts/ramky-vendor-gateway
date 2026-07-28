@@ -1012,7 +1012,7 @@ export default function AdminInvitations() {
                           {(invitation as any).vendor_name ? (
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-muted-foreground" />
-                              <span>{(invitation as any).vendor_name}</span>
+                              <span>{toProperCase((invitation as any).vendor_name)}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
