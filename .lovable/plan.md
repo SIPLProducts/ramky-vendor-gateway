@@ -1,51 +1,48 @@
-## Vendor Reassignment on Buyer Inactive/Delete
+## Why Sunil's data isn't appearing under Divyabharathi
 
-### Schema change
-- Add `original_created_by uuid` to `public.vendor_invitations` (nullable, references `auth.users`).
-- Backfill: leave NULL for existing rows (means "same as current created_by").
+Verified in the DB:
 
-### Edge Function: `reassign-user-work`
-When a buyer is marked Inactive/Deleted with a replacement selected:
-1. For every `vendor_invitations` row where `created_by = <old_buyer>`:
-   - If `original_created_by IS NULL` → set it to the old buyer (preserve first inviter).
-   - Set `created_by = <replacement_buyer>`.
-2. Existing reassignment of `buyer_approval_flows` and `buyer_scm_mappings` continues as today.
-3. Return counts (invitations transferred, flows reassigned) for the UI toast.
+- Audit log for the Sunil→Divya reassignment ran at `2026-07-28 10:20:52` and the `counts` payload has **no `vendor_invitations` key** — meaning the old function ran without the invitation-transfer block.
+- `vendor_invitations` still holds **3 rows with `created_by = Sunil`** and `original_created_by = NULL`:
+  - `ef386de7…` → vendor `011ff700…` (ref `20260728001`, status `buyer_review`)
+  - `e2a7d28d…` → vendor `2c89dc94…` (ref `20260728002`, status `buyer_review`)
+  - `7894dd82…` → `sunilkumar@sharviinfotech.com` (no vendor yet, pending link)
+- All 18 rows currently on Divya have `original_created_by = NULL` (her own — never carried Sunil's stamp).
 
-### Approval matrix behavior after reassignment (your question)
-This is the important part — approvals follow the **current** `created_by`, not the original:
+Because visibility for buyers, dashboard and the `list-pending-approvals-by-stage` edge function all key off `vendor_invitations.created_by`, the two vendors above are still tied to the inactive Sunil and invisible to Divya.
 
-- `buyer_visible_vendor_ids` and `approver_visible_vendor_ids` both key off `vendor_invitations.created_by`. Once we flip `created_by` to Divyabharathi:
-  - Divyabharathi sees Sunil's old vendors in her Buyer dashboard.
-  - The downstream approvers (SCM Manager, SCM Head, Finance 1/2, CEO Office) are resolved from `buyer_approval_flows` for **Divyabharathi's** row — so her SCM/Finance chain becomes the active chain for those vendors going forward.
-  - Sunil's approvers lose visibility to those vendors (correct — Sunil is inactive).
-- Pending approval steps already seeded in `vendor_approval_progress` are **not** rewritten. Two sub-options — pick one:
-  - **A. Leave in-flight approvals as-is** (recommended). Vendors still mid-approval keep the stage rows already generated from Sunil's flow; only *new* submissions or *returned-to-vendor* resubmits use Divyabharathi's flow (because `seed_vendor_approval_progress` re-reads the buyer flow on resubmit — and it reads by the invitation's current `created_by`, which is now Divyabharathi).
-  - **B. Re-seed active approvals** for vendors currently in a review status, so Divyabharathi's chain takes over immediately. Higher risk of losing already-completed approvals — do only if you want a clean cutover.
+Also found: `admin-delete-user` still calls `vendor_invitations.update({ created_by: null })` unconditionally — same bug will bite on Delete. And there's no way to re-run reassignment for an already-inactive user, which is what's blocking the user right now.
 
-Default: **Option A**. Confirm if you want B instead.
+## Fix
 
-- Buyer-stage approval itself: if a vendor is currently sitting at `BUYER` stage (waiting for Sunil), that pending `vendor_approval_progress` row has no `acted_by` yet. Because visibility is now Divyabharathi's, **she can approve it** — the RLS policy checks that the acting user is the current buyer via `vendor_invitations.created_by`. Other reviewers (SCM/Finance/CEO) can approve their own stages exactly as before, based on Divyabharathi's `buyer_approval_flows`.
+1. **Backfill migration — transfer the 3 orphan invitations now.**
+   ```sql
+   UPDATE public.vendor_invitations
+      SET original_created_by = COALESCE(original_created_by, '<Sunil-id>'),
+          created_by = '<Divya-id>'
+    WHERE created_by = '<Sunil-id>';
+   ```
+   Run once via the migration tool. This unlocks the two `buyer_review` vendors for Divya immediately.
 
-### UI
-- `ReplaceUserDialog.tsx`: after reassignment success, toast shows "X invitations transferred to <replacement>".
-- `VendorList.tsx` details popup: show `Original Invited By` row **only if** `original_created_by` is set AND different from current `created_by`. Otherwise hide it.
-- `useVendors.tsx`: join to fetch both profiles (current + original) via `vendor_invitations`.
-- No change to Buyer column in the main table — it keeps showing current `Invited By`.
+2. **`admin-delete-user`: mirror the reassignment logic added to `reassign-user-work`.**
+   Replace the unconditional `nullify_created_by` step with:
+   - If `replacement_user_id` provided → `UPDATE vendor_invitations SET created_by = <repl>, original_created_by = COALESCE(original_created_by, <old>) WHERE created_by = <old>`
+   - Else → keep the current NULL behavior (guest / detached invitations).
+   Include `vendor_invitations` in `applied` counts and in the pre-delete impact preview so the confirmation dialog shows the number.
+
+3. **Add a "Reassign leftover work" admin action for already-inactive users.**
+   Extend `reassign-user-work` to accept a mode where `inactive_user_id` may be a user whose `profiles.status = 'inactive'` (already), and expose it from the User Management row menu ("Reassign work…" shown only when status = inactive and impact counts > 0). Same eligibility rules as today. This prevents the current dead-end where the only recovery is manual SQL.
+
+4. **UI surfacing.**
+   In `ReplaceUserDialog` and the new "Reassign work…" dialog, always render the `vendor_invitations` count line (even when 0) so the operator can confirm the transfer number matches expectations before applying.
+
+5. **No changes needed** to `list-pending-approvals-by-stage`, `useVendors`, or Dashboard RLS — once `created_by` is flipped, all three surfaces resolve to Divya automatically. Buyer-stage `vendor_approval_progress` rows for the two vendors remain `pending` with no `acted_by`, so Divya can approve them directly (Option A, as previously agreed).
 
 ### Files touched
-- Migration: add column + index on `original_created_by`.
-- `supabase/functions/reassign-user-work/index.ts` — extend reassignment block.
-- `src/components/admin/ReplaceUserDialog.tsx` — surface invitation count.
-- `src/hooks/useVendors.tsx` — select `original_created_by` + joined profile.
-- `src/pages/VendorList.tsx` (details popup) — conditional row.
+- New migration: one-shot UPDATE for the 3 stray invitations.
+- `supabase/functions/admin-delete-user/index.ts`: replace the invitations step; include in `applied` and preview counts.
+- `supabase/functions/reassign-user-work/index.ts`: allow running when the target is already inactive.
+- `src/components/admin/ReplaceUserDialog.tsx`: always show the invitations count line; add "Reassign work…" entry-point when opened for an inactive user.
+- `src/pages/UserManagement.tsx`: expose the new action on inactive rows.
 
-### Example (answering your question)
-- Sunil invited Vendor V1. V1 is at SCM Manager review under Sunil's flow.
-- Admin marks Sunil Inactive → picks Divyabharathi as replacement.
-- After save: `vendor_invitations.created_by = Divyabharathi`, `original_created_by = Sunil`.
-- Divyabharathi sees V1 in her dashboard. The SCM Manager currently assigned (from Sunil's flow) continues to approve the pending step. Once V1 progresses, remaining stages use whichever chain is already seeded (Option A). If V1 gets returned to vendor and resubmitted, the fresh seed will use **Divyabharathi's** approval flow.
-- Details popup shows: Invited By: Divyabharathi • Original Invited By: Sunil.
-- If Divyabharathi is later replaced by Ramesh: `created_by = Ramesh`, `original_created_by` stays Sunil.
-
-Approve to implement with Option A (in-flight approvals preserved).
+Approve to implement.
