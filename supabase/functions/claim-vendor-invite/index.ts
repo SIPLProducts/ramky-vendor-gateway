@@ -168,13 +168,19 @@ Deno.serve(async (req) => {
       if (callerEmail !== invitedEmail) {
         return json(403, { status: 'denied', code: 'email_mismatch', message: 'This invitation belongs to a different email address' });
       }
-      // Bind invitation to this user (best-effort, idempotent)
-      if (!invite.user_id) {
-        await admin
-          .from('vendor_invitations')
-          .update({ user_id: callerUserId })
-          .eq('id', invite.id)
-          .is('user_id', null);
+      // Bind invitation to this user (best-effort, idempotent) and stamp
+      // used_at so the Vendor Invitations screen flips from Pending to Used
+      // as soon as the vendor lands on the registration form.
+      {
+        const patch: Record<string, unknown> = {};
+        if (!invite.user_id) patch.user_id = callerUserId;
+        if (!invite.used_at) patch.used_at = new Date().toISOString();
+        if (Object.keys(patch).length > 0) {
+          await admin
+            .from('vendor_invitations')
+            .update(patch)
+            .eq('id', invite.id);
+        }
       }
       await ensureVendorAccount(admin, callerUserId, invitedEmail);
       return json(200, {

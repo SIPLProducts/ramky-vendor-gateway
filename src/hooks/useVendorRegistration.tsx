@@ -1021,6 +1021,25 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         if (error) throw error;
         setVendorId(data.id);
 
+        // Link the freshly created draft to the invitation so the Vendor
+        // Invitations screen flips from "Used" to "In Progress" as soon as
+        // the vendor starts filling the form. claim_invitation is idempotent
+        // and enforces the JWT email match; failures are non-blocking so
+        // autosave never breaks on it.
+        if (options?.invitationToken) {
+          try {
+            const { error: claimErr } = await supabase.rpc('claim_invitation', {
+              _token: options.invitationToken,
+              _vendor_id: data.id,
+            });
+            if (claimErr) {
+              console.warn('[saveVendor] claim_invitation link failed (non-blocking):', claimErr);
+            }
+          } catch (e) {
+            console.warn('[saveVendor] claim_invitation link threw (non-blocking):', e);
+          }
+        }
+
         // Upload documents after vendor is created
         await uploadAllDocuments(formData, data.id);
         savedVendor = data;
