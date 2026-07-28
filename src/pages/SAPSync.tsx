@@ -1171,19 +1171,15 @@ export default function SAPSync() {
                   return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
                 }
                 return (
-                <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{message}</span>
-                    <Badge variant={success ? 'default' : 'destructive'}>
-                      {success ? 'Success' : 'Error'}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground space-y-0.5">
-                    {ref && <p>Ref No: <span className="font-mono">{ref}</span></p>}
-                    {sapCode && <p>SAP Vendor Code: <span className="font-mono font-semibold">{sapCode}</span></p>}
-                  </div>
-                </div>
-              );})}
+                  <SapErrorCard
+                    key={i}
+                    message={message}
+                    sapCode={sapCode}
+                    bpName={r.BPNAME}
+                    refNo={ref}
+                    msgText={r.MSG_TEXT}
+                  />
+                );})}
             </div>
           </ScrollArea>
           <DialogFooter>
