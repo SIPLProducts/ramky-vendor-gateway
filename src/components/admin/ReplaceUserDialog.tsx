@@ -22,9 +22,16 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   inactiveUser: { id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[] } | null;
   onConfirmed: () => void; // called after successful reassignment (caller then flips status)
+  /**
+   * When true, the dialog is used to reassign work for a user who is ALREADY
+   * inactive. The confirm button label switches to "Reassign work" and no
+   * subsequent status flip is expected from the caller.
+   */
+  reassignOnly?: boolean;
 }
 
-export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirmed }: Props) {
+
+export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirmed, reassignOnly = false }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -127,12 +134,14 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
     <Dialog open={open} onOpenChange={(o) => !applying && onOpenChange(o)}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Replace User Before Inactivation</DialogTitle>
+          <DialogTitle>{reassignOnly ? 'Reassign Work to Another User' : 'Replace User Before Inactivation'}</DialogTitle>
           <DialogDescription>
-            Transfer all pending approvals, approval matrix roles and buyer↔SCM mappings from this user
-            to an active replacement. This keeps in-progress vendor workflows moving.
+            {reassignOnly
+              ? 'This user is already inactive but still owns vendor invitations, approval flows or SCM mappings. Transfer them to an active replacement so pending work can move forward.'
+              : 'Transfer all pending approvals, approval matrix roles and buyer↔SCM mappings from this user to an active replacement. This keeps in-progress vendor workflows moving.'}
           </DialogDescription>
         </DialogHeader>
+
 
         {inactiveUser && (
           <div className="rounded-md border p-3 bg-muted/30 space-y-1 text-sm">
@@ -220,8 +229,9 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>Cancel</Button>
           <Button onClick={handleConfirm} disabled={!replacementId || applying || loading}>
             {applying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Confirm & Inactivate
+            {reassignOnly ? 'Reassign Work' : 'Confirm & Inactivate'}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -85,6 +85,10 @@ export default function UserManagement() {
     inactiveUser: { id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[] };
     pendingPatch: { full_name: string; status: 'active' | 'inactive'; role: AppRole; tenantIds: string[]; customRoleIds: string[] };
   }>(null);
+  const [reassignCtx, setReassignCtx] = useState<null | {
+    id: string; email: string; full_name: string | null; roleLabel: string; tenantNames: string[];
+  }>(null);
+
 
   // Deletion is handled by DeleteUserDialog, which enforces replacement-user selection
   // for anyone with active approval workload before invoking admin-delete-user.
@@ -715,6 +719,20 @@ export default function UserManagement() {
                               >
                                 <Pencil className="h-4 w-4 mr-1" /> Edit
                               </Button>
+                              {u.status === 'inactive' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setReassignCtx({
+                                    id: u.id, email: u.email, full_name: u.full_name,
+                                    roleLabel: u.customRoles.map((c) => c.name).join(', ') || u.role,
+                                    tenantNames: u.tenants.map((t) => t.name),
+                                  })}
+                                  title="Reassign this user's leftover vendors, approval flows and mappings"
+                                >
+                                  Reassign work
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -727,6 +745,7 @@ export default function UserManagement() {
                               </Button>
                             </div>
                           </TableCell>
+
                         </TableRow>
                       ))
                     )}
@@ -905,6 +924,15 @@ export default function UserManagement() {
         inactiveUser={replaceCtx?.inactiveUser ?? null}
         onConfirmed={handleReplacementConfirmed}
       />
+
+      <ReplaceUserDialog
+        open={!!reassignCtx}
+        onOpenChange={(o) => { if (!o) setReassignCtx(null); }}
+        inactiveUser={reassignCtx}
+        reassignOnly
+        onConfirmed={() => { setReassignCtx(null); loadData(); }}
+      />
+
 
       <CreateUserDialog
         open={createOpen}

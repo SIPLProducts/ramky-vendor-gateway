@@ -90,24 +90,28 @@ Deno.serve(async (req) => {
     // ----- Assess active workload for this user -----
     log('assess_workload');
     const flowFilters = FLOW_COLS.map((c) => `${c}.eq.${user_id}`).join(',');
-    const [flowRes, matrixRes, mapBuyerRes, mapScmRes, pendingProgressRes] = await Promise.all([
+    const [flowRes, matrixRes, mapBuyerRes, mapScmRes, pendingProgressRes, invitesRes] = await Promise.all([
       admin.from('buyer_approval_flows').select('id', { count: 'exact', head: true }).or(flowFilters),
       admin.from('approval_matrix_approvers').select('id', { count: 'exact', head: true }).eq('user_id', user_id),
       admin.from('buyer_scm_mappings').select('id', { count: 'exact', head: true }).eq('buyer_user_id', user_id),
       admin.from('buyer_scm_mappings').select('id', { count: 'exact', head: true }).eq('scm_manager_user_id', user_id),
       admin.from('vendor_approval_progress').select('id', { count: 'exact', head: true }).eq('acted_by', user_id).eq('status', 'pending'),
+      admin.from('vendor_invitations').select('id', { count: 'exact', head: true }).eq('created_by', user_id),
     ]);
     const workloadCounts = {
       buyer_approval_flows: flowRes.count ?? 0,
       approval_matrix_approvers: matrixRes.count ?? 0,
       buyer_scm_mappings: (mapBuyerRes.count ?? 0) + (mapScmRes.count ?? 0),
       vendor_approval_progress_pending: pendingProgressRes.count ?? 0,
+      vendor_invitations: invitesRes.count ?? 0,
     };
     const hasWorkload =
       workloadCounts.buyer_approval_flows +
       workloadCounts.approval_matrix_approvers +
       workloadCounts.buyer_scm_mappings +
-      workloadCounts.vendor_approval_progress_pending > 0;
+      workloadCounts.vendor_approval_progress_pending +
+      workloadCounts.vendor_invitations > 0;
+
 
     if (hasWorkload && !replacement_user_id) {
       return jsonResponse({
@@ -118,7 +122,7 @@ Deno.serve(async (req) => {
     }
 
     // ----- Validate replacement eligibility (same rule as reassign-user-work) -----
-    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0, vendor_approval_progress: 0 };
+    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0, vendor_approval_progress: 0, vendor_invitations: 0 };
 
     if (replacement_user_id) {
       log('validate_replacement', { replacement_user_id });
@@ -229,7 +233,27 @@ Deno.serve(async (req) => {
         if (error) throw new Error(`vendor_approval_progress: ${error.message}`);
         applied.vendor_approval_progress = updated?.length ?? 0;
       }
+
+      // 5) vendor_invitations — transfer ownership to the replacement buyer and
+      //    preserve the first inviter in original_created_by (only ever set once).
+      {
+        const { data: invRows } = await admin
+          .from('vendor_invitations')
+          .select('id, original_created_by')
+          .eq('created_by', user_id);
+        for (const row of invRows ?? []) {
+          const patch: Record<string, unknown> = { created_by: replacement_user_id };
+          if (!row.original_created_by) patch.original_created_by = user_id;
+          const { error: invErr } = await admin
+            .from('vendor_invitations')
+            .update(patch)
+            .eq('id', row.id);
+          if (invErr) throw new Error(`vendor_invitations: ${invErr.message}`);
+          applied.vendor_invitations += 1;
+        }
+      }
     }
+
 
     // Helper to run step + surface error
     const run = async (step: string, fn: () => Promise<{ error: any } | any>) => {
@@ -270,10 +294,15 @@ Deno.serve(async (req) => {
       admin.from('vendors').update({ purchase_reviewed_by: null }).eq('purchase_reviewed_by', user_id)
     );
 
-    // 5. Detach invitations created by this user
-    await run('vendor_invitations.nullify_created_by', () =>
-      admin.from('vendor_invitations').update({ created_by: null }).eq('created_by', user_id)
-    );
+    // 5. Detach any remaining invitations. When a replacement was provided the
+    //    transfer above already claimed every row this user owned; this call is
+    //    the guest-cleanup fallback for the no-replacement path.
+    if (!replacement_user_id) {
+      await run('vendor_invitations.nullify_created_by', () =>
+        admin.from('vendor_invitations').update({ created_by: null }).eq('created_by', user_id)
+      );
+    }
+
 
     // 6. Detach portal_config.updated_by
     await run('portal_config.nullify_updated_by', () =>
