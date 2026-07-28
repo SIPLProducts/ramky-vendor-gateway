@@ -121,6 +121,37 @@ function SuccessVendorTable({ sapCode, bpName, message, refNo }: { sapCode?: str
   );
 }
 
+function SapErrorCard({ message, sapCode, bpName, refNo, msgText }: { message?: string; sapCode?: string; bpName?: string; refNo?: string; msgText?: string }) {
+  const rows: Array<[string, string, boolean]> = [];
+  if (sapCode) rows.push(['SAP Vendor Code', sapCode, true]);
+  if (bpName) rows.push(['Business Partner', bpName, false]);
+  if (refNo) rows.push(['Reference No', refNo, true]);
+  if (msgText) rows.push(['Details', msgText, false]);
+  const rowCls = 'border-b border-red-100 odd:bg-red-50/60 even:bg-white';
+  return (
+    <div className="rounded-xl border border-red-300 bg-gradient-to-b from-red-50 to-white overflow-hidden shadow-sm ring-1 ring-red-200/60">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-red-100 to-rose-100 border-b border-red-300 flex items-center gap-2">
+        <XCircle className="h-4 w-4 text-red-700" />
+        <div>
+          <p className="text-sm font-bold text-red-900 leading-tight">SAP Error</p>
+          {message && <p className="text-[11px] text-red-800/80">{message}</p>}
+        </div>
+      </div>
+      {rows.length > 0 && (
+        <table className="w-full text-sm">
+          <tbody>
+            {rows.map(([k, v, mono], i) => (
+              <tr key={i} className={i === rows.length - 1 ? 'odd:bg-red-50/60 even:bg-white' : rowCls}>
+                <td className="px-4 py-2 font-semibold text-red-900 w-1/3">{k}</td>
+                <td className={`px-4 py-2 text-red-950 ${mono ? 'font-mono' : ''}`}>{v}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 
 
 export default function SAPSync() {
