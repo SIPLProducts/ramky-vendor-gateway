@@ -9,8 +9,10 @@ import type { Database } from '@/integrations/supabase/types';
 
 // Types from database
 type VendorStatus = Database['public']['Enums']['vendor_status'];
+type VendorInvitedBy = { name: string | null; email: string | null } | null;
 export type VendorRow = Database['public']['Tables']['vendors']['Row'] & {
-  invited_by?: { name: string | null; email: string | null } | null;
+  invited_by?: VendorInvitedBy;
+  original_invited_by?: VendorInvitedBy;
 };
 
 type VendorInsert = Database['public']['Tables']['vendors']['Insert'];
