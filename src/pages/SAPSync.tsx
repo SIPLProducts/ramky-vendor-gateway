@@ -1067,17 +1067,12 @@ export default function SAPSync() {
                       />
                     );
                   }
-                  if (dup.matched && dup.msgText) {
-                    return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
-                  }
                   return (
-                    <SapErrorCard
+                    <SapErrorMessage
                       key={i}
-                      message={longMsg}
-                      sapCode={sapCode}
-                      bpName={r.BPNAME}
-                      refNo={r.REFER_NUM}
-                      msgText={r.MSG_TEXT}
+                      isDuplicate={dup.matched}
+                      message={longMsg || dup.message}
+                      msgText={dup.msgText || r.MSG_TEXT}
                     />
                   );
                 })}
