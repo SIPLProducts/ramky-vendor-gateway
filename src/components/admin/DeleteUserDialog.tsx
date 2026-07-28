@@ -104,11 +104,13 @@ export function DeleteUserDialog({ open, onOpenChange, targetUser, onDeleted }: 
           <>
             {counts && (
               <div className="text-xs text-muted-foreground">
-                Active workload: <strong>{counts.buyer_approval_flows}</strong> approval flow(s),{' '}
+                Active workload: <strong>{counts.vendor_invitations ?? 0}</strong> vendor invitation(s),{' '}
+                <strong>{counts.buyer_approval_flows}</strong> approval flow(s),{' '}
                 <strong>{counts.approval_matrix_approvers}</strong> matrix assignment(s),{' '}
                 <strong>{counts.buyer_scm_mappings}</strong> buyer↔SCM mapping(s).
               </div>
             )}
+
 
             {hasWork && (
               <div className="space-y-1.5">
