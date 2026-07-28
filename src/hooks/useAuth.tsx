@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let hadError = false;
     try {
       const [roleRes, customRes] = await Promise.all([
-        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', userId),
         supabase
           .from('user_custom_roles')
           .select('custom_role_id, custom_roles!inner(id, name, is_active)')
@@ -117,12 +117,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error fetching user role:', roleRes.error);
         hadError = true;
         setUserRole(null);
-      } else if (roleRes.data?.role) {
-        setUserRole(roleRes.data.role as AppRole);
       } else {
-        // No row found → treat as vendor default (matches handle_new_user fallback)
-        setUserRole('vendor');
+        const roles = (roleRes.data ?? []).map((r: any) => r.role as AppRole);
+        // Priority: any non-vendor role wins over the default 'vendor' row
+        // inserted by handle_new_user, so admin-assigned users aren't misrouted.
+        const priority: AppRole[] = ['sharvi_admin', 'admin', 'customer_admin', 'finance', 'purchase', 'approver', 'vendor'];
+        const picked = priority.find((p) => roles.includes(p)) ?? null;
+        setUserRole(picked);
       }
+
 
       if (customRes.error) {
         setCustomRoles([]);
