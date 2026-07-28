@@ -1,48 +1,46 @@
-## Why Sunil's data isn't appearing under Divyabharathi
 
-Verified in the DB:
+## 1) Rename "Original Invited By" → "Primary Buyer"
 
-- Audit log for the Sunil→Divya reassignment ran at `2026-07-28 10:20:52` and the `counts` payload has **no `vendor_invitations` key** — meaning the old function ran without the invitation-transfer block.
-- `vendor_invitations` still holds **3 rows with `created_by = Sunil`** and `original_created_by = NULL`:
-  - `ef386de7…` → vendor `011ff700…` (ref `20260728001`, status `buyer_review`)
-  - `e2a7d28d…` → vendor `2c89dc94…` (ref `20260728002`, status `buyer_review`)
-  - `7894dd82…` → `sunilkumar@sharviinfotech.com` (no vendor yet, pending link)
-- All 18 rows currently on Divya have `original_created_by = NULL` (her own — never carried Sunil's stamp).
+- `src/components/vendor/VendorReviewDialog.tsx` (line 464): change label text.
+- Grep confirms this is the only occurrence in `src/`.
 
-Because visibility for buyers, dashboard and the `list-pending-approvals-by-stage` edge function all key off `vendor_invitations.created_by`, the two vendors above are still tied to the inactive Sunil and invisible to Divya.
+## 2) Dashboard table: add "Actions" column (View + Comments)
 
-Also found: `admin-delete-user` still calls `vendor_invitations.update({ created_by: null })` unconditionally — same bug will bite on Delete. And there's no way to re-run reassignment for an already-inactive user, which is what's blocking the user right now.
+`src/pages/Dashboard.tsx` (lines 428–478):
+- Add `<TableHead className="text-center">Actions</TableHead>` after "Created Date".
+- In each row, add a cell with two icon buttons mirroring `VendorList.tsx`:
+  - **View** → opens `VendorReviewDialog` for `v.id` (Eye icon, tooltip "View").
+  - **Comments** → opens `ApprovalCommentsDialog` (MessageSquare icon, tooltip "Approval Comments").
+- Add local state `viewVendorId` and `commentsVendor` (id + name + reference_number).
+- Mount `<VendorReviewDialog>` and `<ApprovalCommentsDialog>` at the bottom of the component, same wiring pattern used in `VendorList.tsx`.
+- Bump the loading skeleton and empty-state `colSpan` from 6 to 7.
 
-## Fix
+## 3) Buyer re-approve dialog after SCM CO rejection
 
-1. **Backfill migration — transfer the 3 orphan invitations now.**
-   ```sql
-   UPDATE public.vendor_invitations
-      SET original_created_by = COALESCE(original_created_by, '<Sunil-id>'),
-          created_by = '<Divya-id>'
-    WHERE created_by = '<Sunil-id>';
-   ```
-   Run once via the migration tool. This unlocks the two `buyer_review` vendors for Divya immediately.
+File: `src/components/approvals/StageApprovalView.tsx`, the `rejectedAction` dialog (lines 591–634).
 
-2. **`admin-delete-user`: mirror the reassignment logic added to `reassign-user-work`.**
-   Replace the unconditional `nullify_created_by` step with:
-   - If `replacement_user_id` provided → `UPDATE vendor_invitations SET created_by = <repl>, original_created_by = COALESCE(original_created_by, <old>) WHERE created_by = <old>`
-   - Else → keep the current NULL behavior (guest / detached invitations).
-   Include `vendor_invitations` in `applied` counts and in the pre-delete impact preview so the confirmation dialog shows the number.
+### 3a) Stage label in the returned-remarks banner
+The banner currently prints `SCM_MANAGER remarks:` because it just replaces underscores. Replace that logic with `formatStageLevelHistory(stage, 1)` from `src/lib/approvalLabels.ts` so `SCM_MANAGER` renders as **"SCM CO Remarks"** (and other stages get their proper labels too):
 
-3. **Add a "Reassign leftover work" admin action for already-inactive users.**
-   Extend `reassign-user-work` to accept a mode where `inactive_user_id` may be a user whose `profiles.status = 'inactive'` (already), and expose it from the User Management row menu ("Reassign work…" shown only when status = inactive and impact counts > 0). Same eligibility rules as today. This prevents the current dead-end where the only recovery is manual SQL.
+```
+<strong>
+  {rejectedAction.item.rejectionFromStage
+    ? `${formatStageLevelHistory(rejectedAction.item.rejectionFromStage, 1)} Remarks: `
+    : 'Approver Remarks: '}
+</strong>
+```
 
-4. **UI surfacing.**
-   In `ReplaceUserDialog` and the new "Reassign work…" dialog, always render the `vendor_invitations` count line (even when 0) so the operator can confirm the transfer number matches expectations before applying.
+### 3b) Show + allow editing Classification on re-approve
+Currently the re-approve path (`buyer-reapprove-rejected`) does not surface the previously saved Classification (Material Group Vendor / Vendor Category), so the buyer cannot review or change it. Fix:
 
-5. **No changes needed** to `list-pending-approvals-by-stage`, `useVendors`, or Dashboard RLS — once `created_by` is flipped, all three surfaces resolve to Divya automatically. Buyer-stage `vendor_approval_progress` rows for the two vendors remain `pending` with no `acted_by`, so Divya can approve them directly (Option A, as previously agreed).
+- Add a `useEffect` that, when `rejectedAction?.action === 'approve'` opens, loads the vendor's saved `material_group_vendor(s)` and `vendor_category(ies)` into a new `rejectedClassification` state (same query already used for the normal buyer approve prefill, lines 78–92).
+- Render two `ClassificationField` inputs inside the re-approve dialog (before the Optional remarks textarea) — one for Material Group Vendor, one for Vendor Category — pre-filled and editable, matching the styling used in the normal buyer approve dialog.
+- In `submitRejectedAction` (approve branch only), before invoking `buyer-reapprove-rejected`, persist any changes with a `supabase.from('vendors').update({ material_group_vendor, material_group_vendors, vendor_category, vendor_categories })` call (same shape as `submit()` lines 106–112).
+- Disable the Confirm Approve button when either classification array is empty (mirror the existing rule in `submit`).
 
-### Files touched
-- New migration: one-shot UPDATE for the 3 stray invitations.
-- `supabase/functions/admin-delete-user/index.ts`: replace the invitations step; include in `applied` and preview counts.
-- `supabase/functions/reassign-user-work/index.ts`: allow running when the target is already inactive.
-- `src/components/admin/ReplaceUserDialog.tsx`: always show the invitations count line; add "Reassign work…" entry-point when opened for an inactive user.
-- `src/pages/UserManagement.tsx`: expose the new action on inactive rows.
+No changes to the `buyer-reapprove-rejected` edge function are required — classification is persisted directly on the vendor row.
 
-Approve to implement.
+## Out of scope
+- No schema changes.
+- No changes to `buyer-reapprove-rejected` / `process-approval-action` edge functions.
+- No changes to other approval stages' dialogs.

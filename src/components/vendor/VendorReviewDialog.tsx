@@ -461,7 +461,7 @@ export function VendorReviewDialog({
                         </div>
                         {routing.originalBuyerName && (
                           <div className="space-y-1">
-                            <p className="text-muted-foreground">Original Invited By</p>
+                            <p className="text-muted-foreground">Primary Buyer</p>
                             <p className="font-medium">{routing.originalBuyerName}</p>
                           </div>
                         )}

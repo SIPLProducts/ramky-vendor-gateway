@@ -14,6 +14,7 @@ import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, 
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { formatDateTime } from '@/lib/dateFormat';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
+import { formatStageLevelHistory } from '@/lib/approvalLabels';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
@@ -67,6 +68,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
   const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
   const [buyerClassification, setBuyerClassification] = useState<{ materialGroupVendor: string[]; vendorCategory: string[] }>({ materialGroupVendor: [], vendorCategory: [] });
+  const [rejectedClassification, setRejectedClassification] = useState<{ materialGroupVendor: string[]; vendorCategory: string[] }>({ materialGroupVendor: [], vendorCategory: [] });
 
   // Prefill Buyer classification from vendor row when approve dialog opens
   useEffect(() => {
@@ -92,6 +94,33 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     })();
     return () => { cancelled = true; };
   }, [actionItem, isBuyer]);
+
+  // Prefill Classification when the buyer re-approves a rejected vendor
+  useEffect(() => {
+    if (!isBuyer || !rejectedAction || rejectedAction.action !== 'approve') {
+      setRejectedClassification({ materialGroupVendor: [], vendorCategory: [] });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('vendors')
+        .select('material_group_vendor, material_group_vendors, vendor_category, vendor_categories')
+        .eq('id', rejectedAction.item.vendorId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const mg: string[] = Array.isArray((data as any).material_group_vendors) && (data as any).material_group_vendors.length
+        ? (data as any).material_group_vendors
+        : ((data as any).material_group_vendor ? [(data as any).material_group_vendor] : []);
+      const vc: string[] = Array.isArray((data as any).vendor_categories) && (data as any).vendor_categories.length
+        ? (data as any).vendor_categories
+        : ((data as any).vendor_category ? [(data as any).vendor_category] : []);
+      setRejectedClassification({ materialGroupVendor: mg, vendorCategory: vc });
+    })();
+    return () => { cancelled = true; };
+  }, [rejectedAction, isBuyer]);
+
+
 
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
   const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
@@ -200,6 +229,15 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     if (!rejectedAction) return;
     setRejectedSubmitting(true);
     try {
+      if (isBuyer && rejectedAction.action === 'approve') {
+        const { error: clsErr } = await supabase.from('vendors').update({
+          material_group_vendor: rejectedClassification.materialGroupVendor[0] ?? null,
+          material_group_vendors: rejectedClassification.materialGroupVendor,
+          vendor_category: rejectedClassification.vendorCategory[0] ?? null,
+          vendor_categories: rejectedClassification.vendorCategory,
+        }).eq('id', rejectedAction.item.vendorId);
+        if (clsErr) throw clsErr;
+      }
       const fnName =
         rejectedAction.action === 'approve' ? 'buyer-reapprove-rejected' : 'buyer-return-to-vendor';
       const { error } = await supabase.functions.invoke(fnName, {
@@ -609,11 +647,38 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
               <strong>
                 {rejectedAction.item.rejectionFromStage
-                  ? String(rejectedAction.item.rejectionFromStage).replace(/_/g, ' ')
+                  ? formatStageLevelHistory(rejectedAction.item.rejectionFromStage, 1)
                   : 'Approver'}
-                {' remarks: '}
+                {' Remarks: '}
               </strong>
               {rejectedAction.item.rejectionComments}
+            </div>
+          )}
+          {isBuyer && rejectedAction?.action === 'approve' && (
+            <div className="space-y-3 rounded-md border p-3 bg-muted/20">
+              <div className="text-sm font-medium">
+                Classification
+                <span className="text-destructive">*</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Review and update if needed before re-routing to the next approver.
+              </p>
+              <ClassificationField
+                label="Material Group for Vendors"
+                required
+                masterType="material_group_vendor"
+                value={rejectedClassification.materialGroupVendor}
+                onChange={(v) => setRejectedClassification((p) => ({ ...p, materialGroupVendor: v }))}
+                selectPlaceholder="Select material groups"
+              />
+              <ClassificationField
+                label="Vendor Category"
+                required
+                masterType="vendor_category"
+                value={rejectedClassification.vendorCategory}
+                onChange={(v) => setRejectedClassification((p) => ({ ...p, vendorCategory: v }))}
+                selectPlaceholder="Select vendor categories"
+              />
             </div>
           )}
           <Textarea
@@ -624,7 +689,16 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectedAction(null)}>Cancel</Button>
-            <Button onClick={submitRejectedAction} disabled={rejectedSubmitting}>
+            <Button
+              onClick={submitRejectedAction}
+              disabled={
+                rejectedSubmitting ||
+                (isBuyer && rejectedAction?.action === 'approve' && (
+                  rejectedClassification.materialGroupVendor.length === 0 ||
+                  rejectedClassification.vendorCategory.length === 0
+                ))
+              }
+            >
               {rejectedSubmitting
                 ? 'Submitting...'
                 : rejectedAction?.action === 'approve' ? 'Confirm Approve' : 'Send to Vendor'}
