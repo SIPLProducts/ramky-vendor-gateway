@@ -1,39 +1,29 @@
-## Issues
+## Fixes
 
-1. **Classification Details in the View Details popup show raw uppercase codes** (`ADMIN MISCELLANEOUS, AGGREGATES`, `IMPORT`, etc.) instead of the Proper Case descriptions used in the dropdowns.
-2. **Old approval rows still show the auto-generated `Approved after rejection by SCM_MANAGER — …` prefix.** The edge function was fixed to save only the raw comment, but existing `vendor_approval_progress` rows written before the fix still hold the prefixed text.
+### 1. Vendor Category shows in ALL CAPS
+Root cause: rows in `sap_master_data` for `vendor_category` have `description = code` (e.g. `DISTRIBUTOR` / `DISTRIBUTOR`), so the Proper Case fallback never kicks in. Material Group has real proper descriptions and looks fine; Vendor Category doesn't.
 
-## Fix
+Fix in code (data stays as-is):
+- Add a `toProperCase` helper that title-cases any label that is entirely uppercase (letters + spaces/&/`-`).
+- Apply it in two render spots:
+  - `src/components/vendor/ClassificationField.tsx` → inside `toOptions`, on the `label` before returning.
+  - `src/components/vendor/VendorReviewDialog.tsx` → in the SAP-code → description mapper used by the Classification Details block.
+- Codes sent to the backend are unchanged; only the displayed label is normalized.
 
-### 1. Proper Case in `VendorReviewDialog.tsx`
+Result: `DISTRIBUTOR` → `Distributor`, `IMPORT` → `Import`, `MANUFACTURER` → `Manufacturer`, `TRADER` → `Trader`. Already-proper descriptions (e.g. `Admin Miscellaneous`) are left untouched.
 
-- Import `useSapMasterData`.
-- Fetch the 4 master types used by classification: `material_group_vendor`, `vendor_category`, `vendor_cashflow`, `tier_category`.
-- Build a code → description map for each and replace the current `fmtArr(v.material_group_vendors)` / `vendor_categories` / `vendor_cashflow` / `tier_category` calls with a helper that maps each code to its description (Proper Case), falling back to the code only if no description exists.
-- No changes to stored values — display only.
+### 2. Re-approve after rejection — comments mandatory + saved
+In `src/components/approvals/StageApprovalView.tsx`, the buyer re-approval dialog currently uses `placeholder="Optional remarks"` and only blocks submit on classification, not on remarks.
 
-### 2. Backfill historical approval comments
+Changes:
+- Add a `Label` above the Textarea: `Remarks *` (with destructive asterisk).
+- Change placeholder to `Enter remarks (required)`.
+- Extend the submit-disabled condition so `rejectedRemarks.trim().length === 0` also disables the button for `action === 'approve'` (and for `send_to_vendor`, keep current behavior unless you want it required there too — proposing required for both to match "comments mandatory").
+- Saving already works: `submitRejectedAction` posts `comments: rejectedRemarks.trim()` to `buyer-reapprove-rejected`, which (per the last change) writes the raw string into `vendor_approval_progress.comments`. No edge-function change needed.
 
-One migration that rewrites existing rows to strip the auto prefix, matching both variants (with and without stage / trailing comment):
+### Files touched
+- `src/components/vendor/ClassificationField.tsx`
+- `src/components/vendor/VendorReviewDialog.tsx`
+- `src/components/approvals/StageApprovalView.tsx`
 
-```sql
-UPDATE public.vendor_approval_progress
-SET comments = NULLIF(
-  regexp_replace(
-    comments,
-    '^Approved after rejection( by [^—]+)?(\s*—\s*)?',
-    ''
-  ),
-  ''
-)
-WHERE comments LIKE 'Approved after rejection%';
-```
-
-Rows that had no user-entered tail become NULL; rows with a tail keep only what the buyer typed.
-
-The edge function `buyer-reapprove-rejected` was already updated last turn to stop writing the prefix, so no further code change is needed there — but I will redeploy it to guarantee production is running the fixed version.
-
-## Result
-
-- Classification Details popup shows Proper Case descriptions matching the dropdowns.
-- Existing and future approval history entries show only the comment the approver typed — no `Approved after rejection by …` prefix.
+No DB migration, no edge function redeploy.
