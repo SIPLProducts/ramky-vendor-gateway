@@ -647,11 +647,38 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
               <strong>
                 {rejectedAction.item.rejectionFromStage
-                  ? String(rejectedAction.item.rejectionFromStage).replace(/_/g, ' ')
+                  ? formatStageLevelHistory(rejectedAction.item.rejectionFromStage, 1)
                   : 'Approver'}
-                {' remarks: '}
+                {' Remarks: '}
               </strong>
               {rejectedAction.item.rejectionComments}
+            </div>
+          )}
+          {isBuyer && rejectedAction?.action === 'approve' && (
+            <div className="space-y-3 rounded-md border p-3 bg-muted/20">
+              <div className="text-sm font-medium">
+                Classification
+                <span className="text-destructive">*</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Review and update if needed before re-routing to the next approver.
+              </p>
+              <ClassificationField
+                label="Material Group for Vendors"
+                required
+                masterType="material_group_vendor"
+                value={rejectedClassification.materialGroupVendor}
+                onChange={(v) => setRejectedClassification((p) => ({ ...p, materialGroupVendor: v }))}
+                selectPlaceholder="Select material groups"
+              />
+              <ClassificationField
+                label="Vendor Category"
+                required
+                masterType="vendor_category"
+                value={rejectedClassification.vendorCategory}
+                onChange={(v) => setRejectedClassification((p) => ({ ...p, vendorCategory: v }))}
+                selectPlaceholder="Select vendor categories"
+              />
             </div>
           )}
           <Textarea
