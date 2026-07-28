@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     }
 
     // ----- Validate replacement eligibility (same rule as reassign-user-work) -----
-    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0, vendor_approval_progress: 0 };
+    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0, vendor_approval_progress: 0, vendor_invitations: 0 };
 
     if (replacement_user_id) {
       log('validate_replacement', { replacement_user_id });
