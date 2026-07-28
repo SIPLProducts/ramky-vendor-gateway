@@ -1,31 +1,36 @@
 ## Goal
 
-In the SAP Sync Result dialog, all `ACC_RES` messages should be shown with consistent, attractive styling. Currently the duplicate row renders as a nice amber "Existing Vendor Details" table, but the second row (e.g. `"No Bank Key Available"`) falls through to a plain muted `bg-muted` block with just an Error badge — which looks broken next to the themed duplicate card (see screenshot).
+Simplify the SAP Sync Result popup (single + bulk) so duplicate and error rows render as plain text lines instead of table grids, matching:
 
-## Change (visual only)
+```text
+PAN & GST combination is Duplicated  error
+4019846 - VEDA CONSTRUCTIONS - AAQFV6687C - 29AAQFV6687C1ZE
 
-### `src/pages/SAPSync.tsx` — single SAP Sync Result dialog (lines ~1094–1105 fallback branch)
+No Bank Key Available  error
+```
 
-Replace the `bg-muted` fallback with a themed red "SAP Error" card that matches the visual language of the amber duplicate and green success cards:
+Scope: **only** the SAP Sync result popup on `/sap/sync` (single sync dialog + bulk sync dialog). No other dialogs, emails, edge functions, or logic change.
 
-- Outer container: `rounded-xl border border-red-300 bg-gradient-to-b from-red-50 to-white ring-1 ring-red-200/60 shadow-sm overflow-hidden`.
-- Header bar: `bg-gradient-to-r from-red-100 to-rose-100 border-b border-red-300`, `XCircle` (or `AlertCircle`) icon in `text-red-700`, title `"SAP Error"` in `text-red-900 font-bold`, subtitle = the `LONGMSG` in smaller red-800 text.
-- Body table (only rendered when there are extra fields): rows for `SAP Vendor Code`, `Business Partner`, `Reference No`, `MSG_TEXT` — same alternating `odd:bg-red-50/60 even:bg-white`, `text-red-900` labels, mono value column, matching the amber/green cards.
-- If none of those fields exist (typical for `"No Bank Key Available"`), render just the header bar with the message — no empty table.
+## Change
 
-Success (non-duplicate) rows already use `SuccessVendorTable`; duplicate rows already use `DuplicateVendorTable`. Only the error fallback changes.
+### `src/pages/SAPSync.tsx`
 
-### Bulk SAP Sync Result dialog (lines ~1116+)
-
-Apply the same red `SapErrorCard` component to the per-row error fallback so bulk results stay visually consistent with the single-sync dialog.
+1. Remove `DuplicateVendorTable`, `SapErrorCard`, and the unused `parseDupMsgText` helper.
+2. Add a single `SapErrorMessage` component:
+   - Amber theme when `isDuplicate` is true, red theme otherwise.
+   - Renders `LONGMSG` as the main line + a small `error` badge, and `MSG_TEXT` as a second mono line beneath it.
+   - No inner table, no split fields (no SAP Code / Business Partner / Reference No rows).
+3. In the **single SAP Sync Result** dialog (around lines 1100–1136), replace both the `DuplicateVendorTable` and `SapErrorCard` branches with `SapErrorMessage`, passing `isDuplicate={dup.matched}`, `message={longMsg || dup.message}`, and `msgText={dup.msgText || r.MSG_TEXT}`.
+4. In the **bulk SAP Sync Result** dialog (around lines 1160–1182), do the same replacement for non-success rows.
+5. Keep `SuccessVendorTable` unchanged — successful rows continue to render as the green details table.
 
 ## Out of scope
 
-- No changes to parsing (`isPanDuplicateResponse`), success/duplicate tables, edge functions, emails, or DB writes.
-- No changes to the outer dialog header/footer.
+- Success card, DMS result dialog, email templates, auto-reject logic, SAP response parsing, edge functions.
 
 ## Verify
 
-1. Trigger a SAP sync where `ACC_RES` contains a duplicate row + a `"No Bank Key Available"` row → dialog shows the amber Existing Vendor Details card followed by a red "SAP Error" card (not the plain muted block from the screenshot).
-2. Trigger a pure success → still shows the green Vendor Details card only.
-3. Trigger a bulk sync with mixed rows → each row renders in its correct themed card (green / amber / red).
+1. SAP sync returning a duplicate row + a "No Bank Key Available" row → popup shows two plain-text cards (amber, then red) exactly like the requested format.
+2. Pure SAP error → red plain-text card with the message and any `MSG_TEXT`.
+3. Successful sync → green Vendor Details table unchanged.
+4. Bulk sync with mixed rows → each row renders as either the green success table or the correct plain-text error/duplicate card.
