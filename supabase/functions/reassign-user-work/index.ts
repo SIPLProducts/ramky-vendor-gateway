@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Replacement user is not eligible (role, tenant, or active status mismatch)' }, 400);
     }
 
-    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0 };
+    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0, vendor_invitations: 0 };
 
     // 1) buyer_approval_flows — update each column separately
     for (const col of FLOW_COLS) {
