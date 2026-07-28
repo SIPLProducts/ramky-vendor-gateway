@@ -95,6 +95,30 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     return () => { cancelled = true; };
   }, [actionItem, isBuyer]);
 
+  // Prefill Classification when the buyer re-approves a rejected vendor
+  useEffect(() => {
+    if (!isBuyer || !rejectedAction || rejectedAction.action !== 'approve') {
+      setRejectedClassification({ materialGroupVendor: [], vendorCategory: [] });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('vendors')
+        .select('material_group_vendor, material_group_vendors, vendor_category, vendor_categories')
+        .eq('id', rejectedAction.item.vendorId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const mg: string[] = Array.isArray((data as any).material_group_vendors) && (data as any).material_group_vendors.length
+        ? (data as any).material_group_vendors
+        : ((data as any).material_group_vendor ? [(data as any).material_group_vendor] : []);
+      const vc: string[] = Array.isArray((data as any).vendor_categories) && (data as any).vendor_categories.length
+        ? (data as any).vendor_categories
+        : ((data as any).vendor_category ? [(data as any).vendor_category] : []);
+      setRejectedClassification({ materialGroupVendor: mg, vendorCategory: vc });
+    })();
+    return () => { cancelled = true; };
+
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
   const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
   const rejectedItems = items.filter((i) => i.kind === 'rejected');
