@@ -476,7 +476,7 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
+                      <TableCell>{formatVendorName(v) || '—'}</TableCell>
                       <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>
