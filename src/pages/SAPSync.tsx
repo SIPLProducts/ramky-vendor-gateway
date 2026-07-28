@@ -53,51 +53,7 @@ async function persistClassification(vendorIds: string[], overrides: SapFieldOve
   }
 }
 
-// ---- Themed result tables shared across the SAP Sync result dialogs ----
-function parseDupMsgText(msgText: string) {
-  const parts = String(msgText || '')
-    .split(/\s+-\s+|\s+–\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return {
-    sapCode: parts[0] || '',
-    name: parts[1] || '',
-    pan: parts[2] || '',
-    gstin: parts[3] || '',
-    parts,
-  };
-}
-
-function DuplicateVendorTable({ msgText }: { msgText: string }) {
-  const { sapCode, name, pan, gstin, parts } = parseDupMsgText(msgText);
-  const rowCls = 'border-b border-amber-100 odd:bg-amber-50/60 even:bg-white';
-  return (
-    <div className="rounded-xl border border-amber-300 bg-gradient-to-b from-amber-50 to-white overflow-hidden shadow-sm ring-1 ring-amber-200/60">
-      <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100 to-red-100 border-b border-amber-300 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-700" />
-        <div>
-          <p className="text-sm font-bold text-amber-900 leading-tight">Existing Vendor Details</p>
-          <p className="text-[11px] text-amber-800/80">Vendor already exists in SAP</p>
-        </div>
-      </div>
-      <table className="w-full text-sm">
-        <tbody>
-          {parts.length >= 2 ? (
-            <>
-              {sapCode && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900 w-1/3">SAP Vendor Code</td><td className="px-4 py-2 font-mono text-amber-950">{sapCode}</td></tr>)}
-              {name && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900">Vendor Name</td><td className="px-4 py-2 text-amber-950">{name}</td></tr>)}
-              {pan && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900">PAN Number</td><td className="px-4 py-2 font-mono text-amber-950">{pan}</td></tr>)}
-              {gstin && (<tr className="odd:bg-amber-50/60 even:bg-white"><td className="px-4 py-2 font-semibold text-amber-900">GSTIN</td><td className="px-4 py-2 font-mono text-amber-950">{gstin}</td></tr>)}
-            </>
-          ) : (
-            <tr><td className="px-4 py-2 font-semibold text-amber-900 w-1/3 bg-amber-50/60">Details</td><td className="px-4 py-2 text-amber-950 whitespace-pre-wrap">{msgText}</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
+// ---- Themed result cards shared across the SAP Sync result dialogs ----
 function SuccessVendorTable({ sapCode, bpName, message, refNo }: { sapCode?: string; bpName?: string; message?: string; refNo?: string }) {
   const rowCls = 'border-b border-emerald-100 odd:bg-emerald-50/60 even:bg-white';
   return (
@@ -121,37 +77,29 @@ function SuccessVendorTable({ sapCode, bpName, message, refNo }: { sapCode?: str
   );
 }
 
-function SapErrorCard({ message, sapCode, bpName, refNo, msgText }: { message?: string; sapCode?: string; bpName?: string; refNo?: string; msgText?: string }) {
-  const rows: Array<[string, string, boolean]> = [];
-  if (sapCode) rows.push(['SAP Vendor Code', sapCode, true]);
-  if (bpName) rows.push(['Business Partner', bpName, false]);
-  if (refNo) rows.push(['Reference No', refNo, true]);
-  if (msgText) rows.push(['Details', msgText, false]);
-  const rowCls = 'border-b border-red-100 odd:bg-red-50/60 even:bg-white';
+function SapErrorMessage({ message, msgText, isDuplicate }: { message?: string; msgText?: string; isDuplicate?: boolean }) {
+  const cls = isDuplicate
+    ? 'border-amber-300 bg-amber-50 ring-amber-200/60'
+    : 'border-red-300 bg-red-50 ring-red-200/60';
+  const textCls = isDuplicate ? 'text-amber-900' : 'text-red-900';
+  const badgeCls = isDuplicate ? 'bg-amber-200 text-amber-900' : 'bg-red-200 text-red-900';
+  const Icon = isDuplicate ? AlertTriangle : XCircle;
   return (
-    <div className="rounded-xl border border-red-300 bg-gradient-to-b from-red-50 to-white overflow-hidden shadow-sm ring-1 ring-red-200/60">
-      <div className="px-4 py-2.5 bg-gradient-to-r from-red-100 to-rose-100 border-b border-red-300 flex items-center gap-2">
-        <XCircle className="h-4 w-4 text-red-700" />
-        <div>
-          <p className="text-sm font-bold text-red-900 leading-tight">SAP Error</p>
-          {message && <p className="text-[11px] text-red-800/80">{message}</p>}
+    <div className={`rounded-xl border ring-1 shadow-sm px-4 py-3 flex items-start gap-3 ${cls}`}>
+      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${textCls}`} />
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`text-sm font-semibold ${textCls}`}>{message || 'SAP Error'}</p>
+          <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${badgeCls}`}>error</span>
         </div>
+        {msgText && (
+          <p className={`text-sm font-mono break-words ${textCls}`}>{msgText}</p>
+        )}
       </div>
-      {rows.length > 0 && (
-        <table className="w-full text-sm">
-          <tbody>
-            {rows.map(([k, v, mono], i) => (
-              <tr key={i} className={i === rows.length - 1 ? 'odd:bg-red-50/60 even:bg-white' : rowCls}>
-                <td className="px-4 py-2 font-semibold text-red-900 w-1/3">{k}</td>
-                <td className={`px-4 py-2 text-red-950 ${mono ? 'font-mono' : ''}`}>{v}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </div>
   );
 }
+
 
 
 export default function SAPSync() {
