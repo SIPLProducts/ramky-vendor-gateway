@@ -14,6 +14,7 @@ interface Counts {
   buyer_approval_flows: number;
   approval_matrix_approvers: number;
   buyer_scm_mappings: number;
+  vendor_invitations?: number;
 }
 
 interface Props {
