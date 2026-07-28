@@ -154,25 +154,33 @@ serve(async (req) => {
             : `The vendor application below has been <b>closed by the SAP Team</b> because a duplicate vendor already exists in SAP.`;
 
           // Parse existing vendor details from SAP MSG_TEXT (format: "SAPCODE - NAME - PAN - GSTIN")
+          const dupRow = (k: string, v: string, mono = false) =>
+            `<tr>
+              <td style="padding:10px 14px;border-bottom:1px solid #fde68a;background:#fffbeb;color:#78350f;font-weight:600;width:38%">${esc(k)}</td>
+              <td style="padding:10px 14px;border-bottom:1px solid #fde68a;background:#ffffff;color:#451a03;${mono ? "font-family:'Courier New',monospace;" : ''}">${esc(v)}</td>
+            </tr>`;
+          const dupHeader = `
+            <div style="border:1px solid #fcd34d;border-radius:12px;overflow:hidden;margin:20px 0 12px;box-shadow:0 1px 2px rgba(180,83,9,0.08)">
+              <div style="background:linear-gradient(90deg,#fef3c7,#fee2e2);padding:12px 16px;border-bottom:1px solid #fcd34d">
+                <div style="font-size:15px;font-weight:700;color:#92400e;line-height:1.2">&#9888;&nbsp; Existing Vendor Details</div>
+                <div style="font-size:11px;color:#b45309;margin-top:2px">Vendor already exists in SAP</div>
+              </div>
+              <table style="border-collapse:collapse;width:100%;font-size:14px">`;
+          const dupFooter = `</table></div>`;
+
           let existingBlock = "";
           if (existingVendorText) {
             const parts = existingVendorText.split(/\s+-\s+|\s+–\s+/).map(s => s.trim()).filter(Boolean);
             if (parts.length >= 2) {
               const [sapCode, vName, pan, gstin] = [parts[0] || "", parts[1] || "", parts[2] || "", parts[3] || ""];
-              existingBlock = `
-              <h3 style="margin:20px 0 8px;color:#111;font-size:15px">Existing Vendor Details</h3>
-              <table style="border-collapse:collapse;width:100%;margin:0 0 12px;font-size:14px">
-                ${sapCode ? row("SAP Vendor Code", sapCode) : ""}
-                ${vName ? row("Vendor Name", vName) : ""}
-                ${pan ? row("PAN Number", pan) : ""}
-                ${gstin ? row("GSTIN", gstin) : ""}
-              </table>`;
+              existingBlock = dupHeader
+                + (sapCode ? dupRow("SAP Vendor Code", sapCode, true) : "")
+                + (vName ? dupRow("Vendor Name", vName) : "")
+                + (pan ? dupRow("PAN Number", pan, true) : "")
+                + (gstin ? dupRow("GSTIN", gstin, true) : "")
+                + dupFooter;
             } else {
-              existingBlock = `
-              <h3 style="margin:20px 0 8px;color:#111;font-size:15px">Existing Vendor Details</h3>
-              <table style="border-collapse:collapse;width:100%;margin:0 0 12px;font-size:14px">
-                ${row("Details", existingVendorText)}
-              </table>`;
+              existingBlock = dupHeader + dupRow("Details", existingVendorText) + dupFooter;
             }
           }
 

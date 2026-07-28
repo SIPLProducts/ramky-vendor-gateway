@@ -21,7 +21,7 @@ import {
   useVendors, useSAPSync, useMultipleSAPSync, useDMSSync, useBuyerCompanies, VendorRow,
 } from '@/hooks/useVendors';
 import {
-  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban, Undo2, MessageSquare,
+  Search, Eye, CheckCircle, Building2, Loader2, RefreshCw, Upload, Server, FileText, FolderUp, XCircle, Ban, Undo2, MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -52,6 +52,76 @@ async function persistClassification(vendorIds: string[], overrides: SapFieldOve
     console.warn('persistClassification failed', e);
   }
 }
+
+// ---- Themed result tables shared across the SAP Sync result dialogs ----
+function parseDupMsgText(msgText: string) {
+  const parts = String(msgText || '')
+    .split(/\s+-\s+|\s+–\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    sapCode: parts[0] || '',
+    name: parts[1] || '',
+    pan: parts[2] || '',
+    gstin: parts[3] || '',
+    parts,
+  };
+}
+
+function DuplicateVendorTable({ msgText }: { msgText: string }) {
+  const { sapCode, name, pan, gstin, parts } = parseDupMsgText(msgText);
+  const rowCls = 'border-b border-amber-100 odd:bg-amber-50/60 even:bg-white';
+  return (
+    <div className="rounded-xl border border-amber-300 bg-gradient-to-b from-amber-50 to-white overflow-hidden shadow-sm ring-1 ring-amber-200/60">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100 to-red-100 border-b border-amber-300 flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-amber-700" />
+        <div>
+          <p className="text-sm font-bold text-amber-900 leading-tight">Existing Vendor Details</p>
+          <p className="text-[11px] text-amber-800/80">Vendor already exists in SAP</p>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {parts.length >= 2 ? (
+            <>
+              {sapCode && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900 w-1/3">SAP Vendor Code</td><td className="px-4 py-2 font-mono text-amber-950">{sapCode}</td></tr>)}
+              {name && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900">Vendor Name</td><td className="px-4 py-2 text-amber-950">{name}</td></tr>)}
+              {pan && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900">PAN Number</td><td className="px-4 py-2 font-mono text-amber-950">{pan}</td></tr>)}
+              {gstin && (<tr className="odd:bg-amber-50/60 even:bg-white"><td className="px-4 py-2 font-semibold text-amber-900">GSTIN</td><td className="px-4 py-2 font-mono text-amber-950">{gstin}</td></tr>)}
+            </>
+          ) : (
+            <tr><td className="px-4 py-2 font-semibold text-amber-900 w-1/3 bg-amber-50/60">Details</td><td className="px-4 py-2 text-amber-950 whitespace-pre-wrap">{msgText}</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SuccessVendorTable({ sapCode, bpName, message, refNo }: { sapCode?: string; bpName?: string; message?: string; refNo?: string }) {
+  const rowCls = 'border-b border-emerald-100 odd:bg-emerald-50/60 even:bg-white';
+  return (
+    <div className="rounded-xl border border-emerald-300 bg-gradient-to-b from-emerald-50 to-white overflow-hidden shadow-sm ring-1 ring-emerald-200/60">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-emerald-100 to-green-100 border-b border-emerald-300 flex items-center gap-2">
+        <CheckCircle className="h-4 w-4 text-emerald-700" />
+        <div>
+          <p className="text-sm font-bold text-emerald-900 leading-tight">Vendor Details</p>
+          <p className="text-[11px] text-emerald-800/80">Successfully created in SAP</p>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {sapCode && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-emerald-900 w-1/3">SAP Vendor Code</td><td className="px-4 py-2 font-mono text-emerald-950">{sapCode}</td></tr>)}
+          {bpName && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-emerald-900">Business Partner</td><td className="px-4 py-2 text-emerald-950">{bpName}</td></tr>)}
+          {refNo && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-emerald-900">Reference No</td><td className="px-4 py-2 font-mono text-emerald-950">{refNo}</td></tr>)}
+          {message && (<tr className="odd:bg-emerald-50/60 even:bg-white"><td className="px-4 py-2 font-semibold text-emerald-900">Message</td><td className="px-4 py-2 text-emerald-950">{message}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
 
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -766,43 +836,47 @@ export default function SAPSync() {
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                             {dupRaw && (
-                              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
-                                <div className="px-3 py-2 bg-amber-100 border-b border-amber-200">
-                                  <p className="text-xs font-semibold text-amber-900">Existing Vendor Details (from SAP)</p>
+                              <div className="mt-3 rounded-xl border border-amber-300 bg-gradient-to-b from-amber-50 to-white overflow-hidden shadow-sm ring-1 ring-amber-200/60">
+                                <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100 to-red-100 border-b border-amber-300 flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-amber-700" />
+                                  <div>
+                                    <p className="text-sm font-bold text-amber-900 leading-tight">Existing Vendor Details</p>
+                                    <p className="text-[11px] text-amber-800/80">Vendor already exists in SAP</p>
+                                  </div>
                                 </div>
                                 <table className="w-full text-sm">
                                   <tbody>
                                     {dupParts.length >= 2 ? (
                                       <>
                                         {dupSapCode && (
-                                          <tr className="border-b border-amber-100">
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50 w-1/3">SAP Vendor Code</td>
-                                            <td className="px-3 py-2 font-mono text-amber-950">{dupSapCode}</td>
+                                          <tr className="border-b border-amber-100 odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900 w-1/3">SAP Vendor Code</td>
+                                            <td className="px-4 py-2 font-mono text-amber-950">{dupSapCode}</td>
                                           </tr>
                                         )}
                                         {dupName && (
-                                          <tr className="border-b border-amber-100">
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">Vendor Name</td>
-                                            <td className="px-3 py-2 text-amber-950">{dupName}</td>
+                                          <tr className="border-b border-amber-100 odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900">Vendor Name</td>
+                                            <td className="px-4 py-2 text-amber-950">{dupName}</td>
                                           </tr>
                                         )}
                                         {dupPan && (
-                                          <tr className="border-b border-amber-100">
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">PAN Number</td>
-                                            <td className="px-3 py-2 font-mono text-amber-950">{dupPan}</td>
+                                          <tr className="border-b border-amber-100 odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900">PAN Number</td>
+                                            <td className="px-4 py-2 font-mono text-amber-950">{dupPan}</td>
                                           </tr>
                                         )}
                                         {dupGstin && (
-                                          <tr>
-                                            <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50">GSTIN</td>
-                                            <td className="px-3 py-2 font-mono text-amber-950">{dupGstin}</td>
+                                          <tr className="odd:bg-amber-50/60 even:bg-white">
+                                            <td className="px-4 py-2 font-semibold text-amber-900">GSTIN</td>
+                                            <td className="px-4 py-2 font-mono text-amber-950">{dupGstin}</td>
                                           </tr>
                                         )}
                                       </>
                                     ) : (
                                       <tr>
-                                        <td className="px-3 py-2 font-medium text-amber-900 bg-amber-50/50 w-1/3">Details</td>
-                                        <td className="px-3 py-2 text-amber-950 whitespace-pre-wrap">{dupRaw}</td>
+                                        <td className="px-4 py-2 font-semibold text-amber-900 w-1/3 bg-amber-50/60">Details</td>
+                                        <td className="px-4 py-2 text-amber-950 whitespace-pre-wrap">{dupRaw}</td>
                                       </tr>
                                     )}
                                   </tbody>
@@ -998,18 +1072,38 @@ export default function SAPSync() {
                 {(sapSyncResult.ACC_RES || []).length === 0 && (
                   <p className="text-sm text-muted-foreground">No ACC_RES rows returned from SAP.</p>
                 )}
-                {(sapSyncResult.ACC_RES || []).map((r: any, i: number) => (
-                  <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{r.LONGMSG || r.MSG}</span>
-                      <Badge variant={r.MSGTYP === 'S' ? 'default' : 'destructive'}>
-                        {r.MSGTYP === 'S' ? 'Success' : 'Error'}
-                      </Badge>
+                {(sapSyncResult.ACC_RES || []).map((r: any, i: number) => {
+                  const isSuccess = r.MSGTYP === 'S';
+                  const dup = isPanDuplicateResponse(r);
+                  const longMsg = r.LONGMSG || r.MSG || '';
+                  const sapCode = r.VENDOR ?? r.BP_LIFNR ?? '';
+                  if (isSuccess && (sapCode || r.BPNAME)) {
+                    return (
+                      <SuccessVendorTable
+                        key={i}
+                        sapCode={sapCode}
+                        bpName={r.BPNAME}
+                        refNo={r.REFER_NUM}
+                        message={longMsg}
+                      />
+                    );
+                  }
+                  if (dup.matched && dup.msgText) {
+                    return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
+                  }
+                  return (
+                    <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{longMsg}</span>
+                        <Badge variant={isSuccess ? 'default' : 'destructive'}>
+                          {isSuccess ? 'Success' : 'Error'}
+                        </Badge>
+                      </div>
+                      {sapCode && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{sapCode}</span></p>}
+                      {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
                     </div>
-                    {(r.VENDOR || r.BP_LIFNR) && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR ?? r.BP_LIFNR}</span></p>}
-                    {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </ScrollArea>
           )}
@@ -1039,6 +1133,14 @@ export default function SAPSync() {
                 const success = item?.success ?? (r?.MSGTYP === 'S');
                 const ref = item?.refNo || getSapRowRef(r) || getSapRowRef(item?.totRaw);
                 const message = item?.message || getSapRowMessage(r) || getSapRowMessage(item?.totRaw) || 'No message returned from SAP';
+                const sapCode = r.VENDOR ?? r.BP_LIFNR ?? '';
+                const dup = isPanDuplicateResponse(item?.sapResponse || item);
+                if (success && (sapCode || r.BPNAME)) {
+                  return <SuccessVendorTable key={i} sapCode={sapCode} bpName={r.BPNAME} refNo={ref} message={message} />;
+                }
+                if (dup.matched && dup.msgText) {
+                  return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
+                }
                 return (
                 <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
                   <div className="flex items-center justify-between">
@@ -1049,7 +1151,7 @@ export default function SAPSync() {
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     {ref && <p>Ref No: <span className="font-mono">{ref}</span></p>}
-                    {(r.VENDOR || r.BP_LIFNR) && <p>SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR ?? r.BP_LIFNR}</span></p>}
+                    {sapCode && <p>SAP Vendor Code: <span className="font-mono font-semibold">{sapCode}</span></p>}
                   </div>
                 </div>
               );})}

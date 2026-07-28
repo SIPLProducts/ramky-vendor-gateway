@@ -871,18 +871,29 @@ serve(async (req) => {
               hour12: true,
             }) + ' IST';
             const subject = `Vendor ${legal} successfully created in SAP (${sapVendorCode})`;
+            const okRow = (k: string, v: string, mono = false) =>
+              `<tr>
+                <td style="padding:10px 14px;border-bottom:1px solid #a7f3d0;background:#ecfdf5;color:#065f46;font-weight:600;width:38%">${k}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #a7f3d0;background:#ffffff;color:#064e3b;${mono ? "font-family:'Courier New',monospace;" : ''}">${v}</td>
+              </tr>`;
             const html = `
-              <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:14px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;font-size:14px;max-width:640px;margin:auto">
                 <p>Dear ${buyerName},</p>
                 <p>The vendor you onboarded has been <b>successfully created in SAP</b>.</p>
-                <table cellpadding="6" style="border-collapse:collapse;border:1px solid #e5e7eb;">
-                  <tr><td style="background:#f7f9fc;"><b>Vendor Legal Name</b></td><td>${legal}</td></tr>
-                  ${trade ? `<tr><td style="background:#f7f9fc;"><b>Trade Name</b></td><td>${trade}</td></tr>` : ""}
-                  ${buyerCompanyDisplay ? `<tr><td style="background:#f7f9fc;"><b>Buyer Company</b></td><td>${buyerCompanyDisplay}</td></tr>` : ""}
-                  <tr><td style="background:#f7f9fc;"><b>SAP Vendor Code</b></td><td>${sapVendorCode}</td></tr>
-                  <tr><td style="background:#f7f9fc;"><b>Reference No.</b></td><td>${refNo}</td></tr>
-                  <tr><td style="background:#f7f9fc;"><b>Synced At</b></td><td>${syncedAt}</td></tr>
-                </table>
+                <div style="border:1px solid #6ee7b7;border-radius:12px;overflow:hidden;margin:16px 0;box-shadow:0 1px 2px rgba(5,150,105,0.08)">
+                  <div style="background:linear-gradient(90deg,#d1fae5,#dcfce7);padding:12px 16px;border-bottom:1px solid #6ee7b7">
+                    <div style="font-size:15px;font-weight:700;color:#065f46;line-height:1.2">&#10003;&nbsp; Vendor Details</div>
+                    <div style="font-size:11px;color:#047857;margin-top:2px">Successfully created in SAP</div>
+                  </div>
+                  <table style="border-collapse:collapse;width:100%;font-size:14px">
+                    ${okRow("SAP Vendor Code", sapVendorCode, true)}
+                    ${okRow("Vendor Legal Name", legal)}
+                    ${trade ? okRow("Trade Name", trade) : ""}
+                    ${buyerCompanyDisplay ? okRow("Buyer Company", buyerCompanyDisplay) : ""}
+                    ${okRow("Reference No.", refNo, true)}
+                    ${okRow("Synced At", syncedAt)}
+                  </table>
+                </div>
                 <p style="margin-top:16px;">You can review this vendor in the Ramky Vendor Portal.</p>
                 <p>Regards,<br/>Ramky Vendor Portal</p>
               </div>`;
