@@ -1,52 +1,31 @@
 ## Goal
 
-Give the "Vendor Details" tables a clearer, more attractive visual identity so users can distinguish two scenarios at a glance:
+In the SAP Sync Result dialog, all `ACC_RES` messages should be shown with consistent, attractive styling. Currently the duplicate row renders as a nice amber "Existing Vendor Details" table, but the second row (e.g. `"No Bank Key Available"`) falls through to a plain muted `bg-muted` block with just an Error badge — which looks broken next to the themed duplicate card (see screenshot).
 
-- **Duplicate vendor already in SAP** → warm amber/red warning theme (like screenshot 2, but slightly richer)
-- **Vendor successfully created in SAP** → green success theme
+## Change (visual only)
 
-Same visual language in both the SAP Sync screen (in-app) and the buyer notification emails, so the UI and the email match.
+### `src/pages/SAPSync.tsx` — single SAP Sync Result dialog (lines ~1094–1105 fallback branch)
 
-## Scope (visual only, no logic changes)
+Replace the `bg-muted` fallback with a themed red "SAP Error" card that matches the visual language of the amber duplicate and green success cards:
 
-### 1. In-app — `src/pages/SAPSync.tsx`
+- Outer container: `rounded-xl border border-red-300 bg-gradient-to-b from-red-50 to-white ring-1 ring-red-200/60 shadow-sm overflow-hidden`.
+- Header bar: `bg-gradient-to-r from-red-100 to-rose-100 border-b border-red-300`, `XCircle` (or `AlertCircle`) icon in `text-red-700`, title `"SAP Error"` in `text-red-900 font-bold`, subtitle = the `LONGMSG` in smaller red-800 text.
+- Body table (only rendered when there are extra fields): rows for `SAP Vendor Code`, `Business Partner`, `Reference No`, `MSG_TEXT` — same alternating `odd:bg-red-50/60 even:bg-white`, `text-red-900` labels, mono value column, matching the amber/green cards.
+- If none of those fields exist (typical for `"No Bank Key Available"`), render just the header bar with the message — no empty table.
 
-**a. Duplicate & Closed card — "Existing Vendor Details (from SAP)" table** (around lines 768–810)
-- Header bar: gradient `from-amber-100 to-red-100`, amber-800 title, small ⚠ warning icon, subtitle "Vendor already exists in SAP".
-- Table body: alternating amber-50 / white rows, amber-200 borders, amber-900 labels, mono value column.
-- Rounded-xl outer container with a soft amber ring/shadow so it visually separates from the red "Duplicate & Close Remarks" block below.
+Success (non-duplicate) rows already use `SuccessVendorTable`; duplicate rows already use `DuplicateVendorTable`. Only the error fallback changes.
 
-**b. Single-vendor SAP Sync Result dialog** (lines 980–1019)
-- Success case (`success !== false`, MSGTYP === 'S'): render a new **green "Vendor Details (Created in SAP)"** card — emerald header, ✓ success icon, table of SAP Vendor Code, Business Partner Name, Reference No, message — replacing the plain `bg-muted` row.
-- Error case with duplicate row: reuse the same amber/red "Existing Vendor Details" table component (parse `MSG_TEXT` the same way the closed card does).
-- Non-duplicate errors keep the current muted styling.
+### Bulk SAP Sync Result dialog (lines ~1116+)
 
-**c. Bulk SAP Sync Result dialog** (lines 1022–1064)
-- Per row: successful rows get the same green mini-table treatment; failed rows keep destructive badge; duplicate rows (detected via existing `isPanDuplicateResponse` helper) get the amber mini-table.
-
-### 2. Emails
-
-**a. `supabase/functions/sap-team-reject-vendor/index.ts` — duplicate close email**
-- Restyle the existing `existingBlock` (lines 156–177) to match screenshot 2's aesthetic but with a warmer palette:
-  - Amber header bar (`background:#fef3c7; color:#92400e; border:1px solid #fcd34d`) with ⚠ icon and title "Existing Vendor Details".
-  - Rows: alternating `#fffbeb` / `#ffffff`, amber-200 borders, `#78350f` label color, monospace value column.
-- Rest of email (Reason / Remarks / Closed Date table) unchanged.
-
-**b. `supabase/functions/sync-vendor-to-sap/index.ts` — success email** (lines 874–888)
-- Wrap the vendor details table in a green success theme:
-  - Green header bar (`background:#dcfce7; color:#166534; border:1px solid #86efac`) with ✓ icon and title "Vendor Details — Successfully Created in SAP".
-  - Rows: alternating `#f0fdf4` / `#ffffff`, green-200 borders.
-- Keep all fields (Legal Name, Trade Name, Buyer Company, SAP Vendor Code, Reference No, Synced At).
+Apply the same red `SapErrorCard` component to the per-row error fallback so bulk results stay visually consistent with the single-sync dialog.
 
 ## Out of scope
 
-- No changes to parsing (`isPanDuplicateResponse`), DB writes, `sap_duplicate_details` shape, migrations, RLS.
-- No changes to DMS Sync Result dialog styling.
-- No changes to bulk success email (there isn't one today).
+- No changes to parsing (`isPanDuplicateResponse`), success/duplicate tables, edge functions, emails, or DB writes.
+- No changes to the outer dialog header/footer.
 
 ## Verify
 
-1. Trigger a duplicate SAP sync (`AACFU0481F`) → Duplicate & Closed card shows the amber-themed Existing Vendor Details table; buyer email shows the same amber-themed block above the Reason row.
-2. Trigger a successful SAP sync → Result dialog shows a green Vendor Details card with SAP Vendor Code + BP name; buyer email uses the green-themed Vendor Details table.
-3. Trigger a non-duplicate SAP error → dialog keeps current muted red styling (no accidental green/amber tint).
-4. Bulk sync with mixed rows → each row uses the correct theme (green success / amber duplicate / red generic error).
+1. Trigger a SAP sync where `ACC_RES` contains a duplicate row + a `"No Bank Key Available"` row → dialog shows the amber Existing Vendor Details card followed by a red "SAP Error" card (not the plain muted block from the screenshot).
+2. Trigger a pure success → still shows the green Vendor Details card only.
+3. Trigger a bulk sync with mixed rows → each row renders in its correct themed card (green / amber / red).
