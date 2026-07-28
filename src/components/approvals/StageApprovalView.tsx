@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare, Award } from 'lucide-react';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { formatDateTime } from '@/lib/dateFormat';
