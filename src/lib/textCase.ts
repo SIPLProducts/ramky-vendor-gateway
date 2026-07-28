@@ -7,9 +7,9 @@ const KEEP_UPPER = new Set([
 
 const titleWord = (w: string): string => {
   if (!w) return w;
-  const upper = w.toUpperCase();
-  if (KEEP_UPPER.has(upper)) return upper;
-  // Preserve non-letter chars, title-case letter runs.
+  const letterOnly = w.replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (letterOnly && KEEP_UPPER.has(letterOnly)) return w.toUpperCase();
+  if (KEEP_UPPER.has(w.toUpperCase())) return w.toUpperCase();
   return w.toLowerCase().replace(/([a-z])([a-z']*)/gi, (_m, a, rest) => a.toUpperCase() + rest);
 };
 
