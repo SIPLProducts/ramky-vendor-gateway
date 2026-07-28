@@ -233,7 +233,27 @@ Deno.serve(async (req) => {
         if (error) throw new Error(`vendor_approval_progress: ${error.message}`);
         applied.vendor_approval_progress = updated?.length ?? 0;
       }
+
+      // 5) vendor_invitations — transfer ownership to the replacement buyer and
+      //    preserve the first inviter in original_created_by (only ever set once).
+      {
+        const { data: invRows } = await admin
+          .from('vendor_invitations')
+          .select('id, original_created_by')
+          .eq('created_by', user_id);
+        for (const row of invRows ?? []) {
+          const patch: Record<string, unknown> = { created_by: replacement_user_id };
+          if (!row.original_created_by) patch.original_created_by = user_id;
+          const { error: invErr } = await admin
+            .from('vendor_invitations')
+            .update(patch)
+            .eq('id', row.id);
+          if (invErr) throw new Error(`vendor_invitations: ${invErr.message}`);
+          applied.vendor_invitations += 1;
+        }
+      }
     }
+
 
     // Helper to run step + surface error
     const run = async (step: string, fn: () => Promise<{ error: any } | any>) => {
