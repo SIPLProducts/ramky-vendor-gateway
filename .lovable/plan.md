@@ -1,23 +1,16 @@
-Delete the user `sunilkumar@sharviinfotech.com` from the local/dev database so the email can be re-used for testing the "Add User" flow.
+Delete user `sunilkumar@sharviinfotech.com` from the Lovable Cloud (dev) database so the email can be re-used in the Add User flow.
 
-## What will run
+## Steps
 
-A single SQL block that removes the user and all rows that reference them, in dependency order:
+1. Look up the user id in `auth.users` for that email.
+2. Detach / delete all references in this order:
+   - `public.vendor_invitations`: set `user_id = NULL` and `created_by = NULL` where they match (preserve invitation history).
+   - `public.user_custom_roles`, `public.user_roles`, `public.user_tenants`: delete rows for that user.
+   - `public.buyer_approval_flows`: null out `scm_manager_user_id`, `scm_head_user_id`, `finance_1_user_id`, `finance_2_user_id`, `ceo_office_user_id` references; delete rows where `buyer_user_id` matches.
+   - `public.buyer_scm_mappings`: delete rows where `buyer_user_id` or `scm_manager_user_id` matches.
+   - `public.approval_matrix_approvers`: delete rows for that user.
+   - `public.profiles`: delete the row with matching id.
+   - `auth.users`: delete the user row.
+3. Verify via a read query that the email is gone.
 
-1. Look up the user id from `auth.users` where `email = 'sunilkumar@sharviinfotech.com'`.
-2. Delete dependent rows in this order:
-   - `public.user_custom_roles` where `user_id = <id>`
-   - `public.user_roles` where `user_id = <id>`
-   - `public.user_tenants` where `user_id = <id>`
-   - `public.custom_role_screen_permissions` — not user-scoped, skip
-   - `public.vendor_invitations` where `user_id = <id>` or `created_by = <id>` (set to null instead of delete to preserve invitation history)
-   - `public.profiles` where `id = <id>`
-3. Delete from `auth.users` where `id = <id>`.
-
-All wrapped in a `DO $$ ... $$` block using the resolved id.
-
-## Notes
-
-- This is destructive and only intended for the local/dev environment as you stated.
-- If any FK still blocks deletion, we'll add that table to the cleanup list and retry.
-- After deletion, the email is free to re-invite / re-create from the Add User screen.
+Executed as a single SQL block through the data tool.
