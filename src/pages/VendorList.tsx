@@ -599,7 +599,7 @@ export default function VendorList() {
           {returnTarget && (
             <div className="space-y-3 text-sm">
               <div>
-                <div className="font-medium">{pickVendorDisplayName(returnTarget) || returnTarget.id}</div>
+                <div className="font-medium">{formatVendorName(returnTarget) || returnTarget.id}</div>
                 <div className="text-xs text-muted-foreground">
                   Last rejected at: {(returnTarget as any).last_rejection_stage ?? '—'}
                 </div>
