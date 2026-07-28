@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, Edit2, Clock, FileCheck, UserCheck, Building2, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Edit2, Clock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RegistrationStatusTracker, RegistrationStatus } from './RegistrationStatusTracker';
@@ -117,28 +117,6 @@ export function SuccessScreen({
   const config = getStatusConfig();
   const StatusIcon = config.icon;
 
-  const nextSteps = [
-    {
-      icon: FileCheck,
-      title: 'Document Verification',
-      description: 'Your documents will be automatically verified against government databases.',
-    },
-    {
-      icon: Building2,
-      title: 'Finance Review',
-      description: 'Our finance team will review your financial credentials and bank details.',
-    },
-    {
-      icon: UserCheck,
-      title: 'Purchase Approval',
-      description: 'Final approval from the purchase team to complete vendor onboarding.',
-    },
-    {
-      icon: Clock,
-      title: 'SAP Integration',
-      description: 'Upon approval, your vendor code will be generated in our SAP system.',
-    },
-  ];
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
@@ -195,23 +173,8 @@ export function SuccessScreen({
 
       {/* Application Progress diagram intentionally hidden for vendors post-submission. */}
 
-      {/* What's Next */}
-      <div className="bg-card rounded-lg border p-6 shadow-enterprise-sm">
-        <h3 className="text-base font-semibold mb-4">What Happens Next?</h3>
-        <div className="space-y-4">
-          {nextSteps.map((step, index) => (
-            <div key={index} className="flex gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <step.icon className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{step.title}</p>
-                <p className="text-sm text-muted-foreground">{step.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+
+
 
       {/* Contact Support */}
       <div className="mt-6 text-center">
