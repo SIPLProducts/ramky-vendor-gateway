@@ -90,24 +90,28 @@ Deno.serve(async (req) => {
     // ----- Assess active workload for this user -----
     log('assess_workload');
     const flowFilters = FLOW_COLS.map((c) => `${c}.eq.${user_id}`).join(',');
-    const [flowRes, matrixRes, mapBuyerRes, mapScmRes, pendingProgressRes] = await Promise.all([
+    const [flowRes, matrixRes, mapBuyerRes, mapScmRes, pendingProgressRes, invitesRes] = await Promise.all([
       admin.from('buyer_approval_flows').select('id', { count: 'exact', head: true }).or(flowFilters),
       admin.from('approval_matrix_approvers').select('id', { count: 'exact', head: true }).eq('user_id', user_id),
       admin.from('buyer_scm_mappings').select('id', { count: 'exact', head: true }).eq('buyer_user_id', user_id),
       admin.from('buyer_scm_mappings').select('id', { count: 'exact', head: true }).eq('scm_manager_user_id', user_id),
       admin.from('vendor_approval_progress').select('id', { count: 'exact', head: true }).eq('acted_by', user_id).eq('status', 'pending'),
+      admin.from('vendor_invitations').select('id', { count: 'exact', head: true }).eq('created_by', user_id),
     ]);
     const workloadCounts = {
       buyer_approval_flows: flowRes.count ?? 0,
       approval_matrix_approvers: matrixRes.count ?? 0,
       buyer_scm_mappings: (mapBuyerRes.count ?? 0) + (mapScmRes.count ?? 0),
       vendor_approval_progress_pending: pendingProgressRes.count ?? 0,
+      vendor_invitations: invitesRes.count ?? 0,
     };
     const hasWorkload =
       workloadCounts.buyer_approval_flows +
       workloadCounts.approval_matrix_approvers +
       workloadCounts.buyer_scm_mappings +
-      workloadCounts.vendor_approval_progress_pending > 0;
+      workloadCounts.vendor_approval_progress_pending +
+      workloadCounts.vendor_invitations > 0;
+
 
     if (hasWorkload && !replacement_user_id) {
       return jsonResponse({
