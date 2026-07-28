@@ -678,18 +678,24 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               />
             </div>
           )}
-          <Textarea
-            placeholder="Optional remarks"
-            value={rejectedRemarks}
-            onChange={(e) => setRejectedRemarks(e.target.value)}
-            rows={4}
-          />
+          <div className="grid gap-1.5">
+            <Label>
+              Remarks<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Textarea
+              placeholder="Enter remarks (required)"
+              value={rejectedRemarks}
+              onChange={(e) => setRejectedRemarks(e.target.value)}
+              rows={4}
+            />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectedAction(null)}>Cancel</Button>
             <Button
               onClick={submitRejectedAction}
               disabled={
                 rejectedSubmitting ||
+                rejectedRemarks.trim().length === 0 ||
                 (isBuyer && rejectedAction?.action === 'approve' && (
                   rejectedClassification.materialGroupVendor.length === 0 ||
                   rejectedClassification.vendorCategory.length === 0
