@@ -1,38 +1,45 @@
-## Problem
-
-`vendors.sap_duplicate_details` is `NULL` for every duplicate-closed vendor, so the "Existing Vendor Details" table is missing from both the buyer email and the "Duplicate & Closed" card. Verified against the last 5 `sap_team_closed` rows.
-
-The SAP duplicate row you shared:
-
-```
-{ "MSGTYP":"E", "LONGMSG":"PAN Number Duplicated",
-  "MSG_TEXT":"1017527    - Ashish Shreevas - PEGPS8256R", "REFER_NUM":"13991D9D" }
-```
-
 ## Root cause
 
-Two bugs in `src/pages/SAPSync.tsx › isPanDuplicateResponse` (which produces the `existingVendorText` sent to `sap-team-reject-vendor`):
+The duplicate response is now correctly reaching the client, but on the failure path in `src/pages/SAPSync.tsx › handleConfirmSync` we throw the SAP response away before parsing it.
 
-1. It only understands two shapes: `{ ACC_RES: [...] }` and `{ sapResponse: [{ ACC_RES: [...] }] }`. When the edge function returns `sapResponse` as a bare array `[{ ACC_RES: [...], TOT_RES: [...] }]` (which is what actually comes back from SAP), `rows`/`totRows` end up empty, so `MSG_TEXT` is never read. The duplicate is still detected because the catch-path fallback matches the regex on the top-level `message`, but by then no row context is available and `msgText` stays `""`.
-2. Even when rows are found, it picks the first non-empty `MSG_TEXT` from any row. In your sample the duplicate row has the useful `MSG_TEXT`, but a second `"No Bank Key Available"` row is present too — extraction should be anchored to the row whose `LONGMSG` matches the PAN/GST duplicate regex, not "first non-empty".
+`useSAPSync` (`src/hooks/useVendors.tsx`, ~line 600) turns `success: false` into a thrown Error and attaches the SAP data as:
 
-## Fix
+```
+err.sapResponse = sapResult.sapResponse   // raw SAP array [{ ACC_RES, TOT_RES }]
+err.sapResult   = sapResult               // full envelope incl. ACC_RES
+```
 
-1. `src/pages/SAPSync.tsx` — rewrite `isPanDuplicateResponse` to:
-   - Normalize `resp` into a flat list of `ACC_RES` + `TOT_RES` rows, accepting all shapes we produce today: object with `ACC_RES`, object with `sapResponse` (object or array), bare array of `{ ACC_RES, TOT_RES }`, and per-vendor bulk shapes (`raw` / `totRaw`).
-   - Find the row whose `LONGMSG` (or `MSG` / `LONG_MSG`) matches the duplicate regex and read `MSG_TEXT` from that same row. Fall back to the first row with a non-empty `MSG_TEXT` only if no explicit match is found.
-   - Return `{ matched, message, msgText }` as today, so the calling code and the reject edge function keep the same contract.
+But the `catch` block in `handleConfirmSync` reads `error?.ACC_RES` (which doesn't exist) and falls back to a synthetic single row:
 
-2. `supabase/functions/sap-team-reject-vendor/index.ts` — extend the `existingBlock` parser to also handle the 3-part form `SAPCODE - NAME - PAN` (your sample has no GSTIN). Current code already handles 4 parts and the free-text fallback; the 3-part branch just needs to render SAP Vendor Code + Vendor Name + PAN and omit GSTIN. No auth, no schema, no other logic changes.
+```
+[{ MSGTYP:'E', LONGMSG: msg, BP_LIFNR:'', BPNAME: vendor.legal_name }]
+```
 
-3. Same 3-part rendering in the "Duplicate & Closed" tab card in `src/pages/SAPSync.tsx` (lines ~727-790) so the UI table matches the email when GSTIN is absent.
+That synthetic row has no `MSG_TEXT`. `isPanDuplicateResponse` matches the regex on `LONGMSG` ("PAN & GST combination is Duplicated") so `matched=true`, but `msgText` stays `""`. `autoRejectAsDuplicate` is then called with `existingVendorText=''`, so `sap-team-reject-vendor` stores `sap_duplicate_details: null` → the email has no "Existing Vendor Details" block and the "Duplicate & Closed" card has nothing to render.
 
-4. No migration, no backfill. Vendors already closed with `sap_duplicate_details = NULL` stay as-is; new closures after the fix will populate correctly.
+The success path in the same handler and the bulk `handleMultipleSync` path already pass the real SAP response into `isPanDuplicateResponse`, so this only regressed for the single-vendor duplicate flow that comes back via the thrown-error branch (which is the current SAP behaviour — `success:false` → thrown).
+
+## Fix (single file, single function)
+
+`src/pages/SAPSync.tsx` — in the `catch (error)` branch of `handleConfirmSync`:
+
+1. Build `failResp` from what the hook actually attaches, in this priority:
+   - `error.sapResult` if present (full envelope with `ACC_RES` + `sapResponse`)
+   - else `{ success:false, message: msg, sapResponse: error.sapResponse }` when `sapResponse` exists
+   - else the current synthetic fallback (unchanged, for true network errors)
+2. Call `isPanDuplicateResponse` on that `failResp` — the existing parser already walks `sapResponse` / `ACC_RES` / `TOT_RES` and pulls `MSG_TEXT` from the row whose `LONGMSG` matches the duplicate regex.
+3. Keep `setSapSyncResult(failResp)` so the result dialog also shows the real SAP rows (not just the synthesized one-line error).
+
+No changes to:
+- `isPanDuplicateResponse` (already correct for the shapes we now feed it)
+- `sap-team-reject-vendor` (already parses 2/3/4-part `MSG_TEXT` and renders "Existing Vendor Details" before the Reason row in the email)
+- The "Duplicate & Closed" card in `SAPSync.tsx` (already renders the table above the Remarks block)
+- Schema / migrations / RLS
 
 ## Verify
 
-- Trigger a single-vendor SAP sync against a known duplicate PAN.
-- Confirm `vendors.sap_duplicate_details` now stores `"1017527 - Ashish Shreevas - PEGPS8256R"` (or the 4-part form when GSTIN is returned).
-- Confirm the buyer email body shows the "Existing Vendor Details" table with SAP Vendor Code / Vendor Name / PAN (+ GSTIN when present).
-- Confirm the "Duplicate & Closed" card renders the same table.
-- Repeat via the bulk sync path (`handleMultipleSync`) — it uses the same `isPanDuplicateResponse` helper so it's covered by the same fix.
+1. Trigger a single-vendor SAP sync against the known duplicate PAN (`RSJ HOLDINGS` / `AACFU0481F`).
+2. Query `vendors.sap_duplicate_details` for that vendor — expect `"1017575 - Rsj Holdings - AACFU0481F - 29AACFU0481F1Z7"`.
+3. Buyer email: "Existing Vendor Details" table (SAP Vendor Code, Vendor Name, PAN, GSTIN) appears above the Reason row.
+4. SAP Sync → Duplicate & Closed card: same 4-row table appears above the "Duplicate & Close Remarks" block.
+5. Vendors already closed with `sap_duplicate_details = NULL` stay as-is (no backfill requested).
