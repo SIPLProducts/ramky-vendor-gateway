@@ -110,7 +110,7 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
       const c = (data as any).counts as Counts;
       toast({
         title: 'Work reassigned',
-        description: `Invitations: ${c.vendor_inviations ?? c.vendor_invitations ?? 0}, approval flows: ${c.buyer_approval_flows}, matrix: ${c.approval_matrix_approvers}, mappings: ${c.buyer_scm_mappings}`,
+        description: `Invitations: ${c.vendor_invitations ?? 0}, approval flows: ${c.buyer_approval_flows}, matrix: ${c.approval_matrix_approvers}, mappings: ${c.buyer_scm_mappings}`,
       });
       onConfirmed();
       onOpenChange(false);
