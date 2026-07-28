@@ -336,14 +336,21 @@ export default function SAPSync() {
       console.error('[SAPSync] sapSync failed', error);
       const msg = error?.message || 'SAP sync failed';
       toast.error('SAP sync failed', { description: msg });
-      const fallback = error?.ACC_RES ?? [
-        { MSGTYP: 'E', LONGMSG: msg, BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
-      ];
-      const failResp = {
-        success: false,
-        message: msg,
-        ACC_RES: fallback,
-      };
+      // useSAPSync throws with err.sapResult (full envelope: {ACC_RES, sapResponse, ...})
+      // and err.sapResponse (raw SAP array). Prefer those so isPanDuplicateResponse
+      // can extract MSG_TEXT from the actual duplicate row instead of a synthesized
+      // one-liner that only carries LONGMSG.
+      let failResp: any;
+      if (error?.sapResult && typeof error.sapResult === 'object') {
+        failResp = error.sapResult;
+      } else if (error?.sapResponse) {
+        failResp = { success: false, message: msg, sapResponse: error.sapResponse };
+      } else {
+        const fallback = error?.ACC_RES ?? [
+          { MSGTYP: 'E', LONGMSG: msg, BP_LIFNR: '', BPNAME: vendor.legal_name || '' },
+        ];
+        failResp = { success: false, message: msg, ACC_RES: fallback };
+      }
       setSapSyncResult(failResp);
       setSelectedVendor(vendor);
       setShowSapFieldsDialog(false);
