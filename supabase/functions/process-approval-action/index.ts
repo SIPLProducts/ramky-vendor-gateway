@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { progress_id, action, comments, force } = await req.json();
+    const { progress_id, action, comments, force, classification } = await req.json();
     if (!progress_id || !['approve', 'reject'].includes(action)) {
       return new Response(JSON.stringify({ error: 'Invalid input' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -252,6 +252,20 @@ Deno.serve(async (req) => {
     }
 
     // APPROVE
+    // If buyer provided classification, persist it before routing forward.
+    if (isBuyerRow && classification && (
+      Array.isArray(classification.material_group_vendors) || Array.isArray(classification.vendor_categories)
+    )) {
+      const mg = Array.isArray(classification.material_group_vendors) ? classification.material_group_vendors : [];
+      const vc = Array.isArray(classification.vendor_categories) ? classification.vendor_categories : [];
+      await admin.from('vendors').update({
+        material_group_vendor: mg[0] ?? null,
+        material_group_vendors: mg,
+        vendor_category: vc[0] ?? null,
+        vendor_categories: vc,
+      }).eq('id', progress.vendor_id);
+    }
+
     await admin.from('vendor_approval_progress').update({
       status: 'approved', acted_by: userId, acted_at: nowIso, completed_at: nowIso, comments,
     }).eq('id', progress_id);
