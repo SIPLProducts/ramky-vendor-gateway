@@ -122,6 +122,8 @@ export default function Dashboard() {
 
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
+  const [viewVendorId, setViewVendorId] = useState<string | null>(null);
+  const [commentsVendor, setCommentsVendor] = useState<{ id: string; name: string; ref: string } | null>(null);
   const today = endOfDay(new Date());
 
   const handleFromSelect = (d: Date | undefined) => {
