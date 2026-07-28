@@ -16,6 +16,7 @@ import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog'
 import { formatDateTime } from '@/lib/dateFormat';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
 import { formatStageLevelHistory } from '@/lib/approvalLabels';
+import { formatVendorName } from '@/lib/textCase';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
