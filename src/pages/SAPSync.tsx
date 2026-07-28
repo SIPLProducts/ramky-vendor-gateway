@@ -1072,18 +1072,38 @@ export default function SAPSync() {
                 {(sapSyncResult.ACC_RES || []).length === 0 && (
                   <p className="text-sm text-muted-foreground">No ACC_RES rows returned from SAP.</p>
                 )}
-                {(sapSyncResult.ACC_RES || []).map((r: any, i: number) => (
-                  <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{r.LONGMSG || r.MSG}</span>
-                      <Badge variant={r.MSGTYP === 'S' ? 'default' : 'destructive'}>
-                        {r.MSGTYP === 'S' ? 'Success' : 'Error'}
-                      </Badge>
+                {(sapSyncResult.ACC_RES || []).map((r: any, i: number) => {
+                  const isSuccess = r.MSGTYP === 'S';
+                  const dup = isPanDuplicateResponse(r);
+                  const longMsg = r.LONGMSG || r.MSG || '';
+                  const sapCode = r.VENDOR ?? r.BP_LIFNR ?? '';
+                  if (isSuccess && (sapCode || r.BPNAME)) {
+                    return (
+                      <SuccessVendorTable
+                        key={i}
+                        sapCode={sapCode}
+                        bpName={r.BPNAME}
+                        refNo={r.REFER_NUM}
+                        message={longMsg}
+                      />
+                    );
+                  }
+                  if (dup.matched && dup.msgText) {
+                    return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
+                  }
+                  return (
+                    <div key={i} className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{longMsg}</span>
+                        <Badge variant={isSuccess ? 'default' : 'destructive'}>
+                          {isSuccess ? 'Success' : 'Error'}
+                        </Badge>
+                      </div>
+                      {sapCode && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{sapCode}</span></p>}
+                      {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
                     </div>
-                    {(r.VENDOR || r.BP_LIFNR) && <p className="text-xs text-muted-foreground">SAP Vendor Code: <span className="font-mono font-semibold">{r.VENDOR ?? r.BP_LIFNR}</span></p>}
-                    {r.BPNAME && <p className="text-xs text-muted-foreground">Business Partner: {r.BPNAME}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </ScrollArea>
           )}
