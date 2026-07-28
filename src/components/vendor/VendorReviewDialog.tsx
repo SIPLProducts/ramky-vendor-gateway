@@ -207,6 +207,27 @@ export function VendorReviewDialog({
   } | null>(null);
   const { callProvider } = useConfiguredKycApi();
 
+  // Classification master data — for Proper Case display of codes
+  const { data: mgvRows } = useSapMasterData('material_group_vendor');
+  const { data: vcRows } = useSapMasterData('vendor_category');
+  const { data: cfRows } = useSapMasterData('vendor_cashflow');
+  const { data: tcRows } = useSapMasterData('tier_category');
+  const buildDescMap = (rows: any[] | undefined) => {
+    const m = new Map<string, string>();
+    (rows || []).forEach((r) => {
+      if (r?.code) m.set(String(r.code), r.description || r.code);
+    });
+    return m;
+  };
+  const mgvMap = buildDescMap(mgvRows as any);
+  const vcMap = buildDescMap(vcRows as any);
+  const cfMap = buildDescMap(cfRows as any);
+  const tcMap = buildDescMap(tcRows as any);
+  const fmtCodes = (arr: any, map: Map<string, string>) =>
+    Array.isArray(arr) && arr.length
+      ? arr.map((c) => map.get(String(c)) || String(c)).join(', ')
+      : '-';
+
   useEffect(() => {
     let cancelled = false;
     if (!open || !vendorId) {
