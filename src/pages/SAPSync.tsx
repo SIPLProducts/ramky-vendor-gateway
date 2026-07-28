@@ -53,6 +53,76 @@ async function persistClassification(vendorIds: string[], overrides: SapFieldOve
   }
 }
 
+// ---- Themed result tables shared across the SAP Sync result dialogs ----
+function parseDupMsgText(msgText: string) {
+  const parts = String(msgText || '')
+    .split(/\s+-\s+|\s+–\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    sapCode: parts[0] || '',
+    name: parts[1] || '',
+    pan: parts[2] || '',
+    gstin: parts[3] || '',
+    parts,
+  };
+}
+
+function DuplicateVendorTable({ msgText }: { msgText: string }) {
+  const { sapCode, name, pan, gstin, parts } = parseDupMsgText(msgText);
+  const rowCls = 'border-b border-amber-100 odd:bg-amber-50/60 even:bg-white';
+  return (
+    <div className="rounded-xl border border-amber-300 bg-gradient-to-b from-amber-50 to-white overflow-hidden shadow-sm ring-1 ring-amber-200/60">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100 to-red-100 border-b border-amber-300 flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-amber-700" />
+        <div>
+          <p className="text-sm font-bold text-amber-900 leading-tight">Existing Vendor Details</p>
+          <p className="text-[11px] text-amber-800/80">Vendor already exists in SAP</p>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {parts.length >= 2 ? (
+            <>
+              {sapCode && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900 w-1/3">SAP Vendor Code</td><td className="px-4 py-2 font-mono text-amber-950">{sapCode}</td></tr>)}
+              {name && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900">Vendor Name</td><td className="px-4 py-2 text-amber-950">{name}</td></tr>)}
+              {pan && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-amber-900">PAN Number</td><td className="px-4 py-2 font-mono text-amber-950">{pan}</td></tr>)}
+              {gstin && (<tr className="odd:bg-amber-50/60 even:bg-white"><td className="px-4 py-2 font-semibold text-amber-900">GSTIN</td><td className="px-4 py-2 font-mono text-amber-950">{gstin}</td></tr>)}
+            </>
+          ) : (
+            <tr><td className="px-4 py-2 font-semibold text-amber-900 w-1/3 bg-amber-50/60">Details</td><td className="px-4 py-2 text-amber-950 whitespace-pre-wrap">{msgText}</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SuccessVendorTable({ sapCode, bpName, message, refNo }: { sapCode?: string; bpName?: string; message?: string; refNo?: string }) {
+  const rowCls = 'border-b border-emerald-100 odd:bg-emerald-50/60 even:bg-white';
+  return (
+    <div className="rounded-xl border border-emerald-300 bg-gradient-to-b from-emerald-50 to-white overflow-hidden shadow-sm ring-1 ring-emerald-200/60">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-emerald-100 to-green-100 border-b border-emerald-300 flex items-center gap-2">
+        <CheckCircle className="h-4 w-4 text-emerald-700" />
+        <div>
+          <p className="text-sm font-bold text-emerald-900 leading-tight">Vendor Details</p>
+          <p className="text-[11px] text-emerald-800/80">Successfully created in SAP</p>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {sapCode && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-emerald-900 w-1/3">SAP Vendor Code</td><td className="px-4 py-2 font-mono text-emerald-950">{sapCode}</td></tr>)}
+          {bpName && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-emerald-900">Business Partner</td><td className="px-4 py-2 text-emerald-950">{bpName}</td></tr>)}
+          {refNo && (<tr className={rowCls}><td className="px-4 py-2 font-semibold text-emerald-900">Reference No</td><td className="px-4 py-2 font-mono text-emerald-950">{refNo}</td></tr>)}
+          {message && (<tr className="odd:bg-emerald-50/60 even:bg-white"><td className="px-4 py-2 font-semibold text-emerald-900">Message</td><td className="px-4 py-2 text-emerald-950">{message}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+
 export default function SAPSync() {
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerCompanyFilter, setBuyerCompanyFilter] = useState<string>('all');
