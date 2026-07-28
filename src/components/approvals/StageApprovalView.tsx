@@ -68,6 +68,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
   const [forceRejectSubmitting, setForceRejectSubmitting] = useState(false);
   const [commentsItem, setCommentsItem] = useState<StageApprovalItem | null>(null);
   const [buyerClassification, setBuyerClassification] = useState<{ materialGroupVendor: string[]; vendorCategory: string[] }>({ materialGroupVendor: [], vendorCategory: [] });
+  const [rejectedClassification, setRejectedClassification] = useState<{ materialGroupVendor: string[]; vendorCategory: string[] }>({ materialGroupVendor: [], vendorCategory: [] });
 
   // Prefill Buyer classification from vendor row when approve dialog opens
   useEffect(() => {
