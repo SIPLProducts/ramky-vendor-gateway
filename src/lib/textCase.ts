@@ -33,3 +33,12 @@ export function toProperCase(value: string | null | undefined): string {
     return chunk.split(/([-/.])/).map(titleWord).join('');
   }).join('');
 }
+
+import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+
+/** UI helper: display vendor name in Proper Case (raw value stays in DB). */
+export function formatVendorName(vendorOrName: any): string {
+  if (vendorOrName == null) return '';
+  if (typeof vendorOrName === 'string') return toProperCase(vendorOrName);
+  return toProperCase(pickVendorDisplayName(vendorOrName));
+}
