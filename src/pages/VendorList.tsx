@@ -32,6 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { getSapName1, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+import { formatVendorName } from '@/lib/textCase';
 
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
@@ -505,7 +506,7 @@ export default function VendorList() {
                                 <Building2 className="h-4 w-4 text-muted-foreground" />
                               </div>
                               <div>
-                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
+                                <p className="font-medium">{formatVendorName(vendor) || 'Unnamed Vendor'}</p>
                                 <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
                               </div>
                             </div>
@@ -598,7 +599,7 @@ export default function VendorList() {
           {returnTarget && (
             <div className="space-y-3 text-sm">
               <div>
-                <div className="font-medium">{pickVendorDisplayName(returnTarget) || returnTarget.id}</div>
+                <div className="font-medium">{formatVendorName(returnTarget) || returnTarget.id}</div>
                 <div className="text-xs text-muted-foreground">
                   Last rejected at: {(returnTarget as any).last_rejection_stage ?? '—'}
                 </div>

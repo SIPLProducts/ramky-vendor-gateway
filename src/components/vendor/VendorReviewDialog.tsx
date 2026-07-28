@@ -20,6 +20,7 @@ import { useConfiguredKycApi } from '@/hooks/useConfiguredKycApi';
 import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationResult } from '@/types/vendor';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { toProperCase, formatVendorName } from '@/lib/textCase';
 import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
 import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import { useSapMasterData } from '@/hooks/useSapMasterData';
@@ -454,7 +455,7 @@ export function VendorReviewDialog({
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
-            {(vendor && getSapName1(vendor)) || vendor?.legal_name || 'Vendor Details'}
+            {(vendor && formatVendorName(vendor)) || toProperCase(vendor?.legal_name) || 'Vendor Details'}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
@@ -495,8 +496,8 @@ export function VendorReviewDialog({
                   {/* Organization */}
                   <SectionCard icon={Building2} title="Vendor Details">
                     <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="space-y-1"><p className="text-muted-foreground">Legal Name</p><p className="font-medium">{vendor.legal_name || '-'}</p></div>
-                      <div className="space-y-1"><p className="text-muted-foreground">Trade Name</p><p className="font-medium">{vendor.trade_name || '-'}</p></div>
+                      <div className="space-y-1"><p className="text-muted-foreground">Legal Name</p><p className="font-medium">{toProperCase(vendor.legal_name) || '-'}</p></div>
+                      <div className="space-y-1"><p className="text-muted-foreground">Trade Name</p><p className="font-medium">{toProperCase(vendor.trade_name) || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Industry Type</p><p className="font-medium">{vendor.industry_type || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Organization Type</p><p className="font-medium">{vendor.organization_type || '-'}</p></div>
                       <div className="space-y-1"><p className="text-muted-foreground">Ownership Type</p><p className="font-medium">{vendor.ownership_type || '-'}</p></div>
@@ -531,7 +532,7 @@ export function VendorReviewDialog({
                           <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-1"><Label text="GSTIN" ok={gstOk} /><p className="font-mono font-medium">{v.gstin || '-'}</p></div>
                             <div className="space-y-1"><Label text="PAN" ok={panOk} /><p className="font-mono font-medium">{v.pan || '-'}</p></div>
-                            <div className="space-y-1"><Label text="PAN Holder Name" ok={panOk} /><p className="font-medium">{v.pan_holder_name || v.msme_enterprise_name || v.account_holder_name || v.trade_name || v.legal_name || '-'}</p></div>
+                            <div className="space-y-1"><Label text="PAN Holder Name" ok={panOk} /><p className="font-medium">{toProperCase(v.pan_holder_name || v.msme_enterprise_name || v.account_holder_name || v.trade_name || v.legal_name) || '-'}</p></div>
                           </div>
                           <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-1"><Label text={PAN_STATUS_LABEL} ok={panOk} /><p className="font-medium">{v.pan_status ? formatPanStatus(v.pan_status) : (v.pan && panOk ? 'Valid' : '-')}</p></div>

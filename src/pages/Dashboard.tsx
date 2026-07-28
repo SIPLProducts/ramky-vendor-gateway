@@ -39,6 +39,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
 import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+import { formatVendorName } from '@/lib/textCase';
 
 
 type VendorRow = {
@@ -476,7 +477,7 @@ export default function Dashboard() {
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{pickVendorDisplayName(v) || '—'}</TableCell>
+                      <TableCell>{formatVendorName(v) || '—'}</TableCell>
                       <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>{statusBadge(v.status)}</TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>

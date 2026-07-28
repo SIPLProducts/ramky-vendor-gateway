@@ -31,7 +31,8 @@ import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDi
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
-import { getSapVenClass, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+import { getSapVenClass } from '@/lib/sapPayloadBuilder';
+import { formatVendorName } from '@/lib/textCase';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -122,7 +123,7 @@ export default function SAPSync() {
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
-      const label = pickVendorDisplayName(rejectVendor) || rejectVendor.id;
+      const label = formatVendorName(rejectVendor) || rejectVendor.id;
       const emailSent = !!(data as any)?.email_sent;
       if (emailSent) {
         toast.success('Vendor closed — buyer notified by email', { description: label });
@@ -148,7 +149,7 @@ export default function SAPSync() {
       return;
     }
     setReturningVendorId(returnVendor.id);
-    const vendorLabel = pickVendorDisplayName(returnVendor) || returnVendor.id;
+    const vendorLabel = formatVendorName(returnVendor) || returnVendor.id;
     try {
       const invokeReturn = (forceReject: boolean) =>
         supabase.functions.invoke('sap-team-return-to-buyer', {
@@ -301,7 +302,7 @@ export default function SAPSync() {
     const vendor = pendingSyncVendor;
     if (!vendor) return;
     console.log('[SAPSync] handleConfirmSync starting for vendor', vendor.id, overrides);
-    toast.info('Syncing vendor to SAP…', { description: pickVendorDisplayName(vendor) || vendor.id });
+    toast.info('Syncing vendor to SAP…', { description: formatVendorName(vendor) || vendor.id });
     setSyncingVendorId(vendor.id);
     try {
       await persistClassification([vendor.id], overrides);
@@ -533,7 +534,7 @@ export default function SAPSync() {
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-bold text-lg">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</h3>
+                            <h3 className="font-bold text-lg">{formatVendorName(vendor) || "Unnamed Vendor"}</h3>
                           </div>
                           <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
                           <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -660,7 +661,7 @@ export default function SAPSync() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{pickVendorDisplayName(v) || 'Unnamed'}</div>
+                              <div className="font-medium">{formatVendorName(v) || "Unnamed"}</div>
                               <div className="text-xs text-muted-foreground">{getBuyerCompanyName(v.tenant_id)}</div>
                             </TableCell>
                             <TableCell><span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{refNo}</span></TableCell>
@@ -740,7 +741,7 @@ export default function SAPSync() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1 flex-wrap">
-                              <h3 className="font-bold text-lg">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</h3>
+                              <h3 className="font-bold text-lg">{formatVendorName(vendor) || "Unnamed Vendor"}</h3>
                               <Badge className="bg-red-100 text-red-700 border-red-200">Duplicate &amp; Closed</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{getBuyerCompanyName(vendor.tenant_id)} • {vendor.industry_type}</p>
@@ -830,7 +831,7 @@ export default function SAPSync() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-semibold">{pickVendorDisplayName(rejectVendor) || 'Unnamed Vendor'}</p>
+              <p className="font-semibold">{formatVendorName(rejectVendor) || "Unnamed Vendor"}</p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 Ref No: {(rejectVendor as any)?.reference_number || rejectVendor?.id.slice(0, 8).toUpperCase()}
               </p>
@@ -883,7 +884,7 @@ export default function SAPSync() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-semibold">{pickVendorDisplayName(returnVendor) || 'Unnamed Vendor'}</p>
+              <p className="font-semibold">{formatVendorName(returnVendor) || "Unnamed Vendor"}</p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 Ref No: {(returnVendor as any)?.reference_number || returnVendor?.id.slice(0, 8).toUpperCase()}
               </p>
@@ -1104,7 +1105,7 @@ export default function SAPSync() {
         open={!!commentsVendor}
         onOpenChange={(o) => { if (!o) setCommentsVendor(null); }}
         vendorId={commentsVendor?.id ?? null}
-        vendorName={commentsVendor ? (pickVendorDisplayName(commentsVendor) || 'Vendor') : undefined}
+        vendorName={commentsVendor ? (formatVendorName(commentsVendor) || "Vendor") : undefined}
         referenceNumber={(commentsVendor as any)?.reference_number || commentsVendor?.id.slice(0, 8).toUpperCase()}
       />
     </div>
