@@ -118,6 +118,9 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
       setRejectedClassification({ materialGroupVendor: mg, vendorCategory: vc });
     })();
     return () => { cancelled = true; };
+  }, [rejectedAction, isBuyer]);
+
+
 
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
   const waitingItems = items.filter((i) => i.kind !== 'rejected' && i.blockedByPrevious);
