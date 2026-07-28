@@ -123,7 +123,7 @@ export default function SAPSync() {
       });
       if (error) throw error;
       if (data && (data as any).error) throw new Error((data as any).error);
-      const label = pickVendorDisplayName(rejectVendor) || rejectVendor.id;
+      const label = formatVendorName(rejectVendor) || rejectVendor.id;
       const emailSent = !!(data as any)?.email_sent;
       if (emailSent) {
         toast.success('Vendor closed — buyer notified by email', { description: label });
@@ -149,7 +149,7 @@ export default function SAPSync() {
       return;
     }
     setReturningVendorId(returnVendor.id);
-    const vendorLabel = pickVendorDisplayName(returnVendor) || returnVendor.id;
+    const vendorLabel = formatVendorName(returnVendor) || returnVendor.id;
     try {
       const invokeReturn = (forceReject: boolean) =>
         supabase.functions.invoke('sap-team-return-to-buyer', {
@@ -302,7 +302,7 @@ export default function SAPSync() {
     const vendor = pendingSyncVendor;
     if (!vendor) return;
     console.log('[SAPSync] handleConfirmSync starting for vendor', vendor.id, overrides);
-    toast.info('Syncing vendor to SAP…', { description: pickVendorDisplayName(vendor) || vendor.id });
+    toast.info('Syncing vendor to SAP…', { description: formatVendorName(vendor) || vendor.id });
     setSyncingVendorId(vendor.id);
     try {
       await persistClassification([vendor.id], overrides);
