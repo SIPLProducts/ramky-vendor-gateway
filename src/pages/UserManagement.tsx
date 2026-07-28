@@ -925,6 +925,15 @@ export default function UserManagement() {
         onConfirmed={handleReplacementConfirmed}
       />
 
+      <ReplaceUserDialog
+        open={!!reassignCtx}
+        onOpenChange={(o) => { if (!o) setReassignCtx(null); }}
+        inactiveUser={reassignCtx}
+        reassignOnly
+        onConfirmed={() => { setReassignCtx(null); loadData(); }}
+      />
+
+
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
