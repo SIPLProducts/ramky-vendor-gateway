@@ -324,7 +324,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     </TableCell>
                   )}
                   <TableCell className="font-medium">
-                    <div>{it.vendorName}</div>
+                    <div>{formatVendorName(it.vendorName)}</div>
                     <div className="text-xs text-muted-foreground font-mono mt-0.5">Ref No: {it.referenceNumber || it.vendorId.slice(0, 8).toUpperCase()}</div>
 
                     {blocked && (
@@ -411,7 +411,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             rows.map((it) => (
               <TableRow key={it.vendorId}>
                 <TableCell className="font-medium">
-                  <div>{it.vendorName}</div>
+                  <div>{formatVendorName(it.vendorName)}</div>
                   <div className="text-xs text-muted-foreground font-mono mt-0.5">Ref No: {it.referenceNumber || it.vendorId.slice(0, 8).toUpperCase()}</div>
                   {it.isOnBehalf && (
                     <Badge variant="secondary" className="mt-1">On-behalf</Badge>
@@ -537,8 +537,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           <DialogHeader>
             <DialogTitle>
               {actionItem?.action === 'approve'
-                ? `Approve — ${actionItem?.item.vendorName}`
-                : `Reject — ${actionItem?.item.vendorName}`}
+                ? `Approve — ${formatVendorName(actionItem?.item.vendorName)}`
+                : `Reject — ${formatVendorName(actionItem?.item.vendorName)}`}
             </DialogTitle>
             {actionItem?.action === 'reject' && isBuyer ? (
               <DialogDescription>
@@ -633,8 +633,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
           <DialogHeader>
             <DialogTitle>
               {rejectedAction?.action === 'approve'
-                ? `Approve — ${rejectedAction?.item.vendorName}`
-                : `Send back to vendor — ${rejectedAction?.item.vendorName}`}
+                ? `Approve — ${formatVendorName(rejectedAction?.item.vendorName)}`
+                : `Send back to vendor — ${formatVendorName(rejectedAction?.item.vendorName)}`}
             </DialogTitle>
             <DialogDescription>
               {rejectedAction?.action === 'approve'
@@ -728,7 +728,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
         open={!!commentsItem}
         onOpenChange={(o) => { if (!o) setCommentsItem(null); }}
         vendorId={commentsItem?.vendorId ?? null}
-        vendorName={commentsItem?.vendorName}
+        vendorName={formatVendorName(commentsItem?.vendorName)}
         referenceNumber={commentsItem?.referenceNumber}
       />
 
