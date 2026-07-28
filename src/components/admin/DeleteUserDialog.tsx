@@ -56,7 +56,7 @@ export function DeleteUserDialog({ open, onOpenChange, targetUser, onDeleted }: 
     })();
   }, [open, targetUser, toast]);
 
-  const hasWork = !!counts && (counts.buyer_approval_flows + counts.approval_matrix_approvers + counts.buyer_scm_mappings > 0);
+  const hasWork = !!counts && (counts.buyer_approval_flows + counts.approval_matrix_approvers + counts.buyer_scm_mappings + (counts.vendor_invitations ?? 0) > 0);
 
   const handleDelete = async () => {
     if (!targetUser) return;
