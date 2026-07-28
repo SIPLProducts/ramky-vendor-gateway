@@ -1750,6 +1750,7 @@ export type Database = {
           expires_at: string
           id: string
           last_signin_sent_at: string | null
+          original_created_by: string | null
           phone_number: string | null
           resend_email_id: string | null
           signin_sent_count: number
@@ -1772,6 +1773,7 @@ export type Database = {
           expires_at: string
           id?: string
           last_signin_sent_at?: string | null
+          original_created_by?: string | null
           phone_number?: string | null
           resend_email_id?: string | null
           signin_sent_count?: number
@@ -1794,6 +1796,7 @@ export type Database = {
           expires_at?: string
           id?: string
           last_signin_sent_at?: string | null
+          original_created_by?: string | null
           phone_number?: string | null
           resend_email_id?: string | null
           signin_sent_count?: number

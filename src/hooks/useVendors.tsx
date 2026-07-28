@@ -9,8 +9,10 @@ import type { Database } from '@/integrations/supabase/types';
 
 // Types from database
 type VendorStatus = Database['public']['Enums']['vendor_status'];
+type VendorInvitedBy = { name: string | null; email: string | null } | null;
 export type VendorRow = Database['public']['Tables']['vendors']['Row'] & {
-  invited_by?: { name: string | null; email: string | null } | null;
+  invited_by?: VendorInvitedBy;
+  original_invited_by?: VendorInvitedBy;
 };
 
 type VendorInsert = Database['public']['Tables']['vendors']['Insert'];
@@ -59,17 +61,25 @@ export function useVendors(statuses?: VendorStatus[]) {
         const ids = rows.map((r) => r.id);
         const { data: invites } = await supabase
           .from('vendor_invitations')
-          .select('vendor_id, created_by, email, created_at')
+          .select('vendor_id, created_by, original_created_by, email, created_at')
           .in('vendor_id', ids)
           .order('created_at', { ascending: false });
-        const latest = new Map<string, { created_by: string | null; email: string | null }>();
+        const latest = new Map<string, { created_by: string | null; original_created_by: string | null; email: string | null }>();
         (invites ?? []).forEach((inv: any) => {
           if (inv.vendor_id && !latest.has(inv.vendor_id)) {
-            latest.set(inv.vendor_id, { created_by: inv.created_by, email: inv.email });
+            latest.set(inv.vendor_id, {
+              created_by: inv.created_by,
+              original_created_by: inv.original_created_by ?? null,
+              email: inv.email,
+            });
           }
         });
         const buyerIds = Array.from(
-          new Set(Array.from(latest.values()).map((v) => v.created_by).filter(Boolean) as string[]),
+          new Set(
+            Array.from(latest.values())
+              .flatMap((v) => [v.created_by, v.original_created_by])
+              .filter(Boolean) as string[],
+          ),
         );
         const profMap = new Map<string, { name: string | null; email: string | null }>();
         if (buyerIds.length > 0) {
@@ -83,11 +93,17 @@ export function useVendors(statuses?: VendorStatus[]) {
         }
         rows.forEach((r: any) => {
           const inv = latest.get(r.id);
-          if (!inv) { r.invited_by = null; return; }
+          if (!inv) { r.invited_by = null; r.original_invited_by = null; return; }
           const prof = inv.created_by ? profMap.get(inv.created_by) : null;
           r.invited_by = prof
             ? { name: prof.name, email: prof.email }
             : { name: null, email: inv.email };
+          if (inv.original_created_by && inv.original_created_by !== inv.created_by) {
+            const op = profMap.get(inv.original_created_by);
+            r.original_invited_by = op ? { name: op.name, email: op.email } : null;
+          } else {
+            r.original_invited_by = null;
+          }
         });
       }
 

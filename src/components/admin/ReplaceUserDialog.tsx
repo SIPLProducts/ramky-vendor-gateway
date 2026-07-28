@@ -14,6 +14,7 @@ interface Counts {
   buyer_approval_flows: number;
   approval_matrix_approvers: number;
   buyer_scm_mappings: number;
+  vendor_invitations?: number;
 }
 
 interface Props {
@@ -109,7 +110,7 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
       const c = (data as any).counts as Counts;
       toast({
         title: 'Work reassigned',
-        description: `Approval flows: ${c.buyer_approval_flows}, matrix: ${c.approval_matrix_approvers}, mappings: ${c.buyer_scm_mappings}`,
+        description: `Invitations: ${c.vendor_invitations ?? 0}, approval flows: ${c.buyer_approval_flows}, matrix: ${c.approval_matrix_approvers}, mappings: ${c.buyer_scm_mappings}`,
       });
       onConfirmed();
       onOpenChange(false);
@@ -120,7 +121,7 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
     }
   };
 
-  const hasWork = !!counts && (counts.buyer_approval_flows + counts.approval_matrix_approvers + counts.buyer_scm_mappings > 0);
+  const hasWork = !!counts && (counts.buyer_approval_flows + counts.approval_matrix_approvers + counts.buyer_scm_mappings + (counts.vendor_invitations ?? 0) > 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !applying && onOpenChange(o)}>
@@ -149,7 +150,8 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
           <>
             {counts && (
               <div className="text-xs text-muted-foreground">
-                Impact: <strong>{counts.buyer_approval_flows}</strong> approval flow(s),{' '}
+                Impact: <strong>{counts.vendor_invitations ?? 0}</strong> vendor invitation(s),{' '}
+                <strong>{counts.buyer_approval_flows}</strong> approval flow(s),{' '}
                 <strong>{counts.approval_matrix_approvers}</strong> matrix assignment(s),{' '}
                 <strong>{counts.buyer_scm_mappings}</strong> buyer↔SCM mapping(s) will be transferred.
               </div>

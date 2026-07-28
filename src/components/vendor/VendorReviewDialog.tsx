@@ -199,6 +199,8 @@ export function VendorReviewDialog({
     companyMismatch: boolean;
     buyerName: string | null;
     buyerEmail: string | null;
+    originalBuyerName: string | null;
+    originalBuyerEmail: string | null;
     mappedScm: Array<{ name: string | null; email: string | null }>;
     invitedAt: string | null;
   } | null>(null);
@@ -278,7 +280,7 @@ export function VendorReviewDialog({
       try {
         const { data: inv } = await supabase
           .from('vendor_invitations')
-          .select('created_by, tenant_id, created_at')
+          .select('created_by, original_created_by, tenant_id, created_at')
           .eq('vendor_id', vendorId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -291,14 +293,23 @@ export function VendorReviewDialog({
         const tMap = new Map((tens ?? []).map((t: any) => [t.id, t]));
 
         let buyer: any = null;
+        let originalBuyer: any = null;
         let mappedScm: Array<{ name: string | null; email: string | null }> = [];
-        if (inv?.created_by) {
-          const { data: bp } = await supabase
+        const profileIds = Array.from(
+          new Set([inv?.created_by, inv?.original_created_by].filter(Boolean) as string[]),
+        );
+        if (profileIds.length) {
+          const { data: bps } = await supabase
             .from('profiles')
             .select('id, full_name, email')
-            .eq('id', inv.created_by)
-            .maybeSingle();
-          buyer = bp;
+            .in('id', profileIds);
+          const pMap = new Map((bps ?? []).map((p: any) => [p.id, p]));
+          buyer = inv?.created_by ? pMap.get(inv.created_by) ?? null : null;
+          if (inv?.original_created_by && inv.original_created_by !== inv.created_by) {
+            originalBuyer = pMap.get(inv.original_created_by) ?? null;
+          }
+        }
+        if (inv?.created_by) {
           const { data: maps } = await supabase
             .from('buyer_scm_mappings')
             .select('scm_manager_user_id')
@@ -322,6 +333,8 @@ export function VendorReviewDialog({
             companyMismatch: !!(vt && it && v?.tenant_id !== inv?.tenant_id),
             buyerName: buyer?.full_name ?? null,
             buyerEmail: buyer?.email ?? null,
+            originalBuyerName: originalBuyer?.full_name ?? null,
+            originalBuyerEmail: originalBuyer?.email ?? null,
             mappedScm,
             invitedAt: inv?.created_at ?? null,
           });
@@ -446,6 +459,12 @@ export function VendorReviewDialog({
                           <p className="text-muted-foreground">Invited By (Buyer)</p>
                           <p className="font-medium">{routing.buyerName || '-'}</p>
                         </div>
+                        {routing.originalBuyerName && (
+                          <div className="space-y-1">
+                            <p className="text-muted-foreground">Original Invited By</p>
+                            <p className="font-medium">{routing.originalBuyerName}</p>
+                          </div>
+                        )}
                       </div>
                     </SectionCard>
                   )}

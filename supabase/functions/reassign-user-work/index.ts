@@ -85,16 +85,18 @@ Deno.serve(async (req) => {
 
     // Compute impact counts
     const flowFilters = FLOW_COLS.map((c) => `${c}.eq.${inactive_user_id}`).join(',');
-    const [flowRes, matrixRes, mapBuyerRes, mapScmRes] = await Promise.all([
+    const [flowRes, matrixRes, mapBuyerRes, mapScmRes, invitesRes] = await Promise.all([
       admin.from('buyer_approval_flows').select('id', { count: 'exact', head: true }).or(flowFilters),
       admin.from('approval_matrix_approvers').select('id', { count: 'exact', head: true }).eq('user_id', inactive_user_id),
       admin.from('buyer_scm_mappings').select('id', { count: 'exact', head: true }).eq('buyer_user_id', inactive_user_id),
       admin.from('buyer_scm_mappings').select('id', { count: 'exact', head: true }).eq('scm_manager_user_id', inactive_user_id),
+      admin.from('vendor_invitations').select('id', { count: 'exact', head: true }).eq('created_by', inactive_user_id),
     ]);
     const counts = {
       buyer_approval_flows: flowRes.count ?? 0,
       approval_matrix_approvers: matrixRes.count ?? 0,
       buyer_scm_mappings: (mapBuyerRes.count ?? 0) + (mapScmRes.count ?? 0),
+      vendor_invitations: invitesRes.count ?? 0,
     };
 
     // Build eligible replacement list (active, same role scope, overlapping tenant)
@@ -155,7 +157,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Replacement user is not eligible (role, tenant, or active status mismatch)' }, 400);
     }
 
-    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0 };
+    const applied = { buyer_approval_flows: 0, approval_matrix_approvers: 0, buyer_scm_mappings: 0, vendor_invitations: 0 };
 
     // 1) buyer_approval_flows — update each column separately
     for (const col of FLOW_COLS) {
@@ -226,6 +228,24 @@ Deno.serve(async (req) => {
       }
       applied.buyer_scm_mappings += 1;
     }
+
+    // 4) vendor_invitations — transfer ownership to replacement buyer,
+    // preserving the original inviter in `original_created_by` (only set once).
+    const { data: invRows } = await admin
+      .from('vendor_invitations')
+      .select('id, original_created_by')
+      .eq('created_by', inactive_user_id);
+    for (const row of invRows ?? []) {
+      const patch: Record<string, unknown> = { created_by: replacement_user_id };
+      if (!row.original_created_by) patch.original_created_by = inactive_user_id;
+      const { error: invErr } = await admin
+        .from('vendor_invitations')
+        .update(patch)
+        .eq('id', row.id);
+      if (invErr) throw new Error(`vendor_invitations: ${invErr.message}`);
+      applied.vendor_invitations += 1;
+    }
+
 
     // Audit log
     const { data: replProf } = await admin
