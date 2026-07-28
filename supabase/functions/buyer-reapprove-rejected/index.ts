@@ -110,9 +110,8 @@ Deno.serve(async (req) => {
       .limit(1).maybeSingle();
 
     if (buyerRow) {
-      const buyerComment = `Approved after rejection${fromStage ? ` by ${fromStage}` : ''}${comments ? ` — ${comments}` : ''}`;
       await admin.from('vendor_approval_progress').update({
-        status: 'approved', acted_by: auth.userId, acted_at: nowIso, comments: buyerComment,
+        status: 'approved', acted_by: auth.userId, acted_at: nowIso, comments: comments ?? null,
       }).eq('id', buyerRow.id);
     }
 
