@@ -246,42 +246,55 @@ export default function SAPSync() {
 
   const isPanDuplicateResponse = (resp: any): { matched: boolean; message: string; msgText: string } => {
     if (!resp) return { matched: false, message: '', msgText: '' };
-    const wrapped = Array.isArray(resp.sapResponse) ? resp.sapResponse : [];
-    const rows = [
-      ...(Array.isArray(resp.ACC_RES) ? resp.ACC_RES : []),
-      ...wrapped.flatMap((w: any) => Array.isArray(w?.ACC_RES) ? w.ACC_RES : []),
-    ];
-    const totRows = [
-      ...(Array.isArray(resp.TOT_RES) ? resp.TOT_RES : []),
-      ...wrapped.flatMap((w: any) => Array.isArray(w?.TOT_RES) ? w.TOT_RES : []),
-    ];
-    const texts: string[] = [
-      resp.message || '',
-      ...rows.map((r: any) => getSapRowMessage(r)),
-      ...totRows.map((r: any) => getSapRowMessage(r)),
-    ];
     const re = /pan\s*number\s*duplicat|duplicate\s*pan|pan\s*&\s*gst\s*combination\s*is\s*duplicat/i;
     const readMsgText = (o: any) =>
-      String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || o?.LONG_MSG || '').trim();
-    // Try to find MSG_TEXT with existing vendor details: "SAPCODE - NAME - PAN - GSTIN"
-    let msgText = '';
-    for (const r of [...rows, ...totRows]) {
-      const t = readMsgText(r);
-      if (t) { msgText = t; break; }
+      String(o?.MSG_TEXT || o?.MSGTEXT || o?.MSG_LONG_TEXT || '').trim();
+    const readLongMsg = (o: any) =>
+      String(o?.LONGMSG || o?.LONG_MSG || o?.MSG || o?.message || '').trim();
+
+    // Collect ACC_RES + TOT_RES rows across all shapes we produce:
+    //  - { ACC_RES, TOT_RES }                              (single)
+    //  - { sapResponse: {...} } or { sapResponse: [...] }  (edge fn wrap)
+    //  - [{ ACC_RES, TOT_RES }, ...]                       (raw SAP array)
+    //  - per-vendor bulk: { raw:{...}, totRaw:{...} }
+    const rows: any[] = [];
+    const collect = (node: any) => {
+      if (!node) return;
+      if (Array.isArray(node)) { for (const n of node) collect(n); return; }
+      if (typeof node !== 'object') return;
+      if (Array.isArray(node.ACC_RES)) rows.push(...node.ACC_RES);
+      if (Array.isArray(node.TOT_RES)) rows.push(...node.TOT_RES);
+      if (node.sapResponse) collect(node.sapResponse);
+      if (node.raw) collect(node.raw);
+      if (node.totRaw) collect(node.totRaw);
+    };
+    collect(resp);
+    // Fallback: response itself may be a bare row (bulk per-vendor shape)
+    if (rows.length === 0 && (readLongMsg(resp) || readMsgText(resp))) rows.push(resp);
+
+    // Prefer the row whose LONGMSG matches the duplicate regex — its MSG_TEXT
+    // carries the existing vendor line ("SAPCODE - NAME - PAN [- GSTIN]").
+    let matchedRow: any = null;
+    for (const r of rows) {
+      if (re.test(readLongMsg(r))) { matchedRow = r; break; }
     }
-    // Fallbacks: bulk per-vendor row shape { raw/totRaw: {...}, message, ... } or a bare ACC_RES/TOT_RES row
-    if (!msgText) msgText = readMsgText(resp?.raw) || readMsgText(resp?.totRaw) || readMsgText(resp);
-    // Also include row-level LONGMSG/MSG from raw/self when regex-testing
-    const extraTexts = [
-      getSapRowMessage(resp?.raw),
-      getSapRowMessage(resp?.totRaw),
-      getSapRowMessage(resp),
-    ];
-    for (const t of [...texts, ...extraTexts]) {
-      if (t && re.test(t)) return { matched: true, message: String(t).trim(), msgText };
+    const topMsg = String(resp?.message || '').trim();
+    const matched = !!matchedRow || (topMsg ? re.test(topMsg) : false);
+    if (!matched) return { matched: false, message: '', msgText: '' };
+
+    const message = readLongMsg(matchedRow) || topMsg;
+    let msgText = readMsgText(matchedRow);
+    if (!msgText) {
+      for (const r of rows) {
+        const t = readMsgText(r);
+        if (t) { msgText = t; break; }
+      }
     }
-    return { matched: false, message: '', msgText };
+    // Normalize whitespace inside the existing-vendor line
+    msgText = msgText.replace(/\s+-\s+/g, ' - ').replace(/\s{2,}/g, ' ').trim();
+    return { matched: true, message, msgText };
   };
+
 
 
   const autoRejectAsDuplicate = async (vendorId: string, remarks: string, existingVendorText?: string) => {
