@@ -15,6 +15,7 @@ import type { VendorRow } from '@/hooks/useVendors';
 import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster } from '@/hooks/useSapMasterData';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
+import { formatVendorName, toProperCase } from '@/lib/textCase';
 import { SapF4SelectField, SapF4MultiSelectField, WithholdingTaxSection, type SapFieldOverrides } from './SapFieldsDialog';
 
 interface Props {
