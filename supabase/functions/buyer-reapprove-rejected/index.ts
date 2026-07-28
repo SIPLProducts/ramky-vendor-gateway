@@ -68,6 +68,20 @@ Deno.serve(async (req) => {
     const fromStage = vendor.last_rejection_stage ?? null;
     const nowIso = new Date().toISOString();
 
+    // If buyer provided classification, persist it before re-routing forward.
+    if (classification && (
+      Array.isArray(classification.material_group_vendors) || Array.isArray(classification.vendor_categories)
+    )) {
+      const mg = Array.isArray(classification.material_group_vendors) ? classification.material_group_vendors : [];
+      const vc = Array.isArray(classification.vendor_categories) ? classification.vendor_categories : [];
+      await admin.from('vendors').update({
+        material_group_vendor: mg[0] ?? null,
+        material_group_vendors: mg,
+        vendor_category: vc[0] ?? null,
+        vendor_categories: vc,
+      }).eq('id', vendor_id);
+    }
+
     // Re-seed the approval chain from scratch (BUYER row + matrix levels).
     // The trigger only auto-seeds when coming from 'returned_to_vendor', so we
     // call the seeding function directly to cover the 'returned_to_buyer' path.
