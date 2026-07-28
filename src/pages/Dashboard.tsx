@@ -39,6 +39,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext, useTenantFilter } from '@/hooks/useTenantContext';
 import { cn } from '@/lib/utils';
 import { pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+import { formatVendorName } from '@/lib/textCase';
 
 
 type VendorRow = {
