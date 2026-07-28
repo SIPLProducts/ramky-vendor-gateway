@@ -229,6 +229,24 @@ Deno.serve(async (req) => {
       applied.buyer_scm_mappings += 1;
     }
 
+    // 4) vendor_invitations — transfer ownership to replacement buyer,
+    // preserving the original inviter in `original_created_by` (only set once).
+    const { data: invRows } = await admin
+      .from('vendor_invitations')
+      .select('id, original_created_by')
+      .eq('created_by', inactive_user_id);
+    for (const row of invRows ?? []) {
+      const patch: Record<string, unknown> = { created_by: replacement_user_id };
+      if (!row.original_created_by) patch.original_created_by = inactive_user_id;
+      const { error: invErr } = await admin
+        .from('vendor_invitations')
+        .update(patch)
+        .eq('id', row.id);
+      if (invErr) throw new Error(`vendor_invitations: ${invErr.message}`);
+      applied.vendor_invitations += 1;
+    }
+
+
     // Audit log
     const { data: replProf } = await admin
       .from('profiles').select('email, full_name').eq('id', replacement_user_id).maybeSingle();
