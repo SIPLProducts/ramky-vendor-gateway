@@ -134,12 +134,14 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
     <Dialog open={open} onOpenChange={(o) => !applying && onOpenChange(o)}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Replace User Before Inactivation</DialogTitle>
+          <DialogTitle>{reassignOnly ? 'Reassign Work to Another User' : 'Replace User Before Inactivation'}</DialogTitle>
           <DialogDescription>
-            Transfer all pending approvals, approval matrix roles and buyer↔SCM mappings from this user
-            to an active replacement. This keeps in-progress vendor workflows moving.
+            {reassignOnly
+              ? 'This user is already inactive but still owns vendor invitations, approval flows or SCM mappings. Transfer them to an active replacement so pending work can move forward.'
+              : 'Transfer all pending approvals, approval matrix roles and buyer↔SCM mappings from this user to an active replacement. This keeps in-progress vendor workflows moving.'}
           </DialogDescription>
         </DialogHeader>
+
 
         {inactiveUser && (
           <div className="rounded-md border p-3 bg-muted/30 space-y-1 text-sm">
