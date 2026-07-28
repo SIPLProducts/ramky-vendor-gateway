@@ -456,12 +456,12 @@ export function VendorReviewDialog({
                           <p className="font-medium">{routing.vendorCompany || '-'}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-muted-foreground">Invited By (Buyer)</p>
+                          <p className="text-muted-foreground">Invited By</p>
                           <p className="font-medium">{routing.buyerName || '-'}</p>
                         </div>
-                        {routing.originalBuyerName && (
+                        {routing.originalBuyerName && routing.originalBuyerName !== routing.buyerName && (
                           <div className="space-y-1">
-                            <p className="text-muted-foreground">Primary Buyer</p>
+                            <p className="text-muted-foreground">Invited By</p>
                             <p className="font-medium">{routing.originalBuyerName}</p>
                           </div>
                         )}

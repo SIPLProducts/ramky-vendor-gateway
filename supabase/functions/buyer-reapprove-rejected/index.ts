@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (!auth.ok) return authErrorResponse(auth, corsHeaders);
 
   try {
-    const { vendor_id, comments } = await req.json();
+    const { vendor_id, comments, classification } = await req.json();
     if (!vendor_id) {
       return new Response(JSON.stringify({ error: 'vendor_id required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { progress_id, action, comments, force } = await req.json();
+    const { progress_id, action, comments, force, classification } = await req.json();
     if (!progress_id || !['approve', 'reject'].includes(action)) {
       return new Response(JSON.stringify({ error: 'Invalid input' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
