@@ -212,10 +212,17 @@ export function VendorReviewDialog({
   const { data: vcRows } = useSapMasterData('vendor_category');
   const { data: cfRows } = useSapMasterData('vendor_cashflow');
   const { data: tcRows } = useSapMasterData('tier_category');
+  const toProperCase = (s: string) => {
+    if (!s) return s;
+    if (!/[a-z]/.test(s) && /[A-Z]/.test(s)) {
+      return s.toLowerCase().replace(/\b([a-z])/g, (_, c) => c.toUpperCase());
+    }
+    return s;
+  };
   const buildDescMap = (rows: any[] | undefined) => {
     const m = new Map<string, string>();
     (rows || []).forEach((r) => {
-      if (r?.code) m.set(String(r.code), r.description || r.code);
+      if (r?.code) m.set(String(r.code), toProperCase(r.description || r.code));
     });
     return m;
   };
@@ -225,7 +232,7 @@ export function VendorReviewDialog({
   const tcMap = buildDescMap(tcRows as any);
   const fmtCodes = (arr: any, map: Map<string, string>) =>
     Array.isArray(arr) && arr.length
-      ? arr.map((c) => map.get(String(c)) || String(c)).join(', ')
+      ? arr.map((c) => map.get(String(c)) || toProperCase(String(c))).join(', ')
       : '-';
 
   useEffect(() => {

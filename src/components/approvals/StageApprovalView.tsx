@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, MessageSquare, Award } from 'lucide-react';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { formatDateTime } from '@/lib/dateFormat';
@@ -678,18 +679,24 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               />
             </div>
           )}
-          <Textarea
-            placeholder="Optional remarks"
-            value={rejectedRemarks}
-            onChange={(e) => setRejectedRemarks(e.target.value)}
-            rows={4}
-          />
+          <div className="grid gap-1.5">
+            <Label>
+              Remarks<span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Textarea
+              placeholder="Enter remarks (required)"
+              value={rejectedRemarks}
+              onChange={(e) => setRejectedRemarks(e.target.value)}
+              rows={4}
+            />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectedAction(null)}>Cancel</Button>
             <Button
               onClick={submitRejectedAction}
               disabled={
                 rejectedSubmitting ||
+                rejectedRemarks.trim().length === 0 ||
                 (isBuyer && rejectedAction?.action === 'approve' && (
                   rejectedClassification.materialGroupVendor.length === 0 ||
                   rejectedClassification.vendorCategory.length === 0
