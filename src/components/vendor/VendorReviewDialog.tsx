@@ -199,6 +199,8 @@ export function VendorReviewDialog({
     companyMismatch: boolean;
     buyerName: string | null;
     buyerEmail: string | null;
+    originalBuyerName: string | null;
+    originalBuyerEmail: string | null;
     mappedScm: Array<{ name: string | null; email: string | null }>;
     invitedAt: string | null;
   } | null>(null);
