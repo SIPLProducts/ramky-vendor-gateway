@@ -121,7 +121,7 @@ export function ReplaceUserDialog({ open, onOpenChange, inactiveUser, onConfirme
     }
   };
 
-  const hasWork = !!counts && (counts.buyer_approval_flows + counts.approval_matrix_approvers + counts.buyer_scm_mappings > 0);
+  const hasWork = !!counts && (counts.buyer_approval_flows + counts.approval_matrix_approvers + counts.buyer_scm_mappings + (counts.vendor_invitations ?? 0) > 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !applying && onOpenChange(o)}>
