@@ -506,7 +506,7 @@ export default function VendorList() {
                                 <Building2 className="h-4 w-4 text-muted-foreground" />
                               </div>
                               <div>
-                                <p className="font-medium">{pickVendorDisplayName(vendor) || 'Unnamed Vendor'}</p>
+                                <p className="font-medium">{formatVendorName(vendor) || 'Unnamed Vendor'}</p>
                                 <p className="text-xs text-muted-foreground font-mono">Ref No: {(vendor as any).reference_number || `${vendor.id.slice(0, 8)}...`}</p>
                               </div>
                             </div>
