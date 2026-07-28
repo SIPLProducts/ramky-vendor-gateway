@@ -32,6 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { getSapName1, pickVendorDisplayName } from '@/lib/sapPayloadBuilder';
+import { formatVendorName } from '@/lib/textCase';
 
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { VendorReviewDialog } from '@/components/vendor/VendorReviewDialog';
