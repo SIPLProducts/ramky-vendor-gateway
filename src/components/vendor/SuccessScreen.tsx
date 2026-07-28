@@ -109,7 +109,7 @@ export function SuccessScreen({
           iconClass: 'text-success',
           bgClass: 'bg-success/10',
           title: 'Application Submitted Successfully',
-          message: 'Thank you for registering. Your application is now under review.',
+          message: 'Thank you for submitting your application.',
         };
     }
   };
