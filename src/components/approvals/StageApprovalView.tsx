@@ -120,6 +120,12 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
     return () => { cancelled = true; };
   }, [rejectedAction, isBuyer]);
 
+  // Reset comment inputs whenever the dialog opens/closes so stale text
+  // from a previous vendor doesn't carry over.
+  useEffect(() => { setComments(''); }, [actionItem]);
+  useEffect(() => { setRejectedRemarks(''); }, [rejectedAction]);
+
+
 
 
   const pendingItems = items.filter((i) => i.kind !== 'rejected' && !i.blockedByPrevious);
