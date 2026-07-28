@@ -294,10 +294,15 @@ Deno.serve(async (req) => {
       admin.from('vendors').update({ purchase_reviewed_by: null }).eq('purchase_reviewed_by', user_id)
     );
 
-    // 5. Detach invitations created by this user
-    await run('vendor_invitations.nullify_created_by', () =>
-      admin.from('vendor_invitations').update({ created_by: null }).eq('created_by', user_id)
-    );
+    // 5. Detach any remaining invitations. When a replacement was provided the
+    //    transfer above already claimed every row this user owned; this call is
+    //    the guest-cleanup fallback for the no-replacement path.
+    if (!replacement_user_id) {
+      await run('vendor_invitations.nullify_created_by', () =>
+        admin.from('vendor_invitations').update({ created_by: null }).eq('created_by', user_id)
+      );
+    }
+
 
     // 6. Detach portal_config.updated_by
     await run('portal_config.nullify_updated_by', () =>
