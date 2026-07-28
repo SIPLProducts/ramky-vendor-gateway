@@ -17,7 +17,7 @@ interface Props {
 const toOptions = (rows: SapMasterRow[] | undefined) =>
   (rows || []).map((r) => ({
     value: r.code,
-    label: r.description ? `${r.code} — ${r.description}` : r.code,
+    label: r.description || r.code,
   }));
 
 export function ClassificationField({
