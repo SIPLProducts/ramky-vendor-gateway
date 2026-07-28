@@ -1111,17 +1111,10 @@ export default function SAPSync() {
                   return <SuccessVendorTable key={i} sapCode={sapCode} bpName={r.BPNAME} refNo={ref} message={message} />;
                 }
                 if (dup.matched && dup.msgText) {
-                  return <DuplicateVendorTable key={i} msgText={dup.msgText} />;
+                  return <SapErrorMessage key={i} isDuplicate message={dup.message || message} msgText={dup.msgText} />;
                 }
                 return (
-                  <SapErrorCard
-                    key={i}
-                    message={message}
-                    sapCode={sapCode}
-                    bpName={r.BPNAME}
-                    refNo={ref}
-                    msgText={r.MSG_TEXT}
-                  />
+                  <SapErrorMessage key={i} message={message} msgText={r.MSG_TEXT} />
                 );})}
             </div>
           </ScrollArea>
