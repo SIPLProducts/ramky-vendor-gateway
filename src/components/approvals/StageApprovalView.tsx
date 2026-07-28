@@ -14,6 +14,7 @@ import { CheckCircle2, XCircle, LucideIcon, Eye, FileText, Send, Pencil, Undo2, 
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { formatDateTime } from '@/lib/dateFormat';
 import { ClassificationField } from '@/components/vendor/ClassificationField';
+import { formatStageLevelHistory } from '@/lib/approvalLabels';
 
 import { useToast } from '@/hooks/use-toast';
 import { ApprovalStage, StageApprovalItem, usePendingApprovalsByStage } from '@/hooks/usePendingApprovalsByStage';
