@@ -703,7 +703,7 @@ export function VendorReviewDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-2 flex-1 overflow-auto">
+            <TabsContent value="documents" className="mt-4 flex-1 overflow-auto pt-1">
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
