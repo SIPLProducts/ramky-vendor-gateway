@@ -84,11 +84,14 @@ interface OrganizationStepProps {
   vendorId?: string;
   tenantId?: string | null;
   showClassification?: boolean;
+  /** Bumped by the parent when a GST identity change happens; forces the
+   *  form to drop dirty values and accept the newly cleared parent state. */
+  resetKey?: number;
   onNext: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
   onLiveUpdate?: (data: { organization: OrganizationDetails; statutory: StatutoryDetails }) => void;
 }
 
-export function OrganizationStep({ data, statutoryData, vendorId, tenantId, showClassification = true, onNext, onLiveUpdate }: OrganizationStepProps) {
+export function OrganizationStep({ data, statutoryData, vendorId, tenantId, showClassification = true, resetKey, onNext, onLiveUpdate }: OrganizationStepProps) {
   const { data: buyerCompanies, isLoading: isLoadingCompanies } = useQuery({
     queryKey: ['buyer-companies'],
     queryFn: async () => {
@@ -132,6 +135,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
     control,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -139,6 +143,18 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
     values: formValues,
     resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
+
+  // When the parent bumps resetKey (GST identity change), force-accept the
+  // cleared values instead of preserving the vendor's dirty selections
+  // (Industry / Organization / Ownership type, etc.).
+  const prevResetKeyRef = useRef<number | undefined>(resetKey);
+  useEffect(() => {
+    if (resetKey !== undefined && prevResetKeyRef.current !== undefined && resetKey !== prevResetKeyRef.current) {
+      reset(formValues, { keepDirtyValues: false, keepDirty: false });
+    }
+    prevResetKeyRef.current = resetKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
 
 

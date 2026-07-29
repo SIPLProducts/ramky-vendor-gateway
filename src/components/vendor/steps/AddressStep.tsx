@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { MapPin, Building, Globe } from 'lucide-react';
 import { AddressDetails, INDIAN_STATES } from '@/types/vendor';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { digitsOnly } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -97,17 +97,21 @@ const schema = z.object({
 interface AddressStepProps {
   data: AddressDetails;
   tenantId?: string | null;
+  /** Bumped by the parent when a GST identity change happens; forces the
+   *  form to drop dirty values and accept the newly cleared parent state. */
+  resetKey?: number;
   onNext: (data: AddressDetails) => void;
   onBack: () => void;
 }
 
-export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: AddressStepProps) {
+export function AddressStep({ data, tenantId: _tenantId, resetKey, onNext, onBack }: AddressStepProps) {
   const {
     register,
     handleSubmit,
     control,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<AddressDetails>({
     resolver: zodResolver(schema),
@@ -115,6 +119,16 @@ export function AddressStep({ data, tenantId: _tenantId, onNext, onBack }: Addre
     values: data,
     resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
+
+  // Force-accept the parent-cleared values when a GST identity change fires.
+  const prevResetKeyRef = useRef<number | undefined>(resetKey);
+  useEffect(() => {
+    if (resetKey !== undefined && prevResetKeyRef.current !== undefined && resetKey !== prevResetKeyRef.current) {
+      reset(data, { keepDirtyValues: false, keepDirty: false });
+    }
+    prevResetKeyRef.current = resetKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   // Wrap register() so phone/pincode inputs strip non-digits + clamp length.
   const numericField = (name: keyof AddressDetails, max: number) => ({
