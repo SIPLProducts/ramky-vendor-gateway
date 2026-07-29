@@ -1,17 +1,18 @@
 ## Problem
-
-1. Tab labels ("All Details", "Documents", "GST Compliance Report") are visually bisected by the `TabsList` bottom border — the triggers have no explicit height and `-mb-px` pushes text across the underline.
-2. The "GST Return Filing Status" sub-header inside the filing card is redundant with the tab title.
+Current TabsList makes labels disappear — the `flex-1` triggers with connected-border approach isn't rendering text visibly in the preview. User wants the previous rounded pill-style tabs back but with proper height and clear active/inactive labels.
 
 ## Fix
 
 ### `src/components/vendor/VendorReviewDialog.tsx`
-- Add `h-11 items-end` to the `TabsList` so it has a fixed height and triggers align to the bottom border.
-- Change each `TabsTrigger` to `h-10 items-center` with `-mb-[1px]` and `border-b-2 border-transparent data-[state=active]:border-b-white` so the active tab's white bottom edge cleanly covers the container border (creating the connected-tab effect). Non-active triggers stay muted with just a bottom border color transition.
-- Bump `TabsContent` top margin back to `mt-4` so cards don't hug the tab bar.
+Revert TabsList to the original clean pill/segmented style with explicit height and explicit inactive text color:
 
-### `src/components/vendor/kyc/GstFilingStatusTable.tsx`
-- Remove the header block (`<div className="px-4 py-2.5 border-b bg-muted/40">` containing "GST Return Filing Status" and subtitle). Table renders directly inside its bordered container.
+- `TabsList`: `grid w-full grid-cols-3 rounded-xl bg-muted p-1 h-12`
+- Each `TabsTrigger`: `h-10 rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:shadow-sm`
+- TabsContent margins stay `mt-4`.
+
+This restores the previous working look, adds explicit `h-12` on the list and `h-10` on triggers so labels are clearly visible, and keeps the active tab highlighted with a white background + emerald border.
+
+No other changes.
 
 ## Verification
-Open View Details → tab labels fully visible above the border with clean active/inactive states; GST Compliance tab shows summary + filing table without the extra "GST Return Filing Status" sub-header.
+Open View Details → three tabs clearly labeled ("All Details", "Documents", "GST Compliance Report"), active tab shows white background with emerald border and text, inactive tabs show muted grey text on the muted bar.
