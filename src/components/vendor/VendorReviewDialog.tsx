@@ -449,9 +449,17 @@ export function VendorReviewDialog({
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
+  const zoom = useBrowserZoom();
+  const scale = Math.max(0.5, Math.min(1.5, 0.75 / zoom));
+  const supportsZoom = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('zoom', '1');
+  const scaleStyle: React.CSSProperties = supportsZoom
+    ? ({ zoom: scale } as any)
+    : { transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%`, height: `${100 / scale}%` };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <div style={scaleStyle} className="flex flex-col flex-1 min-h-0 overflow-hidden p-6">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
@@ -459,6 +467,8 @@ export function VendorReviewDialog({
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
+
+
 
         {loading ? (
           <Skeleton className="h-64 w-full" />
@@ -784,9 +794,30 @@ export function VendorReviewDialog({
           </Button>
           {footerExtra}
         </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
+}
+
+function useBrowserZoom(): number {
+  const [zoom, setZoom] = useState<number>(1);
+  useEffect(() => {
+    const read = () => {
+      if (typeof window === 'undefined') return 1;
+      const ratio = window.outerWidth > 0 ? window.outerWidth / window.innerWidth : window.devicePixelRatio || 1;
+      return Math.max(0.25, Math.min(5, Math.round(ratio * 100) / 100));
+    };
+    const update = () => setZoom(read());
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('visibilitychange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('visibilitychange', update);
+    };
+  }, []);
+  return zoom;
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
