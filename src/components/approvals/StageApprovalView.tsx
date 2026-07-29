@@ -347,33 +347,37 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                     {formatDateTime(it.submittedAt, '—')}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
-                        <Eye className="h-4 w-4 mr-1" /> View Details
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
-                        <MessageSquare className="h-4 w-4 mr-1" /> Comments
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive border-destructive"
-                        disabled={blocked}
-                        title={blocked ? 'The previous approver has not approved yet.' : undefined}
-                        onClick={() => setActionItem({ item: it, action: 'reject' })}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" /> Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-success border-success"
-                        disabled={blocked}
-                        title={blocked ? 'The previous approver has not approved yet.' : undefined}
-                        onClick={() => setActionItem({ item: it, action: 'approve' })}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
-                      </Button>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
+                          <Eye className="h-4 w-4 mr-1" /> View Details
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
+                          <MessageSquare className="h-4 w-4 mr-1" /> Comments
+                        </Button>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive border-destructive"
+                          disabled={blocked}
+                          title={blocked ? 'The previous approver has not approved yet.' : undefined}
+                          onClick={() => setActionItem({ item: it, action: 'reject' })}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" /> Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-success border-success"
+                          disabled={blocked}
+                          title={blocked ? 'The previous approver has not approved yet.' : undefined}
+                          onClick={() => setActionItem({ item: it, action: 'approve' })}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -436,45 +440,48 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                   {formatDateTime(it.rejectionAt, '—')}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
-                      <Eye className="h-4 w-4 mr-1" /> View Details
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
-                      <MessageSquare className="h-4 w-4 mr-1" /> Comments
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-success border-success"
-                      onClick={() => { setRejectedAction({ item: it, action: 'approve' }); setRejectedRemarks(''); }}
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
-                    </Button>
-                    {it.isOnBehalf ? (
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setViewVendorId(it.vendorId)}>
+                        <Eye className="h-4 w-4 mr-1" /> View Details
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setCommentsItem(it)}>
+                        <MessageSquare className="h-4 w-4 mr-1" /> Comments
+                      </Button>
+                    </div>
+                    <div className="flex justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          if (!it.invitationId) {
-                            toast({ title: 'Missing invitation', description: 'Cannot open edit form for this vendor.', variant: 'destructive' });
-                            return;
-                          }
-                          navigate(`/vendor/registration?onBehalfOf=${it.invitationId}`);
-                        }}
+                        className="text-success border-success"
+                        onClick={() => { setRejectedAction({ item: it, action: 'approve' }); setRejectedRemarks(''); }}
                       >
-                        <Pencil className="h-4 w-4 mr-1" /> Edit & Resubmit
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                       </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
-                      >
-                        <Send className="h-4 w-4 mr-1" /> Send to Vendor
-                      </Button>
-                    )}
-
+                      {it.isOnBehalf ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (!it.invitationId) {
+                              toast({ title: 'Missing invitation', description: 'Cannot open edit form for this vendor.', variant: 'destructive' });
+                              return;
+                            }
+                            navigate(`/vendor/registration?onBehalfOf=${it.invitationId}`);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" /> Edit & Resubmit
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setRejectedAction({ item: it, action: 'send_to_vendor' }); setRejectedRemarks(''); }}
+                        >
+                          <Send className="h-4 w-4 mr-1" /> Send to Vendor
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
               </TableRow>

@@ -1,22 +1,33 @@
-## Fix mobile header "SA" avatar (top-right)
+## Goal
+Reorganize the action buttons in the approval table so they appear in two stacked rows instead of one horizontal row, matching the user's reference screenshot.
 
-**Problem (mobile view)**
-- Tapping the "SA" avatar doesn't log the user out / return to login.
-- The avatar is cramped against the edge (no right padding) and low visibility on the light header.
+## Scope
+This affects the shared `StageApprovalView` component used by every approval stage (Buyer, SCM CO, SCM Head, Finance 1, Finance 2, CEO Office). Two tables in this file render action buttons:
+1. Pending / waiting approval rows
+2. Rejected / returned rows
 
-**Changes — `src/components/layout/MobileHeader.tsx` only**
+## Changes
 
-1. **Make avatar tap sign out directly**
-   - Replace the `DropdownMenu` around the avatar with a plain `Button` that calls `onSignOut` (same handler already wired from `AppLayout` → `handleLogout` → `navigate('/auth')`).
-   - Keep Settings / Help / Change Password reachable via the existing sidebar menu (they already live there); mobile header becomes: Tenant switcher · Bell · Avatar-as-Logout, matching the desktop Sidebar Logout icon pattern we added earlier.
-   - Add `title="Sign out"` and `aria-label="Sign out"` for clarity.
+### 1. Pending / waiting actions
+In `src/components/approvals/StageApprovalView.tsx` (the pending/waiting table around the Actions `TableCell`):
+- Keep the existing four buttons: **View Details**, **Comments**, **Reject**, **Approve**.
+- Wrap them in a vertical flex container with two horizontal rows:
+  - Row 1: **View Details** + **Comments**
+  - Row 2: **Reject** + **Approve**
+- Preserve existing disabled state, tooltips, click handlers, and styling (`size="sm"`, `variant="outline"`, success/destructive colors).
 
-2. **Spacing & visibility**
-   - Add right padding to the header action row (`pr-2` on the container) so the avatar isn't flush to the screen edge.
-   - Increase gap between Bell and Avatar (`gap-2`).
-   - Improve avatar contrast: solid `bg-primary` with a subtle `ring-1 ring-primary/30` and `shadow-sm` so it stands out on the white header; keep initials in `text-primary-foreground font-semibold`.
-   - Bump touch target to `h-10 w-10` (avatar stays `h-8 w-8`) for reliable tap on mobile.
+### 2. Rejected / returned actions
+Apply the same 2-row stacking to the rejected table:
+  - Row 1: **View Details** + **Comments**
+  - Row 2: **Approve** + **Send to Vendor** (or **Edit & Resubmit** for on-behalf invitations)
 
-**Out of scope**
-- Desktop sidebar avatar/logout (already correct).
-- Any auth/routing logic — `handleLogout` already navigates to `/auth`.
+### 3. Responsive behavior
+- Use `flex-col` with `gap-2` for the outer container and `flex-row gap-2` for each inner row.
+- Keep buttons from overflowing the cell on narrow viewports.
+
+## Validation
+After the change, the approval table should show:
+- Top row: View Details | Comments
+- Bottom row: Reject | Approve
+
+No logic or route changes are required.
