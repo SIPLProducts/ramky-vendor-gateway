@@ -794,9 +794,30 @@ export function VendorReviewDialog({
           </Button>
           {footerExtra}
         </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
+}
+
+function useBrowserZoom(): number {
+  const [zoom, setZoom] = useState<number>(1);
+  useEffect(() => {
+    const read = () => {
+      if (typeof window === 'undefined') return 1;
+      const ratio = window.outerWidth > 0 ? window.outerWidth / window.innerWidth : window.devicePixelRatio || 1;
+      return Math.max(0.25, Math.min(5, Math.round(ratio * 100) / 100));
+    };
+    const update = () => setZoom(read());
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('visibilitychange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('visibilitychange', update);
+    };
+  }, []);
+  return zoom;
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
