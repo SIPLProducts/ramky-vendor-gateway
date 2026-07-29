@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
 import { getLocationLabel } from '@/lib/stateToSapLocation';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
+import { toProperCase } from '@/lib/textCase';
 
 export type WTaxRow = {
   witht: string;
@@ -407,6 +408,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                     value={form.classify.MGV || []}
                     onChange={(v) => setClassify('MGV', v)}
                     placeholder="Select material groups"
+                    properCaseLabels
                   />
                   <SapF4MultiSelectField
                     label="Vendor Category"
@@ -414,6 +416,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                     value={form.classify.CATV || []}
                     onChange={(v) => setClassify('CATV', v)}
                     placeholder="Select vendor categories"
+                    properCaseLabels
                   />
                 </div>
                 <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'cfstmt' ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -425,6 +428,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                     onChange={(v) => setClassify('CASH', v)}
                     liveItems={liveF4?.CFSTMT}
                     placeholder="Select cash flow"
+                    properCaseLabels
                   />
                   <SapF4MultiSelectField
                     label="Tier Category"
@@ -433,6 +437,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                     onChange={(v) => setClassify('TIER', v)}
                     liveItems={liveF4?.CP_TIER}
                     placeholder="Select tier category"
+                    properCaseLabels
                   />
                 </div>
               </div>
@@ -728,7 +733,7 @@ export function SapF4SelectField({
 }
 
 export function SapF4MultiSelectField({
-  label, masterType, value, onChange, liveItems, placeholder,
+  label, masterType, value, onChange, liveItems, placeholder, properCaseLabels,
 }: {
   label: string;
   masterType: string;
@@ -736,10 +741,13 @@ export function SapF4MultiSelectField({
   onChange: (v: string[]) => void;
   liveItems?: any[] | null;
   placeholder?: string;
+  properCaseLabels?: boolean;
 }) {
   const map = F4_FIELD_MAP[masterType];
   const isLive = Array.isArray(liveItems) && liveItems.length > 0;
   const { data: cachedRows, isLoading } = useSapMasterData(masterType);
+
+  const fmt = (s: any) => (properCaseLabels ? toProperCase(String(s ?? '')) : String(s ?? ''));
 
   const options = (() => {
     if (isLive) {
@@ -748,7 +756,7 @@ export function SapF4MultiSelectField({
           const code = map ? item?.[map.code] : item?.code;
           if (code === undefined || code === null || String(code).trim() === '') return null;
           const desc = map?.desc ? item?.[map.desc] : item?.description;
-          const labelText = desc ? `${code} — ${desc}` : String(code);
+          const labelText = desc ? `${fmt(code)} — ${fmt(desc)}` : fmt(code);
           return { value: String(code), label: labelText };
         })
         .filter(Boolean) as { value: string; label: string }[];
@@ -757,7 +765,7 @@ export function SapF4MultiSelectField({
       const extra = r.extra || {};
       const code = map ? (extra[map.code] ?? r.code) : r.code;
       const desc = map?.desc ? (extra[map.desc] ?? r.description) : r.description;
-      const labelText = desc ? `${code} — ${desc}` : String(code);
+      const labelText = desc ? `${fmt(code)} — ${fmt(desc)}` : fmt(code);
       return { value: String(r.code), label: labelText };
     });
   })();

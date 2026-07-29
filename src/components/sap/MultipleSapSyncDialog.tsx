@@ -328,6 +328,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
                     value={form.classify.MGV || []}
                     onChange={(v) => setClassify('MGV', v)}
                     placeholder="Select material groups"
+                    properCaseLabels
                   />
                   <SapF4MultiSelectField
                     label="Vendor Category"
@@ -335,6 +336,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
                     value={form.classify.CATV || []}
                     onChange={(v) => setClassify('CATV', v)}
                     placeholder="Select vendor categories"
+                    properCaseLabels
                   />
                 </div>
                 <div className={`border border-border rounded-lg p-4 space-y-3 ${classifyMode !== 'cfstmt' ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -346,6 +348,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
                     onChange={(v) => setClassify('CASH', v)}
                     liveItems={liveF4?.CFSTMT}
                     placeholder="Select cash flow"
+                    properCaseLabels
                   />
                   <SapF4MultiSelectField
                     label="Tier Category"
@@ -354,6 +357,7 @@ export function MultipleSapSyncDialog({ open, onOpenChange, vendors, onConfirm, 
                     onChange={(v) => setClassify('TIER', v)}
                     liveItems={liveF4?.CP_TIER}
                     placeholder="Select tier category"
+                    properCaseLabels
                   />
                 </div>
               </div>

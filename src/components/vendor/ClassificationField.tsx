@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { useEnsureSapMaster, SapMasterRow } from "@/hooks/useSapMasterData";
+import { toProperCase } from "@/lib/textCase";
 
 interface Props {
   label: string;
@@ -13,17 +14,6 @@ interface Props {
   errorText?: string;
   selectPlaceholder?: string;
 }
-
-const toProperCase = (s: string) => {
-  if (!s) return s;
-  // Only transform if entirely uppercase (letters); leave mixed-case as-is
-  if (!/[a-z]/.test(s) && /[A-Z]/.test(s)) {
-    return s
-      .toLowerCase()
-      .replace(/\b([a-z])/g, (_, c) => c.toUpperCase());
-  }
-  return s;
-};
 
 const toOptions = (rows: SapMasterRow[] | undefined) =>
   (rows || []).map((r) => ({
