@@ -778,8 +778,8 @@ export function VendorReviewDialog({
           <div className="text-sm text-muted-foreground py-8 text-center">Vendor not found.</div>
         )}
 
-        <DialogFooter className="gap-2 mt-4 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+        <DialogFooter className="gap-2 mt-2 pt-2 border-t">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="rounded-lg">
             Close
           </Button>
           {footerExtra}
