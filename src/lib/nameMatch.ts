@@ -236,6 +236,9 @@ export function formatCrossMatchFailure(
   candidateLabel: string,
   best: { field: string; score: number } | null,
 ): string {
+  if (candidateLabel === 'Account Holder Name') {
+    return `${candidateLabel} does not match the GST, PAN, or MSME records. Please upload a cheque belonging to the same person or organization associated with the uploaded GST, PAN, or MSME documents.`;
+  }
   if (!best) return `${candidateLabel} could not be matched against any verified name.`;
   return `${candidateLabel} does not match any of the verified names (best ${best.score}% with ${best.field}). Minimum required is ${NAME_MATCH_MIN_PASS}%.`;
 }
