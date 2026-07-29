@@ -135,6 +135,7 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
     control,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -142,6 +143,18 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
     values: formValues,
     resetOptions: { keepDirtyValues: true, keepDirty: true },
   });
+
+  // When the parent bumps resetKey (GST identity change), force-accept the
+  // cleared values instead of preserving the vendor's dirty selections
+  // (Industry / Organization / Ownership type, etc.).
+  const prevResetKeyRef = useRef<number | undefined>(resetKey);
+  useEffect(() => {
+    if (resetKey !== undefined && prevResetKeyRef.current !== undefined && resetKey !== prevResetKeyRef.current) {
+      reset(formValues, { keepDirtyValues: false, keepDirty: false });
+    }
+    prevResetKeyRef.current = resetKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
 
 
