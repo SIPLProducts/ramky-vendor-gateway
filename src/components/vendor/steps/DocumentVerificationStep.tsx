@@ -1160,6 +1160,7 @@ export function DocumentVerificationStep({
           return {
             ok: false as const,
             message: formatCrossMatchFailure("Account Holder Name", evalRes.best),
+            isNameMismatch: true as const,
           };
         }
         holderNameStatus = "passed";
