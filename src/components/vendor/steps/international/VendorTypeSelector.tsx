@@ -73,7 +73,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
                 />
               </div>
 
-              <h4 className="w-full shrink-0 text-center py-0.5 text-xs sm:text-sm font-semibold text-slate-900 leading-tight bg-white">
+              <h4 className="flex-1 flex items-center justify-center w-full text-center px-2 text-xs sm:text-sm font-semibold text-slate-900 leading-tight bg-white">
                 {opt.title}
               </h4>
 
