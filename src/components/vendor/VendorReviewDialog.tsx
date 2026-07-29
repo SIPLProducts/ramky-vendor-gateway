@@ -465,11 +465,11 @@ export function VendorReviewDialog({
         ) : vendor ? (
           <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
-              <TabsTrigger value="details" className="rounded-lg">All Details</TabsTrigger>
-              <TabsTrigger value="documents" className="rounded-lg">
+              <TabsTrigger value="details" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">All Details</TabsTrigger>
+              <TabsTrigger value="documents" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
                 <FolderOpen className="h-4 w-4 mr-2" />Documents
               </TabsTrigger>
-              <TabsTrigger value="gst_compliance" className="rounded-lg">
+              <TabsTrigger value="gst_compliance" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
                 <Shield className="h-4 w-4 mr-2" />GST Compliance Report
               </TabsTrigger>
             </TabsList>
