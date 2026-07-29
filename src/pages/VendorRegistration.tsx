@@ -1530,9 +1530,9 @@ export default function VendorRegistration() {
       case 1:
         return null; // rendered persistently outside renderStep
       case 2:
-        return <OrganizationStep tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} showClassification={isOnBehalfMode} onNext={handleOrganizationComplete} onLiveUpdate={(d) => setFormData((prev) => ({ ...prev, organization: d.organization, statutory: d.statutory }))} />;
+        return <OrganizationStep resetKey={gstResetKey} tenantId={tenantId} data={formData.organization} statutoryData={formData.statutory} vendorId={vendorId || undefined} showClassification={isOnBehalfMode} onNext={handleOrganizationComplete} onLiveUpdate={(d) => setFormData((prev) => ({ ...prev, organization: d.organization, statutory: d.statutory }))} />;
       case 3:
-        return <AddressStep tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
+        return <AddressStep resetKey={gstResetKey} tenantId={tenantId} data={formData.address} onNext={(data) => handleStepComplete(3, data)} onBack={handleBack} />;
       case 4:
         return (
           <FinancialInfrastructureStep
