@@ -464,16 +464,15 @@ export function VendorReviewDialog({
           <Skeleton className="h-64 w-full" />
         ) : vendor ? (
           <Tabs defaultValue="details" className="w-full flex-1 min-h-0 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1 h-12">
-              <TabsTrigger value="details" className="h-10 rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:shadow-sm">All Details</TabsTrigger>
-              <TabsTrigger value="documents" className="h-10 rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:shadow-sm">
-                <FolderOpen className="h-4 w-4 mr-2" />Documents
+            <TabsList className="flex w-full gap-1 border-b border-border bg-transparent p-0 h-11 items-end rounded-none justify-start">
+              <TabsTrigger value="details" className="flex-1 h-10 items-center justify-center gap-2 rounded-t-md rounded-b-none border border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground hover:text-foreground data-[state=active]:bg-white data-[state=active]:border-emerald-500 data-[state=active]:border-b-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-none -mb-[1px]">All Details</TabsTrigger>
+              <TabsTrigger value="documents" className="flex-1 h-10 items-center justify-center gap-2 rounded-t-md rounded-b-none border border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground hover:text-foreground data-[state=active]:bg-white data-[state=active]:border-emerald-500 data-[state=active]:border-b-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-none -mb-[1px]">
+                <FolderOpen className="h-4 w-4 mr-1" />Documents
               </TabsTrigger>
-              <TabsTrigger value="gst_compliance" className="h-10 rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:shadow-sm">
-                <Shield className="h-4 w-4 mr-2" />GST Compliance Report
+              <TabsTrigger value="gst_compliance" className="flex-1 h-10 items-center justify-center gap-2 rounded-t-md rounded-b-none border border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground hover:text-foreground data-[state=active]:bg-white data-[state=active]:border-emerald-500 data-[state=active]:border-b-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-none -mb-[1px]">
+                <Shield className="h-4 w-4 mr-1" />GST Compliance Report
               </TabsTrigger>
             </TabsList>
-
 
             <TabsContent value="details" className="mt-4 flex-1 min-h-0 overflow-hidden">
 
