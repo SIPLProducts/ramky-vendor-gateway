@@ -474,7 +474,7 @@ export function VendorReviewDialog({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="mt-2 flex-1 overflow-hidden">
+            <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-full pr-4">
                 <div className="space-y-6">
                   {/* Routing / Invitation */}
@@ -703,12 +703,12 @@ export function VendorReviewDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-2 flex-1 overflow-auto">
+            <TabsContent value="documents" className="mt-4 flex-1 overflow-auto pt-1">
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-2 flex-1 overflow-hidden">
+            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-full pr-4">
                 {gstReport && (
                   <div className="space-y-4">
