@@ -1796,7 +1796,7 @@ export default function VendorRegistration() {
 
         {/* Vendor Type chip (shown after type is chosen) */}
         {!isSubmitted && (
-          <div className="px-4 sm:px-6 pt-4 flex items-center justify-between gap-3">
+          <div className="px-3 sm:px-6 pt-2 md:pt-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Vendor Type: {isInternational ? 'International' : 'Domestic'}
@@ -1817,10 +1817,10 @@ export default function VendorRegistration() {
         )}
 
         {/* Form Card */}
-        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
           {/* Rejection remarks banner — shown when a buyer/approver has returned the application to the vendor */}
           {(vendorStatusState === 'returned_to_vendor' || vendorStatusState === 'returned_to_buyer') && (existingVendor as any)?.last_rejection_comments && (
-            <div className="mb-4 rounded-[10px] border border-destructive/40 bg-destructive/5 p-4">
+            <div className="mb-3 rounded-[10px] border border-destructive/40 bg-destructive/5 p-3 sm:p-4">
               <div className="flex items-start gap-3">
                 <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -1844,19 +1844,19 @@ export default function VendorRegistration() {
           )}
           <div className="bg-card rounded-[10px] shadow-enterprise-md border">
 
-            {/* Form Header */}
-            <div className="px-6 py-4 border-b">
-              {isTokenMode && invitationEmail && (
-                <div className="mb-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            {/* Optional invited-email banner (only in token mode) */}
+            {isTokenMode && invitationEmail && (
+              <div className="px-4 sm:px-6 pt-3">
+                <div className="p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">Invited Email:</span> {invitationEmail}
                   </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Form Content */}
-            <div className="p-6" key={`step-${formData.vendorType}-${resetNonce}`}>
+            <div className="p-3 sm:p-5" key={`step-${formData.vendorType}-${resetNonce}`}>
               {/* Step 1 stays mounted across navigation so in-progress KYC
                   inputs (MSME manual entry, picked files, OCR previews, etc.)
                   survive when the user moves to another step and returns. */}

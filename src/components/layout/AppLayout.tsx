@@ -40,14 +40,15 @@ export function AppLayout() {
         console.error('Supabase signOut error:', error);
         toast.error('Error signing out');
       } else {
-        console.log('Signed out successfully');
         toast.success('Signed out successfully');
       }
-      window.location.href = '/auth';
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Error signing out');
-      window.location.href = '/auth';
+    } finally {
+      // Use React Router navigation to avoid hitting nginx-proxied /auth/ path
+      // on self-host (which routes to GoTrue and shows a basic-auth prompt).
+      navigate('/auth', { replace: true });
     }
   };
 
