@@ -154,6 +154,38 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
     }
   }, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
 
+  // Legal Name / Trade Name are always sourced from the latest GST verification
+  // (or PAN Holder Name when GST is not registered). They are read-only in the
+  // UI, so we force-sync them from props whenever the parent updates — this is
+  // required because `keepDirtyValues` would otherwise preserve a stale value
+  // from a previously uploaded GST document.
+  const watchedLegal = watch('legalName');
+  const watchedTrade = watch('tradeName');
+  useEffect(() => {
+    const nextLegal = data?.legalName || '';
+    if (nextLegal !== watchedLegal) {
+      setValue('legalName', nextLegal, { shouldDirty: false, shouldValidate: false });
+    }
+  }, [data?.legalName]);
+  useEffect(() => {
+    const nextTrade = data?.tradeName || '';
+    if (nextTrade !== watchedTrade) {
+      setValue('tradeName', nextTrade, { shouldDirty: false, shouldValidate: false });
+    }
+  }, [data?.tradeName]);
+
+  // Field-lock flags: once GST or PAN has been verified, the Organization
+  // step must not allow editing these identity fields.
+  const gstVerified = statutoryData?.isGstRegistered === true && !!statutoryData?.gstin;
+  const panVerified = !!statutoryData?.pan && !!statutoryData?.panHolderName;
+  const identityLocked = gstVerified || panVerified;
+  const identitySourceLabel = gstVerified
+    ? 'Auto-filled from GST Verification'
+    : panVerified
+      ? 'Auto-filled from PAN Verification'
+      : '';
+
+
   // Auto-populate Vendor Location (Classification) directly from the selected State.
   // Vendor Location mirrors the State value and is read-only.
   const watchedState = watch('state');
