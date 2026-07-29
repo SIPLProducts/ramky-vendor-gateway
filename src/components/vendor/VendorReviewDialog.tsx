@@ -465,17 +465,17 @@ export function VendorReviewDialog({
         ) : vendor ? (
           <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
-              <TabsTrigger value="details" className="rounded-lg">All Details</TabsTrigger>
-              <TabsTrigger value="documents" className="rounded-lg">
+              <TabsTrigger value="details" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">All Details</TabsTrigger>
+              <TabsTrigger value="documents" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
                 <FolderOpen className="h-4 w-4 mr-2" />Documents
               </TabsTrigger>
-              <TabsTrigger value="gst_compliance" className="rounded-lg">
+              <TabsTrigger value="gst_compliance" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
                 <Shield className="h-4 w-4 mr-2" />GST Compliance Report
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
-              <ScrollArea className="h-[50vh] pr-4">
+            <TabsContent value="details" className="mt-2 flex-1 overflow-hidden">
+              <ScrollArea className="h-full pr-4">
                 <div className="space-y-6">
                   {/* Routing / Invitation */}
                   {routing && (
@@ -703,16 +703,16 @@ export function VendorReviewDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
+            <TabsContent value="documents" className="mt-2 flex-1 overflow-auto">
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
-              <ScrollArea className="h-[55vh] pr-4">
+            <TabsContent value="gst_compliance" className="mt-2 flex-1 overflow-hidden">
+              <ScrollArea className="h-full pr-4">
                 {gstReport && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">GSTIN</p>
                         <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
