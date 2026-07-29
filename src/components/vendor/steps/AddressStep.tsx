@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { MapPin, Building, Globe } from 'lucide-react';
 import { AddressDetails, INDIAN_STATES } from '@/types/vendor';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { digitsOnly } from '@/lib/utils';
 import { toast } from 'sonner';
 
