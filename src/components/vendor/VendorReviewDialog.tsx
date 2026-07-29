@@ -465,11 +465,22 @@ export function VendorReviewDialog({
         ) : vendor ? (
           <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
-              <TabsTrigger value="details" className="rounded-lg">All Details</TabsTrigger>
-              <TabsTrigger value="documents" className="rounded-lg">
+              <TabsTrigger
+                value="details"
+                className="rounded-lg border-2 border-transparent data-[state=active]:bg-background data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
+              >
+                All Details
+              </TabsTrigger>
+              <TabsTrigger
+                value="documents"
+                className="rounded-lg border-2 border-transparent data-[state=active]:bg-background data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
+              >
                 <FolderOpen className="h-4 w-4 mr-2" />Documents
               </TabsTrigger>
-              <TabsTrigger value="gst_compliance" className="rounded-lg">
+              <TabsTrigger
+                value="gst_compliance"
+                className="rounded-lg border-2 border-transparent data-[state=active]:bg-background data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
+              >
                 <Shield className="h-4 w-4 mr-2" />GST Compliance Report
               </TabsTrigger>
             </TabsList>
@@ -708,8 +719,8 @@ export function VendorReviewDialog({
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
-              <ScrollArea className="h-[55vh] pr-4">
+            <TabsContent value="gst_compliance" className="mt-4 flex-1 min-h-0 overflow-hidden">
+              <ScrollArea className="h-full pr-4">
                 {gstReport && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -745,7 +756,7 @@ export function VendorReviewDialog({
                             <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
                           </div>
                           {rawRows.length > 0 ? (
-                            <GstFilingStatusTable rows={rawRows} limit={3} />
+                            <GstFilingStatusTable rows={rawRows} limit={3} scrollable={false} />
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               {filingFetching
@@ -767,8 +778,8 @@ export function VendorReviewDialog({
           <div className="text-sm text-muted-foreground py-8 text-center">Vendor not found.</div>
         )}
 
-        <DialogFooter className="gap-2 mt-4 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+        <DialogFooter className="gap-2 mt-2 pt-2 border-t">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="rounded-lg">
             Close
           </Button>
           {footerExtra}
@@ -799,7 +810,7 @@ function SectionCard({
   className?: string;
 }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm", className)}>
+    <div className={cn("relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm", className)}>
       <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
       <div className="mb-4 flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary" />
