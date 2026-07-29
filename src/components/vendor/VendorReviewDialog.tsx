@@ -810,7 +810,7 @@ function SectionCard({
   className?: string;
 }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background to-muted/40 p-5 shadow-sm", className)}>
+    <div className={cn("relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm", className)}>
       <div className="absolute left-0 top-0 h-full w-1.5 bg-primary/80" />
       <div className="mb-4 flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary" />
