@@ -703,16 +703,16 @@ export function VendorReviewDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
+            <TabsContent value="documents" className="mt-2 flex-1 overflow-auto">
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
-              <ScrollArea className="h-[55vh] pr-4">
+            <TabsContent value="gst_compliance" className="mt-2 flex-1 overflow-hidden">
+              <ScrollArea className="h-full pr-4">
                 {gstReport && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">GSTIN</p>
                         <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
