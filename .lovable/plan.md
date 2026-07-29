@@ -1,25 +1,36 @@
-# Vendor Type Cards – Remove Inner & Between-Card Empty Space
-
 ## Problem
-Even after shrinking the outer card, there's still visible empty space:
-- Above the "Domestic Vendor" label (between the flag image and the text).
-- Between the Domestic and International cards.
-- Left/right of the flag and world map images inside each card.
 
-## Changes
+On the Bank tab, when the cheque OCR reads the account holder name **successfully** and the penny-drop API returns a valid account holder name, but that name doesn't cross-match the GST / PAN / MSME names, the flow currently opens the **"Bank verification — enter details manually"** dialog with the mismatch text as its description.
 
-### `src/components/vendor/steps/international/VendorTypeSelector.tsx`
-1. **Kill horizontal gutters around the image**: the image container uses `object-contain` which leaves whitespace on the sides for wide/narrow images. Switch to `object-cover` and remove the extra `bg-white` around it so the image fills edge-to-edge.
-2. **Tighten card internal layout**: reduce card height (`h-[130px]`) and image height (`h-[70px]` filling full width); make the label row use `py-1` with tight `leading-none` so there is no extra space between image and text.
-3. **Reduce gap between the two cards**: change grid gap from `gap-1.5 sm:gap-2` to `gap-1`.
+That popup is meant for the case where the OCR (or the penny-drop) couldn't read/verify the cheque — not for a genuine cross-field name mismatch on data that was read correctly.
 
-### `src/pages/VendorRegistration.tsx` (vendor type gating block, ~lines 1610–1637)
-- Reduce top space between the "Select Vendor Type" title and the first card: change `space-y-1` on the inner column to `space-y-0.5` and reduce title bottom margin (use `leading-tight` only, no extra margin).
-- Keep outer card at `w-[min(92vw,260px)]` and padding `p-2`.
+## Root cause
 
-## Out of scope
-- No changes to selection behavior, images themselves, colors, or other steps.
+In `src/components/vendor/steps/DocumentVerificationStep.tsx` (~lines 1265–1281), `runDocFlow` treats **any** failure returned by `verifyApi("cheque", …)` — including the cross-field Account Holder Name mismatch produced at ~line 1160 — as a "cheque couldn't be verified" case and unconditionally calls `openBankManualPopup(...)`.
 
-## Verification
-- Build passes.
-- Preview at 375px, 768px, and 1280px: no visible empty band between flag and "Domestic Vendor" label, no wide side gutters around images, cards sit close together, Continue button remains fully visible below.
+The cheque verify path returns `ok:false` with `message = "Account Holder Name does not match any of the verified names …"` even when OCR + penny-drop both succeeded, and the outer handler doesn't distinguish that from a real read failure.
+
+## Fix (scoped)
+
+Distinguish "OCR/penny-drop couldn't verify the cheque" from "cross-field name mismatch on successfully read data" and only open the manual-entry popup for the former.
+
+### Changes
+
+1. `src/components/vendor/steps/DocumentVerificationStep.tsx` — bank OCR verify function (~lines 1149–1168):
+   - When the cross-name check fails, return `{ ok: false, message, isNameMismatch: true }` (mirrors the MSME pattern already in use at line 1271).
+
+2. Same file — `runDocFlow` cheque branch (~lines 1274–1281):
+   - If `(v as any).isNameMismatch` is true, do **not** call `openBankManualPopup`. The existing inline "failed" state on the Bank tab (red banner under the cheque row with the mismatch message) already communicates the issue and lets the vendor replace/re-upload the cheque or fix the source names on GST/PAN/MSME tabs.
+   - Keep opening the popup for all other cheque failures (OCR unreadable, low confidence, penny-drop provider error, rate-limit, account not found, etc.) exactly as today.
+
+3. `src/components/vendor/kyc/BankKycTab.tsx` (admin Live Test panel) — apply the same behavior in `handleOcrVerify` / `finalizePennyDrop`: on a pure name-mismatch failure, keep the inline red banner (already rendered at lines 277–300) and skip any popup. The current code here already does not open the popup on name-mismatch, so this is a verification-only check — no functional change expected.
+
+### Not touched
+- GST / PAN / MSME manual-entry fallbacks — unchanged.
+- Cross-name evaluation thresholds / `nameMatch.ts` — unchanged.
+- Penny-drop API call, IFSC lookup, and downstream form persistence — unchanged.
+- Popup content / manual-entry flow itself — unchanged; it just won't be triggered for name-mismatch.
+
+## Result
+
+After the fix, in the scenario the user described (GST/PAN/MSME verified, cheque OCR successful, penny-drop returned a name that doesn't cross-match), the vendor sees only the inline red mismatch banner under the cheque — no "Bank verification — enter details manually" dialog. The dialog still appears when the cheque genuinely can't be read or the penny-drop itself fails.

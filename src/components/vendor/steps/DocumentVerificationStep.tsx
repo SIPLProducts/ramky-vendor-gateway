@@ -1160,6 +1160,7 @@ export function DocumentVerificationStep({
           return {
             ok: false as const,
             message: formatCrossMatchFailure("Account Holder Name", evalRes.best),
+            isNameMismatch: true as const,
           };
         }
         holderNameStatus = "passed";
@@ -1271,10 +1272,14 @@ export function DocumentVerificationStep({
       if (kind === "msme" && (v as any).isNameMismatch) {
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
-      } else if (kind === "cheque") {
-        // For ANY cheque/penny-drop failure (rate-limit, OCR mismatch,
-        // upstream 500, account-holder mismatch) — let the vendor enter
-        // bank details manually and re-verify via the configured BANK API.
+      } else if (kind === "cheque" && !(v as any).isNameMismatch) {
+        // For cheque/penny-drop failures that indicate the cheque couldn't
+        // be read or verified (rate-limit, OCR mismatch, upstream 500,
+        // account not found, etc.) — let the vendor enter bank details
+        // manually and re-verify via the configured BANK API.
+        // Skip the manual popup for pure cross-field Account Holder Name
+        // mismatches: OCR + penny-drop succeeded, so the inline red banner
+        // is the correct surface.
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
