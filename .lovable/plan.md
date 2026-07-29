@@ -1,25 +1,25 @@
 
-Scope: `src/components/vendor/VendorReviewDialog.tsx` only — the "View Details" dialog opened from Dashboard / All Vendors / Approval screens.
+Scope: the "View Details" popup only — `src/components/vendor/VendorReviewDialog.tsx`. No other screens touched.
 
-### 1. Make the selected tab clearly visible
-The three tabs (All Details / Documents / GST Compliance Report) inherit the default shadcn active style, which is barely visible on top of the muted TabsList background. Update each `TabsTrigger` to force a distinct active state:
-- Active state: white background (`bg-background`), green border (`border-2 border-emerald-500`), emerald text.
-- Inactive: transparent background, muted text, no border.
-Use `data-[state=active]:...` utilities directly on the triggers so it works without touching the shared shadcn primitive.
+### Goal
+The dialog should look the same at every browser zoom level (50% / 75% / 90% / 100% / 125% / 150%). Currently at 100%+ zoom the effective viewport shrinks and content wraps/overflows; the user wants the 75%-zoom look preserved.
 
-### 2. GST Compliance Report — allow scrolling to the bottom
-Currently the tab wraps its content in `ScrollArea h-[55vh]`, but the inner filing-status table also has its own `max-h-72 overflow-auto` in `GstFilingStatusTable`, which traps scroll inside the small inner box and hides rows underneath.
-- Remove the fixed viewport height and switch the outer container to `flex-1 min-h-0` so the ScrollArea takes all remaining dialog height.
-- Pass a prop (or wrap the table) to disable the inner `max-h-72` when rendered inside the review dialog, so scrolling happens only on the outer ScrollArea and every row is reachable.
+### Approach — counter-zoom the dialog content
+Use CSS `zoom` on the dialog content wrapper, driven by `window.devicePixelRatio` and `window.outerWidth / window.innerWidth` (the ratio browsers expose for zoom). Compute a factor so the dialog effectively renders at 75%-zoom regardless of the user's actual zoom.
 
-### 3. Reduce footer whitespace
-DialogFooter currently uses `gap-2 mt-4 pt-4 border-t` for a single Close button, producing a large empty strip.
-- Tighten to `mt-2 pt-2 border-t` and right-align a compact Close button (`size="sm"`), removing the extra vertical padding.
-
-### 4. SectionCard background — white cards with subtle contrast
-All detail sections (Buyer, Vendor, Statutory, Bank, Address, Classification, Financial) use `bg-gradient-to-br from-background to-muted/40` which reads as grey on grey.
-- Change `SectionCard` background to solid `bg-card` (white in light theme, still theme-safe for dark mode), keep the left accent bar and rounded border, and lighten the border to `border-border`.
-- Keep spacing, header, and icon styling as-is.
+Implementation:
+1. **Hook**: add a small `useBrowserZoom()` hook (inline in the file, no new files) that:
+   - Reads zoom as `Math.round((window.outerWidth / window.innerWidth) * 100) / 100` on mount, on `resize`, and on `visibilitychange`.
+   - Falls back to `window.devicePixelRatio` when `outerWidth` is unreliable (e.g. some Chromium PWAs).
+2. **Scale factor**: `scale = 0.75 / currentZoom` (clamped between 0.5 and 1.5 for safety).
+3. **Apply**: wrap the existing `DialogContent` inner tree in a `<div style={{ zoom: scale }}>`. CSS `zoom` (not `transform: scale`) is the right primitive here because it also resizes the layout box, so the dialog stays centered, the shadcn overlay stays correct, and scrolling in the tabs continues to work without manual width math.
+4. **Dialog width**: bump `DialogContent` max width from `max-w-5xl` to `max-w-6xl` so the counter-scaled content has room at 75%-equivalent density, then let `zoom` shrink it visually at higher browser zoom.
+5. **Guard for Firefox**: Firefox does not support CSS `zoom`. Detect via `CSS.supports('zoom', '1')`; when unsupported, fall back to `transform: scale()` with `transform-origin: top left` on the same wrapper and set an explicit inverse `width`/`height` so the dialog still fits.
 
 ### Out of scope
-No changes to data fetching, tab structure, or other dialogs. Documents tab and non-review screens remain untouched. `GstFilingStatusTable` gets an opt-in prop only; its default (used elsewhere) stays the same.
+No global changes to the app shell, no root-level zoom counter, no changes to other dialogs, tables, sidebars, or the registration form. If the same treatment is wanted elsewhere later, the same hook can be reused.
+
+### Notes / trade-offs
+- CSS `zoom` overrides the user's chosen browser zoom for this dialog specifically. That is exactly what was requested.
+- Content inside the dialog (e.g. `VendorDocuments`, `GstFilingStatusTable`) inherits the zoom automatically — no per-child edits needed.
+- Print styles and screen readers are unaffected because `zoom` is a visual transformation only on this wrapper.
