@@ -112,8 +112,11 @@ export function GstFilingStatusTable({ rows, limit }: { rows: FilingStatusRow[];
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="px-4 py-2.5 border-b bg-muted/40">
+        <h4 className="text-sm font-semibold">GST Return Filing Status</h4>
+        <p className="text-xs text-muted-foreground">GSTR1 — last {sorted.length} return{sorted.length === 1 ? "" : "s"} reported by the GST registry</p>
+      </div>
       <div>
-
         <Table className="[&_th]:border [&_td]:border [&_th]:text-center [&_td]:text-center">
           <TableHeader>
             <TableRow className="bg-muted/60 hover:bg-muted/60">
