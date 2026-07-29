@@ -708,7 +708,7 @@ export function VendorReviewDialog({
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-2 flex-1 overflow-hidden">
+            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-full pr-4">
                 {gstReport && (
                   <div className="space-y-4">
