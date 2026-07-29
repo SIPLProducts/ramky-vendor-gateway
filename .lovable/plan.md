@@ -1,15 +1,18 @@
-## Vendor Review Dialog – Tab Body Spacing & Background
+## Problem
+Current TabsList makes labels disappear — the `flex-1` triggers with connected-border approach isn't rendering text visibly in the preview. User wants the previous rounded pill-style tabs back but with proper height and clear active/inactive labels.
 
-Small visual polish for the tab panels inside `src/components/vendor/VendorReviewDialog.tsx`.
+## Fix
 
-### Changes
-1. **Gap between tab bar and body**
-   - Reduce/standardize the top spacing on every `TabsContent` panel to a tight `6px` gap (`mt-1.5`) instead of the current `mt-4`, so the body sits just below the tab strip as requested (5–7px).
+### `src/components/vendor/VendorReviewDialog.tsx`
+Revert TabsList to the original clean pill/segmented style with explicit height and explicit inactive text color:
 
-2. **White card background for tab body**
-   - Wrap each `TabsContent` panel's inner content in a white card container (`bg-white rounded-lg border border-border p-4`) so the active tab's body clearly reads as a white card against the dialog's grey backdrop.
-   - Applies to all tabs: All Details, Documents, GST Compliance, Approval History, Comments.
+- `TabsList`: `grid w-full grid-cols-3 rounded-xl bg-muted p-1 h-12`
+- Each `TabsTrigger`: `h-10 rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:shadow-sm`
+- TabsContent margins stay `mt-4`.
 
-### Out of scope
-- No changes to tab pill styling itself (kept as previously restored).
-- No changes to dialog header/footer or business logic.
+This restores the previous working look, adds explicit `h-12` on the list and `h-10` on triggers so labels are clearly visible, and keeps the active tab highlighted with a white background + emerald border.
+
+No other changes.
+
+## Verification
+Open View Details → three tabs clearly labeled ("All Details", "Documents", "GST Compliance Report"), active tab shows white background with emerald border and text, inactive tabs show muted grey text on the muted bar.
