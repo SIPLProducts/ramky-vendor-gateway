@@ -146,7 +146,8 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
 
 
       {/* Right Actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2 pr-2">
+
         {showSwitcher && (
           <Select
             value={activeTenantId ?? '__all__'}
