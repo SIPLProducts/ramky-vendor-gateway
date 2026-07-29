@@ -1206,6 +1206,12 @@ export default function VendorRegistration() {
   const handleDocStageChange = (data: VerifiedDocumentData) => {
     latestStep1DataRef.current = data;
     setVerifiedData(data);
+    // Detect GST-identity changes so child step forms can force-reset.
+    const nextIdentity = `${data.isGstRegistered ? 'Y' : 'N'}|${(data.gst?.gstin || '').toUpperCase()}|${data.manualLegalName || ''}|${data.manualAddress?.address || ''}`;
+    if (gstIdentityRef.current && gstIdentityRef.current !== nextIdentity) {
+      setGstResetKey((k) => k + 1);
+    }
+    gstIdentityRef.current = nextIdentity;
     setFormData((prev) => {
       const next = mergeVerifiedDataIntoForm(prev, data);
       // Avoid no-op updates that would re-trigger autosave
