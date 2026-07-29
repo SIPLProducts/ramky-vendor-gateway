@@ -163,7 +163,19 @@ serve(async (req) => {
       } else {
         console.log(`[kyc-api-execute] multipart extraFieldsResolved=<none>`);
       }
+      // Auto-inject use_pdf=true when a PDF is uploaded (Surepass Bank/PAN OCR
+      // requires this flag for PDF inputs). Skip if the admin's template already
+      // provided it, so explicit config always wins.
+      const isPdf = (fileMimeType?.toLowerCase() === "application/pdf")
+        || (uploadName?.toLowerCase().endsWith(".pdf") ?? false);
+      const templateHasUsePdf = !!(extraTpl && typeof extraTpl === "object" && !Array.isArray(extraTpl)
+        && Object.keys(extraTpl as Record<string, any>).some((k) => k.toLowerCase() === "use_pdf"));
+      if (isPdf && !templateHasUsePdf) {
+        fd.append("use_pdf", "true");
+        console.log(`[kyc-api-execute] auto-injected use_pdf=true for PDF upload`);
+      }
       body = fd;
+
       // CRITICAL: never force Content-Type for multipart — fetch must set the
       // multipart/form-data boundary itself, otherwise Surepass returns HTTP 400.
       for (const k of Object.keys(headers)) {
