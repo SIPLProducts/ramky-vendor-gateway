@@ -1,36 +1,45 @@
 ## Problem
 
-On the Bank tab, when the cheque OCR reads the account holder name **successfully** and the penny-drop API returns a valid account holder name, but that name doesn't cross-match the GST / PAN / MSME names, the flow currently opens the **"Bank verification — enter details manually"** dialog with the mismatch text as its description.
+When the Bank KYC cross-name check fails, the current inline red banner reads:
 
-That popup is meant for the case where the OCR (or the penny-drop) couldn't read/verify the cheque — not for a genuine cross-field name mismatch on data that was read correctly.
+> Account Holder Name does not match any of the verified names (best 0% with GST Legal Name). Minimum required is 20%.
 
-## Root cause
+This message is produced by the shared `formatCrossMatchFailure` helper in `src/lib/nameMatch.ts` and is technical and confusing for vendors. The user wants it replaced with a plain, actionable message.
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx` (~lines 1265–1281), `runDocFlow` treats **any** failure returned by `verifyApi("cheque", …)` — including the cross-field Account Holder Name mismatch produced at ~line 1160 — as a "cheque couldn't be verified" case and unconditionally calls `openBankManualPopup(...)`.
+## Goal
 
-The cheque verify path returns `ok:false` with `message = "Account Holder Name does not match any of the verified names …"` even when OCR + penny-drop both succeeded, and the outer handler doesn't distinguish that from a real read failure.
+Display this exact message for every **Account Holder Name** mismatch case:
 
-## Fix (scoped)
+> Account Holder Name does not match the GST, PAN, or MSME records. Please upload a cheque belonging to the same person or organization associated with the uploaded GST, PAN, or MSME documents.
 
-Distinguish "OCR/penny-drop couldn't verify the cheque" from "cross-field name mismatch on successfully read data" and only open the manual-entry popup for the former.
+All other cross-field mismatch messages (GST Legal Name, PAN Holder Name, Enterprise Name, etc.) must keep the existing generic scoring text unchanged.
 
-### Changes
+## Scope
 
-1. `src/components/vendor/steps/DocumentVerificationStep.tsx` — bank OCR verify function (~lines 1149–1168):
-   - When the cross-name check fails, return `{ ok: false, message, isNameMismatch: true }` (mirrors the MSME pattern already in use at line 1271).
+Only `src/lib/nameMatch.ts` needs to change.
 
-2. Same file — `runDocFlow` cheque branch (~lines 1274–1281):
-   - If `(v as any).isNameMismatch` is true, do **not** call `openBankManualPopup`. The existing inline "failed" state on the Bank tab (red banner under the cheque row with the mismatch message) already communicates the issue and lets the vendor replace/re-upload the cheque or fix the source names on GST/PAN/MSME tabs.
-   - Keep opening the popup for all other cheque failures (OCR unreadable, low confidence, penny-drop provider error, rate-limit, account not found, etc.) exactly as today.
+## Changes
 
-3. `src/components/vendor/kyc/BankKycTab.tsx` (admin Live Test panel) — apply the same behavior in `handleOcrVerify` / `finalizePennyDrop`: on a pure name-mismatch failure, keep the inline red banner (already rendered at lines 277–300) and skip any popup. The current code here already does not open the popup on name-mismatch, so this is a verification-only check — no functional change expected.
+1. Open `src/lib/nameMatch.ts`.
+2. In the `formatCrossMatchFailure` function, detect when `candidateLabel === 'Account Holder Name'`.
+3. For that label, return the user-supplied message directly (skip score/field interpolation).
+4. Keep the existing `return` statement as the default for all other labels.
 
-### Not touched
-- GST / PAN / MSME manual-entry fallbacks — unchanged.
-- Cross-name evaluation thresholds / `nameMatch.ts` — unchanged.
-- Penny-drop API call, IFSC lookup, and downstream form persistence — unchanged.
-- Popup content / manual-entry flow itself — unchanged; it just won't be triggered for name-mismatch.
+## Affected call sites
+
+The new text will automatically apply wherever the function is called with `formatCrossMatchFailure('Account Holder Name', ...)`:
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx` (OCR + manual flow)
+- `src/components/vendor/kyc/BankKycTab.tsx` (admin Live Test panel)
+
+No other call sites are affected because the condition is scoped to the exact candidate label string.
+
+## Not changed
+
+- `NAME_MATCH_MIN_PASS`, scoring logic, or `evaluateCrossNameMatch` behavior.
+- Bank manual-entry popup logic (that fix was already applied earlier).
+- Any other KYC tab messaging.
 
 ## Result
 
-After the fix, in the scenario the user described (GST/PAN/MSME verified, cheque OCR successful, penny-drop returned a name that doesn't cross-match), the vendor sees only the inline red mismatch banner under the cheque — no "Bank verification — enter details manually" dialog. The dialog still appears when the cheque genuinely can't be read or the penny-drop itself fails.
+After the change, vendors will see the clearer, action-oriented message when the cheque account holder name does not align with the already verified GST/PAN/MSME names, while internal/debug-style scoring text remains for the other KYC documents.
