@@ -149,10 +149,12 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
   const currentBuyer = watch('buyerCompanyId');
   useEffect(() => {
     const next = tenantId || data?.buyerCompanyId || '';
+    console.log('[Org] buyer sync', { tenantId, dataBuyer: data?.buyerCompanyId, currentBuyer, willSet: next });
     if (next && next !== currentBuyer) {
       setValue('buyerCompanyId', next, { shouldDirty: false, shouldValidate: false });
     }
   }, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
+
 
   // Legal Name / Trade Name are always sourced from the latest GST verification
   // (or PAN Holder Name when GST is not registered). They are read-only in the

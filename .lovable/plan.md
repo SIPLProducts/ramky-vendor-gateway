@@ -1,43 +1,51 @@
-## Goal
+## Two fixes
 
-1. Make **Legal Name of Organization** and **Trade Name / Brand Name** on the Organization Profile step **read-only and always driven by the GST Verification API response**. If GST is not registered, fall back to the **PAN Holder Name** from the PAN Verification API.
-2. When a vendor uploads / replaces / re-verifies a GST document, **fully reset every GST-derived field** (address, city, district, state, country, pincode, industry/organization/ownership types, etc.) before the new GST response is applied — so no data from the previous GST persists.
+### 1. Bank OCR fails on PDF — "Set use_pdf=True for PDF input"
 
-## Changes
+Surepass's Bank cheque OCR endpoint accepts image uploads by default. When a PDF is uploaded, the provider requires an extra multipart field `use_pdf=true`; without it, it returns the error the vendor is seeing.
 
-### 1. `src/pages/VendorRegistration.tsx` → `mergeVerifiedDataIntoForm`
+**Fix (edge function `supabase/functions/kyc-api-execute/index.ts`, multipart branch ~line 140–166):**
+- After appending the file blob and the resolved `request_body_template` extras, detect whether the uploaded file is a PDF (`fileMimeType === "application/pdf"` or filename ends in `.pdf`).
+- If yes, append `use_pdf=true` to the FormData — but only if the template didn't already set `use_pdf` (so admin config still wins).
+- Log the injection so it's visible in edge function logs.
 
-- Change GST-derived fields from `fill` (fill-only-if-empty) to `overwrite` (latest verified wins) so a new GST upload overrides stale values. This applies to:
-  - `organization.legalName`, `organization.tradeName`, `organization.state`
-  - `address.registeredAddress`, `registeredCity`, `registeredState`, `registeredPincode`
-- Extend the existing `gstChanged` detection to also detect **GST reset / re-verification** (verified-timestamp bump or verified-flag flip), and when it fires, **clear the following before merging**: `registeredAddress`, `registeredCity`, `registeredDistrict`, `registeredState`, `registeredCountry`, `registeredPincode`, plus `organization.legalName`, `organization.tradeName`, `organization.state`, and any downstream statutory GST fields already handled below. (Country defaults to India for domestic.)
-- Legal Name precedence: `data.gst?.apiName || data.gst?.legalName` when GST=Yes → else `data.pan?.apiName || data.pan?.holderName` → else `data.manualLegalName`. Trade Name precedence: `data.gst?.tradeName` when GST=Yes → else `data.pan?.apiName || data.pan?.holderName` (per requirement "if gst not there then these should be pan holder name").
-- When GST=No, keep the existing manual-address behavior intact (no change to non-GST flows).
+This is a generic fix for any multipart provider; it will only kick in when a PDF is sent, so image cheques are unaffected.
 
-### 2. `src/components/vendor/steps/OrganizationStep.tsx`
+### 2. Buyer Company must not reset
 
-- Make **Legal Name** and **Trade Name** inputs `readOnly` whenever GST is verified (`statutoryData.isGstRegistered === true && statutoryData.gstin`) OR when PAN has been verified (`statutoryData.pan && statutoryData.panHolderName`). Style with the same muted / verified appearance already used for other auto-filled fields (`bg-muted/40 cursor-not-allowed`).
-- Add a small helper caption under each field ("Auto-filled from GST Verification" / "Auto-filled from PAN Verification") so vendors understand why it is locked.
-- Keep the fields editable only when neither GST nor PAN has been verified (edge case: draft loaded without either).
+Confirmed by reading the code: `mergeVerifiedDataIntoForm` in `src/pages/VendorRegistration.tsx` does not touch `organization.buyerCompanyId`, and the seeding effects (invitation load, existing vendor hydrate, on-behalf tenant) all use the `prev.organization.buyerCompanyId === X ? prev : {...}` guard so they never overwrite an already-set value.
 
-### 3. `src/components/vendor/steps/DocumentVerificationStep.tsx`
+However, `OrganizationStep.tsx` currently has this effect:
 
-- In `handleGstUpload` (and the manual-GST submit path `handleGstManualSubmit`), before running OCR/verify, **reset all GST-derived local state** to defaults: `setGstDoc(idleDoc)`, `setEditablePrincipalPlace('')`, `setGstFilingRows([])`, `setGstCompliance(null)`, `gstFilingChecked=false`, so that the child never emits a `VerifiedDocumentData` that mixes old + new GST fields.
-- The child already emits `handleDocStageChange` after every state change; the parent overwrite logic in step 1 will then propagate the reset to the form.
+```ts
+useEffect(() => {
+  const next = tenantId || data?.buyerCompanyId || '';
+  if (next && next !== currentBuyer) {
+    setValue('buyerCompanyId', next, ...);
+  }
+}, [tenantId, data?.buyerCompanyId, currentBuyer, setValue]);
+```
 
-### 4. No changes to
+The `if (next && ...)` guard prevents clearing when tenantId/data become empty, so this is safe. But because `useForm` is instantiated with `defaultValues: { buyerCompanyId: v.buyerCompanyId || '' }` and no `values`/`resetOptions`, when parent data hydrates AFTER the form mounted with empty tenantId, the form value could be empty until that effect runs. That's the only edge case — and the effect does populate it.
 
-- SAP / DMS payload builders (they read from form state, which is refreshed above).
-- Bank, PAN, MSME upload flows.
-- Approval / Buyer re-approval screens.
+**Plan for buyer company:**
+- Verify by adding a one-line console.log inside that effect: `console.log('[Org] buyer sync', { tenantId, dataBuyer: data?.buyerCompanyId, currentBuyer, willSet: next })`. Ask the user to reproduce; if the log shows an unexpected empty overwrite, fix at that call site.
+- No code change to the reset logic unless the log proves an actual reset happens — from the current reading, the buyer company is preserved across GST changes and re-uploads.
 
-## Technical notes
+### Technical details
 
-- `mergeVerifiedDataIntoForm` currently has partial `gstChanged` logic that clears only `organization.{legalName, tradeName, state}`. We are widening the reset to the full GST-derived surface and switching to `overwrite` for those keys so the next merge unconditionally uses the latest GST response.
-- Read-only is enforced in the UI layer only; validation (`zod` schemas) already accepts any non-empty string, so no schema changes.
-- Country defaults: the address step already defaults `registeredCountry` to "India" for domestic — reset restores that default rather than blanking it.
+**File: `supabase/functions/kyc-api-execute/index.ts`**
+Add after the `extraTpl` block (before `body = fd`):
+```ts
+const isPdf = (fileMimeType?.toLowerCase() === "application/pdf")
+  || (uploadName?.toLowerCase().endsWith(".pdf") ?? false);
+const templateHasUsePdf = extraTpl && typeof extraTpl === "object"
+  && Object.keys(extraTpl as Record<string, any>).some(k => k.toLowerCase() === "use_pdf");
+if (isPdf && !templateHasUsePdf) {
+  fd.append("use_pdf", "true");
+  console.log(`[kyc-api-execute] auto-injected use_pdf=true for PDF upload`);
+}
+```
 
-## Out of scope
-
-- Vendor Type / International flow (no GST there).
-- Approver-side screens (they display persisted values only; they will naturally reflect the latest GST once the vendor re-submits).
+**File: `src/components/vendor/steps/OrganizationStep.tsx`**
+Add temporary diagnostic log (line ~150) inside the buyer sync effect. Remove after confirming behaviour.
