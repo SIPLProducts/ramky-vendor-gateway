@@ -1002,16 +1002,21 @@ export default function VendorRegistration() {
       (n !== undefined && n !== null && (n as unknown) !== '') ? (n as T) : p;
 
     const gstYes = data.isGstRegistered === true;
-    const ocrLegalName =
-      (gstYes ? data.gst?.legalName : data.manualLegalName) ||
-      data.pan?.holderName ||
-      '';
-    const ocrTradeName = data.gst?.tradeName || '';
+    // Legal / Trade name precedence: GST registry name (when GST=Yes) →
+    // PAN Holder name (when GST is not registered / not yet verified) →
+    // manual entry fallback. These are the ONLY sources; the vendor cannot
+    // override them from the Organization step (fields are read-only there).
+    const panHolderName = data.pan?.apiName || data.pan?.holderName || '';
+    const ocrLegalName = gstYes
+      ? (data.gst?.apiName || data.gst?.legalName || panHolderName || '')
+      : (panHolderName || data.manualLegalName || '');
+    const ocrTradeName = gstYes
+      ? (data.gst?.tradeName || '')
+      : (panHolderName || '');
     const principalPlace = data.gst?.principalPlaceOfBusiness || data.gst?.address || '';
     // Address parts extracted from the GST registry (when GST=yes) or the
-    // MSME / manual address fallback. These auto-populate City / State /
-    // PIN Code on the Address step the first time, but never overwrite
-    // values the vendor has typed.
+    // MSME / manual address fallback. When GST changes we OVERWRITE the
+    // Address step fields so no stale value from a previous GST persists.
     const gstAddrParts = data.gst?.addressParts;
     const msmeAddrParts = data.msme?.addressParts;
     const addrLineFromDoc =
@@ -1037,33 +1042,41 @@ export default function VendorRegistration() {
     const wantsSecondary = prev.bank.secondary?.enabled === true || !!data.bank2;
 
     // GST cascade — when the verified GSTIN changes (replaced or reset),
-    // clear the Organization tab's Legal Name, Trade Name and State so they
-    // are re-populated from the freshly verified GST document and never carry
-    // stale values from a previously uploaded GSTIN.
+    // clear ALL GST-derived fields (Organization + Address) so the new GST
+    // response is the only data visible. This is essential when a vendor
+    // uploads a different GST document without refreshing the page.
     const prevGstin = (prev.statutory.gstin || '').toUpperCase();
     const newGstin = (data.gst?.gstin || '').toUpperCase();
-    const gstChanged = !!prevGstin && prevGstin !== newGstin;
+    const gstChanged = prevGstin !== newGstin;
 
     const orgLegalBase = gstChanged ? '' : prev.organization.legalName;
     const orgTradeBase = gstChanged ? '' : prev.organization.tradeName;
     const orgStateBase = gstChanged ? '' : prev.organization.state;
+    const addrLineBase = gstChanged && gstYes ? '' : prev.address.registeredAddress;
+    const addrCityBase = gstChanged && gstYes ? '' : prev.address.registeredCity;
+    const addrStateBase = gstChanged && gstYes ? '' : prev.address.registeredState;
+    const addrPinBase = gstChanged && gstYes ? '' : prev.address.registeredPincode;
+    const addrDistrictBase = gstChanged && gstYes ? '' : (prev.address as any).registeredDistrict;
 
     return {
       ...prev,
       organization: {
         ...prev.organization,
-        legalName: fill(orgLegalBase, ocrLegalName),
-        tradeName: fill(orgTradeBase, ocrTradeName),
-        state: fill(orgStateBase, stateFromDoc),
+        // GST/PAN-derived — latest verified always wins; fields are read-only in the UI.
+        legalName: ocrLegalName || orgLegalBase,
+        tradeName: ocrTradeName || orgTradeBase,
+        state: stateFromDoc || orgStateBase,
       },
 
       address: {
         ...prev.address,
-        registeredAddress: fill(prev.address.registeredAddress, addrLineFromDoc),
-        registeredCity: fill(prev.address.registeredCity, cityFromDoc),
-        registeredState: fill(prev.address.registeredState, stateFromDoc),
-        registeredPincode: fill(prev.address.registeredPincode, pinFromDoc),
+        registeredAddress: (gstYes ? addrLineFromDoc : '') || addrLineBase,
+        registeredCity: (gstYes ? cityFromDoc : '') || addrCityBase,
+        registeredState: (gstYes ? stateFromDoc : '') || addrStateBase,
+        registeredPincode: (gstYes ? pinFromDoc : '') || addrPinBase,
+        ...(gstChanged && gstYes ? { registeredDistrict: addrDistrictBase || '' } : {}),
       },
+
       contact: {
         ...prev.contact,
         // PAN holder name is a reasonable seed for the primary CEO contact;
