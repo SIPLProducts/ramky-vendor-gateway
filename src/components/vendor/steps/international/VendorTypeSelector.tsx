@@ -63,7 +63,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
 
               <div
                 className="relative w-full overflow-hidden bg-white"
-                style={{ height: 'clamp(128px, 28vh, 205px)' }}
+                style={{ height: '70px' }}
               >
                 <img
                   src={opt.image}
