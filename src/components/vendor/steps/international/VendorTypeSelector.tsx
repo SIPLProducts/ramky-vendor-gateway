@@ -33,7 +33,7 @@ const OPTIONS: {
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
   return (
     <div className="rounded-xl p-0 w-full min-h-0 shrink">
-      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-1.5 sm:gap-2 w-full">
+      <div role="radiogroup" aria-label="Vendor Type" className="grid grid-cols-1 gap-1 w-full">
         {OPTIONS.map((opt, idx) => {
           const selected = value === opt.value;
           return (
@@ -46,7 +46,7 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full max-w-[200px] h-[160px] mx-auto overflow-hidden rounded-xl bg-white text-left',
+                'group relative w-full max-w-[200px] h-[110px] mx-auto overflow-hidden rounded-xl bg-white text-left',
                 'shadow-md transition-shadow duration-200',
                 'hover:shadow-xl',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
@@ -56,26 +56,24 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               )}
             >
               {selected && (
-                <span className="absolute top-2 right-2 z-20 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2 py-0.5 shadow">
+                <span className="absolute top-1 right-1 z-20 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2 py-0.5 shadow">
                   <Check className="h-3 w-3" /> Selected
                 </span>
               )}
 
-              <div
-                className="relative w-full overflow-hidden bg-white"
-                style={{ height: '55px' }}
-              >
+              <div className="relative w-full flex-1 overflow-hidden bg-white">
                 <img
                   src={opt.image}
                   alt={opt.alt}
-                  className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
+                  className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
 
-              <h4 className="flex-1 flex items-center justify-center w-full text-center px-2 text-xs sm:text-sm font-semibold text-slate-900 leading-tight bg-white">
+              <h4 className="w-full text-center px-2 py-1 text-xs sm:text-sm font-semibold text-slate-900 leading-none bg-white">
                 {opt.title}
               </h4>
+
 
             </button>
 
