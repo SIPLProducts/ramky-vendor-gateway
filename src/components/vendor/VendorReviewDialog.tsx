@@ -756,7 +756,7 @@ export function VendorReviewDialog({
                             <h4 className="font-semibold text-sm">GST Filing Status (Last 3 Months)</h4>
                           </div>
                           {rawRows.length > 0 ? (
-                            <GstFilingStatusTable rows={rawRows} limit={3} />
+                            <GstFilingStatusTable rows={rawRows} limit={3} scrollable={false} />
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               {filingFetching
