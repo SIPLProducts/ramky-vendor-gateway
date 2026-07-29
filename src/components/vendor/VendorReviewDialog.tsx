@@ -463,20 +463,19 @@ export function VendorReviewDialog({
         {loading ? (
           <Skeleton className="h-64 w-full" />
         ) : vendor ? (
-          <Tabs defaultValue="details" className="w-full flex-1 min-h-0 overflow-hidden flex flex-col">
-            <TabsList className="flex w-full gap-1 border-b border-border bg-transparent p-0 h-auto rounded-none justify-start">
-              <TabsTrigger value="details" className="flex-1 justify-center gap-2 rounded-t-md rounded-b-none border border-transparent border-b-0 px-3 py-2 text-sm text-muted-foreground hover:text-foreground data-[state=active]:bg-white data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none -mb-px">All Details</TabsTrigger>
-              <TabsTrigger value="documents" className="flex-1 justify-center gap-2 rounded-t-md rounded-b-none border border-transparent border-b-0 px-3 py-2 text-sm text-muted-foreground hover:text-foreground data-[state=active]:bg-white data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none -mb-px">
-                <FolderOpen className="h-4 w-4 mr-1" />Documents
+          <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
+            <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">
+              <TabsTrigger value="details" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">All Details</TabsTrigger>
+              <TabsTrigger value="documents" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
+                <FolderOpen className="h-4 w-4 mr-2" />Documents
               </TabsTrigger>
-              <TabsTrigger value="gst_compliance" className="flex-1 justify-center gap-2 rounded-t-md rounded-b-none border border-transparent border-b-0 px-3 py-2 text-sm text-muted-foreground hover:text-foreground data-[state=active]:bg-white data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none -mb-px">
-                <Shield className="h-4 w-4 mr-1" />GST Compliance Report
+              <TabsTrigger value="gst_compliance" className="rounded-lg data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
+                <Shield className="h-4 w-4 mr-2" />GST Compliance Report
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="mt-3 flex-1 min-h-0 overflow-hidden">
+            <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
               <ScrollArea className="h-full pr-4">
-
                 <div className="space-y-6">
                   {/* Routing / Invitation */}
                   {routing && (
@@ -704,34 +703,34 @@ export function VendorReviewDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-3 flex-1 min-h-0 overflow-auto">
+            <TabsContent value="documents" className="mt-4 flex-1 overflow-auto pt-1">
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-3 flex-1 min-h-0 flex flex-col gap-3">
-              {gstReport && (
-                <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm shrink-0 px-1">
-                    <div>
-                      <p className="text-muted-foreground">GSTIN</p>
-                      <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
+            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
+              <ScrollArea className="h-full pr-4">
+                {gstReport && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">GSTIN</p>
+                        <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Registration Date</p>
+                        <p className="font-medium">{formatDate(gstReport.registrationDate, gstReport.registrationDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Filing Status</p>
+                        <p className="font-medium">{gstReport.filingStatus}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Last Filed Return</p>
+                        <p className="font-medium">{gstReport.lastFiledReturn}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Registration Date</p>
-                      <p className="font-medium">{formatDate(gstReport.registrationDate, gstReport.registrationDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Filing Status</p>
-                      <p className="font-medium">{gstReport.filingStatus}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Last Filed Return</p>
-                      <p className="font-medium">{gstReport.lastFiledReturn}</p>
-                    </div>
-                  </div>
 
-                  <div className="flex-1 min-h-0 overflow-auto pr-1">
                     {(() => {
                       const rawRows: FilingStatusRow[] = (() => {
                         const persisted = normalizeFilingStatus(gstValidation?.details?.filing_status);
@@ -760,10 +759,9 @@ export function VendorReviewDialog({
                       );
                     })()}
                   </div>
-                </>
-              )}
+                )}
+              </ScrollArea>
             </TabsContent>
-
           </Tabs>
         ) : (
           <div className="text-sm text-muted-foreground py-8 text-center">Vendor not found.</div>
