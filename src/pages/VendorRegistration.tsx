@@ -178,6 +178,11 @@ export default function VendorRegistration() {
   const onBehalfBootstrapStartedRef = useRef(false);
   const formDataLoadedRef = useRef(false);
   const [resetNonce, setResetNonce] = useState(0);
+  // Bumped whenever a GST identity change reset fires — child step forms
+  // watch this to force-accept cleared parent values (bypassing the
+  // react-hook-form `keepDirtyValues` behavior for that one cycle).
+  const [gstResetKey, setGstResetKey] = useState(0);
+  const gstIdentityRef = useRef<string>('');
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
