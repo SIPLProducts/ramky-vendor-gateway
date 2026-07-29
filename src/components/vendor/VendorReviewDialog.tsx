@@ -474,8 +474,8 @@ export function VendorReviewDialog({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="mt-4 flex-1 overflow-hidden">
-              <ScrollArea className="h-[50vh] pr-4">
+            <TabsContent value="details" className="mt-2 flex-1 overflow-hidden">
+              <ScrollArea className="h-full pr-4">
                 <div className="space-y-6">
                   {/* Routing / Invitation */}
                   {routing && (
